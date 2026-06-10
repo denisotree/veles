@@ -1,0 +1,20 @@
+# Русский перевод. Ключи, отсутствующие здесь, автоматически фоллбечатся
+# на en.toml — частичный перевод допустим.
+
+[project_wizard]
+intro_no_project = "В {cwd} не найден проект Veles."
+ask_initialize = "Инициализировать данную директорию как проект Veles? Добавятся дополнительные файлы (.veles/ + AGENTS.md), а файлы проекта будут проиндексированы"
+created_state = "  · создан {state_dir}, написан AGENTS.md skeleton."
+ready = "<проект '{name}' готов. Отредактируй AGENTS.md, чтобы добавить контекст.>"
+ask_provider_override = "Закрепить provider/модель за проектом? (по умолчанию: наследовать user-level)"
+ask_provider_label = "Provider"
+ask_model_label = "Model id (пусто — пропустить)"
+provider_written = "  · записан override provider'а → {path}"
+ask_wiki_seed = "Засеять wiki/sources/ из существующих docs ({sample}{extra})?"
+wiki_seed_done = "  · скопировано {count} файл(ов) в wiki/sources/ (запусти `veles add` для ingest позже)"
+ask_telegram = "Настроить Telegram-канал для проекта?"
+ask_telegram_token = "Bot token (пусто — пропустить)"
+ask_telegram_chat = "Chat id"
+telegram_chat_required = "  ! chat id обязателен; настройка Telegram пропущена."
+telegram_written = "  · записан Telegram-канал → {path}"
+indexed_wiki = "  · проиндексировано {pages} страниц(ы) wiki в FTS-базу."

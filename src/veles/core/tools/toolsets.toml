@@ -1,0 +1,80 @@
+# Declarative tool composition (Tier δ, M57).
+#
+# Each table is a named toolset. `tools` is the explicit tool list; `includes`
+# pulls every tool from another toolset transitively. Cycles are an error
+# at load time. `core/tools/toolsets.py:load_toolsets` reads this file.
+#
+# Until M57, the same tuples lived inline in `cli/_runtime.py`. Migrating
+# them here means: (a) CLI commands ship with the canonical set without
+# touching Python, (b) modules and projects can later override via
+# user/project-level TOML files using the same schema.
+
+[builtin]
+# Read-only baseline — included by every command that doesn't need writes.
+# `search_files` / `list_files` / `stat_file` (M124-perm-unify) keep the
+# agent from falling back to `run_shell find|grep` for basic file ops —
+# they declare SEARCH_ONLY / READ_ONLY risk classes so the Permission
+# Engine auto-allows them.
+tools = [
+    "read_file",
+    "search_files",
+    "list_files",
+    "stat_file",
+    "wiki_list_pages",
+    "wiki_read_page",
+    "wiki_search",
+]
+
+[run]
+# `veles run` — the full interactive agent surface. Wiki-write tools are
+# included (M83/M86) so the agent can `/wiki add` from TUI and auto-ingest
+# new info into the project knowledge base mid-conversation. memory_save_*
+# (M125) lets the agent persist rules/insights into SQL memory directly —
+# durable across sessions, queryable via /rules /insights inspectors.
+includes = ["builtin"]
+tools = [
+    "write_file",
+    "run_shell",
+    "fetch_url",
+    "web_search",
+    "ask_user",
+    "advisor_review",
+    "pdf_read",
+    "image_ocr",
+    "image_describe",
+    "wiki_write_page",
+    "wiki_append_log",
+    "wiki_ingest",
+    "memory_save_insight",
+    "memory_save_rule",
+]
+
+[ingest]
+# `veles ingest <source>` — read inputs, write wiki pages.
+tools = [
+    "read_file",
+    "fetch_url",
+    "web_search",
+    "pdf_read",
+    "image_ocr",
+    "image_describe",
+    "wiki_write_page",
+    "wiki_append_log",
+    "wiki_ingest",
+]
+
+[planning]
+# TUI PlanningMode — read-only research surface plus advisor + plan
+# authoring. The Permission Engine separately enforces `plan_mode=True`
+# (blocks mutation classes); this toolset is the UX layer: the model
+# never sees `write_file` / `run_shell` schemas so it doesn't waste a
+# turn trying them and getting denied.
+includes = ["builtin"]
+tools = [
+    "fetch_url",
+    "web_search",
+    "advisor_review",
+    "pdf_read",
+    "image_describe",
+    "create_plan",
+]

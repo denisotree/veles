@@ -1,0 +1,28 @@
+[layout]
+name = "llm-wiki"
+description = "Karpathy-style LLM Wiki: sources/ (raw), wiki/ (LLM-generated), INDEX.md, LOG.md"
+version = "1.0"
+
+[[layout.writable_zones]]
+path = "wiki/"
+description = "LLM-generated knowledge — the only zone the agent writes content into"
+
+[[layout.writable_zones]]
+path = "sources/"
+readonly = true
+description = "Raw, immutable source material that ingest extracts from"
+
+[[layout.operations]]
+name = "ingest"
+skill = "ingest"
+description = "Read a source URL or file and write a wiki page summarising it"
+
+[[layout.operations]]
+name = "query"
+skill = "query"
+description = "Answer a question using the wiki via wiki_search + wiki_read_page"
+
+[[layout.operations]]
+name = "lint"
+skill = "lint"
+description = "Find orphan / stale / duplicate wiki pages"

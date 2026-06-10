@@ -1,0 +1,27 @@
+# Canonical English strings. All other locales are translations of these
+# keys; missing keys in a non-EN locale fall back here at lookup time.
+
+[project_wizard]
+intro_no_project = "No Veles project found at {cwd}."
+ask_initialize = "Initialize this directory as a Veles project? It will add `.veles/` and an `AGENTS.md` template, and index existing project files."
+created_state = "  · created {state_dir} and AGENTS.md skeleton."
+ready = "<project '{name}' ready. edit AGENTS.md to add context.>"
+ask_provider_override = "Pin a project-specific provider/model? (default: inherit user-level)"
+ask_provider_label = "Provider"
+ask_model_label = "Model id (blank to skip)"
+provider_written = "  · wrote provider override → {path}"
+ask_wiki_seed = "Seed wiki/sources/ from existing docs ({sample}{extra})?"
+wiki_seed_done = "  · copied {count} file(s) into wiki/sources/ (run `veles add` later to ingest)"
+ask_telegram = "Configure Telegram channel for this project?"
+ask_telegram_token = "Bot token (blank to skip)"
+ask_telegram_chat = "Chat id"
+telegram_chat_required = "  ! chat id required; skipping Telegram setup."
+telegram_written = "  · wrote Telegram channel → {path}"
+indexed_wiki = "  · indexed {pages} wiki page(s) into the FTS database."
+
+[rules_digest]
+header = "House rules (learned from this project)"
+group_preference = "Preferences:"
+group_dont = "Don't:"
+group_do = "Do:"
+group_format = "Output format:"

@@ -1,0 +1,127 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "veles"
+version = "0.1.0"
+description = "Veles — a minimalist agent framework: clean, decomposed code, compounding per-project memory, and a modular core with optional pluggable modules."
+requires-python = ">=3.13,<3.14"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "denisotree" }]
+keywords = [
+    "agent",
+    "llm",
+    "memory",
+    "wiki",
+    "multi-project",
+    "anthropic",
+    "openai",
+    "openrouter",
+    "self-improving",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dependencies = [
+    "openai>=1.50",
+    "pydantic>=2.5",
+    "httpx>=0.28",
+    "anthropic>=0.100.0",
+    "google-genai>=2.0.1",
+    "rich>=15.0.0",
+    "pypdf>=6.11.0",
+    "aiohttp>=3.10",
+    "prompt_toolkit>=3.0",
+    "ddgs>=9.0",
+    "html2text>=2024.0",
+    "markdown-it-py>=3.0",
+    "keyring>=24",
+    "textual>=0.85",
+    "croniter>=2.0",
+    "mcp>=1.0",
+]
+
+[project.scripts]
+veles = "veles.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/denisotree/veles"
+Repository = "https://github.com/denisotree/veles"
+Issues = "https://github.com/denisotree/veles/issues"
+Changelog = "https://github.com/denisotree/veles/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/veles"]
+
+[tool.uv]
+dev-dependencies = [
+    "ruff>=0.6",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-aiohttp>=1.0",
+    "mypy>=1.10",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+ignore = ["N818"]  # Veles uses Python-stdlib exception naming (FileNotFoundError-style)
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --basetemp=./tmp/pytest"
+asyncio_mode = "auto"
+
+# M60: mypy --strict gates the Tier ε modules I authored after the
+# Sprint ε hardening trunk. The legacy surface is too sprawling for a
+# global strict sweep right now — adding modules to `files` here is the
+# opt-in path. Running: `uv run mypy` (no args) checks just this set.
+[tool.mypy]
+python_version = "3.13"
+strict = true
+files = [
+    "src/veles/core/risk.py",
+    "src/veles/core/tool_result.py",
+    "src/veles/core/trace.py",
+    "src/veles/core/events.py",
+    "src/veles/core/agent_state.py",
+    "src/veles/core/permission",
+    "src/veles/core/approval.py",
+    "src/veles/core/untrusted.py",
+    "src/veles/core/context_builder.py",
+    "src/veles/core/doctor.py",
+    "src/veles/core/provider_routing.py",
+    "src/veles/core/secrets.py",
+    "src/veles/core/goal.py",
+    "src/veles/core/plan_artifact.py",
+    "src/veles/core/approval_prompter.py",
+]
+
+# These follow_imports = silent lets each strict module reference legacy
+# code (registry, project, ...) without flagging the legacy file's
+# remaining type gaps. Once those modules get retrofitted we can drop
+# the override per-path.
+[[tool.mypy.overrides]]
+module = ["veles.core.tools.registry", "veles.core.project", "veles.core.wiki"]
+follow_imports = "silent"

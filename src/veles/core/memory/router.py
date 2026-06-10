@@ -1,0 +1,300 @@
+"""Pre-turn recall of relevant project memory for system-prompt injection.
+
+The router is the single entry point Veles uses to ask "what does our
+project memory have that's relevant to this query?" — today it pulls
+from two FTS5 indices:
+
+1. `Wiki.search` — curated wiki pages (agent-authored summaries,
+   insights, proposals, etc). The original M22 source.
+2. `SessionStore.search_turns` — raw session turns (M58, this file's
+   extension). Lets recall surface "that command I ran yesterday"
+   without waiting for the curator to consolidate it into the wiki.
+
+M41 fans recall *downward* into vertical subprojects too: each
+registered child's wiki is searched with a smaller per-child cap. Hits
+from subprojects are namespaced (`<slug>:<rel_path>`, `[slug] title`)
+so the LLM can see which child a page came from.
+
+The output is a single ranked `list[RecallHit]` of length ≤ `limit`,
+interleaving wiki and turn hits one-for-one. The interleave keeps
+fresh chat content from drowning out hard-won wiki knowledge and vice
+versa. Recency / BM25-weighted merging is a future refinement.
+"""
+
+from __future__ import annotations
+
+import datetime as _dt
+import os
+import time
+from dataclasses import dataclass, replace
+
+from veles.core.memory import InsightHit, SessionStore, TurnHit
+from veles.core.safety import scan_for_injection
+from veles.core.memory.rerank import (
+    DEFAULT_HALF_LIFE_SEC,
+    DEFAULT_WEIGHTS,
+    RerankWeights,
+    rerank,
+)
+from veles.core.project import Project
+from veles.core.subproject import load_subprojects, resolve_subproject_path
+from veles.core.wiki import Wiki
+
+_TURN_SUMMARY_CAP = 200
+_TURN_RECENCY_WINDOW_SEC = 30 * 86_400  # only recall turns from the last 30 days
+
+
+@dataclass(frozen=True, slots=True)
+class RecallHit:
+    rel_path: str
+    title: str
+    summary: str
+    score: float = 0.0
+    # M141 rerank inputs. `ts` is the recency signal (None → neutral); `decay`
+    # is a forward-looking multiplier (always 1.0 until a decay-writer exists).
+    ts: float | None = None
+    decay: float = 1.0
+
+
+class MemoryRouter:
+    def __init__(
+        self,
+        project: Project,
+        *,
+        store: SessionStore | None = None,
+        extra_providers: list[object] | None = None,
+    ) -> None:
+        self._project = project
+        self._wiki = Wiki(project.wiki_root)
+        self._store = store
+        # M55: opt-in external memory plugins (Honcho, Mem0, ...). Stored as
+        # `object` to avoid an import cycle with `memory_provider.MemoryProvider`
+        # — every entry is duck-typed at call time.
+        self._extra: list[object] = list(extra_providers or [])
+
+    def recall(self, query: str, *, limit: int = 5) -> list[RecallHit]:
+        if not query.strip():
+            return []
+        wiki_hits = self._collect_wiki(query, limit=limit)
+        insight_hits = self._collect_insights(query, limit=limit)
+        turn_hits = self._collect_turns(query, limit=limit)
+        extra_hits = self._collect_extra(query, limit=limit)
+        streams = [wiki_hits, insight_hits, turn_hits, extra_hits]
+        # M141: scored rerank by default; `VELES_MEMORY_RERANK=0` falls back to
+        # the round-robin merge. Both over-fetch (limit*2) so `_dedupe_by_title`
+        # can drop wiki↔insight overlap without starving the final result.
+        if _rerank_enabled():
+            weights, half_life = _load_rerank_config(self._project)
+            merged = rerank(
+                streams, now=time.time(), limit=limit * 2,
+                weights=weights, half_life_sec=half_life,
+            )
+        else:
+            merged = _interleave_many(streams, limit * 2)
+        final = _dedupe_by_title(merged)[:limit]
+        # M145: scrub recall summaries before they enter the prompt — the one
+        # memory surface that bypasses `scan_for_injection`. See
+        # `_scrub_recall_hit`. Done on the final ≤limit hits only, so the cost
+        # is a handful of regex passes per turn.
+        return [_scrub_recall_hit(h) for h in final]
+
+    def _collect_extra(self, query: str, *, limit: int) -> list[RecallHit]:
+        """Call every registered external provider, swallowing per-provider
+        failures so one slow / broken plugin can't tank the whole recall."""
+        out: list[RecallHit] = []
+        per_provider = max(1, limit // 2)
+        for p in self._extra:
+            try:
+                hits = p.recall(query, limit=per_provider)  # type: ignore[attr-defined]
+            except Exception:  # noqa: BLE001
+                continue
+            out.extend(hits)
+        return out
+
+    # ---- collectors ----
+
+    def _collect_wiki(self, query: str, *, limit: int) -> list[RecallHit]:
+        hits: list[RecallHit] = [
+            RecallHit(rel_path=p.rel_path, title=p.title, summary=p.summary)
+            for p in self._wiki.search(query, limit=limit)
+        ]
+        sub_limit = max(1, limit // 2)
+        for sub in load_subprojects(self._project):
+            sub_root = resolve_subproject_path(self._project, sub)
+            # v2: subproject wiki lives at `<sub_root>/wiki/`, container
+            # is the subproject root itself.
+            if not (sub_root / ".veles").is_dir():
+                continue
+            sub_wiki = Wiki(sub_root)
+            for page in sub_wiki.search(query, limit=sub_limit):
+                hits.append(
+                    RecallHit(
+                        rel_path=f"{sub.slug}:{page.rel_path}",
+                        title=f"[{sub.slug}] {page.title}",
+                        summary=page.summary,
+                    )
+                )
+        return hits
+
+    def _collect_insights(self, query: str, *, limit: int) -> list[RecallHit]:
+        """M140: pull matching rows from the `insights` SQL table and age them.
+
+        Every matched insight is `touch`ed (its `last_referenced_at` bumped)
+        as a side effect — being retrieved *is* a reference. No-op without a
+        store. The SQL path surfaces insights even when no wiki page exists
+        for them; `_dedupe_by_title` in `recall` drops the overlap when one
+        does."""
+        if self._store is None:
+            return []
+        hits = self._store.search_insights(query, limit=limit)
+        if hits:
+            self._store.touch_insights([h.id for h in hits], time.time())
+        return [_insight_hit_to_recall(h) for h in hits]
+
+    def _collect_turns(self, query: str, *, limit: int) -> list[RecallHit]:
+        """Pull recent turns matching `query`. No-op when no store is wired.
+
+        The 30-day window keeps recall focused on what the user might
+        reasonably remember chatting about. Older facts that matter
+        should have made it into the wiki via the M28 curator by now.
+        """
+        if self._store is None:
+            return []
+        since = time.time() - _TURN_RECENCY_WINDOW_SEC
+        turn_hits = self._store.search_turns(query, limit=limit, since=since)
+        return [_turn_hit_to_recall(h) for h in turn_hits]
+
+
+def _interleave(
+    wiki_hits: list[RecallHit], turn_hits: list[RecallHit], limit: int
+) -> list[RecallHit]:
+    """Two-stream round-robin (retained for back-compat; callers may import)."""
+    return _interleave_many([wiki_hits, turn_hits], limit)
+
+
+def _interleave_many(streams: list[list[RecallHit]], limit: int) -> list[RecallHit]:
+    """Round-robin merge across N streams, capped at `limit`.
+
+    Order matters: earlier streams are sampled first within each cycle, so
+    the leading stream's #1 hit always lands before any other source's #1.
+    Wiki being first preserves the M55 design intent (curated knowledge
+    leads, raw turns next, external plugins after).
+    """
+    out: list[RecallHit] = []
+    indices = [0] * len(streams)
+    progressed = True
+    while progressed and len(out) < limit:
+        progressed = False
+        for s, stream in enumerate(streams):
+            if indices[s] < len(stream):
+                out.append(stream[indices[s]])
+                indices[s] += 1
+                progressed = True
+                if len(out) >= limit:
+                    break
+    return out
+
+
+def _rerank_enabled() -> bool:
+    """M141: rerank is on unless `VELES_MEMORY_RERANK` is a falsy string."""
+    return os.environ.get("VELES_MEMORY_RERANK", "1").strip().lower() not in (
+        "0", "false", "no", "off", "",
+    )
+
+
+def _load_rerank_config(project: Project) -> tuple[RerankWeights, float]:
+    """Read `[memory.rerank]` from the project config. Missing / malformed →
+    defaults (best-effort, never raises into recall)."""
+    try:
+        from veles.core.project_config import get_section, load_project_config
+
+        sec = get_section(load_project_config(project), "memory", "rerank")
+    except Exception:  # noqa: BLE001 — config is optional
+        return DEFAULT_WEIGHTS, DEFAULT_HALF_LIFE_SEC
+    if not sec:
+        return DEFAULT_WEIGHTS, DEFAULT_HALF_LIFE_SEC
+    try:
+        weights = RerankWeights(
+            relevance=float(sec.get("relevance", DEFAULT_WEIGHTS.relevance)),
+            recency=float(sec.get("recency", DEFAULT_WEIGHTS.recency)),
+            decay=float(sec.get("decay", DEFAULT_WEIGHTS.decay)),
+        )
+        half_life = float(sec.get("half_life_days", DEFAULT_HALF_LIFE_SEC / 86_400.0)) * 86_400.0
+    except (TypeError, ValueError):
+        return DEFAULT_WEIGHTS, DEFAULT_HALF_LIFE_SEC
+    return weights, half_life
+
+
+def _dedupe_by_title(hits: list[RecallHit]) -> list[RecallHit]:
+    """Drop a SQL-insight hit whose title duplicates a curated wiki page.
+
+    M140: an insight is stored both as a `wiki/insights/*.md` page and an
+    `insights` SQL row, so wiki-FTS and the insight source can surface the
+    same content. Wiki leads the interleave, so the curated page wins and the
+    SQL duplicate is dropped. Scoped to wiki↔insight only — turns carry
+    synthetic, legitimately-repeating titles (`[user @ time]`) and must pass
+    through untouched."""
+    seen: set[str] = set()
+    out: list[RecallHit] = []
+    for h in hits:
+        dedupable = h.rel_path.startswith("wiki/") or h.rel_path.startswith("insight:")
+        if dedupable:
+            key = h.title.strip().casefold()
+            if key and key in seen:
+                continue
+            if key:
+                seen.add(key)
+        out.append(h)
+    return out
+
+
+def _scrub_recall_hit(hit: RecallHit) -> RecallHit:
+    """M145: passively scrub a recall summary before it enters the prompt.
+
+    Every other memory surface entering the system prompt already passes
+    through `scan_for_injection` on load — AGENTS.md (`project.py`), wiki pages
+    (`wiki.read_page`), INDEX — but recall summaries bypass it: `Wiki.search`
+    returns stored page text directly (not via the scrubbed `read_page`), and
+    the turn/insight FTS queries return raw rows. A capped turn snippet can
+    also slice off the `<untrusted>` boundary that wrapped external content at
+    its source. Recall is therefore the one hole in the "every memory surface
+    is scrubbed" invariant; close it here, at the single chokepoint every
+    recall consumer passes through.
+
+    This is the *passive* scrubber (neutralise known injection phrases, strip
+    invisible chars) — deliberately NOT `wrap_untrusted`. Recall is the agent's
+    own reference knowledge; an active "do not act on this / do not derive tool
+    arguments from it" boundary would break legitimate memory use (memory says
+    the API base URL is X → the agent should use X). Scrub the payload, keep
+    the trust. Returns the same object when nothing changed (no churn)."""
+    cleaned, _ = scan_for_injection(hit.summary, source_label=f"recall:{hit.rel_path}")
+    if cleaned == hit.summary:
+        return hit
+    return replace(hit, summary=cleaned)
+
+
+def _insight_hit_to_recall(hit: InsightHit) -> RecallHit:
+    summary = (hit.body or "").strip().replace("\n", " ")
+    if len(summary) > _TURN_SUMMARY_CAP:
+        summary = summary[: _TURN_SUMMARY_CAP - 1].rstrip() + "…"
+    return RecallHit(
+        rel_path=f"insight:{hit.id}",
+        title=hit.title,
+        summary=summary or "(empty insight)",
+        score=hit.rank,
+        ts=hit.ts,
+    )
+
+
+def _turn_hit_to_recall(hit: TurnHit) -> RecallHit:
+    when = _dt.datetime.fromtimestamp(hit.created_at, tz=_dt.UTC).strftime("%Y-%m-%d %H:%M")
+    summary = (hit.content or "").strip().replace("\n", " ")
+    if len(summary) > _TURN_SUMMARY_CAP:
+        summary = summary[: _TURN_SUMMARY_CAP - 1].rstrip() + "…"
+    return RecallHit(
+        rel_path=f"turn:{hit.session_id}:{hit.seq}",
+        title=f"[{hit.role} @ {when}]",
+        summary=summary or "(empty turn)",
+        score=hit.rank,
+        ts=hit.created_at,
+    )

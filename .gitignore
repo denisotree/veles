@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+.venv/
+venv/
+.python-version.local
+dist/
+build/
+
+# Test / lint / type caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Secrets / env
+.env
+.env.local
+
+# Local runtime / session state
+.veles/
+tmp/
+
+# AI assistant instruction / runtime files (kept locally, never shipped)
+/CLAUDE.md
+/GEMINI.md
+.claude/
+.remember/
+.cursor/
+.aider*
+.continue/
+.github/copilot-instructions.md
+
+# Internal development docs & helpers (kept locally, not part of the release)
+/MILESTONES.md
+/TASKS.md
+/ISSUES.md
+/scripts/
+/docs/plans/
+/docs/refactor-backlog-r3.md
