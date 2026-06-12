@@ -1,8 +1,9 @@
 """Agent-initiated subproject proposal (M62) — closes VISION §2.2.
 
-VISION §2.2 says: "Декомпозицию инициирует агент: при росте контекста
-или wiki видит смысловые кластеры и предлагает выделить подпроект;
-пользователь одобряет." M41 shipped the *infrastructure* for vertical
+VISION §2.2: decomposition is agent-initiated — as the context or the
+wiki grows, the agent spots semantic clusters and proposes splitting
+them into a subproject; the user approves.
+M41 shipped the *infrastructure* for vertical
 subprojects (init/list/switch/remove + the registry + memory router
 fan-out), but nothing inside Veles ever actually *proposes* that a
 cluster of related wiki pages should be split off — the user had to

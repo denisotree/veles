@@ -1,9 +1,9 @@
 """M117c-final: enforce layout-pack writable_zones at write time.
 
-VISION §4: "Writable-зоны декларативны. Конкретные writable-зоны
-зависят от выбранного пользователем layout и декларируются в
-AGENTS.md. В дефолтном LLM Wiki layout LLM пишет только в `wiki/`
-и `<cwd>/.veles/`; `sources/` read-only."
+Design rule (VISION §4): writable zones are declarative. The concrete
+zones depend on the layout the user picked and are declared in
+AGENTS.md. In the default LLM Wiki layout the LLM writes only to
+`wiki/` and `<cwd>/.veles/`; `sources/` is read-only.
 
 `is_writable(project, path)` is the runtime check the builtin
 `write_file` tool (and any agent-generated write tool) consults

@@ -6,8 +6,8 @@ agent uses to interact with that content. The default pack ships
 inside Veles (`builtin/llm-wiki/`); users can add custom packs to
 `<project>/.veles/layouts/<name>/` or `~/.veles/layouts/<name>/`.
 
-VISION §5.2: "core не делает предположений о том, как именно
-хранится контент". Project memory (`<cwd>/.veles/`) stays
+Design rule (VISION §5.2): the core makes no assumptions about how
+user content is stored. Project memory (`<cwd>/.veles/`) stays
 layout-agnostic; only the user-content side switches.
 
 Public surface:

@@ -131,9 +131,9 @@ _RUN_WIKI_RAG_BLOCK = (
 def _identity_header(project: Project) -> str:
     """Short instruction that pins the assistant to the active project.
 
-    Without this, the Mind Palace incident reproduces: asked "опиши
-    текущий проект", the agent described Veles (its runtime) instead of
-    the project, because the only project-shaped content in the prompt
+    Without this, the Mind Palace incident reproduces: asked "describe
+    the current project", the agent described Veles (its runtime) instead
+    of the project, because the only project-shaped content in the prompt
     was an AGENTS.md template enumerating `veles ingest/query/lint`.
     Naming the project up-front and forbidding self-descriptions of the
     runtime moves the agent's default frame from "Veles assistant" to

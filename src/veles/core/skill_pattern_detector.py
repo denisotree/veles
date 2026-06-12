@@ -1,9 +1,10 @@
 """M121b: pattern detector — surface skill candidates from session
 tool-use history.
 
-VISION §5.5 contract: "при обнаружении кластера ≥3 раз агент
-предлагает создать skill". This module ships the detection half;
-the suggestion / approval flow lives in the curator (M121c).
+Contract (VISION §5.5): when a workflow cluster recurs 3+ times, the
+agent proposes formalising it as a skill. This module ships the
+detection half; the suggestion / approval flow lives in the curator
+(M121c).
 
 Strategy (token-based, no embeddings — M121b1):
 
