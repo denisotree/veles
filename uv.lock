@@ -1902,7 +1902,7 @@ wheels = [
 ]
 
 [[package]]
-name = "veles"
+name = "veles-ai"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

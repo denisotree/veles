@@ -66,7 +66,7 @@ def current_version() -> str:
     literal is hand-kept in sync with pyproject.toml at release time.
     """
     try:
-        return metadata.version("veles")
+        return metadata.version("veles-ai")
     except metadata.PackageNotFoundError:
         return "0.1.0"
 

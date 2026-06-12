@@ -9,7 +9,7 @@
 Unlike chat tools that start fresh every time, Veles maintains **structured project memory** — insights, rules, and curated knowledge that accumulate across sessions and make the agent more useful the longer you use it. How your *content* is organised is pluggable: a Karpathy-style LLM wiki by default, flat notes, or no structure at all for code repos. Built clean: no god-files, no vendor lock-in, no cloud sync.
 
 ```bash
-uv tool install .
+uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
 veles tui   # interactive REPL
 ```
@@ -40,9 +40,10 @@ veles tui   # interactive REPL
 # 1. Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 2. Install veles globally from source
-git clone https://github.com/denisotree/veles.git && cd veles
-uv tool install .
+# 2. Install veles (the package is published as `veles-ai`; the command is `veles`)
+uv tool install veles-ai
+# …or from source:
+#   git clone https://github.com/denisotree/veles.git && cd veles && uv tool install .
 
 # 3. Set an API key — OpenRouter is recommended (access to all models, one key)
 export OPENROUTER_API_KEY=sk-or-v1-...

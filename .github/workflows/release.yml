@@ -1,9 +1,10 @@
 # Publishes to PyPI on a version tag (v*) via PyPI Trusted Publishing (OIDC).
+# Distribution name is "veles-ai" (PyPI "veles" is taken); the import package
+# and CLI remain "veles".
 # Before the first release:
-#   1. Finalize the distribution name in pyproject.toml (PyPI "veles" is taken).
-#   2. Register this repo as a Trusted Publisher for that name on PyPI
+#   1. Register this repo as a Trusted Publisher for "veles-ai" on PyPI
 #      (Manage project -> Publishing -> add GitHub publisher, environment: pypi).
-#   3. Create a "pypi" environment in the repo settings.
+#   2. Create a "pypi" environment in the repo settings.
 name: Release
 
 on:
