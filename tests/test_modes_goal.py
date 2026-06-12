@@ -236,7 +236,7 @@ def test_goal_interview_uses_writing_registry_and_interview_prompt(
 
 def test_goal_confirm_first_turn_emits_confirmation_line(project, state) -> None:
     """When entering CONFIRM (prompt empty), GoalMode emits the
-    «Давай проверим...» line via direct ChatDelta + TurnDone."""
+    localized confirmation line via direct ChatDelta + TurnDone."""
     from veles.tui.messages import ChatDelta
 
     token = set_active_project(project)
@@ -260,9 +260,11 @@ def test_goal_confirm_first_turn_emits_confirmation_line(project, state) -> None
 
     chat_deltas = [m for m in rec.posted if isinstance(m, ChatDelta)]
     assert chat_deltas, "CONFIRM phase must emit a chat-visible confirmation line"
+    from veles.core.i18n import t
+
     body = chat_deltas[0].text
-    assert "Давай проверим" in body
-    assert "Add dark theme" in body
+    assert t("goal.confirm_line", summary="Add dark theme.") in body
+    assert t("goal.confirm_actions") in body
 
 
 def test_goal_confirm_yes_advances_to_plan(project, state) -> None:

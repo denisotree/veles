@@ -17,6 +17,7 @@ import pytest
 from veles.channels.daemon_client import DaemonClientError
 from veles.channels.session_map import SessionMap
 from veles.channels.telegram import TelegramGateway
+from veles.core.i18n import t
 
 
 class _FakeDaemonClient:
@@ -199,7 +200,7 @@ async def test_reset_command_with_active_session(session_map: SessionMap) -> Non
     gateway = _make_gateway(daemon, session_map, sends)
     await gateway._handle_update(_message_update(42, "/reset"))
     assert session_map.get("42") is None
-    assert "очищена" in sends[0][1]["text"]
+    assert sends[0][1]["text"] == t("telegram.history_cleared")
 
 
 async def test_reset_command_without_active_session(session_map: SessionMap) -> None:
@@ -207,7 +208,7 @@ async def test_reset_command_without_active_session(session_map: SessionMap) -> 
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
     await gateway._handle_update(_message_update(42, "/reset"))
-    assert "пуста" in sends[0][1]["text"]
+    assert sends[0][1]["text"] == t("telegram.history_empty")
 
 
 async def test_message_creates_session_mapping(session_map: SessionMap) -> None:

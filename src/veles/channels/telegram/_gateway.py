@@ -60,6 +60,7 @@ from typing import Any
 import aiohttp
 
 from veles.channels.daemon_client import DaemonClientError
+from veles.core.i18n import t
 from veles.channels.protocols import RunBackend
 from veles.channels.session_map import SessionMap
 from veles.channels.telegram._api import TelegramApi
@@ -240,17 +241,13 @@ class TelegramGateway:
         if parsed is not None:
             cmd, args = parsed
             if cmd == "start":
-                await self._send_message(
-                    chat_id,
-                    "Привет! Я Veles. Просто пиши сообщение — я отвечу. "
-                    "Подсказка: /help — список команд.",
-                )
+                await self._send_message(chat_id, t("telegram.start_greeting"))
                 return
             if cmd == "reset":
                 removed = self.session_map.reset(chat_key)
                 await self._send_message(
                     chat_id,
-                    "История очищена." if removed else "История уже пуста.",
+                    t("telegram.history_cleared") if removed else t("telegram.history_empty"),
                 )
                 return
             reply = await dispatch(self, chat_key, cmd, args)

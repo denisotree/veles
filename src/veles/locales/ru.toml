@@ -18,3 +18,12 @@ ask_telegram_chat = "Chat id"
 telegram_chat_required = "  ! chat id обязателен; настройка Telegram пропущена."
 telegram_written = "  · записан Telegram-канал → {path}"
 indexed_wiki = "  · проиндексировано {pages} страниц(ы) wiki в FTS-базу."
+
+[goal]
+confirm_line = "Давай проверим, верно ли я понял что нужно: {summary}"
+confirm_actions = "Подтверди (yes), отредактируй (опиши, что не так), или отмени (cancel)."
+
+[telegram]
+start_greeting = "Привет! Я Veles. Просто пиши сообщение — я отвечу. Подсказка: /help — список команд."
+history_cleared = "История очищена."
+history_empty = "История уже пуста."

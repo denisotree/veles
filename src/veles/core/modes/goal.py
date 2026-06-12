@@ -14,7 +14,8 @@ Per-turn dispatch (one user prompt = one phase transition):
     INTERVIEW: model asks ONE clarifying question; when it has enough,
                it emits `<ready>summary</ready>`. Parser → CONFIRM.
     CONFIRM:   direct provider call (no agent.run, no SessionStore
-               write) emits "Давай проверим, верно ли я понял: …".
+               write) emits the localized "let me check I got this
+               right: …" confirmation line.
                User's NEXT prompt is read as ack ("yes" → PLAN) or
                edits ("no, …" → INTERVIEW, summary cleared).
     PLAN:      `agent.run` in planning configuration. Model emits a
@@ -63,18 +64,6 @@ emit on a single line:
 Until then, ask ONE question per turn and stop. Don't number, don't
 batch, don't preface with chit-chat.
 </mode>
-"""
-
-_CONFIRM_SYSTEM = """\
-The user is in GOAL mode and we are at the CONFIRM phase. You will be
-given a draft summary of the user's request. Reply with EXACTLY the
-following pattern (substituting `{summary}` with what you were given):
-
-    Давай проверим, верно ли я понял что нужно: {summary}
-
-    Подтверди (yes), отредактируй (опиши, что не так), или отмени (cancel).
-
-Do not paraphrase the summary or add anything else.
 """
 
 _PLAN_SYSTEM = """\
@@ -330,8 +319,8 @@ class GoalMode:
     def _run_confirm(self, prompt: str, ctx: ModeContext, goal) -> None:
         """If `prompt` is non-empty, it's the user's reply to the
         previous CONFIRM line. Otherwise (first turn in CONFIRM), we
-        emit the "Давай проверим..." line and stop, waiting for the
-        user to respond next turn.
+        emit the confirmation line and stop, waiting for the user to
+        respond next turn.
 
         No SessionStore write happens for the synthetic confirmation
         line — the user's reply will land in the next turn's history
@@ -387,18 +376,20 @@ class GoalMode:
         self._run_interview(prompt, ctx, goal)
 
     def _emit_confirmation(self, ctx: ModeContext, goal) -> None:
-        """Print the «Давай проверим...» confirmation line directly to
-        the chat. No `agent.run` and no provider call — the summary
-        text is already on the Goal artifact; we just want it surfaced
-        to the user and stop. SessionStore stays clean of this synthetic
+        """Print the localized confirmation line directly to the chat.
+        No `agent.run` and no provider call — the summary text is
+        already on the Goal artifact; we just want it surfaced to the
+        user and stop. SessionStore stays clean of this synthetic
         assistant message; the user's next reply will land in history
         normally."""
         from veles.core.agent import RunResult
+        from veles.core.i18n import t
         from veles.tui.messages import ChatDelta
 
         text = (
-            f"Давай проверим, верно ли я понял что нужно: {goal.interview_summary}\n\n"
-            "Подтверди (yes), отредактируй (опиши, что не так), или отмени (cancel)."
+            t("goal.confirm_line", summary=goal.interview_summary)
+            + "\n\n"
+            + t("goal.confirm_actions")
         )
         ctx.post(ChatDelta(text=text))
         ctx.post(

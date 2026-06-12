@@ -25,3 +25,12 @@ group_preference = "Preferences:"
 group_dont = "Don't:"
 group_do = "Do:"
 group_format = "Output format:"
+
+[goal]
+confirm_line = "Let me check I got this right: {summary}"
+confirm_actions = "Confirm (yes), edit (describe what's wrong), or cancel (cancel)."
+
+[telegram]
+start_greeting = "Hi! I'm Veles. Just send a message and I'll reply. Tip: /help lists the commands."
+history_cleared = "History cleared."
+history_empty = "History is already empty."
