@@ -1,5 +1,9 @@
 # Veles
 
+[![CI](https://github.com/denisotree/veles/actions/workflows/ci.yml/badge.svg)](https://github.com/denisotree/veles/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue.svg)](pyproject.toml)
+
 **A minimal CLI agent framework that gets smarter with every session.**
 
 Unlike chat tools that start fresh every time, Veles maintains **structured project memory** — insights, rules, and curated knowledge that accumulate across sessions and make the agent more useful the longer you use it. How your *content* is organised is pluggable: a Karpathy-style LLM wiki by default, flat notes, or no structure at all for code repos. Built clean: no god-files, no vendor lock-in, no cloud sync.
@@ -37,7 +41,7 @@ veles tui   # interactive REPL
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 2. Install veles globally from source
-git clone <repo-url> && cd veles
+git clone https://github.com/denisotree/veles.git && cd veles
 uv tool install .
 
 # 3. Set an API key — OpenRouter is recommended (access to all models, one key)
@@ -323,13 +327,13 @@ Full documentation — Diátaxis-organized (tutorials · how-to guides · refere
 ## Contributing
 
 ```bash
-git clone <repo-url> && cd veles
+git clone https://github.com/denisotree/veles.git && cd veles
 uv sync                    # install dev dependencies
 pytest                     # run the test suite (3200+ tests)
 VELES_LIVE_TESTS=1 pytest -m live   # opt-in live-API smoke tests
 ```
 
-The codebase is deliberately decomposed — single responsibility throughout, no files exceeding a few hundred lines. Read `CLAUDE.md` for project conventions before opening a PR.
+The codebase is deliberately decomposed — single responsibility throughout, no files exceeding a few hundred lines. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for project conventions before opening a PR.
 
 Contributions welcome: provider adapters, skills for common workflows, module hooks (observability, logging, policy enforcement), and platform packaging.
 
