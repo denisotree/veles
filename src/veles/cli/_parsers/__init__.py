@@ -67,7 +67,14 @@ _REGISTRARS = (
 
 
 def build_parser() -> argparse.ArgumentParser:
+    from veles import __version__
+
     parser = argparse.ArgumentParser(prog="veles", description="Veles agent.")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"veles {__version__}",
+    )
     parser.add_argument(
         "--no-wizard",
         action="store_true",

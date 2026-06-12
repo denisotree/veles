@@ -5,6 +5,17 @@ from __future__ import annotations
 from veles.cli import _build_parser
 
 
+def test_version_flag_prints_and_exits(capsys) -> None:
+    import pytest
+
+    from veles import __version__
+
+    with pytest.raises(SystemExit) as exc:
+        _build_parser().parse_args(["--version"])
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.strip() == f"veles {__version__}"
+
+
 def test_run_accepts_stream_flag() -> None:
     args = _build_parser().parse_args(["run", "--stream", "hi"])
     assert args.command == "run"
