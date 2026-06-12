@@ -112,7 +112,7 @@ def test_mem0_recall_returns_hits(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch,
         {"results": [{"id": "x1", "memory": "prefers concise responses", "score": 0.7}]},
     )
-    p = Mem0MemoryProvider(api_key="k", user_id="denisotree")
+    p = Mem0MemoryProvider(api_key="k", user_id="test-user")
     hits = p.recall("preferences", limit=3)
     assert len(hits) == 1
     assert hits[0].rel_path == "mem0:x1"
@@ -153,11 +153,11 @@ def test_builder_picks_up_honcho_and_mem0(tmp_path: Path) -> None:
 [memory.external.honcho]
 api_key = "h-key"
 app_id = "demo"
-user_id = "denisotree"
+user_id = "test-user"
 
 [memory.external.mem0]
 api_key = "m-key"
-user_id = "denisotree"
+user_id = "test-user"
 """
     )
     providers = build_extra_providers(cfg)
@@ -229,10 +229,10 @@ def test_supermemory_handles_documents_key(monkeypatch: pytest.MonkeyPatch) -> N
 
 def test_supermemory_user_id_passed_through(monkeypatch: pytest.MonkeyPatch) -> None:
     client = _install_fake_supermemory(monkeypatch, {"results": []})
-    p = SupermemoryProvider(api_key="k", user_id="denisotree")
+    p = SupermemoryProvider(api_key="k", user_id="test-user")
     p.recall("q", limit=1)
     kwargs = client.search.call_args.kwargs
-    assert kwargs.get("user_id") == "denisotree"
+    assert kwargs.get("user_id") == "test-user"
 
 
 def test_builder_picks_up_all_three(tmp_path: Path) -> None:
@@ -277,11 +277,11 @@ def test_builder_skips_partial_section(tmp_path: Path) -> None:
 [memory.external.honcho]
 api_key = "h-key"
 # app_id missing on purpose
-user_id = "denisotree"
+user_id = "test-user"
 
 [memory.external.mem0]
 api_key = "m-key"
-user_id = "denisotree"
+user_id = "test-user"
 """
     )
     providers = build_extra_providers(cfg)

@@ -9,7 +9,7 @@ Configuration source (`~/.veles/config.toml`):
 
     [memory.external.mem0]
     api_key  = "..."
-    user_id  = "denisotree"
+    user_id  = "your-user-id"
     agent_id = "veles"     # optional; identifies the calling agent
 """
 

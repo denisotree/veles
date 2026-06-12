@@ -15,7 +15,7 @@ Config source (`~/.veles/config.toml`):
 
     [memory.external.supermemory]
     api_key = "..."
-    user_id = "denisotree"   # optional; included if set
+    user_id = "your-user-id" # optional; included if set
 """
 
 from __future__ import annotations

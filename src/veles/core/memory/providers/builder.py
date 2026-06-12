@@ -9,12 +9,12 @@ Config shape (everything under `[memory.external]` is optional):
     [memory.external.honcho]
     api_key  = "..."
     app_id   = "..."
-    user_id  = "denisotree"
+    user_id  = "your-user-id"
     base_url = "https://demo.honcho.dev"   # optional
 
     [memory.external.mem0]
     api_key  = "..."
-    user_id  = "denisotree"
+    user_id  = "your-user-id"
     agent_id = "veles"                     # optional
 
 Missing keys for an adapter → that adapter is skipped (no exception).
