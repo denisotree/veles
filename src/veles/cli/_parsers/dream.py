@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 
 from veles.cli._parsers._common import (
-    DEFAULT_PROVIDER,
     PROVIDER_CHOICES,
     add_project_root_flag,
 )
@@ -56,14 +55,18 @@ def register(sub: argparse._SubParsersAction) -> None:
     dream.add_argument(
         "--provider",
         choices=PROVIDER_CHOICES,
-        default=DEFAULT_PROVIDER,
-        help=f"Provider for the consolidation sub-agent (default: {DEFAULT_PROVIDER}).",
+        default=None,
+        help=(
+            "Provider for the consolidation sub-agent. Omit to use the "
+            "routed provider for this project (`veles route show insights`)."
+        ),
     )
     dream.add_argument(
         "--consolidation-model",
         dest="consolidation_model",
         default=None,
         help=(
-            "Override the cheap-model used for consolidation (default: anthropic/claude-haiku-4.5)."
+            "Override the model used for consolidation. Omit to use the "
+            "routed model (falls back to anthropic/claude-haiku-4.5)."
         ),
     )

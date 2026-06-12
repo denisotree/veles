@@ -23,11 +23,22 @@ def cmd_dream(args: argparse.Namespace, project) -> int:
 
     provider = None
     history_loader = None
+    consolidation_model = getattr(args, "consolidation_model", None)
     if include_consolidation:
-        try:
-            from veles.cli import _make_provider
+        from veles.cli import _make_provider
+        from veles.core.routing.ensemble import route
 
-            provider_name = getattr(args, "provider", "openrouter")
+        # Resolve the consolidation provider+model through routing (M125) so
+        # they stay consistent. A bare `veles dream --include-consolidation`
+        # on a fully-local project (`[provider]=ollama`) must not ask that
+        # backend for the hardcoded `anthropic/claude-haiku-4.5` slug → 404.
+        # An explicit `--provider` still wins; the routed model is adopted
+        # only when it belongs to that same provider.
+        routed_provider, routed_model = route("insights", project)
+        provider_name = getattr(args, "provider", None) or routed_provider
+        if consolidation_model is None and provider_name == routed_provider:
+            consolidation_model = routed_model
+        try:
             provider = _make_provider(provider_name)
         except Exception as exc:
             print(f"warning: provider unavailable, consolidation skipped: {exc}", file=sys.stderr)
@@ -45,7 +56,7 @@ def cmd_dream(args: argparse.Namespace, project) -> int:
         skip_lint=skip_lint,
         dry_run=dry_run,
         provider=provider,
-        consolidation_model=getattr(args, "consolidation_model", None),
+        consolidation_model=consolidation_model,
         insight_history_loader=history_loader,
     )
     print(result.summary())

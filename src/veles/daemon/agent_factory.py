@@ -32,6 +32,18 @@ def _attach_background_runners(state, project, agent_factory, provider_name: str
     from veles.core.job_runner import JobRunner
     from veles.core.jobs_store import JobsStore
     from veles.core.memory import SessionStore
+    from veles.core.routing.ensemble import route
+
+    # The dream's LLM steps (insight extraction + consolidation) resolve
+    # their provider AND model together through routing — the same cascade
+    # the post-turn insight extractor uses (`route("insights")`). Reusing
+    # the daemon's main `provider_name` while letting the model default to
+    # dreaming's hardcoded `anthropic/claude-haiku-4.5` decoupled the two:
+    # a daemon on a local `[provider]` (e.g. ollama) asked that backend for
+    # an OpenRouter slug and got HTTP 404 on every deep-dream cycle. Routing
+    # both keeps them consistent (ollama → an ollama model, etc.).
+    del provider_name
+    dream_provider_name, dream_model = route("insights", project)
 
     jobs_store = JobsStore(project.memory_db_path)
     state.job_runner = JobRunner(
@@ -41,7 +53,7 @@ def _attach_background_runners(state, project, agent_factory, provider_name: str
     )
 
     def _provider_for_dream():
-        return _make_provider_for_dream(provider_name)
+        return _make_provider_for_dream(dream_provider_name)
 
     def _history_loader():
         from veles.core.curator_state import load as _load_curator
@@ -73,6 +85,7 @@ def _attach_background_runners(state, project, agent_factory, provider_name: str
         project=project,
         state=state,
         provider_factory=_provider_for_dream,
+        consolidation_model=dream_model,
         insight_history_loader=_history_loader,
         runtime_session_loader=_runtime_session_loader,
     )
