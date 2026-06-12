@@ -1,0 +1,38 @@
+# Publishes to PyPI on a version tag (v*) via PyPI Trusted Publishing (OIDC).
+# Before the first release:
+#   1. Finalize the distribution name in pyproject.toml (PyPI "veles" is taken).
+#   2. Register this repo as a Trusted Publisher for that name on PyPI
+#      (Manage project -> Publishing -> add GitHub publisher, environment: pypi).
+#   3. Create a "pypi" environment in the repo settings.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Build sdist and wheel
+        run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
