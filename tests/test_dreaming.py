@@ -117,16 +117,16 @@ def _StubProvider():
 
 
 def _seed_insights(project: Project, count: int = 3) -> None:
-    from veles.core.wiki import Wiki
+    from veles.core.tools.builtin.memory_save import save_insight_row
 
-    wiki = Wiki(project.wiki_root)
     for i in range(count):
-        wiki.write_page(
-            category="insights",
-            slug=f"insight-{i}",
+        rid = save_insight_row(
             title=f"Insight {i}",
-            content=f"# Insight {i}\n\nSomething to remember number {i}.",
+            body=f"Something to remember number {i}.",
+            category="test-seed",
+            project=project,
         )
+        assert rid > 0
 
 
 def test_consolidate_writes_proposal(project: Project) -> None:

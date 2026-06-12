@@ -15,7 +15,7 @@ def register(sub: argparse._SubParsersAction) -> None:
     module_sub.add_parser("list", help="List installed modules.")
 
     module_show = module_sub.add_parser("show", help="Print a module's manifest.")
-    module_show.add_argument("name")
+    module_show.add_argument("name", help="Module name.")
 
     module_add = module_sub.add_parser(
         "add", help="Install a module from a git URL or local directory."

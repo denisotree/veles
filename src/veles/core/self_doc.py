@@ -1,23 +1,18 @@
 """Self-documentation generator for Veles projects.
 
 `generate_self_doc` collects runtime state (sessions, wiki pages, skills,
-tools, routing, insights, LOG.md tail) into a `SelfDocReport` dataclass.
-`render_self_doc` converts it to a markdown page.
-`refresh_self_doc` calls both and persists the result to
-`wiki/self-doc/overview.md`, returning the rel_path.
-
-The page is FTS5-indexed and surfaces via memory recall when the agent asks
-questions about project capabilities ("what tools do I have?", "which skills
-are installed?").
+tools, routing, insights, journal tail) into a `SelfDocReport` dataclass.
+`render_self_doc` converts it to a markdown page. `refresh_self_doc`
+calls both and persists the result — to `wiki/self-doc/overview.md` when
+the active layout enables the wiki engine (FTS5-indexed, surfaces via
+recall), otherwise to `.veles/memory/self-doc.md` (M163).
 """
 
 from __future__ import annotations
 
 import datetime as _dt
-import os
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from veles.core.project import Project
@@ -43,10 +38,10 @@ def generate_self_doc(
     tools: list[tuple[str, str]] | None = None,
 ) -> SelfDocReport:
     """Collect all project self-knowledge into a `SelfDocReport`."""
+    from veles.core.layout.engines import wiki_enabled
     from veles.core.memory import SessionStore
     from veles.core.routing import DEFAULT_TASKS, route
     from veles.core.skills import discover_skills
-    from veles.core.wiki import Wiki
 
     # --- project meta ---
     created_iso = _dt.datetime.fromtimestamp(project.created_at, tz=_dt.timezone.utc).strftime(
@@ -58,10 +53,16 @@ def generate_self_doc(
         sessions = store.list_sessions(limit=99_999)
     session_count = len(sessions)
 
-    # --- wiki pages ---
-    wiki = Wiki(project.wiki_root)
-    pages = wiki.list_pages()
-    wiki_page_count = len(pages)
+    # --- wiki pages (only when the layout enables the wiki engine) ---
+    wiki_page_count = 0
+    wiki_categories: dict[str, int] = {}
+    if wiki_enabled(project):
+        from veles.core.wiki import Wiki
+
+        pages = Wiki(project.wiki_root).list_pages()
+        wiki_page_count = len(pages)
+        for page in pages:
+            wiki_categories[page.category] = wiki_categories.get(page.category, 0) + 1
 
     # --- skills ---
     raw_skills = discover_skills(project)
@@ -80,21 +81,13 @@ def generate_self_doc(
         except Exception:
             pass
 
-    # --- wiki categories aggregation ---
-    wiki_categories: dict[str, int] = {}
-    for page in pages:
-        wiki_categories[page.category] = wiki_categories.get(page.category, 0) + 1
+    # --- recent insights (M161: the SQL table is canonical) ---
+    recent_insights = _recent_insight_titles(project, limit=5)
 
-    # --- recent insights (last 5 by mtime) ---
-    insight_pages = [p for p in pages if p.category == "insights"]
-    insight_paths = [project.wiki_root / p.rel_path for p in insight_pages]
-    insight_paths.sort(key=lambda p: os.path.getmtime(p) if p.exists() else 0.0, reverse=True)
-    recent_insights = [
-        str(Path(p).relative_to(project.wiki_root)) for p in insight_paths[:5]
-    ]
+    # --- system-ops journal tail (M160: `.veles/memory/LOG.md`) ---
+    from veles.core.memory.artefacts import memory_log_path
 
-    # --- log tail ---
-    log_path = project.wiki_root / "LOG.md"
+    log_path = memory_log_path(project)
     log_tail: list[str] = []
     if log_path.is_file():
         lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -112,6 +105,28 @@ def generate_self_doc(
         recent_insights=recent_insights,
         log_tail=log_tail,
     )
+
+
+def _recent_insight_titles(project: Project, *, limit: int) -> list[str]:
+    """Titles of the most recently referenced/created insight rows."""
+    import sqlite3
+
+    if not project.memory_db_path.is_file():
+        return []
+    try:
+        conn = sqlite3.connect(str(project.memory_db_path))
+        try:
+            rows = conn.execute(
+                "SELECT title FROM insights"
+                " WHERE id NOT IN (SELECT from_insight_id FROM insight_refs)"
+                " ORDER BY COALESCE(last_referenced_at, created_at) DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return []
+    return [str(r[0]) for r in rows]
 
 
 def _render_list_section(
@@ -205,19 +220,32 @@ def refresh_self_doc(
     *,
     tools: list[tuple[str, str]] | None = None,
 ) -> str:
-    """Generate, render, write to wiki/self-doc/overview.md. Returns rel_path."""
-    from veles.core.wiki import Wiki
+    """Generate, render, persist. Returns the project-relative path.
+
+    Wiki engine on → `wiki/self-doc/overview.md` (FTS-indexed, recall
+    surfaces it). Off → `.veles/memory/self-doc.md` (M163)."""
+    from veles.core.layout.engines import wiki_enabled
+    from veles.core.memory.artefacts import append_memory_log
 
     report = generate_self_doc(project, tools=tools)
     content = render_self_doc(report)
-    wiki = Wiki(project.wiki_root)
-    rel_path = wiki.write_page(
-        category="self-doc",
-        slug="overview",
-        title="Self-Documentation",
-        content=content,
-    )
-    wiki.append_log(
+    if wiki_enabled(project):
+        from veles.core.wiki import Wiki
+
+        wiki = Wiki(project.wiki_root)
+        rel_path = wiki.write_page(
+            category="self-doc",
+            slug="overview",
+            title="Self-Documentation",
+            content=content,
+        )
+    else:
+        out = project.memory_dir / "self-doc.md"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(content, encoding="utf-8")
+        rel_path = out.relative_to(project.root).as_posix()
+    append_memory_log(
+        project,
         op="self-doc",
         summary=(
             f"{report.session_count} sessions, "

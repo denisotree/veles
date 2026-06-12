@@ -228,7 +228,14 @@ def main(argv: list[str] | None = None) -> int:
             set_budget(TokenBudget(limit=snap.limit, consumed=snap.consumed))
     composite = registry.subset(registry.list_names())
     skill_names = _register_project_skills(composite, project, args.skill_model)
-    server = MCPServer(composite, list(_MCP_TOOLS) + skill_names, budget_path=budget_path)
+    # M163: drop wiki-engine tools when the project's layout doesn't
+    # enable the engine — same gating as `_load_skills`.
+    from veles.core.layout.engines import wiki_enabled
+
+    tool_names = list(_MCP_TOOLS)
+    if not wiki_enabled(project):
+        tool_names = [t for t in tool_names if not t.startswith("wiki_")]
+    server = MCPServer(composite, tool_names + skill_names, budget_path=budget_path)
     return server.serve(stdin=sys.stdin, stdout=sys.stdout)
 
 

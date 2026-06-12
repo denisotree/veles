@@ -6,8 +6,10 @@ M117c-removal; `cmd_add` is the only caller of `_run_ingest_cli`.)"""
 from __future__ import annotations
 
 import argparse
+import sys
 
 from veles.core.ingest import INGEST_SYSTEM_PROMPT, ingest_user_message
+from veles.core.layout.engines import wiki_enabled
 from veles.core.project import Project
 from veles.core.wiki import Wiki
 
@@ -26,6 +28,19 @@ def _run_ingest_cli(
         _warn_if_agents_md_invalid,
         build_command_agent,
     )
+
+    # M162: ingest is a wiki-engine operation — the active layout pack
+    # must declare it ([layout.engines] wiki = true).
+    if not wiki_enabled(project):
+        print(
+            f"error: `veles add` needs the wiki content engine, but the active "
+            f"layout pack {project.layout_name!r} does not enable it.\n"
+            "Switch the project to a wiki layout (edit `layout` in "
+            ".veles/project.toml, e.g. to \"llm-wiki\") or store the source "
+            "yourself and reference it from AGENTS.md.",
+            file=sys.stderr,
+        )
+        return 2
 
     if args.provider in _PROVIDER_API_KEY_ENVS and not _ensure_api_key(args.provider):
         return 2

@@ -65,7 +65,6 @@ class MemoryRouter:
         extra_providers: list[object] | None = None,
     ) -> None:
         self._project = project
-        self._wiki = Wiki(project.wiki_root)
         self._store = store
         # M55: opt-in external memory plugins (Honcho, Mem0, ...). Stored as
         # `object` to avoid an import cycle with `memory_provider.MemoryProvider`
@@ -81,17 +80,17 @@ class MemoryRouter:
         extra_hits = self._collect_extra(query, limit=limit)
         streams = [wiki_hits, insight_hits, turn_hits, extra_hits]
         # M141: scored rerank by default; `VELES_MEMORY_RERANK=0` falls back to
-        # the round-robin merge. Both over-fetch (limit*2) so `_dedupe_by_title`
-        # can drop wiki↔insight overlap without starving the final result.
+        # the round-robin merge. (M161 made insights SQL-only, so the old
+        # wiki↔insight title dedupe is gone — the streams no longer overlap.)
         if _rerank_enabled():
             weights, half_life = _load_rerank_config(self._project)
             merged = rerank(
-                streams, now=time.time(), limit=limit * 2,
+                streams, now=time.time(), limit=limit,
                 weights=weights, half_life_sec=half_life,
             )
         else:
-            merged = _interleave_many(streams, limit * 2)
-        final = _dedupe_by_title(merged)[:limit]
+            merged = _interleave_many(streams, limit)
+        final = merged[:limit]
         # M145: scrub recall summaries before they enter the prompt — the one
         # memory surface that bypasses `scan_for_injection`. See
         # `_scrub_recall_hit`. Done on the final ≤limit hits only, so the cost
@@ -114,16 +113,27 @@ class MemoryRouter:
     # ---- collectors ----
 
     def _collect_wiki(self, query: str, *, limit: int) -> list[RecallHit]:
-        hits: list[RecallHit] = [
-            RecallHit(rel_path=p.rel_path, title=p.title, summary=p.summary)
-            for p in self._wiki.search(query, limit=limit)
-        ]
+        """Wiki-engine collector (M163: layout-gated). A project whose
+        layout pack doesn't enable the wiki engine contributes no wiki
+        hits; recall still works off insights/rules/turns/extras. The
+        same check applies per subproject — each child's own layout
+        decides."""
+        from veles.core.layout.engines import wiki_enabled
+
+        hits: list[RecallHit] = []
+        if wiki_enabled(self._project):
+            hits.extend(
+                RecallHit(rel_path=p.rel_path, title=p.title, summary=p.summary)
+                for p in Wiki(self._project.wiki_root).search(query, limit=limit)
+            )
         sub_limit = max(1, limit // 2)
         for sub in load_subprojects(self._project):
             sub_root = resolve_subproject_path(self._project, sub)
             # v2: subproject wiki lives at `<sub_root>/wiki/`, container
             # is the subproject root itself.
             if not (sub_root / ".veles").is_dir():
+                continue
+            if not _subproject_wiki_enabled(sub_root):
                 continue
             sub_wiki = Wiki(sub_root)
             for page in sub_wiki.search(query, limit=sub_limit):
@@ -141,9 +151,8 @@ class MemoryRouter:
 
         Every matched insight is `touch`ed (its `last_referenced_at` bumped)
         as a side effect — being retrieved *is* a reference. No-op without a
-        store. The SQL path surfaces insights even when no wiki page exists
-        for them; `_dedupe_by_title` in `recall` drops the overlap when one
-        does."""
+        store. M161: the SQL row is the sole insight store (the markdown
+        under `.veles/memory/insights/` is a rendered view, never searched)."""
         if self._store is None:
             return []
         hits = self._store.search_insights(query, limit=limit)
@@ -163,6 +172,18 @@ class MemoryRouter:
         since = time.time() - _TURN_RECENCY_WINDOW_SEC
         turn_hits = self._store.search_turns(query, limit=limit, since=since)
         return [_turn_hit_to_recall(h) for h in turn_hits]
+
+
+def _subproject_wiki_enabled(sub_root) -> bool:
+    """Best-effort wiki-engine check for a subproject (its own layout
+    decides). Unloadable child → no wiki hits from it."""
+    from veles.core.layout.engines import wiki_enabled
+    from veles.core.project import load_project
+
+    try:
+        return wiki_enabled(load_project(sub_root))
+    except Exception:  # noqa: BLE001 — recall must never die on a broken child
+        return False
 
 
 def _interleave(
@@ -223,29 +244,6 @@ def _load_rerank_config(project: Project) -> tuple[RerankWeights, float]:
     except (TypeError, ValueError):
         return DEFAULT_WEIGHTS, DEFAULT_HALF_LIFE_SEC
     return weights, half_life
-
-
-def _dedupe_by_title(hits: list[RecallHit]) -> list[RecallHit]:
-    """Drop a SQL-insight hit whose title duplicates a curated wiki page.
-
-    M140: an insight is stored both as a `wiki/insights/*.md` page and an
-    `insights` SQL row, so wiki-FTS and the insight source can surface the
-    same content. Wiki leads the interleave, so the curated page wins and the
-    SQL duplicate is dropped. Scoped to wiki↔insight only — turns carry
-    synthetic, legitimately-repeating titles (`[user @ time]`) and must pass
-    through untouched."""
-    seen: set[str] = set()
-    out: list[RecallHit] = []
-    for h in hits:
-        dedupable = h.rel_path.startswith("wiki/") or h.rel_path.startswith("insight:")
-        if dedupable:
-            key = h.title.strip().casefold()
-            if key and key in seen:
-                continue
-            if key:
-                seen.add(key)
-        out.append(h)
-    return out
 
 
 def _scrub_recall_hit(hit: RecallHit) -> RecallHit:

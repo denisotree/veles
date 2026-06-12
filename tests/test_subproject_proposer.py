@@ -163,7 +163,7 @@ def test_clusters_sorted_by_score_desc(project: Project) -> None:
 # ---- write_proposals ----
 
 
-def test_write_proposals_creates_pages_under_wiki(project: Project) -> None:
+def test_write_proposals_creates_pages_in_memory_dir(project: Project) -> None:
     cluster = Cluster(
         slug="frontend-stack",
         pages=["wiki/concepts/a.md", "wiki/concepts/b.md"],
@@ -172,8 +172,9 @@ def test_write_proposals_creates_pages_under_wiki(project: Project) -> None:
     )
     written = write_proposals(project, [cluster])
     assert len(written) == 1
-    page_path = project.wiki_root / written[0]
+    page_path = project.root / written[0]
     assert page_path.is_file()
+    assert page_path.parent == project.memory_dir / "proposals"
     body = page_path.read_text(encoding="utf-8")
     assert "Subproject proposal" in body
     assert "veles subproject init frontend-stack" in body
@@ -189,14 +190,14 @@ def test_write_proposals_idempotent_rewrites(project: Project) -> None:
     write_proposals(project, [cluster])
     cluster2 = Cluster(slug="frontend", pages=["wiki/concepts/a.md"], score=0.8, rationale="r2")
     write_proposals(project, [cluster2])
-    body = (project.wiki_root / "wiki" / "proposals" / "frontend.md").read_text(encoding="utf-8")
+    body = (project.memory_dir / "proposals" / "frontend.md").read_text(encoding="utf-8")
     assert "0.80" in body
 
 
 def test_write_proposals_appends_log(project: Project) -> None:
     cluster = Cluster(slug="cluster-x", pages=["wiki/concepts/a.md"], score=0.3, rationale="r")
     write_proposals(project, [cluster])
-    log = (project.wiki_root / "LOG.md").read_text(encoding="utf-8")
+    log = (project.memory_dir / "LOG.md").read_text(encoding="utf-8")
     assert "subproject-proposal" in log
     assert "cluster-x" in log
 
@@ -210,7 +211,7 @@ def test_recent_proposals_filters_by_age(project: Project) -> None:
     fresh = recent_proposals(project, max_age_days=7)
     assert len(fresh) == 1
     # Backdate the file 30 days
-    page = project.wiki_root / "wiki" / "proposals" / "x.md"
+    page = project.memory_dir / "proposals" / "x.md"
     old = time.time() - 30 * 86400
     import os
 
@@ -243,16 +244,17 @@ def test_build_proposals_block_renders_tag_and_slugs(project: Project) -> None:
 
 
 def test_build_proposals_block_truncates_when_too_large() -> None:
-    from veles.core.wiki import WikiPageInfo
+    from pathlib import Path
+
+    from veles.core.memory.artefacts import ProposalInfo
 
     huge = "x" * 5000
     pages = [
-        WikiPageInfo(
-            rel_path=f"wiki/proposals/p{i}.md",
-            category="proposals",
+        ProposalInfo(
             slug=f"p{i}",
             title="title",
             summary=huge,
+            path=Path(f"/nonexistent/p{i}.md"),
         )
         for i in range(20)
     ]

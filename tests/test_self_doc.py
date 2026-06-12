@@ -161,5 +161,5 @@ def test_refresh_self_doc_idempotent(tmp_path: Path) -> None:
 def test_refresh_self_doc_logs_op(tmp_path: Path) -> None:
     project = _make_project(tmp_path)
     refresh_self_doc(project)
-    log_text = (project.wiki_root / "LOG.md").read_text()
+    log_text = (project.memory_dir / "LOG.md").read_text()
     assert "self-doc" in log_text

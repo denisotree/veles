@@ -29,10 +29,22 @@ def register(sub: argparse._SubParsersAction) -> None:
         action="store_true",
         help="Execute all steps but skip the final wiki/state writes.",
     )
-    dream.add_argument("--skip-insights", dest="skip_insights", action="store_true")
-    dream.add_argument("--skip-dedup", dest="skip_dedup", action="store_true")
-    dream.add_argument("--skip-promote", dest="skip_promote", action="store_true")
-    dream.add_argument("--skip-lint", dest="skip_lint", action="store_true")
+    dream.add_argument(
+        "--skip-insights", dest="skip_insights", action="store_true",
+        help="Skip extracting insights from recent sessions.",
+    )
+    dream.add_argument(
+        "--skip-dedup", dest="skip_dedup", action="store_true",
+        help="Skip the skill-deduplication step.",
+    )
+    dream.add_argument(
+        "--skip-promote", dest="skip_promote", action="store_true",
+        help="Skip generating skill-promotion suggestions.",
+    )
+    dream.add_argument(
+        "--skip-lint", dest="skip_lint", action="store_true",
+        help="Skip linting the wiki for orphan / stale / duplicate pages.",
+    )
     dream.add_argument(
         "--provider",
         choices=PROVIDER_CHOICES,

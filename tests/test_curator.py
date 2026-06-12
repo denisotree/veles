@@ -222,8 +222,8 @@ def test_cmd_curate_advances_state_on_success(
     assert state.sessions_curated_total == 2
     assert state.last_curated_at > 0
 
-    # LOG.md entry written
-    log = (project.wiki_root / "LOG.md").read_text(encoding="utf-8")
+    # System-ops journal entry written
+    log = (project.memory_dir / "LOG.md").read_text(encoding="utf-8")
     assert "curate-batch" in log
 
     # Second invocation: nothing new (cursor at the latest), exit 0 with no-new message
@@ -446,7 +446,7 @@ def test_post_turn_curator_logs_skip_on_exception(
 
     monkeypatch.setattr("veles.cli._run_curator_pass", boom)
     _maybe_run_post_turn_curator(_run_args(), project)
-    log = (project.wiki_root / "LOG.md").read_text(encoding="utf-8")
+    log = (project.memory_dir / "LOG.md").read_text(encoding="utf-8")
     assert "curate-skip" in log
     assert "kaboom" in log
 

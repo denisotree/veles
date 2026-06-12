@@ -46,6 +46,7 @@ tmp/
 # Internal development docs & helpers (kept locally, not part of the release)
 /MILESTONES.md
 /TASKS.md
+/VISION.md
 /ISSUES.md
 /scripts/
 /docs/plans/

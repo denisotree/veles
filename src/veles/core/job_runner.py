@@ -9,7 +9,7 @@ A single instance lives inside the daemon (`DaemonState.job_runner`). On each
 3. each `_run_one` constructs a fresh `Agent` via `AgentFactory(None)`
    (isolated session), optionally prefixes the prompt with the previous
    job's output (`context_from`), writes the markdown output under
-   `<project>/.veles/wiki/jobs/<job_id>/<ts>.md`, marks the run finished,
+   `<project>/.veles/jobs/<job_id>/<ts>.md`, marks the run finished,
    and computes the next `next_run_at` from the schedule (or marks the job
    `done` if a `once`-style schedule fired or `repeat_times` is exhausted).
 

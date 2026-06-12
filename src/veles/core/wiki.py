@@ -29,13 +29,12 @@ from __future__ import annotations
 
 import datetime as _dt
 import logging
-import re
 import sqlite3
-import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
 from veles.core.safety import scan_for_injection
+from veles.core.slug import normalize_slug as _normalize_slug
 
 logger = logging.getLogger(__name__)
 
@@ -44,14 +43,15 @@ _LOG_FILE = "LOG.md"
 _WIKI_DIR = "wiki"
 _SOURCES_DIR = "sources"
 _FTS_DB = "wiki_index.db"
+# M160/M161: `proposals` and `insights` removed — both are system memory
+# and live in `.veles/memory/` (core/memory/artefacts.py + the `insights`
+# SQL table), not user content.
 _ALLOWED_CATEGORIES = (
     "concepts",
     "entities",
     "sources",
     "queries",
     "sessions",
-    "insights",
-    "proposals",
     "self-doc",
 )
 _SUMMARY_CHAR_CAP = 200
@@ -68,17 +68,6 @@ class WikiPageInfo:
 
 def _now_iso_z() -> str:
     return _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-_SLUG_NON_ALNUM = re.compile(r"[^a-z0-9]+")
-
-
-def _normalize_slug(raw: str) -> str:
-    """Return a kebab-case ASCII slug. Empty inputs yield 'untitled'."""
-    nfkd = unicodedata.normalize("NFKD", raw)
-    ascii_only = nfkd.encode("ascii", "ignore").decode("ascii").lower()
-    cleaned = _SLUG_NON_ALNUM.sub("-", ascii_only).strip("-")
-    return cleaned or "untitled"
 
 
 def _extract_title_and_summary(content: str, fallback: str) -> tuple[str, str]:

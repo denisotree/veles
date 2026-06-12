@@ -40,28 +40,30 @@ def register(sub: argparse._SubParsersAction) -> None:
     )
 
     job_list = job_sub.add_parser("list", help="List all jobs (most-recent first).")
-    job_list.add_argument("--json", action="store_true")
+    job_list.add_argument("--json", action="store_true", help="Output the job list as JSON.")
 
     job_show = job_sub.add_parser("show", help="Print a single job as JSON.")
-    job_show.add_argument("id")
+    job_show.add_argument("id", help="Job id.")
 
     job_pause = job_sub.add_parser("pause", help="Disable a job until resumed.")
-    job_pause.add_argument("id")
+    job_pause.add_argument("id", help="Job id.")
 
     job_resume = job_sub.add_parser("resume", help="Re-enable a paused job.")
-    job_resume.add_argument("id")
+    job_resume.add_argument("id", help="Job id.")
 
     job_trigger = job_sub.add_parser(
         "trigger", help="Force a job to run on the next tick (sets next_run_at=now)."
     )
-    job_trigger.add_argument("id")
+    job_trigger.add_argument("id", help="Job id.")
 
     job_remove = job_sub.add_parser("remove", help="Delete a job and its history.")
-    job_remove.add_argument("id")
+    job_remove.add_argument("id", help="Job id.")
 
     job_history = job_sub.add_parser("history", help="Show recent runs of a job.")
-    job_history.add_argument("id")
-    job_history.add_argument("--limit", type=int, default=20)
+    job_history.add_argument("id", help="Job id.")
+    job_history.add_argument(
+        "--limit", type=int, default=20, help="Max runs to show (default 20)."
+    )
 
     job_tick = job_sub.add_parser(
         "tick",

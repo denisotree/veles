@@ -1,4 +1,4 @@
-"""M63 — autopilot dispatch writes `op=autopilot-<tool>` to LOG.md."""
+"""M63 — autopilot dispatch writes `op=autopilot-<tool>` to the system-ops journal."""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ def test_autopilot_dispatch_logs_to_log_md(
     call = ToolCall(id="t1", name="fake_shell", arguments={"cmd": "ls"})
     msg = _dispatch(sensitive_registry, call, log=_noop_log)
     assert "ran: ls" in (msg.content or "")
-    log = (project.wiki_root / "LOG.md").read_text(encoding="utf-8")
+    log = (project.memory_dir / "LOG.md").read_text(encoding="utf-8")
     assert "autopilot-fake_shell" in log
 
 
@@ -76,7 +76,7 @@ def test_non_autopilot_grant_does_not_log_autopilot_op(
     TrustStore.load(user_trust_path()).grant("fake_shell")
     call = ToolCall(id="t1", name="fake_shell", arguments={"cmd": "ls"})
     _dispatch(sensitive_registry, call, log=_noop_log)
-    log_path = project.wiki_root / "LOG.md"
+    log_path = project.memory_dir / "LOG.md"
     log = log_path.read_text(encoding="utf-8") if log_path.is_file() else ""
     assert "autopilot-fake_shell" not in log
 
@@ -88,7 +88,7 @@ def test_non_sensitive_tool_under_autopilot_does_not_log(
     activate(time.time() + 3600)
     call = ToolCall(id="t1", name="safe_read", arguments={"path": "/tmp/x"})
     _dispatch(sensitive_registry, call, log=_noop_log)
-    log_path = project.wiki_root / "LOG.md"
+    log_path = project.memory_dir / "LOG.md"
     log = log_path.read_text(encoding="utf-8") if log_path.is_file() else ""
     assert "autopilot-safe_read" not in log
 
@@ -108,6 +108,6 @@ def test_autopilot_dispatch_records_failure_in_log(
     call = ToolCall(id="t1", name="boom", arguments={})
     msg = _dispatch(reg, call, log=_noop_log)
     assert "explosion" in (msg.content or "")
-    log = (project.wiki_root / "LOG.md").read_text(encoding="utf-8")
+    log = (project.memory_dir / "LOG.md").read_text(encoding="utf-8")
     assert "autopilot-boom" in log
     assert "failed" in log

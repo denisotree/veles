@@ -16,7 +16,9 @@ def register(sub: argparse._SubParsersAction) -> None:
             "providers (ollama / llamacpp / openai-compat) are always live."
         ),
     )
-    cmd.add_argument("provider", choices=PROVIDER_CHOICES)
+    cmd.add_argument(
+        "provider", choices=PROVIDER_CHOICES, help="Provider whose models to list."
+    )
     cmd.add_argument(
         "--refresh",
         action="store_true",

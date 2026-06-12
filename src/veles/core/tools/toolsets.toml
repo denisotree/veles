@@ -8,6 +8,23 @@
 # them here means: (a) CLI commands ship with the canonical set without
 # touching Python, (b) modules and projects can later override via
 # user/project-level TOML files using the same schema.
+#
+# M163: `engine-wiki` is special — it lists the tools owned by the wiki
+# content engine. The static sets below keep them (superset); at
+# agent-build time `_load_skills` subtracts the whole `engine-wiki` set
+# when the project's layout pack doesn't enable the engine
+# (`[layout.engines] wiki = true`). Add wiki-coupled tools HERE, not as
+# ad-hoc Python checks.
+
+[engine-wiki]
+tools = [
+    "wiki_list_pages",
+    "wiki_read_page",
+    "wiki_search",
+    "wiki_write_page",
+    "wiki_append_log",
+    "wiki_ingest",
+]
 
 [builtin]
 # Read-only baseline — included by every command that doesn't need writes.

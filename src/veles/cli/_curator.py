@@ -45,6 +45,7 @@ from veles.core.curator_state import load as load_curator_state
 from veles.core.curator_state import save_atomic as save_curator_state
 from veles.core.insight_extractor import make_insight_extractor
 from veles.core.memory import SessionInfo, SessionStore
+from veles.core.memory.artefacts import append_memory_log
 from veles.core.project import Project
 from veles.core.provider import Message
 from veles.core.routing import route
@@ -56,13 +57,13 @@ from veles.core.wiki import Wiki
 # (CURATE_TOOLS, CURATOR_IDLE_LIMIT, etc.) live in `core/curator.py`.
 
 # M62: subproject proposer rerun cadence — 7d between automatic refreshes
-# of `wiki/proposals/`. The detector is cheap (~tens of ms), but we still
-# avoid hammering it on every `veles run` so proposal pages don't churn
-# their mtimes and stay surfaced via the M22 memory-recall pipeline.
+# of `.veles/memory/proposals/`. The detector is cheap (~tens of ms), but
+# we still avoid hammering it on every `veles run` so proposal pages
+# don't churn their mtimes (the freshness window keys on mtime).
 _PROPOSER_IDLE_THRESHOLD_SEC = 7 * 24 * 3600
 _PROPOSER_STATE_FILE = "proposer.state.json"
 # M61: skill auto-promote suggestion also uses a 7-day cadence so
-# `wiki/proposals/promote-*.md` mtimes stay stable for the M22 recall.
+# `.veles/memory/proposals/promote-*.md` mtimes stay stable.
 _PROMOTE_SUGGEST_IDLE_THRESHOLD_SEC = 7 * 24 * 3600
 _PROMOTE_SUGGEST_STATE_FILE = "promote_suggest.state.json"
 
@@ -82,7 +83,10 @@ def _run_curator_pass(
     — callers print the user-facing summary so each entry-point keeps
     its existing tone.
     """
-    Wiki(project.wiki_root).ensure_layout()
+    from veles.core.layout.engines import wiki_enabled
+
+    if wiki_enabled(project):
+        Wiki(project.wiki_root).ensure_layout()
     state_path = project.state_dir / "curator.state.json"
     state = load_curator_state(state_path)
     cutoff = time.time() - _CURATE_QUIET_WINDOW_SEC
@@ -122,7 +126,8 @@ def _run_curator_pass(
                 sessions_curated_total=state.sessions_curated_total + successes,
             ),
         )
-        Wiki(project.wiki_root).append_log(
+        append_memory_log(
+            project,
             op=f"curate-{mode_label}",
             summary=f"{successes} session(s) curated, cursor → {next_cursor}",
         )
@@ -178,7 +183,8 @@ def _maybe_run_idle_curator(args: argparse.Namespace, project: Project) -> None:
             args, project, max_sessions=_CURATOR_IDLE_LIMIT, mode_label="idle"
         )
     except Exception as exc:
-        Wiki(project.wiki_root).append_log(
+        append_memory_log(
+            project,
             op="curate-skip",
             summary=f"idle curator failed: {type(exc).__name__}: {exc}",
         )
@@ -200,7 +206,8 @@ def _maybe_run_post_turn_curator(args: argparse.Namespace, project: Project) -> 
             args, project, max_sessions=_CURATOR_POSTRUN_LIMIT, mode_label="post-turn"
         )
     except Exception as exc:
-        Wiki(project.wiki_root).append_log(
+        append_memory_log(
+            project,
             op="curate-skip",
             summary=f"post-turn curator failed: {type(exc).__name__}: {exc}",
         )
@@ -233,7 +240,8 @@ def _maybe_surface_skill_suggestions(project: Project) -> None:
     except Exception as exc:
         # Same posture as the curator-skip log: don't fail the turn.
         try:
-            Wiki(project.wiki_root).append_log(
+            append_memory_log(
+                project,
                 op="skill-suggest-skip",
                 summary=f"{type(exc).__name__}: {exc}",
             )
@@ -277,7 +285,8 @@ def _maybe_run_post_turn_dream(args: argparse.Namespace, project: Project) -> No
             now=now,
         )
     except Exception as exc:
-        Wiki(project.wiki_root).append_log(
+        append_memory_log(
+            project,
             op="dream-skip",
             summary=f"post-turn dream failed: {type(exc).__name__}: {exc}",
         )
@@ -313,7 +322,8 @@ def _maybe_run_subproject_proposer(args: argparse.Namespace, project: Project) -
         if clusters:
             write_proposals(project, clusters)
     except Exception as exc:
-        Wiki(project.wiki_root).append_log(
+        append_memory_log(
+            project,
             op="proposer-skip",
             summary=f"subproject proposer failed: {type(exc).__name__}: {exc}",
         )
@@ -371,7 +381,8 @@ def _maybe_suggest_promotions(args: argparse.Namespace, project: Project) -> Non
         if candidates:
             write_promote_proposals(project, candidates)
     except Exception as exc:
-        Wiki(project.wiki_root).append_log(
+        append_memory_log(
+            project,
             op="promote-suggest-skip",
             summary=f"skill promote-suggester failed: {type(exc).__name__}: {exc}",
         )
@@ -419,7 +430,8 @@ def _maybe_refresh_nl_routing(args: argparse.Namespace, project: Project) -> Non
     try:
         provider = _make_provider(routed_provider)
     except Exception as exc:
-        Wiki(project.wiki_root).append_log(
+        append_memory_log(
+            project,
             op="route-refresh-skip",
             summary=f"failed to build provider {routed_provider!r}: {exc}",
         )
@@ -429,7 +441,8 @@ def _maybe_refresh_nl_routing(args: argparse.Namespace, project: Project) -> Non
         extractor = make_nl_extractor(provider=provider, model=routed_model)
         refresh_nl_routing(project, agents_md, extractor=extractor)
     except Exception as exc:
-        Wiki(project.wiki_root).append_log(
+        append_memory_log(
+            project,
             op="route-refresh-skip",
             summary=f"nl routing refresh failed: {type(exc).__name__}: {exc}",
         )
@@ -467,7 +480,8 @@ def _maybe_run_insight_extractor(
         )
         extractor(history, session_id)
     except Exception as exc:
-        Wiki(project.wiki_root).append_log(
+        append_memory_log(
+            project,
             op="insight-skip",
             summary=f"insight extraction failed: {type(exc).__name__}: {exc}",
         )
@@ -488,32 +502,53 @@ def _curate_one_session(
         _run_agent_streaming_aware,
     )
 
+    from veles.core.layout.engines import wiki_enabled
+
     messages = store.load_messages(session.id)
     serialized = _truncate_session_messages(messages, _CURATE_TURN_LIMIT, _CURATE_CHARS_LIMIT)
     created_iso = _dt.datetime.fromtimestamp(session.created_at, tz=_dt.UTC).isoformat()
+    # M163: the wiki-page half of curation exists only when the layout
+    # pack enables the wiki engine; without it the distillation lands in
+    # SQL memory alone (memory_save_insight / memory_save_rule).
+    if wiki_enabled(project):
+        persist_steps = (
+            f'- Call wiki_write_page(category="sessions", slug="{session.id}",'
+            " title=..., content=...).\n"
+            "- Call memory_save_insight(title=<same title>, body=<a 2-4 sentence"
+            ' summary>, category="curated-session", file_path=<the wiki page path>)'
+            " so the insight surfaces in /insights and recall.\n"
+        )
+        log_step = (
+            '- Call wiki_append_log(op="curate",'
+            f' summary="<one-line summary>: session {session.id}").\n'
+            "- Reply with one sentence confirming the page path.\n\n"
+        )
+        intro = "Distill this Veles session into a single persistent wiki page."
+    else:
+        persist_steps = (
+            "- Call memory_save_insight(title=<same title>, body=<the distilled"
+            ' content>, category="curated-session") so it surfaces in /insights'
+            " and recall.\n"
+        )
+        log_step = "- Reply with one sentence confirming the insight was saved.\n\n"
+        intro = "Distill this Veles session into one durable memory insight."
     system_prompt = (
-        "You are the Veles curator. Distill this Veles session into a single"
-        " persistent wiki page. Skip greetings, error retries, and tool noise;"
+        f"You are the Veles curator. {intro}"
+        " Skip greetings, error retries, and tool noise;"
         " keep only durable facts, decisions, learnings, and references that a"
         " future agent should be able to recall.\n\n"
         "Workflow:\n"
         "- Choose a short H1 title that names the topic.\n"
         "- Write 3-8 bullet points or short paragraphs covering the durable"
         " signal. Cite tool outputs only when load-bearing.\n"
-        f'- Call wiki_write_page(category="sessions", slug="{session.id}",'
-        " title=..., content=...).\n"
-        "- Call memory_save_insight(title=<same title>, body=<a 2-4 sentence"
-        ' summary>, category="curated-session", file_path=<the wiki page path>)'
-        " so the insight surfaces in /insights and recall.\n"
+        f"{persist_steps}"
         "- If the session reveals a stable behavioral preference or constraint"
         ' (e.g. "user prefers terse responses", "always use real DB in tests",'
         ' "never invoke X without confirmation"), additionally call'
         f' memory_save_rule(kind="preference", body=<rule text>,'
         f' source="session-{session.id}"). Use kind="format" for response shape,'
         ' "do" for always-do, "dont" for never-do, "preference" for taste.\n'
-        '- Call wiki_append_log(op="curate",'
-        f' summary="<one-line summary>: session {session.id}").\n'
-        "- Reply with one sentence confirming the page path.\n\n"
+        f"{log_step}"
         "Session metadata:\n"
         f"  id={session.id}\n"
         f"  created_at={created_iso}\n"

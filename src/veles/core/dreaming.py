@@ -16,8 +16,9 @@ Two callers exist:
    cycle (with consolidation) at most once per `deep_interval_seconds`.
 
 Both contracts converge on `dream_cycle(project, ...)`. The function never
-mutates active sessions; outputs land in `wiki/insights/`, `wiki/proposals/`,
-and `wiki/LOG.md`. A file lock (`<project>/.veles/dream.lock`) prevents a
+mutates active sessions; outputs land in the agent's own memory —
+`.veles/memory/proposals/` and the `.veles/memory/LOG.md` system-ops
+journal (M160). A file lock (`<project>/.veles/dream.lock`) prevents a
 CLI invocation from racing the daemon.
 
 Pipeline:
@@ -31,7 +32,7 @@ Pipeline:
 Steps 1-4 are I/O-bound and millisecond-fast. Step 5 calls a sub-agent on a
 cheap model (default `anthropic/claude-haiku-4.5`) with a tight prompt
 asking for umbrella-skill suggestions. The sub-agent has NO tools — its
-output is appended to `wiki/proposals/dream-consolidate-<ts>.md` so a
+output lands in `.veles/memory/proposals/dream-consolidate-<ts>.md` so a
 follow-up human/agent review owns the merge decisions.
 """
 
@@ -47,6 +48,7 @@ from typing import TYPE_CHECKING
 
 from veles.core.curator_state import CuratorState, load, save_atomic
 from veles.core.file_lock import file_lock
+from veles.core.memory.artefacts import append_memory_log, write_proposal
 from veles.core.wiki import Wiki
 
 if TYPE_CHECKING:
@@ -120,13 +122,6 @@ def _dream_lock_path(project: Project) -> Path:
     return project.state_dir / "dream.lock"
 
 
-def _consolidation_dir(project: Project) -> Path:
-    # `Wiki` writes proposals under `<wiki_root>/wiki/<category>/`; the
-    # bare `wiki_root / "proposals"` path (pre-v2 leftover) pointed at
-    # an unused dir alongside `.veles/wiki/`. Match Wiki's layout.
-    return project.wiki_root / "wiki" / "proposals"
-
-
 @contextmanager
 def _maybe_lock(project: Project, *, blocking: bool):
     """Hold the dream-lock for the body. If `blocking=False` and the lock is
@@ -165,7 +160,7 @@ def _persist_dream_state(
     *,
     state_path: Path,
     state: CuratorState,
-    wiki: Wiki,
+    project: Project,
     result: DreamResult,
     at: float,
     include_consolidation: bool,
@@ -181,7 +176,8 @@ def _persist_dream_state(
     if dry_run:
         return
     save_atomic(state_path, new_state)
-    wiki.append_log(
+    append_memory_log(
+        project,
         op="dream_deep" if include_consolidation else "dream_post_turn",
         summary=result.summary(),
     )
@@ -220,9 +216,14 @@ def dream_cycle(
     if not project.project_toml_path.is_file():
         result.notes.append("skipped: project marker (project.toml) missing")
         return result
+    from veles.core.layout.engines import wiki_enabled
+
     state_path = _dream_state_path(project)
     state = load(state_path)
-    wiki = Wiki(project.wiki_root)
+    # M163: wiki-facing steps (lint, FTS reindex) run only when the
+    # layout pack enables the wiki engine; the rest of the dream operates
+    # on layout-independent memory.
+    wiki = Wiki(project.wiki_root) if wiki_enabled(project) else None
     model = consolidation_model or _DEFAULT_CONSOLIDATION_MODEL
 
     with _maybe_lock(project, blocking=True):
@@ -242,17 +243,17 @@ def dream_cycle(
             )
         if not skip_dedup:
             _run_dream_step(
-                "dedup", lambda: _step_dedup(project, wiki, result, dry_run=dry_run), result
+                "dedup", lambda: _step_dedup(project, result, dry_run=dry_run), result
             )
         if not skip_promote:
             _run_dream_step(
-                "promote", lambda: _step_promote(project, wiki, result, dry_run=dry_run), result
+                "promote", lambda: _step_promote(project, result, dry_run=dry_run), result
             )
-        if not skip_lint:
+        if not skip_lint and wiki is not None:
             _run_dream_step(
                 "lint", lambda: _step_lint(project, wiki, result, dry_run=dry_run), result
             )
-        if not skip_reindex and not dry_run:
+        if not skip_reindex and not dry_run and wiki is not None:
             _run_dream_step(
                 "reindex", lambda: _step_reindex(wiki, result), result
             )
@@ -266,7 +267,7 @@ def dream_cycle(
             _run_dream_step(
                 "consolidation",
                 lambda: _step_consolidate(
-                    project, wiki, provider, model, result, dry_run=dry_run
+                    project, provider, model, result, dry_run=dry_run
                 ),
                 result,
             )
@@ -274,7 +275,7 @@ def dream_cycle(
         _persist_dream_state(
             state_path=state_path,
             state=state,
-            wiki=wiki,
+            project=project,
             result=result,
             at=at,
             include_consolidation=include_consolidation,
@@ -403,7 +404,7 @@ def _step_runtime_sessions(
     result.notes.append("runtime-sessions: fleet snapshot recorded")
 
 
-def _step_dedup(project: Project, wiki: Wiki, result: DreamResult, *, dry_run: bool) -> None:
+def _step_dedup(project: Project, result: DreamResult, *, dry_run: bool) -> None:
     from veles.core.skill_dedup import find_duplicate_skills
     from veles.core.skills import discover_skills
 
@@ -429,16 +430,16 @@ def _step_dedup(project: Project, wiki: Wiki, result: DreamResult, *, dry_run: b
         names = ", ".join(sorted(s.name for s in cluster.skills))
         body_lines.append(f"- **cluster** ({len(cluster.skills)}): {names}")
     slug = f"dream-dedup-{_now_slug()}"
-    wiki.write_page(
-        category="proposals",
+    write_proposal(
+        project,
         slug=slug,
         title="Dream: duplicate-skill clusters",
         content="\n".join(body_lines) + "\n",
     )
-    wiki.append_log(op="dream_dedup", summary=f"{len(clusters)} clusters")
+    append_memory_log(project, op="dream_dedup", summary=f"{len(clusters)} clusters")
 
 
-def _step_promote(project: Project, wiki: Wiki, result: DreamResult, *, dry_run: bool) -> None:
+def _step_promote(project: Project, result: DreamResult, *, dry_run: bool) -> None:
     from veles.core.skill_promotion import find_promote_candidates, write_promote_proposals
 
     candidates = find_promote_candidates(project)
@@ -457,13 +458,13 @@ def _step_lint(project: Project, wiki: Wiki, result: DreamResult, *, dry_run: bo
         return
     rendered = render_report(report)
     slug = f"dream-lint-{_now_slug()}"
-    wiki.write_page(
-        category="proposals",
+    write_proposal(
+        project,
         slug=slug,
         title="Dream: wiki lint",
         content=rendered,
     )
-    wiki.append_log(op="dream_lint", summary=f"{result.lint_findings} findings")
+    append_memory_log(project, op="dream_lint", summary=f"{result.lint_findings} findings")
 
 
 def _step_reindex(wiki: Wiki, result: DreamResult) -> None:
@@ -476,28 +477,36 @@ _CONSOLIDATION_INSIGHTS_LIMIT = 20
 
 
 def _collect_insight_snippets(project: Project, *, limit: int) -> list[str]:
-    """Return the `limit` most-recent insight files as `## title\\nbody` blocks.
+    """Return the `limit` most-recent insights as `## title\\nbody` blocks.
 
-    `Wiki` writes pages under `<wiki_root>/wiki/<category>/`, so the actual
-    on-disk insights dir is `<wiki_root>/wiki/insights`. Files that won't read
-    are skipped, not raised — the consolidator runs on a best-effort budget.
+    M161: reads the canonical `insights` SQL rows (newest first, skipping
+    rows already superseded by the M142 dedup) — not the rendered markdown
+    views. Best-effort: any sqlite failure yields an empty list, the
+    consolidator just skips.
     """
-    insights_dir = project.wiki_root / "wiki" / "insights"
-    if not insights_dir.is_dir():
+    import sqlite3
+
+    if not project.memory_db_path.is_file():
         return []
-    files = sorted(insights_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
-    snippets: list[str] = []
-    for path in files[:limit]:
+    try:
+        conn = sqlite3.connect(str(project.memory_db_path))
+        conn.row_factory = sqlite3.Row
         try:
-            snippets.append(f"## {path.stem}\n{path.read_text(encoding='utf-8')}")
-        except OSError:
-            continue
-    return snippets
+            rows = conn.execute(
+                "SELECT title, body FROM insights"
+                " WHERE id NOT IN (SELECT from_insight_id FROM insight_refs)"
+                " ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return []
+    return [f"## {r['title']}\n{r['body']}" for r in rows]
 
 
 def _step_consolidate(
     project: Project,
-    wiki: Wiki,
     provider: Provider,
     model: str,
     result: DreamResult,
@@ -536,15 +545,15 @@ def _step_consolidate(
         return
 
     slug = f"dream-consolidate-{_now_slug()}"
-    page_rel = wiki.write_page(
-        category="proposals",
+    page_path = write_proposal(
+        project,
         slug=slug,
         title="Dream: consolidation proposals",
         content=f"# Dream: consolidation proposals\n\n_Generated: {_now_iso()}_\n\n{text}\n",
     )
     result.consolidated = True
-    result.consolidation_path = str(project.wiki_root / page_rel)
-    wiki.append_log(op="dream_consolidate", summary=f"-> {page_rel}")
+    result.consolidation_path = str(page_path)
+    append_memory_log(project, op="dream_consolidate", summary=f"-> {page_path}")
 
 
 def _now_slug() -> str:

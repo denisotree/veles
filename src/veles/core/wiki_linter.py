@@ -16,9 +16,10 @@ Both are reachable via `veles lint --llm`, which preserves the
 pre-M32 sub-Agent path.
 
 Excluded categories:
-- `sessions/` and `insights/` — append-only journals of agent
-  activity, naturally orphan and naturally dated. Flagging them
-  would just add noise.
+- `sessions/` — append-only journal of agent activity, naturally
+  orphan and naturally dated. Flagging it would just add noise.
+  (`insights` left wiki entirely in M161 — they live in the
+  `insights` memory table now.)
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
 _DEFAULT_STALE_DAYS = 365
 _DEFAULT_DUPLICATE_THRESHOLD = 0.6
 _LINKABLE_CATEGORIES = frozenset({"concepts", "entities", "sources", "queries"})
-_NOISE_CATEGORIES = frozenset({"sessions", "insights"})
+_NOISE_CATEGORIES = frozenset({"sessions"})
 
 _DATE_RE = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
 _YEAR_RE = re.compile(r"\b(20\d{2})\b")
@@ -250,7 +251,7 @@ def run_lint(
 
 def render_report(report: LintReport, *, now: _dt.datetime | None = None) -> str:
     """Render a `LintReport` as a markdown document suitable for stdout
-    or `wiki/insights/lint-<ts>.md`."""
+    or a `.veles/memory/proposals/dream-lint-<ts>.md` page."""
     now = now or _dt.datetime.now(tz=_dt.UTC)
     lines = [
         "# Veles wiki lint report",

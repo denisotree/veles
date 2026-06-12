@@ -15,7 +15,7 @@ def register(sub: argparse._SubParsersAction) -> None:
     skill_sub.add_parser("list", help="List skills in the active project.")
 
     skill_show = skill_sub.add_parser("show", help="Print a skill's SKILL.md verbatim.")
-    skill_show.add_argument("name")
+    skill_show.add_argument("name", help="Skill name.")
 
     skill_add = skill_sub.add_parser(
         "add", help="Install a skill from a git URL or local directory."
@@ -100,13 +100,14 @@ def register(sub: argparse._SubParsersAction) -> None:
         "suggest-promote",
         help=(
             "List project-scope skills that meet the auto-promote bar "
-            "(use_count + success_rate). --save persists proposals into wiki/proposals/."
+            "(use_count + success_rate). --save persists proposals into "
+            ".veles/memory/proposals/."
         ),
     )
     skill_suggest_promote.add_argument(
         "--save",
         action="store_true",
-        help="Persist each candidate as wiki/proposals/promote-<name>.md.",
+        help="Persist each candidate as .veles/memory/proposals/promote-<name>.md.",
     )
     skill_suggest_promote.add_argument(
         "--min-uses",

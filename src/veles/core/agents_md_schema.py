@@ -57,29 +57,25 @@ def validate(text: str) -> ValidationResult:
 def default_template(name: str) -> str:
     """Return a fresh AGENTS.md that passes `validate()`.
 
-    The template intentionally stays short — PLAN.md §5 caps AGENTS.md
-    at ~300 lines, and `INDEX.md` carries the volume. Sections here
-    are placeholders the user is expected to fill in; the agent reads
-    the file as-is so empty sections still load without error.
+    M162: this is the *layout-agnostic fallback* — a layout pack that
+    wants a richer, structure-specific AGENTS.md ships its own template
+    via `[layout.scaffold].agents_md_template` (the builtin llm-wiki
+    pack does). The template intentionally stays short — PLAN.md §5
+    caps AGENTS.md at ~300 lines. Sections are placeholders the user is
+    expected to fill in; the agent reads the file as-is so empty
+    sections still load without error.
     """
     return (
         f"# {name}\n\n"
         f"Add your project context here. Auto-loaded into the system prompt\n"
-        f"when you run `veles run`, `veles ingest`, or `veles query` from\n"
-        f"this directory (or any subdirectory).\n\n"
+        f"when you run `veles run` or `veles tui` from this directory (or any\n"
+        f"subdirectory).\n\n"
         f"## Layout\n\n"
-        f"- `sources/` — immutable raw inputs.\n"
-        f"- `wiki/` — agent-curated knowledge "
-        f"(concepts, entities, sources, queries, sessions, insights).\n"
-        f"- `INDEX.md` — auto-generated catalogue, refreshed on every wiki write.\n"
-        f"- `LOG.md` — append-only journal of agent operations.\n\n"
+        f"Describe how this project organises its files — which directories\n"
+        f"exist, what lives where, and where the agent may write.\n\n"
         f"## Conventions\n\n"
-        f"- Wiki pages use kebab-case slugs.\n"
-        f"- Tool calls log to `LOG.md` via `wiki_append_log`.\n"
-        f"- LLM-only writes go under `wiki/`; `sources/` is read-only.\n\n"
+        f"Naming, formatting, and workflow rules the agent should follow in\n"
+        f"this project.\n\n"
         f"## Workflows\n\n"
-        f"- `veles ingest <url|file>` — read source, write a wiki page.\n"
-        f"- `veles query <question>` — search the wiki and synthesise an answer.\n"
-        f"- `veles lint` — audit for orphans, stale claims, duplicates.\n"
-        f"- `veles curate` — compact recent sessions into `wiki/sessions/`.\n"
+        f"The recurring tasks this project is used for, and how to run them.\n"
     )

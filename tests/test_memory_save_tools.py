@@ -1,8 +1,10 @@
 """M125: `memory_save_insight` and `memory_save_rule` builtin tools.
 
-These are SQL-direct writers used by the curator agent (and the
-insight extractor's mirror) to land distilled output in M119
-`insights` / `rules` tables, not just in wiki markdown."""
+These are SQL-direct writers used by the curator agent and the insight
+extractor to land distilled output in M119 `insights` / `rules` tables.
+M161: the insights row is canonical; a markdown view is rendered to
+`.veles/memory/insights/` and backfilled into `file_path` when the
+caller didn't supply one."""
 
 from __future__ import annotations
 
@@ -68,16 +70,20 @@ def test_save_insight_writes_row(project) -> None:
     assert row["file_path"] == "wiki/sessions/abc.md"
 
 
-def test_save_insight_no_file_path_stores_null(project) -> None:
+def test_save_insight_no_file_path_renders_view(project) -> None:
+    """M161: empty file_path → backfilled with the rendered memory view."""
     memory_save_insight(
         title="Empty path", body="b", category="curated-session"
     )
     store = SessionStore(project.memory_db_path)
     row = store._conn.execute(
-        "SELECT file_path FROM insights WHERE title=?", ("Empty path",)
+        "SELECT id, file_path FROM insights WHERE title=?", ("Empty path",)
     ).fetchone()
     store._conn.close()
-    assert row["file_path"] is None
+    assert row["file_path"] == f".veles/memory/insights/empty-path-{row['id']}.md"
+    view = project.root / row["file_path"]
+    assert view.is_file()
+    assert "Empty path" in view.read_text(encoding="utf-8")
 
 
 def test_save_insight_idempotent_runs(project) -> None:

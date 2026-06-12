@@ -1,514 +1,340 @@
 # Veles
 
-Минималистичный агентский фреймворк: чистый декомпозированный код, компаундирующая память по каждому проекту, прозрачная автономия и открытые интерфейсы.
+**A minimal CLI agent framework that gets smarter with every session.**
 
-Veles не похож на «чатик с историей»: он ведёт **по каждому проекту персональную LLM-wiki** — структурированную базу знаний, которая накапливается с течением времени. Curator консолидирует сессии, lint ищет противоречия, embedding-distance отлавливает дубликаты скиллов, агент сам предлагает декомпозицию подпроектов, когда wiki разрастается. Никакого облака — всё локально, SQLite + файловая система.
+Unlike chat tools that start fresh every time, Veles maintains **structured project memory** — insights, rules, and curated knowledge that accumulate across sessions and make the agent more useful the longer you use it. How your *content* is organised is pluggable: a Karpathy-style LLM wiki by default, flat notes, or no structure at all for code repos. Built clean: no god-files, no vendor lock-in, no cloud sync.
 
----
-
-## Содержание
-
-- [Чем Veles отличается](#чем-veles-отличается)
-- [Установка](#установка)
-- [Первый запуск](#первый-запуск)
-- [Структура проекта](#структура-проекта)
-- [Базовые команды](#базовые-команды)
-- [Безопасность](#безопасность)
-- [Маршрутизация моделей (ensembles)](#маршрутизация-моделей-ensembles)
-- [Скиллы и модули](#скиллы-и-модули)
-- [TUI](#tui)
-- [Daemon + каналы (Telegram)](#daemon--каналы-telegram)
-- [Multi-project и подпроекты](#multi-project-и-подпроекты)
-- [Памятка по командам](#памятка-по-командам)
+```bash
+uv tool install .
+veles init && veles run "Summarize the project architecture."
+veles tui   # interactive REPL
+```
 
 ---
 
-## Чем Veles отличается
+## Why Veles?
 
-1. **Компаундирующая память.** По каждому проекту ведётся LLM-wiki: накопленные знания не переоткрываются на каждом запросе, а живут как структурированный артефакт. Curator консолидирует завершённые сессии в wiki непрерывно, lint ищет противоречия, telemetry скиллов влияет на их продвижение и архивацию.
+**Compounding memory** — Every session is distilled by the Curator into per-project memory (insights, behavioral rules, session digests in `.veles/`). The agent recalls relevant facts and past decisions automatically — you stop re-explaining the same context. Memory works under *any* content layout.
 
-2. **Двумерная декомпозиция.** Между проектами знания не смешиваются (sandbox). Внутри проекта агент сам видит смысловые кластеры в wiki и предлагает выделить подпроект — пользователь одобряет.
+**Pluggable content layouts** — `veles init` scaffolds a Karpathy-style LLM wiki by default; `--layout notes` gives a flat notes directory; `--layout bare` adds no structure at all (ideal for code repos). Custom layout packs are a single TOML file in `~/.veles/layouts/`.
 
-3. **Backend-агностичность + ансамбли.** OpenRouter, Anthropic, OpenAI, Gemini напрямую через API + `claude` / `gemini` CLI через подписку. Ансамбли (разные модели на разные типы задач) настраиваются типизированно (`routing.toml`) **или** на естественном языке прямо в `AGENTS.md` проекта.
+**Provider-agnostic routing** — OpenRouter, Anthropic, OpenAI, Gemini, Ollama, llamacpp, or your `claude`/`gemini` CLI subscription. Different task types (planning, compression, insights) can route to different models.
 
-4. **Модульность + open interfaces.** Минимальное ядро (память, learning loop, agent loop, провайдер-протокол, реестр инструментов). Всё остальное — опциональные модули и скиллы.
+**Skills that accumulate** — Reusable prompt-blocks become agent tools. Promote a skill from a project to user-global and it's available everywhere. Built-in dedup finds near-duplicate skills before they drift.
 
-5. **Local-first + sandbox.** Агент видит только активный проект (с подпроектами) и `~/.veles`. Никаких других проектов, никаких сетевых вызовов мимо выбранного LLM. Trust ladder при каждой чувствительной операции.
+**Local-first + sandboxed** — No telemetry, no cloud sync. The agent sees only the active project directory. Trust ladder prompts for every sensitive tool call; pre-grant for CI.
+
+**Modular, not monolithic** — Minimal core (memory, agent loop, provider protocol, tool registry). Everything else — TUI, daemon, Telegram gateway, deep research, job scheduler — is an optional, loadable module.
 
 ---
 
-## Установка
+## Quick Start
 
-**Требования:** Python 3.13+, macOS/Linux. Windows — best-effort.
+**Requirements:** Python 3.13+, macOS / Linux (Windows best-effort). Install [uv](https://docs.astral.sh/uv/) first.
 
-```sh
-# 1. uv (если ещё нет)
+```bash
+# 1. Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 2. Глобальная установка из директории с исходниками
-cd /path/to/veles          # директория, где лежит pyproject.toml
+# 2. Install veles globally from source
+git clone <repo-url> && cd veles
 uv tool install .
 
-# 3. Проверка
-veles --help
-```
-
-После `uv tool install .` команда `veles` доступна глобально в PATH — в любой директории, без `uv run`. `uv` создаёт изолированное venv и прописывает шим в `~/.local/bin/` (или эквивалент для вашей ОС).
-
-Если нужна быстрая проверка без глобальной установки — `uv run veles --help` из директории с исходниками тоже работает.
-
-При обновлении исходников запустите `uv tool install . --reinstall`, чтобы обновить глобальный шим.
-
-**API-ключ** (минимум один):
-
-| Провайдер   | Env var                              | Где взять                         |
-|-------------|--------------------------------------|-----------------------------------|
-| OpenRouter  | `OPENROUTER_API_KEY`                 | openrouter.ai (рекомендуется)     |
-| Anthropic   | `ANTHROPIC_API_KEY`                  | console.anthropic.com             |
-| OpenAI      | `OPENAI_API_KEY`                     | platform.openai.com               |
-| Gemini      | `GEMINI_API_KEY` или `GOOGLE_API_KEY`| ai.google.dev                     |
-
-OpenRouter — дефолтный провайдер; через него доступны и Claude, и GPT, и Gemini одним ключом. Альтернатива — подписка на `claude` или `gemini` CLI; в этом случае Veles запускает их как subprocess и работает координатором (`--provider claude-cli` / `--provider gemini-cli`).
-
----
-
-## Первый запуск
-
-```sh
+# 3. Set an API key — OpenRouter is recommended (access to all models, one key)
 export OPENROUTER_API_KEY=sk-or-v1-...
-mkdir my-knowledge-base && cd my-knowledge-base
 
-# Wizard: язык, провайдер по умолчанию, имя проекта.
-# При первом запуске любой команды Veles предложит его пройти автоматически.
-veles init my-kb
+# 4. Create a project
+mkdir my-project && cd my-project
+veles init
 
-# Обычный запрос.
-veles run "Изучи AGENTS.md и опиши проект в трёх предложениях."
+# 5. Talk to the agent
+veles run "Read AGENTS.md and describe this project."
 ```
 
-После `veles init` появляется директория `.veles/` с конфигом проекта и `AGENTS.md` — короткий схема-файл, который агент видит в начале каждой сессии. Его стоит подредактировать под свой workflow:
+Open the interactive TUI instead:
 
-```sh
-veles schema edit            # открывает AGENTS.md в $EDITOR
-veles schema validate        # проверяет, что обязательные секции на месте
+```bash
+veles tui
+```
+
+On first run, a setup wizard will ask for your preferred language, provider, and project name.
+
+---
+
+## Providers
+
+| Provider | Env var | Notes |
+|---|---|---|
+| **OpenRouter** *(recommended)* | `OPENROUTER_API_KEY` | Claude, GPT, Gemini, Llama — one key, hundreds of models |
+| Anthropic | `ANTHROPIC_API_KEY` | Direct API |
+| OpenAI | `OPENAI_API_KEY` | Direct API |
+| Gemini | `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Direct API |
+| `claude` CLI | — | Uses your Claude subscription; no API key needed |
+| `gemini` CLI | — | Uses your Gemini subscription; no API key needed |
+| Ollama | — | Local models, `http://localhost:11434/v1` |
+| llamacpp | — | Local models, `http://localhost:8080/v1` |
+| openai-compat | `OPENAI_COMPAT_BASE_URL` | Any OpenAI-compatible endpoint |
+
+Override per-run:
+
+```bash
+veles run --provider anthropic --model anthropic/claude-opus-4-8 "..."
+veles run --provider ollama --model llama3.2 "..."
+```
+
+Store API keys in the OS keychain instead of environment variables:
+
+```bash
+veles secret set OPENROUTER_API_KEY    # prompts for value, stores in keychain
 ```
 
 ---
 
-## Структура проекта
+## Core Workflow
 
-```
-my-kb/
-├── AGENTS.md          # схема + конвенции + workflow проекта
-├── INDEX.md           # каталог wiki (обновляется атомарно)
-├── LOG.md             # append-only журнал: ## [date] op | description
-├── sources/           # raw immutable источники (агент только читает)
-│   └── <category>/
-├── wiki/              # writable LLM-зона: единственное место, куда агент пишет
-│   ├── concepts/
-│   ├── entities/
-│   ├── insights/      # выжимки из turn'ов
-│   ├── sessions/      # компактификации сессий
-│   ├── proposals/     # предложения от агента (подпроекты, promote скиллов)
-│   └── queries/       # сохранённые ответы query/TUI /save
-├── .veles/            # state (не в git): memory.db, telemetry, routing, ...
-└── CLAUDE.md, GEMINI.md → AGENTS.md   # симлинки для совместимости
+### Pick a content layout
+
+```bash
+veles init                  # default: Karpathy-style LLM wiki (sources/ + wiki/)
+veles init --layout notes   # a single flat notes/ directory
+veles init --layout bare    # no content scaffold — code repos, free-form work
 ```
 
-Это раскладка Karpathy LLM Wiki — три слоя (sources / wiki / schema), три операции (ingest / query / lint). Если пишешь другую структуру — опиши её в `AGENTS.md`, и Veles привяжет операции к твоим путям.
+The agent's own memory (insights, rules, session digests in `.veles/`) works identically under every layout. Custom packs are one `layout.toml` in `~/.veles/layouts/<name>/`.
 
----
+### Build a knowledge base (llm-wiki layout)
 
-## Базовые команды
+```bash
+veles add paper.pdf                   # read a source → write a wiki page
+veles add https://example.com/post    # web pages, PDFs, plain text
 
-### Запуск + разговор
-
-```sh
-veles run "<prompt>"                       # одиночный запрос
-veles run --resume <session_id> "<prompt>" # продолжить сессию
-veles run --stream "<prompt>"              # streaming ответ в stdout
-veles run --provider anthropic "<prompt>"  # выбрать провайдера явно
-veles run --model anthropic/claude-opus-4-7 "<prompt>"
+veles run "What do we know about the authentication design?"
+veles curate                          # explicit session → memory consolidation
 ```
 
-После запуска Veles печатает `<session=...>` — этот id можно использовать в `--resume`.
+The Curator runs automatically after sessions. Insight extraction catches phrases like "always prefer X" or "never do Y" and writes them as persistent project insights.
 
-### Ingest / query / lint — LLM Wiki workflow
+### Deep research
 
-```sh
-veles ingest paper.pdf                  # прочитать источник, записать wiki-страницу
-veles ingest https://example.com/post   # PDF, текст, изображения (Tesseract OCR), web
-veles query "что мы знаем про X?"       # ответ через wiki + memory recall
-veles query "..." --save                # сохранить ответ как wiki-страницу
-veles lint                              # детерминированный health-check wiki
-veles lint --llm                        # дополнительно LLM-проход на противоречия
-veles lint --save                       # отчёт в wiki/insights/lint-<UTC>.md
-veles curate                            # явная консолидация сессий → wiki/sessions/
+```bash
+veles research "What are the trade-offs between SQLite and PostgreSQL for this use case?"
 ```
 
-Curator работает непрерывно (idle pre-run + post-turn) автоматически. Insight extraction после каждого `veles run` ловит фразы вроде «запомни X», «никогда не делай Y» и пишет их в `wiki/insights/`.
+Decomposes the question into parallel sub-questions, explores each, and synthesises a structured report.
 
-### Сессии
+### Long-running goals
 
-```sh
-veles sessions list                      # последние сессии
-veles sessions show <id>                 # печать всех turn'ов
-veles sessions delete <id>
-veles sessions search "<query>"          # FTS5-поиск по содержимому turn'ов
-veles sessions search "<q>" --since 7d --role user
+```bash
+veles goal start "Migrate auth module to the new provider" --max-cost-usd 2.00
+veles goal list
+veles goal checkpoint <id> "Completed step 1: identified all call sites"
 ```
 
-### Wiki
+### Scheduled jobs
 
-```sh
-veles wiki reindex                       # перестроить FTS5-индекс wiki/
+```bash
+veles job add "weekly-review" --schedule "0 9 * * 1" --prompt "Generate a weekly progress summary"
+veles job list
 ```
 
 ---
 
-## Безопасность
+## Model Routing (Ensembles)
 
-Veles разработан под автономную работу с осторожностью по умолчанию.
+Route different task types to different models — set it once and forget it.
 
-### Sandbox
-
-Агент видит только:
-- активный проект (CWD с подпроектами);
-- user-global `~/.veles/` (скиллы, модули, конфиг).
-
-Другие проекты из реестра — невидимы без явного переключения. Симлинки за пределы — отбрасываются. `..`-traversal — refuse.
-
-### Trust ladder per-операция
-
-При каждой sensitive-операции (`run_shell`, `write_file`, `fetch_url`) пользователь получает 4-option выбор:
-
-```
-Tool 'run_shell' wants to execute. Allow?
-  [1] Once (this call only)
-  [2] Always for this project
-  [3] Always everywhere
-  [4] Refuse
+**Via CLI:**
+```bash
+veles route show                                          # current routing table
+veles route set compressor anthropic/claude-haiku-4-5    # typed override
+veles route reset compressor                             # back to default
 ```
 
-Решения 2/3 persist'ятся в `<project>/.veles/trust.json` или `~/.veles/trust.json`. Без TTY — refuse по умолчанию (CI-safe).
-
-Программный CRUD:
-
-```sh
-veles trust list                         # текущие grant'ы (project + user scope)
-veles trust set run_shell --scope user   # пред-grant без интерактива
-veles trust revoke run_shell             # снять grant из обоих scope'ов
-veles trust clear --scope all            # обнулить
-```
-
-### Autopilot — временный bypass
-
-```sh
-veles autopilot enable --until +2h       # 2 часа без trust-prompt'ов
-veles autopilot enable --until 2026-12-31T23:00:00Z
-veles autopilot status
-veles autopilot disable
-```
-
-Каждый dispatch при активном autopilot пишется в `LOG.md` как `op="autopilot-<tool>"` для аудита. **Always-confirm операции** (удаление файлов, install module/skill, запись за пределы проекта) не bypass'ятся autopilot'ом — для них требуется явный `yes`.
-
----
-
-## Маршрутизация моделей (ensembles)
-
-Разные задачи (curator / insights / compressor / advisor / vision / embedding) могут идти к разным моделям.
-
-### Типизированный TOML
-
-```sh
-veles route show                                    # текущая таблица
-veles route set compressor anthropic:claude-haiku-4-5-20251001
-veles route set vision openai:gpt-4o
-veles route reset compressor                        # обратно к дефолту
-```
-
-### Natural-language override в AGENTS.md
-
-В `AGENTS.md` достаточно написать:
-
+**Via natural language in `AGENTS.md`:**
 ```markdown
 ## Routing
-
-Use Opus for planning and architecture. Default to Sonnet for everyday tasks.
+Use Opus for planning and architecture decisions.
 Haiku is fine for compression and insight extraction.
-Vision queries should go through gpt-4o.
 ```
 
-И:
-
-```sh
-veles route refresh                                 # вручную распарсить хинты
+```bash
+veles route refresh    # parse the NL hints; typed overrides always win
 ```
-
-После refresh: `veles route show` покажет источник каждой записи (`project` / `nl` / `default`). **Manual `veles route set` всегда побеждает NL-парсинг.** Auto-refresh запускается при `veles run` если AGENTS.md изменился — отдельный LLM-вызов раз в N дней, не на каждый turn.
-
-### Advisor pattern
-
-Базовая модель может вызвать `advisor_review` как инструмент в checkpoint'ах (план, архитектурное решение, финальный ответ). Маршрутизируется через task `advisor` — обычно идентичная или старшая модель.
 
 ---
 
-## Скиллы и модули
+## Skills and Modules
 
-### Скиллы (Skills)
+**Skills** are reusable prompt-blocks (`SKILL.md`) that become agent tools automatically.
 
-Skill — это директория с `SKILL.md` (frontmatter + body) — переиспользуемый промт-блок. Скиллы автоматически становятся tools, доступными агенту.
-
-```sh
-veles skill list                                    # все скиллы + телеметрия
-veles skill add <git-url>                           # установить из github
-veles skill add ./local-path                        # установить из локальной директории
-veles skill add ./auth-skill --scope user           # сразу в ~/.veles/skills/
-veles skill remove <name>
-veles skill promote <name>                          # project → user-level
-veles skill demote <name>                           # user → project
-veles skill dedup                                   # найти дубликаты (embedding/TF-IDF)
-veles skill suggest-promote --save                  # предложить promotion на основе телеметрии
+```bash
+veles skill add https://github.com/org/skill-repo    # install from git
+veles skill add ./local-skill-dir                    # or from local path
+veles skill list                                     # list with telemetry
+veles skill promote my-skill                         # copy to ~/.veles/skills (global)
+veles skill dedup                                    # find near-duplicates
+veles skill suggest-promote --save                   # propose promotions based on usage
 ```
 
-При промоушене скилл становится доступен **во всех** проектах пользователя.
+**Modules** are Python plugins that can hook into the agent lifecycle (`pre_turn`, `post_turn`, `pre_tool_call`, `post_tool_call`) and veto tool dispatches.
 
-### Модули (Plugins)
-
-Модуль — Python-плагин с `module.toml` и hook-функцией, которая может перехватывать события агента (`pre_turn`, `post_turn`, `pre_tool_call`, `post_tool_call`, `on_session_start`, `on_session_end`).
-
-```sh
+```bash
+veles module add https://github.com/org/module-repo
 veles module list
-veles module add <git-url-or-path>
-veles module remove <name>
 ```
-
-Pre-tool-call hook может **наложить veto** на dispatch — это user-side guard поверх trust ladder.
 
 ---
 
 ## TUI
 
-Интерактивный Textual-приложение поверх агентского loop'а — `veles tui`. Hybrid layout: append-only scrollback с ассистент-ответами, сворачиваемый inspector с live tool-activity, multiline composer внизу.
-
-```sh
-veles tui                                           # новая сессия
-veles tui --resume <session_id>                     # продолжить
+```bash
+veles tui                    # new session
+veles tui --resume <id>      # continue a session
 ```
 
-Хоткеи:
+| Key | Action |
+|---|---|
+| `Enter` | Send message |
+| `Shift+Enter` | Newline in composer |
+| `Ctrl+I` | Toggle tool-activity inspector |
+| `Ctrl+R` | Session picker overlay |
+| `Ctrl+G` | Open `$EDITOR` on current draft |
+| `Tab` | Slash-command autocomplete |
+| `Ctrl+D` | Quit |
 
-```
-Enter                 — отправить
-Shift+Enter           — newline в composer
-Ctrl+G                — открыть $EDITOR на текущем черновике
-Tab                   — цикл по slash-командам (auto-complete)
-Up / Down             — история (если composer пуст и нет очереди);
-                        пуст и очередь не пуста → редактировать последний queued
-Ctrl+I                — toggle inspector (thinking + tool-activity)
-Ctrl+R                — overlay picker сессий
-Ctrl+T                — overlay picker тем
-Ctrl+D                — выход
-Esc                   — закрыть overlay / отменить навигацию по истории
-```
-
-Слэш-команды:
-
-```
-/help                       — справка
-/quit, /q, /exit            — выход
-/clear                      — новая сессия (чистит scrollback)
-/session                    — текущий session_id
-/save <slug>                — последний ответ → wiki/queries/<slug>.md
-/history [N]                — последние N сессий
-/load [<session_id>]        — без аргумента: picker; иначе: переключиться
-/show [N]                   — последние N сообщений текущей сессии
-/wiki list                  — категории + counts
-/wiki read <rel_path>       — отрендерить wiki-страницу
-/wiki search <query>        — FTS5 поиск по wiki
-/search <query>             — FTS5 поиск по всем turn'ам сессий
-/model [<id>]               — без аргумента: picker; иначе: установить
-/theme show|list|use [<n>]  — `use` без имени открывает picker
-/schema validate|fix        — `fix` пока запускайте `veles schema fix` из шелла
-/init                       — пока запускайте `veles init` из шелла
-/self-doc                   — обновить self-документацию проекта
-```
-
-История ввода персистится в `~/.veles/tui_history.jsonl`. Approval/trust-prompts на sensitive tool dispatching открываются модальным overlay'ем (y/N для approval, 1-4 для trust ladder).
+Slash commands: `/help` · `/model` · `/save <slug>` · `/load` · `/wiki search <q>` · `/search <q>` · `/history` · `/theme` and more.
 
 ---
 
-## Daemon + каналы (Telegram)
+## Daemon + Telegram
 
-`veles daemon` — long-running процесс с HTTP+WebSocket API, чтобы внешние клиенты (TUI-клиенты, IDE-плагины, channel-модули) могли драйвить агент без re-exec'а CLI.
+Run Veles as a persistent daemon with an HTTP/WebSocket API:
 
-### Запустить daemon
-
-```sh
-veles daemon token add default           # создать bearer-токен (один раз)
-veles daemon start                       # foreground, 127.0.0.1:8765 по умолчанию
-veles daemon status                      # проверить статус в другом терминале
-veles daemon stop                        # SIGTERM через PID-файл
+```bash
+veles daemon token add default            # create a bearer token (once)
+veles daemon start                        # starts on 127.0.0.1:8765
+veles daemon status
+veles daemon list                         # daemons across all projects
 ```
 
-API:
-- `GET /v1/health` — без auth, статус.
-- `POST /v1/runs` — submit prompt, возвращает `run_id`.
-- `WS /v1/runs/{run_id}/events` — стримит `started → text_delta* → completed/error`.
-- `GET /v1/sessions[?limit=N]` — список сессий.
+API endpoints: `POST /v1/runs` to submit a prompt, `WS /v1/runs/{id}/events` to stream the response, `GET /v1/sessions` to list sessions. All except `GET /v1/health` require `Authorization: Bearer <token>`.
 
-Все endpoint'ы (кроме `/v1/health`) требуют `Authorization: Bearer <token>`.
+Connect a Telegram bot:
 
-### Telegram-бот поверх daemon
-
-```sh
-# 1. Создай бота через @BotFather, получи токен.
-export TELEGRAM_BOT_TOKEN=...
+```bash
+export TELEGRAM_BOT_TOKEN=<from @BotFather>
 export VELES_DAEMON_URL=http://127.0.0.1:8765
 export VELES_DAEMON_TOKEN=vd_...
 
-# 2. Запусти channel-процесс (требует уже запущенный daemon).
 veles channel run --channel telegram
 ```
 
-Каждое сообщение пользователя боту → новый turn в daemon. Маппинг chat_id ↔ session_id персистится в `~/.veles/channels/telegram-sessions.json` — разговор с ботом остаётся continuous между перезапусками.
-
-```sh
-veles channel list-sessions              # активные маппинги
-veles channel reset-session <chat_id>    # начать с пользователем заново
-```
-
-В чате с ботом доступны команды `/start` (приветствие) и `/reset` (очистить mapping для текущего chat'а).
+Each Telegram user gets a persistent session. Use `veles channel list-sessions` / `reset-session` to manage mappings.
 
 ---
 
-## Multi-project и подпроекты
+## Multi-project
 
-Veles работает с несколькими проектами параллельно — каждый изолирован.
+```bash
+veles project list                       # registered projects
+veles project switch <slug>              # print the absolute path
+cd $(veles project switch <slug>)        # jump to a project
 
-```sh
-veles project list                       # все зарегистрированные проекты (slug + last_active)
-veles project switch <slug>              # печатает абсолютный путь
-cd $(veles project switch <slug>)        # переключиться cwd'ом
-veles project add <path>                 # вручную зарегистрировать
-veles project remove <slug>
-```
-
-Внутри одного `veles run` можно одноразово переключить активный проект через slash-prefix:
-
-```sh
-veles run "/project frontend сколько ошибок в last build?"
-```
-
-### Подпроекты
-
-Внутри проекта можно делать вертикальную иерархию:
-
-```sh
-veles subproject init frontend           # <cwd>/frontend/.veles/
-veles subproject list
-veles subproject switch <slug>           # печатает абсолютный путь
-veles subproject suggest                 # детектор кластеров в wiki (агент сам предлагает)
-veles subproject suggest --save          # записать proposals в wiki/proposals/
-```
-
-`subproject suggest` ищет тематические кластеры (Jaccard над title-token'ами в `wiki/concepts` + `wiki/entities`) — когда видит 4+ страницы со схожими темами, предлагает выделить подпроект. Auto-trigger в `veles run` запускает детектор раз в 7 дней, proposals попадают в `wiki/proposals/` и подхватываются recall'ом.
-
----
-
-## Перенос знаний между машинами
-
-```sh
-veles export full ./bundle.tar.gz        # bit-for-bit бэкап проекта
-veles export template ./tmpl.tar.gz      # без sources/sessions/memory + PII-санитизация
-veles import ./bundle.tar.gz --into ./new-cwd
-```
-
-**Full** — для миграции между своими машинами (включая memory.db, sessions, telemetry).
-**Template** — для шаринга шаблона проекта (вычищены sources/sessions/memory/trust; emails/IPs/tokens заменены на placeholder'ы regex'ами; всё равно стоит вычитать вручную перед публикацией).
-
----
-
-## Памятка по командам
-
-| Команда                                  | Назначение                                                       |
-|------------------------------------------|------------------------------------------------------------------|
-| `veles init [name]`                      | Создать новый проект в cwd                                       |
-| `veles run "<prompt>"`                   | Одиночный запрос                                                 |
-| `veles tui`                              | Interactive REPL                                                 |
-| `veles ingest <url\|file>`               | Записать wiki-страницу из источника                              |
-| `veles query "<q>"`                      | Ответ через wiki + memory recall                                 |
-| `veles lint`                             | Health-check wiki                                                |
-| `veles curate`                           | Консолидация сессий → wiki                                       |
-| `veles sessions {list,show,delete,search}` | Управление сессиями                                            |
-| `veles wiki reindex`                     | Перестроить FTS5-индекс                                          |
-| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | Управление скиллами                  |
-| `veles module {list,add,remove}`         | Управление плагинами                                             |
-| `veles route {show,set,reset,refresh}`   | Маршрутизация моделей                                            |
-| `veles schema {validate,edit}`           | AGENTS.md schema check                                           |
-| `veles project {list,add,remove,switch}` | Multi-project registry                                           |
-| `veles subproject {init,list,switch,remove,suggest}` | Вертикальные подпроекты                              |
-| `veles trust {list,set,revoke,clear}`    | Trust grant CRUD                                                 |
-| `veles autopilot {enable,disable,status}`| Временный bypass trust ladder                                    |
-| `veles export {full,template} <path>`    | Экспорт проекта                                                  |
-| `veles import <path>`                    | Импорт проекта                                                   |
-| `veles daemon {start,stop,status,token}` | HTTP+WS daemon                                                   |
-| `veles channel run --channel telegram`   | Telegram-bot gateway                                             |
-
-Для любой команды доступно `--help`:
-
-```sh
-veles run --help
-veles skill add --help
+veles subproject init frontend           # create a child project
+veles subproject suggest --save          # agent-detected topic clusters → proposals
 ```
 
 ---
 
-## Конфигурация
+## Trust and Safety
 
-- **Project-level state:** `<project>/.veles/`
-  - `memory.db` — SQLite + FTS5 (сессии + turn-индекс).
-  - `wiki/` — markdown-страницы (writable LLM-зона).
-  - `routing.toml` — типизированная маршрутизация моделей.
-  - `routing.nl.toml` — auto-generated из AGENTS.md natural-language hints.
-  - `skills/`, `modules/` — project-local скиллы и плагины.
-  - `trust.json` — project-scope grants.
-  - `subprojects.json` — registry дочерних проектов.
+Every sensitive tool call (shell execution, file writes, URL fetches) prompts:
 
-- **User-global state:** `~/.veles/`
-  - `config.toml` — wizard settings (язык, дефолтный провайдер).
-  - `projects/registry.json` — multi-project registry.
-  - `trust.json` — user-scope grants.
-  - `autopilot.json` — autopilot window.
-  - `skills/`, `modules/` — user-level (промоушенные) скиллы.
-  - `daemon.tokens.json`, `daemon.pid`, `daemon.info.json` — daemon state.
-  - `channels/*.json` — channel session mappings.
+```
+Tool 'run_shell' wants to execute. Allow?
+  [1] Once  [2] Always for this project  [3] Always everywhere  [4] Refuse
+```
 
-Override `~/.veles` через `VELES_USER_HOME=/path` (полезно в тестах / CI).
+Pre-grant for CI or extended autonomous runs:
+
+```bash
+veles trust set run_shell --scope project   # pre-grant for this project
+veles autopilot enable --until +2h          # temporary trust bypass (audit-logged)
+veles autopilot disable
+```
+
+The agent sees only the active project directory — other projects, symlink escapes, and `..` traversal are blocked.
 
 ---
 
-## Полезные env vars
+## Export / Import
 
-| Env var                       | Эффект                                                          |
-|-------------------------------|-----------------------------------------------------------------|
-| `OPENROUTER_API_KEY` и др.    | API-ключи провайдеров                                           |
-| `VELES_USER_HOME`             | Override `~/.veles` (CI, sandbox)                               |
-| `VELES_TRUST_AUTO_ALLOW=1`    | Bypass trust ladder (CI, autopilot)                             |
-| `VELES_NO_WIZARD=1`           | Skip first-run wizard                                           |
-| `VELES_REGISTRY_PATH`         | Override path multi-project registry                            |
-| `VELES_LIVE_TESTS=1`          | Включить live-API smoke tests                                   |
+```bash
+veles export full ./backup.tar.gz        # full backup: memory, sessions, telemetry
+veles export template ./template.tar.gz  # sanitised template (no sources/sessions/PII)
+veles import ./backup.tar.gz --into ./new-dir
+```
 
 ---
 
-## Что дальше почитать
+## CLI Reference
 
-- **`AGENTS.md` проекта** — короткий схема-файл, который агент видит на каждой сессии. Подкрути под свой workflow.
-- **`VISION.md`** — продуктовое видение Veles целиком (на русском).
-- **`docs/adr/`** — архитектурные решения (ADR).
+| Command | Purpose |
+|---|---|
+| `veles init [name]` | Create a new project |
+| `veles run "<prompt>"` | Single-turn agent run |
+| `veles tui` | Interactive TUI REPL |
+| `veles add <file\|url>` | Ingest a source → wiki page |
+| `veles research "<question>"` | Deep multi-angle research |
+| `veles curate` | Consolidate sessions into the wiki |
+| `veles sessions {list,show,delete,search}` | Session management |
+| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | Skill management |
+| `veles tool {list,show,promote}` | Tool management |
+| `veles module {list,add,remove}` | Plugin management |
+| `veles route {show,set,reset,refresh}` | Model routing |
+| `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | Long-horizon goals |
+| `veles job {list,add,show,pause,resume,trigger,remove,history}` | Scheduled jobs |
+| `veles dream` | Background memory-consolidation cycle |
+| `veles project {list,add,remove,switch}` | Multi-project registry |
+| `veles subproject {init,list,switch,remove,suggest}` | Child projects |
+| `veles trust {list,set,revoke,clear}` | Trust grants |
+| `veles autopilot {enable,disable,status}` | Temporary trust bypass |
+| `veles secret {set,get,list,delete}` | OS-keychain secrets |
+| `veles daemon {start,stop,status,list,restart,delete,session,token}` | HTTP/WS daemon |
+| `veles channel {run,list-sessions,reset-session}` | External channel gateway |
+| `veles mcp {list,test}` | External MCP servers |
+| `veles models <provider>` | List provider models |
+| `veles doctor` | Health checks |
+| `veles export / import` | Project backup and transfer |
+
+Every command has `--help`.
 
 ---
 
-## Лицензия
+## Documentation
 
-Apache 2.0 (с patent grant). См. `LICENSE` и `NOTICE`.
+Full documentation — Diátaxis-organized (tutorials · how-to guides · reference · explanation):
+
+- **English:** [`docs/en/index.md`](docs/en/index.md)
+- **Русский:** [`docs/ru/index.md`](docs/ru/index.md)
+
+---
+
+## Contributing
+
+```bash
+git clone <repo-url> && cd veles
+uv sync                    # install dev dependencies
+pytest                     # run the test suite (3200+ tests)
+VELES_LIVE_TESTS=1 pytest -m live   # opt-in live-API smoke tests
+```
+
+The codebase is deliberately decomposed — single responsibility throughout, no files exceeding a few hundred lines. Read `CLAUDE.md` for project conventions before opening a PR.
+
+Contributions welcome: provider adapters, skills for common workflows, module hooks (observability, logging, policy enforcement), and platform packaging.
+
+---
+
+## License
+
+Apache 2.0 with patent grant — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).

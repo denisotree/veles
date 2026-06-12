@@ -63,7 +63,6 @@ from veles.core.routing import route
 from veles.core.skills import discover_skills, make_skill_tool
 from veles.core.tools import registry
 from veles.core.tools.registry import Registry
-from veles.core.wiki import Wiki
 
 # ---- shared constants ----
 
@@ -183,14 +182,20 @@ def build_run_system_prompt(
     rules = _rules_digest_block(project)
     if rules:
         stable_parts.append(rules)
-    if include_index:
-        index = _load_index_md(project)
+    # M163: the wiki-specific stable blocks (context file + RAG habits)
+    # appear only when the active layout pack enables the wiki engine.
+    from veles.core.layout.engines import wiki_enabled
+
+    wiki_on = wiki_enabled(project)
+    if include_index and wiki_on:
+        index = _load_context_file(project)
         if index:
             stable_parts.append(
                 "Knowledge base index (read-only). "
                 "Use wiki_read_page/wiki_search to explore:\n\n" + index
             )
-    stable_parts.append(_RUN_WIKI_RAG_BLOCK)
+    if wiki_on:
+        stable_parts.append(_RUN_WIKI_RAG_BLOCK)
     volatile_parts: list[str] = []
     recall = _recall_block(project, prompt or "")
     if recall:
@@ -311,13 +316,30 @@ def _proposals_block(project: Project) -> str | None:
     return build_proposals_block(proposals) if proposals else None
 
 
-def _load_index_md(project: Project) -> str | None:
-    text = Wiki(project.wiki_root).index_text()
+def _load_context_file(project: Project) -> str | None:
+    """M163: read the layout pack's declared `context_file` (e.g. the
+    wiki's INDEX.md) for stable-prompt injection. Scrubbed and capped.
+    No pack / no declaration / no file → no block."""
+    from veles.core.layout.discovery import find_layout
+    from veles.core.safety import scan_for_injection
+
+    pack = find_layout(project.layout_name, project)
+    if pack is None or not pack.manifest.context_file:
+        return None
+    path = project.root / pack.manifest.context_file
+    if not path.is_file():
+        return None
+    raw = path.read_text(encoding="utf-8", errors="replace")
+    text, _ = scan_for_injection(raw, source_label=pack.manifest.context_file)
     if not text:
         return None
     if len(text) > _INDEX_INJECTION_CAP:
         text = text[:_INDEX_INJECTION_CAP] + "\n\n<truncated>"
     return text
+
+
+# Legacy alias — `cli/__init__.py` re-exports `_load_index_md`.
+_load_index_md = _load_context_file
 
 
 # ---- compressor / skills / providers ----
@@ -413,7 +435,16 @@ def _load_skills(
     `[mcp.servers.*]` in the project config are mounted as
     `mcp_<server>_<tool>` entries (lazy import — no-op and zero MCP-SDK
     cost when the section is absent; failures degrade to warnings).
+
+    M163: tools owned by the wiki content engine (the `engine-wiki`
+    toolset) are subtracted from `base_tools` when the project's layout
+    pack doesn't enable the engine — the model never sees their schemas.
     """
+    from veles.core.layout.engines import wiki_enabled
+
+    if not wiki_enabled(project):
+        gated = set(_TOOLSETS.get("engine-wiki", ()))
+        base_tools = tuple(t for t in base_tools if t not in gated)
     # M117b: include layout-pack skills (`ingest`/`query`/`lint` for the
     # default `llm-wiki`) so the runtime agent can call them by name.
     skills = discover_skills(project, include_layout=True, cache_ttl=skills_cache_ttl)

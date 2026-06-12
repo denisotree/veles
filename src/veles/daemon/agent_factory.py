@@ -37,7 +37,7 @@ def _attach_background_runners(state, project, agent_factory, provider_name: str
     state.job_runner = JobRunner(
         store=jobs_store,
         agent_factory=agent_factory,
-        output_root=project.root / ".veles" / "wiki" / "jobs",
+        output_root=project.jobs_dir,
     )
 
     def _provider_for_dream():

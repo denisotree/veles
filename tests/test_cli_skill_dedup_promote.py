@@ -157,7 +157,7 @@ def test_suggest_promote_save_writes_proposals(project, capsys) -> None:
     rc = skills_cmd.cmd_skill(args, project)
     out = capsys.readouterr().out
     assert rc == 0
-    page = project.wiki_root / "wiki" / "proposals" / "promote-winner.md"
+    page = project.memory_dir / "proposals" / "promote-winner.md"
     assert page.is_file()
     assert "wrote 1 proposal" in out
 
@@ -172,7 +172,7 @@ def test_auto_trigger_skipped_on_resume(project, monkeypatch) -> None:
     _write_skill(project, "winner", use_count=20, success_count=18)
     args = _ns(provider="openrouter", resume="ses-x", no_suggest_promote=False)
     _maybe_suggest_promotions(args, project)
-    proposals = project.wiki_root / "wiki" / "proposals"
+    proposals = project.memory_dir / "proposals"
     if proposals.exists():
         assert not list(proposals.iterdir())
 
@@ -184,7 +184,7 @@ def test_auto_trigger_skipped_by_flag(project, monkeypatch) -> None:
     _write_skill(project, "winner", use_count=20, success_count=18)
     args = _ns(provider="openrouter", resume=None, no_suggest_promote=True)
     _maybe_suggest_promotions(args, project)
-    proposals = project.wiki_root / "wiki" / "proposals"
+    proposals = project.memory_dir / "proposals"
     if proposals.exists():
         assert not list(proposals.iterdir())
 
@@ -196,7 +196,7 @@ def test_auto_trigger_writes_proposals_on_first_call(project, monkeypatch) -> No
     _write_skill(project, "winner", use_count=20, success_count=18)
     args = _ns(provider="openrouter", resume=None, no_suggest_promote=False)
     _maybe_suggest_promotions(args, project)
-    page = project.wiki_root / "wiki" / "proposals" / "promote-winner.md"
+    page = project.memory_dir / "proposals" / "promote-winner.md"
     assert page.is_file()
     state = project.state_dir / "promote_suggest.state.json"
     assert state.is_file()
@@ -209,7 +209,7 @@ def test_auto_trigger_idle_threshold_skips_second_call(project, monkeypatch) -> 
     _write_skill(project, "winner", use_count=20, success_count=18)
     args = _ns(provider="openrouter", resume=None, no_suggest_promote=False)
     _maybe_suggest_promotions(args, project)
-    page = project.wiki_root / "wiki" / "proposals" / "promote-winner.md"
+    page = project.memory_dir / "proposals" / "promote-winner.md"
     first = page.stat().st_mtime
     time.sleep(0.05)
     _maybe_suggest_promotions(args, project)

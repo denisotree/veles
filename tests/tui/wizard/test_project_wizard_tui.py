@@ -195,12 +195,11 @@ async def test_normalization_detects_existing_files(tmp_cwd: Path) -> None:
 def test_project_wizard_steps_order(tmp_cwd: Path) -> None:
     steps = project_wizard_steps(tmp_cwd)
     names = [s.name for s in steps]
-    # M117e: layout-picker inserted right after bootstrap so the
-    # project's content layout is selected before downstream steps
-    # touch wiki / daemon config.
+    # M162: layout-picker runs BEFORE bootstrap so init_project
+    # scaffolds exactly what the chosen pack declares.
     assert names == [
-        "bootstrap",
         "layout-picker",
+        "bootstrap",
         "provider_override",
         "agents_md_normalization",
         "wiki_seed",

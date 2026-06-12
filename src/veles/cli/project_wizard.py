@@ -101,16 +101,22 @@ def run_project_wizard(cwd: Path) -> Project | None:
         project = load_project(cwd)
     print(t("project_wizard.created_state", state_dir=project.state_dir), file=sys.stderr)
 
+    from veles.core.layout.engines import wiki_enabled
+
     _step_provider_override(project, prompter)
-    _step_wiki_seed(project, prompter, cwd)
+    if wiki_enabled(project):
+        _step_wiki_seed(project, prompter, cwd)
     _step_telegram(project, prompter)
 
     # Seed the FTS index so the post-init promise — "files will be
     # indexed" — actually holds. Cheap (empty / few-page) wiki rebuild.
-    try:
-        pages = Wiki(project.wiki_root).reindex_if_stale()
-    except Exception:
-        pages = 0
+    # M162: only when the layout pack activates the wiki engine.
+    pages = 0
+    if wiki_enabled(project):
+        try:
+            pages = Wiki(project.wiki_root).reindex_if_stale()
+        except Exception:
+            pages = 0
     if pages:
         print(t("project_wizard.indexed_wiki", pages=pages), file=sys.stderr)
 

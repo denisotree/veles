@@ -14,7 +14,12 @@ def cmd_init(args: argparse.Namespace) -> int:
 
     cwd = Path.cwd()
     try:
-        project = init_project(cwd, name=args.name, force=args.force)
+        project = init_project(
+            cwd,
+            name=args.name,
+            force=args.force,
+            layout=getattr(args, "layout", None) or "llm-wiki",
+        )
     except ProjectAlreadyExists as exc:
         print(f"error: {exc}", file=sys.stderr)
         print("       use `veles init --force` to reset.", file=sys.stderr)

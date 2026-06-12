@@ -44,7 +44,8 @@ async def test_add_channel_to_focused_registry_daemon(tmp_path, monkeypatch):
     app = DaemonPickerApp(project=project)
     async with app.run_test() as pilot:
         await pilot.pause()
-        # Default focus is the registry list (the daemon row) — NO Tab.
+        await pilot.pause()  # let the cursor land on the 'default' daemon node
+        # The cursor starts on the project's unnamed/'default' daemon.
         await pilot.press("c")
         await pilot.pause()
         await pilot.press("enter")        # ChoiceScreen → telegram (default)
@@ -86,6 +87,7 @@ async def test_add_channel_failure_does_not_crash(tmp_path, monkeypatch):
     app = DaemonPickerApp(project=project)
     async with app.run_test() as pilot:
         await pilot.pause()
+        await pilot.pause()  # cursor lands on the 'default' daemon node
         await pilot.press("c")
         await pilot.pause()
         await pilot.press("enter")        # telegram
@@ -111,7 +113,8 @@ async def test_remove_channel_from_focused_registry_daemon(tmp_path, monkeypatch
     app = DaemonPickerApp(project=project)
     async with app.run_test() as pilot:
         await pilot.pause()
-        await pilot.press("x")            # registry daemon focused by default
+        await pilot.pause()  # cursor lands on the 'default' daemon node
+        await pilot.press("x")            # cursor on the daemon → pick-from-list flow
         await pilot.pause()
         await pilot.press("enter")        # ChoiceScreen → telegram (only one)
         await pilot.pause()

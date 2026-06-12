@@ -1,60 +1,103 @@
-"""M98: `veles daemon` (bare) TUI picker.
+"""`veles daemon` (bare) TUI picker — project → daemons → channels tree (M159).
 
-Lists every daemon from `~/.veles/daemons.json` with status + uptime
-and lets the user trigger common actions per row:
+Originally a flat `ListView` of cross-project daemons (M98) plus a second list
+of project runtime sessions (M138). M159 unifies both into a single Textual
+`Tree`, reflecting the real shape: a project has several daemons, and a daemon
+has several channels. Layout:
 
-    Enter      → connect (M99 — stub message for now)
-    s          → start the highlighted daemon (no-op if running)
-    t          → stop (SIGTERM)
-    r          → restart (stop + spawn)
-    d          → delete (with confirmation)
-    q / Esc    → exit
+    Project: <name>                 ← section (when opened inside a project)
+      default   running …           ← the project's unnamed/"default" daemon
+        chan: telegram              ← channels as leaves
+      api       stopped …           ← a named daemon session
+        chan: discord
+      tui  (tui) …                  ← the interactive session row (no channels)
+    Other projects                  ← section
+      other-proj  running …
+        chan: telegram
+
+Per-row keys (focus-aware — they act on the daemon under the cursor, or the
+parent daemon of a channel leaf):
+
+    Enter      → open that daemon's live log
+    s          → start          t → stop (SIGTERM)        r → restart
+    d          → delete (confirm)
+    c          → add a channel   x → remove the channel under the cursor
+    F5         → refresh         q / Esc → exit
+
+`Tree` keys the cursor by node identity, so the 2 s refresh reconciles nodes in
+place (add/remove/relabel) without ever calling `clear()` — the cursor and focus
+survive structural change for free (the old `ListView` rebuild lost them).
 """
 
 from __future__ import annotations
 
+import asyncio
 import os
 import signal
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
-from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import Screen
-from textual.widgets import Footer, Header, Label, ListItem, ListView
+from textual.widgets import Footer, Header, Label, Tree
+from textual.widgets.tree import TreeNode
 
 from veles.daemon.registry import (
-    DaemonEntry,
     DaemonRegistry,
     is_alive,
 )
 
-# Data/formatting helpers live in `_daemon_picker_data` (M154 carve-out).
-# Names unused here are re-exported for tests that import them from this
-# module (tests/tui/test_daemon_picker.py, tests/tui/test_daemon_row_formatter.py,
-# tests/test_daemon_picker_channel_nofocus.py).
+# Data/formatting helpers live in `_daemon_picker_data`. Names unused here are
+# re-exported for the test suites that import them from this module
+# (tests/tui/test_daemon_picker.py, test_daemon_row_formatter.py,
+# test_daemon_tree_model.py, tests/test_daemon_picker_channel_nofocus.py).
 from veles.tui.screens._daemon_picker_data import (
-    DaemonRowFormatter,
+    DaemonNode,
+    DaemonRowFormatter,  # noqa: F401 — re-export for tests
     _enabled_channel_names,  # noqa: F401 — re-export for tests
-    _entry_channels,
-    _entry_model,
+    _entry_channels,  # noqa: F401 — re-export for tests
+    _entry_model,  # noqa: F401 — re-export for tests
     _fmt_model,  # noqa: F401 — re-export for tests
-    _fmt_runtime_row,
+    _fmt_runtime_row,  # noqa: F401 — re-export for tests
     _fmt_uptime,  # noqa: F401 — re-export for tests
     _live_active_model,  # noqa: F401 — re-export for tests
     _live_channels,  # noqa: F401 — re-export for tests
-    _runtime_channels,
+    _runtime_channels,  # noqa: F401 — re-export for tests
+    build_daemon_tree,
+    channel_leaf_label,
+    daemon_node_label,
     runtime_session_action,
-    runtime_session_records,
+    runtime_session_records,  # noqa: F401 — re-export for tests
     runtime_session_rows,  # noqa: F401 — re-export for tests
+    soft_delete_runtime,
+    spawn_daemon_node,
 )
 
 
+@dataclass(slots=True)
+class _Row:
+    """`TreeNode.data` payload tagging what a row represents.
+
+    - "section": a grouping header (current project / other projects).
+    - "daemon":  a daemon; `node` is its `DaemonNode`.
+    - "channel": a channel leaf; `node` is the **parent** daemon, `channel` the
+      channel name — so per-channel keys can act without walking the tree."""
+
+    kind: str
+    node: DaemonNode | None = None
+    channel: str | None = None
+
+
+_KILL_POLL_INTERVAL = 0.05
+_KILL_TIMEOUT = 5.0
+
+
 class DaemonPickerScreen(Screen[None]):
-    """Single-screen daemon control surface."""
+    """Single-screen daemon control surface (project → daemons → channels)."""
 
     DEFAULT_CSS = """
     DaemonPickerScreen { background: $surface; }
@@ -72,7 +115,7 @@ class DaemonPickerScreen(Screen[None]):
         color: $text-muted;
         margin: 2;
     }
-    DaemonPickerScreen ListView {
+    DaemonPickerScreen Tree {
         height: 1fr;
     }
     """
@@ -87,12 +130,8 @@ class DaemonPickerScreen(Screen[None]):
         Binding("c", "add_channel", "add channel", priority=True),
         Binding("x", "remove_channel", "remove channel", priority=True),
         Binding("f5", "refresh_list", "refresh", priority=True),
-        # OSC52 fallback for terminals that forward the copy shortcut as
-        # a key event instead of doing native drag-select. Mirrors the
-        # main chat TUI (veles/tui/app.py:61-74) — `screen.copy_text` is
-        # Textual's built-in action that emits OSC52. macOS Terminal.app
-        # users instead get native drag-select + ⌘C since mouse
-        # reporting is off (DaemonPickerApp().run(mouse=False)).
+        # OSC52 copy fallback — mirrors the main chat TUI; macOS Terminal.app
+        # gets native drag-select since the app runs with mouse=False.
         Binding("super+c", "screen.copy_text", "copy", priority=True, show=False),
         Binding(
             "ctrl+shift+c",
@@ -105,54 +144,30 @@ class DaemonPickerScreen(Screen[None]):
 
     def __init__(self, *, standalone: bool = True, project=None) -> None:
         super().__init__()
-        # standalone=True → the picker IS the app (`DaemonPickerApp`, bare
-        # `veles daemon`), so quit exits the process. standalone=False → pushed
-        # onto the main TUI via `/daemon`, so quit pops back to the chat.
+        # standalone=True → the picker IS the app (bare `veles daemon`), quit
+        # exits. standalone=False → pushed via `/daemon`, quit pops back to chat.
         self._standalone = standalone
-        # M138-followup: when set, show + manage this project's runtime_sessions
-        # (named daemon sessions + the kind=tui row) below the cross-project
-        # registry. Tab moves focus to that list; s/t/r/d then act on it.
         self._project = project
-        self._entries: list[DaemonEntry] = []
-        self._runtime_records: list = []
-        # Track the last action result so tests / users can inspect it.
         self.last_action: str = ""
-        # M111: signature of the last structural state we rendered.
-        # Tuple of (slug, pid, status_for(entry)) per entry — if the
-        # signature is unchanged on the next refresh tick, we update
-        # the uptime label in place instead of rebuilding the ListView.
-        # Rebuilding destroys child widgets and races with Textual's
-        # focus tracking, which is what was making the cursor go dark
-        # 1-2s after opening the picker.
-        self._last_signature: tuple[tuple[str, int, str], ...] = ()
+        # Fixed section nodes (created once in on_mount → stable identity). The
+        # "other projects" section only exists when a project is in scope.
+        self._sec_current: TreeNode | None = None
+        self._sec_other: TreeNode | None = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         with Vertical():
             yield Label("Veles daemons", classes="title")
-            self._listview = ListView(id="daemon-list")
-            yield self._listview
+            self._tree: Tree[_Row] = Tree("daemons", id="daemon-tree")
+            self._tree.show_root = False
+            self._tree.guide_depth = 3
+            yield self._tree
             self._empty = Label(
                 "no daemons registered. Run `veles daemon start` in a project.",
                 classes="empty",
             )
             self._empty.display = False
             yield self._empty
-            # M138-followup: project-local runtime sessions (named daemon
-            # sessions + the kind=tui row), selectable + manageable. Shown only
-            # when a project is in scope (always when opened via `/daemon`).
-            self._runtime_title = Label("Project runtime sessions (Tab)", classes="title")
-            self._runtime_listview = ListView(id="runtime-list")
-            self._runtime_empty = Label("  (none)", classes="empty")
-            if self._project is None:
-                self._runtime_title.display = False
-                self._runtime_listview.display = False
-                self._runtime_empty.display = False
-            yield self._runtime_title
-            yield self._runtime_listview
-            yield self._runtime_empty
-            # Status line: the latest action result (mirrors `last_action`), so
-            # every keypress gives visible feedback even when no row changes.
             self._status = Label("", classes="hint")
             yield self._status
             yield Label(
@@ -163,174 +178,291 @@ class DaemonPickerScreen(Screen[None]):
         yield Footer()
 
     def on_mount(self) -> None:
+        # Create the fixed section nodes once. Their daemon children are
+        # reconciled on every tick; the sections themselves never move.
+        if self._project is not None:
+            self._sec_current = self._tree.root.add(
+                f"Project: {self._project.name}", data=_Row("section"), expand=True
+            )
+            self._sec_other = self._tree.root.add(
+                "Other projects", data=_Row("section"), expand=True
+            )
+        else:
+            # No project in scope → one flat section with every registry daemon.
+            self._sec_other = self._tree.root.add(
+                "Daemons", data=_Row("section"), expand=True
+            )
         self._refresh()
+        self._tree.focus()
+        # Defer to after the first render: a node's `line` isn't computed until
+        # the tree lays out, so move_cursor() inline would land on line 0 (the
+        # section header) instead of the first daemon.
+        self.call_after_refresh(self._move_cursor_to_first_daemon)
         self.set_interval(2.0, self._refresh)
 
+    def _move_cursor_to_first_daemon(self) -> None:
+        """Land the cursor on the first daemon row so s/t/r/d act immediately
+        (the cursor defaults to the section header under a hidden root)."""
+        for section in (self._sec_current, self._sec_other):
+            if section is None:
+                continue
+            for child in section.children:
+                row = child.data
+                if isinstance(row, _Row) and row.kind == "daemon":
+                    self._tree.move_cursor(child)
+                    return
+
+    # ---------------- refresh / reconcile ----------------
+
     def _refresh(self) -> None:
-        registry = DaemonRegistry.load()
-        self._entries = registry.list()
+        tree = build_daemon_tree(self._project)
         now = time.time()
-        if self._project is not None:
-            self._refresh_runtime_list()
-        models = [_entry_model(e) for e in self._entries]
-        channels = [_entry_channels(e) for e in self._entries]
-        signature = tuple(
-            DaemonRowFormatter.signature(e, model=m, channels=c)
-            for e, m, c in zip(self._entries, models, channels, strict=True)
-        )
+        if self._sec_current is not None:
+            self._reconcile_section(self._sec_current, tree.current, now)
+        if self._sec_other is not None:
+            self._reconcile_section(self._sec_other, tree.others, now)
+        total = len(tree.current) + len(tree.others)
+        self._empty.display = total == 0
+        self._tree.display = total > 0
 
-        if signature == self._last_signature and self._entries:
-            # Structure unchanged — update only the uptime portion of
-            # each row's label in place. ListView children are not
-            # recreated, so focus is preserved by construction.
-            for i, (entry, model, chans) in enumerate(
-                zip(self._entries, models, channels, strict=True)
-            ):
-                try:
-                    item = self._listview.children[i]
-                    label = item.query_one(Label)
-                except Exception:  # noqa: BLE001 — defensive against Textual reflow
-                    continue
-                label.update(
-                    DaemonRowFormatter.render(entry, now, model=model, channels=chans)
+    def _reconcile_section(
+        self, section: TreeNode, nodes: list[DaemonNode], now: float
+    ) -> None:
+        """Add/remove/relabel daemon children of `section` in place. Cursor and
+        focus survive because `Tree` tracks the cursor by node identity, so an
+        untouched node keeps the cursor even as its siblings change."""
+        existing: dict[str, TreeNode] = {}
+        for child in list(section.children):
+            row = child.data
+            if isinstance(row, _Row) and row.kind == "daemon" and row.node is not None:
+                existing[row.node.key] = child
+        desired = {n.key for n in nodes}
+        for key, child in existing.items():
+            if key not in desired:
+                child.remove()
+        for node in nodes:
+            child = existing.get(node.key)
+            if child is None:
+                child = section.add(
+                    daemon_node_label(node, now),
+                    data=_Row("daemon", node=node),
+                    expand=True,
                 )
-            self._empty.display = False
-            return
+            else:
+                child.set_label(daemon_node_label(node, now))
+                child.data = _Row("daemon", node=node)
+            self._reconcile_channels(child, node)
 
-        # Structural change: rebuild. clear() destroys the
-        # previously-focused child widget; we re-focus the ListView
-        # *after* Textual finishes reflow via call_after_refresh, which
-        # is race-free (unlike calling focus() inline).
-        self._last_signature = signature
-        prev_index = self._listview.index or 0
-        self._listview.clear()
-        for entry, model, chans in zip(self._entries, models, channels, strict=True):
-            self._listview.append(
-                ListItem(
-                    Label(
-                        DaemonRowFormatter.render(entry, now, model=model, channels=chans)
-                    )
+    def _reconcile_channels(self, daemon_child: TreeNode, node: DaemonNode) -> None:
+        existing: dict[str, TreeNode] = {}
+        for leaf in list(daemon_child.children):
+            row = leaf.data
+            if isinstance(row, _Row) and row.kind == "channel" and row.channel:
+                existing[row.channel] = leaf
+        desired = set(node.channels)
+        for chan, leaf in existing.items():
+            if chan not in desired:
+                leaf.remove()
+        for chan in node.channels:
+            leaf = existing.get(chan)
+            if leaf is None:
+                daemon_child.add_leaf(
+                    channel_leaf_label(chan), data=_Row("channel", node=node, channel=chan)
                 )
-            )
-        self._empty.display = not self._entries
-        if self._entries:
-            self._listview.index = min(prev_index, len(self._entries) - 1)
-            # B: don't steal focus back to the registry list if the user has
-            # Tab'd to the runtime list (the 2 s tick would otherwise yank it).
-            if not self._runtime_focused():
-                self.call_after_refresh(self._listview.focus)
-        elif (
-            # E: registry empty but the project has runtime sessions → focus the
-            # runtime list so s/t/r/d/c/x act on it instead of silently no-op'ing.
-            self._project is not None
-            and self._runtime_records
-            and self.focused is not self._runtime_listview
-        ):
-            self.call_after_refresh(self._runtime_listview.focus)
+            else:
+                # Refresh the parent-daemon reference (pid/status may have moved).
+                leaf.data = _Row("channel", node=node, channel=chan)
 
-    def _selected(self) -> DaemonEntry | None:
-        idx = self._listview.index or 0
-        if 0 <= idx < len(self._entries):
-            return self._entries[idx]
-        return None
-
-    def _refresh_runtime_list(self) -> None:
-        """Rebuild the runtime-session ListView from the store. Simpler than
-        the registry list's diff machinery — this list is short and the user
-        isn't holding focus on it during the 2 s tick in the common case."""
-        records = runtime_session_records(self._project)
-        chan_map = {r.id: _runtime_channels(self._project, r) for r in records}
-        # Skip rebuild when nothing structural changed (preserve focus/cursor).
-        sig = tuple(
-            (r.id, r.status, r.pid, r.port, tuple(chan_map[r.id])) for r in records
-        )
-        if sig == getattr(self, "_runtime_signature", None) and self._runtime_records:
-            return
-        self._runtime_signature = sig
-        self._runtime_records = records
-        prev = self._runtime_listview.index or 0
-        self._runtime_listview.clear()
-        for r in records:
-            self._runtime_listview.append(
-                ListItem(Label(_fmt_runtime_row(r, channels=chan_map[r.id])))
-            )
-        self._runtime_empty.display = not records
-        self._runtime_listview.display = bool(records)
-        if records:
-            self._runtime_listview.index = min(prev, len(records) - 1)
-
-    def _runtime_focused(self) -> bool:
-        return self.focused is self._runtime_listview
-
-    def _runtime_selected(self):
-        idx = self._runtime_listview.index or 0
-        if 0 <= idx < len(self._runtime_records):
-            return self._runtime_records[idx]
-        return None
-
-    def _do_runtime_action(self, action: str) -> bool:
-        """Dispatch a runtime-session action when that list has focus.
-        Returns True if it handled the key (so the registry path is skipped)."""
-        if self._project is None or not self._runtime_focused():
-            return False
-        rec = self._runtime_selected()
-        if rec is None:
-            self._set_action("no runtime session selected", severity="warning")
-            return True
-        result = runtime_session_action(self._project, rec, action)
-        severity = "error" if "failed" in result else "information"
-        self._set_action(result, severity=severity)
+    def action_refresh_list(self) -> None:
         self._refresh()
+
+    # ---------------- cursor resolution ----------------
+
+    def _cursor_row(self) -> _Row | None:
+        node = self._tree.cursor_node
+        data = node.data if node is not None else None
+        return data if isinstance(data, _Row) else None
+
+    def _cursor_daemon(self) -> DaemonNode | None:
+        """The daemon under the cursor: the daemon row itself, or the parent
+        daemon of a channel leaf. None on a section header / empty tree."""
+        row = self._cursor_row()
+        if row is not None and row.kind in ("daemon", "channel"):
+            return row.node
+        return None
+
+    # ---------------- lifecycle actions ----------------
+
+    def action_start_one(self) -> None:
+        node = self._cursor_daemon()
+        if not self._actionable(node, "start"):
+            return
+        assert node is not None
+        if node.pid and is_alive(node.pid):
+            self._set_action(f"{node.name}: already running", severity="warning")
+            return
+        if node.kind == "named":
+            self._set_action(runtime_session_action(self._project, node.record, "start"))
+        else:
+            ok = spawn_daemon_node(node)
+            self._set_action(
+                f"{node.name}: start spawned" if ok else f"{node.name}: start failed",
+                severity="information" if ok else "error",
+            )
+        self._refresh()
+
+    def action_stop_one(self) -> None:
+        node = self._cursor_daemon()
+        if not self._actionable(node, "stop"):
+            return
+        assert node is not None
+        if not (node.pid and is_alive(node.pid)):
+            self._set_action(f"{node.name}: not running", severity="warning")
+            return
+        if node.kind == "named":
+            self._set_action(runtime_session_action(self._project, node.record, "stop"))
+        else:
+            try:
+                os.kill(node.pid, signal.SIGTERM)
+                self._set_action(f"{node.name}: SIGTERM sent (stays listed, stopped)")
+            except OSError as exc:
+                self._set_action(f"{node.name}: stop failed: {exc}", severity="error")
+        self._refresh()
+
+    def action_restart_one(self) -> None:
+        node = self._cursor_daemon()
+        if not self._actionable(node, "restart"):
+            return
+        # Runs as a worker so the kill→wait→spawn poll uses `asyncio.sleep` and
+        # never blocks the message pump (the old inline `time.sleep` froze the
+        # UI for up to a second per restart — the reported "focus disappeared").
+        self.run_worker(self._restart_flow(node), exclusive=True)
+
+    async def _restart_flow(self, node: DaemonNode) -> None:
+        # Order matters: confirm the old process is gone *before* spawning, or
+        # the new daemon races it for the port and silently fails to bind.
+        await self._kill_and_wait(node.pid)
+        ok = spawn_daemon_node(node)
+        self._set_action(
+            f"{node.name}: restart spawned" if ok else f"{node.name}: restart failed",
+            severity="information" if ok else "error",
+        )
+        self._refresh()
+
+    async def _kill_and_wait(self, pid: int | None, *, timeout: float = _KILL_TIMEOUT) -> None:
+        """SIGTERM `pid` and poll (non-blocking) until it dies or `timeout`."""
+        if not (pid and is_alive(pid)):
+            return
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            return
+        for _ in range(int(timeout / _KILL_POLL_INTERVAL)):
+            if not is_alive(pid):
+                return
+            await asyncio.sleep(_KILL_POLL_INTERVAL)
+
+    def action_delete_one(self) -> None:
+        node = self._cursor_daemon()
+        if node is None:
+            self._set_action("no daemon selected", severity="warning")
+            return
+        if node.kind == "tui":
+            self._set_action(
+                f"{node.name}: the TUI session can't be deleted here", severity="warning"
+            )
+            return
+        self.run_worker(self._delete_flow(node), exclusive=True)
+
+    async def _delete_flow(self, node: DaemonNode) -> None:
+        from veles.tui.wizard.screens.confirm import ConfirmScreen
+
+        ok = await self.app.push_screen_wait(
+            ConfirmScreen(
+                "Delete", f"Delete '{node.name}'? (removes it from the list)", default=False
+            )
+        )
+        if ok is not True:
+            self._set_action(f"{node.name}: delete cancelled")
+            return
+        await self._kill_and_wait(node.pid)
+        if node.kind == "named":
+            soft_delete_runtime(self._project, node.record)
+            self._set_action(f"{node.name}: deleted (kept in DB for history)")
+        else:
+            registry = DaemonRegistry.load()
+            if node.entry is not None:
+                registry.remove(node.entry.slug)
+                registry.save()
+            self._set_action(f"{node.name}: deleted")
+        self._refresh()
+
+    def _actionable(self, node: DaemonNode | None, action: str) -> bool:
+        if node is None:
+            self._set_action("no daemon selected", severity="warning")
+            return False
+        if node.kind == "tui":
+            self._set_action(
+                f"{node.name}: {action} not applicable to the TUI session",
+                severity="warning",
+            )
+            return False
         return True
 
+    # ---------------- channel actions ----------------
+
     def action_add_channel(self) -> None:
-        """`c`: attach a channel to the selected daemon. Focus-aware — a
-        registry row (default focus, e.g. the running `mind-palace` daemon)
-        targets that project's global `[channels.<type>]` (session=None); a
-        named runtime daemon session targets `[daemon.<name>.channels.<type>]`.
-        Launches a worker because `push_screen_wait` must run off the message
-        pump (Textual requirement)."""
         target = self._channel_target()
         if target is None:
-            return  # _channel_target already notified
+            return
         project, session, label = target
         self.run_worker(self._add_channel_flow(project, session, label), exclusive=True)
 
+    def action_remove_channel(self) -> None:
+        row = self._cursor_row()
+        target = self._channel_target()
+        if target is None:
+            return
+        project, session, label = target
+        if row is not None and row.kind == "channel" and row.channel:
+            # On a channel leaf → drop exactly that channel, no picker needed.
+            self.run_worker(
+                self._remove_specific_channel(project, session, label, row.channel),
+                exclusive=True,
+            )
+            return
+        self.run_worker(self._remove_channel_flow(project, session, label), exclusive=True)
+
     def _channel_target(self):
-        """Resolve `(project, session_name | None, label)` for a channel action
-        from the focused list. Registry row → that daemon's project + global
-        channels (session=None); runtime daemon row → (this project, name).
-        Notifies and returns None when nothing actionable is selected."""
-        if self._runtime_focused():
-            rec = self._runtime_selected()
-            if rec is None:
-                self._notify("No runtime session selected.")
-                return None
-            if rec.kind != "daemon":
-                self._notify("Channels attach to daemon sessions, not the TUI session.")
-                return None
+        """Resolve `(project, session | None, label)` for a channel action from
+        the daemon under the cursor. Unnamed/registry daemon → its project's
+        global `[channels.*]` (session=None); named daemon → (this project,
+        name) → `[daemon.<name>.channels.*]`."""
+        daemon = self._cursor_daemon()
+        if daemon is None:
+            self._notify("No daemon selected.")
+            return None
+        if daemon.kind == "tui":
+            self._notify("Channels attach to daemon sessions, not the TUI session.")
+            return None
+        if daemon.kind == "named":
             if self._project is None:
                 self._notify("Open the picker inside a project to manage channels.")
                 return None
-            return (self._project, rec.name, rec.name)
-        entry = self._selected()
-        if entry is None:
-            self._notify("No daemon selected.")
-            return None
+            return (self._project, daemon.name, daemon.name)
         from veles.core.project import load_project
 
         try:
-            project = load_project(Path(entry.project_path))
+            project = load_project(Path(daemon.project_path))
         except Exception:  # noqa: BLE001 — bad/missing project path
-            self._notify(f"can't load project at {entry.project_path}")
+            self._notify(f"can't load project at {daemon.project_path}")
             return None
-        # Registry daemons are the unnamed (legacy) daemon → global [channels.*].
-        return (project, None, entry.slug)
+        return (project, None, daemon.name)
 
     async def _add_channel_flow(self, project, session, label) -> None:
         """Modal channel wizard: pick type → collect creds → write the channel
         block (global `[channels.<type>]` when session is None, else
-        `[daemon.<name>.channels.<type>]`) + keychain secret (M137 from TUI)."""
+        `[daemon.<name>.channels.<type>]`) + keychain secret."""
         from veles.channels.platform_registry import (
             ensure_builtins_registered,
             get_platform,
@@ -358,26 +490,26 @@ class DaemonPickerScreen(Screen[None]):
         entry = get_platform(channel)
         secrets: dict[str, str] = {}
         config_fields: dict[str, object] = {}
-        for field in entry.cred_fields:
+        for cred in entry.cred_fields:
             value = await self.app.push_screen_wait(
-                InputScreen(f"{channel}: {field.label}", password=field.secret)
+                InputScreen(f"{channel}: {cred.label}", password=cred.secret)
             )
             if value == CANCEL_SENTINEL:
                 return
             value = (value or "").strip()
             if not value:
-                if field.required:
+                if cred.required:
                     self._set_action(
-                        f"{label}: {field.label} required — cancelled", severity="warning"
+                        f"{label}: {cred.label} required — cancelled", severity="warning"
                     )
                     return
                 continue
-            if field.secret:
-                secrets[field.key] = value
-            elif field.list_value:
-                config_fields[field.key] = [x.strip() for x in value.split(",") if x.strip()]
+            if cred.secret:
+                secrets[cred.key] = value
+            elif cred.list_value:
+                config_fields[cred.key] = [x.strip() for x in value.split(",") if x.strip()]
             else:
-                config_fields[field.key] = value
+                config_fields[cred.key] = value
         try:
             apply_channel(
                 project,
@@ -386,49 +518,14 @@ class DaemonPickerScreen(Screen[None]):
                 secrets=secrets,
                 config_fields=config_fields,
             )
-        except Exception as exc:  # noqa: BLE001 — surface, never crash the worker/app
-            self._set_action(
-                f"{label}: failed to add {channel}: {exc}", severity="error"
-            )
+        except Exception as exc:  # noqa: BLE001 — surface, never crash the worker
+            self._set_action(f"{label}: failed to add {channel}: {exc}", severity="error")
             return
         self._set_action(f"{label}: added {channel} channel (restart to apply)")
         self._refresh()
 
-    def action_remove_channel(self) -> None:
-        """`x`: remove a channel binding from the selected daemon. Focus-aware,
-        same target resolution as `action_add_channel`."""
-        target = self._channel_target()
-        if target is None:
-            return
-        project, session, label = target
-        self.run_worker(self._remove_channel_flow(project, session, label), exclusive=True)
-
-    def _notify(self, message: str, *, severity: str = "warning") -> None:
-        """Best-effort toast — `App.notify` is unavailable in some headless
-        contexts, so never let a missing notifier break the action."""
-        try:
-            self.app.notify(message, severity=severity)
-        except Exception:  # noqa: BLE001
-            pass
-
-    def _set_action(self, message: str, *, severity: str = "information") -> None:
-        """Record + surface an action result: update `last_action`, the on-screen
-        status line, and toast it. The single place every action reports through
-        so the user always sees what happened (no more silent no-ops)."""
-        self.last_action = message
-        status = getattr(self, "_status", None)
-        if status is not None:
-            try:
-                status.update(message)
-            except Exception:  # noqa: BLE001 — status label is best-effort
-                pass
-        self._notify(message, severity=severity)
-
     async def _remove_channel_flow(self, project, session, label) -> None:
-        """Pick one of the target's configured channels and drop its block —
-        global `[channels.*]` when session is None, else
-        `[daemon.<name>.channels.*]`."""
-        from veles.cli.channel_wizard import delete_channel_block
+        """Pick one of the target's configured channels and drop its block."""
         from veles.core.project_config import get_section, load_project_config
         from veles.tui.wizard.screens.choice import ChoiceItem, ChoiceScreen
         from veles.tui.wizard.step import CANCEL_SENTINEL
@@ -452,6 +549,11 @@ class DaemonPickerScreen(Screen[None]):
         )
         if not channel or channel == CANCEL_SENTINEL:
             return
+        await self._remove_specific_channel(project, session, label, channel)
+
+    async def _remove_specific_channel(self, project, session, label, channel) -> None:
+        from veles.cli.channel_wizard import delete_channel_block
+
         try:
             removed = delete_channel_block(project, channel, session=session)
         except Exception as exc:  # noqa: BLE001
@@ -465,7 +567,37 @@ class DaemonPickerScreen(Screen[None]):
         )
         self._refresh()
 
-    # ---------------- actions ----------------
+    # ---------------- log view (Enter) ----------------
+
+    def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
+        row = event.node.data
+        if not isinstance(row, _Row):
+            return
+        node = row.node
+        if node is None:  # section header
+            return
+        self._open_log(node)
+
+    def _open_log(self, node: DaemonNode) -> None:
+        from veles.daemon.paths import daemon_log_path, instance_log_path
+        from veles.tui.screens.daemon_log import DaemonLogScreen
+
+        if node.kind == "registry":
+            self.app.push_screen(
+                DaemonLogScreen(daemon_log_path(node.project_name), slug=node.project_name)
+            )
+        elif self._project is not None:
+            slug = f"{self._project.name}-{node.name}"
+            self.app.push_screen(
+                DaemonLogScreen(
+                    instance_log_path(self._project.name, node.name), slug=slug
+                )
+            )
+        else:
+            return
+        self.last_action = f"{node.name}: log view opened"
+
+    # ---------------- quit / feedback ----------------
 
     def action_quit(self) -> None:
         if self._standalone:
@@ -473,167 +605,35 @@ class DaemonPickerScreen(Screen[None]):
         else:
             self.dismiss(None)
 
-    def action_refresh_list(self) -> None:
-        self._refresh()
-
-    def action_start_one(self) -> None:
-        if self._do_runtime_action("start"):
-            return
-        entry = self._selected()
-        if entry is None:
-            self._set_action("no daemon selected", severity="warning")
-            return
-        if is_alive(entry.pid):
-            self._set_action(f"{entry.slug}: already running", severity="warning")
-            return
-        ok = _spawn_daemon(entry)
-        self._set_action(
-            f"{entry.slug}: start spawned" if ok else f"{entry.slug}: start failed",
-            severity="information" if ok else "error",
-        )
-        self._refresh()
-
-    def action_stop_one(self) -> None:
-        if self._do_runtime_action("stop"):
-            return
-        entry = self._selected()
-        if entry is None:
-            self._set_action("no daemon selected", severity="warning")
-            return
-        if not is_alive(entry.pid):
-            self._set_action(f"{entry.slug}: not running", severity="warning")
-            return
+    def _notify(self, message: str, *, severity: str = "warning") -> None:
+        """Best-effort toast — `App.notify` is unavailable headless, so never
+        let a missing notifier break the action."""
         try:
-            os.kill(entry.pid, signal.SIGTERM)
-            self._set_action(f"{entry.slug}: SIGTERM sent (stays listed, stopped)")
-        except OSError as exc:
-            self._set_action(f"{entry.slug}: stop failed: {exc}", severity="error")
-        self._refresh()
+            self.app.notify(message, severity=severity)
+        except Exception:  # noqa: BLE001
+            pass
 
-    def action_restart_one(self) -> None:
-        if self._do_runtime_action("restart"):
-            return
-        entry = self._selected()
-        if entry is None:
-            self._set_action("no daemon selected", severity="warning")
-            return
-        if is_alive(entry.pid):
+    def _set_action(self, message: str, *, severity: str = "information") -> None:
+        """Record + surface an action result: `last_action`, the status line,
+        and a toast — the single place every action reports through."""
+        self.last_action = message
+        status = getattr(self, "_status", None)
+        if status is not None:
             try:
-                os.kill(entry.pid, signal.SIGTERM)
-            except OSError:
+                status.update(message)
+            except Exception:  # noqa: BLE001 — status label is best-effort
                 pass
-            # Wait briefly for shutdown so the spawn doesn't fight for the port.
-            for _ in range(20):
-                if not is_alive(entry.pid):
-                    break
-                time.sleep(0.05)
-        ok = _spawn_daemon(entry)
-        self._set_action(
-            f"{entry.slug}: restart spawned" if ok else f"{entry.slug}: restart failed",
-            severity="information" if ok else "error",
-        )
-        self._refresh()
-
-    def action_delete_one(self) -> None:
-        """`d`: delete the selected daemon/session — behind a confirm prompt
-        (destructive, and unlike `t`/stop it removes the row). Runs as a worker
-        to await the modal. Both lists supported via `_channel_target`-style
-        focus resolution."""
-        self.run_worker(self._delete_flow(), exclusive=True)
-
-    async def _delete_flow(self) -> None:
-        from veles.tui.wizard.screens.confirm import ConfirmScreen
-
-        runtime = self._runtime_focused()
-        if runtime:
-            rec = self._runtime_selected()
-            if rec is None:
-                self._set_action("no runtime session selected", severity="warning")
-                return
-            label = rec.name
-        else:
-            entry = self._selected()
-            if entry is None:
-                self._set_action("no daemon selected", severity="warning")
-                return
-            label = entry.slug
-        ok = await self.app.push_screen_wait(
-            ConfirmScreen("Delete", f"Delete '{label}'? (removes it from the list)", default=False)
-        )
-        if ok is not True:
-            self._set_action(f"{label}: delete cancelled")
-            return
-        if runtime:
-            # Runtime path graceful-stops a live process then soft-deletes (C).
-            result = runtime_session_action(self._project, rec, "delete")
-            self._set_action(result)
-        else:
-            if is_alive(entry.pid):
-                try:
-                    os.kill(entry.pid, signal.SIGTERM)
-                except OSError:
-                    pass
-                for _ in range(20):
-                    if not is_alive(entry.pid):
-                        break
-                    time.sleep(0.05)
-            registry = DaemonRegistry.load()
-            registry.remove(entry.slug)
-            registry.save()
-            self._set_action(f"{entry.slug}: deleted")
-        self._refresh()
-
-    def on_key(self, event: events.Key) -> None:
-        if event.key == "enter":
-            if self._runtime_focused():
-                # Open the named session's own log (`instance_log_path`).
-                rec = self._runtime_selected()
-                if rec is not None and rec.kind == "daemon" and self._project is not None:
-                    from veles.daemon.paths import instance_log_path
-                    from veles.tui.screens.daemon_log import DaemonLogScreen
-
-                    slug = f"{self._project.name}-{rec.name}"
-                    self.app.push_screen(
-                        DaemonLogScreen(
-                            instance_log_path(self._project.name, rec.name), slug=slug
-                        )
-                    )
-                    self.last_action = f"{rec.name}: log view opened"
-                return
-            entry = self._selected()
-            if entry is not None:
-                # M110: Enter opens the live log view for the selected
-                # daemon. The picker stays in the screen stack underneath
-                # so `q` in the log view pops back to the same row.
-                from veles.daemon.paths import daemon_log_path
-                from veles.tui.screens.daemon_log import DaemonLogScreen
-
-                self.app.push_screen(
-                    DaemonLogScreen(
-                        daemon_log_path(entry.project_name),
-                        slug=entry.project_name,
-                    )
-                )
-                self.last_action = f"{entry.slug}: log view opened"
-
-
-def _spawn_daemon(entry: DaemonEntry) -> bool:
-    """Spawn `veles daemon start` in the entry's project root, detached."""
-    from veles.daemon.spawn import spawn_daemon as _spawn
-
-    return _spawn(project_root=entry.project_path, host=entry.host, port=entry.port) is not None
+        self._notify(message, severity=severity)
 
 
 class DaemonPickerApp(App[None]):
     """Wrapper App that mounts the picker as its only screen.
 
     Native terminal text-selection is enabled by the caller passing
-    `mouse=False` to `.run()` — see `veles/cli/commands/daemon.py`
-    (`_cmd_daemon_picker`). This mirrors the main chat TUI policy in
-    `veles/tui/app.py:158-163`: with mouse reporting off the terminal
-    handles drag-select + the system copy shortcut. The keyboard
-    bindings on `DaemonPickerScreen` add an OSC52 copy fallback for
-    terminals that forward the shortcut as a key event."""
+    `mouse=False` to `.run()` (see `cli/commands/daemon.py::_cmd_daemon_picker`),
+    mirroring the main chat TUI: with mouse reporting off the terminal handles
+    drag-select + the system copy shortcut, and the screen bindings add an OSC52
+    fallback."""
 
     CSS = "Screen { background: $surface; }"
 
@@ -642,9 +642,6 @@ class DaemonPickerApp(App[None]):
         self._project = project
 
     def on_mount(self) -> None:
-        # Match WizardApp.on_mount — pick up the user's theme so the
-        # picker visually matches the wizard and the main TUI REPL.
-        # Fallback to 'everforest' on first run / unreadable config.
         from veles.core.user_config import load_user_config
         from veles.tui.theme_bridge import apply_to_app
 

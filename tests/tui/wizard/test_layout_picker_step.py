@@ -1,11 +1,11 @@
-"""M117e: LayoutPickerStep — wizard step that lets the user choose a
-layout-pack at init time.
+"""M117e/M162: LayoutPickerStep — wizard step that lets the user choose
+a layout-pack at init time. M162 moved it BEFORE BootstrapStep: the
+picker only records `ctx.answers["layout"]`; BootstrapStep passes it to
+`init_project(layout=...)`, which scaffolds the chosen pack directly.
 
 We don't exercise the Textual UI directly here (other wizard tests
 do that via run_test); these unit-test the step's branching against
-a stub WizardContext + stub `push_screen_wait`. That keeps the test
-fast and lets us assert the project.toml rewrite without spinning up
-Textual.
+a stub WizardContext + stub `push_screen_wait`.
 """
 
 from __future__ import annotations
@@ -59,22 +59,21 @@ def _write_user_pack(
     return pack_dir
 
 
-# ---- single-pack: auto-confirm ----
+# ---- builtin packs: picker offered, default llm-wiki ----
 
 
-async def test_single_pack_auto_confirms_without_screen(
+async def test_builtin_packs_offer_picker_with_llm_wiki_default(
     isolated_home: Path, tmp_path: Path
 ) -> None:
-    """Only the builtin pack is available → step doesn't show UI;
-    just records the default and proceeds."""
-    project = init_project(tmp_path / "proj", name="proj")
-    app = _StubApp()  # no responses queued — none should be needed
-    ctx = _StubCtx(app=app, answers={"project": project})
+    """M164 ships three builtin packs (llm-wiki / bare / notes), so the
+    picker always shows; accepting the default records llm-wiki."""
+    app = _StubApp(responses=["llm-wiki"])
+    ctx = _StubCtx(app=app)
     step = LayoutPickerStep()
     outcome = await step.run(ctx)
     assert outcome == WizardOutcome.NEXT
     assert ctx.answers["layout"] == "llm-wiki"
-    assert app.pushed == []
+    assert len(app.pushed) == 1
 
 
 # ---- multi-pack: picker offered ----
@@ -94,42 +93,23 @@ async def test_picker_shown_when_multiple_packs(
     assert len(app.pushed) == 1
 
 
-async def test_picker_rewrites_project_toml(
+async def test_picked_layout_flows_into_init(
     isolated_home: Path, tmp_path: Path
 ) -> None:
-    """After picking a non-default pack, project.toml's `layout` field
-    is rewritten so the next `veles run` sees the choice."""
+    """M162: the picker records the answer; init_project(layout=picked)
+    persists it in project.toml so the next `veles run` sees it."""
     _write_user_pack(isolated_home, "obsidian-import")
-    project = init_project(tmp_path / "proj", name="proj")
-    assert project.layout_name == "llm-wiki"
-
     app = _StubApp(responses=["obsidian-import"])
-    ctx = _StubCtx(app=app, answers={"project": project})
+    ctx = _StubCtx(app=app)
     await LayoutPickerStep().run(ctx)
+    assert ctx.answers["layout"] == "obsidian-import"
 
-    # In-memory project reflects the change
+    project = init_project(
+        tmp_path / "proj", name="proj", layout=ctx.answers["layout"]
+    )
     assert project.layout_name == "obsidian-import"
-    # Reloading from disk also sees it
     reloaded = load_project(project.root)
     assert reloaded.layout_name == "obsidian-import"
-
-
-async def test_picker_keeps_existing_when_same_chosen(
-    isolated_home: Path, tmp_path: Path
-) -> None:
-    """If the user picks the layout already in use, we don't rewrite
-    project.toml needlessly."""
-    _write_user_pack(isolated_home, "obsidian-import")
-    project = init_project(tmp_path / "proj", name="proj")
-    mtime_before = project.project_toml_path.stat().st_mtime
-
-    app = _StubApp(responses=["llm-wiki"])  # picked same as current
-    ctx = _StubCtx(app=app, answers={"project": project})
-    outcome = await LayoutPickerStep().run(ctx)
-    assert outcome == WizardOutcome.NEXT
-    mtime_after = project.project_toml_path.stat().st_mtime
-    # mtime unchanged → no rewrite
-    assert mtime_after == mtime_before
 
 
 async def test_picker_esc_returns_back_signal(
@@ -137,25 +117,23 @@ async def test_picker_esc_returns_back_signal(
 ) -> None:
     """Esc on the picker (push_screen_wait returns None) → `_nav`
     helper translates that to BACK so the wizard runner can step
-    backwards. project.toml stays untouched."""
+    backwards."""
     _write_user_pack(isolated_home, "obsidian-import")
-    project = init_project(tmp_path / "proj", name="proj")
     app = _StubApp(responses=[None])
-    ctx = _StubCtx(app=app, answers={"project": project})
+    ctx = _StubCtx(app=app)
     outcome = await LayoutPickerStep().run(ctx)
     assert outcome == WizardOutcome.BACK
-    # No rewrite happened — current layout preserved
-    assert project.layout_name == "llm-wiki"
+    assert "layout" not in ctx.answers
 
 
-# ---- safety: project missing ----
+# ---- safety: pre-bootstrap (no project in ctx) ----
 
 
-async def test_picker_without_project_in_ctx_skips(tmp_path: Path) -> None:
-    """If BootstrapStep didn't land a project (shouldn't happen, but
-    defensive), the picker no-ops rather than crashing."""
-    app = _StubApp()
+async def test_picker_runs_without_project_in_ctx(tmp_path: Path) -> None:
+    """M162: the picker runs BEFORE bootstrap, so there is never a
+    project in ctx — picking a builtin pack just records the answer."""
+    app = _StubApp(responses=["bare"])
     ctx = _StubCtx(app=app)  # no `project` key
     outcome = await LayoutPickerStep().run(ctx)
     assert outcome == WizardOutcome.NEXT
-    assert app.pushed == []
+    assert ctx.answers["layout"] == "bare"

@@ -1,11 +1,11 @@
 """M125: SQL-direct memory writers — `memory_save_insight` and
 `memory_save_rule`.
 
-The curator and ad-hoc learning passes need to land their extractions
-in queryable SQL (M119 `insights` / `rules` tables), not just in wiki
-markdown. Wiki pages are durable artefacts; SQL rows are the index
-that `/insights`, `/rules`, FTS lookup, and the recall pipeline use to
-surface the same content fast.
+M161: the `insights` SQL row is the *canonical* store — recall, aging
+(`last_referenced_at`), and dream dedup all operate on it. On every
+successful insert `save_insight_row` also renders a human-readable
+markdown view under `.veles/memory/insights/` (best-effort,
+regenerable from the row; see `core/memory/artefacts.py`).
 
 Both tools resolve the active project via the same ContextVar pattern
 that `wiki_tools.py` uses — no Project argument from the agent, no
@@ -16,33 +16,49 @@ as `<error: ...>` strings (consistent with wiki_tools).
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
 from veles.core.context import current_project
 from veles.core.risk import RiskClass
 from veles.core.tools.registry import tool
 
+if TYPE_CHECKING:
+    from veles.core.project import Project
+
 _RULE_KINDS = frozenset({"format", "do", "dont", "preference"})
 
 
-def _open_store():
-    proj = current_project()
+def _resolve_project(project: Project | None) -> Project:
+    proj = project if project is not None else current_project()
     if proj is None:
         raise RuntimeError(
             "no active Veles project; run `veles init` and ensure cwd is inside it"
         )
+    return proj
+
+
+def _open_store(project: Project | None = None):
     from veles.core.memory import SessionStore
 
-    return SessionStore(proj.memory_db_path)
+    return SessionStore(_resolve_project(project).memory_db_path)
 
 
 def save_insight_row(
-    *, title: str, body: str, category: str, file_path: str = ""
+    *, title: str, body: str, category: str, file_path: str = "",
+    project: Project | None = None,
 ) -> int:
-    """Programmatic helper used by curator hooks and the insight
-    extractor — same path the @tool wraps, but no string return.
-    Returns the inserted row id, or 0 on failure (best-effort)."""
+    """Canonical insight writer — used by the @tool wrapper, the insight
+    extractor, the TUI `/save`, and worker mini-reports.
+
+    Inserts the SQL row (source of truth); on success renders the
+    markdown view best-effort and backfills `file_path` with the view's
+    project-relative path when the caller didn't supply one. Returns the
+    row id, or 0 when the SQL write failed — callers must treat 0 as
+    "insight not persisted".
+    """
     try:
-        store = _open_store()
+        proj = _resolve_project(project)
+        store = _open_store(proj)
     except Exception:
         return 0
     try:
@@ -51,8 +67,15 @@ def save_insight_row(
             " VALUES (?, ?, ?, ?, ?)",
             (title, body, category, file_path or None, time.time()),
         )
+        rid = int(cur.lastrowid or 0)
+        if rid and not file_path:
+            view_rel = _render_view(proj, rid=rid, title=title, body=body)
+            if view_rel:
+                store._conn.execute(
+                    "UPDATE insights SET file_path = ? WHERE id = ?", (view_rel, rid)
+                )
         store._conn.commit()
-        return int(cur.lastrowid or 0)
+        return rid
     except Exception:
         return 0
     finally:
@@ -60,6 +83,23 @@ def save_insight_row(
             store._conn.close()
         except Exception:
             pass
+
+
+def _render_view(project: Project, *, rid: int, title: str, body: str) -> str | None:
+    """Render `.veles/memory/insights/<slug>-<id>.md` from the row.
+
+    Best-effort: a filesystem hiccup must not lose the SQL row. Returns
+    the project-relative path, or None on failure."""
+    try:
+        from veles.core.memory.artefacts import write_insight_view
+        from veles.core.slug import normalize_slug
+
+        path = write_insight_view(
+            project, slug=f"{normalize_slug(title)}-{rid}", title=title, body=body
+        )
+        return path.relative_to(project.root).as_posix()
+    except Exception:
+        return None
 
 
 def save_rule_row(*, kind: str, body: str, source: str) -> int:
@@ -98,8 +138,9 @@ def memory_save_insight(
     project would benefit from recalling later (curated session
     summary, recovery pattern, design decision). `category` groups
     related insights (e.g. `curated-session`, `recovery`,
-    `architecture`); `file_path` is optional pointer to the
-    corresponding wiki page when one exists.
+    `architecture`); `file_path` is an optional pointer to a related
+    page when one exists (left empty, it is backfilled with the
+    rendered memory view's path).
 
     Returns a short confirmation with the row id.
     """

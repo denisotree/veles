@@ -1,0 +1,16 @@
+# Bare layout — no user-content structure at all (M164).
+#
+# For code repositories and projects where Veles works on existing files
+# rather than maintaining its own knowledge base. The agent's project
+# memory (.veles/: memory.db, insights, rules, proposals, journal) works
+# exactly as everywhere else — memory is layout-independent by design
+# (VISION §5.1).
+#
+# No writable_zones → the path-guard falls back to its permissive
+# pre-M117 contract (writes allowed anywhere inside the project root,
+# still subject to the trust ladder).
+
+[layout]
+name = "bare"
+description = "No content scaffold — agent memory only. For code repos and free-form projects."
+version = "1.0"

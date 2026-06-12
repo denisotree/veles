@@ -23,7 +23,7 @@ def register(sub: argparse._SubParsersAction) -> None:
     )
     route_set.add_argument(
         "task",
-        help="Task type (default, curator, compressor, insights, skills).",
+        help="Task type: default, curator, compressor, insights, skills, advisor, vision, embedding.",
     )
     route_set.add_argument(
         "spec",
@@ -33,13 +33,15 @@ def register(sub: argparse._SubParsersAction) -> None:
     route_reset = route_sub.add_parser(
         "reset", help="Reset one task (or all if none given) back to the default routing."
     )
-    route_reset.add_argument("task", nargs="?", default=None)
+    route_reset.add_argument(
+        "task", nargs="?", default=None, help="Task type to reset; omit to reset all tasks."
+    )
 
     route_refresh = route_sub.add_parser(
         "refresh",
         help=(
-            "M43b — re-parse natural-language routing hints from AGENTS.md "
-            "into `routing.nl.toml`. Manual `routing.toml` entries always win."
+            "Re-parse natural-language routing hints from AGENTS.md into "
+            "routing.nl.toml. Explicit [routing.tasks] entries in config.toml always win."
         ),
     )
     route_refresh.add_argument(

@@ -1,7 +1,14 @@
 [layout]
 name = "llm-wiki"
 description = "Karpathy-style LLM Wiki: sources/ (raw), wiki/ (LLM-generated), INDEX.md, LOG.md"
-version = "1.0"
+version = "1.1"
+context_file = "INDEX.md"
+
+[layout.engines]
+wiki = true
+
+[layout.scaffold]
+agents_md_template = "templates/AGENTS.md"
 
 [[layout.writable_zones]]
 path = "wiki/"

@@ -8,14 +8,14 @@ Three commands cover three use cases:
   live loop, not durable state).
 
 - `veles export template <bundle.tar.gz>` packs a sanitised subset for
-  sharing or publishing: schema (`AGENTS.md` + `project.toml`), knowledge
-  artefacts (`wiki/{concepts,entities,insights,queries}`), installed
-  skills/modules, routing + subprojects metadata. Excludes: `memory.db`
-  (session transcripts), `sources/` (raw materials), `wiki/sessions/`
-  (per-session pages), `trust.json` (user grants), `curator.state.json`
-  (cursor). Every text file is run through PII regex sanitisation —
-  emails, IPs, common API-key shapes, bearer tokens are replaced with
-  placeholders.
+  sharing or publishing: schema (`AGENTS.md` + `project.toml`), memory
+  artefacts (`.veles/memory/` insight views, proposals, journal),
+  installed skills/modules, routing + subprojects metadata. Excludes:
+  `memory.db` (session transcripts), `.veles/memory/sessions/`
+  (compaction history), `.veles/jobs/` (run outputs), `trust.json`
+  (user grants), `curator.state.json` (cursor). Every text file is run
+  through PII regex sanitisation — emails, IPs, common API-key shapes,
+  bearer tokens are replaced with placeholders.
 
 - `veles import <bundle.tar.gz> [--into <dir>]` validates the bundle
   (manifest version + no path-escape entries) and unpacks into the
@@ -55,16 +55,13 @@ _TEMPLATE_EXCLUDED_FILES: frozenset[str] = frozenset(
     {"memory.db", "trust.json", "curator.state.json"}
 )
 _TEMPLATE_EXCLUDED_PREFIXES: tuple[str, ...] = (
-    # v2: wiki + sources live in the project root.
-    "sources/",
-    "sources",
-    "wiki/sessions/",
-    "wiki/sessions",
-    # v1 leftovers — kept for any still-unmigrated bundle.
-    ".veles/sources/",
-    ".veles/sources",
-    ".veles/wiki/sessions/",
-    ".veles/wiki/sessions",
+    # M160: per-session memory artefacts and job outputs are run history,
+    # not template material. The rest of `.veles/memory/` (insight views,
+    # proposals, system-ops journal) ships with the template.
+    ".veles/memory/sessions/",
+    ".veles/memory/sessions",
+    ".veles/jobs/",
+    ".veles/jobs",
 )
 
 _PII_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (

@@ -1,11 +1,12 @@
 """Per-session insight extraction — pulls durable lessons from history.
 
 Closes TASK.md #2.2 ("memory + learning loop"): M22 added per-turn
-recall and M28 added a continuous curator that condenses sessions
-into wiki pages, but neither pulls *atomic* lessons out — the user
-saying "remember X" or a tool error followed by a successful
-correction. M31 surfaces those as `wiki/insights/<slug>.md` pages so
-M22's memory recall can resurface them on future relevant prompts.
+recall and M28 added a continuous curator that condenses sessions,
+but neither pulls *atomic* lessons out — the user saying "remember X"
+or a tool error followed by a successful correction. M31 extracts
+those; M161 made the `insights` SQL row the canonical store (recall,
+aging, and dream dedup operate on it), with a markdown view rendered
+to `.veles/memory/insights/` as a regenerable human-readable mirror.
 
 Two heuristic triggers, both detected on the completed `Agent.run`
 history (no per-turn LLM cost):
@@ -20,10 +21,11 @@ history (no per-turn LLM cost):
    was fixed (or attempted)".
 
 Both run a single sub-Agent call on a cheap model (default
-`anthropic/claude-haiku-4.5`) with no tools; the model is
-asked for a short markdown body and a kebab-case slug. Output is
-written via `Wiki.write_page(category="insights", ...)` which
-auto-updates INDEX.md, then `LOG.md` gets an `op="insight"` entry.
+`anthropic/claude-haiku-4.5`) with no tools; the model is asked for a
+short markdown body and a kebab-case slug. Each extraction is
+persisted via `save_insight_row` (SQL write required — a db failure
+means the insight is not persisted), then journalled to the
+system-ops log (`op="insight"`).
 
 A trigger that yields an empty summary or fails LLM-side is silently
 skipped — the parent run already succeeded and we'd rather lose a
@@ -32,15 +34,13 @@ lesson than crash on a follow-up.
 
 from __future__ import annotations
 
-import datetime as _dt
 import re
-import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from veles.core.provider import Message
-from veles.core.wiki import _normalize_slug
+from veles.core.slug import normalize_slug as _normalize_slug
 
 if TYPE_CHECKING:
     from veles.core.project import Project
@@ -127,10 +127,6 @@ def _render_window(history: list[Message], start: int, end: int) -> str:
             body = (body + "\n" if body else "") + f"<calls: {calls}>"
         blocks.append(f"# {tag}\n{body}")
     return "\n\n".join(blocks)
-
-
-def _now_slug() -> str:
-    return _dt.datetime.now(tz=_dt.UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
 _REMEMBER_PROMPT = (
@@ -305,8 +301,9 @@ def make_insight_extractor(
     project: Project,
     max_insights: int = _MAX_INSIGHTS_PER_RUN,
 ) -> InsightExtractor:
-    """Build an `InsightExtractor` that scans completed history and writes
-    `wiki/insights/<slug>.md` pages for each detected trigger.
+    """Build an `InsightExtractor` that scans completed history and
+    persists one `insights` row (+ rendered memory view) per detected
+    trigger.
 
     The sub-Agent shares the parent's `TokenBudget` (ContextVar) and
     runs with no tools. An LLM failure on a single trigger is logged
@@ -314,43 +311,9 @@ def make_insight_extractor(
     extraction is better than total loss.
     """
     from veles.core.agent import Agent
+    from veles.core.memory.artefacts import append_memory_log
+    from veles.core.tools.builtin.memory_save import save_insight_row
     from veles.core.tools.registry import Registry
-    from veles.core.wiki import Wiki
-
-    wiki = Wiki(project.wiki_root)
-
-    def _mirror_to_sql_insights(
-        *, title: str, body: str, category: str, file_path: str
-    ) -> None:
-        """Bridge: write the same insight row into M119 `insights`
-        table. Failures are silent — wiki/insights/<slug>.md is the
-        primary; SQL is the discovery shortcut. We don't want a
-        sqlite hiccup to lose a successfully-extracted insight.
-
-        M125: delegates to the shared `save_insight_row` writer so
-        all SQL-direct memory writes (curator tool calls, extractor
-        mirror, mini-report) flow through the same code path."""
-        # ContextVar may not be set during extractor (it runs after the
-        # parent agent returns). Inject project so the helper resolves.
-        from veles.core.context import (
-            current_project,
-            reset_active_project,
-            set_active_project,
-        )
-        from veles.core.tools.builtin.memory_save import save_insight_row
-
-        token = None
-        try:
-            if current_project() is None:
-                token = set_active_project(project)
-            save_insight_row(
-                title=title, body=body, category=category, file_path=file_path
-            )
-        except Exception:
-            pass
-        finally:
-            if token is not None:
-                reset_active_project(token)
 
     def _extract_one(prompt: str, snippet: str) -> tuple[str, str] | None:
         sub = Agent(
@@ -368,7 +331,7 @@ def make_insight_extractor(
         return _parse_extractor_output(result.text or "")
 
     def _persist_one(
-        *, prompt: str, snippet: str, slug_id: str, ts_suffix: str, trigger_label: str
+        *, prompt: str, snippet: str, slug_id: str, trigger_label: str
     ) -> int:
         """Run one extractor pass and persist the result. Returns 1 on success, 0 otherwise."""
         parsed = _extract_one(prompt, snippet)
@@ -376,26 +339,21 @@ def make_insight_extractor(
             return 0
         slug, body = parsed
         title = slug.replace("-", " ").title()
-        rel_path = wiki.write_page(
-            category="insights",
-            slug=f"{slug}-{slug_id[:8]}-{ts_suffix}",
-            title=title,
-            content=body,
+        # SQL row is canonical — a db failure means the insight is NOT
+        # persisted (no orphaned markdown that recall can't see).
+        rid = save_insight_row(
+            title=title, body=body, category=trigger_label, project=project
         )
-        wiki.append_log(
-            op="insight",
-            summary=f"{trigger_label}: session {slug_id} -> {rel_path}",
-        )
-        # Curator → SQL bridge: mirror the insight into the M119
-        # `insights` table so FTS / curator queries / channel
-        # surfacing (Telegram `/insights` etc.) can find it without
-        # walking the wiki filesystem.
-        _mirror_to_sql_insights(
-            title=title,
-            body=body,
-            category=trigger_label,
-            file_path=rel_path,
-        )
+        if rid == 0:
+            return 0
+        try:
+            append_memory_log(
+                project,
+                op="insight",
+                summary=f"{trigger_label}: session {slug_id} -> insight #{rid}",
+            )
+        except Exception:
+            pass
         return 1
 
     def _extract(history: list[Message], session_id: str | None) -> int:
@@ -409,7 +367,6 @@ def make_insight_extractor(
         budget_left = max_insights - len(triggers_remember)
         triggers_recovery = triggers_recovery[-max(0, budget_left) :]
 
-        ts_suffix = _now_slug()
         slug_id = session_id or "session"
         written = 0
 
@@ -420,7 +377,6 @@ def make_insight_extractor(
                 prompt=_REMEMBER_PROMPT,
                 snippet=_render_window(history, window_start, window_end),
                 slug_id=slug_id,
-                ts_suffix=ts_suffix,
                 trigger_label="remember-trigger",
             )
 
@@ -429,7 +385,6 @@ def make_insight_extractor(
                 prompt=_RECOVERY_PROMPT,
                 snippet=_render_window(history, rtrig.window_start, rtrig.window_end),
                 slug_id=slug_id,
-                ts_suffix=ts_suffix,
                 trigger_label="recovery-trigger",
             )
 

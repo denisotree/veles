@@ -17,6 +17,9 @@ Public surface:
   in priority order (project → user → builtin)
 - `find_layout(project, name)` — pick a specific pack by name
 - `LAYOUT_DEFAULT` — `"llm-wiki"`, the dropdown default in `veles init`
+- `apply_scaffold(pack, root, name)` — pack-driven init skeleton (M162)
+- `wiki_enabled(project)` / `engine_enabled(project, name)` — content
+  engine activation checks (M162)
 """
 
 from veles.core.layout.discovery import (
@@ -25,6 +28,11 @@ from veles.core.layout.discovery import (
     discover_layouts,
     find_layout,
 )
+from veles.core.layout.engines import (
+    clear_engine_cache,
+    engine_enabled,
+    wiki_enabled,
+)
 from veles.core.layout.manifest import (
     LayoutManifest,
     LayoutManifestError,
@@ -32,6 +40,7 @@ from veles.core.layout.manifest import (
     LayoutWritableZone,
     read_manifest,
 )
+from veles.core.layout.scaffold import apply_scaffold
 from veles.core.layout.writable import is_writable, writable_zones
 
 __all__ = [
@@ -41,9 +50,13 @@ __all__ = [
     "LayoutManifestError",
     "LayoutOperation",
     "LayoutWritableZone",
+    "apply_scaffold",
+    "clear_engine_cache",
     "discover_layouts",
+    "engine_enabled",
     "find_layout",
     "is_writable",
     "read_manifest",
+    "wiki_enabled",
     "writable_zones",
 ]

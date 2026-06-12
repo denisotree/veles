@@ -24,7 +24,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from veles.core.project import Project
-from veles.core.wiki import _normalize_slug
+from veles.core.slug import normalize_slug as _normalize_slug
 
 _DEFAULT_REGISTRY_REL = ".veles/projects/registry.json"
 _REGISTRY_VERSION = 1

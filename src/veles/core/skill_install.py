@@ -30,7 +30,7 @@ from veles.core.skills import (
     render_frontmatter,
     user_skills_dir,
 )
-from veles.core.wiki import _normalize_slug
+from veles.core.slug import normalize_slug as _normalize_slug
 
 
 class SkillInstallError(RuntimeError):

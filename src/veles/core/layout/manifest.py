@@ -6,6 +6,17 @@ A layout-pack's `layout.toml` looks like:
     name = "llm-wiki"
     description = "Karpathy-style LLM Wiki: sources/, wiki/, INDEX, LOG"
     version = "1.0"
+    # Optional (M162): file injected into the stable system prompt.
+    context_file = "INDEX.md"
+
+    # Optional (M162): core content engines this pack activates.
+    [layout.engines]
+    wiki = true
+
+    # Optional (M162): what `veles init` scaffolds for this pack.
+    [layout.scaffold]
+    dirs = ["notes/"]
+    agents_md_template = "templates/AGENTS.md"   # inside the pack root
 
     [[layout.writable_zones]]
     path = "wiki/"
@@ -82,9 +93,25 @@ class LayoutManifest:
     version: str = "0.0"
     writable_zones: tuple[LayoutWritableZone, ...] = field(default_factory=tuple)
     operations: tuple[LayoutOperation, ...] = field(default_factory=tuple)
+    # M162: names of core content engines this pack activates (only
+    # `[layout.engines]` keys with a `true` value). Today the only
+    # engine core ships is `wiki`.
+    engines: tuple[str, ...] = field(default_factory=tuple)
+    # M162: project-root-relative file injected into the stable system
+    # prompt (e.g. the wiki's `INDEX.md`). None → no injection.
+    context_file: str | None = None
+    # M162: directories `veles init` creates for this pack (relative to
+    # the project root).
+    scaffold_dirs: tuple[str, ...] = field(default_factory=tuple)
+    # M162: pack-root-relative path of an AGENTS.md template ({name} is
+    # substituted). None → core's layout-agnostic default template.
+    agents_md_template: str | None = None
     # Source path of the manifest file. Useful for error messages and
     # for the discovery layer to compute the pack's root directory.
     source: Path | None = None
+
+    def engine_enabled(self, engine: str) -> bool:
+        return engine in self.engines
 
     def writable_path_strings(self) -> tuple[str, ...]:
         """Just the `path` strings of the non-readonly zones — handy for
@@ -139,8 +166,20 @@ def read_manifest(path: Path) -> LayoutManifest:
             "[layout].version must be a string", path=toml_path
         )
 
+    context_file = layout_section.get("context_file")
+    if context_file is not None and (
+        not isinstance(context_file, str) or not context_file.strip()
+    ):
+        raise LayoutManifestError(
+            "[layout].context_file must be a non-empty string", path=toml_path
+        )
+
     zones = _parse_zones(layout_section.get("writable_zones", []), toml_path)
     operations = _parse_operations(layout_section.get("operations", []), toml_path)
+    engines = _parse_engines(layout_section.get("engines", {}), toml_path)
+    scaffold_dirs, agents_md_template = _parse_scaffold(
+        layout_section.get("scaffold", {}), toml_path
+    )
 
     return LayoutManifest(
         name=name.strip(),
@@ -148,8 +187,68 @@ def read_manifest(path: Path) -> LayoutManifest:
         version=str(version),
         writable_zones=zones,
         operations=operations,
+        engines=engines,
+        context_file=context_file.strip() if isinstance(context_file, str) else None,
+        scaffold_dirs=scaffold_dirs,
+        agents_md_template=agents_md_template,
         source=toml_path,
     )
+
+
+def _parse_engines(raw: object, toml_path: Path) -> tuple[str, ...]:
+    if not isinstance(raw, dict):
+        raise LayoutManifestError(
+            "[layout.engines] must be a table of booleans", path=toml_path
+        )
+    out: list[str] = []
+    for key, value in raw.items():
+        if not isinstance(value, bool):
+            raise LayoutManifestError(
+                f"[layout.engines].{key} must be a boolean", path=toml_path
+            )
+        if value:
+            out.append(str(key))
+    return tuple(sorted(out))
+
+
+def _parse_scaffold(
+    raw: object, toml_path: Path
+) -> tuple[tuple[str, ...], str | None]:
+    if not isinstance(raw, dict):
+        raise LayoutManifestError(
+            "[layout.scaffold] must be a table", path=toml_path
+        )
+    dirs_raw = raw.get("dirs", [])
+    if not isinstance(dirs_raw, list) or not all(
+        isinstance(d, str) and d.strip() for d in dirs_raw
+    ):
+        raise LayoutManifestError(
+            "[layout.scaffold].dirs must be a list of non-empty strings",
+            path=toml_path,
+        )
+    dirs: list[str] = []
+    for d in dirs_raw:
+        clean = d.strip()
+        if clean.startswith("/") or ".." in Path(clean).parts:
+            raise LayoutManifestError(
+                f"[layout.scaffold].dirs entry escapes the project root: {d!r}",
+                path=toml_path,
+            )
+        dirs.append(clean)
+    template = raw.get("agents_md_template")
+    if template is not None:
+        if not isinstance(template, str) or not template.strip():
+            raise LayoutManifestError(
+                "[layout.scaffold].agents_md_template must be a non-empty string",
+                path=toml_path,
+            )
+        template = template.strip()
+        if template.startswith("/") or ".." in Path(template).parts:
+            raise LayoutManifestError(
+                "[layout.scaffold].agents_md_template escapes the pack root",
+                path=toml_path,
+            )
+    return tuple(dirs), template
 
 
 def _parse_zones(

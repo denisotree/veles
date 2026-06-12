@@ -5,14 +5,17 @@ Bootstrap is the gate — declining cancels the whole flow. Subsequent
 steps are independent and skippable.
 
 Step order:
-    1. Bootstrap            (confirm → init_project)
-    2. Provider override    (optional; per-project API-key flow)
-    3. AGENTS.md normalize  (only when CLAUDE.md/GEMINI.md conflicts exist;
+    1. Layout picker        (M162: BEFORE bootstrap, so init_project
+                             scaffolds the chosen pack; auto-skips when
+                             only one pack is installed)
+    2. Bootstrap            (confirm → init_project(layout=picked))
+    3. Provider override    (optional; per-project API-key flow)
+    4. AGENTS.md normalize  (only when CLAUDE.md/GEMINI.md conflicts exist;
                              stub here — full implementation lands in M96)
-    4. Wiki seed            (only when there are seed candidates)
-    5. Daemon mode          (optional; if accepted → host/port + Telegram
+    5. Wiki seed            (only with the wiki engine + seed candidates)
+    6. Daemon mode          (optional; if accepted → host/port + Telegram
                              token + whitelist; else skipped)
-    6. Recap                (always shown)
+    7. Recap                (always shown)
 """
 
 from __future__ import annotations
@@ -62,13 +65,16 @@ class BootstrapStep:
     title: str = "Initialize Veles project"
 
     async def run(self, ctx: WizardContext) -> WizardOutcome:
+        from veles.core.layout import LAYOUT_DEFAULT
+
+        layout = ctx.answers.get("layout") or LAYOUT_DEFAULT
         # If the preceding user-wizard already asked "initialize here?" and
         # got a Yes, skip the duplicate confirm and go straight to init —
         # otherwise the user has to answer the same question twice (the
         # screen flashes for a moment, then re-appears identical).
         if ctx.answers.get("_skip_bootstrap_confirm"):
             try:
-                project = init_project(self.cwd, name=None, force=False)
+                project = init_project(self.cwd, name=None, force=False, layout=layout)
             except ProjectAlreadyExists:
                 project = load_project(self.cwd)
             ctx.answers["project"] = project
@@ -88,7 +94,7 @@ class BootstrapStep:
         if not result:
             return WizardOutcome.CANCEL
         try:
-            project = init_project(self.cwd, name=None, force=False)
+            project = init_project(self.cwd, name=None, force=False, layout=layout)
         except ProjectAlreadyExists:
             project = load_project(self.cwd)
         ctx.answers["project"] = project
@@ -349,6 +355,13 @@ class WikiSeedStep:
     title: str = "Seed wiki/sources/"
 
     async def run(self, ctx: WizardContext) -> WizardOutcome:
+        from veles.core.layout.engines import wiki_enabled
+
+        project: Project | None = ctx.answers.get("project")
+        if project is None or not wiki_enabled(project):
+            # M162: seeding sources/ only makes sense for wiki layouts.
+            ctx.answers["wiki_seed_count"] = 0
+            return WizardOutcome.SKIP
         candidates = _collect_seed_candidates(self.cwd)
         if not candidates:
             ctx.answers["wiki_seed_count"] = 0
@@ -368,7 +381,6 @@ class WikiSeedStep:
         if not wants:
             ctx.answers["wiki_seed_count"] = 0
             return WizardOutcome.SKIP
-        project: Project = ctx.answers["project"]
         seeded = _copy_seed_files(project, candidates)
         ctx.answers["wiki_seed_count"] = seeded
         return WizardOutcome.NEXT
@@ -514,10 +526,14 @@ class RecapStep:
         if ctx.answers.get("telegram"):
             wl = ctx.answers["telegram"]["whitelist"]
             lines.append(f"  · telegram: {len(wl)} user(s) whitelisted")
-        try:
-            pages = Wiki(project.wiki_root).reindex_if_stale()
-        except Exception:
-            pages = 0
+        from veles.core.layout.engines import wiki_enabled
+
+        pages = 0
+        if wiki_enabled(project):
+            try:
+                pages = Wiki(project.wiki_root).reindex_if_stale()
+            except Exception:
+                pages = 0
         if pages:
             lines.append(f"  · indexed {pages} wiki page(s)")
         await ctx.app.push_screen_wait(
@@ -581,8 +597,8 @@ from veles.core.project_config import (
 
 def project_wizard_steps(cwd: Path) -> list:
     return [
-        BootstrapStep(cwd=cwd),
         LayoutPickerStep(),
+        BootstrapStep(cwd=cwd),
         ProviderOverrideStep(),
         NormalizationStep(),
         WikiSeedStep(cwd=cwd),
@@ -598,29 +614,24 @@ def project_wizard_steps(cwd: Path) -> list:
 class LayoutPickerStep:
     """Pick the project's content layout-pack (default `llm-wiki`).
 
-    Runs right after BootstrapStep so the project skeleton already
-    exists — we just rewrite its `layout` field. Single-pack
-    installations (only the builtin `llm-wiki`) auto-confirm without
-    showing the screen; the picker appears only when the user has
-    actually installed alternative packs into `~/.veles/layouts/`
-    or `<project>/.veles/layouts/`.
+    M162: runs BEFORE BootstrapStep so `init_project(layout=...)`
+    scaffolds exactly what the chosen pack declares — no post-hoc
+    project.toml rewrite, no leftover skeleton from the default pack.
+    Single-pack installations auto-confirm without showing the screen.
     """
 
     name: str = "layout-picker"
     title: str = "Pick a content layout"
 
     async def run(self, ctx: WizardContext) -> WizardOutcome:
-        project: Project | None = ctx.answers.get("project")
-        if project is None:
-            return WizardOutcome.NEXT
-
         from veles.core.layout import LAYOUT_DEFAULT, discover_layouts
 
-        packs = discover_layouts(project=project)
+        # Pre-bootstrap: no project exists yet, so discovery sees the
+        # user-level and builtin packs (project-level packs can't exist
+        # before init by definition).
+        packs = discover_layouts(project=None)
         if len(packs) <= 1:
-            # Only the builtin pack — no choice to offer. Keep the
-            # default that init_project already wrote.
-            ctx.answers["layout"] = project.layout_name
+            ctx.answers["layout"] = packs[0].manifest.name if packs else LAYOUT_DEFAULT
             return WizardOutcome.NEXT
 
         items = [
@@ -636,32 +647,13 @@ class LayoutPickerStep:
                 title=self.title,
                 items=items,
                 subtitle="Layouts shape how the agent stores user content. Default: llm-wiki.",
-                default=project.layout_name or LAYOUT_DEFAULT,
+                default=LAYOUT_DEFAULT,
             )
         )
         nav = _nav(picked)
         if nav is not None:
             return nav
-        if picked is None or picked == project.layout_name:
-            ctx.answers["layout"] = project.layout_name
-            return WizardOutcome.NEXT
-
-        # Rewrite project.toml with the new layout selection. We
-        # re-emit the whole file via _write_project_toml so
-        # subsequent migrations still see a clean shape.
-        from veles.core.project import _write_project_toml
-
-        _write_project_toml(
-            project.project_toml_path,
-            name=project.name,
-            created_at=project.created_at,
-            schema_version=project.schema_version,
-            layout_name=picked,
-        )
-        # Mutate the in-memory dataclass too so later steps see the
-        # new value without a reload.
-        project.layout_name = picked
-        ctx.answers["layout"] = picked
+        ctx.answers["layout"] = picked or LAYOUT_DEFAULT
         return WizardOutcome.NEXT
 
 

@@ -21,8 +21,9 @@ Output side has three surfaces:
    `Cluster` objects. Used directly by the CLI verb
    `veles subproject suggest` and by the curator auto-trigger.
 2. `write_proposals(project, clusters)` — persists each cluster as a
-   markdown page under `wiki/proposals/<slug>.md` plus a LOG.md entry
-   so the agent's memory recall (M22) picks them up naturally.
+   markdown page under `.veles/memory/proposals/<slug>.md` (M160 —
+   proposals are the agent's own memory, not user content) plus a
+   system-ops journal entry.
 3. `recent_proposals(project, max_age_days)` — lists existing
    proposals younger than `max_age_days`; used by both the CLI to
    avoid duplicate proposals and by the system-prompt block to
@@ -30,11 +31,9 @@ Output side has three surfaces:
 
 The detector is deterministic + cheap (tens of ms for a project with
 hundreds of pages), so the auto-trigger can fire on every `veles run`
-post-turn without LLM cost. The reason it's a wiki page (not just a
-JSON state file): when the agent's memory router fans pages in via
-FTS5, the proposals naturally surface alongside the rest of the
-project's knowledge — the agent can read them, mention them to the
-user, and decide whether to suggest acting on them.
+post-turn without LLM cost. Proposals reach the agent via the
+`<subproject-proposals>` system-prompt block (`memory/injector.py`),
+not via wiki FTS recall.
 """
 
 from __future__ import annotations
@@ -45,11 +44,17 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from veles.core.memory.artefacts import (
+    ProposalInfo,
+    append_memory_log,
+    list_proposals,
+    proposals_dir,
+    write_proposal,
+)
 from veles.core.project import Project
 from veles.core.wiki import Wiki, WikiPageInfo
 
 _CLUSTER_CATEGORIES = frozenset({"concepts", "entities"})
-_PROPOSAL_CATEGORY = "proposals"
 _DEFAULT_MIN_PAGES = 4
 _DEFAULT_MIN_SIMILARITY = 0.25
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
@@ -187,7 +192,7 @@ def _build_cluster_summary(pages: list[WikiPageInfo]) -> tuple[str, str]:
 
 
 def proposal_page_path(project: Project, cluster: Cluster) -> Path:
-    return project.wiki_root / "wiki" / _PROPOSAL_CATEGORY / f"{cluster.slug}.md"
+    return proposals_dir(project) / f"{cluster.slug}.md"
 
 
 def _render_proposal(cluster: Cluster) -> tuple[str, str]:
@@ -220,44 +225,36 @@ def _render_proposal(cluster: Cluster) -> tuple[str, str]:
 
 
 def write_proposals(project: Project, clusters: list[Cluster]) -> list[str]:
-    """Persist each cluster as `wiki/proposals/<slug>.md`. Append LOG.md.
+    """Persist each cluster as `.veles/memory/proposals/<slug>.md`.
 
-    Returns the list of rel_paths written. Idempotent rewrites: an
-    existing proposal with the same slug is overwritten so the cohesion
-    score / page list stay current.
+    Returns the written paths relative to the project root. Idempotent
+    rewrites: an existing proposal with the same slug is overwritten so
+    the cohesion score / page list stay current. Each write is
+    journalled to the system-ops log.
     """
-    wiki = Wiki(project.wiki_root)
     written: list[str] = []
     for cluster in clusters:
         title, body = _render_proposal(cluster)
-        rel = wiki.write_page(
-            category=_PROPOSAL_CATEGORY,
-            slug=cluster.slug,
-            title=title,
-            content=body,
-        )
-        wiki.append_log(
+        path = write_proposal(project, slug=cluster.slug, title=title, content=body)
+        append_memory_log(
+            project,
             op="subproject-proposal",
             summary=(
                 f"proposed subproject '{cluster.slug}' "
                 f"({len(cluster.pages)} pages, score {cluster.score:.2f})"
             ),
         )
-        written.append(rel)
+        written.append(path.relative_to(project.root).as_posix())
     return written
 
 
-def recent_proposals(project: Project, *, max_age_days: int = 7) -> list[WikiPageInfo]:
+def recent_proposals(project: Project, *, max_age_days: int = 7) -> list[ProposalInfo]:
     """Return proposal pages whose mtime is newer than `max_age_days` ago."""
-    wiki = Wiki(project.wiki_root)
     cutoff = time.time() - max_age_days * 86_400
-    out: list[WikiPageInfo] = []
-    for page in wiki.list_pages():
-        if page.category != _PROPOSAL_CATEGORY:
-            continue
-        abs_path = project.wiki_root / page.rel_path
+    out: list[ProposalInfo] = []
+    for page in list_proposals(project):
         try:
-            mtime = abs_path.stat().st_mtime
+            mtime = page.path.stat().st_mtime
         except OSError:
             continue
         if mtime >= cutoff:

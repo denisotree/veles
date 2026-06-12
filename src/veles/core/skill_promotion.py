@@ -14,12 +14,12 @@ Decision rule:
 - `scope == "project"` (already-user-level skills are excluded).
 - No same-name skill at user scope (collision = noisy suggestion).
 
-Output channel: `wiki/proposals/promote-<slug>.md` — same `proposals/`
-category as M62 subproject proposals. The agent's memory recall (M22)
-picks these up naturally; the agent then mentions them to the user in
-conversation. `recent_promote_proposals(project)` lists fresh ones for
-the system-prompt surfacing block; staleness is mtime-based same as
-M62.
+Output channel (M160): `.veles/memory/proposals/promote-<slug>.md` —
+system memory, same proposals dir as M62 subproject proposals. The
+proposals system-prompt block surfaces fresh ones to the agent; the
+agent then mentions them to the user in conversation.
+`recent_promote_proposals(project)` lists fresh ones; staleness is
+mtime-based same as M62.
 
 Idempotency: `write_promote_proposals` overwrites the page when a
 candidate is still active, so updated telemetry is reflected on every
@@ -33,13 +33,18 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from veles.core.memory.artefacts import (
+    ProposalInfo,
+    append_memory_log,
+    list_proposals,
+    proposals_dir,
+    write_proposal,
+)
 from veles.core.project import Project
 from veles.core.skills import Skill, discover_skills, user_skills_dir
-from veles.core.wiki import Wiki, WikiPageInfo
 
 _DEFAULT_MIN_USES = 10
 _DEFAULT_MIN_SUCCESS_RATE = 0.7
-_PROPOSAL_CATEGORY = "proposals"
 _PROPOSAL_SLUG_PREFIX = "promote-"
 _DEFAULT_MAX_AGE_DAYS = 7
 
@@ -101,8 +106,7 @@ def proposal_slug(skill_name: str) -> str:
 
 
 def proposal_path(project: Project, skill_name: str) -> Path:
-    slug = proposal_slug(skill_name)
-    return project.wiki_root / "wiki" / _PROPOSAL_CATEGORY / f"{slug}.md"
+    return proposals_dir(project) / f"{proposal_slug(skill_name)}.md"
 
 
 def _render_proposal(candidate: PromoteCandidate) -> tuple[str, str]:
@@ -136,18 +140,22 @@ def _render_proposal(candidate: PromoteCandidate) -> tuple[str, str]:
 def write_promote_proposals(
     project: Project, candidates: list[PromoteCandidate]
 ) -> list[str]:
-    """Persist each candidate as `wiki/proposals/promote-<name>.md`. LOG.md op."""
-    wiki = Wiki(project.wiki_root)
+    """Persist each candidate as `.veles/memory/proposals/promote-<name>.md`.
+
+    Returns the written paths relative to the project root. Each write
+    is journalled to the system-ops log.
+    """
     written: list[str] = []
     for candidate in candidates:
         title, body = _render_proposal(candidate)
-        rel = wiki.write_page(
-            category=_PROPOSAL_CATEGORY,
+        path = write_proposal(
+            project,
             slug=proposal_slug(candidate.skill.name),
             title=title,
             content=body,
         )
-        wiki.append_log(
+        append_memory_log(
+            project,
             op="skill-promote-proposal",
             summary=(
                 f"suggested promotion of skill '{candidate.skill.name}' "
@@ -155,29 +163,25 @@ def write_promote_proposals(
                 f"{int(candidate.success_rate * 100)}% success)"
             ),
         )
-        written.append(rel)
+        written.append(path.relative_to(project.root).as_posix())
     return written
 
 
 def recent_promote_proposals(
     project: Project, *, max_age_days: int = _DEFAULT_MAX_AGE_DAYS
-) -> list[WikiPageInfo]:
+) -> list[ProposalInfo]:
     """List `promote-*.md` proposals younger than `max_age_days`.
 
     Used by the system-prompt surfacing block so the agent only
     mentions promotions the user might still be interested in.
     """
-    wiki = Wiki(project.wiki_root)
     cutoff = time.time() - max_age_days * 86_400
-    out: list[WikiPageInfo] = []
-    for page in wiki.list_pages():
-        if page.category != _PROPOSAL_CATEGORY:
-            continue
+    out: list[ProposalInfo] = []
+    for page in list_proposals(project):
         if not page.slug.startswith(_PROPOSAL_SLUG_PREFIX):
             continue
-        abs_path = project.wiki_root / page.rel_path
         try:
-            mtime = abs_path.stat().st_mtime
+            mtime = page.path.stat().st_mtime
         except OSError:
             continue
         if mtime >= cutoff:

@@ -56,8 +56,8 @@ def register(sub: argparse._SubParsersAction) -> None:
         "--save",
         action="store_true",
         help=(
-            "Persist each proposal as wiki/proposals/<slug>.md so the agent's "
-            "memory recall surfaces it on future runs."
+            "Persist each proposal as .veles/memory/proposals/<slug>.md so the "
+            "agent surfaces it on future runs."
         ),
     )
     subproject_suggest.add_argument(

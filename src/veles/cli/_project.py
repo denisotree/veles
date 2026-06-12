@@ -33,7 +33,7 @@ from veles.core.project import (
     load_project,
 )
 from veles.core.project_registry import Registry as ProjectRegistry
-from veles.core.wiki import _normalize_slug
+from veles.core.slug import normalize_slug as _normalize_slug
 
 
 def _load_project_modules(project: Project) -> ModuleRegistry:

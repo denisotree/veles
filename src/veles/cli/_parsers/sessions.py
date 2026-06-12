@@ -18,10 +18,10 @@ def register(sub: argparse._SubParsersAction) -> None:
     )
 
     sessions_show = sessions_sub.add_parser("show", help="Print a session's history.")
-    sessions_show.add_argument("session_id")
+    sessions_show.add_argument("session_id", help="Session id to print.")
 
     sessions_delete = sessions_sub.add_parser("delete", help="Delete a session and all its turns.")
-    sessions_delete.add_argument("session_id")
+    sessions_delete.add_argument("session_id", help="Session id to delete.")
 
     sessions_search = sessions_sub.add_parser(
         "search",

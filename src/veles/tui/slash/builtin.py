@@ -102,10 +102,11 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
     """M87 shapes:
       - `/save` (no args) — list pending insight candidates the periodic
         extractor surfaced; user reruns with a slug to commit.
-      - `/save <slug>` — if the slug matches a pending candidate, write
-        that candidate as `wiki/insights/<slug>.md`. Otherwise fall back
-        to the legacy behaviour: save the last assistant reply to
-        `wiki/queries/<slug>.md`.
+      - `/save <slug>` — if the slug matches a pending candidate, save
+        it into the project's insight memory (M161: SQL row + rendered
+        view under `.veles/memory/insights/`). Otherwise fall back to
+        the legacy behaviour: save the last assistant reply to
+        `wiki/queries/<slug>.md` (user content).
     """
     from veles.core.wiki import Wiki
 
@@ -121,26 +122,33 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
         return SlashResult.ok("\n".join(rows))
 
     slug = line.split()[0]
-    wiki = Wiki(ctx.project.wiki_root)
     # First, try matching a pending candidate.
     for cand_slug, title, body in candidates:
         if cand_slug == slug:
+            from veles.core.memory.artefacts import append_memory_log
+            from veles.core.tools.builtin.memory_save import save_insight_row
+
+            rid = save_insight_row(
+                title=title, body=body, category="tui-save", project=ctx.project
+            )
+            if rid == 0:
+                return SlashResult.err("/save failed: could not write insight to memory.db")
             try:
-                rel = wiki.write_page(
-                    category="insights", slug=slug, title=title, content=body
+                append_memory_log(
+                    ctx.project, op="tui-save-insight", summary=f"-> insight #{rid}"
                 )
-            except ValueError as exc:
-                return SlashResult.err(f"/save failed: {exc}")
-            wiki.append_log(op="tui-save-insight", summary=f"-> {rel}")
+            except Exception:
+                pass
             ctx.state.insight_candidates = [
                 c for c in candidates if c[0] != slug
             ]
-            return SlashResult.ok(f"saved insight to {rel}")
+            return SlashResult.ok(f"saved insight #{rid}")
     # Legacy path: save the last assistant reply under wiki/queries/.
     last = ctx.state.last_assistant_text
     if not last or not last.strip():
         return SlashResult.err("/save: nothing to save yet (no assistant response in this run)")
     title = _title_from_text(last) or slug.replace("-", " ").title()
+    wiki = Wiki(ctx.project.wiki_root)
     try:
         rel = wiki.write_page(category="queries", slug=slug, title=title, content=last)
     except ValueError as exc:
@@ -173,6 +181,13 @@ def _wiki(line: str, ctx: SlashContext) -> SlashResult:
     `/wiki query <question>` — agent answers from the wiki using
     wiki_search/wiki_read_page. Both delegate to the live agent turn so
     the TUI doesn't fork a second runtime."""
+    from veles.core.layout.engines import wiki_enabled
+
+    if not wiki_enabled(ctx.project):
+        return SlashResult.err(
+            f"/wiki: the active layout pack {ctx.project.layout_name!r} does "
+            "not enable the wiki engine"
+        )
     del ctx
     if not line:
         return SlashResult.err("/wiki: expected add <path|url> | query <question>")
@@ -542,11 +557,12 @@ def _rules(line: str, ctx: SlashContext) -> SlashResult:
 def _self_doc(line: str, ctx: SlashContext) -> SlashResult:
     del line
     try:
+        from veles.core.safety import scan_for_injection
         from veles.core.self_doc import refresh_self_doc
-        from veles.core.wiki import Wiki
 
         rel = refresh_self_doc(ctx.project)
-        content = Wiki(ctx.project.wiki_root).read_page(rel)
+        raw = (ctx.project.root / rel).read_text(encoding="utf-8", errors="replace")
+        content, _ = scan_for_injection(raw, source_label=rel)
     except Exception as exc:
         return SlashResult.err(f"self-doc failed: {exc}")
     return SlashResult.ok(content)

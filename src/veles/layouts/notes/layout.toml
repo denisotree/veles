@@ -1,0 +1,19 @@
+# Notes layout — a single flat notes/ directory (M164).
+#
+# The minimal custom-pack example: one writable zone, no wiki engine,
+# no operations. Useful as a starting point for your own packs in
+# ~/.veles/layouts/<name>/ — copy this file, adjust the dirs/zones, and
+# optionally add a templates/AGENTS.md and skills/<op>/SKILL.md files.
+
+[layout]
+name = "notes"
+description = "A single flat notes/ directory the agent writes into. No wiki machinery."
+version = "1.0"
+
+[layout.scaffold]
+dirs = ["notes/"]
+agents_md_template = "templates/AGENTS.md"
+
+[[layout.writable_zones]]
+path = "notes/"
+description = "Free-form markdown notes — the only zone the agent writes content into"

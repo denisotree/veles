@@ -16,9 +16,12 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from dataclasses import dataclass, field
+
 from veles.core.project_config import read_provider_model_at
 from veles.daemon.registry import (
     DaemonEntry,
+    DaemonRegistry,
     is_alive,
     status_for,
     uptime_seconds,
@@ -336,3 +339,198 @@ def _runtime_channels(project, record) -> list[str]:
         return _enabled_channel_names(block.get("channels"))
     except Exception:  # noqa: BLE001 — informational only
         return []
+
+
+# ---------------- M159: project → daemons → channels tree model ----------------
+#
+# The picker (rewritten onto Textual's `Tree`) renders one node per daemon with
+# its channels as leaf children, grouped into the current project's daemons and
+# everyone else's. `DaemonNode` is the single abstraction over the two storage
+# backends a daemon can live in:
+#
+#   - the unnamed/"default" daemon → `daemon/registry.py` (cross-project,
+#     `DaemonEntry`); its channels are the project's global `[channels.*]`;
+#   - a named daemon session → `runtime_sessions` (`RuntimeSessionRecord`,
+#     project-local); its channels are `[daemon.<name>.channels.*]`.
+#
+# Plus the `kind=tui` runtime row (no channels) so Enter still opens its log.
+
+
+def _resolve_path(p: str | Path | None) -> Path | None:
+    """`Path.resolve()` defensively — symlinks/trailing-slash must not push a
+    daemon into the wrong project bucket (the mind-palace case lives under a
+    symlinked obsidian vault). Returns None on falsy/garbage input."""
+    if not p:
+        return None
+    try:
+        return Path(p).resolve()
+    except (OSError, ValueError, RuntimeError):
+        return None
+
+
+@dataclass(slots=True)
+class DaemonNode:
+    """One daemon in the picker tree, unifying a registry `DaemonEntry` (unnamed
+    daemon) and a `RuntimeSessionRecord` (named daemon / tui session)."""
+
+    key: str            # stable tree identity (survives in-place reconcile)
+    kind: str           # "registry" | "named" | "tui"
+    name: str           # display name ("default" for the project's unnamed daemon)
+    host: str | None
+    port: int | None
+    pid: int | None
+    status: str         # "running" | "stopped" | "unknown"
+    model: str | None
+    channels: list[str] = field(default_factory=list)
+    project_path: str = ""
+    project_name: str = ""
+    entry: DaemonEntry | None = None    # set when kind == "registry"
+    record: object | None = None        # RuntimeSessionRecord when kind in (named, tui)
+
+    @property
+    def manageable(self) -> bool:
+        """tui sessions are surfaced for their log but not start/stop/restart."""
+        return self.kind in ("registry", "named")
+
+
+@dataclass(slots=True)
+class DaemonTree:
+    """Result of `build_daemon_tree`: the current project's daemons + the rest."""
+
+    current: list[DaemonNode]
+    others: list[DaemonNode]
+    project_name: str | None
+
+
+def _runtime_status(record) -> str:
+    """Live status for a runtime-session record: trust the pid over the stored
+    status, which can lag (a crashed daemon leaves status='running')."""
+    if record.pid and is_alive(record.pid):
+        return "running"
+    return record.status if record.status in ("stopped", "error", "created") else "stopped"
+
+
+def _node_from_entry(entry: DaemonEntry, *, name: str) -> DaemonNode:
+    return DaemonNode(
+        key=f"reg:{entry.slug}",
+        kind="registry",
+        name=name,
+        host=entry.host,
+        port=entry.port,
+        pid=entry.pid or None,
+        status=status_for(entry),
+        model=_entry_model(entry),
+        channels=_entry_channels(entry),
+        project_path=entry.project_path,
+        project_name=entry.project_name,
+        entry=entry,
+    )
+
+
+def _node_from_record(project, record) -> DaemonNode:
+    is_tui = record.kind == "tui"
+    return DaemonNode(
+        key=f"{record.kind}:{record.id}",
+        kind="tui" if is_tui else "named",
+        name=record.name,
+        host=record.host,
+        port=record.port,
+        pid=record.pid,
+        status=_runtime_status(record),
+        model=record.model,
+        channels=[] if is_tui else _runtime_channels(project, record),
+        project_path=str(getattr(project, "root", "")) if project else "",
+        project_name=getattr(project, "name", "") if project else "",
+        record=record,
+    )
+
+
+def build_daemon_tree(project) -> DaemonTree:
+    """Group every known daemon into (current project, other projects).
+
+    Current project = the cross-project registry entry whose `project_path`
+    resolves to `project.root` (the unnamed/"default" daemon) **plus** the
+    project's `runtime_sessions` (named daemons + the tui row). Everyone else's
+    registry entries land in `others`. With no project in scope, all registry
+    entries are `others` and there are no runtime sessions to read."""
+    registry = DaemonRegistry.load()
+    proj_root = _resolve_path(getattr(project, "root", None)) if project else None
+
+    current: list[DaemonNode] = []
+    others: list[DaemonNode] = []
+    for entry in registry.list():
+        belongs = proj_root is not None and _resolve_path(entry.project_path) == proj_root
+        if belongs:
+            # The project's own unnamed daemon → label it "default".
+            current.append(_node_from_entry(entry, name="default"))
+        else:
+            # Other projects: identify by project name, fall back to slug.
+            others.append(_node_from_entry(entry, name=entry.project_name or entry.slug))
+
+    if project is not None:
+        named: list[DaemonNode] = []
+        tui: list[DaemonNode] = []
+        for record in runtime_session_records(project):
+            node = _node_from_record(project, record)
+            (tui if node.kind == "tui" else named).append(node)
+        named.sort(key=lambda n: n.name)
+        # Order: unnamed/default daemon(s) first, then named daemons, then tui.
+        current.extend(named)
+        current.extend(tui)
+
+    return DaemonTree(
+        current=current,
+        others=others,
+        project_name=getattr(project, "name", None) if project else None,
+    )
+
+
+def daemon_node_label(node: DaemonNode, now: float) -> str:
+    """One-line label for a daemon tree node (channels render as leaves)."""
+    port = node.port if node.port is not None else "-"
+    model = node.model or "-"
+    bits = [f"{node.status}"]
+    if node.pid:
+        bits.append(f"pid={node.pid}")
+    if node.kind == "registry" and node.entry is not None:
+        up = _fmt_uptime(uptime_seconds(node.entry, now=now))
+        if up != "-":
+            bits.append(f"up {up}")
+    meta = "  ".join(bits)
+    tag = "" if node.kind != "tui" else "  (tui)"
+    return f"{node.name}{tag}   {node.host or '-'}:{port}  {meta}  {model}"
+
+
+def channel_leaf_label(channel: str) -> str:
+    return f"chan: {channel}"
+
+
+def spawn_daemon_node(node: DaemonNode) -> bool:
+    """Spawn the daemon backing `node`, detached. Registry/unnamed → host/port
+    in its own project root; named → adds `--name` so the child re-attaches its
+    `runtime_sessions` row. Returns True on a live child handle."""
+    from veles.daemon.spawn import spawn_daemon
+
+    host = node.host or "127.0.0.1"
+    port = node.port or 8765
+    if node.kind == "named":
+        return (
+            spawn_daemon(
+                project_root=node.project_path, host=host, port=port, name=node.name
+            )
+            is not None
+        )
+    return spawn_daemon(project_root=node.project_path, host=host, port=port) is not None
+
+
+def soft_delete_runtime(project, record) -> None:
+    """Soft-delete a `runtime_sessions` row (kept for curator/dream history).
+    The kill+wait is the caller's job (the picker does it async, off the message
+    pump) — this is the bare store write."""
+    from veles.core.runtime_sessions import RuntimeSessionStore
+
+    store = RuntimeSessionStore(project.memory_db_path)
+    try:
+        store.soft_delete(record.id)
+    finally:
+        store.close()

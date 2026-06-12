@@ -127,7 +127,7 @@ def test_write_creates_page_and_log(project: Project) -> None:
     body = page.read_text(encoding="utf-8")
     assert "Promote skill: winner" in body
     assert "veles skill promote winner" in body
-    log = (project.wiki_root / "LOG.md").read_text(encoding="utf-8")
+    log = (project.memory_dir / "LOG.md").read_text(encoding="utf-8")
     assert "skill-promote-proposal" in log
     assert "winner" in log
 
@@ -169,12 +169,11 @@ def test_recent_filters_by_age(project: Project) -> None:
 
 
 def test_recent_excludes_non_promote_proposals(project: Project) -> None:
-    """Subproject proposals (M62) share the proposals/ category but a different prefix."""
-    from veles.core.wiki import Wiki
+    """Subproject proposals (M62) share the proposals dir but a different prefix."""
+    from veles.core.memory.artefacts import write_proposal
 
-    wiki = Wiki(project.wiki_root)
-    wiki.write_page(
-        category="proposals",
+    write_proposal(
+        project,
         slug="frontend-cluster",
         title="Subproject proposal: frontend-cluster",
         content="something",

@@ -109,10 +109,9 @@ def test_orphan_skipped_when_referenced_from_other_page(tmp_path: Path) -> None:
     assert all("target" not in f.pages[0] for f in findings)
 
 
-def test_orphan_skips_sessions_and_insights(tmp_path: Path) -> None:
+def test_orphan_skips_sessions(tmp_path: Path) -> None:
     w = _seed_wiki(tmp_path)
     w.write_page(category="sessions", slug="s1", title="S1", content="x")
-    w.write_page(category="insights", slug="i1", title="I1", content="y")
     (w.root / "INDEX.md").write_text("(empty)\n", encoding="utf-8")
     findings = find_orphans(w)
     assert findings == []
@@ -155,10 +154,9 @@ def test_stale_skips_dateless_page(tmp_path: Path) -> None:
     assert findings == []
 
 
-def test_stale_skips_sessions_and_insights(tmp_path: Path) -> None:
+def test_stale_skips_sessions(tmp_path: Path) -> None:
     w = _seed_wiki(tmp_path)
     w.write_page(category="sessions", slug="s1", title="S1", content="As of 2010-01-01.")
-    w.write_page(category="insights", slug="i1", title="I1", content="As of 2010-01-01.")
     now = _dt.datetime(2026, 1, 1, tzinfo=_dt.UTC)
     assert find_stale(w, max_age_days=365, now=now) == []
 

@@ -24,10 +24,10 @@ def register(sub: argparse._SubParsersAction) -> None:
     project_remove = project_sub.add_parser(
         "remove", help="Remove a project from the registry (does not delete files)."
     )
-    project_remove.add_argument("slug")
+    project_remove.add_argument("slug", help="Project slug to unregister.")
 
     project_switch = project_sub.add_parser(
         "switch",
         help="Print the absolute path of a registered project; bumps last-active.",
     )
-    project_switch.add_argument("slug")
+    project_switch.add_argument("slug", help="Project slug to resolve to a path.")

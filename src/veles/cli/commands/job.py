@@ -164,7 +164,7 @@ def _cmd_tick(args: argparse.Namespace, store: JobsStore, project) -> int:
     runner = JobRunner(
         store=store,
         agent_factory=factory,
-        output_root=project.root / ".veles" / "wiki" / "jobs",
+        output_root=project.jobs_dir,
     )
     try:
         summaries = asyncio.run(runner._tick_once(time.time()))

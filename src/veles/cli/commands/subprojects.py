@@ -101,9 +101,9 @@ def _suggest(args: argparse.Namespace, project: Project) -> int:
     _print_clusters(clusters)
     if args.save:
         written = write_proposals(project, clusters)
-        print(f"\nwrote {len(written)} proposal page(s) under wiki/proposals/.")
+        print(f"\nwrote {len(written)} proposal page(s) under .veles/memory/proposals/.")
     else:
-        print("\n(pass --save to persist these as wiki/proposals/<slug>.md pages)")
+        print("\n(pass --save to persist these as .veles/memory/proposals/<slug>.md pages)")
     return 0
 
 

@@ -9,8 +9,8 @@ memory rotates.
 
 from __future__ import annotations
 
+from veles.core.memory.artefacts import ProposalInfo
 from veles.core.memory.router import RecallHit
-from veles.core.wiki import WikiPageInfo
 
 _BLOCK_OPEN = "<memory-context>"
 _BLOCK_CLOSE = "</memory-context>"
@@ -44,7 +44,7 @@ def build_memory_context_block(
 
 
 def build_proposals_block(
-    proposals: list[WikiPageInfo], *, max_chars: int = _PROPOSALS_MAX_CHARS
+    proposals: list[ProposalInfo], *, max_chars: int = _PROPOSALS_MAX_CHARS
 ) -> str | None:
     """Render fresh M62 subproject proposals into a system-prompt block.
 
@@ -57,7 +57,7 @@ def build_proposals_block(
     lines = [
         _PROPOSALS_OPEN,
         f"The curator has identified {len(proposals)} candidate subproject(s) "
-        "in this project's wiki. Each is persisted under wiki/proposals/.",
+        "in this project. Each is persisted under .veles/memory/proposals/.",
         "Consider mentioning these to the user when relevant:",
     ]
     for p in proposals:

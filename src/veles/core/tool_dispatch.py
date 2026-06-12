@@ -361,21 +361,23 @@ def _emit(
 
 
 def _audit_autopilot_dispatch(tool_name: str, error: str | None) -> None:
-    """Append `op="autopilot-<tool>"` to the active project's LOG.md.
+    """Append `op="autopilot-<tool>"` to the system-ops journal
+    (`.veles/memory/LOG.md`).
 
     M63: every sensitive-tool dispatch that bypassed the trust ladder
     via the autopilot window is recorded so the user can audit
-    unattended runs. Failures don't propagate — LOG.md is best-effort.
+    unattended runs. Failures don't propagate — the journal is
+    best-effort.
     """
     project = current_project()
     if project is None:
         return
     try:
-        from veles.core.wiki import Wiki
+        from veles.core.memory.artefacts import append_memory_log
 
         summary = f"sensitive tool {tool_name!r} dispatched"
         if error is not None:
             summary += f" (failed: {error})"
-        Wiki(project.wiki_root).append_log(op=f"autopilot-{tool_name}", summary=summary)
+        append_memory_log(project, op=f"autopilot-{tool_name}", summary=summary)
     except Exception:
         pass

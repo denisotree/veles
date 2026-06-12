@@ -1,13 +1,15 @@
 """M31 — heuristic-driven insight extraction from completed sessions.
 
 Pure-detection tests cover the EN/RU keyword regex and the tool-error
-pairing logic. The closure factory test verifies wiki write + LOG
-append happen on a remember-trigger when the sub-agent emits a
-well-formed slug + body, and that a `SKIP` reply is silently dropped.
+pairing logic. The closure factory test verifies the SQL row + memory
+view + journal entry land on a remember-trigger when the sub-agent
+emits a well-formed slug + body, and that a `SKIP` reply is silently
+dropped (M161: SQL-primary).
 """
 
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -17,14 +19,24 @@ from veles.core.insight_extractor import (
     find_remember_triggers,
     make_insight_extractor,
 )
-from veles.core.project import init_project
+from veles.core.project import Project, init_project
 from veles.core.provider import (
     Message,
     ProviderResponse,
     TokenUsage,
     ToolCall,
 )
-from veles.core.wiki import Wiki
+
+
+def _insight_rows(project: Project) -> list[sqlite3.Row]:
+    conn = sqlite3.connect(str(project.memory_db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        return conn.execute(
+            "SELECT id, title, body, category, file_path FROM insights"
+        ).fetchall()
+    finally:
+        conn.close()
 
 # ---- find_remember_triggers ----
 
@@ -149,7 +161,7 @@ def test_parse_extractor_output_rejects_single_line() -> None:
     assert _parse_extractor_output("just-a-line") is None
 
 
-# ---- Integration: closure factory writes wiki page on real trigger ----
+# ---- Integration: closure factory persists the insight on real trigger ----
 
 
 @dataclass
@@ -176,7 +188,7 @@ def _resp(text: str) -> ProviderResponse:
     )
 
 
-def test_extractor_writes_wiki_page_on_remember_trigger(tmp_path: Path) -> None:
+def test_extractor_persists_insight_on_remember_trigger(tmp_path: Path) -> None:
     project = init_project(tmp_path, name="t")
     provider = _ScriptedProvider(
         responses=[_resp("ruff-before-commit\n\n# Ruff before commit\n\nAlways run ruff.")]
@@ -190,10 +202,14 @@ def test_extractor_writes_wiki_page_on_remember_trigger(tmp_path: Path) -> None:
     written = extractor(history, "session-abc")
     assert written == 1
 
-    pages = Wiki(project.wiki_root).list_pages()
-    insights = [p for p in pages if p.category == "insights"]
-    assert len(insights) == 1
-    assert "ruff-before-commit" in insights[0].slug
+    rows = _insight_rows(project)
+    assert len(rows) == 1
+    assert rows[0]["title"] == "Ruff Before Commit"
+    assert rows[0]["category"] == "remember-trigger"
+    # M161: the rendered memory view is backfilled into file_path.
+    view = project.root / rows[0]["file_path"]
+    assert view.is_file()
+    assert view.parent == project.memory_dir / "insights"
 
 
 def test_extractor_silently_drops_skip_response(tmp_path: Path) -> None:
@@ -203,8 +219,7 @@ def test_extractor_silently_drops_skip_response(tmp_path: Path) -> None:
     history = [Message(role="user", content="remember this trivial fact")]
     written = extractor(history, "s1")
     assert written == 0
-    pages = Wiki(project.wiki_root).list_pages()
-    assert [p for p in pages if p.category == "insights"] == []
+    assert _insight_rows(project) == []
 
 
 def test_extractor_no_triggers_returns_zero_without_llm_call(tmp_path: Path) -> None:
@@ -227,7 +242,7 @@ def test_extractor_writes_log_entry_on_success(tmp_path: Path) -> None:
     history = [Message(role="user", content="never force push to main")]
     extractor(history, "s2")
 
-    log_path = project.wiki_root / "LOG.md"
+    log_path = project.memory_dir / "LOG.md"
     assert log_path.is_file()
     log = log_path.read_text(encoding="utf-8")
     assert "insight" in log

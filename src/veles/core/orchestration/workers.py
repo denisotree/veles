@@ -389,9 +389,8 @@ def mini_report(
 
     The report shape is documented per VISION §5.3 step 5: what was
     done, why this decomposition, and what was hard. We collapse that
-    into a markdown body so it shows up as a normal insight in
-    `wiki/insights/` consumers — but the row also lives in SQL for
-    fast retrieval by category.
+    into a markdown body so it shows up as a normal insight to recall
+    and `/insights` consumers, retrievable fast by category.
     """
     wall = time.time() if now is None else now
     title = f"manager: {objective[:80]}"

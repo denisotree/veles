@@ -21,7 +21,7 @@ from veles.core.module_manifest import (
 )
 from veles.core.modules import ModuleHandle, discover_modules
 from veles.core.project import Project
-from veles.core.wiki import _normalize_slug
+from veles.core.slug import normalize_slug as _normalize_slug
 
 
 class ModuleInstallError(RuntimeError):

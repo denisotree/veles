@@ -107,9 +107,23 @@ def _seed_registry_entry(project) -> None:
     reg.save()
 
 
-async def test_refresh_does_not_steal_focus_from_runtime_list(tmp_path, monkeypatch):
-    """B: the 2s refresh must not yank focus back to the registry list when the
-    user has Tab'd to the runtime list."""
+def _named(screen, name):
+    from veles.tui.screens.daemon_picker import _Row
+
+    for section in (screen._sec_current, screen._sec_other):
+        if section is None:
+            continue
+        for child in section.children:
+            row = child.data
+            if isinstance(row, _Row) and row.kind == "daemon" and row.node is not None:
+                if row.node.name == name:
+                    return child
+    return None
+
+
+async def test_refresh_keeps_focus_and_cursor_on_named_daemon(tmp_path, monkeypatch):
+    """M159: the 2 s refresh reconciles tree nodes in place — the cursor stays on
+    the named daemon the user selected, and the tree keeps focus."""
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
     from veles.tui.screens.daemon_picker import DaemonPickerApp
 
@@ -122,20 +136,25 @@ async def test_refresh_does_not_steal_focus_from_runtime_list(tmp_path, monkeypa
     app = DaemonPickerApp(project=project)
     async with app.run_test() as pilot:
         await pilot.pause()
-        screen = pilot.app.screen
-        screen._runtime_listview.focus()
         await pilot.pause()
+        screen = pilot.app.screen
+        screen._tree.move_cursor(_named(screen, "api"))
+        await pilot.pause()
+        before = screen._tree.cursor_node
         screen._refresh()  # the structural tick
         await pilot.pause()
-        assert screen._runtime_listview.has_focus is True
+        assert screen._tree.cursor_node is before
+        assert screen._tree.has_focus is True
 
 
-async def test_default_focus_runtime_when_registry_empty(tmp_path, monkeypatch):
-    """E: with no registry daemons but a runtime session, the runtime list gets
-    default focus so s/t/r/d act on it instead of silently no-op'ing."""
+async def test_named_daemon_actionable_when_no_registry_entry(tmp_path, monkeypatch):
+    """M159: with only a named session (no registry/unnamed daemon), the cursor
+    still lands on a daemon so s/t/r/d act on it instead of a silent no-op."""
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    import veles.daemon.spawn as spawn_mod
     from veles.tui.screens.daemon_picker import DaemonPickerApp
 
+    monkeypatch.setattr(spawn_mod, "spawn_daemon", lambda **kw: object())  # no real subprocess
     project = init_project(tmp_path / "p", name="p")
     store = RuntimeSessionStore(project.memory_db_path)
     store.create("api", "daemon", port=8801)
@@ -144,8 +163,10 @@ async def test_default_focus_runtime_when_registry_empty(tmp_path, monkeypatch):
     app = DaemonPickerApp(project=project)
     async with app.run_test() as pilot:
         await pilot.pause()
+        await pilot.pause()
         screen = pilot.app.screen
-        assert screen._runtime_listview.has_focus is True
+        daemon = screen._cursor_daemon()
+        assert daemon is not None and daemon.name == "api"
         await pilot.press("s")  # start the named session (not a silent no-op)
         await pilot.pause()
         assert "api" in screen.last_action

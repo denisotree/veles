@@ -10,13 +10,15 @@ Layout:
     ├── AGENTS.md             project context
     ├── CLAUDE.md → AGENTS.md
     ├── GEMINI.md → AGENTS.md
+    ├── INDEX.md, LOG.md      (Wiki — user content, llm-wiki layout)
+    ├── wiki/, sources/       (user content, llm-wiki layout)
     └── .veles/
-        ├── project.toml      {name, created_at, schema_version}
+        ├── project.toml      {name, created_at, schema_version, layout}
         ├── memory.db         (SessionStore — populated lazily on first run)
-        ├── INDEX.md          (Wiki — populated lazily on first ingest)
-        ├── LOG.md
-        ├── wiki/{concepts,entities,sources}/
-        └── sources/
+        ├── memory/           agent's own artefacts (M160): LOG.md journal,
+        │                     insights/, sessions/, proposals/
+        ├── jobs/             scheduled-job outputs
+        └── skills/, modules/, tmp/
 
 System-level config (defaults shared across projects) lives separately at
 `~/.veles/config.toml` and is NOT touched by this module.
@@ -34,7 +36,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from veles.core.safety import scan_for_injection
-from veles.core.wiki import Wiki
 
 _STATE_DIR = ".veles"
 _PROJECT_TOML = "project.toml"
@@ -89,6 +90,19 @@ class Project:
         dir name (e.g. `WIKI/` uppercase for Obsidian vaults) is a
         follow-up — for now the layout is the Karpathy default."""
         return self.root
+
+    @property
+    def memory_dir(self) -> Path:
+        """The agent's own memory artefacts (system-ops journal, insight
+        views, session compactions, proposals) — system-owned and
+        layout-independent (VISION §5.1). Owned by
+        `core/memory/artefacts.py`; never part of user content."""
+        return self.state_dir / "memory"
+
+    @property
+    def jobs_dir(self) -> Path:
+        """Scheduled-job outputs (`veles job` + daemon JobRunner)."""
+        return self.state_dir / "jobs"
 
     @property
     def skills_dir(self) -> Path:
@@ -156,7 +170,13 @@ def load_project(root: Path) -> Project:
     return run_pending_migrations(project)
 
 
-def init_project(root: Path, *, name: str | None = None, force: bool = False) -> Project:
+def init_project(
+    root: Path,
+    *,
+    name: str | None = None,
+    force: bool = False,
+    layout: str = "llm-wiki",
+) -> Project:
     """Create the project skeleton. Returns the new Project.
 
     The "already initialised" guard keys on the `project.toml` marker —
@@ -169,6 +189,11 @@ def init_project(root: Path, *, name: str | None = None, force: bool = False) ->
     and recreates from scratch. This is what lets the wizard and
     `veles init` recover such a half-existing dir instead of dead-ending
     on `ProjectAlreadyExists` → `load_project` → `ProjectNotFound`.
+
+    M162: the user-content skeleton is owned by the chosen layout pack
+    (`apply_scaffold`) — core no longer assumes the wiki shape. An
+    unknown `layout` degrades to a bare scaffold (default AGENTS.md, no
+    content dirs) with a stderr warning.
     """
     root = root.resolve()
     state_dir = root / _STATE_DIR
@@ -194,18 +219,22 @@ def init_project(root: Path, *, name: str | None = None, force: bool = False) ->
         state_dir / _PROJECT_TOML,
         name=resolved_name,
         created_at=now,
+        layout_name=layout,
     )
 
-    # v2: wiki lives in project root, not under `.veles/`. `Wiki` itself
-    # adds the `wiki/<category>/` and `sources/` subpaths beneath the
-    # container we pass it.
-    Wiki(root).ensure_layout()
+    # Lazy import — `core.layout.discovery` imports Project from this
+    # module; importing it at the top would be a cycle.
+    from veles.core.layout.discovery import find_layout
+    from veles.core.layout.scaffold import apply_scaffold
 
-    agents_md = root / _AGENTS_MD
-    if not agents_md.exists():
-        from veles.core.agents_md_schema import default_template
-
-        agents_md.write_text(default_template(resolved_name), encoding="utf-8")
+    pack = find_layout(layout, project=None)
+    if pack is None:
+        print(
+            f"warning: layout pack {layout!r} not found; "
+            "initialising without a content scaffold",
+            file=sys.stderr,
+        )
+    apply_scaffold(pack, root, resolved_name)
 
     _ensure_symlinks(root)
 
@@ -214,6 +243,7 @@ def init_project(root: Path, *, name: str | None = None, force: bool = False) ->
         name=resolved_name,
         created_at=now,
         schema_version=_SCHEMA_VERSION,
+        layout_name=layout,
     )
     # M118b: warm the project_tree cache on init so the first
     # `veles run` doesn't pay a cold-scan cost. The scanner is

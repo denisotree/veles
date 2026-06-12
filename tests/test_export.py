@@ -36,14 +36,17 @@ def _seed_project(tmp_path: Path, *, name: str = "demo") -> Path:
 
     # Memory DB stub (binary-ish)
     (state / "memory.db").write_bytes(b"\x00stub-sqlite\x00")
-    # Wiki concept + session pages
-    _write(state / "wiki" / "concepts" / "auth.md", "# Auth\nuse OAuth (alice@example.com)")
+    # M160 memory artefacts: insight view (kept in template) + session
+    # compaction (excluded in template) + job output (excluded in template)
     _write(
-        state / "wiki" / "sessions" / "abc.md",
+        state / "memory" / "insights" / "lesson.md",
+        "# Lesson\nuse OAuth (alice@example.com)",
+    )
+    _write(
+        state / "memory" / "sessions" / "abc.md",
         "# Session abc\nUser asked alice@example.com to test 192.168.1.5.",
     )
-    # Sources (raw)
-    _write(state / "sources" / "snippet.md", "raw snippet")
+    _write(state / "jobs" / "job-1" / "20260101T000000Z.md", "# job output")
     # Skills
     _write(
         state / "skills" / "planner" / "SKILL.md",
@@ -147,8 +150,8 @@ def test_export_full_writes_manifest_and_files(tmp_path: Path) -> None:
     assert ".veles/project.toml" in arcs
     assert ".veles/memory.db" in arcs
     assert ".veles/trust.json" in arcs
-    assert ".veles/sources/snippet.md" in arcs
-    assert ".veles/wiki/sessions/abc.md" in arcs
+    assert ".veles/memory/sessions/abc.md" in arcs
+    assert ".veles/jobs/job-1/20260101T000000Z.md" in arcs
 
 
 def test_export_full_excludes_runtime_files(tmp_path: Path) -> None:
@@ -188,11 +191,10 @@ def test_export_template_excludes_sensitive_files(tmp_path: Path) -> None:
     assert ".veles/memory.db" not in arcs
     assert ".veles/trust.json" not in arcs
     assert ".veles/curator.state.json" not in arcs
-    # Sources stripped
-    assert not any(m.startswith(".veles/sources") for m in arcs)
-    # Wiki sessions stripped, but other wiki categories kept
-    assert not any(m.startswith(".veles/wiki/sessions") for m in arcs)
-    assert ".veles/wiki/concepts/auth.md" in arcs
+    # Per-session compactions + job outputs stripped, insight views kept
+    assert not any(m.startswith(".veles/memory/sessions") for m in arcs)
+    assert not any(m.startswith(".veles/jobs") for m in arcs)
+    assert ".veles/memory/insights/lesson.md" in arcs
     # Schema kept
     assert "AGENTS.md" in arcs
     assert ".veles/project.toml" in arcs
@@ -207,7 +209,7 @@ def test_export_template_runs_pii_sanitisation(tmp_path: Path) -> None:
 
     export_template(load_project(project_root), bundle)
     with tarfile.open(bundle, "r:gz") as tf:
-        member = tf.getmember(".veles/wiki/concepts/auth.md")
+        member = tf.getmember(".veles/memory/insights/lesson.md")
         fh = tf.extractfile(member)
         assert fh is not None
         body = fh.read().decode("utf-8")

@@ -3,10 +3,11 @@
 Mandatory per PLAN.md §3.3: without it, long sessions hit the provider's
 context limit. When the in-memory turn history grows past
 `threshold_tokens`, the middle range is summarised by a cheap-model
-sub-agent and the result is persisted as a `wiki/sessions/<...>.md`
-page (Karpathy-style ingest). The conversation passed to the next LLM
+sub-agent and the result is persisted under
+`.veles/memory/sessions/<...>.md` (M160 — compactions are the agent's
+own memory, not user content). The conversation passed to the next LLM
 call is `head` + `tail`, with the first system message extended by a
-short `[CONTEXT-COMPRESSION]` note pointing the agent at the wiki page.
+short `[CONTEXT-COMPRESSION]` note pointing the agent at the summary.
 
 Why augment the system prompt rather than insert a placeholder turn:
 Anthropic and most other providers strictly require alternating
@@ -25,7 +26,8 @@ Two surfaces:
   `find_safe_boundaries`, `render_middle_for_summary`,
   `apply_compression`) deterministic and testable in isolation.
 - `make_default_compressor(...)` returns a `HistoryCompressor` callable
-  that wraps the utilities with a sub-Agent summariser + Wiki write.
+  that wraps the utilities with a sub-Agent summariser + memory-artefact
+  write.
 """
 
 from __future__ import annotations
@@ -226,7 +228,7 @@ def make_default_compressor(
     project: Project,
 ) -> HistoryCompressor:
     """Build a `HistoryCompressor` that summarises with a sub-Agent and
-    writes the result to `wiki/sessions/`.
+    writes the result to `.veles/memory/sessions/`.
 
     The sub-Agent shares the parent's `TokenBudget` (ContextVar) and
     runs with no tools and no nested compressor — recursion is therefore
@@ -234,15 +236,13 @@ def make_default_compressor(
     drop the middle (the agent will know less, which is preferable to
     crashing the parent on a context overflow).
     """
-    # Late imports — Agent / Wiki are core but importing them at module
-    # top would couple every importer of compression utilities to those
-    # heavy modules, and Agent annotates its compressor parameter, so a
-    # cycle is one careless import away.
+    # Late import — Agent is core but importing it at module top would
+    # couple every importer of compression utilities to that heavy
+    # module, and Agent annotates its compressor parameter, so a cycle
+    # is one careless import away.
     from veles.core.agent import Agent
+    from veles.core.memory.artefacts import append_memory_log, write_session_summary
     from veles.core.tools.registry import Registry
-    from veles.core.wiki import Wiki
-
-    wiki = Wiki(project.wiki_root)
 
     def _compress(history: list[Message], session_id: str | None) -> list[Message]:
         sid = session_id or "session"
@@ -333,13 +333,15 @@ def make_default_compressor(
         slug_id = sid
         slug = f"{slug_id}-c-{_now_slug()}"
         title = f"Compressed segment of session {slug_id}"
-        rel_path = wiki.write_page(
-            category="sessions",
-            slug=slug,
-            title=title,
-            content=summary,
+        summary_abs = write_session_summary(
+            project, slug=slug, title=title, content=summary
         )
-        wiki.append_log(
+        try:
+            rel_path = summary_abs.relative_to(project.root).as_posix()
+        except ValueError:
+            rel_path = str(summary_abs)
+        append_memory_log(
+            project,
             op="compress",
             summary=f"compressed {len(middle)} turns of session {slug_id} -> {rel_path}",
         )

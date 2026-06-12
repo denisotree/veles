@@ -5,7 +5,7 @@ channel chat from outside the inbound polling loop.
 
 Target syntax (parsed by `DeliveryTarget.parse`):
 
-    local                          → log-only (stderr / wiki/jobs/...).
+    local                          → log-only (stderr / .veles/jobs/...).
     origin                         → reply on the same chat that originated
                                      the request (carried by SessionSource).
     <platform>:<chat_id>           → send to that chat on that platform.

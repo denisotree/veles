@@ -1,10 +1,11 @@
 """M140: the `insights` SQL table becomes a first-class recall source, and
-recall hits age the rows via `last_referenced_at`.
+recall hits age the rows via `last_referenced_at`. (M161 made the SQL row
+the *sole* insight store — the old wiki↔SQL title de-dup is gone.)
 
 Units under test:
   - `SessionStore.search_insights(query, limit)` — FTS5 MATCH over insights.
   - `SessionStore.touch_insights(ids, at)` — bump `last_referenced_at`.
-  - `MemoryRouter._collect_insights` + recall fan-out + SQL/wiki de-dup.
+  - `MemoryRouter._collect_insights` + recall fan-out.
 """
 
 from __future__ import annotations
@@ -137,18 +138,19 @@ def test_recall_surfaces_insight_via_sql_path(tmp_path: Path) -> None:
     assert ref is not None
 
 
-def test_recall_dedupes_sql_and_wiki(tmp_path: Path) -> None:
-    """An insight present both as a wiki page and a SQL row appears once."""
+def test_recall_returns_insight_alongside_wiki_pages(tmp_path: Path) -> None:
+    """M161: insights live only in SQL; wiki pages and insight rows are
+    distinct sources that both surface without any title de-dup pass."""
     from veles.core.memory.router import MemoryRouter
     from veles.core.wiki import Wiki
 
     project = init_project(tmp_path / "p", name="p")
     wiki = Wiki(project.wiki_root)
     wiki.write_page(
-        category="insights",
-        slug="cache-ttl",
-        title="cache ttl policy",
-        content="# cache ttl policy\n\nset redis ttl to 300 seconds for session keys\n",
+        category="concepts",
+        slug="cache-design",
+        title="cache design",
+        content="# cache design\n\nsession keys live in redis with a ttl\n",
     )
     wiki.reindex_if_stale()
     store = SessionStore(project.memory_db_path)
@@ -160,4 +162,5 @@ def test_recall_dedupes_sql_and_wiki(tmp_path: Path) -> None:
     finally:
         store.close()
     titles = [h.title for h in hits]
-    assert titles.count("cache ttl policy") == 1
+    assert "cache ttl policy" in titles
+    assert "cache design" in titles

@@ -1,9 +1,11 @@
-"""M87: `/save` lists pending candidates when bare; `/save <slug>` writes
-the matching candidate to wiki/insights/ and pops it from state."""
+"""M87: `/save` lists pending candidates when bare; `/save <slug>` saves
+the matching candidate into insight memory (M161: SQL row + rendered
+view) and pops it from state."""
 
 from __future__ import annotations
 
-from veles.core.wiki import Wiki
+import sqlite3
+
 from veles.tui.slash import build_default_registry
 from veles.tui.widgets.status_bar import StatusBar
 
@@ -34,10 +36,23 @@ def test_save_commits_candidate_and_removes_from_list(slash_ctx):
     ]
     res = _reg().dispatch("/save alpha-note", slash_ctx)
     assert res is not None and not res.is_error
-    assert "wiki/insights/alpha-note.md" in res.text
-    wiki = Wiki(slash_ctx.project.wiki_root)
-    body = wiki.read_page("wiki/insights/alpha-note.md")
-    assert "First insight body." in body
+    assert "saved insight #" in res.text
+    # M161: the canonical store is the insights SQL row...
+    conn = sqlite3.connect(str(slash_ctx.project.memory_db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            "SELECT title, body, category, file_path FROM insights"
+        ).fetchone()
+    finally:
+        conn.close()
+    assert row is not None
+    assert row["title"] == "Alpha note"
+    assert row["category"] == "tui-save"
+    # ...with a rendered view under .veles/memory/insights/.
+    view = slash_ctx.project.root / row["file_path"]
+    assert view.is_file()
+    assert "First insight body." in view.read_text(encoding="utf-8")
     # The committed candidate is popped from state.
     assert slash_ctx.state.insight_candidates == []
 

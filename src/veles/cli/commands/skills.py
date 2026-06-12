@@ -89,9 +89,11 @@ def _suggest_promote(args: argparse.Namespace, project: Project) -> int:
         )
     if args.save:
         written = write_promote_proposals(project, candidates)
-        print(f"\nwrote {len(written)} proposal page(s) under wiki/proposals/.")
+        print(f"\nwrote {len(written)} proposal page(s) under .veles/memory/proposals/.")
     else:
-        print("\n(pass --save to persist these as wiki/proposals/promote-<name>.md pages)")
+        print(
+            "\n(pass --save to persist these as .veles/memory/proposals/promote-<name>.md pages)"
+        )
     return 0
 
 

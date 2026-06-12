@@ -24,6 +24,14 @@ def _register_init(sub: argparse._SubParsersAction) -> None:
         help="Project name (default: cwd basename, normalised).",
     )
     init.add_argument(
+        "--layout",
+        default="llm-wiki",
+        help=(
+            "Layout pack for the user-content scaffold (default: llm-wiki). "
+            "Discovered from ~/.veles/layouts/ and the builtin packs."
+        ),
+    )
+    init.add_argument(
         "--force",
         action="store_true",
         help="Recreate .veles/ even if it already exists.",
@@ -68,14 +76,17 @@ def _register_run(sub: argparse._SubParsersAction) -> None:
     run.add_argument(
         "--no-insights",
         action="store_true",
-        help="Disable post-run insight extraction (wiki/insights/) for this invocation.",
+        help=(
+            "Disable post-run insight extraction (the `insights` memory "
+            "table) for this invocation."
+        ),
     )
     run.add_argument(
         "--no-proposer",
         action="store_true",
         help=(
             "Disable the subproject proposer auto-trigger (it normally "
-            "refreshes `wiki/proposals/` at most once every 7 days)."
+            "refreshes `.veles/memory/proposals/` at most once every 7 days)."
         ),
     )
     run.add_argument(
@@ -91,7 +102,7 @@ def _register_run(sub: argparse._SubParsersAction) -> None:
         action="store_true",
         help=(
             "Disable the auto-promote suggester (it normally refreshes "
-            "`wiki/proposals/promote-*.md` at most once every 7 days)."
+            "`.veles/memory/proposals/promote-*.md` at most once every 7 days)."
         ),
     )
     run.add_argument(
@@ -162,6 +173,10 @@ def _register_tui(sub: argparse._SubParsersAction) -> None:
         type=int,
         default=DEFAULT_COMPRESS_THRESHOLD_TOKENS,
         metavar="N",
+        help=(
+            f"Estimated history token count that triggers compression "
+            f"(default: {DEFAULT_COMPRESS_THRESHOLD_TOKENS})."
+        ),
     )
     tui.add_argument(
         "--theme",
@@ -179,7 +194,10 @@ def _register_curate(sub: argparse._SubParsersAction) -> None:
 
     curate = sub.add_parser(
         "curate",
-        help="Compact unprocessed sessions into wiki/sessions/ pages.",
+        help=(
+            "Distill unprocessed sessions into durable memory (wiki page per "
+            "session when the layout has the wiki engine, SQL insights always)."
+        ),
     )
     curate.add_argument(
         "--limit",
