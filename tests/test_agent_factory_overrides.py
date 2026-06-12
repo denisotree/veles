@@ -106,7 +106,10 @@ def test_factory_ignores_stray_session_override(project, store, state) -> None:
     assert captured["settings"].provider_name == "ollama"
 
 
-def test_factory_none_session_id_uses_config_model(project, store, state) -> None:
+def test_factory_none_session_id_uses_config_model(project, store, state, monkeypatch) -> None:
+    # The factory validates the routed provider's API key before building;
+    # CI has none, so inject a dummy (no network call — the build is patched).
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key-unused")
     state.set_overrides("any-session", model="should-not-apply")
     captured = {}
 

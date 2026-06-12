@@ -236,6 +236,51 @@ def fake_keyring(monkeypatch: pytest.MonkeyPatch) -> FakeKeyring:
     return kr
 
 
+@pytest.fixture(autouse=True)
+def _in_memory_keyring() -> Iterator[None]:
+    """Give every test a working in-memory OS-keyring backend.
+
+    Headless CI (and some Linux dev boxes) ship no keyring backend, so any
+    test that drives the real `keyring` path — storing a Telegram bot token,
+    starting a channel gateway — died with `KeyringUnavailable`. The suite
+    only passed on a maintainer's macOS box with a live Keychain.
+
+    A fresh in-memory store per test keeps secrets from leaking across
+    tests. Tests that need the keyring to *fail* (or want the tmp-isolated
+    sidecar index) patch `secrets._keyring` themselves, which overrides this.
+    """
+    import keyring
+    from keyring.backend import KeyringBackend
+
+    class _InMemory(KeyringBackend):
+        priority = 1  # type: ignore[assignment]
+
+        def __init__(self) -> None:
+            super().__init__()
+            self._data: dict[tuple[str, str], str] = {}
+
+        def get_password(self, service: str, username: str) -> str | None:
+            return self._data.get((service, username))
+
+        def set_password(self, service: str, username: str, password: str) -> None:
+            self._data[(service, username)] = password
+
+        def delete_password(self, service: str, username: str) -> None:
+            from keyring.errors import PasswordDeleteError
+
+            try:
+                del self._data[(service, username)]
+            except KeyError as exc:
+                raise PasswordDeleteError("not found") from exc
+
+    prev = keyring.get_keyring()
+    keyring.set_keyring(_InMemory())
+    try:
+        yield
+    finally:
+        keyring.set_keyring(prev)
+
+
 @pytest.fixture
 def isolated_user_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     """Point `VELES_USER_HOME` at a fresh temp dir and clear provider

@@ -406,26 +406,40 @@ def test_spawn_parallel_runs_concurrently() -> None:
 
 
 def test_spawn_parallel_respects_max_concurrent_cap() -> None:
-    """When pool size is bounded, two workers run, then two more."""
+    """A bounded pool runs workers in parallel but never exceeds the cap.
+
+    Observes the actual peak concurrency rather than wall-clock time —
+    a timing assertion was flaky on slow/variable CI runners, where the
+    scheduling overhead of two batches could exceed the budget for one.
+    """
+    import threading
     import time as _time
 
     from veles.core.orchestration import WorkerSpec, spawn_parallel
+
+    lock = threading.Lock()
+    active = 0
+    peak = 0
 
     class _SlowAgent:
         def __init__(self, **_kw) -> None:
             pass
 
         def run(self, prompt: str):
-            _time.sleep(0.1)
+            nonlocal active, peak
+            with lock:
+                active += 1
+                peak = max(peak, active)
+            _time.sleep(0.05)
+            with lock:
+                active -= 1
             return _FakeResult(text=prompt)
 
     def factory(**_kwargs):
         return _SlowAgent()
 
-    specs = [WorkerSpec(role="x", prompt=f"t-{i}") for i in range(4)]
-    t0 = _time.monotonic()
+    specs = [WorkerSpec(role="x", prompt=f"t-{i}") for i in range(6)]
     spawn_parallel(specs, agent_factory=factory, max_concurrent=2)
-    elapsed = _time.monotonic() - t0
-    # 4 workers, pool of 2 → 2 batches × 0.1s sleep ≈ 0.2s.
-    # Allow generous slack for thread scheduling.
-    assert 0.15 < elapsed < 0.4, f"expected ~0.2s batching, got {elapsed}s"
+    # Cap honoured (never more than 2 at once) and the pool is genuinely
+    # parallel (it actually reached the cap, not serialised to 1).
+    assert peak == 2, f"expected peak concurrency of exactly 2, saw {peak}"
