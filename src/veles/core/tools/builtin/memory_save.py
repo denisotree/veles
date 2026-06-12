@@ -15,6 +15,7 @@ as `<error: ...>` strings (consistent with wiki_tools).
 
 from __future__ import annotations
 
+import contextlib
 import time
 from typing import TYPE_CHECKING
 
@@ -31,9 +32,7 @@ _RULE_KINDS = frozenset({"format", "do", "dont", "preference"})
 def _resolve_project(project: Project | None) -> Project:
     proj = project if project is not None else current_project()
     if proj is None:
-        raise RuntimeError(
-            "no active Veles project; run `veles init` and ensure cwd is inside it"
-        )
+        raise RuntimeError("no active Veles project; run `veles init` and ensure cwd is inside it")
     return proj
 
 
@@ -44,7 +43,11 @@ def _open_store(project: Project | None = None):
 
 
 def save_insight_row(
-    *, title: str, body: str, category: str, file_path: str = "",
+    *,
+    title: str,
+    body: str,
+    category: str,
+    file_path: str = "",
     project: Project | None = None,
 ) -> int:
     """Canonical insight writer — used by the @tool wrapper, the insight
@@ -79,10 +82,8 @@ def save_insight_row(
     except Exception:
         return 0
     finally:
-        try:
+        with contextlib.suppress(Exception):
             store._conn.close()
-        except Exception:
-            pass
 
 
 def _render_view(project: Project, *, rid: int, title: str, body: str) -> str | None:
@@ -113,8 +114,7 @@ def save_rule_row(*, kind: str, body: str, source: str) -> int:
         return 0
     try:
         cur = store._conn.execute(
-            "INSERT INTO rules(kind, body, source, created_at)"
-            " VALUES (?, ?, ?, ?)",
+            "INSERT INTO rules(kind, body, source, created_at) VALUES (?, ?, ?, ?)",
             (kind, body, source, time.time()),
         )
         store._conn.commit()
@@ -122,10 +122,8 @@ def save_rule_row(*, kind: str, body: str, source: str) -> int:
     except Exception:
         return 0
     finally:
-        try:
+        with contextlib.suppress(Exception):
             store._conn.close()
-        except Exception:
-            pass
 
 
 @tool(risk_class=RiskClass.WRITE_LOCAL_PROJECT, side_effects=["filesystem"])

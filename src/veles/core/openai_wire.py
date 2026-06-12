@@ -112,9 +112,7 @@ class OpenAICompatibleProvider:
     def _max_tokens_kwarg(self, model: str) -> str:
         return max_tokens_kwarg_for(model)
 
-    def _prepare_messages(
-        self, messages: list[Message], model: str
-    ) -> list[dict[str, Any]]:
+    def _prepare_messages(self, messages: list[Message], model: str) -> list[dict[str, Any]]:
         """Default: plain wire-form. Cloud adapters override to call
         `apply_cache_hints` on top."""
         return [to_openai_message(m) for m in messages]
@@ -266,9 +264,7 @@ class OpenAICompatibleProvider:
                 text_buffer += delta.content
             for tc_delta in getattr(delta, "tool_calls", None) or []:
                 idx = getattr(tc_delta, "index", 0)
-                acc = tool_calls_acc.setdefault(
-                    idx, {"id": "", "name": "", "arguments": ""}
-                )
+                acc = tool_calls_acc.setdefault(idx, {"id": "", "name": "", "arguments": ""})
                 if tc_delta.id:
                     acc["id"] = tc_delta.id
                 fn = getattr(tc_delta, "function", None)
@@ -283,9 +279,7 @@ class OpenAICompatibleProvider:
         tool_calls: list[ToolCall] = []
         for acc in tool_calls_acc.values():
             arguments = decode_tool_args(acc["arguments"])
-            tool_calls.append(
-                ToolCall(id=acc["id"], name=acc["name"], arguments=arguments)
-            )
+            tool_calls.append(ToolCall(id=acc["id"], name=acc["name"], arguments=arguments))
         response = ProviderResponse(
             text=text_buffer or None,
             tool_calls=tool_calls,

@@ -32,6 +32,7 @@ survive structural change for free (the old `ListView` rebuild lost them).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import signal
 import time
@@ -189,9 +190,7 @@ class DaemonPickerScreen(Screen[None]):
             )
         else:
             # No project in scope → one flat section with every registry daemon.
-            self._sec_other = self._tree.root.add(
-                "Daemons", data=_Row("section"), expand=True
-            )
+            self._sec_other = self._tree.root.add("Daemons", data=_Row("section"), expand=True)
         self._refresh()
         self._tree.focus()
         # Defer to after the first render: a node's `line` isn't computed until
@@ -225,9 +224,7 @@ class DaemonPickerScreen(Screen[None]):
         self._empty.display = total == 0
         self._tree.display = total > 0
 
-    def _reconcile_section(
-        self, section: TreeNode, nodes: list[DaemonNode], now: float
-    ) -> None:
+    def _reconcile_section(self, section: TreeNode, nodes: list[DaemonNode], now: float) -> None:
         """Add/remove/relabel daemon children of `section` in place. Cursor and
         focus survive because `Tree` tracks the cursor by node identity, so an
         untouched node keeps the cursor even as its siblings change."""
@@ -454,7 +451,7 @@ class DaemonPickerScreen(Screen[None]):
 
         try:
             project = load_project(Path(daemon.project_path))
-        except Exception:  # noqa: BLE001 — bad/missing project path
+        except Exception:
             self._notify(f"can't load project at {daemon.project_path}")
             return None
         return (project, None, daemon.name)
@@ -518,7 +515,7 @@ class DaemonPickerScreen(Screen[None]):
                 secrets=secrets,
                 config_fields=config_fields,
             )
-        except Exception as exc:  # noqa: BLE001 — surface, never crash the worker
+        except Exception as exc:
             self._set_action(f"{label}: failed to add {channel}: {exc}", severity="error")
             return
         self._set_action(f"{label}: added {channel} channel (restart to apply)")
@@ -556,7 +553,7 @@ class DaemonPickerScreen(Screen[None]):
 
         try:
             removed = delete_channel_block(project, channel, session=session)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             self._set_action(f"{label}: failed to remove {channel}: {exc}", severity="error")
             return
         self._set_action(
@@ -589,9 +586,7 @@ class DaemonPickerScreen(Screen[None]):
         elif self._project is not None:
             slug = f"{self._project.name}-{node.name}"
             self.app.push_screen(
-                DaemonLogScreen(
-                    instance_log_path(self._project.name, node.name), slug=slug
-                )
+                DaemonLogScreen(instance_log_path(self._project.name, node.name), slug=slug)
             )
         else:
             return
@@ -608,10 +603,8 @@ class DaemonPickerScreen(Screen[None]):
     def _notify(self, message: str, *, severity: str = "warning") -> None:
         """Best-effort toast — `App.notify` is unavailable headless, so never
         let a missing notifier break the action."""
-        try:
+        with contextlib.suppress(Exception):
             self.app.notify(message, severity=severity)
-        except Exception:  # noqa: BLE001
-            pass
 
     def _set_action(self, message: str, *, severity: str = "information") -> None:
         """Record + surface an action result: `last_action`, the status line,
@@ -619,10 +612,8 @@ class DaemonPickerScreen(Screen[None]):
         self.last_action = message
         status = getattr(self, "_status", None)
         if status is not None:
-            try:
+            with contextlib.suppress(Exception):
                 status.update(message)
-            except Exception:  # noqa: BLE001 — status label is best-effort
-                pass
         self._notify(message, severity=severity)
 
 

@@ -100,9 +100,7 @@ def test_disabled_server_skipped() -> None:
 def test_disabled_tools_filtered() -> None:
     mgr = FakeManager({"gh": [_tool("keep"), _tool("drop")]})
     reg = Registry()
-    names = register_mcp_tools(
-        reg, mgr, {"gh": _cfg("gh")}, disabled_tools={"gh": ["drop"]}
-    )
+    names = register_mcp_tools(reg, mgr, {"gh": _cfg("gh")}, disabled_tools={"gh": ["drop"]})
     assert names == ["mcp_gh_keep"]
 
 

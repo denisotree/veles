@@ -32,8 +32,8 @@ import json
 import logging
 import math
 import sqlite3
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -172,16 +172,13 @@ def upsert_embedding(
         return int(cur.lastrowid or 0)
     row_id = int(existing["id"])
     conn.execute(
-        "UPDATE embeddings_blob SET dim = ?, vec_json = ?, created_at = ?"
-        " WHERE id = ?",
+        "UPDATE embeddings_blob SET dim = ?, vec_json = ?, created_at = ? WHERE id = ?",
         (dim, payload, wall, row_id),
     )
     return row_id
 
 
-def get_embedding(
-    conn: sqlite3.Connection, *, ref_kind: str, ref_id: int
-) -> list[float] | None:
+def get_embedding(conn: sqlite3.Connection, *, ref_kind: str, ref_id: int) -> list[float] | None:
     ensure_embeddings_table(conn)
     row = conn.execute(
         "SELECT vec_json FROM embeddings_blob WHERE ref_kind = ? AND ref_id = ?",
@@ -192,9 +189,7 @@ def get_embedding(
     return json.loads(row["vec_json"])
 
 
-def delete_embedding(
-    conn: sqlite3.Connection, *, ref_kind: str, ref_id: int
-) -> bool:
+def delete_embedding(conn: sqlite3.Connection, *, ref_kind: str, ref_id: int) -> bool:
     ensure_embeddings_table(conn)
     cur = conn.execute(
         "DELETE FROM embeddings_blob WHERE ref_kind = ? AND ref_id = ?",
@@ -377,7 +372,7 @@ def _cosine_distance(a: list[float], b: list[float]) -> float:
     """1 - cosine_similarity, stabilised with `math.fsum`."""
     if len(a) != len(b):
         return 2.0  # max cosine distance
-    dot = math.fsum(x * y for x, y in zip(a, b))
+    dot = math.fsum(x * y for x, y in zip(a, b, strict=False))
     na = math.sqrt(math.fsum(x * x for x in a))
     nb = math.sqrt(math.fsum(x * x for x in b))
     if na == 0.0 or nb == 0.0:

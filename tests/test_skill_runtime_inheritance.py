@@ -49,9 +49,7 @@ def _write_skill(
 # ---- default behaviour: inheritance applied ----
 
 
-def test_discover_merges_extends_chain_by_default(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_discover_merges_extends_chain_by_default(isolated_home: Path, tmp_path: Path) -> None:
     """A child skill with `extends: base` returns flattened — child's
     tools union base's tools, parent body concatenated, extends
     cleared on the result."""
@@ -83,16 +81,12 @@ def test_discover_merges_extends_chain_by_default(
     assert smart.extends is None
 
 
-def test_discover_opt_out_of_inheritance(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_discover_opt_out_of_inheritance(isolated_home: Path, tmp_path: Path) -> None:
     """Tests that want to inspect raw frontmatter set
     `resolve_inheritance_chain=False`."""
     project = init_project(tmp_path / "proj", name="proj")
     _write_skill(project.skills_dir, "base", "Base body.", tools=["a"])
-    _write_skill(
-        project.skills_dir, "child", "Child body.", tools=["b"], extends="base"
-    )
+    _write_skill(project.skills_dir, "child", "Child body.", tools=["b"], extends="base")
 
     raw = discover_skills(project, resolve_inheritance_chain=False)
     by_name = {s.name: s for s in raw}
@@ -103,9 +97,7 @@ def test_discover_opt_out_of_inheritance(
     assert "Base body" not in child.body
 
 
-def test_discover_chain_with_no_extends_unchanged(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_discover_chain_with_no_extends_unchanged(isolated_home: Path, tmp_path: Path) -> None:
     """If no skill uses `extends`, the merge step is a no-op and the
     skill list is returned identical."""
     project = init_project(tmp_path / "proj", name="proj")
@@ -117,9 +109,7 @@ def test_discover_chain_with_no_extends_unchanged(
     assert by_name["standalone"].extends is None
 
 
-def test_discover_three_level_chain_collapses(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_discover_three_level_chain_collapses(isolated_home: Path, tmp_path: Path) -> None:
     """grandparent → parent → child flattens to one skill with the
     union of all three."""
     project = init_project(tmp_path / "proj", name="proj")
@@ -156,13 +146,10 @@ def test_discover_inheritance_unknown_parent_keeps_child_intact(
     assert "Orphan body" in by_name["orphan"].body
 
 
-def test_make_skill_tool_sees_merged_tools(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_make_skill_tool_sees_merged_tools(isolated_home: Path, tmp_path: Path) -> None:
     """End-to-end: make_skill_tool builds its dispatch handler from
     the flattened skill, so the child's runtime tool surface is the
     union — which is the whole point of M121c."""
-    from veles.core.skills import make_skill_tool
 
     project = init_project(tmp_path / "proj", name="proj")
     _write_skill(

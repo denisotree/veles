@@ -167,9 +167,7 @@ async def test_stop_on_non_running_records_skip(tmp_path) -> None:
         assert "not running" in screen.last_action
 
 
-async def test_start_does_not_spawn_when_running(
-    tmp_path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_start_does_not_spawn_when_running(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     project = init_project(tmp_path / "p", name="p")
     _seed_registry([_entry("p", project_path=str(tmp_path / "p"), pid=os.getpid())])
     called = {"n": 0}
@@ -188,9 +186,7 @@ async def test_start_does_not_spawn_when_running(
         assert called["n"] == 0
 
 
-async def test_start_spawns_when_stopped(
-    tmp_path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_start_spawns_when_stopped(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     project = init_project(tmp_path / "p", name="p")
     _seed_registry([_entry("p", project_path=str(tmp_path / "p"), pid=999_999)])
     called = {"n": 0}
@@ -285,9 +281,7 @@ async def test_cursor_and_focus_survive_stop_action(
     # the flag instead of a real os.kill(pid, 0) — otherwise the global os.kill
     # patch below would flip the flag during the very first refresh.
     monkeypatch.setattr(dp, "is_alive", lambda pid: alive["v"])
-    monkeypatch.setattr(
-        "veles.tui.screens._daemon_picker_data.is_alive", lambda pid: alive["v"]
-    )
+    monkeypatch.setattr("veles.tui.screens._daemon_picker_data.is_alive", lambda pid: alive["v"])
     monkeypatch.setattr("veles.daemon.registry.is_alive", lambda pid: alive["v"])
     monkeypatch.setattr(dp.os, "kill", lambda pid, sig: alive.__setitem__("v", False))
 
@@ -326,9 +320,7 @@ async def test_restart_kills_before_spawn_and_keeps_focus(
         alive["v"] = False  # process dies → poll exits immediately
 
     monkeypatch.setattr(dp.os, "kill", fake_kill)
-    monkeypatch.setattr(
-        dp, "spawn_daemon_node", lambda node: (seq.append("spawn"), True)[1]
-    )
+    monkeypatch.setattr(dp, "spawn_daemon_node", lambda node: (seq.append("spawn"), True)[1])
 
     app = DaemonPickerApp(project=project)
     async with app.run_test() as pilot:
@@ -583,9 +575,20 @@ def _daemon_rec(**kw):
     from veles.core.runtime_sessions import RuntimeSessionRecord
 
     base = dict(
-        id="rt-1", name="api", kind="daemon", model=None, provider=None,
-        host="127.0.0.1", port=8801, mode=None, status="created", pid=None,
-        created_at=0.0, last_started_at=None, last_stopped_at=None, deleted_at=None,
+        id="rt-1",
+        name="api",
+        kind="daemon",
+        model=None,
+        provider=None,
+        host="127.0.0.1",
+        port=8801,
+        mode=None,
+        status="created",
+        pid=None,
+        created_at=0.0,
+        last_started_at=None,
+        last_stopped_at=None,
+        deleted_at=None,
     )
     base.update(kw)
     return RuntimeSessionRecord(**base)
@@ -599,9 +602,7 @@ def test_runtime_action_start_spawns(tmp_path, monkeypatch):
     project = init_project(tmp_path / "p", name="p")
     monkeypatch.setattr(picker_mod, "is_alive", lambda pid: False)
     calls = {}
-    monkeypatch.setattr(
-        spawn_mod, "spawn_daemon", lambda **kw: calls.update(kw) or object()
-    )
+    monkeypatch.setattr(spawn_mod, "spawn_daemon", lambda **kw: calls.update(kw) or object())
     msg = runtime_session_action(project, _daemon_rec(pid=None), "start")
     assert "start spawned" in msg
     assert calls["name"] == "api"

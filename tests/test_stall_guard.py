@@ -94,7 +94,7 @@ class _StuckProvider:
     with_tools_calls: int = 0
     tools_seen: list[bool] = field(default_factory=list)
 
-    def create_message(self, messages, tools=None, *, model, max_tokens=4096):  # noqa: ANN001
+    def create_message(self, messages, tools=None, *, model, max_tokens=4096):
         del messages, model, max_tokens
         self.tools_seen.append(bool(tools))
         if tools:
@@ -147,9 +147,7 @@ def test_agent_forces_answer_when_tool_call_repeats() -> None:
     assert provider.with_tools_calls == 3
     assert provider.tools_seen[-1] is False  # last round was tool-free
     # The nudge was injected into history before the forced round.
-    assert any(
-        m.role == "user" and m.content == STALL_NUDGE for m in result.history
-    )
+    assert any(m.role == "user" and m.content == STALL_NUDGE for m in result.history)
 
 
 def test_agent_unaffected_when_guard_disabled_and_tools_progress() -> None:
@@ -161,7 +159,7 @@ def test_agent_unaffected_when_guard_disabled_and_tools_progress() -> None:
         supports_streaming: bool = False
         n: int = 0
 
-        def create_message(self, messages, tools=None, *, model, max_tokens=4096):  # noqa: ANN001
+        def create_message(self, messages, tools=None, *, model, max_tokens=4096):
             del messages, tools, model, max_tokens
             self.n += 1
             if self.n == 1:

@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from textual.app import App
 
 
-class WizardOutcome(str, Enum):
+class WizardOutcome(StrEnum):
     """Navigation signal returned by a step."""
 
     NEXT = "next"
@@ -37,8 +37,7 @@ class WizardStep(Protocol):
     name: str
     title: str
 
-    async def run(self, ctx: WizardContext) -> WizardOutcome:
-        ...
+    async def run(self, ctx: WizardContext) -> WizardOutcome: ...
 
 
 CANCEL_SENTINEL = "__wizard_cancel__"

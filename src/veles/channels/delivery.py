@@ -90,13 +90,13 @@ class DeliveryRouter:
         *,
         local_sink=None,
         origin_handler=None,
-        platform_deliverers: dict[str, "PlatformDeliverer"] | None = None,
+        platform_deliverers: dict[str, PlatformDeliverer] | None = None,
     ) -> None:
         self._local_sink = local_sink
         self._origin_handler = origin_handler
         self._deliverers: dict[str, PlatformDeliverer] = dict(platform_deliverers or {})
 
-    def register_deliverer(self, platform: str, deliverer: "PlatformDeliverer") -> None:
+    def register_deliverer(self, platform: str, deliverer: PlatformDeliverer) -> None:
         """Attach a deliverer for a given platform (overrides the registry path)."""
         self._deliverers[platform] = deliverer
 

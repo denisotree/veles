@@ -31,7 +31,7 @@ def _manager_opt_in(prompt: str) -> bool:
         from veles.core.orchestration import should_use_manager
 
         return should_use_manager(prompt, use_heuristic_default=False)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
 
@@ -41,9 +41,7 @@ class InProcessRunBackend:
     def __init__(self, state: DaemonState) -> None:
         self._state = state
 
-    async def submit_run(
-        self, prompt: str, *, session_id: str | None = None
-    ) -> dict[str, Any]:
+    async def submit_run(self, prompt: str, *, session_id: str | None = None) -> dict[str, Any]:
         handle = new_run_handle(session_id=session_id)
         self._state.add_run(handle)
         # M122f: channel turns route through the manager-spawn orchestrator
@@ -118,12 +116,8 @@ class InProcessRunBackend:
         because the only caller is the gateway's inline-keyboard tap,
         which never produces unvalidated user input here."""
         if model is None and mode is None and provider is None:
-            raise ValueError(
-                "update_session requires at least one of model/mode/provider"
-            )
-        overrides = self._state.set_overrides(
-            session_id, model=model, mode=mode, provider=provider
-        )
+            raise ValueError("update_session requires at least one of model/mode/provider")
+        overrides = self._state.set_overrides(session_id, model=model, mode=mode, provider=provider)
         # Mirror the format of `daemon/server.py:_handle_patch_session`
         # so log scrapers can match a single regex regardless of the
         # backend (HTTP or in-process).
@@ -160,15 +154,11 @@ class InProcessRunBackend:
             raise LookupError(f"unknown run_id: {run_id!r}")
         pending = handle.pending_prompts.pop(prompt_id, None)
         if pending is None:
-            raise LookupError(
-                f"prompt {prompt_id!r} not pending on run {run_id!r}"
-            )
+            raise LookupError(f"prompt {prompt_id!r} not pending on run {run_id!r}")
         if choice not in pending.valid_choices:
             # Restore so a follow-up call with a valid key can resolve.
             handle.pending_prompts[prompt_id] = pending
-            raise ValueError(
-                f"choice {choice!r} not valid for {pending.kind} prompt"
-            )
+            raise ValueError(f"choice {choice!r} not valid for {pending.kind} prompt")
         pending.future.set_result(choice)
         handle.append_event(
             {

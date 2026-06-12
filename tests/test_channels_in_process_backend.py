@@ -10,9 +10,9 @@ import asyncio
 
 from veles.channels.in_process_backend import InProcessRunBackend
 from veles.core.memory import SessionStore
+from veles.core.project import init_project
 from veles.daemon.auth import TokenStore
 from veles.daemon.state import DaemonState
-from veles.core.project import init_project
 
 
 class _StubAgent:
@@ -21,7 +21,7 @@ class _StubAgent:
         self._final = final_text
         self._sid = session_id
 
-    def run(self, prompt: str, *, on_text_delta):  # noqa: ARG002 — match Agent signature
+    def run(self, prompt: str, *, on_text_delta):
         for d in self._deltas:
             on_text_delta(d)
         from veles.core.agent import RunResult
@@ -39,7 +39,7 @@ def _build_state(tmp_path):
     store = SessionStore(project.memory_db_path)
     tokens = TokenStore.load()
 
-    def factory(session_id, *, prompt=None):  # noqa: ARG001
+    def factory(session_id, *, prompt=None):
         return _StubAgent(deltas=["he", "llo"], final_text="hello")
 
     return DaemonState(
@@ -67,7 +67,7 @@ async def test_channel_routes_through_manager_when_opted_in(tmp_path, monkeypatc
 
     used_worker_factory = {"called": False}
 
-    def worker_factory(**kwargs):  # noqa: ARG001
+    def worker_factory(**kwargs):
         used_worker_factory["called"] = True
         raise AssertionError("not reached — decompose_and_run is stubbed")
 
@@ -75,7 +75,7 @@ async def test_channel_routes_through_manager_when_opted_in(tmp_path, monkeypatc
 
     captured = {}
 
-    def fake_decompose(prompt, *, agent_factory, **kw):  # noqa: ARG001
+    def fake_decompose(prompt, *, agent_factory, **kw):
         captured["prompt"] = prompt
         from veles.core.orchestration.manager import ManagerRunResult
         from veles.core.orchestration.workers import WorkerPlan
@@ -103,7 +103,7 @@ async def test_channel_stays_direct_when_not_opted_in(tmp_path, monkeypatch) -> 
     state = _build_state(tmp_path)
     state.worker_agent_factory = lambda **kw: None  # present but must be unused
 
-    def boom(*a, **kw):  # noqa: ARG001
+    def boom(*a, **kw):
         raise AssertionError("decompose_and_run must not run when opt-in is off")
 
     monkeypatch.setattr("veles.core.orchestration.decompose_and_run", boom)
@@ -161,7 +161,8 @@ async def test_update_session_writes_overrides(tmp_path, caplog) -> None:
     stored = state.get_overrides("sess-x")
     assert stored is not None and stored.model == "openai/gpt-4o"
     matched = [
-        r for r in caplog.records
+        r
+        for r in caplog.records
         if "in-process session=sess-x" in r.message and "openai/gpt-4o" in r.message
     ]
     assert matched, f"expected override log, got: {[r.message for r in caplog.records]}"

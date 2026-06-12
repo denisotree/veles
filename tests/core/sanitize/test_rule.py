@@ -66,10 +66,7 @@ def test_ruleset_skips_when_text_empty() -> None:
 
 
 def test_ruleset_len_and_iter() -> None:
-    rules = [
-        LiteralRule(name=f"r{i}", pattern=str(i), replacement=str(i + 1))
-        for i in range(3)
-    ]
+    rules = [LiteralRule(name=f"r{i}", pattern=str(i), replacement=str(i + 1)) for i in range(3)]
     rs = RuleSet(rules)
     assert len(rs) == 3
     assert [r.name for r in rs] == ["r0", "r1", "r2"]

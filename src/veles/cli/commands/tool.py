@@ -65,9 +65,7 @@ def _cmd_list(args: argparse.Namespace, project: Project) -> int:
     return 0
 
 
-def _format_table(
-    records: list[ToolRecord], tele: dict[str, ToolTelemetry]
-) -> str:
+def _format_table(records: list[ToolRecord], tele: dict[str, ToolTelemetry]) -> str:
     name_w = max(len("name"), max(len(r.name) for r in records))
     scope_w = max(len("scope"), max(len(r.scope) for r in records))
     origin_w = max(len("origin"), max(len(r.origin) for r in records))
@@ -117,9 +115,7 @@ def _cmd_show(args: argparse.Namespace, project: Project) -> int:
     if rec.description:
         print(f"description: {rec.description}")
     if rec.base_tool_id is not None:
-        base = conn.execute(
-            "SELECT name FROM tools WHERE id = ?", (rec.base_tool_id,)
-        ).fetchone()
+        base = conn.execute("SELECT name FROM tools WHERE id = ?", (rec.base_tool_id,)).fetchone()
         if base:
             print(f"inherits:    {base['name']}")
     if rec.manifest_json:
@@ -162,16 +158,13 @@ def _cmd_promote(args: argparse.Namespace, project: Project) -> int:
     dst = user_tools_dir / f"{name}.py"
     if dst.exists():
         print(
-            f"{dst} already exists. Refusing to overwrite. Move it "
-            "aside or delete it first.",
+            f"{dst} already exists. Refusing to overwrite. Move it aside or delete it first.",
             file=sys.stderr,
         )
         return 1
 
     if not args.yes:
-        prompt = (
-            f"Move {src} → {dst} (tool '{name}' becomes user-global)? [y/N] "
-        )
+        prompt = f"Move {src} → {dst} (tool '{name}' becomes user-global)? [y/N] "
         try:
             response = input(prompt).strip().lower()
         except EOFError:
@@ -187,8 +180,7 @@ def _cmd_promote(args: argparse.Namespace, project: Project) -> int:
     # in-place scope flip is just for users who inspect right now.
     store = SessionStore(project.memory_db_path)
     store._conn.execute(
-        "UPDATE tools SET scope = 'user', origin = 'manual', updated_at = ?"
-        " WHERE name = ?",
+        "UPDATE tools SET scope = 'user', origin = 'manual', updated_at = ? WHERE name = ?",
         (_now(), name),
     )
     print(f"promoted {name}: {src} → {dst}")

@@ -16,9 +16,9 @@ import json
 import os
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from pathlib import Path
-from typing import Callable, Literal
+from typing import Literal
 
 from veles.core.approval import list_approvals
 from veles.core.project import Project
@@ -115,7 +115,9 @@ def _check_user_home() -> CheckResult:
             name="user_home",
             status="info",
             message=f"{home} not created yet (first-run wizard will set it up)",
-            fix_hint="run `veles tui` to trigger the first-run wizard, or `veles init` inside a project",
+            fix_hint=(
+                "run `veles tui` to trigger the first-run wizard, or `veles init` inside a project"
+            ),
         )
     if not os.access(home, os.W_OK):
         return CheckResult(
@@ -147,7 +149,7 @@ def _check_user_config() -> CheckResult:
 
         with cfg.open("rb") as f:
             tomllib.load(f)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return CheckResult(
             name="user_config",
             status="error",
@@ -164,10 +166,7 @@ def _check_provider_keys() -> CheckResult:
             name="provider_keys",
             status="warn",
             message="no provider API keys set in environment",
-            fix_hint=(
-                "export at least one of: "
-                + ", ".join(sorted(_PROVIDER_KEY_ENVS.values()))
-            ),
+            fix_hint=("export at least one of: " + ", ".join(sorted(_PROVIDER_KEY_ENVS.values()))),
         )
     return CheckResult(
         name="provider_keys",
@@ -225,7 +224,11 @@ def _check_agents_md(project: Project | None) -> CheckResult:
             message="AGENTS.md is empty",
             fix_hint="describe the project layout, conventions, workflows",
         )
-    return CheckResult(name="agents_md", status="ok", message=f"AGENTS.md present ({p.stat().st_size} bytes)")
+    return CheckResult(
+        name="agents_md",
+        status="ok",
+        message=f"AGENTS.md present ({p.stat().st_size} bytes)",
+    )
 
 
 def _check_symlinks(project: Project | None) -> CheckResult:

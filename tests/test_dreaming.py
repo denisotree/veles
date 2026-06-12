@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-from veles.core import dreaming
 from veles.core.curator_state import load as load_state
 from veles.core.dreaming import dream_cycle
 from veles.core.project import Project, init_project
@@ -112,7 +111,7 @@ def _fixed_text_provider(text: str):
     )
 
 
-def _StubProvider():
+def _stub_provider():
     return _fixed_text_provider("## umbrella: foo\n- a\n- b")
 
 
@@ -134,7 +133,7 @@ def test_consolidate_writes_proposal(project: Project) -> None:
     result = dream_cycle(
         project,
         include_consolidation=True,
-        provider=_StubProvider(),
+        provider=_stub_provider(),
     )
     assert result.consolidated is True
     assert result.consolidation_path is not None
@@ -145,7 +144,7 @@ def test_consolidate_skips_when_no_insights(project: Project) -> None:
     result = dream_cycle(
         project,
         include_consolidation=True,
-        provider=_StubProvider(),
+        provider=_stub_provider(),
     )
     assert result.consolidated is False
     assert any("no insights" in n for n in result.notes)

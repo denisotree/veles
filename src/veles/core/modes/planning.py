@@ -80,9 +80,7 @@ class PlanningMode:
             and ctx.state.last_mode_in_session is not None
             and ctx.state.last_mode_in_session != self.name
         ):
-            effective_prompt = wrap_mode_switch_observation(
-                prompt, self.name, self.system_block
-            )
+            effective_prompt = wrap_mode_switch_observation(prompt, self.name, self.system_block)
 
         agent = ctx.factory(ctx.state, mode_override=self.name)
         result = agent.run(

@@ -20,7 +20,6 @@ from veles.core.provider import ProviderResponse, TokenUsage, ToolCall
 from veles.core.risk import RiskClass
 from veles.core.tools.registry import Registry, ToolEntry
 
-
 # ---------- engine rule, unit-level ----------
 
 
@@ -118,7 +117,7 @@ def test_invocation_set_isolated_after_reset() -> None:
 # ---------- Agent end-to-end ----------
 
 
-def _pair_registry(draft_handler, commit_handler) -> Registry:  # noqa: ANN001
+def _pair_registry(draft_handler, commit_handler) -> Registry:
     reg = Registry()
     reg.register(
         ToolEntry(
@@ -183,7 +182,11 @@ def test_agent_allows_commit_after_draft_within_same_run() -> None:
     invocation set carries draft_email into the second call's evaluation."""
     from veles.core.permission.prompt import (
         PromptAnswer,
+    )
+    from veles.core.permission.prompt import (
         reset_prompter as reset_unified_prompter,
+    )
+    from veles.core.permission.prompt import (
         set_prompter as set_unified_prompter,
     )
     from veles.core.trust import begin_trust_turn, end_trust_turn
@@ -223,9 +226,7 @@ def test_agent_allows_commit_after_draft_within_same_run() -> None:
     token = begin_trust_turn()
     pt = set_unified_prompter(lambda _req: PromptAnswer("allow_once"))
     try:
-        agent = Agent(
-            provider, _pair_registry(lambda: "drafted", commit_handler), model="m"
-        )
+        agent = Agent(provider, _pair_registry(lambda: "drafted", commit_handler), model="m")
         agent.run("send the email")
     finally:
         reset_unified_prompter(pt)

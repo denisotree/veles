@@ -44,7 +44,7 @@ class StallGuard:
     """Trips once when a tool-call signature repeats `repeat_limit` times in a
     turn. `repeat_limit` of 0 or None disables the guard entirely."""
 
-    __slots__ = ("_repeat_limit", "_counts", "_tripped")
+    __slots__ = ("_counts", "_repeat_limit", "_tripped")
 
     def __init__(self, *, repeat_limit: int | None = 3) -> None:
         self._repeat_limit = repeat_limit if repeat_limit and repeat_limit > 0 else None

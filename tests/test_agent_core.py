@@ -96,9 +96,7 @@ def test_usage_accumulates_across_iterations() -> None:
     """Each iteration's `response.usage` rolls into `RunResult.usage`."""
     # Turn 1: tool call with usage 6 total; turn 2: final text with 10 total.
     reg = _echo_registry()
-    provider = _StubProvider(
-        responses=[_tool_call("echo"), _final("done", prompt=4, completion=6)]
-    )
+    provider = _StubProvider(responses=[_tool_call("echo"), _final("done", prompt=4, completion=6)])
     agent = Agent(provider, reg, model="m", max_iterations=5)
     result = agent.run("go")
     assert result.stopped_reason == "completed"
@@ -112,15 +110,13 @@ def test_compressor_runs_each_iteration_before_request() -> None:
     the working history. Each call sees the prior turn appended."""
     seen: list[int] = []
 
-    def compressor(history, session_id):  # noqa: ANN001
+    def compressor(history, session_id):
         del session_id
         seen.append(len(history))
         return history
 
     provider = _StubProvider(responses=[_final("ok")])
-    agent = Agent(
-        provider, Registry(), model="m", max_iterations=5, compressor=compressor
-    )
+    agent = Agent(provider, Registry(), model="m", max_iterations=5, compressor=compressor)
     agent.run("hi")
     # Single iteration → single compressor call. History at that point
     # holds the user turn (1 msg). Compressor sees it before the

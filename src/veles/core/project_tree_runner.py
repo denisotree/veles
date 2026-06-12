@@ -24,7 +24,7 @@ import sqlite3
 
 from veles.core.memory import SessionStore
 from veles.core.project import Project
-from veles.core.project_tree import ScanReport, Scanner
+from veles.core.project_tree import Scanner, ScanReport
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ def scan_project_tree(project: Project) -> ScanReport | None:
             report.removed,
         )
         return report
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.info("project_tree scan failed: %s", exc)
         return None
 

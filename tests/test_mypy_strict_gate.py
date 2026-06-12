@@ -36,7 +36,5 @@ def test_mypy_strict_passes_on_sprint_epsilon_modules() -> None:
         check=False,
     )
     assert result.returncode == 0, (
-        f"mypy --strict failed:\n"
-        f"--- stdout ---\n{result.stdout}\n"
-        f"--- stderr ---\n{result.stderr}\n"
+        f"mypy --strict failed:\n--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}\n"
     )

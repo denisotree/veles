@@ -30,7 +30,6 @@ from veles.core.runtime_sessions import (
     RuntimeSessionStore,
 )
 
-
 # ---- RuntimeSessionStore ----
 
 
@@ -137,23 +136,15 @@ def test_daemon_session_provider_model_beats_project_provider(tmp_path: Path):
     assert resolve_effective_model(args, project) == "anthropic/claude-sonnet-4.6"
     # With daemon_session=local → the [daemon.local] pins win.
     assert resolve_effective_provider(args, project, daemon_session="local") == "ollama"
-    assert (
-        resolve_effective_model(args, project, daemon_session="local")
-        == "qwen3:4b-instruct"
-    )
+    assert resolve_effective_model(args, project, daemon_session="local") == "qwen3:4b-instruct"
 
 
 def test_explicit_flag_still_beats_daemon_session(tmp_path: Path):
     project = init_project(tmp_path / "p", name="p")
-    save_project_config(
-        project, {"daemon": {"local": {"provider": "ollama", "model": "qwen3"}}}
-    )
+    save_project_config(project, {"daemon": {"local": {"provider": "ollama", "model": "qwen3"}}})
     args = _ns(provider="anthropic", model="claude-opus-4-8")
     assert resolve_effective_provider(args, project, daemon_session="local") == "anthropic"
-    assert (
-        resolve_effective_model(args, project, daemon_session="local")
-        == "claude-opus-4-8"
-    )
+    assert resolve_effective_model(args, project, daemon_session="local") == "claude-opus-4-8"
 
 
 def test_daemon_session_without_pins_falls_through(tmp_path: Path):

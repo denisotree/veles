@@ -33,8 +33,6 @@ import sys
 from pathlib import Path
 
 from veles.adapters.openrouter import OpenRouterProvider
-
-logger = logging.getLogger(__name__)
 from veles.core.agent import Agent
 from veles.core.budget_state import BudgetSnapshot, save_atomic
 from veles.core.budget_state import load as load_budget_snapshot
@@ -64,16 +62,18 @@ from veles.core.skills import discover_skills, make_skill_tool
 from veles.core.tools import registry
 from veles.core.tools.registry import Registry
 
+# M57 — toolset lists live in `core/tools/toolsets.toml` and load via
+# `core.tools.toolsets.TOOLSETS`. These module-level aliases preserve the
+# import paths CLI commands already depend on.
+from veles.core.tools.toolsets import TOOLSETS as _TOOLSETS
+
+logger = logging.getLogger(__name__)
+
 # ---- shared constants ----
 
 _INDEX_INJECTION_CAP = 8_000
 _RECALL_LIMIT = 5
 _RECALL_BLOCK_CHARS_CAP = 4_000
-
-# M57 — toolset lists live in `core/tools/toolsets.toml` and load via
-# `core.tools.toolsets.TOOLSETS`. These module-level aliases preserve the
-# import paths CLI commands already depend on.
-from veles.core.tools.toolsets import TOOLSETS as _TOOLSETS
 
 _RUN_TOOLS = _TOOLSETS["run"]
 _INGEST_TOOLS = _TOOLSETS["ingest"]

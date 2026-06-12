@@ -124,12 +124,11 @@ def test_missing_path_returns_marker(project, no_rg) -> None:
 # ---- ripgrep backend ----
 
 
-def test_ripgrep_path_invokes_rg(
-    project, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_ripgrep_path_invokes_rg(project, monkeypatch: pytest.MonkeyPatch) -> None:
     """When rg is available, search_files shells out to it and folds
     absolute paths back to project-relative."""
     import subprocess as _subprocess
+
     import veles.core.tools.builtin.search_files as mod
 
     (project.root / "a.py").write_text("todo\n")
@@ -138,13 +137,11 @@ def test_ripgrep_path_invokes_rg(
 
     captured: dict[str, object] = {}
 
-    def fake_run(cmd, **kw):  # noqa: ANN001
+    def fake_run(cmd, **kw):
         captured["cmd"] = cmd
         # Simulate rg's output: absolute_path:lineno:content
         abs_path = str(project.root / "a.py")
-        return _subprocess.CompletedProcess(
-            cmd, 0, stdout=f"{abs_path}:1:todo\n", stderr=""
-        )
+        return _subprocess.CompletedProcess(cmd, 0, stdout=f"{abs_path}:1:todo\n", stderr="")
 
     monkeypatch.setattr(mod.subprocess, "run", fake_run)
 
@@ -155,9 +152,7 @@ def test_ripgrep_path_invokes_rg(
     assert "--line-number" in cmd
 
 
-def test_ripgrep_oserror_falls_back_to_python(
-    project, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_ripgrep_oserror_falls_back_to_python(project, monkeypatch: pytest.MonkeyPatch) -> None:
     """A crashing rg shouldn't abort the search — Python fallback runs."""
     import veles.core.tools.builtin.search_files as mod
 

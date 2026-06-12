@@ -27,7 +27,6 @@ from pathlib import Path
 
 from veles.core.agents_md_schema import RECOMMENDED_SECTIONS, default_template
 
-
 _CONTEXT_FILES: tuple[str, ...] = ("AGENTS.md", "CLAUDE.md", "GEMINI.md")
 _H2_RE = re.compile(r"^\s*##\s+(.+?)\s*$")
 
@@ -114,7 +113,7 @@ def llm_merge(
         "Source files to merge:",
     ]
     for f in files:
-        blocks.append(f"\n<file path=\"{f.name}\">\n{f.content}\n</file>")
+        blocks.append(f'\n<file path="{f.name}">\n{f.content}\n</file>')
 
     sub = Agent(
         provider=provider,  # type: ignore[arg-type]
@@ -156,15 +155,15 @@ def deterministic_merge(files: list[ContextFileInfo], *, project_name: str = "Pr
         current_name: str | None = None
         current_buf: list[str] = []
 
-        def _flush():
-            if current_name is None:
+        def _flush(name: str | None, buf: list[str]) -> None:
+            if name is None:
                 return
-            existing = sections.setdefault(current_name, [])
-            if current_name not in order:
-                order.append(current_name)
+            existing = sections.setdefault(name, [])
+            if name not in order:
+                order.append(name)
             # Dedupe body lines while preserving order.
             seen = {line for line in existing}
-            for line in current_buf:
+            for line in buf:
                 if line in seen:
                     continue
                 existing.append(line)
@@ -173,14 +172,14 @@ def deterministic_merge(files: list[ContextFileInfo], *, project_name: str = "Pr
         for raw in f.content.splitlines():
             m = _H2_RE.match(raw)
             if m:
-                _flush()
+                _flush(current_name, current_buf)
                 current_name = m.group(1)
                 current_buf = []
                 continue
             if current_name is None:
                 continue  # ignore pre-H2 prose (we keep only sectioned content)
             current_buf.append(raw.rstrip())
-        _flush()
+        _flush(current_name, current_buf)
 
     if h1 is None:
         h1 = project_name

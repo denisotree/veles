@@ -331,9 +331,7 @@ def _transition(
 ) -> Goal:
     goal = _require(state_dir, goal_id)
     if goal.status not in from_:
-        raise ValueError(
-            f"cannot transition goal {goal_id} from {goal.status!r} to {target!r}"
-        )
+        raise ValueError(f"cannot transition goal {goal_id} from {goal.status!r} to {target!r}")
     goal.status = target
     goal.updated_at = _now_iso()
     _write(state_dir, goal)
@@ -343,9 +341,7 @@ def _transition(
 def _write(state_dir: Path, goal: Goal) -> None:
     path = _goal_path(state_dir, goal.id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(asdict(goal), ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    path.write_text(json.dumps(asdict(goal), ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _from_dict(raw: dict[str, Any]) -> Goal:

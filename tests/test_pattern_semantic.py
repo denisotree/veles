@@ -123,9 +123,7 @@ def test_near_duplicate_sequences_cluster_together(conn) -> None:
     for i, sid in enumerate(["b1", "b2"]):
         _seed_session(conn, sid, seq_b, base_time=200.0 + i)
 
-    patterns = detect_patterns_semantic(
-        conn, min_repetitions=3, similarity_threshold=0.5
-    )
+    patterns = detect_patterns_semantic(conn, min_repetitions=3, similarity_threshold=0.5)
     # The cluster has 5 members total — would be invisible to the
     # token detector at min_repetitions=3 if treated as separate
     # clusters (a-cluster=3, b-cluster=2, b would be dropped).
@@ -144,9 +142,7 @@ def test_strict_threshold_keeps_clusters_separate(conn) -> None:
         _seed_session(conn, sid, seq_a, base_time=100.0 + i)
     for i, sid in enumerate(["b1", "b2", "b3"]):
         _seed_session(conn, sid, seq_b, base_time=200.0 + i)
-    patterns = detect_patterns_semantic(
-        conn, min_repetitions=3, similarity_threshold=0.99
-    )
+    patterns = detect_patterns_semantic(conn, min_repetitions=3, similarity_threshold=0.99)
     # Two distinct clusters
     assert len(patterns) == 2
 
@@ -161,9 +157,7 @@ def test_canonical_tools_is_most_frequent_sequence(conn) -> None:
         _seed_session(conn, sid, short, base_time=100.0 + i)
     _seed_session(conn, "long1", long, base_time=200.0)
 
-    patterns = detect_patterns_semantic(
-        conn, min_repetitions=3, similarity_threshold=0.5
-    )
+    patterns = detect_patterns_semantic(conn, min_repetitions=3, similarity_threshold=0.5)
     assert len(patterns) == 1
     # Most-frequent variant wins as the canonical tuple
     assert patterns[0].tools == tuple(short)

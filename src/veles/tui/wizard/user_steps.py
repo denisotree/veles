@@ -12,19 +12,23 @@ which API key env var to consult, theme is independent (any moment),
 
 from __future__ import annotations
 
+import contextlib
 import os
 from dataclasses import dataclass
 
+from veles.core.providers import ALL_PROVIDERS as _ALL_PROVIDERS
+from veles.core.providers import tui_label
 from veles.tui.wizard.screens import (
     ChoiceScreen,
     ConfirmScreen,
     InputScreen,
 )
 from veles.tui.wizard.screens.choice import ChoiceItem
-from veles.tui.wizard.step import WizardContext, WizardOutcome
-
 from veles.tui.wizard.step import (
     CANCEL_SENTINEL as _CANCEL_SENTINEL,
+)
+from veles.tui.wizard.step import WizardContext, WizardOutcome
+from veles.tui.wizard.step import (
     outcome_from_dismiss as _outcome_from_dismiss,
 )
 
@@ -35,13 +39,7 @@ _LANGUAGES = [
     ChoiceItem(label="Русский", value="ru"),
 ]
 
-from veles.core.providers import ALL_PROVIDERS as _ALL_PROVIDERS, tui_label
-
-_PROVIDERS = [
-    ChoiceItem(label=tui_label(spec), value=spec.value) for spec in _ALL_PROVIDERS
-]
-
-
+_PROVIDERS = [ChoiceItem(label=tui_label(spec), value=spec.value) for spec in _ALL_PROVIDERS]
 
 
 # ---------------- Step 1: Language ----------------
@@ -81,9 +79,7 @@ class ProviderStep:
             ChoiceScreen(
                 title=self.title,
                 items=_PROVIDERS,
-                subtitle=(
-                    "Veles can talk to any of these. You can override per-project later."
-                ),
+                subtitle=("Veles can talk to any of these. You can override per-project later."),
                 default=ctx.answers.get("default_provider", "openrouter"),
             )
         )
@@ -329,10 +325,8 @@ class ThemeStep:
         nav = _outcome_from_dismiss(result)
         if nav is not None:
             # Roll back to whatever was active before this step.
-            try:
+            with contextlib.suppress(Exception):
                 ctx.app.theme = snapshot
-            except Exception:  # noqa: BLE001
-                pass
             return nav
         ctx.answers["tui_theme"] = result
         apply_to_app(ctx.app, result)

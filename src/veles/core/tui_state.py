@@ -14,6 +14,7 @@ of a stale preference file.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import tempfile
@@ -62,9 +63,7 @@ def load_tui_state(state_dir: Path) -> TuiPersistentState:
     model = payload.get("model")
     if model is not None and not isinstance(model, str):
         model = None
-    return TuiPersistentState(
-        mode=mode, active_goal_id=active_goal_id, model=model
-    )
+    return TuiPersistentState(mode=mode, active_goal_id=active_goal_id, model=model)
 
 
 def save_tui_state(state_dir: Path, state: TuiPersistentState) -> None:
@@ -75,9 +74,7 @@ def save_tui_state(state_dir: Path, state: TuiPersistentState) -> None:
     target = tui_state_path(state_dir)
     payload = {"version": _SCHEMA_VERSION, **asdict(state)}
     text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
-    fd, tmp_name = tempfile.mkstemp(
-        prefix=target.name + ".", suffix=".tmp", dir=target.parent
-    )
+    fd, tmp_name = tempfile.mkstemp(prefix=target.name + ".", suffix=".tmp", dir=target.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(text)
@@ -111,10 +108,8 @@ def persist_model_choice(project: Project, model: str) -> None:
     runs so we don't lose both at once."""
     state = load_for_project(project)
     state.model = model
-    try:
+    with contextlib.suppress(OSError):
         save_for_project(project, state)
-    except OSError:
-        pass
 
     from veles.core.project_config import load_project_config, save_project_config
 
@@ -124,10 +119,8 @@ def persist_model_choice(project: Project, model: str) -> None:
         cfg["provider"] = {"model": model}
     else:
         provider_section["model"] = model
-    try:
+    with contextlib.suppress(OSError):
         save_project_config(project, cfg)
-    except OSError:
-        pass
 
 
 __all__ = [

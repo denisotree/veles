@@ -17,7 +17,6 @@ from veles.core.agents_md_fixer import (
 )
 from veles.core.agents_md_schema import RECOMMENDED_SECTIONS, default_template
 
-
 # ---- fixtures ----
 
 
@@ -65,12 +64,14 @@ def test_parse_questions_missing_questions_key() -> None:
 
 
 def test_parse_questions_bad_item_skipped() -> None:
-    raw = json.dumps({
-        "questions": [
-            {"text": "", "choices": []},
-            {"text": "Good?", "choices": ["A"]},
-        ]
-    })
+    raw = json.dumps(
+        {
+            "questions": [
+                {"text": "", "choices": []},
+                {"text": "Good?", "choices": ["A"]},
+            ]
+        }
+    )
     qs = _parse_questions(raw)
     assert len(qs) == 1
     assert qs[0].text == "Good?"
@@ -219,9 +220,7 @@ def test_fix_agents_md_adds_missing_sections(
     assert set(added) == set(RECOMMENDED_SECTIONS)
 
 
-def test_fix_agents_md_appends_to_file(
-    agents_md: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_fix_agents_md_appends_to_file(agents_md: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "veles.core.agents_md_fixer._run_sub_agent",
         lambda *a, **kw: "",
@@ -239,9 +238,7 @@ def test_fix_agents_md_appends_to_file(
     assert "## Conventions" in text
 
 
-def test_fix_agents_md_calls_callbacks(
-    agents_md: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_fix_agents_md_calls_callbacks(agents_md: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     started: list[str] = []
     done: list[str] = []
     monkeypatch.setattr(

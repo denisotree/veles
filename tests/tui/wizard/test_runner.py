@@ -53,9 +53,7 @@ async def test_linear_next_collects_all_answers():
 
 
 async def test_back_revisits_previous_step():
-    s1 = _ScriptedStep(
-        "a", "A", "k_a", [WizardOutcome.NEXT, WizardOutcome.NEXT], set_value="first"
-    )
+    s1 = _ScriptedStep("a", "A", "k_a", [WizardOutcome.NEXT, WizardOutcome.NEXT], set_value="first")
     s2 = _ScriptedStep("b", "B", "k_b", [WizardOutcome.BACK, WizardOutcome.NEXT])
     answers = await _run([s1, s2])
     # s1 must have been visited twice; s2 once with BACK, then forward.

@@ -34,7 +34,7 @@ def _default_prompter(question: str) -> str | None:
 
         if is_active():
             return None
-    except Exception:  # noqa: BLE001 — autopilot state must never break a tool
+    except Exception:
         pass
     print(f"\n[agent question] {question}\n> ", file=sys.stderr, end="", flush=True)
     try:

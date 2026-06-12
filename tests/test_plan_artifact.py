@@ -26,7 +26,6 @@ from veles.core.plan_artifact import (
     update_status,
 )
 
-
 # ---------- path helpers + plan_ref scheme ----------
 
 
@@ -190,7 +189,7 @@ def test_render_block_with_steps_and_approval() -> None:
 def test_render_block_contains_plan_ref() -> None:
     plan = PlanArtifact(id="xyz", objective="o")
     block = render_system_block(plan)
-    assert "ref=\"artifact://veles/plans/xyz\"" in block
+    assert 'ref="artifact://veles/plans/xyz"' in block
 
 
 # ---------- collect_active_refs (compactor-side helper) ----------

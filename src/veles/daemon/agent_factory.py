@@ -31,7 +31,7 @@ def _attach_background_runners(state, project, agent_factory, provider_name: str
     from veles.core.dream_runner import DreamRunner
     from veles.core.job_runner import JobRunner
     from veles.core.jobs_store import JobsStore
-    from veles.core.memory import SessionStore as _SS
+    from veles.core.memory import SessionStore
 
     jobs_store = JobsStore(project.memory_db_path)
     state.job_runner = JobRunner(
@@ -47,7 +47,7 @@ def _attach_background_runners(state, project, agent_factory, provider_name: str
         from veles.core.curator_state import load as _load_curator
 
         s = _load_curator(project.state_dir / "curator.state.json")
-        sub = _SS(project.memory_db_path)
+        sub = SessionStore(project.memory_db_path)
         try:
             for sess in sub.list_sessions_since(s.last_curated_at, limit=20):
                 yield sess.id, sub.load_messages(sess.id)
@@ -150,8 +150,7 @@ def _factory_settings_from_args(
         or compressor_section.get("max_summariser_input_tokens")
     )
     hard_ceiling = _int_or_none(
-        getattr(args, "hard_ceiling_tokens", None)
-        or compressor_section.get("hard_ceiling_tokens")
+        getattr(args, "hard_ceiling_tokens", None) or compressor_section.get("hard_ceiling_tokens")
     )
 
     return _FactorySettings(
@@ -177,7 +176,8 @@ def _factory_settings_from_args(
         # `[daemon] skills_cache_ttl` (seconds); absent → 600s, explicit 0
         # disables (re-parse every turn). `_int_or_none` preserves a literal 0.
         skills_cache_ttl=float(
-            ttl if (ttl := _int_or_none(daemon_section.get("skills_cache_ttl"))) is not None
+            ttl
+            if (ttl := _int_or_none(daemon_section.get("skills_cache_ttl"))) is not None
             else 600
         ),
     )
@@ -279,9 +279,7 @@ def _build_agent_for_turn(
     sid = session_id if session_id is not None else store.create_session()
     # Channel/daemon runs are scoped to one project — proposals about
     # *other* subprojects would leak scope to the user (Mind Palace bug).
-    base_system = build_run_system_prompt(
-        project, prompt=prompt or "", include_proposals=False
-    )
+    base_system = build_run_system_prompt(project, prompt=prompt or "", include_proposals=False)
     if system_prompt_override:
         system_prompt = (
             f"{base_system}\n\n---\n\n{system_prompt_override}"
@@ -464,7 +462,7 @@ def _make_post_turn_hook(args: argparse.Namespace, project):
         ):
             try:
                 step()
-            except Exception as exc:  # noqa: BLE001 — learning loop is best-effort
+            except Exception as exc:
                 print(
                     f"post-turn hook failed ({type(exc).__name__}: {exc})",
                     file=sys.stderr,

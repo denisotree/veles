@@ -116,9 +116,7 @@ class Composer(TextArea):
         self.queue_provider: QueuePopProvider | None = queue_provider
         # M78: callable returning the project root used by the `@` file
         # picker. Set by TuiApp on mount; None disables the picker.
-        self.project_root_provider: Callable[[], Path | None] | None = (
-            project_root_provider
-        )
+        self.project_root_provider: Callable[[], Path | None] | None = project_root_provider
         # Tab-cycle state: candidates plus the buffer that produced them.
         # Re-tabbing only advances the index while the buffer is unchanged;
         # any edit resets the cycle in `on_text_area_changed`.
@@ -143,19 +141,15 @@ class Composer(TextArea):
 
     def action_history_up(self) -> None:
         """Up routing (in priority order):
-          - multiline draft & not navigating → cursor up
-          - empty draft & queue non-empty   → pop the newest queued
-            prompt back into the composer (no history step taken)
-          - otherwise                       → previous history entry
+        - multiline draft & not navigating → cursor up
+        - empty draft & queue non-empty   → pop the newest queued
+          prompt back into the composer (no history step taken)
+        - otherwise                       → previous history entry
         """
         if "\n" in self.text and not self.input_history.navigating:
             TextArea.action_cursor_up(self)
             return
-        if (
-            not self.text
-            and self.queue_provider is not None
-            and not self.input_history.navigating
-        ):
+        if not self.text and self.queue_provider is not None and not self.input_history.navigating:
             popped = self.queue_provider()
             if popped is not None:
                 self._replace_text(popped)

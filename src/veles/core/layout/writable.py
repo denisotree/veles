@@ -96,7 +96,7 @@ def _effective_writable_zones(project: Project) -> list[str]:
         from veles.core.layout.discovery import find_layout
 
         pack = find_layout(project.layout_name, project=project)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.debug("layout lookup failed: %s", exc)
         return []
     if pack is None:

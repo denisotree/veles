@@ -65,12 +65,8 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         )
         super().__init__(client=client)
 
-    def _prepare_messages(
-        self, messages: list[Message], model: str
-    ) -> list[dict[str, Any]]:
-        return apply_cache_hints(
-            [to_openai_message(m) for m in messages], model
-        )
+    def _prepare_messages(self, messages: list[Message], model: str) -> list[dict[str, Any]]:
+        return apply_cache_hints([to_openai_message(m) for m in messages], model)
 
     def _extract_usage(self, usage_obj: Any) -> TokenUsage:
         return extract_usage_with_cache(usage_obj)

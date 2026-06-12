@@ -28,7 +28,7 @@ class FilePickerScreen(PickerScreen[str]):
         )
         self._initial_filter = initial_filter
 
-    def on_mount(self) -> None:  # noqa: D401
+    def on_mount(self) -> None:
         super().on_mount()
         if self._initial_filter:
             from textual.widgets import Input

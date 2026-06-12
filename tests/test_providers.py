@@ -27,7 +27,7 @@ def test_all_providers_unique_values() -> None:
 def test_known_providers_matches_catalogue() -> None:
     """model_naming.KNOWN_PROVIDERS is derived from PROVIDER_VALUES;
     they must agree."""
-    assert KNOWN_PROVIDERS == frozenset(PROVIDER_VALUES)
+    assert frozenset(PROVIDER_VALUES) == KNOWN_PROVIDERS
 
 
 def test_every_provider_classified_somewhere() -> None:
@@ -38,9 +38,7 @@ def test_every_provider_classified_somewhere() -> None:
     cli_delegates = frozenset({"claude-cli", "gemini-cli"})
     for spec in ALL_PROVIDERS:
         assert (
-            spec.value in keyed
-            or spec.value in LOCAL_PROVIDERS
-            or spec.value in cli_delegates
+            spec.value in keyed or spec.value in LOCAL_PROVIDERS or spec.value in cli_delegates
         ), f"provider {spec.value!r} has no adapter category"
 
 

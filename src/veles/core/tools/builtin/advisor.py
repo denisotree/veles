@@ -58,9 +58,7 @@ class Verdict:
     suggestions: list[str] = field(default_factory=list)
 
 
-def call_advisor(
-    input_text: str, *, system_prompt: str | None = None
-) -> str:
+def call_advisor(input_text: str, *, system_prompt: str | None = None) -> str:
     """Direct provider call to the routed advisor model.
 
     Lower-level than the `advisor_review` tool: callers (GoalMode's CHECK

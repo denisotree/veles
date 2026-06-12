@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -95,9 +94,7 @@ def test_detach_path_default_calls_spawn(
     from veles.daemon import spawn as spawn_mod
 
     web_run_calls: list[Any] = []
-    monkeypatch.setattr(
-        "aiohttp.web.run_app", lambda *a, **k: web_run_calls.append((a, k))
-    )
+    monkeypatch.setattr("aiohttp.web.run_app", lambda *a, **k: web_run_calls.append((a, k)))
 
     pid_file = isolated_user_home / "daemon.pid"
     info_file = isolated_user_home / "daemon.info.json"
@@ -126,12 +123,8 @@ def test_detach_path_default_calls_spawn(
     # from) `daemon_lifecycle`, so patch the canonical module.
     from veles.cli.commands import daemon_lifecycle as lifecycle_mod
 
-    monkeypatch.setattr(
-        lifecycle_mod, "_process_alive", lambda pid: pid == fake_child_pid
-    )
-    monkeypatch.setattr(
-        "veles.cli._ensure_api_key", lambda provider, project=None: True
-    )
+    monkeypatch.setattr(lifecycle_mod, "_process_alive", lambda pid: pid == fake_child_pid)
+    monkeypatch.setattr("veles.cli._ensure_api_key", lambda provider, project=None: True)
 
     rc = daemon_cmd._cmd_daemon_start(_start_args())
     assert rc == 0
@@ -150,9 +143,7 @@ def test_detach_path_spawn_returns_none_reports_failure(
     from veles.daemon import spawn as spawn_mod
 
     monkeypatch.setattr(spawn_mod, "spawn_daemon", lambda **_: None)
-    monkeypatch.setattr(
-        "veles.cli._ensure_api_key", lambda provider, project=None: True
-    )
+    monkeypatch.setattr("veles.cli._ensure_api_key", lambda provider, project=None: True)
 
     rc = daemon_cmd._cmd_daemon_start(_start_args())
     assert rc == 1
@@ -182,9 +173,7 @@ def test_detach_path_pid_never_appears_reports_log_tail(
             return 1  # already exited
 
     monkeypatch.setattr(spawn_mod, "spawn_daemon", lambda **_: _DeadProc())
-    monkeypatch.setattr(
-        "veles.cli._ensure_api_key", lambda provider, project=None: True
-    )
+    monkeypatch.setattr("veles.cli._ensure_api_key", lambda provider, project=None: True)
     # Speed up the polling loop so the test doesn't take 5s.
     monkeypatch.setattr("time.sleep", lambda _s: None)
 
@@ -201,9 +190,7 @@ def test_detach_path_already_running_refuses(
     """Existing pid file + live pid → reject the start."""
     pid_file = isolated_user_home / "daemon.pid"
     pid_file.write_text(f"{os.getpid()}\n", encoding="utf-8")
-    monkeypatch.setattr(
-        "veles.cli._ensure_api_key", lambda provider, project=None: True
-    )
+    monkeypatch.setattr("veles.cli._ensure_api_key", lambda provider, project=None: True)
 
     rc = daemon_cmd._cmd_daemon_start(_start_args())
     assert rc == 1
@@ -227,12 +214,8 @@ def test_foreground_flag_runs_aiohttp_inline(
     monkeypatch.setattr(spawn_mod, "spawn_daemon", lambda **k: spawn_calls.append(k))
 
     web_run_called: list[Any] = []
-    monkeypatch.setattr(
-        "aiohttp.web.run_app", lambda *a, **k: web_run_called.append((a, k))
-    )
-    monkeypatch.setattr(
-        "veles.cli._ensure_api_key", lambda provider, project=None: True
-    )
+    monkeypatch.setattr("aiohttp.web.run_app", lambda *a, **k: web_run_called.append((a, k)))
+    monkeypatch.setattr("veles.cli._ensure_api_key", lambda provider, project=None: True)
 
     rc = daemon_cmd._cmd_daemon_start(_start_args(foreground=True))
     assert rc == 0

@@ -280,7 +280,7 @@ def _cosine_sim(a: list[float], b: list[float]) -> float:
 
     if not a or not b or len(a) != len(b):
         return 0.0
-    dot = math.fsum(x * y for x, y in zip(a, b))
+    dot = math.fsum(x * y for x, y in zip(a, b, strict=False))
     na = math.sqrt(math.fsum(x * x for x in a))
     nb = math.sqrt(math.fsum(x * x for x in b))
     if na == 0.0 or nb == 0.0:

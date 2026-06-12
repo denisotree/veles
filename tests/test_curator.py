@@ -126,7 +126,7 @@ def test_curate_one_session_advances_on_completed(
     assert session is not None
 
     monkeypatch.setattr("veles.cli._run_agent_streaming_aware", lambda *a, **kw: _make_completed())
-    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _StubProvider())
+    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _stub_provider())
     monkeypatch.setattr(
         "veles.cli._load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
@@ -148,7 +148,7 @@ def test_curate_one_session_returns_false_on_max_iterations(
     assert session is not None
 
     monkeypatch.setattr("veles.cli._run_agent_streaming_aware", lambda *a, **kw: _make_failed())
-    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _StubProvider())
+    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _stub_provider())
     monkeypatch.setattr(
         "veles.cli._load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
@@ -182,7 +182,7 @@ def test_cmd_curate_skips_quiet_window(
     store.close()
 
     monkeypatch.setattr("veles.cli._run_agent_streaming_aware", lambda *a, **kw: _make_completed())
-    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _StubProvider())
+    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _stub_provider())
     monkeypatch.setattr(
         "veles.cli._load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
@@ -207,7 +207,7 @@ def test_cmd_curate_advances_state_on_success(
     store.close()
 
     monkeypatch.setattr("veles.cli._run_agent_streaming_aware", lambda *a, **kw: _make_completed())
-    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _StubProvider())
+    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _stub_provider())
     monkeypatch.setattr(
         "veles.cli._load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
@@ -251,7 +251,7 @@ def test_cmd_curate_failure_stops_batch_and_does_not_advance(
         return _make_failed()
 
     monkeypatch.setattr("veles.cli._run_agent_streaming_aware", fake)
-    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _StubProvider())
+    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _stub_provider())
     monkeypatch.setattr(
         "veles.cli._load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
@@ -268,7 +268,7 @@ def test_cmd_curate_failure_stops_batch_and_does_not_advance(
 # ---- helpers ----
 
 
-def _StubProvider():
+def _stub_provider():
     # Provider is never actually called in these tests (the agent run is
     # stubbed); only `name`/`supports_tools` are inspected.
     from tests.conftest import StubProvider
@@ -290,7 +290,7 @@ def test_cmd_curate_state_json_format(tmp_path: Path, monkeypatch: pytest.Monkey
     store.close()
 
     monkeypatch.setattr("veles.cli._run_agent_streaming_aware", lambda *a, **kw: _make_completed())
-    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _StubProvider())
+    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _stub_provider())
     monkeypatch.setattr(
         "veles.cli._load_skills",
         lambda project, base, *, provider, model: _empty_registry(),

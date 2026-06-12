@@ -83,9 +83,7 @@ async def test_ctrl_v_image_paste_saves_to_veles_tmp_and_inserts_ref(
 
     monkeypatch.setattr("veles.tui.clipboard.paste_image", fake_image)
     # Make sure text paste isn't taken if image succeeded.
-    monkeypatch.setattr(
-        "veles.tui.clipboard.paste_text", lambda: pytest.fail("should not run")
-    )
+    monkeypatch.setattr("veles.tui.clipboard.paste_text", lambda: pytest.fail("should not run"))
 
     app = _app(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:

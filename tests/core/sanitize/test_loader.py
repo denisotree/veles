@@ -63,9 +63,7 @@ def test_loader_project_toml_extends_global(monkeypatch, tmp_path: Path) -> None
     assert out == "<g> and <proj>"
 
 
-def test_loader_invalid_regex_logged_and_skipped(
-    monkeypatch, tmp_path: Path, caplog
-) -> None:
+def test_loader_invalid_regex_logged_and_skipped(monkeypatch, tmp_path: Path, caplog) -> None:
     """A broken local rule must not silently take the agent down."""
     fake_home = _isolate_home(monkeypatch, tmp_path)
     (fake_home / ".veles").mkdir()
@@ -84,12 +82,12 @@ def test_loader_invalid_regex_logged_and_skipped(
     assert any("invalid regex" in m for m in caplog.messages)
 
 
-def test_loader_broken_toml_logged_and_skipped(
-    monkeypatch, tmp_path: Path, caplog
-) -> None:
+def test_loader_broken_toml_logged_and_skipped(monkeypatch, tmp_path: Path, caplog) -> None:
     fake_home = _isolate_home(monkeypatch, tmp_path)
     (fake_home / ".veles").mkdir()
-    (fake_home / ".veles" / "sanitize.toml").write_text("this = not valid TOML[\n", encoding="utf-8")
+    (fake_home / ".veles" / "sanitize.toml").write_text(
+        "this = not valid TOML[\n", encoding="utf-8"
+    )
     loader_mod.clear_cache()
     import logging
 

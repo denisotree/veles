@@ -22,7 +22,7 @@ def test_set_active_project_visible_in_factory_closure(tmp_path: Path) -> None:
     try:
         seen: list[object] = []
 
-        def factory(session_id, *, prompt=None):  # noqa: ARG001
+        def factory(session_id, *, prompt=None):
             seen.append(current_project())
             return None  # we don't actually build an Agent here
 

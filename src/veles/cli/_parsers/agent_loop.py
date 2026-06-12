@@ -9,8 +9,8 @@ from __future__ import annotations
 import argparse
 
 from veles.cli._parsers._common import (
-    DEFAULT_COMPRESSOR_MODEL,
     DEFAULT_COMPRESS_THRESHOLD_TOKENS,
+    DEFAULT_COMPRESSOR_MODEL,
     add_common_run_flags,
 )
 
@@ -77,8 +77,7 @@ def _register_run(sub: argparse._SubParsersAction) -> None:
         "--no-insights",
         action="store_true",
         help=(
-            "Disable post-run insight extraction (the `insights` memory "
-            "table) for this invocation."
+            "Disable post-run insight extraction (the `insights` memory table) for this invocation."
         ),
     )
     run.add_argument(
@@ -190,7 +189,7 @@ def _register_tui(sub: argparse._SubParsersAction) -> None:
 
 
 def _register_curate(sub: argparse._SubParsersAction) -> None:
-    from veles.cli._curator import _CURATE_DEFAULT_LIMIT
+    from veles.core.curator import _CURATE_DEFAULT_LIMIT
 
     curate = sub.add_parser(
         "curate",

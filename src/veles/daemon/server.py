@@ -27,14 +27,12 @@ import asyncio
 import contextlib
 import json
 import logging
-import sys
 import time
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
 from aiohttp import WSMsgType, web
 
+from veles import __version__
 from veles.daemon.auth import TokenStore, bearer_auth_middleware
 from veles.daemon.runner import (
     AgentFactory,
@@ -44,7 +42,7 @@ from veles.daemon.runner import (
 )
 from veles.daemon.state import DaemonState
 
-_VERSION = "0.0.1"
+logger = logging.getLogger(__name__)
 
 
 def make_app(state: DaemonState) -> web.Application:
@@ -62,9 +60,7 @@ def make_app(state: DaemonState) -> web.Application:
     app.router.add_get("/v1/runs", _handle_list_runs)
     app.router.add_get("/v1/runs/{run_id}", _handle_get_run)
     app.router.add_get("/v1/runs/{run_id}/events", _handle_run_events_ws)
-    app.router.add_post(
-        "/v1/runs/{run_id}/prompts/{prompt_id}", _handle_resolve_prompt
-    )
+    app.router.add_post("/v1/runs/{run_id}/prompts/{prompt_id}", _handle_resolve_prompt)
     app.router.add_get("/v1/sessions", _handle_list_sessions)
     app.router.add_get("/v1/sessions/{session_id}", _handle_get_session)
     app.router.add_delete("/v1/sessions/{session_id}", _handle_delete_session)
@@ -94,7 +90,7 @@ async def _handle_health(request: web.Request) -> web.Response:
     return web.json_response(
         {
             "status": "ok",
-            "version": _VERSION,
+            "version": __version__,
             "project": state.project.name,
             "project_root": sanitize(str(state.project.root), project=state.project),
             "started_at": state.started_at,
@@ -132,7 +128,7 @@ async def _handle_status(request: web.Request) -> web.Response:
     return web.json_response(
         {
             "status": "ok",
-            "version": _VERSION,
+            "version": __version__,
             "project": state.project.name,
             "project_root": sanitize(str(state.project.root), project=state.project),
             "started_at": state.started_at,
@@ -327,14 +323,10 @@ async def _handle_resolve_prompt(request: web.Request) -> web.Response:
         return web.json_response({"error": "body must be a JSON object"}, status=400)
     choice = body.get("choice")
     if not isinstance(choice, str) or not choice:
-        return web.json_response(
-            {"error": "'choice' (non-empty string) required"}, status=400
-        )
+        return web.json_response({"error": "'choice' (non-empty string) required"}, status=400)
     pending = handle.pending_prompts.pop(prompt_id, None)
     if pending is None:
-        return web.json_response(
-            {"error": f"prompt {prompt_id!r} not pending"}, status=404
-        )
+        return web.json_response({"error": f"prompt {prompt_id!r} not pending"}, status=404)
     if choice not in pending.valid_choices:
         # Put it back so a follow-up POST with the right key can still resolve.
         handle.pending_prompts[prompt_id] = pending
@@ -346,9 +338,7 @@ async def _handle_resolve_prompt(request: web.Request) -> web.Response:
             status=409,
         )
     pending.future.set_result(choice)
-    handle.append_event(
-        {"type": "prompt_resolved", "prompt_id": prompt_id, "choice": choice}
-    )
+    handle.append_event({"type": "prompt_resolved", "prompt_id": prompt_id, "choice": choice})
     return web.json_response({"accepted": True, "choice": choice})
 
 
@@ -439,10 +429,7 @@ async def _handle_get_session(request: web.Request) -> web.Response:
     # can tell "no override" from "override cleared to default".
     overrides = state.get_overrides(session_id)
     overrides_payload: dict[str, Any] | None
-    if overrides is None or overrides.is_empty():
-        overrides_payload = None
-    else:
-        overrides_payload = overrides.to_dict()
+    overrides_payload = None if overrides is None or overrides.is_empty() else overrides.to_dict()
     return web.json_response(
         {
             "id": info.id,
@@ -516,12 +503,8 @@ async def _handle_patch_session(request: web.Request) -> web.Response:
         )
 
     overrides = state.set_overrides(session_id, mode=mode)
-    logger.info(
-        "PATCH /v1/sessions/%s overrides=%s", session_id, overrides.to_dict()
-    )
-    return web.json_response(
-        {"session_id": session_id, "overrides": overrides.to_dict()}
-    )
+    logger.info("PATCH /v1/sessions/%s overrides=%s", session_id, overrides.to_dict())
+    return web.json_response({"session_id": session_id, "overrides": overrides.to_dict()})
 
 
 _SENTINEL = object()
@@ -699,10 +682,8 @@ async def _handle_dream_run(request: web.Request) -> web.Response:
     if state.dream_runner is None:
         return web.json_response({"error": "dream-runner not enabled"}, status=503)
     body: dict[str, Any] = {}
-    try:
+    with contextlib.suppress(Exception):
         body = await request.json()
-    except Exception:
-        pass
     include_consolidation = bool(body.get("include_consolidation", True))
     force_fn = getattr(state.dream_runner, "force_run", None)
     if not callable(force_fn):
@@ -770,13 +751,10 @@ def _build_channel_gateway(platform: str, channel_cfg: dict, *, backend, state: 
     except KeyError:
         logger.warning("channel %r is not a registered platform — skipping", platform)
         return None
-    token = get_provider_key(platform, project=state.project.name) or channel_cfg.get(
-        "bot_token"
-    )
+    token = get_provider_key(platform, project=state.project.name) or channel_cfg.get("bot_token")
     if not token:
         logger.warning(
-            "[channels.%s] enabled but no bot token in keychain "
-            "(veles:%s:%s) or config — skipping",
+            "[channels.%s] enabled but no bot token in keychain (veles:%s:%s) or config — skipping",
             platform,
             platform,
             state.project.name,
@@ -804,9 +782,7 @@ def _build_channel_gateway(platform: str, channel_cfg: dict, *, backend, state: 
         return gateway
     # Generic platforms use the minimal factory contract shared with
     # `veles channel run` (bot_token / daemon_client / session_map).
-    gateway = entry.factory(
-        bot_token=str(token), daemon_client=backend, session_map=session_map
-    )
+    gateway = entry.factory(bot_token=str(token), daemon_client=backend, session_map=session_map)
     logger.info("channel %r started", platform)
     return gateway
 
@@ -849,10 +825,8 @@ async def _run_channel_gateway(gateway) -> None:
         await gateway.start()
     except asyncio.CancelledError:
         raise
-    except Exception as exc:  # noqa: BLE001
-        logger.error(
-            "channel gateway crashed: %s: %s", type(exc).__name__, exc
-        )
+    except Exception as exc:
+        logger.error("channel gateway crashed: %s: %s", type(exc).__name__, exc)
         with contextlib.suppress(Exception):
             await gateway.stop()
 

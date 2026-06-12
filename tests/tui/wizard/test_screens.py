@@ -290,9 +290,7 @@ async def test_choice_screen_filter_narrows_visible_items():
         # Type "haiku" into the focused filter Input.
         await pilot.press("h", "a", "i", "k", "u")
         await pilot.pause()
-        assert [it.value for it in screen._visible_items] == [
-            "anthropic/claude-haiku-4.5"
-        ]
+        assert [it.value for it in screen._visible_items] == ["anthropic/claude-haiku-4.5"]
         # Arrow-down moves focus from Input → ListView, then Enter picks.
         await pilot.press("down")
         await pilot.pause()

@@ -27,7 +27,7 @@ def _register_tui_session(project: Project):
             rec = store.create("tui", "tui")
         store.mark_started(rec.id, pid=os.getpid())
         return store, rec.id
-    except Exception:  # noqa: BLE001 — runtime-session tracking is best-effort
+    except Exception:
         return None
 
 
@@ -87,9 +87,7 @@ def run_tui(args: argparse.Namespace, project: Project) -> int:
     _warn_if_agents_md_invalid(project)
 
     persisted = load_for_project(project)
-    effective_model = resolve_effective_model(
-        args, project, persisted_model=persisted.model
-    )
+    effective_model = resolve_effective_model(args, project, persisted_model=persisted.model)
     args.model = effective_model
 
     provider = _make_provider(args.provider)
@@ -98,12 +96,8 @@ def run_tui(args: argparse.Namespace, project: Project) -> int:
     # depending on the active mode. Skills are baked into both so the
     # user's project-level tools are available in both modes.
     registries = {
-        "writing": _load_skills(
-            project, _RUN_TOOLS, provider=provider, model=args.model
-        ),
-        "planning": _load_skills(
-            project, _PLANNING_TOOLS, provider=provider, model=args.model
-        ),
+        "writing": _load_skills(project, _RUN_TOOLS, provider=provider, model=args.model),
+        "planning": _load_skills(project, _PLANNING_TOOLS, provider=provider, model=args.model),
     }
     store = SessionStore(project.memory_db_path)
 
@@ -139,9 +133,7 @@ def run_tui(args: argparse.Namespace, project: Project) -> int:
                 sys_chunks.append(mode.system_block.strip())
         if extra_system and extra_system.strip():
             sys_chunks.append(extra_system.strip())
-        system_prompt: str | None = (
-            "\n\n".join(sys_chunks) if sys_chunks else None
-        )
+        system_prompt: str | None = "\n\n".join(sys_chunks) if sys_chunks else None
 
         return Agent(
             provider=provider,

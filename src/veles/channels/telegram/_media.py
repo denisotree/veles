@@ -39,9 +39,7 @@ class TelegramMedia:
     def __init__(self, gateway: TelegramGateway) -> None:
         self._gw = gateway
 
-    async def transcribe_voice(
-        self, chat_id: int, voice: dict[str, Any]
-    ) -> str | None:
+    async def transcribe_voice(self, chat_id: int, voice: dict[str, Any]) -> str | None:
         """Fetch voice file → STT adapter → return text. Returns the
         already-formatted prompt chunk on success, or a polite "not
         configured" notice on missing adapter / size cap, or None to
@@ -78,7 +76,7 @@ class TelegramMedia:
             return None
         try:
             audio_bytes = await gw._download_telegram_file(file_id, size or 0)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("voice download failed: %s", exc)
             return None
         try:
@@ -88,14 +86,12 @@ class TelegramMedia:
                 chat_id, f"<i>couldn't transcribe voice: {escape_html(str(exc))}</i>"
             )
             return None
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("STT adapter raised %s: %s", type(exc).__name__, exc)
             return None
         return f"[voice transcript] {text.strip()}"
 
-    async def describe_photo(
-        self, chat_id: int, photo: list[dict[str, Any]]
-    ) -> str | None:
+    async def describe_photo(self, chat_id: int, photo: list[dict[str, Any]]) -> str | None:
         """Same shape as `transcribe_voice` but via the Vision
         adapter. `photo` is Telegram's size-variants array; we pick
         the largest so the vision model sees the most detail."""
@@ -134,19 +130,17 @@ class TelegramMedia:
             return None
         try:
             image_bytes = await gw._download_telegram_file(file_id, size)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("photo download failed: %s", exc)
             return None
         try:
-            description = await asyncio.to_thread(
-                adapter.describe_image, image_bytes, "image/jpeg"
-            )
+            description = await asyncio.to_thread(adapter.describe_image, image_bytes, "image/jpeg")
         except VisionError as exc:
             await gw._send_message(
                 chat_id, f"<i>couldn't describe photo: {escape_html(str(exc))}</i>"
             )
             return None
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("Vision adapter raised %s: %s", type(exc).__name__, exc)
             return None
         return f"[photo description] {description.strip()}"
@@ -163,9 +157,7 @@ class TelegramMedia:
         target.write_bytes(data)
         return target
 
-    async def save_telegram_document(
-        self, chat_id: int, document: dict[str, Any]
-    ) -> Path | None:
+    async def save_telegram_document(self, chat_id: int, document: dict[str, Any]) -> Path | None:
         """Validate → ack → download → persist for one document. Returns
         the saved Path on success, None on reject/error (the user has
         already been told what happened via send/edit messages)."""
@@ -183,9 +175,7 @@ class TelegramMedia:
         if gw.attachment_dir is None:
             await gw._send_message(chat_id, "📎 Attachments are not configured.")
             return None
-        ack = await gw._send_message(
-            chat_id, f"📎 Saving <code>{escape_html(name)}</code>…"
-        )
+        ack = await gw._send_message(chat_id, f"📎 Saving <code>{escape_html(name)}</code>…")
         ack_id = ack.get("message_id") if isinstance(ack, dict) else None
         try:
             data = await gw._download_telegram_file(file_id, size)

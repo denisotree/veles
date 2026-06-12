@@ -43,9 +43,7 @@ def test_wiki_ingest_local_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
 
         result = wiki_ingest(str(src), slug="my-note", title="My Note")
         assert "wiki/sources/my-note.md" in result
-        page = (project.wiki_root / "wiki" / "sources" / "my-note.md").read_text(
-            encoding="utf-8"
-        )
+        page = (project.wiki_root / "wiki" / "sources" / "my-note.md").read_text(encoding="utf-8")
         assert "My Note" in page
     finally:
         # set_active_project returns a token but its module's reset signature
@@ -63,16 +61,12 @@ def test_wiki_ingest_url_calls_fetch_and_writes(
         def fake_fetch(url: str, max_bytes: int = 200_000, **kwargs: Any) -> str:
             return f"# Fetched\n\nfrom {url}"
 
-        monkeypatch.setattr(
-            "veles.core.tools.builtin.fetch_url.fetch_url", fake_fetch
-        )
+        monkeypatch.setattr("veles.core.tools.builtin.fetch_url.fetch_url", fake_fetch)
         from veles.core.tools.builtin.wiki_tools import wiki_ingest
 
         result = wiki_ingest("https://example.com/post")
         assert "wiki/sources/fetched.md" in result
-        page = (project.wiki_root / "wiki" / "sources" / "fetched.md").read_text(
-            encoding="utf-8"
-        )
+        page = (project.wiki_root / "wiki" / "sources" / "fetched.md").read_text(encoding="utf-8")
         assert "from https://example.com/post" in page
         # External source → trust frontmatter present.
         assert "trust" in page

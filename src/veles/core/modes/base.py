@@ -20,8 +20,9 @@ keeps them unit-testable with a fake `post` callback.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from veles.core.agent import Agent
@@ -38,8 +39,8 @@ EventSink = Callable[["Event"], None]
 
 @dataclass(slots=True)
 class ModeContext:
-    state: "AppState"
-    project: "Project"
+    state: AppState
+    project: Project
     factory: AgentFactory
     post: PostFn
     on_text: TextSink
@@ -62,9 +63,7 @@ class Mode(Protocol):
         ...
 
 
-def wrap_mode_switch_observation(
-    prompt: str, mode_name: str, system_block: str
-) -> str:
+def wrap_mode_switch_observation(prompt: str, mode_name: str, system_block: str) -> str:
     """When the active mode changed mid-session, the next user prompt
     is prefixed with a one-shot observation block. The Agent doesn't
     re-emit its constructor system prompt on resumed sessions

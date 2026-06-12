@@ -78,9 +78,7 @@ def test_known_model_picks_right_context_window() -> None:
     """Claude defaults to 200k, GPT-4o to 128k. Make sure the % flips
     when the model id changes for the same token count."""
     bar1 = StatusBar()
-    bar1.render_state(
-        _state(model="anthropic/claude-sonnet-4.6", last_turn_total_tokens=64_000)
-    )
+    bar1.render_state(_state(model="anthropic/claude-sonnet-4.6", last_turn_total_tokens=64_000))
     pct_claude = "32%"  # 64k/200k
     assert pct_claude in bar1.last_text
 

@@ -48,12 +48,12 @@ async def test_add_channel_to_focused_registry_daemon(tmp_path, monkeypatch):
         # The cursor starts on the project's unnamed/'default' daemon.
         await pilot.press("c")
         await pilot.pause()
-        await pilot.press("enter")        # ChoiceScreen → telegram (default)
+        await pilot.press("enter")  # ChoiceScreen → telegram (default)
         await pilot.pause()
         await pilot.press(*"tok123")
-        await pilot.press("enter")        # bot token
+        await pilot.press("enter")  # bot token
         await pilot.pause()
-        await pilot.press("enter")        # whitelist blank
+        await pilot.press("enter")  # whitelist blank
         await pilot.pause()
 
         # Visible feedback: status line / last_action confirms the add.
@@ -82,7 +82,9 @@ async def test_add_channel_failure_does_not_crash(tmp_path, monkeypatch):
 
     import veles.cli.channel_wizard as cw
 
-    monkeypatch.setattr(cw, "apply_channel", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(
+        cw, "apply_channel", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom"))
+    )
 
     app = DaemonPickerApp(project=project)
     async with app.run_test() as pilot:
@@ -90,12 +92,12 @@ async def test_add_channel_failure_does_not_crash(tmp_path, monkeypatch):
         await pilot.pause()  # cursor lands on the 'default' daemon node
         await pilot.press("c")
         await pilot.pause()
-        await pilot.press("enter")        # telegram
+        await pilot.press("enter")  # telegram
         await pilot.pause()
         await pilot.press(*"tok")
-        await pilot.press("enter")        # token
+        await pilot.press("enter")  # token
         await pilot.pause()
-        await pilot.press("enter")        # whitelist blank
+        await pilot.press("enter")  # whitelist blank
         await pilot.pause()
         screen = pilot.app.screen
         assert "failed to add telegram" in screen.last_action
@@ -107,16 +109,18 @@ async def test_remove_channel_from_focused_registry_daemon(tmp_path, monkeypatch
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
     project = init_project(tmp_path / "p", name="p")
     _seed_registry_for(project)
-    apply_channel(project, session=None, channel="telegram", secrets={"bot_token": "t"}, config_fields={})
+    apply_channel(
+        project, session=None, channel="telegram", secrets={"bot_token": "t"}, config_fields={}
+    )
     assert get_section(load_project_config(project), "channels", "telegram").get("enabled") is True
 
     app = DaemonPickerApp(project=project)
     async with app.run_test() as pilot:
         await pilot.pause()
         await pilot.pause()  # cursor lands on the 'default' daemon node
-        await pilot.press("x")            # cursor on the daemon → pick-from-list flow
+        await pilot.press("x")  # cursor on the daemon → pick-from-list flow
         await pilot.pause()
-        await pilot.press("enter")        # ChoiceScreen → telegram (only one)
+        await pilot.press("enter")  # ChoiceScreen → telegram (only one)
         await pilot.pause()
 
     assert get_section(load_project_config(project), "channels") == {}

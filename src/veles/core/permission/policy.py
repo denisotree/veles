@@ -35,9 +35,7 @@ from veles.core.user_config import get_user_section
 
 logger = logging.getLogger(__name__)
 
-VALID_POLICIES: Final[frozenset[str]] = frozenset(
-    {"allow", "approval_required", "always_confirm"}
-)
+VALID_POLICIES: Final[frozenset[str]] = frozenset({"allow", "approval_required", "always_confirm"})
 
 
 BUILTIN_TOOL_POLICY_OVERRIDES: Final[dict[str, str]] = {
@@ -151,9 +149,7 @@ def _violates_floor(entry: ToolEntry, candidate: str) -> bool:
     rc = entry.risk_class
     if rc is None:
         return False
-    if rc in _NEVER_LOWER_FLOOR_CLASSES and candidate != "always_confirm":
-        return True
-    return False
+    return bool(rc in _NEVER_LOWER_FLOOR_CLASSES and candidate != "always_confirm")
 
 
 def _read_project_override(tool_name: str) -> str | None:

@@ -46,11 +46,17 @@ def register(sub: argparse._SubParsersAction) -> None:
         help="Wall-clock budget in seconds (default 3600).",
     )
     g_start.add_argument(
-        "--forbid", action="append", default=None, metavar="ACTION",
+        "--forbid",
+        action="append",
+        default=None,
+        metavar="ACTION",
         help="Forbid an action (repeatable).",
     )
     g_start.add_argument(
-        "--approve", action="append", default=None, metavar="ACTION",
+        "--approve",
+        action="append",
+        default=None,
+        metavar="ACTION",
         help="Pre-approve an action so it runs without a prompt (repeatable).",
     )
 

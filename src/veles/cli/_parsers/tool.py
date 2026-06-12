@@ -24,13 +24,9 @@ def register(sub: argparse._SubParsersAction) -> None:
     add_project_root_flag(tool)
     tool_sub = tool.add_subparsers(dest="tool_command", required=True)
 
-    tool_sub.add_parser(
-        "list", help="List tools catalogued in this project's memory.db."
-    )
+    tool_sub.add_parser("list", help="List tools catalogued in this project's memory.db.")
 
-    tool_show = tool_sub.add_parser(
-        "show", help="Print one tool's manifest + telemetry."
-    )
+    tool_show = tool_sub.add_parser("show", help="Print one tool's manifest + telemetry.")
     tool_show.add_argument("name", help="Tool name (as registered).")
 
     tool_promote = tool_sub.add_parser(

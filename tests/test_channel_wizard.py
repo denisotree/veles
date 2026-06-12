@@ -37,9 +37,7 @@ def test_add_telegram_to_default_daemon_writes_config_and_keychain(tmp_path: Pat
     from veles.core.secrets import get_provider_key
 
     project = init_project(tmp_path / "p", name="p")
-    prompter = _scripted_prompter(
-        {"bot token": "123:ABC", "chat ids": "111, 222"}
-    )
+    prompter = _scripted_prompter({"bot token": "123:ABC", "chat ids": "111, 222"})
     rc = add_channel(project, channel="telegram", prompter=prompter)
     assert rc == 0
 
@@ -154,9 +152,7 @@ def test_delete_channel_block_returns_bool(tmp_path: Path, fake_keyring):
     cfg = load_project_config(project)
     cfg.setdefault("daemon", {})["api"] = {"port": 8801}
     save_project_config(project, cfg)
-    apply_channel(
-        project, session="api", channel="telegram", secrets={}, config_fields={}
-    )
+    apply_channel(project, session="api", channel="telegram", secrets={}, config_fields={})
     assert delete_channel_block(project, "telegram", session="api") is True
     assert get_section(load_project_config(project), "daemon", "api", "channels") == {}
     # Second delete → False (already gone).
@@ -180,8 +176,11 @@ def test_apply_channel_keychain_failure_leaves_no_half_write(tmp_path: Path, mon
 
     with pytest.raises(secrets_mod.KeyringUnavailable):
         apply_channel(
-            project, session=None, channel="telegram",
-            secrets={"bot_token": "x"}, config_fields={},
+            project,
+            session=None,
+            channel="telegram",
+            secrets={"bot_token": "x"},
+            config_fields={},
         )
     # Config untouched — no enabled-but-tokenless block.
     assert get_section(load_project_config(project), "channels") == {}

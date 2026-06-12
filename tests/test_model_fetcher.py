@@ -4,7 +4,7 @@ strategy per provider class."""
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -22,11 +22,9 @@ def _isolated_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 def _write_cache_file(provider: str, models: list[str], age_seconds: float = 0.0) -> Path:
     path = mf._cache_path(provider)
     path.parent.mkdir(parents=True, exist_ok=True)
-    fetched_at = datetime.now(timezone.utc) - timedelta(seconds=age_seconds)
+    fetched_at = datetime.now(UTC) - timedelta(seconds=age_seconds)
     path.write_text(
-        json.dumps(
-            {"fetched_at": fetched_at.isoformat(timespec="seconds"), "models": models}
-        ),
+        json.dumps({"fetched_at": fetched_at.isoformat(timespec="seconds"), "models": models}),
         encoding="utf-8",
     )
     return path
@@ -129,8 +127,9 @@ def test_local_does_not_merge_with_curated() -> None:
     entries (if any) must not appear alongside, since they'd advertise
     models the local server doesn't actually have."""
     fake_make = _make_provider_returning(["only-local"])
-    with patch("veles.cli._make_provider", fake_make), patch.object(
-        mf, "known_models", return_value=["curated-ghost"]
+    with (
+        patch("veles.cli._make_provider", fake_make),
+        patch.object(mf, "known_models", return_value=["curated-ghost"]),
     ):
         result = mf.fetch_models("ollama")
     assert result.models == ["only-local"]

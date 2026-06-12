@@ -56,9 +56,7 @@ def _noop_log(*_a, **_kw) -> None:
     return None
 
 
-def test_autopilot_dispatch_logs_to_log_md(
-    project: Project, sensitive_registry: Registry
-) -> None:
+def test_autopilot_dispatch_logs_to_log_md(project: Project, sensitive_registry: Registry) -> None:
     activate(time.time() + 3600)
     call = ToolCall(id="t1", name="fake_shell", arguments={"cmd": "ls"})
     msg = _dispatch(sensitive_registry, call, log=_noop_log)

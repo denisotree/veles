@@ -59,9 +59,7 @@ def test_resume_with_new_system_prompt_replaces_in_history() -> None:
 
         # Second turn — same session, different system prompt (e.g.
         # AGENTS.md changed, or recall pulled new wiki pages).
-        agent2 = _make_agent(
-            session_id=sid, system_prompt="FRESH-AGENTS-MD", store=store
-        )
+        agent2 = _make_agent(session_id=sid, system_prompt="FRESH-AGENTS-MD", store=store)
         history = agent2._bootstrap_history()
         assert history[0].role == "system"
         assert history[0].content == "FRESH-AGENTS-MD"
@@ -97,9 +95,7 @@ def test_resume_with_no_stored_system_prepends_fresh() -> None:
         # Manually seed history with a user message only — no system.
         store.append_turn(sid, Message(role="user", content="hi"))
 
-        agent = _make_agent(
-            session_id=sid, system_prompt="FRESH", store=store
-        )
+        agent = _make_agent(session_id=sid, system_prompt="FRESH", store=store)
         history = agent._bootstrap_history()
         assert history[0].role == "system"
         assert history[0].content == "FRESH"

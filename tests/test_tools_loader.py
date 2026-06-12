@@ -50,9 +50,9 @@ def greet(name: str = "world") -> str:
     return f"hi {name}"
 '''
 
-_BODY_BROKEN = '''
+_BODY_BROKEN = """
 this is not valid python
-'''
+"""
 
 
 # ---- empty / missing dirs ----
@@ -237,9 +237,7 @@ def test_loaded_tool_landed_in_database(tmp_path: Path, conn) -> None:
     assert rec.origin == "agent-generated"
 
 
-def test_load_does_not_write_to_db_when_conn_omitted(
-    tmp_path: Path, conn
-) -> None:
+def test_load_does_not_write_to_db_when_conn_omitted(tmp_path: Path, conn) -> None:
     project_tools = tmp_path / "project" / ".veles" / "tools"
     _write_tool(project_tools, "hello.py", _BODY_HELLO)
 

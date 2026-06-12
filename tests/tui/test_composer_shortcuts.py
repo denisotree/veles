@@ -70,9 +70,7 @@ async def _mounted_composer(tmp_project, agent_factory_for, text_response):
     return app
 
 
-async def test_alt_backspace_deletes_word_left(
-    tmp_project, agent_factory_for, text_response
-):
+async def test_alt_backspace_deletes_word_left(tmp_project, agent_factory_for, text_response):
     app = await _mounted_composer(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:
         composer = pilot.app.query_one(Composer)
@@ -85,9 +83,7 @@ async def test_alt_backspace_deletes_word_left(
         assert composer.text == "hello world "
 
 
-async def test_ctrl_backspace_deletes_word_left(
-    tmp_project, agent_factory_for, text_response
-):
+async def test_ctrl_backspace_deletes_word_left(tmp_project, agent_factory_for, text_response):
     app = await _mounted_composer(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:
         composer = pilot.app.query_one(Composer)
@@ -99,9 +95,7 @@ async def test_ctrl_backspace_deletes_word_left(
         assert composer.text == "alpha beta "
 
 
-async def test_alt_left_jumps_one_word(
-    tmp_project, agent_factory_for, text_response
-):
+async def test_alt_left_jumps_one_word(tmp_project, agent_factory_for, text_response):
     app = await _mounted_composer(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:
         composer = pilot.app.query_one(Composer)
@@ -115,9 +109,7 @@ async def test_alt_left_jumps_one_word(
         assert (row, col) == (0, 6)
 
 
-async def test_ctrl_delete_removes_word_right(
-    tmp_project, agent_factory_for, text_response
-):
+async def test_ctrl_delete_removes_word_right(tmp_project, agent_factory_for, text_response):
     app = await _mounted_composer(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:
         composer = pilot.app.query_one(Composer)

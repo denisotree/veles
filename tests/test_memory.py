@@ -30,9 +30,7 @@ def test_orphan_session_model_overrides_table_is_dropped(tmp_path) -> None:
         "CREATE TABLE IF NOT EXISTS session_model_overrides "
         "(session_id TEXT PRIMARY KEY, model TEXT)"
     )
-    conn.execute(
-        "INSERT INTO session_model_overrides VALUES ('s1', 'anthropic/claude-haiku-4.5')"
-    )
+    conn.execute("INSERT INTO session_model_overrides VALUES ('s1', 'anthropic/claude-haiku-4.5')")
     conn.commit()
     conn.close()
 
@@ -41,8 +39,7 @@ def test_orphan_session_model_overrides_table_is_dropped(tmp_path) -> None:
     conn = sqlite3.connect(str(db))
     try:
         rows = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' "
-            "AND name='session_model_overrides'"
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='session_model_overrides'"
         ).fetchall()
     finally:
         conn.close()

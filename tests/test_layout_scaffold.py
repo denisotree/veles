@@ -68,14 +68,12 @@ def test_builtin_manifest_declares_engine_and_context_file(tmp_path: Path) -> No
 # ---- custom pack without the wiki engine ----
 
 
-def test_init_custom_pack_scaffolds_only_declared_dirs(
-    tmp_path: Path, user_home: Path
-) -> None:
+def test_init_custom_pack_scaffolds_only_declared_dirs(tmp_path: Path, user_home: Path) -> None:
     _write_pack(
         user_home,
         "flat-notes",
         '[layout]\nname = "flat-notes"\n'
-        "[layout.scaffold]\ndirs = [\"notes/\"]\n"
+        '[layout.scaffold]\ndirs = ["notes/"]\n'
         '[[layout.writable_zones]]\npath = "notes/"\n',
     )
     project = init_project(tmp_path / "p", name="p", layout="flat-notes")
@@ -98,14 +96,11 @@ def test_init_unknown_layout_degrades_to_bare(tmp_path: Path, capsys) -> None:
     assert "not found" in capsys.readouterr().err
 
 
-def test_pack_agents_md_template_substitutes_name(
-    tmp_path: Path, user_home: Path
-) -> None:
+def test_pack_agents_md_template_substitutes_name(tmp_path: Path, user_home: Path) -> None:
     _write_pack(
         user_home,
         "tpl",
-        '[layout]\nname = "tpl"\n'
-        "[layout.scaffold]\nagents_md_template = \"templates/AGENTS.md\"\n",
+        '[layout]\nname = "tpl"\n[layout.scaffold]\nagents_md_template = "templates/AGENTS.md"\n',
     )
     tpl_dir = user_home / "layouts" / "tpl" / "templates"
     tpl_dir.mkdir(parents=True)
@@ -131,9 +126,7 @@ def test_apply_scaffold_never_overwrites_agents_md(tmp_path: Path) -> None:
 # ---- engine cache ----
 
 
-def test_wiki_enabled_tracks_manifest_changes(
-    tmp_path: Path, user_home: Path
-) -> None:
+def test_wiki_enabled_tracks_manifest_changes(tmp_path: Path, user_home: Path) -> None:
     import os
     import time
 

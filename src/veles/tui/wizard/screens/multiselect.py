@@ -69,9 +69,7 @@ class MultiSelectScreen(ModalScreen[list[str] | None]):
             self._listview = ListView(id="wizard-multi-list")
             yield self._listview
             if self._allow_freeform:
-                self._input = Input(
-                    placeholder=self._freeform_placeholder, id="wizard-multi-free"
-                )
+                self._input = Input(placeholder=self._freeform_placeholder, id="wizard-multi-free")
                 yield self._input
             yield Label(self._hint, classes="wizard-hint")
 

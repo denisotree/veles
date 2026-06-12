@@ -44,7 +44,7 @@ class _Chat:
     def __init__(self, exc: Exception) -> None:
         self._exc = exc
 
-    def create(self, **kwargs):  # noqa: ANN003
+    def create(self, **kwargs):
         raise self._exc
 
 
@@ -55,7 +55,7 @@ class _StreamChat:
     def __init__(self, exc: Exception) -> None:
         self._exc = exc
 
-    def create(self, **kwargs):  # noqa: ANN003
+    def create(self, **kwargs):
         exc = self._exc
 
         def _gen():
@@ -66,7 +66,7 @@ class _StreamChat:
 
 
 class _NS:
-    def __init__(self, **kw):  # noqa: ANN003
+    def __init__(self, **kw):
         self.__dict__.update(kw)
 
 

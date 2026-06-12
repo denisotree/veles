@@ -24,14 +24,8 @@ def read_file(path: str, offset: int = 0, limit: int = 2000) -> str:
     selected = lines[offset : offset + limit]
     project = current_project()
     try:
-        rel = (
-            str(p.relative_to(project.root.resolve()))
-            if project is not None
-            else str(p)
-        )
+        rel = str(p.relative_to(project.root.resolve())) if project is not None else str(p)
     except ValueError:
         rel = str(p)
-    logger.info(
-        "file.read rel=%s lines=%d offset=%d", rel, len(selected), offset
-    )
+    logger.info("file.read rel=%s lines=%d offset=%d", rel, len(selected), offset)
     return "".join(f"{i + offset + 1:>6}\t{line}" for i, line in enumerate(selected))

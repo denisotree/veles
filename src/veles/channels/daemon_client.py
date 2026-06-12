@@ -129,9 +129,7 @@ class DaemonClient:
         if provider is not None:
             body["provider"] = provider
         if not body:
-            raise DaemonClientError(
-                "update_session requires at least one of model/mode/provider"
-            )
+            raise DaemonClientError("update_session requires at least one of model/mode/provider")
         async with self.session.patch(
             f"{self._base}/v1/sessions/{session_id}",
             json=body,

@@ -67,12 +67,8 @@ def test_manager_path_activates_with_flag(
     # Stub out everything beyond the gate so the test doesn't hit
     # the LLM. The manager dispatcher itself is fully exercised in
     # `test_orchestration_manager.py` — here we verify the wiring.
-    fake_result = MagicMock(
-        error=None, final_text="synthesised answer from writer worker"
-    )
-    monkeypatch.setattr(
-        "veles.cli.commands.run.Agent", MagicMock(return_value=MagicMock())
-    )
+    fake_result = MagicMock(error=None, final_text="synthesised answer from writer worker")
+    monkeypatch.setattr("veles.cli.commands.run.Agent", MagicMock(return_value=MagicMock()))
 
     captured = {}
 
@@ -81,9 +77,7 @@ def test_manager_path_activates_with_flag(
         captured["agent_factory"] = agent_factory
         return fake_result
 
-    monkeypatch.setattr(
-        "veles.core.orchestration.decompose_and_run", fake_decompose
-    )
+    monkeypatch.setattr("veles.core.orchestration.decompose_and_run", fake_decompose)
     monkeypatch.setattr("veles.cli._make_provider", lambda _: MagicMock())
     monkeypatch.setattr("veles.cli._build_compressor", lambda *a, **kw: None)
     monkeypatch.setattr("veles.cli._build_run_system_prompt", lambda *a, **kw: "base")

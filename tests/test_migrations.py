@@ -14,8 +14,8 @@ import pytest
 
 from veles.core.migrations import run_pending_migrations
 from veles.core.project import (
-    Project,
     _SCHEMA_VERSION,
+    Project,
     _write_project_toml,
     load_project,
 )
@@ -33,9 +33,7 @@ def _make_v1_project(tmp_path: Path) -> Project:
         schema_version=1,
     )
     (state_dir / "wiki" / "concepts").mkdir(parents=True)
-    (state_dir / "wiki" / "concepts" / "x.md").write_text(
-        "# X\nlegacy page\n", encoding="utf-8"
-    )
+    (state_dir / "wiki" / "concepts" / "x.md").write_text("# X\nlegacy page\n", encoding="utf-8")
     return Project(
         root=tmp_path,
         name="alpha",
@@ -53,9 +51,7 @@ def test_current_schema_is_a_noop(tmp_path: Path) -> None:
         created_at=1.0,
         schema_version=_SCHEMA_VERSION,
     )
-    project = Project(
-        root=tmp_path, name="cur", created_at=1.0, schema_version=_SCHEMA_VERSION
-    )
+    project = Project(root=tmp_path, name="cur", created_at=1.0, schema_version=_SCHEMA_VERSION)
     migrated = run_pending_migrations(project)
     assert migrated is project
     assert migrated.schema_version == _SCHEMA_VERSION

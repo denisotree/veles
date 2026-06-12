@@ -85,7 +85,7 @@ def test_available_locales_includes_builtin_and_user(
 ):
     user_root = tmp_path / ".veles" / "locales"
     user_root.mkdir(parents=True)
-    (user_root / "de.toml").write_text("[x]\ny = \"z\"\n", encoding="utf-8")
+    (user_root / "de.toml").write_text('[x]\ny = "z"\n', encoding="utf-8")
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path))
     i18n.reset_for_tests()
     locales = i18n.available_locales()

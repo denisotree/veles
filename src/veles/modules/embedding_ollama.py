@@ -84,9 +84,7 @@ class OllamaEmbeddingAdapter:
                 raise EmbeddingError(f"ollama returned non-JSON: {exc}") from exc
             vec = data.get("embedding")
             if not isinstance(vec, list):
-                raise EmbeddingError(
-                    f"ollama embedding response missing 'embedding': {data}"
-                )
+                raise EmbeddingError(f"ollama embedding response missing 'embedding': {data}")
             floats = [float(x) for x in vec]
             if floats and self.dim != len(floats):
                 self.dim = len(floats)
@@ -104,7 +102,7 @@ def probe_ollama(host: str | None = None, *, timeout: float = 1.5) -> bool:
             return resp.status == 200
     except (urllib.error.URLError, OSError, TimeoutError):
         return False
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
 

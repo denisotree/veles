@@ -31,6 +31,7 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass
 
 from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
+from veles.core.providers import PROVIDER_VALUES as _PROVIDER_CHOICES
 from veles.core.user_config import (
     UserConfig,
     load_user_config,
@@ -39,7 +40,6 @@ from veles.core.user_config import (
 )
 
 _LANGUAGES: tuple[str, ...] = ("en", "ru")
-from veles.core.providers import PROVIDER_VALUES as _PROVIDER_CHOICES
 _BOOTSTRAP_COMMANDS: frozenset[str] = frozenset({"init", "import"})
 
 
@@ -188,7 +188,7 @@ def maybe_run_first_run_wizard(args: argparse.Namespace) -> None:
                     "\n<wizard cancelled; will retry next launch>",
                     file=sys.stderr,
                 )
-                args._wizard_user_chose_no_project = True  # noqa: SLF001
+                args._wizard_user_chose_no_project = True
                 return
             # Respect "No" on the final init-project question by
             # suppressing the project-wizard hook downstream AND telling
@@ -196,16 +196,16 @@ def maybe_run_first_run_wizard(args: argparse.Namespace) -> None:
             # exits 0 instead of printing the generic "no project" error.
             if raw.get("init_project_here") is False:
                 args.no_wizard = True
-                args._wizard_user_chose_no_project = True  # noqa: SLF001
+                args._wizard_user_chose_no_project = True
             elif raw.get("init_project_here") is True:
                 # Carry the answer into the project-wizard so its
                 # BootstrapStep skips the duplicate Initialize? confirm.
-                args._wizard_init_project_here = True  # noqa: SLF001
+                args._wizard_init_project_here = True
             return
         except ImportError:
             # Textual not available (degraded environment). Fall back.
             pass
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             print(
                 f"warning: TUI wizard failed ({type(exc).__name__}: {exc}); "
                 "falling back to stdin prompts.",
@@ -214,7 +214,7 @@ def maybe_run_first_run_wizard(args: argparse.Namespace) -> None:
         run_wizard()
     except KeyboardInterrupt:
         print("\n<wizard interrupted; will retry next launch>", file=sys.stderr)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(
             f"warning: first-run wizard failed: {type(exc).__name__}: {exc}",
             file=sys.stderr,

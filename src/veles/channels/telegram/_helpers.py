@@ -21,7 +21,9 @@ def _truncate(text: str) -> str:
 
 
 def _build_combined_prompt(
-    parts: list[str], attachments: list[Path], project_root: Path | None,
+    parts: list[str],
+    attachments: list[Path],
+    project_root: Path | None,
 ) -> str:
     """Slice the buffered messages into a single prompt the LLM gets.
 
@@ -45,11 +47,7 @@ def _build_combined_prompt(
         except ValueError:
             rels.append(p.name)
     listing = ", ".join(f"`{r}`" for r in rels)
-    return (
-        f"{body}\n\n"
-        f"[Attachments saved: {listing}. "
-        f"Read each via read_file() before answering.]"
-    )
+    return f"{body}\n\n[Attachments saved: {listing}. Read each via read_file() before answering.]"
 
 
 def _is_parse_error(exc: BaseException) -> bool:
@@ -65,8 +63,4 @@ def _html_to_plain(text: str) -> str:
     fallback send carries readable plain text instead of `&lt;b&gt;`
     visible to the user."""
     no_tags = _re.sub(r"<[^>]+>", "", text)
-    return (
-        no_tags.replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&amp;", "&")
-    )
+    return no_tags.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")

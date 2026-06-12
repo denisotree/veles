@@ -83,13 +83,13 @@ def paste_image(target: Path) -> bool:
             # The TID-eval pattern fails silently when the clipboard isn't an
             # image, so we measure success by the resulting file size.
             script = (
-                'try\n'
-                '  set pngData to (the clipboard as «class PNGf»)\n'
+                "try\n"
+                "  set pngData to (the clipboard as «class PNGf»)\n"
                 f'  set fd to open for access POSIX file "{target}" with write permission\n'
-                '  set eof of fd to 0\n'
-                '  write pngData to fd\n'
-                '  close access fd\n'
-                'end try'
+                "  set eof of fd to 0\n"
+                "  write pngData to fd\n"
+                "  close access fd\n"
+                "end try"
             )
             subprocess.run(
                 ["osascript", "-e", script],
@@ -135,9 +135,7 @@ def paste_image(target: Path) -> bool:
 
 def _run_stdin(cmd: list[str], text: str) -> bool:
     try:
-        proc = subprocess.run(
-            cmd, input=text, encoding="utf-8", check=False, timeout=5
-        )
+        proc = subprocess.run(cmd, input=text, encoding="utf-8", check=False, timeout=5)
         return proc.returncode == 0
     except (OSError, subprocess.SubprocessError):
         return False
@@ -145,9 +143,7 @@ def _run_stdin(cmd: list[str], text: str) -> bool:
 
 def _run_capture(cmd: list[str]) -> str | None:
     try:
-        proc = subprocess.run(
-            cmd, capture_output=True, encoding="utf-8", check=False, timeout=5
-        )
+        proc = subprocess.run(cmd, capture_output=True, encoding="utf-8", check=False, timeout=5)
         if proc.returncode != 0:
             return None
         return proc.stdout

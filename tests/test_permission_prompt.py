@@ -35,9 +35,7 @@ def test_body_renders_empty_args_as_none() -> None:
 
 def test_body_truncates_long_scalar_with_total_count() -> None:
     huge = "x" * 2500
-    body = format_prompt_body(
-        _req(arguments={"payload": huge}), max_value_chars=200
-    )
+    body = format_prompt_body(_req(arguments={"payload": huge}), max_value_chars=200)
     assert "x" * 200 in body
     assert "total 2500 chars" in body
     # the raw 2500-char value should NOT appear in full
@@ -45,9 +43,7 @@ def test_body_truncates_long_scalar_with_total_count() -> None:
 
 
 def test_body_renders_dict_value_as_pretty_json() -> None:
-    body = format_prompt_body(
-        _req(arguments={"opts": {"recursive": True, "limit": 5}})
-    )
+    body = format_prompt_body(_req(arguments={"opts": {"recursive": True, "limit": 5}}))
     # JSON dump uses double-quoted keys
     assert '"recursive": true' in body
     assert '"limit": 5' in body

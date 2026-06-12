@@ -20,7 +20,7 @@ class _RecordingApp:
         self.pushed: list[Any] = []
         self._answer = default_answer
 
-    async def push_screen_wait(self, screen):  # noqa: D401
+    async def push_screen_wait(self, screen):
         self.pushed.append(screen)
         return self._answer
 

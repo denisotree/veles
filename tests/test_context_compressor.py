@@ -320,7 +320,8 @@ def test_compressor_logs_skip_below_threshold(tmp_path, caplog) -> None:
     with caplog.at_level("INFO", logger="veles.core.context_compressor"):
         compressor(h, "sess-low")
     assert any(
-        "compressor skip" in r.message and "below-threshold" in r.message
+        "compressor skip" in r.message
+        and "below-threshold" in r.message
         and "sess-low" in r.message
         for r in caplog.records
     )
@@ -333,14 +334,11 @@ def test_compressor_logs_skip_when_no_safe_boundaries(tmp_path, caplog) -> None:
     cfg = CompressionConfig(threshold_tokens=10, head_keep=1, tail_keep=4)
     compressor = _make_compressor(project, cfg)
     # Long enough to trigger needs_compression but tail has no user role.
-    h = [_msg("system", "s" + "x" * 200)] + [
-        _msg("assistant", "a" + "x" * 200) for _ in range(10)
-    ]
+    h = [_msg("system", "s" + "x" * 200)] + [_msg("assistant", "a" + "x" * 200) for _ in range(10)]
     with caplog.at_level("INFO", logger="veles.core.context_compressor"):
         compressor(h, "sess-no-bounds")
     assert any(
-        "compressor skip" in r.message and "no-safe-boundaries" in r.message
-        for r in caplog.records
+        "compressor skip" in r.message and "no-safe-boundaries" in r.message for r in caplog.records
     )
 
 
@@ -372,25 +370,20 @@ def test_compressor_truncates_middle_when_too_large(tmp_path, caplog) -> None:
                     break
             return _ok("summary")
 
-    compressor = _make_compressor(
-        project, cfg, sub_provider=_SizeCapturingProvider()
-    )
+    compressor = _make_compressor(project, cfg, sub_provider=_SizeCapturingProvider())
     # 6 middle messages each ~200 chars → ~300 tokens of rendered, well
     # above the 20-token cap; we expect trimming to leave a much
     # smaller payload.
     h = (
         [_msg("system", "sys")]
-        + [
-            _msg("user" if i % 2 == 0 else "assistant", ("c" + str(i)) * 50)
-            for i in range(6)
-        ]
+        + [_msg("user" if i % 2 == 0 else "assistant", ("c" + str(i)) * 50) for i in range(6)]
         + [_msg("user", "u-final")]
     )
     with caplog.at_level("INFO", logger="veles.core.context_compressor"):
         compressor(h, "sess-trunc")
-    assert any(
-        "summariser-input-truncated" in r.message for r in caplog.records
-    ), "expected truncation log line"
+    assert any("summariser-input-truncated" in r.message for r in caplog.records), (
+        "expected truncation log line"
+    )
 
 
 def test_compressor_swallows_summariser_failure(tmp_path, caplog) -> None:
@@ -410,10 +403,7 @@ def test_compressor_swallows_summariser_failure(tmp_path, caplog) -> None:
     compressor = _make_compressor(project, cfg, sub_provider=_RaisingProvider())
     h = (
         [_msg("system", "sys")]
-        + [
-            _msg("user" if i % 2 == 0 else "assistant", f"turn-{i}")
-            for i in range(6)
-        ]
+        + [_msg("user" if i % 2 == 0 else "assistant", f"turn-{i}") for i in range(6)]
         + [_msg("user", "u-final")]
     )
     with caplog.at_level("WARNING", logger="veles.core.context_compressor"):
@@ -421,8 +411,7 @@ def test_compressor_swallows_summariser_failure(tmp_path, caplog) -> None:
     # Compressor returned a shorter history despite the failure.
     assert len(result) < len(h)
     assert any(
-        "summariser-failed" in r.message and "RuntimeError" in r.message
-        for r in caplog.records
+        "summariser-failed" in r.message and "RuntimeError" in r.message for r in caplog.records
     )
 
 
@@ -446,8 +435,7 @@ def test_compressor_logs_applied_summary(tmp_path, caplog) -> None:
     with caplog.at_level("INFO", logger="veles.core.context_compressor"):
         result = compressor(h, "sess-applied")
     assert any(
-        "compressor applied" in r.message and "sess-applied" in r.message
-        for r in caplog.records
+        "compressor applied" in r.message and "sess-applied" in r.message for r in caplog.records
     )
     assert len(result) < len(h)
 
@@ -495,8 +483,7 @@ def test_agent_emergency_truncates_when_compressor_left_too_much(
         return history  # compressor that does nothing
 
     big_history = [_msg("system", "sys")] + [
-        _msg("user" if i % 2 == 0 else "assistant", "x" * 400)
-        for i in range(20)
+        _msg("user" if i % 2 == 0 else "assistant", "x" * 400) for i in range(20)
     ]
 
     # Pre-populate the store so Agent loads `big_history` as resumption.
@@ -522,7 +509,5 @@ def test_agent_emergency_truncates_when_compressor_left_too_much(
     assert estimate_tokens(seen) <= 500
     # Emergency banner present.
     assert any(
-        "[CONTEXT-EMERGENCY-TRUNCATED]" in (m.content or "")
-        for m in seen
-        if m.role == "system"
+        "[CONTEXT-EMERGENCY-TRUNCATED]" in (m.content or "") for m in seen if m.role == "system"
     )

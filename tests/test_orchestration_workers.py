@@ -19,7 +19,6 @@ from veles.core.orchestration import (
     spawn,
 )
 
-
 # ---- stub Agent ----
 
 
@@ -102,14 +101,12 @@ def test_spawn_parallel_propagates_caller_context_to_workers() -> None:
             seen.append(b.limit if b is not None else None)
             return _FakeResult(text="ok")
 
-    def factory(**kwargs):  # noqa: ANN003
+    def factory(**kwargs):
         return _CtxAgent()
 
     token = set_budget(TokenBudget(limit=12345))
     try:
-        spawn_parallel(
-            [("explorer", "a"), ("explorer", "b")], agent_factory=factory
-        )
+        spawn_parallel([("explorer", "a"), ("explorer", "b")], agent_factory=factory)
     finally:
         reset_budget(token)
 
@@ -254,9 +251,7 @@ def test_mini_report_writes_insight_row(conn) -> None:
         challenges="evidence was thin in one corner",
     )
     assert rid > 0
-    row = conn.execute(
-        "SELECT title, body, category FROM insights WHERE id = ?", (rid,)
-    ).fetchone()
+    row = conn.execute("SELECT title, body, category FROM insights WHERE id = ?", (rid,)).fetchone()
     assert "solve X" in row["title"]
     assert "What was done" in row["body"]
     assert "Why this decomposition" in row["body"]
@@ -271,9 +266,7 @@ def test_mini_report_omits_challenges_when_empty(conn) -> None:
         what_was_done="single writer turn",
         why_this_decomposition="trivial decomposition",
     )
-    row = conn.execute(
-        "SELECT body FROM insights WHERE id = ?", (rid,)
-    ).fetchone()
+    row = conn.execute("SELECT body FROM insights WHERE id = ?", (rid,)).fetchone()
     assert "Challenges" not in row["body"]
 
 
@@ -387,6 +380,7 @@ def test_spawn_parallel_runs_concurrently() -> None:
     """Wall time for N slow workers in a pool of N should be roughly
     the slowest worker, not their sum."""
     import time as _time
+
     from veles.core.orchestration import WorkerSpec, spawn_parallel
 
     class _SlowAgent:
@@ -400,10 +394,7 @@ def test_spawn_parallel_runs_concurrently() -> None:
     def factory(**_kwargs):
         return _SlowAgent()
 
-    specs = [
-        WorkerSpec(role="explorer", prompt=f"task-{i}")
-        for i in range(5)
-    ]
+    specs = [WorkerSpec(role="explorer", prompt=f"task-{i}") for i in range(5)]
     t0 = _time.monotonic()
     handles = spawn_parallel(specs, agent_factory=factory)
     elapsed = _time.monotonic() - t0
@@ -417,6 +408,7 @@ def test_spawn_parallel_runs_concurrently() -> None:
 def test_spawn_parallel_respects_max_concurrent_cap() -> None:
     """When pool size is bounded, two workers run, then two more."""
     import time as _time
+
     from veles.core.orchestration import WorkerSpec, spawn_parallel
 
     class _SlowAgent:

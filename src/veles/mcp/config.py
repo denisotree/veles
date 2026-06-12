@@ -197,9 +197,7 @@ def load_disabled_tools(project: Project) -> dict[str, list[str]]:
         if isinstance(tools, list):
             out[str(server)] = [str(t) for t in tools]
         else:
-            logger.warning(
-                "MCP disabled_tools for %r must be a list; ignoring %r", server, tools
-            )
+            logger.warning("MCP disabled_tools for %r must be a list; ignoring %r", server, tools)
     return out
 
 

@@ -23,7 +23,6 @@ from veles.core.goal import (
     resume,
 )
 
-
 # ---------- create / read ----------
 
 

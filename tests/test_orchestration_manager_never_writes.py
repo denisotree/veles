@@ -23,9 +23,7 @@ def _stub_provider() -> StubProvider:
             ProviderResponse(
                 text="should never be reached",
                 tool_calls=[],
-                usage=TokenUsage(
-                    prompt_tokens=1, completion_tokens=1, total_tokens=2
-                ),
+                usage=TokenUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
                 finish_reason="stop",
             )
         ],

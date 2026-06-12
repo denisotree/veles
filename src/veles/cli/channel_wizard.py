@@ -88,9 +88,7 @@ def add_channel(
         print("error: no channel platforms registered.")
         return 1
     if channel is None:
-        channel = _ask_choice(
-            ask, "Channel type", platforms, default=platforms[0]
-        )
+        channel = _ask_choice(ask, "Channel type", platforms, default=platforms[0])
     try:
         entry = get_platform(channel)
     except KeyError as exc:
@@ -110,7 +108,8 @@ def add_channel(
     where = f"[daemon.{session}.channels.{channel}]" if session else f"[channels.{channel}]"
     scope = f"daemon session {session!r}" if session else "the default daemon"
     print(f"added {channel} channel to {scope} ({where} in config.toml).")
-    print("Restart the daemon to pick it up: `veles daemon restart" + (f" --name {session}`" if session else "`"))
+    suffix = f" --name {session}`" if session else "`"
+    print("Restart the daemon to pick it up: `veles daemon restart" + suffix)
     return 0
 
 

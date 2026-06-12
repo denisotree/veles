@@ -26,10 +26,34 @@ _TEXTUAL_MIME_LITERALS = frozenset(
 )
 _TEXTUAL_EXTENSIONS = frozenset(
     {
-        ".md", ".txt", ".rst", ".json", ".yaml", ".yml", ".toml",
-        ".csv", ".tsv", ".py", ".js", ".ts", ".go", ".rs", ".java",
-        ".c", ".cpp", ".h", ".sh", ".sql", ".html", ".css", ".xml",
-        ".ini", ".env", ".log", ".diff", ".patch",
+        ".md",
+        ".txt",
+        ".rst",
+        ".json",
+        ".yaml",
+        ".yml",
+        ".toml",
+        ".csv",
+        ".tsv",
+        ".py",
+        ".js",
+        ".ts",
+        ".go",
+        ".rs",
+        ".java",
+        ".c",
+        ".cpp",
+        ".h",
+        ".sh",
+        ".sql",
+        ".html",
+        ".css",
+        ".xml",
+        ".ini",
+        ".env",
+        ".log",
+        ".diff",
+        ".patch",
     }
 )
 _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
@@ -48,9 +72,7 @@ def _is_textual(name: str, mime: str) -> bool:
 def _reject_reason(name: str, mime: str, size: int) -> str | None:
     if size > _MAX_ATTACHMENT_BYTES:
         kb = size // 1024
-        return (
-            f"📎 File larger than 5 MB ({kb} KB) — refused."
-        )
+        return f"📎 File larger than 5 MB ({kb} KB) — refused."
     if not _is_textual(name, mime):
         safe = escape_html(name or "file")
         mime_disp = escape_html(mime) if mime else "unknown"

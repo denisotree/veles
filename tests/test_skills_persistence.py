@@ -18,7 +18,6 @@ from veles.core.skills_persistence import (
     upsert_skill,
 )
 
-
 # ---- helpers ----
 
 
@@ -237,9 +236,7 @@ def test_resolve_chain_three_deep() -> None:
     root = _skill("root", tools=["r"], body="root body")
     mid = _skill("mid", tools=["m"], body="mid body", extends="root")
     leaf = _skill("leaf", tools=["l"], body="leaf body", extends="mid")
-    merged = resolve_inheritance(
-        leaf, by_name={"root": root, "mid": mid, "leaf": leaf}
-    )
+    merged = resolve_inheritance(leaf, by_name={"root": root, "mid": mid, "leaf": leaf})
     # Tools accumulate root → mid → leaf order
     assert merged.tools == ["r", "m", "l"]
     # Body flows root → mid → leaf

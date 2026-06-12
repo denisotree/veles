@@ -174,9 +174,7 @@ async def test_permission_breadcrumbs_appear_when_expanded():
             )
         )
         insp.notify_event(
-            ApprovalResult(
-                ts=now_iso(), session_id=None, action="dispatch x", status="approved"
-            )
+            ApprovalResult(ts=now_iso(), session_id=None, action="dispatch x", status="approved")
         )
         await pilot.pause()
         rows = "\n".join(insp.activity_log)
@@ -337,15 +335,15 @@ async def test_errors_persist_across_turn_reset():
         assert any("sticky" in row for row in insp.activity_log)
 
 
-async def test_seed_errors_from_events_log_on_mount(
-    tmp_project, agent_factory_for, text_response
-):
+async def test_seed_errors_from_events_log_on_mount(tmp_project, agent_factory_for, text_response):
     """M132: the App reads recent ErrorEvents from the persisted
     events.jsonl on mount, so a failure from a previous session is shown
     after a restart. Exercises the real read→reconstruct→seed path in
     `TuiApp._seed_inspector_errors`, not just `Inspector.seed_errors`."""
     from veles.core.events import (
         ErrorEvent as _ErrorEvent,
+    )
+    from veles.core.events import (
         EventWriter,
         events_path_for_project,
         now_iso,

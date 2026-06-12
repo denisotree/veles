@@ -48,7 +48,7 @@ def spawn_daemon(
     if name:
         cmd += ["--name", name]
     try:
-        return subprocess.Popen(  # noqa: S603
+        return subprocess.Popen(
             cmd,
             cwd=str(project_root),
             stdout=subprocess.DEVNULL,

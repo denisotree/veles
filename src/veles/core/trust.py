@@ -162,9 +162,7 @@ _DECISION_TO_CHOICE = {
 }
 
 
-def _ask_user(
-    tool_name: str, arguments: dict[str, Any], reason: str
-) -> TrustChoice:
+def _ask_user(tool_name: str, arguments: dict[str, Any], reason: str) -> TrustChoice:
     """Resolve the user-prompt step of `evaluate_trust`.
 
     Uses the unified Prompter (PromptRequest → PromptAnswer) if one is

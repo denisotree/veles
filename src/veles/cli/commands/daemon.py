@@ -97,18 +97,6 @@ from veles.daemon.logging import setup_daemon_logging as _setup_daemon_logging  
 from veles.daemon.paths import (  # noqa: F401 (re-export)
     daemon_log_path,
 )
-from veles.daemon.paths import (
-    info_path as _info_path,
-)
-from veles.daemon.paths import (
-    instance_info_path as _instance_info_path,
-)
-from veles.daemon.paths import (
-    instance_pid_path as _instance_pid_path,
-)
-from veles.daemon.paths import (
-    pid_path as _pid_path,
-)
 
 
 def cmd_daemon(args: argparse.Namespace) -> int:
@@ -157,7 +145,7 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
         # double-start.
         from veles.cli.project_wizard import maybe_run_project_wizard
 
-        args._suppress_wizard_daemon_autostart = True  # noqa: SLF001
+        args._suppress_wizard_daemon_autostart = True
         project = maybe_run_project_wizard(args, Path.cwd())
     if project is None:
         if getattr(args, "_wizard_user_chose_no_project", False):
@@ -397,9 +385,7 @@ def _cmd_daemon_list(args: argparse.Namespace) -> int:
             up_s = f"{up / 3600:.1f}h"
         else:
             up_s = f"{up / 86400:.1f}d"
-        rows.append(
-            (entry.slug, entry.project_path, str(entry.port), str(entry.pid), st, up_s)
-        )
+        rows.append((entry.slug, entry.project_path, str(entry.port), str(entry.pid), st, up_s))
     widths = [max(len(str(r[c])) for r in rows) for c in range(len(rows[0]))]
     for row in rows:
         print("  ".join(str(c).ljust(widths[i]) for i, c in enumerate(row)))
@@ -456,7 +442,7 @@ def _cmd_daemon_restart(args: argparse.Namespace) -> int:
         str(entry.port),
     ]
     try:
-        proc = subprocess.Popen(  # noqa: S603
+        proc = subprocess.Popen(
             cmd,
             cwd=entry.project_path,
             stdout=subprocess.DEVNULL,
@@ -520,8 +506,7 @@ def _resolve_target_slug(args: argparse.Namespace) -> str | None:
     slug = getattr(args, "target", None) or getattr(args, "name", None)
     if not slug:
         print(
-            "error: this command needs a daemon id or name. "
-            "See `veles daemon list`.",
+            "error: this command needs a daemon id or name. See `veles daemon list`.",
             file=sys.stderr,
         )
         return None

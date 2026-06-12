@@ -91,4 +91,4 @@ def truncate_for_log(text: object, cap: int = DEFAULT_TRUNCATE_CHARS) -> str:
     return f"{s[:cap]}… (truncated, {len(s)} chars total)"
 
 
-__all__ = ["setup_daemon_logging", "truncate_for_log", "DEFAULT_TRUNCATE_CHARS"]
+__all__ = ["DEFAULT_TRUNCATE_CHARS", "setup_daemon_logging", "truncate_for_log"]

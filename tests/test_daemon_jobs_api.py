@@ -23,7 +23,7 @@ from veles.daemon.auth import TokenStore
 from veles.daemon.server import build_state, make_app
 
 
-def _StubProvider() -> StubProvider:
+def _stub_provider() -> StubProvider:
     resp = ProviderResponse(
         text="ok",
         tool_calls=[],
@@ -45,7 +45,7 @@ def _make_stub_factory(store: SessionStore):
     def factory(session_id: str | None):
         sid = session_id or store.create_session()
         return Agent(
-            provider=_StubProvider(),
+            provider=_stub_provider(),
             registry=Registry(),
             model="stub-model",
             max_iterations=1,
@@ -140,9 +140,7 @@ async def test_get_jobs_lists(aiohttp_client, app, good_token: str) -> None:
         json={"name": "t", "prompt": "x", "schedule": "1h"},
         headers={"Authorization": f"Bearer {good_token}"},
     )
-    resp = await client.get(
-        "/v1/jobs", headers={"Authorization": f"Bearer {good_token}"}
-    )
+    resp = await client.get("/v1/jobs", headers={"Authorization": f"Bearer {good_token}"})
     assert resp.status == 200
     body = await resp.json()
     assert len(body["jobs"]) == 1

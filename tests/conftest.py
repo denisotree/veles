@@ -51,15 +51,17 @@ class StubProvider:
         self.name = name
         self.supports_tools = supports_tools
         self.supports_streaming = supports_streaming
-        self.stream_events = (
-            list(stream_events) if stream_events is not None else None
-        )
+        self.stream_events = list(stream_events) if stream_events is not None else None
         self.repeat_last = repeat_last
         self.calls: list[dict[str, Any]] = []
         self._idx = 0
 
     def create_message(
-        self, messages=None, tools=None, *, model: str = "stub-model",
+        self,
+        messages=None,
+        tools=None,
+        *,
+        model: str = "stub-model",
         max_tokens: int = 4096,
     ):
         # Snapshot: the agent mutates its history list in place between calls.
@@ -84,7 +86,11 @@ class StubProvider:
         return resp
 
     def stream_message(
-        self, messages=None, tools=None, *, model: str = "stub-model",
+        self,
+        messages=None,
+        tools=None,
+        *,
+        model: str = "stub-model",
         max_tokens: int = 4096,
     ):
         if self.stream_events is None:
@@ -231,9 +237,7 @@ def fake_keyring(monkeypatch: pytest.MonkeyPatch) -> FakeKeyring:
 
 
 @pytest.fixture
-def isolated_user_home(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> Iterator[Path]:
+def isolated_user_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     """Point `VELES_USER_HOME` at a fresh temp dir and clear provider
     env vars so tests don't inherit a real user's key from the shell.
 

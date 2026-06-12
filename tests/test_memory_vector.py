@@ -16,6 +16,7 @@ import pytest
 from veles.core.memory import SessionStore
 from veles.core.memory.vector import (
     EmbeddingHit,
+    _reset_backend_cache,
     available_backend,
     delete_embedding,
     ensure_embeddings_table,
@@ -24,7 +25,6 @@ from veles.core.memory.vector import (
     migrate_legacy_skill_embeddings,
     upsert_embedding,
 )
-from veles.core.memory.vector import _reset_backend_cache
 
 
 @pytest.fixture()
@@ -244,9 +244,7 @@ def test_numpy_backend_smoke(conn, monkeypatch) -> None:
     assert hits[0].ref_id == 1
 
 
-@pytest.mark.skipif(
-    not _has_module("sqlite_vec"), reason="sqlite_vec not installed"
-)
+@pytest.mark.skipif(not _has_module("sqlite_vec"), reason="sqlite_vec not installed")
 def test_sqlite_vec_backend_smoke(conn, monkeypatch) -> None:
     import veles.core.memory.vector as mv
 

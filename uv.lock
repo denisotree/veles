@@ -1509,7 +1509,7 @@ dev = [
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-aiohttp", specifier = ">=1.0" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
-    { name = "ruff", specifier = ">=0.6" },
+    { name = "ruff", specifier = ">=0.15.12,<0.16" },
 ]
 
 [[package]]

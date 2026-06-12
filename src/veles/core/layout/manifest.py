@@ -144,32 +144,22 @@ def read_manifest(path: Path) -> LayoutManifest:
 
     layout_section = data.get("layout")
     if not isinstance(layout_section, dict):
-        raise LayoutManifestError(
-            "layout.toml must contain a [layout] section", path=toml_path
-        )
+        raise LayoutManifestError("layout.toml must contain a [layout] section", path=toml_path)
 
     name = layout_section.get("name")
     if not isinstance(name, str) or not name.strip():
-        raise LayoutManifestError(
-            "[layout].name must be a non-empty string", path=toml_path
-        )
+        raise LayoutManifestError("[layout].name must be a non-empty string", path=toml_path)
 
     description = layout_section.get("description", "")
     if not isinstance(description, str):
-        raise LayoutManifestError(
-            "[layout].description must be a string", path=toml_path
-        )
+        raise LayoutManifestError("[layout].description must be a string", path=toml_path)
 
     version = layout_section.get("version", "0.0")
     if not isinstance(version, (str, int, float)):
-        raise LayoutManifestError(
-            "[layout].version must be a string", path=toml_path
-        )
+        raise LayoutManifestError("[layout].version must be a string", path=toml_path)
 
     context_file = layout_section.get("context_file")
-    if context_file is not None and (
-        not isinstance(context_file, str) or not context_file.strip()
-    ):
+    if context_file is not None and (not isinstance(context_file, str) or not context_file.strip()):
         raise LayoutManifestError(
             "[layout].context_file must be a non-empty string", path=toml_path
         )
@@ -197,27 +187,19 @@ def read_manifest(path: Path) -> LayoutManifest:
 
 def _parse_engines(raw: object, toml_path: Path) -> tuple[str, ...]:
     if not isinstance(raw, dict):
-        raise LayoutManifestError(
-            "[layout.engines] must be a table of booleans", path=toml_path
-        )
+        raise LayoutManifestError("[layout.engines] must be a table of booleans", path=toml_path)
     out: list[str] = []
     for key, value in raw.items():
         if not isinstance(value, bool):
-            raise LayoutManifestError(
-                f"[layout.engines].{key} must be a boolean", path=toml_path
-            )
+            raise LayoutManifestError(f"[layout.engines].{key} must be a boolean", path=toml_path)
         if value:
             out.append(str(key))
     return tuple(sorted(out))
 
 
-def _parse_scaffold(
-    raw: object, toml_path: Path
-) -> tuple[tuple[str, ...], str | None]:
+def _parse_scaffold(raw: object, toml_path: Path) -> tuple[tuple[str, ...], str | None]:
     if not isinstance(raw, dict):
-        raise LayoutManifestError(
-            "[layout.scaffold] must be a table", path=toml_path
-        )
+        raise LayoutManifestError("[layout.scaffold] must be a table", path=toml_path)
     dirs_raw = raw.get("dirs", [])
     if not isinstance(dirs_raw, list) or not all(
         isinstance(d, str) and d.strip() for d in dirs_raw
@@ -251,9 +233,7 @@ def _parse_scaffold(
     return tuple(dirs), template
 
 
-def _parse_zones(
-    raw: object, toml_path: Path
-) -> tuple[LayoutWritableZone, ...]:
+def _parse_zones(raw: object, toml_path: Path) -> tuple[LayoutWritableZone, ...]:
     if not isinstance(raw, list):
         raise LayoutManifestError(
             "[[layout.writable_zones]] must be a list of tables", path=toml_path
@@ -261,9 +241,7 @@ def _parse_zones(
     out: list[LayoutWritableZone] = []
     for i, entry in enumerate(raw):
         if not isinstance(entry, dict):
-            raise LayoutManifestError(
-                f"layout.writable_zones[{i}] must be a table", path=toml_path
-            )
+            raise LayoutManifestError(f"layout.writable_zones[{i}] must be a table", path=toml_path)
         path_value = entry.get("path")
         if not isinstance(path_value, str) or not path_value.strip():
             raise LayoutManifestError(
@@ -292,20 +270,14 @@ def _parse_zones(
     return tuple(out)
 
 
-def _parse_operations(
-    raw: object, toml_path: Path
-) -> tuple[LayoutOperation, ...]:
+def _parse_operations(raw: object, toml_path: Path) -> tuple[LayoutOperation, ...]:
     if not isinstance(raw, list):
-        raise LayoutManifestError(
-            "[[layout.operations]] must be a list of tables", path=toml_path
-        )
+        raise LayoutManifestError("[[layout.operations]] must be a list of tables", path=toml_path)
     out: list[LayoutOperation] = []
     seen: set[str] = set()
     for i, entry in enumerate(raw):
         if not isinstance(entry, dict):
-            raise LayoutManifestError(
-                f"layout.operations[{i}] must be a table", path=toml_path
-            )
+            raise LayoutManifestError(f"layout.operations[{i}] must be a table", path=toml_path)
         name = entry.get("name")
         if not isinstance(name, str) or not name.strip():
             raise LayoutManifestError(

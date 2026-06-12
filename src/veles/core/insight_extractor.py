@@ -34,6 +34,7 @@ lesson than crash on a follow-up.
 
 from __future__ import annotations
 
+import contextlib
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -330,9 +331,7 @@ def make_insight_extractor(
             return None
         return _parse_extractor_output(result.text or "")
 
-    def _persist_one(
-        *, prompt: str, snippet: str, slug_id: str, trigger_label: str
-    ) -> int:
+    def _persist_one(*, prompt: str, snippet: str, slug_id: str, trigger_label: str) -> int:
         """Run one extractor pass and persist the result. Returns 1 on success, 0 otherwise."""
         parsed = _extract_one(prompt, snippet)
         if parsed is None:
@@ -341,19 +340,15 @@ def make_insight_extractor(
         title = slug.replace("-", " ").title()
         # SQL row is canonical — a db failure means the insight is NOT
         # persisted (no orphaned markdown that recall can't see).
-        rid = save_insight_row(
-            title=title, body=body, category=trigger_label, project=project
-        )
+        rid = save_insight_row(title=title, body=body, category=trigger_label, project=project)
         if rid == 0:
             return 0
-        try:
+        with contextlib.suppress(Exception):
             append_memory_log(
                 project,
                 op="insight",
                 summary=f"{trigger_label}: session {slug_id} -> insight #{rid}",
             )
-        except Exception:
-            pass
         return 1
 
     def _extract(history: list[Message], session_id: str | None) -> int:

@@ -17,7 +17,6 @@ from veles.core.trace import (
     trace_path_for_project,
 )
 
-
 # ---------- hashing ----------
 
 
@@ -186,8 +185,7 @@ def test_alert_silent_on_short_history() -> None:
 
 def test_alert_silent_on_changing_system_prompt() -> None:
     records = [
-        {"system_prompt_hash": hash_text(f"prompt-{i}"), "cache_read_tokens": 0}
-        for i in range(5)
+        {"system_prompt_hash": hash_text(f"prompt-{i}"), "cache_read_tokens": 0} for i in range(5)
     ]
     assert cache_fragmentation_alert(records, min_streak=5) is None
 
@@ -208,10 +206,9 @@ def test_alert_considers_only_trailing_window() -> None:
     h_old = hash_text("old")
     h_new = hash_text("new")
     # Older mixed history, but the last 5 are uniform-fragmenting.
-    records = (
-        [{"system_prompt_hash": h_old, "cache_read_tokens": 100}]
-        + [{"system_prompt_hash": h_new, "cache_read_tokens": 0} for _ in range(5)]
-    )
+    records = [{"system_prompt_hash": h_old, "cache_read_tokens": 100}] + [
+        {"system_prompt_hash": h_new, "cache_read_tokens": 0} for _ in range(5)
+    ]
     alert = cache_fragmentation_alert(records, min_streak=5)
     assert alert is not None
     assert alert["system_prompt_hash"] == h_new

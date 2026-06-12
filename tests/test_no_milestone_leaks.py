@@ -91,11 +91,7 @@ def _scan_toml(path: Path) -> list[tuple[int, str]]:
 )
 def test_user_facing_python_strings_have_no_milestone_leaks(rel_path: str) -> None:
     target = _REPO_ROOT / rel_path
-    files = (
-        sorted(target.rglob("*.py"))
-        if target.is_dir()
-        else [target]
-    )
+    files = sorted(target.rglob("*.py")) if target.is_dir() else [target]
     leaks: list[str] = []
     for f in files:
         for lineno, lit in _scan_python(f):

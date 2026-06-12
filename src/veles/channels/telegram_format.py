@@ -39,11 +39,7 @@ def escape_html(text: str) -> str:
     we emit ourselves."""
     if not text:
         return text
-    return (
-        text.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    )
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _escape_href(url: str) -> str:
@@ -128,7 +124,7 @@ def html_safe_truncate(html: str, limit: int = _TELEGRAM_LIMIT) -> str:
 class _TelegramRenderer:
     """Walks markdown-it tokens, emits Telegram-allowed HTML."""
 
-    __slots__ = ("_out", "_list_stack")
+    __slots__ = ("_list_stack", "_out")
 
     def __init__(self) -> None:
         self._out: list[str] = []
@@ -247,12 +243,14 @@ class _TelegramRenderer:
 def _open(tag: str):
     def _fn(self: _TelegramRenderer, tok: Token) -> None:
         self._out.append(f"<{tag}>")
+
     return _fn
 
 
 def _close(tag: str):
     def _fn(self: _TelegramRenderer, tok: Token) -> None:
         self._out.append(f"</{tag}>")
+
     return _fn
 
 

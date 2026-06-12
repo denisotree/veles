@@ -72,9 +72,7 @@ def test_fresh_session_injects_agents_md(tmp_path: Path, monkeypatch) -> None:
         reset_active_project(token)
 
 
-def test_daemon_system_prompt_isolates_subproject(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_daemon_system_prompt_isolates_subproject(tmp_path: Path, monkeypatch) -> None:
     """Mind Palace bug: the channel-run system prompt must not leak
 
     1. other subprojects' proposals,

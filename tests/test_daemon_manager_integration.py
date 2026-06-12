@@ -36,7 +36,7 @@ def _stub_agent_factory(store: SessionStore):
         supports_tools = False
         supports_streaming = True
 
-        def create_message(self, *a, **kw):  # noqa: ARG002
+        def create_message(self, *a, **kw):
             from veles.core.provider import ProviderResponse, TokenUsage
 
             return ProviderResponse(
@@ -46,7 +46,7 @@ def _stub_agent_factory(store: SessionStore):
                 finish_reason="stop",
             )
 
-        def stream_message(self, *a, **kw):  # noqa: ARG002
+        def stream_message(self, *a, **kw):
             from veles.core.provider import (
                 ProviderResponse,
                 StreamEnd,
@@ -64,7 +64,7 @@ def _stub_agent_factory(store: SessionStore):
                 )
             )
 
-    def factory(session_id: str | None, *, prompt: str | None = None):  # noqa: ARG001
+    def factory(session_id: str | None, *, prompt: str | None = None):
         sid = session_id or store.create_session()
         return Agent(
             provider=_NoopProvider(),
@@ -117,7 +117,7 @@ def _make_app_with_manager(
         agent_factory=agent_factory,
     )
 
-    def worker_factory(**kwargs):  # noqa: ARG001
+    def worker_factory(**kwargs):
         # Workers never actually run — decompose_and_run is patched.
         return MagicMock()
 
@@ -166,13 +166,11 @@ async def test_short_prompt_bypasses_manager(
     monkeypatch.delenv("VELES_MANAGER_MODE", raising=False)
     called = {"manager": False}
 
-    def fake_decompose(*a, **kw):  # noqa: ARG001
+    def fake_decompose(*a, **kw):
         called["manager"] = True
         raise AssertionError("manager path should not fire for short prompt")
 
-    monkeypatch.setattr(
-        "veles.core.orchestration.decompose_and_run", fake_decompose
-    )
+    monkeypatch.setattr("veles.core.orchestration.decompose_and_run", fake_decompose)
 
     app = _make_app_with_manager(project, store, token_store, manager_result=None)
     client = await aiohttp_client(app)
@@ -244,9 +242,7 @@ async def test_research_prompt_routes_through_manager_and_emits_plan(
     body = await resp.json()
     run_id = body["run_id"]
 
-    async with client.ws_connect(
-        f"/v1/runs/{run_id}/events", headers=headers
-    ) as ws:
+    async with client.ws_connect(f"/v1/runs/{run_id}/events", headers=headers) as ws:
         events = await _drain_events(ws)
 
     types = [e["type"] for e in events]
@@ -303,9 +299,7 @@ async def test_manager_error_marks_run_failed(
     body = await resp.json()
     run_id = body["run_id"]
 
-    async with client.ws_connect(
-        f"/v1/runs/{run_id}/events", headers=headers
-    ) as ws:
+    async with client.ws_connect(f"/v1/runs/{run_id}/events", headers=headers) as ws:
         events = await _drain_events(ws)
 
     types = [e["type"] for e in events]
@@ -328,7 +322,7 @@ async def test_kill_switch_disables_manager_even_for_long_prompt(
     runs through the direct agent factory."""
     monkeypatch.setenv("VELES_MANAGER_MODE", "0")
 
-    def boom(*a, **kw):  # noqa: ARG001
+    def boom(*a, **kw):
         raise AssertionError("decompose_and_run should not be invoked")
 
     monkeypatch.setattr("veles.core.orchestration.decompose_and_run", boom)
@@ -366,7 +360,7 @@ async def test_missing_worker_factory_bypasses_manager(
     runs as before."""
     monkeypatch.delenv("VELES_MANAGER_MODE", raising=False)
 
-    def boom(*a, **kw):  # noqa: ARG001
+    def boom(*a, **kw):
         raise AssertionError("decompose_and_run should not be invoked")
 
     monkeypatch.setattr("veles.core.orchestration.decompose_and_run", boom)

@@ -146,9 +146,7 @@ def test_read_file_rejects_user_root_registry(
         reset_active_project(token)
 
 
-def test_read_file_allows_user_root_skills(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_read_file_allows_user_root_skills(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Counterpart: a global skill under `~/.veles/skills/` is reachable
     from any project (VISION §8)."""
     monkeypatch.delenv("VELES_SANDBOX_ROOTS", raising=False)

@@ -243,7 +243,7 @@ class JobsStore:
         if "enabled" in fields:
             fields["enabled"] = 1 if fields["enabled"] else 0
         setters = ", ".join(f"{k}=?" for k in fields)
-        values = list(fields.values()) + [job_id]
+        values = [*list(fields.values()), job_id]
         with self._tx():
             cur = self._conn.execute(f"UPDATE jobs SET {setters} WHERE id=?", values)
         return cur.rowcount > 0
@@ -256,9 +256,7 @@ class JobsStore:
     def trigger_job(self, job_id: str, *, now: float | None = None) -> bool:
         """Force next_run_at to `now` so the runner picks it up on next tick."""
         at = now if now is not None else time.time()
-        return self.update_job(
-            job_id, next_run_at=at, state="scheduled", enabled=True
-        )
+        return self.update_job(job_id, next_run_at=at, state="scheduled", enabled=True)
 
     # ---- run lifecycle ----
 

@@ -15,7 +15,6 @@ from veles.core.memory.providers.honcho import HonchoMemoryProvider
 from veles.core.memory.providers.mem0 import Mem0MemoryProvider
 from veles.core.memory.providers.supermemory import SupermemoryProvider
 
-
 # ---------- Honcho adapter ----------
 
 
@@ -34,7 +33,12 @@ def test_honcho_recall_returns_hits(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_honcho(
         monkeypatch,
         [
-            {"id": "m1", "title": "Last conversation", "content": "agent discussed X", "score": 0.9},
+            {
+                "id": "m1",
+                "title": "Last conversation",
+                "content": "agent discussed X",
+                "score": 0.9,
+            },
             {"id": "m2", "text": "earlier note", "score": 0.5},
         ],
     )
@@ -74,9 +78,7 @@ def test_honcho_network_error_returns_empty(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_honcho_long_content_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
-    _install_fake_honcho(
-        monkeypatch, [{"id": "m1", "content": "x" * 1000}]
-    )
+    _install_fake_honcho(monkeypatch, [{"id": "m1", "content": "x" * 1000}])
     p = HonchoMemoryProvider(api_key="k", app_id="a", user_id="u")
     hits = p.recall("q", limit=1)
     assert len(hits[0].summary) <= 200

@@ -61,7 +61,9 @@ Requirements:
 """
 
 
-def _run_sub_agent(system_prompt: str, user_prompt: str, *, provider: str, model: str, max_tokens: int) -> str:
+def _run_sub_agent(
+    system_prompt: str, user_prompt: str, *, provider: str, model: str, max_tokens: int
+) -> str:
     """Spawn a tool-less, max-iter-1 Agent and return its text response.
 
     Module-level so tests can monkeypatch it without patching the Agent class.

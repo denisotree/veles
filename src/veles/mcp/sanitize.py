@@ -86,9 +86,7 @@ def _sanitize_property(value: Any) -> dict[str, Any]:
         elif key == "enum":
             if isinstance(item, list):
                 out[key] = [
-                    sanitize_text(v, limit=MAX_PARAM_NAME_CHARS)
-                    if isinstance(v, str)
-                    else v
+                    sanitize_text(v, limit=MAX_PARAM_NAME_CHARS) if isinstance(v, str) else v
                     for v in item[:MAX_PARAMS_PER_TOOL]
                 ]
         elif key == "items":

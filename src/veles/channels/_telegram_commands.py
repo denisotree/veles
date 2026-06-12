@@ -36,6 +36,7 @@ What's deferred (M116.next sub-tasks):
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
@@ -48,7 +49,7 @@ if TYPE_CHECKING:
 CommandHandler = Callable[["TelegramGateway", str, str], Awaitable[str]]
 
 
-async def _cmd_help(gateway: "TelegramGateway", chat_key: str, args: str) -> str:
+async def _cmd_help(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     del gateway, chat_key, args
     return (
         "<b>Veles bot — commands</b>\n\n"
@@ -68,7 +69,7 @@ async def _cmd_help(gateway: "TelegramGateway", chat_key: str, args: str) -> str
     )
 
 
-async def _cmd_session(gateway: "TelegramGateway", chat_key: str, args: str) -> str:
+async def _cmd_session(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     del args
     sid = gateway.session_map.get(chat_key)
     if sid:
@@ -76,15 +77,11 @@ async def _cmd_session(gateway: "TelegramGateway", chat_key: str, args: str) -> 
     return "session: <i>none yet</i> — send a message to start one"
 
 
-async def _cmd_status(gateway: "TelegramGateway", chat_key: str, args: str) -> str:
+async def _cmd_status(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     del args
     sid = gateway.session_map.get(chat_key) or "—"
     proj = str(gateway.project_root) if gateway.project_root is not None else "—"
-    wl = (
-        f"{len(gateway.whitelist)} entries"
-        if gateway.whitelist
-        else "open (no whitelist)"
-    )
+    wl = f"{len(gateway.whitelist)} entries" if gateway.whitelist else "open (no whitelist)"
     attach = str(gateway.attachment_dir) if gateway.attachment_dir is not None else "—"
     return (
         "<b>status</b>\n"
@@ -95,9 +92,7 @@ async def _cmd_status(gateway: "TelegramGateway", chat_key: str, args: str) -> s
     )
 
 
-async def _cmd_tokens_placeholder(
-    gateway: "TelegramGateway", chat_key: str, args: str
-) -> str:
+async def _cmd_tokens_placeholder(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     del gateway, chat_key, args
     return (
         "<b>tokens</b>\n"
@@ -107,9 +102,7 @@ async def _cmd_tokens_placeholder(
     )
 
 
-async def _cmd_context_placeholder(
-    gateway: "TelegramGateway", chat_key: str, args: str
-) -> str:
+async def _cmd_context_placeholder(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     del gateway, chat_key, args
     return (
         "<b>context</b>\n"
@@ -122,9 +115,7 @@ async def _cmd_context_placeholder(
 # ---- M116b: agent modes via slash ----
 
 
-async def _cmd_goal(
-    gateway: "TelegramGateway", chat_key: str, args: str
-) -> str:
+async def _cmd_goal(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     """Forward the user's goal description as an agent prompt prefixed
     with a goal-mode marker the daemon factory reads. Until M122c wires
     the full FSM through the channels API, the prompt prefix is the
@@ -149,7 +140,7 @@ async def _cmd_goal(
             f"[GOAL MODE] {task}",
             session_id=gateway.session_map.get(chat_key),
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"could not start goal-mode run: {exc}"
     return (
         f"started goal-mode run for: <code>{task[:80]}</code>\n"
@@ -171,19 +162,14 @@ def chat_key_to_int(chat_key: str) -> int:
         return 0
 
 
-async def _cmd_mode(
-    gateway: "TelegramGateway", chat_key: str, args: str
-) -> str:
+async def _cmd_mode(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     """M126: list agent modes as inline keyboard buttons. Tapping
     PATCHes the session's mode override."""
     del args
 
     session_id = gateway.session_map.get(chat_key)
     if not session_id:
-        return (
-            "<i>send a message first to start a session — then /mode can "
-            "switch its mode.</i>"
-        )
+        return "<i>send a message first to start a session — then /mode can switch its mode.</i>"
 
     modes = [
         ("auto", "classifier picks per turn"),
@@ -192,8 +178,7 @@ async def _cmd_mode(
         ("goal", "long-running goal loop"),
     ]
     buttons = [
-        [{"text": f"{name} — {desc}", "callback_data": f"mo:{name}"}]
-        for name, desc in modes
+        [{"text": f"{name} — {desc}", "callback_data": f"mo:{name}"}] for name, desc in modes
     ]
     body = (
         "<b>Pick a mode</b> — applies to this chat's session.\n"
@@ -205,12 +190,12 @@ async def _cmd_mode(
             body,
             reply_markup={"inline_keyboard": buttons},
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"could not send mode picker: {exc}"
     return ""
 
 
-def _resolve_project(gateway: "TelegramGateway"):
+def _resolve_project(gateway: TelegramGateway):
     """Resolve the active project from the gateway's `project_root`.
     Returns None when no root is configured or the path is invalid."""
     if gateway.project_root is None:
@@ -223,9 +208,7 @@ def _resolve_project(gateway: "TelegramGateway"):
         return None
 
 
-async def _cmd_insights(
-    gateway: "TelegramGateway", chat_key: str, args: str
-) -> str:
+async def _cmd_insights(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     """List recent rows from the M119 `insights` table — mirrors the
     TUI `/insights` slash. Optional category filter as the first arg."""
     del chat_key
@@ -235,17 +218,15 @@ async def _cmd_insights(
     category_filter = parts[0].lower() if parts else None
     limit = 10
     if len(parts) > 1:
-        try:
+        with contextlib.suppress(ValueError):
             limit = max(1, min(50, int(parts[1])))
-        except ValueError:
-            pass
 
     project = _resolve_project(gateway)
     if project is None:
         return "<i>no active project — cannot query insights</i>"
     try:
         store = SessionStore(project.memory_db_path)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"could not open memory.db: {exc}"
     try:
         if category_filter and category_filter != "all":
@@ -274,9 +255,7 @@ async def _cmd_insights(
     return "\n".join(out)
 
 
-async def _cmd_rules(
-    gateway: "TelegramGateway", chat_key: str, args: str
-) -> str:
+async def _cmd_rules(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     """List recent rows from the M119 `rules` table — mirrors the TUI
     `/rules` slash. Optional kind filter as the first arg."""
     del chat_key
@@ -286,17 +265,15 @@ async def _cmd_rules(
     kind_filter = parts[0].lower() if parts else None
     limit = 10
     if len(parts) > 1:
-        try:
+        with contextlib.suppress(ValueError):
             limit = max(1, min(50, int(parts[1])))
-        except ValueError:
-            pass
 
     project = _resolve_project(gateway)
     if project is None:
         return "<i>no active project — cannot query rules</i>"
     try:
         store = SessionStore(project.memory_db_path)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"could not open memory.db: {exc}"
     try:
         if kind_filter and kind_filter != "all":
@@ -327,9 +304,7 @@ async def _cmd_rules(
     return "\n".join(out)
 
 
-async def _cmd_dream(
-    gateway: "TelegramGateway", chat_key: str, args: str
-) -> str:
+async def _cmd_dream(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     """Trigger one consolidation pass on the project memory. Same
     daemon-side prompt-prefix contract as /goal — the marker upgrades
     to `dream` mode in the factory."""
@@ -339,7 +314,7 @@ async def _cmd_dream(
             "[DREAM MODE] consolidate insights, lint wiki, prune stale claims",
             session_id=gateway.session_map.get(chat_key),
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return f"could not start dream-mode run: {exc}"
     return (
         "started dream-mode consolidation. The agent will compact "
@@ -396,9 +371,7 @@ def all_command_names() -> list[str]:
     return sorted({"start", "reset"} | set(_HANDLERS.keys()))
 
 
-async def dispatch(
-    gateway: "TelegramGateway", chat_key: str, cmd: str, args: str
-) -> str | None:
+async def dispatch(gateway: TelegramGateway, chat_key: str, cmd: str, args: str) -> str | None:
     """Run the handler for `cmd`. Returns the reply text or `None` if
     the command isn't owned by this dispatcher (`/start` and `/reset`
     are owned by the gateway itself and return `None` here)."""
@@ -417,7 +390,10 @@ def menu_descriptors() -> list[dict[str, str]]:
         {"command": "status", "description": "Session / project snapshot"},
         {"command": "session", "description": "Show current session id"},
         {"command": "mode", "description": "List available agent modes"},
-        {"command": "insights", "description": "Recent insights (skill suggestions, manager reports)"},
+        {
+            "command": "insights",
+            "description": "Recent insights (skill suggestions, manager reports)",
+        },
         {"command": "rules", "description": "Recent behavioral rules (preferences, dont)"},
         {"command": "goal", "description": "Run agent in long-running goal mode"},
         {"command": "dream", "description": "Trigger memory consolidation pass"},

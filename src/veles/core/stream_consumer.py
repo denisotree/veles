@@ -68,9 +68,7 @@ def consume_stream(
             state["response"] = event.response
 
     cancel = current_cancel_token()
-    stream = provider.stream_message(
-        history, tools=tools, model=model, max_tokens=max_tokens
-    )
+    stream = provider.stream_message(history, tools=tools, model=model, max_tokens=max_tokens)
     if cancel is None:
         # Fast path — no cancellation requested, iterate inline.
         for event in stream:
@@ -108,14 +106,14 @@ def _consume_cancellable(stream, handle, cancel) -> None:
     from veles.core.provider import StreamEnd as _StreamEnd
 
     q: queue.Queue = queue.Queue(maxsize=256)
-    _SENTINEL = object()
+    _sentinel = object()
 
     def _pump() -> None:
         try:
             for event in stream:
                 q.put(("ev", event))
-            q.put(("end", _SENTINEL))
-        except BaseException as exc:  # noqa: BLE001 - forwarded to consumer
+            q.put(("end", _sentinel))
+        except BaseException as exc:
             q.put(("err", exc))
 
     t = threading.Thread(target=_pump, name="veles-stream-pump", daemon=True)

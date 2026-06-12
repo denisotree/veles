@@ -12,13 +12,10 @@ def _reg():
     return build_default_registry()
 
 
-def _seed_insight(
-    project, *, title: str, body: str, category: str, created_at: float
-) -> None:
+def _seed_insight(project, *, title: str, body: str, category: str, created_at: float) -> None:
     store = SessionStore(project.memory_db_path)
     store._conn.execute(
-        "INSERT INTO insights(title, body, category, created_at)"
-        " VALUES (?, ?, ?, ?)",
+        "INSERT INTO insights(title, body, category, created_at) VALUES (?, ?, ?, ?)",
         (title, body, category, created_at),
     )
     store._conn.close()

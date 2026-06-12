@@ -75,9 +75,7 @@ _SECRET_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
     ),
     (
         "pem-private-key",
-        re.compile(
-            r"-----BEGIN[ A-Z]*PRIVATE KEY-----[\s\S]+?-----END[ A-Z]*PRIVATE KEY-----"
-        ),
+        re.compile(r"-----BEGIN[ A-Z]*PRIVATE KEY-----[\s\S]+?-----END[ A-Z]*PRIVATE KEY-----"),
         "[REDACTED:pem-private-key]",
     ),
     (
@@ -167,10 +165,4 @@ def trust_frontmatter(source_url: str, *, fetched: str | None = None) -> str:
     """
     fetched = fetched or _now_iso()
     safe = source_url.replace('"', "%22")
-    return (
-        "---\n"
-        "trust: external\n"
-        f'source_url: "{safe}"\n'
-        f'fetched: "{fetched}"\n'
-        "---\n\n"
-    )
+    return f'---\ntrust: external\nsource_url: "{safe}"\nfetched: "{fetched}"\n---\n\n'

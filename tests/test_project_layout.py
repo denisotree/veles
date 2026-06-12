@@ -28,9 +28,7 @@ def test_load_project_handles_missing_layout_field(tmp_path: Path) -> None:
     toml_path = project.project_toml_path
     text = toml_path.read_text(encoding="utf-8")
     # Strip the layout line to mimic a pre-M117 file.
-    stripped = "\n".join(
-        line for line in text.splitlines() if not line.startswith("layout = ")
-    )
+    stripped = "\n".join(line for line in text.splitlines() if not line.startswith("layout = "))
     toml_path.write_text(stripped + "\n", encoding="utf-8")
     reloaded = load_project(project.root)
     assert reloaded.layout_name == "llm-wiki"
@@ -42,9 +40,7 @@ def test_load_project_custom_layout_value(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     toml_path = project.project_toml_path
     text = toml_path.read_text(encoding="utf-8")
-    text = text.replace(
-        'layout = "llm-wiki"', 'layout = "obsidian-import"'
-    )
+    text = text.replace('layout = "llm-wiki"', 'layout = "obsidian-import"')
     toml_path.write_text(text, encoding="utf-8")
     reloaded = load_project(project.root)
     assert reloaded.layout_name == "obsidian-import"

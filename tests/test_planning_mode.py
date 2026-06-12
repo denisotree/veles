@@ -18,7 +18,6 @@ from veles.core.provider import ProviderResponse, TokenUsage, ToolCall
 from veles.core.risk import RiskClass, is_mutation_class
 from veles.core.tools.registry import Registry, ToolEntry
 
-
 # ---------- AgentState basics ----------
 
 

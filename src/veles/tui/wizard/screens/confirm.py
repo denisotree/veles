@@ -51,7 +51,7 @@ class _FlatButton(Static, can_focus=True):
             super().__init__()
             self.source = source
 
-    def __init__(self, label: str, *, id: str) -> None:  # noqa: A002
+    def __init__(self, label: str, *, id: str) -> None:
         super().__init__(label, id=id)
         self._label = label
 

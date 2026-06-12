@@ -43,7 +43,7 @@ class SupermemoryProvider:
             return []
         try:
             client = Supermemory(api_key=self.api_key)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _warn_once(f"Supermemory client init failed: {type(exc).__name__}: {exc}")
             return []
         response = self._search(client, query, limit)
@@ -63,7 +63,7 @@ class SupermemoryProvider:
                 return client.search(**{keyword: query, **base})
             except TypeError:
                 continue  # try next keyword
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 _warn_once(f"Supermemory recall failed: {type(exc).__name__}: {exc}")
                 return None
         _warn_once("Supermemory.search rejected both `q=` and `query=`; SDK changed shape")

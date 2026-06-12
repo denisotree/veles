@@ -67,9 +67,7 @@ def upsert_skill(
     the agent still calls them through the Registry; the catalogue
     just doesn't have a row to point at."""
     wall = time.time() if now is None else now
-    base_id = (
-        _id_for_name(conn, skill.extends) if skill.extends else None
-    )
+    base_id = _id_for_name(conn, skill.extends) if skill.extends else None
     frontmatter = json.dumps(
         {
             "tools": list(skill.tools),
@@ -79,9 +77,7 @@ def upsert_skill(
         },
         sort_keys=True,
     )
-    existing = conn.execute(
-        "SELECT id FROM skills WHERE name = ?", (skill.name,)
-    ).fetchone()
+    existing = conn.execute("SELECT id FROM skills WHERE name = ?", (skill.name,)).fetchone()
     if existing is None:
         cur = conn.execute(
             "INSERT INTO skills("
@@ -121,16 +117,12 @@ def upsert_skill(
     return skill_id
 
 
-def _sync_skill_tool_refs(
-    conn: sqlite3.Connection, skill_id: int, tool_names: list[str]
-) -> None:
+def _sync_skill_tool_refs(conn: sqlite3.Connection, skill_id: int, tool_names: list[str]) -> None:
     """Replace this skill's tool edges with the current list. Tools
     not in the catalogue are skipped (they may be in-memory builtins).
     Old edges to tools no longer mentioned are dropped — the table
     reflects the skill's *current* declared dependencies."""
-    conn.execute(
-        "DELETE FROM skill_tool_refs WHERE skill_id = ?", (skill_id,)
-    )
+    conn.execute("DELETE FROM skill_tool_refs WHERE skill_id = ?", (skill_id,))
     if not tool_names:
         return
     placeholders = ",".join("?" * len(tool_names))
@@ -195,16 +187,13 @@ def record_skill_use(
 
 def get_skill(conn: sqlite3.Connection, name: str) -> SkillRecord | None:
     row = conn.execute(
-        "SELECT id, name, scope, base_skill_id, description, file_path"
-        " FROM skills WHERE name = ?",
+        "SELECT id, name, scope, base_skill_id, description, file_path FROM skills WHERE name = ?",
         (name,),
     ).fetchone()
     return _row_to_record(row) if row else None
 
 
-def list_skills(
-    conn: sqlite3.Connection, *, scope: str | None = None
-) -> list[SkillRecord]:
+def list_skills(conn: sqlite3.Connection, *, scope: str | None = None) -> list[SkillRecord]:
     if scope is None:
         rows = conn.execute(
             "SELECT id, name, scope, base_skill_id, description, file_path"
@@ -246,9 +235,7 @@ def skill_telemetry(conn: sqlite3.Connection, name: str) -> SkillTelemetry:
     )
 
 
-def inheritance_chain(
-    conn: sqlite3.Connection, name: str
-) -> list[SkillRecord]:
+def inheritance_chain(conn: sqlite3.Connection, name: str) -> list[SkillRecord]:
     """Walk the `name → base_skill_id` chain (recursive CTE, depth ≤ 10).
     Returns chain in descent order: `name` at index 0, its base at 1,
     grandparent at 2, ..."""
@@ -277,9 +264,7 @@ def inheritance_chain(
 # ---------- pure-Python inheritance resolver ----------
 
 
-def resolve_inheritance(
-    skill: Skill, by_name: dict[str, Skill]
-) -> Skill:
+def resolve_inheritance(skill: Skill, by_name: dict[str, Skill]) -> Skill:
     """Merge `skill` with its `extends` chain into a single
     *flattened* Skill. Pure Python — works on `Skill` objects from
     `discover_skills`, no DB needed. Useful for runtime invocation
@@ -355,9 +340,7 @@ def resolve_inheritance(
     )
 
 
-def _merge_parameters(
-    base: list[dict], child: list[dict]
-) -> list[dict]:
+def _merge_parameters(base: list[dict], child: list[dict]) -> list[dict]:
     out: list[dict] = []
     child_by_name = {p.get("name"): p for p in child if isinstance(p, dict)}
     overridden: set[str] = set()
@@ -370,9 +353,11 @@ def _merge_parameters(
             out.append(p)
     for p in child:
         name = p.get("name") if isinstance(p, dict) else None
-        if name and name not in overridden and name not in {
-            p2.get("name") for p2 in base if isinstance(p2, dict)
-        }:
+        if (
+            name
+            and name not in overridden
+            and name not in {p2.get("name") for p2 in base if isinstance(p2, dict)}
+        ):
             out.append(p)
     return out
 

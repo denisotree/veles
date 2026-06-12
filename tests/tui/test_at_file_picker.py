@@ -83,7 +83,5 @@ async def test_at_inside_word_does_not_open_picker(
         await pilot.press("f", "o", "o")
         await pilot.press("@")
         await pilot.pause()
-        assert not any(
-            isinstance(s, FilePickerScreen) for s in pilot.app.screen_stack
-        )
+        assert not any(isinstance(s, FilePickerScreen) for s in pilot.app.screen_stack)
         assert composer.text == "foo@"

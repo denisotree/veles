@@ -22,9 +22,7 @@ from pathlib import Path
 from veles.core.layout.discovery import LayoutDirectory
 
 
-def apply_scaffold(
-    pack: LayoutDirectory | None, root: Path, name: str
-) -> None:
+def apply_scaffold(pack: LayoutDirectory | None, root: Path, name: str) -> None:
     """Create the user-content skeleton the pack declares.
 
     Idempotent: existing dirs are kept, an existing AGENTS.md is never

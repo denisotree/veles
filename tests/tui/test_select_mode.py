@@ -46,9 +46,7 @@ def test_chat_log_user_static_is_selectable() -> None:
 # ---- mouse capture is off from boot, no toggle action ----
 
 
-async def test_mouse_capture_disabled_on_mount(
-    agent_factory_for, text_response
-) -> None:
+async def test_mouse_capture_disabled_on_mount(agent_factory_for, text_response) -> None:
     """Native terminal drag-select works from boot without any user
     action. M115.5: mouse reporting is now disabled driver-level via
     `app.run(mouse=False)` in `veles.tui.run_tui`; under Pilot the
@@ -86,9 +84,7 @@ def test_inspector_header_is_selectable() -> None:
     assert header.allow_select is True
 
 
-async def test_inspector_body_rows_are_selectable(
-    agent_factory_for, text_response
-) -> None:
+async def test_inspector_body_rows_are_selectable(agent_factory_for, text_response) -> None:
     """Once the inspector is expanded and a tool call lands, body rows
     are SelectableStatics so a user can drag-copy any single line."""
     from veles.core.events import ToolCall
@@ -126,11 +122,7 @@ def test_super_c_binding_routes_to_screen_copy_text() -> None:
 
     from veles.tui.app import TuiApp
 
-    matches = [
-        b
-        for b in TuiApp.BINDINGS
-        if isinstance(b, Binding) and b.key == "super+c"
-    ]
+    matches = [b for b in TuiApp.BINDINGS if isinstance(b, Binding) and b.key == "super+c"]
     assert matches, "super+c binding missing"
     assert matches[0].action == "screen.copy_text"
 
@@ -141,11 +133,7 @@ def test_ctrl_shift_c_binding_routes_to_screen_copy_text() -> None:
 
     from veles.tui.app import TuiApp
 
-    matches = [
-        b
-        for b in TuiApp.BINDINGS
-        if isinstance(b, Binding) and b.key == "ctrl+shift+c"
-    ]
+    matches = [b for b in TuiApp.BINDINGS if isinstance(b, Binding) and b.key == "ctrl+shift+c"]
     assert matches, "ctrl+shift+c binding missing"
     assert matches[0].action == "screen.copy_text"
 
@@ -158,9 +146,7 @@ def test_ctrl_c_still_routes_to_copy_or_exit() -> None:
 
     from veles.tui.app import TuiApp
 
-    matches = [
-        b for b in TuiApp.BINDINGS if isinstance(b, Binding) and b.key == "ctrl+c"
-    ]
+    matches = [b for b in TuiApp.BINDINGS if isinstance(b, Binding) and b.key == "ctrl+c"]
     assert matches and matches[0].action == "copy_or_exit"
 
 

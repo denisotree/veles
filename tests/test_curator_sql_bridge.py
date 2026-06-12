@@ -66,7 +66,7 @@ def test_curate_prompt_instructs_memory_save_insight(project) -> None:
         def __init__(self, **kwargs):
             captured["system_prompt"] = kwargs.get("system_prompt", "")
 
-        def run(self, *a, **kw):  # noqa: ARG002
+        def run(self, *a, **kw):
             from veles.core.agent import RunResult
 
             return RunResult(
@@ -77,8 +77,8 @@ def test_curate_prompt_instructs_memory_save_insight(project) -> None:
                 session_id="x",
             )
 
-    import veles.cli._curator as curator_mod
     import veles.cli as cli_mod
+    import veles.cli._curator as curator_mod
     from veles.core.memory import SessionInfo
 
     store = SessionStore(project.memory_db_path)
@@ -98,7 +98,8 @@ def test_curate_prompt_instructs_memory_save_insight(project) -> None:
         cli_mod._load_skills = lambda *a, **kw: None
         cli_mod._qualify_for_provider = lambda prompt, *a, **kw: prompt
         cli_mod._run_agent_streaming_aware = lambda *a, **kw: (
-            type("R", (), {"stopped_reason": "completed"})(), None
+            type("R", (), {"stopped_reason": "completed"})(),
+            None,
         )
 
         class _Args:
@@ -133,8 +134,9 @@ def test_insight_extractor_imports_shared_save_writer() -> None:
     `save_insight_row` helper from `memory_save.py` rather than
     re-implementing the INSERT. Code-level check: read the
     insight_extractor source and confirm the import landed."""
-    import veles.core.insight_extractor as ie_mod
     import inspect
+
+    import veles.core.insight_extractor as ie_mod
 
     source = inspect.getsource(ie_mod)
     assert "from veles.core.tools.builtin.memory_save import save_insight_row" in source
@@ -149,21 +151,17 @@ def test_insight_extractor_mirror_writes_to_insights_table(project) -> None:
     in the SQL `insights` table via `save_insight_row`."""
     from unittest.mock import patch
 
+    from tests.conftest import StubProvider
     from veles.core.agent import RunResult
     from veles.core.insight_extractor import make_insight_extractor
-    from veles.core.provider import Message
-
-    from tests.conftest import StubProvider
-    from veles.core.provider import ProviderResponse, TokenUsage
+    from veles.core.provider import Message, ProviderResponse, TokenUsage
 
     stub_provider = StubProvider(
         [
             ProviderResponse(
                 text="slug: real-db-rule\nbody: always use real DB",
                 tool_calls=[],
-                usage=TokenUsage(
-                    prompt_tokens=0, completion_tokens=0, total_tokens=0
-                ),
+                usage=TokenUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0),
                 finish_reason="stop",
             )
         ],
@@ -172,10 +170,10 @@ def test_insight_extractor_mirror_writes_to_insights_table(project) -> None:
     )
 
     class _StubAgent:
-        def __init__(self, **kwargs):  # noqa: ARG002
+        def __init__(self, **kwargs):
             pass
 
-        def run(self, snippet):  # noqa: ARG002
+        def run(self, snippet):
             return RunResult(
                 text="slug: real-db-rule\nbody: always use real DB in tests",
                 history=[],
@@ -184,9 +182,7 @@ def test_insight_extractor_mirror_writes_to_insights_table(project) -> None:
                 session_id=None,
             )
 
-    extractor = make_insight_extractor(
-        provider=stub_provider, model="x", project=project
-    )
+    extractor = make_insight_extractor(provider=stub_provider, model="x", project=project)
 
     fake_history = [
         Message(role="user", content="please remember: always use real DB in tests"),
@@ -197,9 +193,7 @@ def test_insight_extractor_mirror_writes_to_insights_table(project) -> None:
         extractor(fake_history, "test-session")
 
     store = SessionStore(project.memory_db_path)
-    rows = store._conn.execute(
-        "SELECT title, body, category FROM insights"
-    ).fetchall()
+    rows = store._conn.execute("SELECT title, body, category FROM insights").fetchall()
     store._conn.close()
     assert rows, "expected at least one SQL insight row from extractor mirror"
     # Categories track the trigger label ("remember", "recovery")

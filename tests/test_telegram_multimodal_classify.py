@@ -5,7 +5,7 @@ classification."""
 
 from __future__ import annotations
 
-from veles.channels.telegram import _Kind, _classify
+from veles.channels.telegram import _classify, _Kind
 
 
 def test_voice_message_classified_as_voice() -> None:

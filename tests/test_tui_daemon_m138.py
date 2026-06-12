@@ -18,7 +18,6 @@ from veles.core.project import init_project
 from veles.core.runtime_sessions import RuntimeSessionStore
 from veles.tui.slash.builtin import build_default_registry
 
-
 # ---- /daemon slash command ----
 
 
@@ -49,7 +48,7 @@ def test_register_tui_session_creates_running_row(tmp_path: Path):
     project = init_project(tmp_path / "p", name="p")
     result = _register_tui_session(project)
     assert result is not None
-    store, rid = result
+    store, _rid = result
     try:
         rec = store.get_by_name("tui", kind="tui")
         assert rec is not None and rec.status == "running" and rec.pid is not None
@@ -115,9 +114,13 @@ def _named(screen, name):
             continue
         for child in section.children:
             row = child.data
-            if isinstance(row, _Row) and row.kind == "daemon" and row.node is not None:
-                if row.node.name == name:
-                    return child
+            if (
+                isinstance(row, _Row)
+                and row.kind == "daemon"
+                and row.node is not None
+                and row.node.name == name
+            ):
+                return child
     return None
 
 

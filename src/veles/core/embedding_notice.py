@@ -20,6 +20,7 @@ repeatedly — idempotent on the insights row.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import sqlite3
 import time
@@ -57,9 +58,7 @@ panel after you've decided.
 """
 
 
-def maybe_surface_embedding_setup_hint(
-    project: Project, *, now: float | None = None
-) -> bool:
+def maybe_surface_embedding_setup_hint(project: Project, *, now: float | None = None) -> bool:
     """Write the setup hint to `insights` if not already present.
     Returns True iff a fresh row was inserted (False = already there).
     Never raises — a sqlite hiccup just skips the notice."""
@@ -80,8 +79,7 @@ def maybe_surface_embedding_setup_hint(
         if existing is not None:
             return False
         conn.execute(
-            "INSERT INTO insights(title, body, category, created_at)"
-            " VALUES (?, ?, ?, ?)",
+            "INSERT INTO insights(title, body, category, created_at) VALUES (?, ?, ?, ?)",
             (SETUP_HINT_TITLE, _BODY, SETUP_HINT_CATEGORY, wall),
         )
         return True
@@ -89,10 +87,8 @@ def maybe_surface_embedding_setup_hint(
         logger.info("setup-hint: write failed: %s", exc)
         return False
     finally:
-        try:
+        with contextlib.suppress(Exception):
             conn.close()
-        except Exception:
-            pass
 
 
 __all__ = [

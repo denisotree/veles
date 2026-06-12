@@ -120,9 +120,7 @@ def _render_value(value: Any, max_chars: int) -> str:
 
 # ---------------- prompter ContextVar ----------------
 
-_active: ContextVar[Prompter | None] = ContextVar(
-    "veles_unified_prompter", default=None
-)
+_active: ContextVar[Prompter | None] = ContextVar("veles_unified_prompter", default=None)
 
 
 def current_prompter() -> Prompter | None:

@@ -59,13 +59,10 @@ def _create(args: argparse.Namespace) -> int:
         # Port distinctness: two live daemon sessions can't share a bind port
         # (they'd collide on startup). Fail loud at declaration time.
         if args.port is not None:
-            clash = next(
-                (s for s in store.list(kind="daemon") if s.port == args.port), None
-            )
+            clash = next((s for s in store.list(kind="daemon") if s.port == args.port), None)
             if clash is not None:
                 print(
-                    f"error: port {args.port} already used by daemon session "
-                    f"{clash.name!r}.",
+                    f"error: port {args.port} already used by daemon session {clash.name!r}.",
                     file=sys.stderr,
                 )
                 return 2
@@ -132,10 +129,7 @@ def _list(args: argparse.Namespace) -> int:
         model = r.model or "—"
         provider = r.provider or "—"
         port = r.port if r.port is not None else "—"
-        print(
-            f"  {r.name:<{name_w}}  {r.status:<8}  {provider}:{model}  "
-            f"port={port}{flags}"
-        )
+        print(f"  {r.name:<{name_w}}  {r.status:<8}  {provider}:{model}  port={port}{flags}")
     return 0
 
 

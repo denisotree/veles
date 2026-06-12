@@ -7,7 +7,6 @@ import pytest
 from veles.core.provider import ProviderResponse, TokenUsage
 from veles.core.provider_pool import FailoverProvider, is_transient
 
-
 # ---------- transient classification ----------
 
 
@@ -56,12 +55,12 @@ class _OkProvider:
         )
         self.call_count = 0
 
-    def create_message(self, *args, **kwargs):  # noqa: ANN002, ANN003
+    def create_message(self, *args, **kwargs):
         del args, kwargs
         self.call_count += 1
         return self._response
 
-    def stream_message(self, *args, **kwargs):  # noqa: ANN002, ANN003
+    def stream_message(self, *args, **kwargs):
         del args, kwargs
         yield self._response  # not realistic, just unused in tests
 
@@ -81,12 +80,12 @@ class _TransientFailProvider:
     def __init__(self) -> None:
         self.call_count = 0
 
-    def create_message(self, *args, **kwargs):  # noqa: ANN002, ANN003
+    def create_message(self, *args, **kwargs):
         del args, kwargs
         self.call_count += 1
         raise _RateLimit("429")
 
-    def stream_message(self, *args, **kwargs):  # noqa: ANN002, ANN003
+    def stream_message(self, *args, **kwargs):
         del args, kwargs
         raise _RateLimit("429")
 
@@ -96,11 +95,11 @@ class _HardFailProvider:
     supports_tools = True
     supports_streaming = False
 
-    def create_message(self, *args, **kwargs):  # noqa: ANN002, ANN003
+    def create_message(self, *args, **kwargs):
         del args, kwargs
         raise ValueError("permanent")
 
-    def stream_message(self, *args, **kwargs):  # noqa: ANN002, ANN003
+    def stream_message(self, *args, **kwargs):
         del args, kwargs
         raise ValueError("permanent")
 
@@ -180,11 +179,11 @@ def test_supports_flags_inherit_from_first() -> None:
         supports_tools = False
         supports_streaming = True
 
-        def create_message(self, *a, **kw):  # noqa: ANN002, ANN003
+        def create_message(self, *a, **kw):
             del a, kw
             return ProviderResponse(text="", tool_calls=[], usage=TokenUsage())
 
-        def stream_message(self, *a, **kw):  # noqa: ANN002, ANN003
+        def stream_message(self, *a, **kw):
             del a, kw
             yield None  # unused
 

@@ -70,23 +70,17 @@ def test_schema_caps_param_count() -> None:
 
 
 def test_schema_drops_oversized_param_names() -> None:
-    out = sanitize_schema(
-        {"properties": {"ok": {"type": "string"}, "y" * 65: {"type": "string"}}}
-    )
+    out = sanitize_schema({"properties": {"ok": {"type": "string"}, "y" * 65: {"type": "string"}}})
     assert set(out["properties"]) == {"ok"}
 
 
 def test_schema_drops_unsafe_param_names() -> None:
-    out = sanitize_schema(
-        {"properties": {"with space": {}, "ctrl\x01": {}, "fine_name": {}}}
-    )
+    out = sanitize_schema({"properties": {"with space": {}, "ctrl\x01": {}, "fine_name": {}}})
     assert set(out["properties"]) == {"fine_name"}
 
 
 def test_schema_truncates_property_descriptions() -> None:
-    out = sanitize_schema(
-        {"properties": {"p": {"type": "string", "description": "d" * 999}}}
-    )
+    out = sanitize_schema({"properties": {"p": {"type": "string", "description": "d" * 999}}})
     desc = out["properties"]["p"]["description"]
     assert len(desc) <= MAX_TEXT_CHARS
     assert desc.endswith("…")

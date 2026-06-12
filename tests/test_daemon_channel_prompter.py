@@ -143,9 +143,7 @@ async def test_approval_prompt_emits_event_and_returns_allow_once() -> None:
     task = asyncio.create_task(
         _run_prompter_on_thread(
             prompter,
-            _approval_req(
-                "Write", arguments={"path": "/etc/x"}, reason="writes outside project"
-            ),
+            _approval_req("Write", arguments={"path": "/etc/x"}, reason="writes outside project"),
         )
     )
     for _ in range(50):
@@ -173,9 +171,7 @@ async def test_approval_prompt_no_returns_deny() -> None:
     handle = _new_handle()
     loop = asyncio.get_running_loop()
     prompter = make_unified_prompter(handle, loop, timeout=5.0)
-    task = asyncio.create_task(
-        _run_prompter_on_thread(prompter, _approval_req("Write"))
-    )
+    task = asyncio.create_task(_run_prompter_on_thread(prompter, _approval_req("Write")))
     for _ in range(50):
         if handle.pending_prompts:
             break

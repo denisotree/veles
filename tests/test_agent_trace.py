@@ -132,7 +132,7 @@ def test_trace_write_failure_does_not_break_run(tmp_path: Path) -> None:
     """A broken writer must not propagate; runs are sacred."""
 
     class _BadWriter:
-        def write(self, record):  # noqa: ANN001
+        def write(self, record):
             raise RuntimeError("disk on fire")
 
     provider = _StubProvider(responses=[_ok("done")])

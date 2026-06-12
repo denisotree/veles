@@ -7,7 +7,6 @@ from pathlib import Path
 from veles.channels.session_map import SessionMap, channel_session_path
 from veles.cli.commands import channel as channel_cmd
 
-
 # `isolated_user_home` comes from tests/conftest.py.
 
 

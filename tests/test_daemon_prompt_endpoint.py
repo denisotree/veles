@@ -59,7 +59,7 @@ def app(
     token_store: TokenStore,
     tmp_path: Path,
 ) -> web.Application:
-    def _factory(session_id, *, prompt=None):  # noqa: ARG001
+    def _factory(session_id, *, prompt=None):
         raise AssertionError("not invoked by this test")
 
     state = build_state(
@@ -79,9 +79,7 @@ def _install_pending(state, *, run_id: str, prompt_id: str, kind: str = "trust")
     pending = PendingPrompt(
         kind=kind,
         tool="Bash",
-        valid_choices=("once", "always_project", "refuse")
-        if kind == "trust"
-        else ("yes", "no"),
+        valid_choices=("once", "always_project", "refuse") if kind == "trust" else ("yes", "no"),
     )
     handle.pending_prompts[prompt_id] = pending
     state.add_run(handle)
@@ -118,9 +116,7 @@ async def test_resolve_prompt_unblocks_future_and_emits_event(
     assert resolved["choice"] == "once"
 
 
-async def test_resolve_prompt_404_when_run_unknown(
-    aiohttp_client, app, good_token: str
-) -> None:
+async def test_resolve_prompt_404_when_run_unknown(aiohttp_client, app, good_token: str) -> None:
     client = await aiohttp_client(app)
     resp = await client.post(
         "/v1/runs/run-missing/prompts/xx",
@@ -130,9 +126,7 @@ async def test_resolve_prompt_404_when_run_unknown(
     assert resp.status == 404
 
 
-async def test_resolve_prompt_404_when_prompt_unknown(
-    aiohttp_client, app, good_token: str
-) -> None:
+async def test_resolve_prompt_404_when_prompt_unknown(aiohttp_client, app, good_token: str) -> None:
     state = app["state"]
     _install_pending(state, run_id="run-B", prompt_id="aaaa1111")
     client = await aiohttp_client(app)
@@ -164,9 +158,7 @@ async def test_resolve_prompt_409_on_invalid_choice_and_remains_pending(
     assert not pending.future.done()
 
 
-async def test_resolve_prompt_400_on_malformed_body(
-    aiohttp_client, app, good_token: str
-) -> None:
+async def test_resolve_prompt_400_on_malformed_body(aiohttp_client, app, good_token: str) -> None:
     state = app["state"]
     _install_pending(state, run_id="run-D", prompt_id="dddd")
     client = await aiohttp_client(app)
@@ -178,9 +170,7 @@ async def test_resolve_prompt_400_on_malformed_body(
     assert resp.status == 400
 
 
-async def test_resolve_prompt_401_without_token(
-    aiohttp_client, app
-) -> None:
+async def test_resolve_prompt_401_without_token(aiohttp_client, app) -> None:
     state = app["state"]
     _install_pending(state, run_id="run-E", prompt_id="eeee")
     client = await aiohttp_client(app)
@@ -191,9 +181,7 @@ async def test_resolve_prompt_401_without_token(
     assert resp.status == 401
 
 
-async def test_double_resolve_returns_404(
-    aiohttp_client, app, good_token: str
-) -> None:
+async def test_double_resolve_returns_404(aiohttp_client, app, good_token: str) -> None:
     state = app["state"]
     _install_pending(state, run_id="run-F", prompt_id="ffff")
     client = await aiohttp_client(app)

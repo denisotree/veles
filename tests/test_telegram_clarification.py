@@ -128,10 +128,10 @@ def _make_gateway(session_map: SessionMap, sends: list[tuple[str, dict[str, Any]
     test_channels_telegram.py pattern)."""
 
     class _NullClient:
-        async def submit_run(self, prompt: str, *, session_id=None):  # noqa: ARG002
+        async def submit_run(self, prompt: str, *, session_id=None):
             return {"run_id": "x", "session_id": session_id, "state": "running"}
 
-        async def stream_events(self, run_id):  # noqa: ARG002
+        async def stream_events(self, run_id):
             if False:
                 yield
 
@@ -195,10 +195,10 @@ async def test_callback_resolves_clarification_choice(
     submitted_answers: list[tuple[str, str]] = []
 
     class _RecordingClient:
-        async def submit_run(self, prompt: str, *, session_id=None):  # noqa: ARG002
+        async def submit_run(self, prompt: str, *, session_id=None):
             return {"run_id": "x", "session_id": session_id, "state": "running"}
 
-        async def stream_events(self, run_id):  # noqa: ARG002
+        async def stream_events(self, run_id):
             if False:
                 yield
 

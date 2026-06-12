@@ -8,15 +8,15 @@ imports from this module and re-exports the names for tests.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import signal
 import time
 import urllib.error
 import urllib.request
-from pathlib import Path
-
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from veles.core.project_config import read_provider_model_at
 from veles.daemon.registry import (
@@ -67,7 +67,7 @@ def runtime_session_records(project) -> list:
             return store.list()
         finally:
             store.close()
-    except Exception:  # noqa: BLE001 — defensive; runtime-session view is informational
+    except Exception:
         return []
 
 
@@ -77,10 +77,7 @@ def _fmt_runtime_row(r, *, channels: list[str] | None = None) -> str:
     provider = r.provider or "-"
     port = r.port if r.port is not None else "-"
     chans = f"  chans={','.join(channels)}" if channels else ""
-    return (
-        f"  {r.name:<16}  {r.kind:<6}  {r.status:<8}  "
-        f"{provider}:{model}  port={port}{chans}"
-    )
+    return f"  {r.name:<16}  {r.kind:<6}  {r.status:<8}  {provider}:{model}  port={port}{chans}"
 
 
 def runtime_session_rows(project) -> list[str]:
@@ -109,9 +106,10 @@ def runtime_session_action(project, record, action: str) -> str:
     pid = record.pid or 0
 
     def _spawn() -> bool:
-        return spawn_daemon(
-            project_root=project.root, host=host, port=port, name=record.name
-        ) is not None
+        return (
+            spawn_daemon(project_root=project.root, host=host, port=port, name=record.name)
+            is not None
+        )
 
     if action == "start":
         if pid and is_alive(pid):
@@ -127,10 +125,8 @@ def runtime_session_action(project, record, action: str) -> str:
             return f"{record.name}: stop failed: {exc}"
     if action == "restart":
         if pid and is_alive(pid):
-            try:
+            with contextlib.suppress(OSError):
                 os.kill(pid, signal.SIGTERM)
-            except OSError:
-                pass
             for _ in range(20):
                 if not is_alive(pid):
                     break
@@ -140,10 +136,8 @@ def runtime_session_action(project, record, action: str) -> str:
         # Graceful-stop a live process first (mirror registry delete) so we
         # don't orphan a running named daemon, then soft-delete the row.
         if pid and is_alive(pid):
-            try:
+            with contextlib.suppress(OSError):
                 os.kill(pid, signal.SIGTERM)
-            except OSError:
-                pass
             for _ in range(20):
                 if not is_alive(pid):
                     break
@@ -233,7 +227,7 @@ def _fetch_health(entry: DaemonEntry) -> dict | None:
         return None
     url = f"http://{entry.host}:{entry.port}/v1/health"
     try:
-        with urllib.request.urlopen(url, timeout=0.5) as resp:  # noqa: S310
+        with urllib.request.urlopen(url, timeout=0.5) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
     except (urllib.error.URLError, OSError, json.JSONDecodeError, TimeoutError):
         return None
@@ -285,7 +279,7 @@ def _entry_model(entry: DaemonEntry) -> str | None:
         return None
     try:
         return read_provider_model_at(Path(entry.project_path))
-    except Exception:  # noqa: BLE001 — defensive against unforeseen FS errors
+    except Exception:
         return None
 
 
@@ -294,9 +288,7 @@ def _enabled_channel_names(channels) -> list[str]:
     if not isinstance(channels, dict):
         return []
     return sorted(
-        name
-        for name, cfg in channels.items()
-        if isinstance(cfg, dict) and cfg.get("enabled")
+        name for name, cfg in channels.items() if isinstance(cfg, dict) and cfg.get("enabled")
     )
 
 
@@ -324,7 +316,7 @@ def _entry_channels(entry: DaemonEntry) -> list[str]:
 
         cfg = load_project_config(load_project(Path(entry.project_path)))
         return _enabled_channel_names(get_section(cfg, "channels"))
-    except Exception:  # noqa: BLE001 — informational only
+    except Exception:
         return []
 
 
@@ -337,7 +329,7 @@ def _runtime_channels(project, record) -> list[str]:
 
         block = get_daemon_session_config(load_project_config(project), record.name)
         return _enabled_channel_names(block.get("channels"))
-    except Exception:  # noqa: BLE001 — informational only
+    except Exception:
         return []
 
 
@@ -373,19 +365,19 @@ class DaemonNode:
     """One daemon in the picker tree, unifying a registry `DaemonEntry` (unnamed
     daemon) and a `RuntimeSessionRecord` (named daemon / tui session)."""
 
-    key: str            # stable tree identity (survives in-place reconcile)
-    kind: str           # "registry" | "named" | "tui"
-    name: str           # display name ("default" for the project's unnamed daemon)
+    key: str  # stable tree identity (survives in-place reconcile)
+    kind: str  # "registry" | "named" | "tui"
+    name: str  # display name ("default" for the project's unnamed daemon)
     host: str | None
     port: int | None
     pid: int | None
-    status: str         # "running" | "stopped" | "unknown"
+    status: str  # "running" | "stopped" | "unknown"
     model: str | None
     channels: list[str] = field(default_factory=list)
     project_path: str = ""
     project_name: str = ""
-    entry: DaemonEntry | None = None    # set when kind == "registry"
-    record: object | None = None        # RuntimeSessionRecord when kind in (named, tui)
+    entry: DaemonEntry | None = None  # set when kind == "registry"
+    record: object | None = None  # RuntimeSessionRecord when kind in (named, tui)
 
     @property
     def manageable(self) -> bool:
@@ -515,9 +507,7 @@ def spawn_daemon_node(node: DaemonNode) -> bool:
     port = node.port or 8765
     if node.kind == "named":
         return (
-            spawn_daemon(
-                project_root=node.project_path, host=host, port=port, name=node.name
-            )
+            spawn_daemon(project_root=node.project_path, host=host, port=port, name=node.name)
             is not None
         )
     return spawn_daemon(project_root=node.project_path, host=host, port=port) is not None

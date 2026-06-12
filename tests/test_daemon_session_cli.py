@@ -79,7 +79,8 @@ def test_delete_soft_deletes_and_drops_config(tmp_path, monkeypatch):
     # Row kept in DB (soft delete) — visible only with include_deleted.
     store = RuntimeSessionStore(project.memory_db_path)
     assert store.get_by_name("api", kind="daemon") is None
-    assert any(r.name == "api" and r.deleted for r in store.list(kind="daemon", include_deleted=True))
+    rows = store.list(kind="daemon", include_deleted=True)
+    assert any(r.name == "api" and r.deleted for r in rows)
     # Name freed: re-create works.
     assert cmd_daemon_session(_args(daemon_session_command="create", name="api")) == 0
 

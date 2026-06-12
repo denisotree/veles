@@ -42,6 +42,7 @@ def fenced_tools_enabled_by_env() -> bool:
     raw = os.environ.get("VELES_FENCED_TOOLS", "").strip().lower()
     return raw not in {"0", "false", "no", "off"}
 
+
 # Marker embedded in the rendered prompt so the agent can detect (and avoid
 # re-appending) the tool instructions when a session is resumed.
 FENCED_SENTINEL = "<!-- veles-fenced-tools -->"
@@ -79,8 +80,7 @@ def render_tools_prompt(schemas: list[dict]) -> str:
         "",
         "Rules:",
         "- One JSON object per block; emit one block per tool you want to call.",
-        "- After emitting tool blocks, stop and wait — the results come back "
-        "in the next message.",
+        "- After emitting tool blocks, stop and wait — the results come back in the next message.",
         "- When you are done and need no more tools, reply in plain text with "
         "no `veles-tool` block.",
         "- Use only the tools listed below, with exactly these argument names.",

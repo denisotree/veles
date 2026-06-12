@@ -91,9 +91,7 @@ def search_files(
     if not root.exists():
         return f"<no such path: {path!r}>"
     try:
-        compiled = re.compile(
-            pattern, re.IGNORECASE if case_insensitive else 0
-        )
+        compiled = re.compile(pattern, re.IGNORECASE if case_insensitive else 0)
     except re.error as exc:
         return f"<invalid regex {pattern!r}: {exc}>"
 
@@ -151,19 +149,13 @@ def _search_with_ripgrep(
     except (OSError, subprocess.SubprocessError) as exc:
         logger.warning("search_files: rg failed (%s), falling back to python", exc)
         compiled = re.compile(pattern, re.IGNORECASE if case_insensitive else 0)
-        return _search_with_python(
-            compiled, root, glob=glob, max_results=max_results
-        )
+        return _search_with_python(compiled, root, glob=glob, max_results=max_results)
 
     lines = [_relativise(ln, root) for ln in proc.stdout.splitlines() if ln]
     if not lines:
         return "<no matches>"
     capped = lines[:max_results]
-    tail = (
-        f"\n<... truncated at {max_results} matches>"
-        if len(lines) > max_results
-        else ""
-    )
+    tail = f"\n<... truncated at {max_results} matches>" if len(lines) > max_results else ""
     return "\n".join(capped) + tail
 
 
@@ -201,9 +193,7 @@ def _search_with_python(
             with file_path.open(encoding="utf-8", errors="replace") as fh:
                 for line_no, line in enumerate(fh, start=1):
                     if compiled.search(line):
-                        results.append(
-                            _format_hit(file_path, line_no, line, root)
-                        )
+                        results.append(_format_hit(file_path, line_no, line, root))
                         if len(results) >= max_results:
                             truncated = True
                             break
@@ -211,9 +201,7 @@ def _search_with_python(
             continue
     if not results:
         return "<no matches>"
-    tail = (
-        f"\n<... truncated at {max_results} matches>" if truncated else ""
-    )
+    tail = f"\n<... truncated at {max_results} matches>" if truncated else ""
     return "\n".join(results) + tail
 
 

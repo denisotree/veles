@@ -31,9 +31,7 @@ def _new_app(tmp_project, agent_factory_for, text_response):
     )
 
 
-async def test_shift_tab_advances_one_step(
-    tmp_project, agent_factory_for, text_response
-) -> None:
+async def test_shift_tab_advances_one_step(tmp_project, agent_factory_for, text_response) -> None:
     app = _new_app(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:
         assert pilot.app.state.mode == "auto"
@@ -96,9 +94,7 @@ async def test_shift_tab_into_goal_abandons_active_goal(
     from veles.core.goal import create_goal, read_goal
 
     project, _ = tmp_project
-    stale = create_goal(
-        project.state_dir, objective="old goal", done_condition=""
-    )
+    stale = create_goal(project.state_dir, objective="old goal", done_condition="")
 
     app = _new_app(tmp_project, agent_factory_for, text_response)
     app.state.active_goal_id = stale.id

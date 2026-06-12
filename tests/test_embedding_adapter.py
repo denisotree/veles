@@ -6,8 +6,6 @@ calls are out of scope for unit tests."""
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
-from unittest.mock import patch
 
 import pytest
 
@@ -90,9 +88,7 @@ def test_autodetect_picks_ollama_when_present(
 ) -> None:
     """When `probe_ollama` returns True, the Ollama adapter wins —
     no env credential check happens."""
-    monkeypatch.setattr(
-        "veles.modules.embedding_autodetect.probe_ollama", lambda: True
-    )
+    monkeypatch.setattr("veles.modules.embedding_autodetect.probe_ollama", lambda: True)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
@@ -105,9 +101,7 @@ def test_autodetect_falls_back_to_openrouter(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """No Ollama, but OPENROUTER_API_KEY set → OpenAI-shape adapter."""
-    monkeypatch.setattr(
-        "veles.modules.embedding_autodetect.probe_ollama", lambda: False
-    )
+    monkeypatch.setattr("veles.modules.embedding_autodetect.probe_ollama", lambda: False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
@@ -121,9 +115,7 @@ def test_autodetect_falls_back_to_openai(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """OpenRouter unset but OPENAI_API_KEY set → direct OpenAI."""
-    monkeypatch.setattr(
-        "veles.modules.embedding_autodetect.probe_ollama", lambda: False
-    )
+    monkeypatch.setattr("veles.modules.embedding_autodetect.probe_ollama", lambda: False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
@@ -139,9 +131,7 @@ def test_autodetect_returns_none_when_nothing_available(
 ) -> None:
     """No Ollama, no API key → None. Ranking falls back to
     token-based; user sees the setup-hint insight."""
-    monkeypatch.setattr(
-        "veles.modules.embedding_autodetect.probe_ollama", lambda: False
-    )
+    monkeypatch.setattr("veles.modules.embedding_autodetect.probe_ollama", lambda: False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
@@ -154,14 +144,10 @@ def test_autodetect_returns_none_when_nothing_available(
 def test_autodetect_caches_result(monkeypatch: pytest.MonkeyPatch) -> None:
     """Without `force=True`, autodetect returns the cached adapter
     and doesn't re-probe."""
-    monkeypatch.setattr(
-        "veles.modules.embedding_autodetect.probe_ollama", lambda: True
-    )
+    monkeypatch.setattr("veles.modules.embedding_autodetect.probe_ollama", lambda: True)
     first = autodetect_embedding_adapter(force=True)
     # Simulate Ollama going down — repeat call must still see first
-    monkeypatch.setattr(
-        "veles.modules.embedding_autodetect.probe_ollama", lambda: False
-    )
+    monkeypatch.setattr("veles.modules.embedding_autodetect.probe_ollama", lambda: False)
     second = autodetect_embedding_adapter()
     assert second is first
 
@@ -202,9 +188,7 @@ def test_setup_hint_idempotent(isolated_home: Path, tmp_path: Path) -> None:
     assert count == 1
 
 
-def test_setup_hint_no_crash_on_db_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_setup_hint_no_crash_on_db_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """If the SessionStore raises during open, the notice silently
     no-ops — we don't break the user's turn for a UI suggestion."""
     import sqlite3 as _sqlite3
@@ -254,9 +238,9 @@ def test_ollama_adapter_embeds_via_http(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Mock urlopen → adapter returns the parsed vector."""
-    from veles.modules.embedding_ollama import OllamaEmbeddingAdapter
-    import io
     import json
+
+    from veles.modules.embedding_ollama import OllamaEmbeddingAdapter
 
     class _Resp:
         def __init__(self, body: bytes) -> None:
@@ -271,12 +255,10 @@ def test_ollama_adapter_embeds_via_http(
         def read(self) -> bytes:
             return self._body
 
-    def fake_urlopen(req, timeout=None):  # noqa: ARG001
+    def fake_urlopen(req, timeout=None):
         return _Resp(json.dumps({"embedding": [1.0, 2.0, 3.0]}).encode())
 
-    monkeypatch.setattr(
-        "veles.modules.embedding_ollama.urllib.request.urlopen", fake_urlopen
-    )
+    monkeypatch.setattr("veles.modules.embedding_ollama.urllib.request.urlopen", fake_urlopen)
     a = OllamaEmbeddingAdapter()
     vecs = a.embed(["hello"])
     assert vecs == [[1.0, 2.0, 3.0]]
@@ -287,15 +269,14 @@ def test_ollama_adapter_embeds_via_http(
 def test_ollama_adapter_raises_embedding_error_on_network(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from veles.modules.embedding_ollama import OllamaEmbeddingAdapter
     import urllib.error
 
-    def boom(req, timeout=None):  # noqa: ARG001
+    from veles.modules.embedding_ollama import OllamaEmbeddingAdapter
+
+    def boom(req, timeout=None):
         raise urllib.error.URLError("connection refused")
 
-    monkeypatch.setattr(
-        "veles.modules.embedding_ollama.urllib.request.urlopen", boom
-    )
+    monkeypatch.setattr("veles.modules.embedding_ollama.urllib.request.urlopen", boom)
     with pytest.raises(EmbeddingError) as ei:
         OllamaEmbeddingAdapter().embed(["x"])
     assert "ollama" in str(ei.value).lower()

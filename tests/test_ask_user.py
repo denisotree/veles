@@ -27,7 +27,6 @@ from veles.core.user_prompt import (
     set_question_prompter,
 )
 
-
 # --- unit: the tool --------------------------------------------------------
 
 
@@ -84,13 +83,15 @@ class _OneAskProvider:
     supports_streaming: bool = False
     n: int = 0
 
-    def create_message(self, messages, tools=None, *, model, max_tokens=4096):  # noqa: ANN001
+    def create_message(self, messages, tools=None, *, model, max_tokens=4096):
         del tools, model, max_tokens
         self.n += 1
         if self.n == 1:
             return ProviderResponse(
                 text=None,
-                tool_calls=[ToolCall(id="c1", name="ask_user", arguments={"question": "prod or dev?"})],
+                tool_calls=[
+                    ToolCall(id="c1", name="ask_user", arguments={"question": "prod or dev?"})
+                ],
                 usage=TokenUsage(total_tokens=1),
                 finish_reason="tool_use",
             )

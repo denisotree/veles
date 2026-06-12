@@ -10,18 +10,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from veles.cli._parsers import build_parser as _build_parser
-from veles.cli._parsers._common import (
-    DEFAULT_COMPRESSOR_MODEL,
-    DEFAULT_COMPRESS_THRESHOLD_TOKENS,
-    DEFAULT_MAX_ITERATIONS,
-    DEFAULT_MAX_TOKENS_TOTAL,
-    DEFAULT_MODEL,
-    DEFAULT_PROVIDER,
-    PROVIDER_CHOICES as _PROVIDER_CHOICES,
-    add_common_run_flags as _add_common_run_flags,
-    add_project_root_flag as _add_project_root_flag,
-)
+from veles.cli._agent_builder import build_command_agent
 
 # Per-verb command modules (M46). Re-exported under their old private
 # names for backward compatibility with tests that monkey-patch
@@ -30,7 +19,6 @@ from veles.cli._parsers._common import (
 # M48 TUI, M51 daemon, M52 channels) doesn't bloat this file.
 from veles.cli._curator import (
     _CURATE_CHARS_LIMIT,
-    _CURATE_DEFAULT_LIMIT,
     _CURATE_QUIET_WINDOW_SEC,
     _CURATE_TOOLS,
     _CURATE_TURN_LIMIT,
@@ -49,11 +37,21 @@ from veles.cli._curator import (
     _maybe_run_post_turn_curator,
     _maybe_run_subproject_proposer,
     _maybe_suggest_promotions,
-    _render_message,
     _run_curator_pass,
     _truncate_session_messages,
 )
-from veles.cli._agent_builder import build_command_agent
+from veles.cli._parsers import build_parser as _build_parser
+from veles.cli._parsers._common import (
+    DEFAULT_COMPRESS_THRESHOLD_TOKENS,
+    DEFAULT_COMPRESSOR_MODEL,
+    DEFAULT_MAX_ITERATIONS,
+    DEFAULT_MAX_TOKENS_TOTAL,
+    DEFAULT_MODEL,
+    DEFAULT_PROVIDER,
+)
+from veles.cli._parsers._common import (
+    PROVIDER_CHOICES as _PROVIDER_CHOICES,
+)
 from veles.cli._project import (
     _load_project_modules,
     _register_project,
@@ -71,8 +69,6 @@ from veles.cli._runtime import (
     _budget_scope,
     _build_compressor,
     _build_run_system_prompt,
-    build_compressor,
-    build_run_system_prompt,
     _load_index_md,
     _load_skills,
     _make_tool_aware_provider,
@@ -82,19 +78,20 @@ from veles.cli._runtime import (
     _qualify_for_provider,
     _recall_block,
     _run_agent_streaming_aware,
+    build_compressor,
+    build_run_system_prompt,
 )
+from veles.cli.commands.add import cmd_add as _cmd_add
 from veles.cli.commands.autopilot import cmd_autopilot as _cmd_autopilot
 from veles.cli.commands.browse import cmd_browse as _cmd_browse
-from veles.cli.commands.doctor import cmd_doctor as _cmd_doctor
-from veles.cli.commands.goal import cmd_goal as _cmd_goal
-from veles.cli.commands.secrets import cmd_secret as _cmd_secret
 from veles.cli.commands.channel import cmd_channel as _cmd_channel
 from veles.cli.commands.curate import cmd_curate as _cmd_curate
 from veles.cli.commands.daemon import cmd_daemon as _cmd_daemon
-from veles.cli.commands.add import cmd_add as _cmd_add
+from veles.cli.commands.doctor import cmd_doctor as _cmd_doctor
 from veles.cli.commands.dream import cmd_dream as _cmd_dream
-from veles.cli.commands.job import cmd_job as _cmd_job
+from veles.cli.commands.goal import cmd_goal as _cmd_goal
 from veles.cli.commands.init import cmd_init as _cmd_init
+from veles.cli.commands.job import cmd_job as _cmd_job
 from veles.cli.commands.mcp import cmd_mcp as _cmd_mcp
 from veles.cli.commands.models import cmd_models as _cmd_models
 from veles.cli.commands.modules import cmd_module as _cmd_module
@@ -105,6 +102,7 @@ from veles.cli.commands.research import cmd_research as _cmd_research
 from veles.cli.commands.route import cmd_route as _cmd_route
 from veles.cli.commands.run import cmd_run as _cmd_run
 from veles.cli.commands.schema import cmd_schema_dispatch as _cmd_schema_dispatch
+from veles.cli.commands.secrets import cmd_secret as _cmd_secret
 from veles.cli.commands.self_doc import cmd_self_doc as _cmd_self_doc
 from veles.cli.commands.sessions import cmd_sessions as _cmd_sessions
 from veles.cli.commands.skills import cmd_skill as _cmd_skill
@@ -115,6 +113,10 @@ from veles.cli.commands.tui import cmd_tui as _cmd_tui
 from veles.core.context import (
     reset_active_project,
     set_active_project,
+)
+from veles.core.curator import (
+    _CURATE_DEFAULT_LIMIT,
+    _render_message,
 )
 from veles.core.modules import (
     reset_module_registry,
@@ -156,41 +158,41 @@ __all__ = [
     "_INGEST_TOOLS",
     "_PLANNING_TOOLS",
     "_PROPOSER_IDLE_THRESHOLD_SEC",
-    "_SELF_DOC_IDLE_SEC",
     # provider factory aliases (live in core.provider_factory)
     "_PROVIDER_API_KEY_ENVS",
     "_PROVIDER_CHOICES",
     "_RECALL_BLOCK_CHARS_CAP",
     "_RECALL_LIMIT",
     "_RUN_TOOLS",
+    "_SELF_DOC_IDLE_SEC",
     "_CuratorPassResult",
     "_budget_scope",
     "_build_compressor",
     "_build_parser",
     "_build_run_system_prompt",
+    "_cmd_add",
     # verb dispatchers
     "_cmd_autopilot",
     "_cmd_browse",
-    "_cmd_doctor",
-    "_cmd_goal",
-    "_cmd_secret",
     "_cmd_channel",
     "_cmd_curate",
     "_cmd_daemon",
-    "_cmd_export",
-    "_cmd_import",
+    "_cmd_doctor",
     "_cmd_dream",
-    "_cmd_add",
-    "_cmd_job",
+    "_cmd_export",
+    "_cmd_goal",
+    "_cmd_import",
     "_cmd_init",
+    "_cmd_job",
     "_cmd_mcp",
     "_cmd_models",
     "_cmd_module",
     "_cmd_project",
-    "_cmd_route",
     "_cmd_research",
+    "_cmd_route",
     "_cmd_run",
     "_cmd_schema_dispatch",
+    "_cmd_secret",
     "_cmd_self_doc",
     "_cmd_sessions",
     "_cmd_skill",
@@ -229,6 +231,8 @@ __all__ = [
     "_truncate_session_messages",
     "_warn_if_agents_md_invalid",
     "build_command_agent",
+    "build_compressor",
+    "build_run_system_prompt",
     "main",
 ]
 
@@ -379,7 +383,8 @@ def _ensure_api_key(provider: str = "openrouter", *, project: str | None = None)
         return True
     label = " (or ".join(envs) + ")" if len(envs) > 1 else envs[0]
     print(
-        f"error: no API key for --provider {provider} (set {label} or store via `veles secret set {provider}`)",
+        f"error: no API key for --provider {provider} "
+        f"(set {label} or store via `veles secret set {provider}`)",
         file=sys.stderr,
     )
     return False

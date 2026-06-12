@@ -66,9 +66,7 @@ def test_schema_has_expected_columns(conn: sqlite3.Connection) -> None:
 # ---- scanner: first scan ----
 
 
-def test_first_scan_records_every_file_and_dir(
-    tmp_path: Path, conn: sqlite3.Connection
-) -> None:
+def test_first_scan_records_every_file_and_dir(tmp_path: Path, conn: sqlite3.Connection) -> None:
     root = _make_project(tmp_path / "proj")
     report = Scanner(root, conn).scan()
     assert report.scanned > 0
@@ -86,9 +84,7 @@ def test_first_scan_records_every_file_and_dir(
     assert paths.get("pyproject.toml") == "file"
 
 
-def test_scan_skips_always_excluded_dirs(
-    tmp_path: Path, conn: sqlite3.Connection
-) -> None:
+def test_scan_skips_always_excluded_dirs(tmp_path: Path, conn: sqlite3.Connection) -> None:
     root = _make_project(tmp_path / "proj")
     (root / ".veles").mkdir()
     (root / ".veles" / "memory.db").write_text("x")
@@ -106,9 +102,7 @@ def test_scan_skips_always_excluded_dirs(
         assert not any(p.startswith(excluded) for p in paths), excluded
 
 
-def test_scan_honours_gitignore(
-    tmp_path: Path, conn: sqlite3.Connection
-) -> None:
+def test_scan_honours_gitignore(tmp_path: Path, conn: sqlite3.Connection) -> None:
     root = _make_project(tmp_path / "proj")
     (root / ".gitignore").write_text("*.log\ntmp/\n")
     (root / "out.log").write_text("noise")
@@ -117,17 +111,13 @@ def test_scan_honours_gitignore(
     (root / "tmp" / "junk.txt").write_text("noise")
 
     Scanner(root, conn).scan()
-    paths = {
-        r["rel_path"] for r in conn.execute("SELECT rel_path FROM project_tree").fetchall()
-    }
+    paths = {r["rel_path"] for r in conn.execute("SELECT rel_path FROM project_tree").fetchall()}
     assert "keep.txt" in paths
     assert "out.log" not in paths
     assert "tmp/junk.txt" not in paths
 
 
-def test_parent_path_set_for_nested_files(
-    tmp_path: Path, conn: sqlite3.Connection
-) -> None:
+def test_parent_path_set_for_nested_files(tmp_path: Path, conn: sqlite3.Connection) -> None:
     root = _make_project(tmp_path / "proj")
     Scanner(root, conn).scan()
     row = conn.execute(
@@ -160,9 +150,7 @@ def test_semantic_tagger_classifies_top_level_dirs(
     assert tags.get("docs") == "docs"
 
 
-def test_top_level_files_get_doc_or_config_tag(
-    tmp_path: Path, conn: sqlite3.Connection
-) -> None:
+def test_top_level_files_get_doc_or_config_tag(tmp_path: Path, conn: sqlite3.Connection) -> None:
     root = _make_project(tmp_path / "proj")
     Scanner(root, conn).scan()
     rows = conn.execute(
@@ -176,9 +164,7 @@ def test_top_level_files_get_doc_or_config_tag(
 # ---- scanner: incremental ----
 
 
-def test_second_scan_no_changes_yields_no_updates(
-    tmp_path: Path, conn: sqlite3.Connection
-) -> None:
+def test_second_scan_no_changes_yields_no_updates(tmp_path: Path, conn: sqlite3.Connection) -> None:
     root = _make_project(tmp_path / "proj")
     Scanner(root, conn).scan()
     report = Scanner(root, conn).scan()
@@ -187,9 +173,7 @@ def test_second_scan_no_changes_yields_no_updates(
     assert report.removed == 0
 
 
-def test_modified_file_triggers_update(
-    tmp_path: Path, conn: sqlite3.Connection
-) -> None:
+def test_modified_file_triggers_update(tmp_path: Path, conn: sqlite3.Connection) -> None:
     root = _make_project(tmp_path / "proj")
     Scanner(root, conn).scan()
     # Touch a file with a new mtime
@@ -205,9 +189,7 @@ def test_modified_file_triggers_update(
     assert report.added == 0
 
 
-def test_deleted_file_pruned_from_cache(
-    tmp_path: Path, conn: sqlite3.Connection
-) -> None:
+def test_deleted_file_pruned_from_cache(tmp_path: Path, conn: sqlite3.Connection) -> None:
     root = _make_project(tmp_path / "proj")
     Scanner(root, conn).scan()
     (root / "docs" / "guide.md").unlink()
@@ -224,9 +206,7 @@ def test_deleted_file_pruned_from_cache(
 # ---- recall API ----
 
 
-def test_relevant_returns_top_matches_by_token(
-    tmp_path: Path, conn: sqlite3.Connection
-) -> None:
+def test_relevant_returns_top_matches_by_token(tmp_path: Path, conn: sqlite3.Connection) -> None:
     root = _make_project(tmp_path / "proj")
     Scanner(root, conn).scan()
     hits = relevant(conn, "agent.py", limit=5)
@@ -236,9 +216,7 @@ def test_relevant_returns_top_matches_by_token(
     assert "src/veles/agent.py" in rel_paths
 
 
-def test_relevant_uses_semantic_tag(
-    tmp_path: Path, conn: sqlite3.Connection
-) -> None:
+def test_relevant_uses_semantic_tag(tmp_path: Path, conn: sqlite3.Connection) -> None:
     root = _make_project(tmp_path / "proj")
     Scanner(root, conn).scan()
     hits = relevant(conn, "docs", limit=10)
@@ -248,17 +226,13 @@ def test_relevant_uses_semantic_tag(
     assert "README.md" in rel_paths
 
 
-def test_relevant_empty_query_returns_nothing(
-    tmp_path: Path, conn: sqlite3.Connection
-) -> None:
+def test_relevant_empty_query_returns_nothing(tmp_path: Path, conn: sqlite3.Connection) -> None:
     root = _make_project(tmp_path / "proj")
     Scanner(root, conn).scan()
     assert relevant(conn, "", limit=5) == []
 
 
-def test_relevant_respects_limit(
-    tmp_path: Path, conn: sqlite3.Connection
-) -> None:
+def test_relevant_respects_limit(tmp_path: Path, conn: sqlite3.Connection) -> None:
     root = _make_project(tmp_path / "proj")
     # add many files to inflate the candidate set
     for i in range(20):
@@ -268,9 +242,7 @@ def test_relevant_respects_limit(
     assert len(hits) == 3
 
 
-def test_relevant_returns_typed_entries(
-    tmp_path: Path, conn: sqlite3.Connection
-) -> None:
+def test_relevant_returns_typed_entries(tmp_path: Path, conn: sqlite3.Connection) -> None:
     root = _make_project(tmp_path / "proj")
     Scanner(root, conn).scan()
     hits = relevant(conn, "src core", limit=5)

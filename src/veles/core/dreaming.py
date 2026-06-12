@@ -242,9 +242,7 @@ def dream_cycle(
                 result,
             )
         if not skip_dedup:
-            _run_dream_step(
-                "dedup", lambda: _step_dedup(project, result, dry_run=dry_run), result
-            )
+            _run_dream_step("dedup", lambda: _step_dedup(project, result, dry_run=dry_run), result)
         if not skip_promote:
             _run_dream_step(
                 "promote", lambda: _step_promote(project, result, dry_run=dry_run), result
@@ -254,9 +252,7 @@ def dream_cycle(
                 "lint", lambda: _step_lint(project, wiki, result, dry_run=dry_run), result
             )
         if not skip_reindex and not dry_run and wiki is not None:
-            _run_dream_step(
-                "reindex", lambda: _step_reindex(wiki, result), result
-            )
+            _run_dream_step("reindex", lambda: _step_reindex(wiki, result), result)
         if include_consolidation:
             _run_dream_step(
                 "insight_dedup",
@@ -266,9 +262,7 @@ def dream_cycle(
         if include_consolidation and provider is not None:
             _run_dream_step(
                 "consolidation",
-                lambda: _step_consolidate(
-                    project, provider, model, result, dry_run=dry_run
-                ),
+                lambda: _step_consolidate(project, provider, model, result, dry_run=dry_run),
                 result,
             )
 
@@ -380,7 +374,7 @@ def _step_runtime_sessions(
 
     try:
         digest = runtime_loader()
-    except Exception as exc:  # noqa: BLE001 — loader is best-effort
+    except Exception as exc:
         result.notes.append(f"runtime-sessions loader failed: {exc}")
         return
     if not digest:
@@ -565,9 +559,9 @@ def _now_iso() -> str:
 
 
 __all__ = [
-    "DreamResult",
     "_DEEP_DEFAULT_IDLE_SEC",
     "_DEEP_DEFAULT_INTERVAL_SEC",
     "_POST_TURN_DEFAULT_INTERVAL_SEC",
+    "DreamResult",
     "dream_cycle",
 ]

@@ -23,7 +23,6 @@ from veles.daemon.auth import TokenStore
 from veles.daemon.server import _channel_session_map, _start_channel_runners
 from veles.daemon.state import DaemonState
 
-
 # ---- list_channel_configs (pure config parsing) ----
 
 
@@ -159,7 +158,7 @@ async def test_credless_channel_skipped_others_survive(state, fake_platforms, ca
     _write_config(
         state.project,
         '[channels.fake]\nenabled = true\nbot_token = "a"\n'
-        '[channels.fake2]\nenabled = true\n',  # no token
+        "[channels.fake2]\nenabled = true\n",  # no token
     )
     with caplog.at_level(logging.WARNING, logger="veles.daemon.server"):
         _start_channel_runners(state)

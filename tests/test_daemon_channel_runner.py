@@ -24,7 +24,7 @@ def state(tmp_path: Path) -> DaemonState:
     store = SessionStore(project.memory_db_path)
     tokens = TokenStore.load()
 
-    def factory(session_id):  # noqa: ARG001
+    def factory(session_id):
         raise AssertionError("agent factory must not be called when no message arrives")
 
     return DaemonState(
@@ -50,7 +50,7 @@ def test_no_config_means_no_channel_runners(state: DaemonState) -> None:
 def test_disabled_telegram_skipped(state: DaemonState) -> None:
     _write_config(
         state.project,
-        '[channels.telegram]\nenabled = false\nwhitelist = []\n',
+        "[channels.telegram]\nenabled = false\nwhitelist = []\n",
     )
     _start_channel_runners(state)
     assert state.channel_runners == []
@@ -71,9 +71,7 @@ def test_enabled_but_no_token_skipped(state: DaemonState, caplog) -> None:
     assert any("no bot token" in rec.message for rec in caplog.records)
 
 
-async def test_enabled_with_keychain_token_starts_gateway(
-    state: DaemonState, monkeypatch
-) -> None:
+async def test_enabled_with_keychain_token_starts_gateway(state: DaemonState, monkeypatch) -> None:
     set_provider_key("telegram", "tok-test", project=state.project.name)
     _write_config(
         state.project,
@@ -83,10 +81,10 @@ async def test_enabled_with_keychain_token_starts_gateway(
     started: list[bool] = []
     stopped: list[bool] = []
 
-    async def fake_start(self):  # noqa: ARG001
+    async def fake_start(self):
         started.append(True)
 
-    async def fake_stop(self):  # noqa: ARG001
+    async def fake_stop(self):
         stopped.append(True)
 
     from veles.channels import telegram as tg_mod
@@ -113,16 +111,14 @@ async def test_enabled_with_keychain_token_starts_gateway(
     delete_provider_key("telegram", project=state.project.name)
 
 
-async def test_legacy_chat_id_promoted_to_whitelist(
-    state: DaemonState, monkeypatch
-) -> None:
+async def test_legacy_chat_id_promoted_to_whitelist(state: DaemonState, monkeypatch) -> None:
     set_provider_key("telegram", "tok-test", project=state.project.name)
     _write_config(
         state.project,
         '[channels.telegram]\nenabled = true\nchat_id = "555"\n',
     )
 
-    async def fake_start(self):  # noqa: ARG001
+    async def fake_start(self):
         pass
 
     from veles.channels import telegram as tg_mod

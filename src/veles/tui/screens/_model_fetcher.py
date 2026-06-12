@@ -33,7 +33,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -79,8 +79,8 @@ def _read_cache(provider: str) -> list[str] | None:
         payload = json.loads(path.read_text(encoding="utf-8"))
         fetched_at = datetime.fromisoformat(payload["fetched_at"])
         if fetched_at.tzinfo is None:
-            fetched_at = fetched_at.replace(tzinfo=timezone.utc)
-        age = (datetime.now(timezone.utc) - fetched_at).total_seconds()
+            fetched_at = fetched_at.replace(tzinfo=UTC)
+        age = (datetime.now(UTC) - fetched_at).total_seconds()
         if age >= CACHE_TTL_SECONDS:
             return None
         models = payload.get("models")
@@ -96,7 +96,7 @@ def _write_cache(provider: str, models: list[str]) -> None:
     path = _cache_path(provider)
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "fetched_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "models": models,
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -140,9 +140,7 @@ def _try_live(provider: str) -> list[str] | None:
     return result
 
 
-def validate_and_fetch_models(
-    provider: str, api_key: str
-) -> tuple[bool, list[str], str]:
+def validate_and_fetch_models(provider: str, api_key: str) -> tuple[bool, list[str], str]:
     """One-shot validation + model listing using `api_key`.
 
     Temporarily plants the key in the canonical env var for `provider`

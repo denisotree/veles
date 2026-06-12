@@ -47,9 +47,7 @@ def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path / "home"
 
 
-def _write_user_pack(
-    isolated_home: Path, name: str, description: str = ""
-) -> Path:
+def _write_user_pack(isolated_home: Path, name: str, description: str = "") -> Path:
     pack_dir = isolated_home / ".veles" / "layouts" / name
     pack_dir.mkdir(parents=True, exist_ok=True)
     (pack_dir / "layout.toml").write_text(
@@ -79,9 +77,7 @@ async def test_builtin_packs_offer_picker_with_llm_wiki_default(
 # ---- multi-pack: picker offered ----
 
 
-async def test_picker_shown_when_multiple_packs(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+async def test_picker_shown_when_multiple_packs(isolated_home: Path, tmp_path: Path) -> None:
     _write_user_pack(isolated_home, "obsidian-import", "Mind Palace mapper")
     project = init_project(tmp_path / "proj", name="proj")
     app = _StubApp(responses=["obsidian-import"])
@@ -93,9 +89,7 @@ async def test_picker_shown_when_multiple_packs(
     assert len(app.pushed) == 1
 
 
-async def test_picked_layout_flows_into_init(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+async def test_picked_layout_flows_into_init(isolated_home: Path, tmp_path: Path) -> None:
     """M162: the picker records the answer; init_project(layout=picked)
     persists it in project.toml so the next `veles run` sees it."""
     _write_user_pack(isolated_home, "obsidian-import")
@@ -104,17 +98,13 @@ async def test_picked_layout_flows_into_init(
     await LayoutPickerStep().run(ctx)
     assert ctx.answers["layout"] == "obsidian-import"
 
-    project = init_project(
-        tmp_path / "proj", name="proj", layout=ctx.answers["layout"]
-    )
+    project = init_project(tmp_path / "proj", name="proj", layout=ctx.answers["layout"])
     assert project.layout_name == "obsidian-import"
     reloaded = load_project(project.root)
     assert reloaded.layout_name == "obsidian-import"
 
 
-async def test_picker_esc_returns_back_signal(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+async def test_picker_esc_returns_back_signal(isolated_home: Path, tmp_path: Path) -> None:
     """Esc on the picker (push_screen_wait returns None) → `_nav`
     helper translates that to BACK so the wizard runner can step
     backwards."""

@@ -151,6 +151,4 @@ def test_factory_log_line_shows_config_model_no_overridden_marker(
         and "model=config-model" in r.message
         and "(overridden)" not in r.message
     ]
-    assert matched, (
-        f"expected config-model log line, got: {[r.message for r in caplog.records]}"
-    )
+    assert matched, f"expected config-model log line, got: {[r.message for r in caplog.records]}"

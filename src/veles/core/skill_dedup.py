@@ -187,14 +187,11 @@ def _build_embedding_provider(project: Project | None):
         if api_key:
             break
     if not api_key and provider_name in ("openai", "openrouter"):
-        raise RuntimeError(
-            f"no API key for routed embedding provider {provider_name!r}"
-        )
+        raise RuntimeError(f"no API key for routed embedding provider {provider_name!r}")
     base_url = "https://openrouter.ai/api/v1" if provider_name == "openrouter" else None
     if provider_name not in ("openai", "openrouter"):
         raise RuntimeError(
-            f"embedding provider {provider_name!r} is not supported; "
-            "route to openai or openrouter"
+            f"embedding provider {provider_name!r} is not supported; route to openai or openrouter"
         )
     return OpenAIEmbeddingAdapter(model=model, api_key=api_key, base_url=base_url)
 
@@ -215,6 +212,7 @@ def _cluster_by_pairwise(
     A missing vector for either skill yields similarity 0.0 (that pair never
     clusters), preserving the M61 behaviour of skipping vector-less skills.
     Re-sorts by `(-score, first-skill-name)` to keep the M61 tiebreak."""
+
     def sim(i: int, j: int) -> float:
         va = vectors.get(skills[i].name)
         vb = vectors.get(skills[j].name)

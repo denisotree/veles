@@ -19,6 +19,8 @@ Invariants:
 
 from __future__ import annotations
 
+import contextlib
+
 from veles.core.provider import ProviderResponse, ProviderUnavailable, TokenUsage
 from veles.core.provider_pool import FailoverProvider
 
@@ -51,7 +53,7 @@ class _Ok:
     def __init__(self) -> None:
         self.call_count = 0
 
-    def create_message(self, *a, **k):  # noqa: ANN002, ANN003
+    def create_message(self, *a, **k):
         del a, k
         self.call_count += 1
         return ProviderResponse(text="ok", tool_calls=[], usage=TokenUsage(total_tokens=1))
@@ -68,7 +70,7 @@ class _Flaky:
         self.call_count = 0
         self.heal_after = heal_after
 
-    def create_message(self, *a, **k):  # noqa: ANN002, ANN003
+    def create_message(self, *a, **k):
         del a, k
         self.call_count += 1
         if self.heal_after is not None and self.call_count > self.heal_after:
@@ -90,7 +92,8 @@ def test_dead_host_is_skipped_for_healthy_peer() -> None:
     assert pool.cooling_down() == []
     # Force flaky back to index 0 and fail it again to reach the threshold.
     pool._idx = 0
-    assert pool.create_message([], model="m").text == "ok"  # flaky fails (streak 2 → dead), good serves
+    # flaky fails (streak 2 → dead), good serves
+    assert pool.create_message([], model="m").text == "ok"
     assert pool.cooling_down() == [0]
     # Next call: flaky is dead → skipped entirely; good serves without touching flaky.
     before = flaky.call_count
@@ -106,10 +109,8 @@ def test_all_dead_fails_fast() -> None:
         [a, b], max_attempts=2, cooldown_sec=20.0, fail_threshold=1, clock=clock
     )
     # threshold=1: first failure of each marks it dead. One call fails both → both dead.
-    try:
+    with contextlib.suppress(_RateLimit):
         pool.create_message([], model="m")
-    except _RateLimit:
-        pass
     assert pool.cooling_down() == [0, 1]
     # Next call: every provider cooling down → fail fast, nothing called.
     a_before, b_before = a.call_count, b.call_count
@@ -129,17 +130,13 @@ def test_cooldown_expires_and_host_retried() -> None:
     )
     # Two failing calls arm the cooldown (single provider, max_attempts=1).
     for _ in range(2):
-        try:
+        with contextlib.suppress(_RateLimit):
             pool.create_message([], model="m")
-        except _RateLimit:
-            pass
     assert pool.cooling_down() == [0]
     # Within the window: fail fast, host not called.
     before = flaky.call_count
-    try:
+    with contextlib.suppress(ProviderUnavailable):
         pool.create_message([], model="m")
-    except ProviderUnavailable:
-        pass
     assert flaky.call_count == before
     # After the window: host retried and (now healed) succeeds.
     clock.advance(21.0)
@@ -153,19 +150,15 @@ def test_success_resets_failure_streak() -> None:
     pool = FailoverProvider(
         [flaky], max_attempts=1, cooldown_sec=20.0, fail_threshold=2, clock=clock
     )
-    try:
+    with contextlib.suppress(_RateLimit):
         pool.create_message([], model="m")  # streak 1
-    except _RateLimit:
-        pass
     pool.create_message([], model="m")  # success → streak reset to 0
     # A subsequent single failure must not immediately trip (streak restarts).
     flaky.heal_after = None  # make it always fail again
     flaky.call_count = 0
     # call fails once; streak is 1 (<2) so not dead.
-    try:
+    with contextlib.suppress(_RateLimit):
         pool.create_message([], model="m")
-    except _RateLimit:
-        pass
     assert pool.cooling_down() == []
 
 
@@ -174,8 +167,6 @@ def test_cooldown_disabled_restores_pure_rotation() -> None:
     a, b = _Flaky(), _Flaky()
     pool = FailoverProvider([a, b], max_attempts=2, cooldown_sec=0.0, clock=clock)
     # Both fail; with cooldown off nothing is ever marked dead.
-    try:
+    with contextlib.suppress(_RateLimit):
         pool.create_message([], model="m")
-    except _RateLimit:
-        pass
     assert pool.cooling_down() == []

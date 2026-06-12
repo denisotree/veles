@@ -13,7 +13,6 @@ from veles.core.self_doc import (
 )
 from veles.core.wiki import Wiki
 
-
 # ---- helpers ----
 
 

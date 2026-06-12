@@ -120,9 +120,7 @@ class TelegramApi:
             logger.debug("editMessageText failed (ignored): %s", exc)
             return {}
 
-    async def answer_callback_query(
-        self, callback_id: str, *, text: str | None = None
-    ) -> None:
+    async def answer_callback_query(self, callback_id: str, *, text: str | None = None) -> None:
         payload: dict[str, Any] = {"callback_query_id": callback_id}
         if text is not None:
             payload["text"] = text

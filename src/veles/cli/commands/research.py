@@ -68,7 +68,7 @@ def cmd_research(args: argparse.Namespace, project: Project) -> int:
     # single-agent / manager run paths use.
     compressor = _build_compressor(args, project, provider)
 
-    def factory(**kwargs):  # noqa: ANN003
+    def factory(**kwargs):
         worker_system = kwargs.get("system_prompt") or ""
         full_system = (
             f"{base_system}\n\n---\n\n{worker_system}"

@@ -82,9 +82,7 @@ class ChatLog(VerticalScroll):
         if self._current_assistant is not None:
             return
         self._buffer = ""
-        self._current_assistant = SelectableStatic(
-            "assistant>", classes="veles-assistant"
-        )
+        self._current_assistant = SelectableStatic("assistant>", classes="veles-assistant")
         self.transcript.append(("assistant", ""))
         self.mount(self._current_assistant)
         self.scroll_end(animate=False)
@@ -107,9 +105,7 @@ class ChatLog(VerticalScroll):
         coloring), then drops the streaming handle so the next delta
         opens a fresh Static instead of growing the previous one."""
         if self._current_assistant is not None and self._buffer.strip():
-            self._current_assistant.update(
-                Markdown(self._buffer, code_theme="monokai")
-            )
+            self._current_assistant.update(Markdown(self._buffer, code_theme="monokai"))
         self._seal_assistant()
 
     def append_error(self, text: str) -> None:

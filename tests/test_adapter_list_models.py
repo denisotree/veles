@@ -86,7 +86,7 @@ class _StubGeminiModels:
     def __init__(self, items: list[_GeminiModel]) -> None:
         self._items = items
 
-    def list(self):  # noqa: A003 (matches SDK shape)
+    def list(self):
         return iter(self._items)
 
 
@@ -115,9 +115,7 @@ def test_gemini_list_models_skips_empty_names(monkeypatch: pytest.MonkeyPatch) -
     from veles.adapters import gemini as mod
 
     monkeypatch.setenv("GEMINI_API_KEY", "k")
-    stub = _StubGeminiClient(
-        [_GeminiModel(name="models/gemini-2.5-pro"), _GeminiModel(name="")]
-    )
+    stub = _StubGeminiClient([_GeminiModel(name="models/gemini-2.5-pro"), _GeminiModel(name="")])
     with patch.object(mod.genai, "Client", return_value=stub):
         p = mod.GeminiProvider()
     assert p.list_models() == ["gemini-2.5-pro"]

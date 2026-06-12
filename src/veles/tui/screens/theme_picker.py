@@ -23,9 +23,7 @@ class ThemePickerScreen(PickerScreen[str]):
         items: list[PickerItem[str]] = []
         for name in builtin_theme_names():
             marker = "* " if name == current else "  "
-            items.append(
-                PickerItem(label=f"{marker}{name}", haystack=name, value=name)
-            )
+            items.append(PickerItem(label=f"{marker}{name}", haystack=name, value=name))
         super().__init__(
             title="Pick a theme (Esc to cancel)",
             items=items,

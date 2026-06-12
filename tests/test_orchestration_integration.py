@@ -14,7 +14,6 @@ from veles.core.orchestration import (
     should_use_manager,
 )
 
-
 # ---- env_manager_mode ----
 
 
@@ -106,8 +105,10 @@ class _StubAgent:
         self.system_prompt = system_prompt or ""
 
     def run(self, prompt: str) -> _FakeResult:
-        role = "writer" if "writer worker" in self.system_prompt else (
-            "explorer" if "explorer worker" in self.system_prompt else "other"
+        role = (
+            "writer"
+            if "writer worker" in self.system_prompt
+            else ("explorer" if "explorer worker" in self.system_prompt else "other")
         )
         return _FakeResult(text=f"[{role}] head: {prompt[:40]}", session_id="s")
 
@@ -126,9 +127,7 @@ def test_direct_runner_called_when_not_eligible(
         captured.append(prompt)
         return f"direct: {prompt}"
 
-    out = run_with_manager_if_eligible(
-        "short", agent_factory=_factory, direct_runner=direct
-    )
+    out = run_with_manager_if_eligible("short", agent_factory=_factory, direct_runner=direct)
     assert out == "direct: short"
     assert captured == ["short"]
 
@@ -230,8 +229,6 @@ def test_manager_failure_falls_back_to_direct(
         direct_calls.append(prompt)
         return "fallback"
 
-    out = run_with_manager_if_eligible(
-        "anything", agent_factory=bad_factory, direct_runner=direct
-    )
+    out = run_with_manager_if_eligible("anything", agent_factory=bad_factory, direct_runner=direct)
     assert direct_calls == ["anything"]
     assert out == "fallback"

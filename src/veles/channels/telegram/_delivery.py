@@ -154,9 +154,7 @@ class TelegramDelivery:
         except asyncio.CancelledError:
             raise
 
-    async def send_manager_plan_notice(
-        self, chat_id: int, event: dict[str, Any]
-    ) -> None:
+    async def send_manager_plan_notice(self, chat_id: int, event: dict[str, Any]) -> None:
         """M124: render the manager-spawn plan as a chat message so the
         user sees what's happening before the writer's final text lands.
         Format mirrors the WorkerPlan checkbox renderer."""
@@ -165,8 +163,5 @@ class TelegramDelivery:
         if not roles:
             return
         roles_label = ", ".join(roles)
-        body = (
-            f"🧠 <i>Decomposing into {len(roles)} workers: "
-            f"{escape_html(roles_label)}…</i>"
-        )
+        body = f"🧠 <i>Decomposing into {len(roles)} workers: {escape_html(roles_label)}…</i>"
         await self._gw._send_message(chat_id, body)

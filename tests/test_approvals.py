@@ -40,9 +40,7 @@ def test_record_fields_round_trip(tmp_path: Path) -> None:
         arguments={"path": "/tmp/x", "content": "hello"},
         scope="always-project",
     )
-    saved = json.loads(
-        (state / APPROVALS_DIRNAME / f"{rec.approval_id}.json").read_text()
-    )
+    saved = json.loads((state / APPROVALS_DIRNAME / f"{rec.approval_id}.json").read_text())
     assert saved["tool_name"] == "write_file"
     assert saved["rule"] == "always_confirm"
     assert saved["session_id"] == "sess-42"
@@ -114,7 +112,5 @@ def test_record_includes_action_label(tmp_path: Path) -> None:
     state = tmp_path / ".veles"
     rec = record_approval(state, tool_name="run_shell", rule="trust_ladder")
     assert rec.action == "dispatch run_shell"
-    custom = record_approval(
-        state, tool_name="foo", rule="trust_ladder", action="explicit-action"
-    )
+    custom = record_approval(state, tool_name="foo", rule="trust_ladder", action="explicit-action")
     assert custom.action == "explicit-action"

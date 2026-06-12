@@ -27,10 +27,7 @@ def _tables(store: SessionStore) -> set[str]:
 
 
 def _cols(store: SessionStore, table: str) -> set[str]:
-    return {
-        r["name"]
-        for r in store._conn.execute(f"PRAGMA table_info({table})").fetchall()
-    }
+    return {r["name"] for r in store._conn.execute(f"PRAGMA table_info({table})").fetchall()}
 
 
 # ---- schema presence ----
@@ -95,8 +92,7 @@ def test_skills_columns(store: SessionStore) -> None:
 def test_insert_tool_and_use(store: SessionStore) -> None:
     c = store._conn
     c.execute(
-        "INSERT INTO tools(name, scope, origin, created_at, updated_at)"
-        " VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO tools(name, scope, origin, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
         ("read_file", "builtin", "builtin", 1.0, 1.0),
     )
     tool_id = c.execute("SELECT id FROM tools WHERE name = ?", ("read_file",)).fetchone()["id"]
@@ -119,8 +115,7 @@ def test_tool_scope_constraint(store: SessionStore) -> None:
     c = store._conn
     with pytest.raises(_sqlite3.IntegrityError):
         c.execute(
-            "INSERT INTO tools(name, scope, origin, created_at, updated_at)"
-            " VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO tools(name, scope, origin, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
             ("x", "bogus_scope", "builtin", 1.0, 1.0),
         )
 
@@ -130,14 +125,12 @@ def test_unique_tool_name(store: SessionStore) -> None:
 
     c = store._conn
     c.execute(
-        "INSERT INTO tools(name, scope, origin, created_at, updated_at)"
-        " VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO tools(name, scope, origin, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
         ("dup", "user", "manual", 1.0, 1.0),
     )
     with pytest.raises(_sqlite3.IntegrityError):
         c.execute(
-            "INSERT INTO tools(name, scope, origin, created_at, updated_at)"
-            " VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO tools(name, scope, origin, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
             ("dup", "user", "manual", 2.0, 2.0),
         )
 
@@ -176,8 +169,12 @@ def test_rules_fts_indexed_on_insert(store: SessionStore) -> None:
     c = store._conn
     c.execute(
         "INSERT INTO rules(kind, body, source, created_at) VALUES (?, ?, ?, ?)",
-        ("dont", "always set explicit timeout on long-running shell calls",
-         "explicit-feedback", 1.0),
+        (
+            "dont",
+            "always set explicit timeout on long-running shell calls",
+            "explicit-feedback",
+            1.0,
+        ),
     )
     matches = c.execute(
         "SELECT body FROM rules_fts WHERE rules_fts MATCH ?", ("timeout",)
@@ -189,8 +186,7 @@ def test_rules_fts_indexed_on_insert(store: SessionStore) -> None:
 def test_insights_fts_searches_title_and_body(store: SessionStore) -> None:
     c = store._conn
     c.execute(
-        "INSERT INTO insights(title, body, category, created_at)"
-        " VALUES (?, ?, ?, ?)",
+        "INSERT INTO insights(title, body, category, created_at) VALUES (?, ?, ?, ?)",
         ("Telegram pattern", "Use HTML, not Markdown", "format", 1.0),
     )
     rows = c.execute(

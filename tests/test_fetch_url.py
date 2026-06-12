@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import socket
+from typing import ClassVar
 
 import pytest
 
@@ -94,7 +95,7 @@ def test_fetch_url_does_call_httpx_for_public(monkeypatch) -> None:
     class _Resp:
         text = "OK body"
         status_code = 200
-        headers: dict = {}
+        headers: ClassVar[dict] = {}
 
     def fake_get(url, **kwargs):
         captured["url"] = url

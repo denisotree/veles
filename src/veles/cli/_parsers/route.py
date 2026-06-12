@@ -23,7 +23,9 @@ def register(sub: argparse._SubParsersAction) -> None:
     )
     route_set.add_argument(
         "task",
-        help="Task type: default, curator, compressor, insights, skills, advisor, vision, embedding.",
+        help=(
+            "Task type: default, curator, compressor, insights, skills, advisor, vision, embedding."
+        ),
     )
     route_set.add_argument(
         "spec",

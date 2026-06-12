@@ -81,9 +81,7 @@ def popen_jsonl(
         except (OSError, ValueError):
             pass  # pipe closed under us during teardown — tail stays as-is
 
-    drainer = threading.Thread(
-        target=_drain_stderr, name="popen-jsonl-stderr-drain", daemon=True
-    )
+    drainer = threading.Thread(target=_drain_stderr, name="popen-jsonl-stderr-drain", daemon=True)
     drainer.start()
 
     def _stderr_tail() -> str:
@@ -101,9 +99,7 @@ def popen_jsonl(
         for raw in proc.stdout:
             if time.monotonic() > deadline:
                 proc.kill()
-                raise RuntimeError(
-                    f"{cmd[0]} timed out after {timeout:.0f}s: {_stderr_tail()}"
-                )
+                raise RuntimeError(f"{cmd[0]} timed out after {timeout:.0f}s: {_stderr_tail()}")
             line = raw.strip()
             if not line:
                 continue
@@ -116,8 +112,7 @@ def popen_jsonl(
         except subprocess.TimeoutExpired:
             proc.kill()
             raise RuntimeError(
-                f"{cmd[0]} did not exit within {timeout:.0f}s after stdout EOF: "
-                f"{_stderr_tail()}"
+                f"{cmd[0]} did not exit within {timeout:.0f}s after stdout EOF: {_stderr_tail()}"
             ) from None
         if rc != 0:
             raise RuntimeError(f"{cmd[0]} exited {rc}: {_stderr_tail()}")

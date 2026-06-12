@@ -7,7 +7,11 @@ from veles.core.permission import Decision, evaluate
 from veles.core.permission.engine import event_decision_str
 from veles.core.permission.prompt import (
     PromptAnswer,
+)
+from veles.core.permission.prompt import (
     reset_prompter as reset_unified_prompter,
+)
+from veles.core.permission.prompt import (
     set_prompter as set_unified_prompter,
 )
 from veles.core.risk import RiskClass
@@ -187,13 +191,9 @@ def test_decision_propagates_via_autopilot_flag(monkeypatch) -> None:
 
     def fake_evaluate_trust(name, arguments=None, *, reason=""):
         del name, arguments, reason
-        return trust_mod.TrustDecision(
-            allowed=True, reason="autopilot active", via_autopilot=True
-        )
+        return trust_mod.TrustDecision(allowed=True, reason="autopilot active", via_autopilot=True)
 
-    monkeypatch.setattr(
-        "veles.core.permission.engine.evaluate_trust", fake_evaluate_trust
-    )
+    monkeypatch.setattr("veles.core.permission.engine.evaluate_trust", fake_evaluate_trust)
     d = evaluate(_entry(sensitive=True, risk_class=RiskClass.PROCESS_EXECUTION), {})
     assert d.kind == "allow"
     assert d.rule == "trust_ladder"

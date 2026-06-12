@@ -81,9 +81,7 @@ class _KeywordEmbedding:
 # ---- fallback when no adapter ----
 
 
-def test_no_adapter_falls_back_to_token_ranking(
-    conn: sqlite3.Connection, tmp_path: Path
-) -> None:
+def test_no_adapter_falls_back_to_token_ranking(conn: sqlite3.Connection, tmp_path: Path) -> None:
     """With no embedding adapter registered, `relevant_semantic`
     returns whatever `relevant` (token-based) returns."""
     root = _make_project(tmp_path / "proj")
@@ -94,9 +92,7 @@ def test_no_adapter_falls_back_to_token_ranking(
     assert [h.rel_path for h in semantic_hits] == [h.rel_path for h in token_hits]
 
 
-def test_empty_query_returns_empty_with_adapter(
-    conn: sqlite3.Connection, tmp_path: Path
-) -> None:
+def test_empty_query_returns_empty_with_adapter(conn: sqlite3.Connection, tmp_path: Path) -> None:
     register_embedding_adapter(_KeywordEmbedding())
     root = _make_project(tmp_path / "proj")
     Scanner(root, conn).scan()
@@ -112,9 +108,7 @@ def test_empty_tree_returns_empty(conn: sqlite3.Connection) -> None:
 # ---- happy path with stub adapter ----
 
 
-def test_semantic_ranks_relevant_files_first(
-    conn: sqlite3.Connection, tmp_path: Path
-) -> None:
+def test_semantic_ranks_relevant_files_first(conn: sqlite3.Connection, tmp_path: Path) -> None:
     """Query containing 'auth' ranks auth-related entries above
     billing/docs entries via the stub's keyword-overlap cosine."""
     register_embedding_adapter(_KeywordEmbedding())
@@ -132,9 +126,7 @@ def test_semantic_ranks_relevant_files_first(
         assert min(auth_positions) < max(other_positions)
 
 
-def test_semantic_respects_limit(
-    conn: sqlite3.Connection, tmp_path: Path
-) -> None:
+def test_semantic_respects_limit(conn: sqlite3.Connection, tmp_path: Path) -> None:
     register_embedding_adapter(_KeywordEmbedding())
     root = _make_project(tmp_path / "proj")
     Scanner(root, conn).scan()
@@ -165,9 +157,7 @@ def test_semantic_invokes_adapter_with_query_and_signatures(
 # ---- error handling ----
 
 
-def test_adapter_failure_falls_back_to_token(
-    conn: sqlite3.Connection, tmp_path: Path
-) -> None:
+def test_adapter_failure_falls_back_to_token(conn: sqlite3.Connection, tmp_path: Path) -> None:
     """If the adapter raises EmbeddingError mid-query, we fall back
     to token ranking transparently — never break the user's turn."""
     from veles.modules import EmbeddingError
@@ -188,9 +178,7 @@ def test_adapter_failure_falls_back_to_token(
     assert isinstance(hits, list)
 
 
-def test_returns_typed_entries(
-    conn: sqlite3.Connection, tmp_path: Path
-) -> None:
+def test_returns_typed_entries(conn: sqlite3.Connection, tmp_path: Path) -> None:
     from veles.core.project_tree import TreeEntry
 
     register_embedding_adapter(_KeywordEmbedding())

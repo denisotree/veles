@@ -44,7 +44,7 @@ def generate_self_doc(
     from veles.core.skills import discover_skills
 
     # --- project meta ---
-    created_iso = _dt.datetime.fromtimestamp(project.created_at, tz=_dt.timezone.utc).strftime(
+    created_iso = _dt.datetime.fromtimestamp(project.created_at, tz=_dt.UTC).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
 
@@ -159,7 +159,7 @@ def _name_desc_bullet(pair: tuple[str, str | None]) -> str:
 
 def render_self_doc(report: SelfDocReport) -> str:
     """Render a `SelfDocReport` to markdown. Starts with `# Self-Documentation`."""
-    now = _dt.datetime.now(tz=_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     lines: list[str] = [
         "# Self-Documentation",
         "",

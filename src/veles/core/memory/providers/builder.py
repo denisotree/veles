@@ -57,9 +57,7 @@ def build_extra_providers(config_path: Path | None = None) -> list[object]:
             file=sys.stderr,
         )
         return []
-    external = (
-        data.get("memory", {}).get("external", {}) if isinstance(data, dict) else {}
-    )
+    external = data.get("memory", {}).get("external", {}) if isinstance(data, dict) else {}
     if not isinstance(external, dict):
         return []
     providers: list[object] = []

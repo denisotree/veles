@@ -63,16 +63,15 @@ def build_command_agent(
     # is picked up at call time, not at module-import time.
     import veles.cli as cli
 
-    if check_api_key:
-        if args.provider in cli._PROVIDER_API_KEY_ENVS and not cli._ensure_api_key(
-            args.provider
-        ):
-            return None
+    if (
+        check_api_key
+        and args.provider in cli._PROVIDER_API_KEY_ENVS
+        and not cli._ensure_api_key(args.provider)
+    ):
+        return None
 
     if tool_aware:
-        provider = cli._make_tool_aware_provider(
-            args.provider, project, skill_model=args.model
-        )
+        provider = cli._make_tool_aware_provider(args.provider, project, skill_model=args.model)
     else:
         provider = cli._make_provider(args.provider)
 

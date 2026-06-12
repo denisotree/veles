@@ -49,14 +49,6 @@ def test_none_returns_empty() -> None:
 
 def test_handles_missing_fields() -> None:
     # Block missing the body section is dropped; the second valid block stays.
-    raw = (
-        "slug: incomplete\n"
-        "title: Incomplete\n"
-        "\n"
-        "slug: good\n"
-        "title: Good\n"
-        "body:\n"
-        "ok body\n"
-    )
+    raw = "slug: incomplete\ntitle: Incomplete\n\nslug: good\ntitle: Good\nbody:\nok body\n"
     cands = _parse_batch_output(raw)
     assert [c.slug for c in cands] == ["good"]

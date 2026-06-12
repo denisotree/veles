@@ -22,9 +22,9 @@ schema gets a clear log message suggesting `veles init --force`.
 from __future__ import annotations
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 
-from veles.core.project import Project, _SCHEMA_VERSION
+from veles.core.project import _SCHEMA_VERSION, Project
 
 logger = logging.getLogger(__name__)
 

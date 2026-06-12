@@ -142,7 +142,7 @@ command = "coo"
 
 
 def test_stdio_without_command_skipped(project: Project, caplog: pytest.LogCaptureFixture) -> None:
-    _write_config(project, "[mcp.servers.nocmd]\nargs = [\"x\"]\n")
+    _write_config(project, '[mcp.servers.nocmd]\nargs = ["x"]\n')
     with caplog.at_level(logging.WARNING, logger="veles.mcp.config"):
         assert load_mcp_config(project) == {}
     assert any("requires `command`" in rec.message for rec in caplog.records)

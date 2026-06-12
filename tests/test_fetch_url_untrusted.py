@@ -54,9 +54,7 @@ def test_web_search_wraps_results_as_untrusted() -> None:
             return "fake"
 
         def search(self, query, limit):
-            return [
-                {"title": "T", "url": "https://x", "description": "d", "position": 1}
-            ]
+            return [{"title": "T", "url": "https://x", "description": "d", "position": 1}]
 
     with patch.object(web_search_mod, "_resolve_provider", return_value=_FakeProvider()):
         out = web_search_mod.web_search("hello", limit=1)

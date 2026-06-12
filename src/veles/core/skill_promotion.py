@@ -137,9 +137,7 @@ def _render_proposal(candidate: PromoteCandidate) -> tuple[str, str]:
     return title, "\n".join(lines) + "\n"
 
 
-def write_promote_proposals(
-    project: Project, candidates: list[PromoteCandidate]
-) -> list[str]:
+def write_promote_proposals(project: Project, candidates: list[PromoteCandidate]) -> list[str]:
     """Persist each candidate as `.veles/memory/proposals/promote-<name>.md`.
 
     Returns the written paths relative to the project root. Each write

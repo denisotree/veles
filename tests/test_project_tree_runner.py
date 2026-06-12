@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.core.project_tree_runner import scan_project_tree
@@ -13,9 +11,7 @@ from veles.core.project_tree_runner import scan_project_tree
 
 def _tree_count(project) -> int:
     store = SessionStore(project.memory_db_path)
-    count = store._conn.execute(
-        "SELECT COUNT(*) AS n FROM project_tree"
-    ).fetchone()["n"]
+    count = store._conn.execute("SELECT COUNT(*) AS n FROM project_tree").fetchone()["n"]
     store._conn.close()
     return int(count)
 

@@ -22,12 +22,11 @@ def cmd_self_doc(args: argparse.Namespace, project: Project | None) -> int:
 
 
 def _refresh(project: Project) -> int:
+    # Import builtin modules so @tool decorators fire and register entries.
+    import veles.core.tools.builtin  # noqa: F401
     from veles.cli._runtime import _RUN_TOOLS
     from veles.core.self_doc import refresh_self_doc
     from veles.core.tools.registry import registry as _tool_registry
-
-    # Import builtin modules so @tool decorators fire and register entries.
-    import veles.core.tools.builtin  # noqa: F401
 
     tools: list[tuple[str, str]] = []
     for name in _RUN_TOOLS:

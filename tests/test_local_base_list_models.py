@@ -74,7 +74,9 @@ def test_iteration_friendly_page() -> None:
     class _Client:
         def __init__(self) -> None:
             self.models = MagicMock()
-            self.models.list = MagicMock(return_value=_IterablePage([_Model(id="a"), _Model(id="b")]))
+            self.models.list = MagicMock(
+                return_value=_IterablePage([_Model(id="a"), _Model(id="b")])
+            )
             self.base_url = "http://localhost:8080/v1"
 
     p = LlamaCppProvider(client=_Client())

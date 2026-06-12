@@ -199,4 +199,4 @@ class ComposerPrompt(Vertical):
             self._future.set_result(key)
 
 
-__all__ = ["ComposerPrompt", "PromptOption", "FreeformAnswer"]
+__all__ = ["ComposerPrompt", "FreeformAnswer", "PromptOption"]

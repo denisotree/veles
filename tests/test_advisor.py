@@ -124,7 +124,7 @@ def test_render_verdict_only_suggestions() -> None:
 # ---------- advisor_review (integration via stub provider) ----------
 
 
-def _StubProvider(
+def _stub_provider(
     response_text: str = '{"ok": true, "concerns": [], "suggestions": []}',
 ) -> StubProvider:
     return StubProvider(
@@ -132,9 +132,7 @@ def _StubProvider(
             ProviderResponse(
                 text=response_text,
                 tool_calls=[],
-                usage=TokenUsage(
-                    prompt_tokens=10, completion_tokens=5, total_tokens=15
-                ),
+                usage=TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
                 finish_reason="stop",
             )
         ],
@@ -181,9 +179,7 @@ def test_advisor_review_renders_stub_verdict(
     """End-to-end: stub the routed provider's make_provider, return canned JSON."""
     project = init_project(tmp_path / "p", name="p")
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
-    stub = _StubProvider(
-        '{"ok": false, "concerns": ["scope unclear"], "suggestions": []}'
-    )
+    stub = _stub_provider('{"ok": false, "concerns": ["scope unclear"], "suggestions": []}')
     monkeypatch.setattr("veles.core.provider_factory.make_provider", lambda name: stub)
     token = set_active_project(project)
     try:

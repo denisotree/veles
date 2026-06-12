@@ -115,14 +115,9 @@ def _format_prompt_body(kind: str, event: dict[str, Any]) -> str:
     reason = str(event.get("reason") or "(no reason supplied)")
     args = event.get("arguments") or {}
     if kind == "trust":
-        header = (
-            f"🔧 <b>Tool:</b> <code>{escape_html(tool)}</code> wants to run."
-        )
+        header = f"🔧 <b>Tool:</b> <code>{escape_html(tool)}</code> wants to run."
     else:
-        header = (
-            f"🔐 <b>Approval required</b>\n"
-            f"🔧 <b>Tool:</b> <code>{escape_html(tool)}</code>"
-        )
+        header = f"🔐 <b>Approval required</b>\n🔧 <b>Tool:</b> <code>{escape_html(tool)}</code>"
     return (
         f"{header}\n"
         f"📝 <b>Reason:</b> {escape_html(sanitize(reason))}\n"
@@ -156,7 +151,5 @@ def _render_prompt_args(args: Any) -> str:
             dumped = sanitize(dumped)
             if len(dumped) > 400:
                 dumped = dumped[:400] + "\n…"
-            lines.append(
-                f"• <code>{key_html}</code>:\n<pre>{escape_html(dumped)}</pre>"
-            )
+            lines.append(f"• <code>{key_html}</code>:\n<pre>{escape_html(dumped)}</pre>")
     return "\n".join(lines)

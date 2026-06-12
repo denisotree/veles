@@ -173,21 +173,17 @@ def test_create_message_returns_text() -> None:
 
 
 def test_create_message_passes_model() -> None:
-    completion = _Completion(
-        choices=[_Choice(message=_AssistantMessage(content="ok"))], usage=None
-    )
+    completion = _Completion(choices=[_Choice(message=_AssistantMessage(content="ok"))], usage=None)
     client = _StubClient([completion])
     p = OllamaProvider(client=client)
     p.create_message([Message(role="user", content="hi")], model="qwen2.5:7b")
     assert client.chat.completions.last_kwargs["model"] == "qwen2.5:7b"
 
 
-def test_tools_NOT_forwarded_when_supports_tools_false() -> None:
+def test_tools_not_forwarded_when_supports_tools_false() -> None:
     """Default off ⇒ tools arg is silently dropped, agent loop won't deadlock
     waiting for tool calls a tool-blind model would never emit."""
-    completion = _Completion(
-        choices=[_Choice(message=_AssistantMessage(content="ok"))], usage=None
-    )
+    completion = _Completion(choices=[_Choice(message=_AssistantMessage(content="ok"))], usage=None)
     client = _StubClient([completion])
     p = OllamaProvider(client=client)  # supports_tools=False
     p.create_message(
@@ -199,9 +195,7 @@ def test_tools_NOT_forwarded_when_supports_tools_false() -> None:
 
 
 def test_tools_forwarded_when_enabled() -> None:
-    completion = _Completion(
-        choices=[_Choice(message=_AssistantMessage(content="ok"))], usage=None
-    )
+    completion = _Completion(choices=[_Choice(message=_AssistantMessage(content="ok"))], usage=None)
     client = _StubClient([completion])
     p = OllamaProvider(client=client, enable_tools=True)
     p.create_message(
@@ -298,9 +292,7 @@ def test_stream_emits_deltas_then_end() -> None:
 
 def test_list_models_parses_tags(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_resp = MagicMock()
-    fake_resp.json.return_value = {
-        "models": [{"name": "llama3.2:1b"}, {"name": "qwen2.5:7b"}]
-    }
+    fake_resp.json.return_value = {"models": [{"name": "llama3.2:1b"}, {"name": "qwen2.5:7b"}]}
     fake_resp.raise_for_status = MagicMock()
     fake_get = MagicMock(return_value=fake_resp)
     p = OllamaProvider(client=_StubClient())

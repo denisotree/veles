@@ -16,7 +16,6 @@ from veles.core.tools.persistence import (
 )
 from veles.core.tools.registry import ToolEntry
 
-
 # ---- helpers ----
 
 
@@ -59,9 +58,7 @@ def test_list_with_empty_catalogue(project, capsys) -> None:
 def test_list_prints_catalogued_tools(project, capsys) -> None:
     store = SessionStore(project.memory_db_path)
     upsert_tool(store._conn, _entry("alpha"), scope="builtin", origin="builtin")
-    upsert_tool(
-        store._conn, _entry("custom"), scope="project", origin="agent-generated"
-    )
+    upsert_tool(store._conn, _entry("custom"), scope="project", origin="agent-generated")
     record_use(store._conn, tool_name="alpha", ok=True, latency_ms=10)
     record_use(store._conn, tool_name="alpha", ok=False, latency_ms=5)
     store._conn.close()
@@ -132,17 +129,13 @@ def test_show_renders_inheritance_chain(project, capsys) -> None:
 
 
 def test_promote_missing_file_errors(project, capsys) -> None:
-    rc = cmd_tool(
-        _ns(tool_command="promote", name="missing", yes=True), project
-    )
+    rc = cmd_tool(_ns(tool_command="promote", name="missing", yes=True), project)
     assert rc == 1
     err = capsys.readouterr().err
     assert "no project-level tool" in err.lower()
 
 
-def test_promote_moves_file_and_updates_scope(
-    project, isolated_home: Path, capsys
-) -> None:
+def test_promote_moves_file_and_updates_scope(project, isolated_home: Path, capsys) -> None:
     """File moves from project to user dir; catalogue row's scope flips
     to 'user' and origin to 'manual'."""
     project_tools = project.state_dir / "tools"
@@ -151,14 +144,10 @@ def test_promote_moves_file_and_updates_scope(
     tool_file.write_text("# stub\n", encoding="utf-8")
 
     store = SessionStore(project.memory_db_path)
-    upsert_tool(
-        store._conn, _entry("demo"), scope="project", origin="agent-generated"
-    )
+    upsert_tool(store._conn, _entry("demo"), scope="project", origin="agent-generated")
     store._conn.close()
 
-    rc = cmd_tool(
-        _ns(tool_command="promote", name="demo", yes=True), project
-    )
+    rc = cmd_tool(_ns(tool_command="promote", name="demo", yes=True), project)
     assert rc == 0
     out = capsys.readouterr().out
     assert "promoted" in out
@@ -186,9 +175,7 @@ def test_promote_refuses_to_overwrite_existing_user_file(
     user_dir.mkdir(parents=True)
     (user_dir / "demo.py").write_text("# pre-existing user version\n", encoding="utf-8")
 
-    rc = cmd_tool(
-        _ns(tool_command="promote", name="demo", yes=True), project
-    )
+    rc = cmd_tool(_ns(tool_command="promote", name="demo", yes=True), project)
     assert rc == 1
     err = capsys.readouterr().err
     assert "already exists" in err.lower()
@@ -196,17 +183,13 @@ def test_promote_refuses_to_overwrite_existing_user_file(
     assert (project_tools / "demo.py").is_file()
 
 
-def test_promote_prompt_n_aborts(
-    project, isolated_home: Path, capsys, monkeypatch
-) -> None:
+def test_promote_prompt_n_aborts(project, isolated_home: Path, capsys, monkeypatch) -> None:
     project_tools = project.state_dir / "tools"
     project_tools.mkdir(parents=True, exist_ok=True)
     (project_tools / "demo.py").write_text("# stub\n", encoding="utf-8")
     monkeypatch.setattr("builtins.input", lambda _prompt: "n")
 
-    rc = cmd_tool(
-        _ns(tool_command="promote", name="demo", yes=False), project
-    )
+    rc = cmd_tool(_ns(tool_command="promote", name="demo", yes=False), project)
     assert rc == 0
     assert "aborted" in capsys.readouterr().out.lower()
     # File untouched
@@ -224,9 +207,7 @@ def test_promote_yes_flag_bypasses_prompt(
         raise AssertionError("input() must not be invoked when --yes is set")
 
     monkeypatch.setattr("builtins.input", _boom)
-    rc = cmd_tool(
-        _ns(tool_command="promote", name="demo", yes=True), project
-    )
+    rc = cmd_tool(_ns(tool_command="promote", name="demo", yes=True), project)
     assert rc == 0
     user_dest = isolated_home / ".veles" / "tools" / "demo.py"
     assert user_dest.is_file()

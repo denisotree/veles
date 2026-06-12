@@ -35,6 +35,8 @@ from typing import Any
 from veles.core.permission.prompt import (
     PromptAnswer,
     PromptRequest,
+)
+from veles.core.permission.prompt import (
     Prompter as UnifiedPrompter,
 )
 from veles.daemon.runner import PendingPrompt, RunHandle
@@ -55,6 +57,7 @@ _APPROVAL_OPTIONS_TELEGRAM: tuple[dict[str, str], ...] = (
     {"key": "yes", "label": "✅ Allow"},
     {"key": "no", "label": "❌ Deny"},
 )
+
 
 def _make_prompt_id() -> str:
     return secrets.token_hex(4)

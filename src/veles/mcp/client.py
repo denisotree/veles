@@ -266,23 +266,18 @@ class McpClientManager:
         if conn is None or conn.state != "connected" or conn.session is None:
             detail = conn.error if conn is not None else None
             raise McpServerUnavailable(
-                f"MCP server {server!r} is not connected"
-                + (f" ({detail})" if detail else "")
+                f"MCP server {server!r} is not connected" + (f" ({detail})" if detail else "")
             )
         loop = self._loop
         if loop is None or loop.is_closed():
             raise McpServerUnavailable("MCP client manager is closed")
         budget = timeout_s if timeout_s is not None else conn.config.timeout_s
-        fut = asyncio.run_coroutine_threadsafe(
-            conn.session.call_tool(tool, arguments or {}), loop
-        )
+        fut = asyncio.run_coroutine_threadsafe(conn.session.call_tool(tool, arguments or {}), loop)
         try:
             return fut.result(timeout=budget)
         except concurrent.futures.TimeoutError:
             fut.cancel()
-            raise McpToolTimeout(
-                f"MCP tool {server}/{tool} timed out after {budget:g}s"
-            ) from None
+            raise McpToolTimeout(f"MCP tool {server}/{tool} timed out after {budget:g}s") from None
 
     def close(self) -> None:
         """Tear down all connections and stop the background loop. Idempotent."""
@@ -304,9 +299,7 @@ class McpClientManager:
                 await asyncio.wait(tasks, timeout=_CLOSE_GRACE_S)
 
         try:
-            asyncio.run_coroutine_threadsafe(_shutdown(), loop).result(
-                timeout=_CLOSE_GRACE_S * 2
-            )
+            asyncio.run_coroutine_threadsafe(_shutdown(), loop).result(timeout=_CLOSE_GRACE_S * 2)
         except Exception as exc:
             logger.warning("MCP shutdown did not complete cleanly: %s", exc)
         loop.call_soon_threadsafe(loop.stop)

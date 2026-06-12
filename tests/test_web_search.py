@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sys
 from typing import Any
@@ -12,12 +13,11 @@ import pytest
 from veles.core.tools.builtin.web_search import (
     _BraveProvider,
     _DDGProvider,
+    _resolve_provider,
     _SearXNGProvider,
     _TavilyProvider,
-    _resolve_provider,
     web_search,
 )
-
 
 # ---- provider.available() ----
 
@@ -53,14 +53,14 @@ def test_ddgs_not_available_when_package_missing(monkeypatch: pytest.MonkeyPatch
     # Re-create provider so the import check runs fresh
     p = _DDGProvider()
     # Simulate ImportError by removing from sys.modules
-    with patch.dict(sys.modules, {"ddgs": None}):  # type: ignore[dict-item]
-        # available() tries `import ddgs`; None entry raises ImportError
-        try:
-            result = p.available()
-        except Exception:
-            result = False
-    # Either False or an exception → provider not available
-    assert result is False or True  # just check it doesn't crash
+    # available() tries `import ddgs`; the None entry raises ImportError.
+    # Either False or an exception → provider not available; the test
+    # only checks it doesn't crash with an unexpected error type.
+    with (
+        patch.dict(sys.modules, {"ddgs": None}),  # type: ignore[dict-item]
+        contextlib.suppress(Exception),
+    ):
+        p.available()
 
 
 # ---- _resolve_provider ----

@@ -18,7 +18,7 @@ import os
 import pytest
 
 
-def pytest_collection_modifyitems(config, items):  # noqa: ARG001
+def pytest_collection_modifyitems(config, items):
     """Skip every item in tests/evals/ unless VELES_EVALS=1 is set."""
     if os.environ.get("VELES_EVALS") == "1":
         return

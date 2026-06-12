@@ -388,9 +388,7 @@ async def test_typing_indicator_cancelled_after_completion(
     # After _handle_update returns the typing loop is already cancelled,
     # so no further sendChatAction calls fire after the final edit.
     methods_order = [m for m, _ in sends]
-    final_edit_idx = next(
-        i for i, m in enumerate(methods_order) if m == "editMessageText"
-    )
+    final_edit_idx = next(i for i, m in enumerate(methods_order) if m == "editMessageText")
     assert "sendChatAction" not in methods_order[final_edit_idx + 1 :]
 
 
@@ -419,9 +417,7 @@ async def test_whitelist_blocks_non_whitelisted_sender(session_map: SessionMap) 
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
     gateway.whitelist = ("12345", "@allowed_user")
-    await gateway._handle_update(
-        _message_with_sender(42, "hi", user_id=99999, username="stranger")
-    )
+    await gateway._handle_update(_message_with_sender(42, "hi", user_id=99999, username="stranger"))
     assert sends == []
     assert daemon.submitted == []
 
@@ -431,9 +427,7 @@ async def test_whitelist_allows_numeric_match(session_map: SessionMap) -> None:
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
     gateway.whitelist = ("12345",)
-    await gateway._handle_update(
-        _message_with_sender(42, "hi", user_id=12345, username="anyname")
-    )
+    await gateway._handle_update(_message_with_sender(42, "hi", user_id=12345, username="anyname"))
     assert daemon.submitted == [("hi", None)]
 
 
@@ -442,9 +436,7 @@ async def test_whitelist_allows_username_case_insensitive(session_map: SessionMa
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
     gateway.whitelist = ("@AllowedUser",)
-    await gateway._handle_update(
-        _message_with_sender(42, "hi", user_id=1, username="alloweduser")
-    )
+    await gateway._handle_update(_message_with_sender(42, "hi", user_id=1, username="alloweduser"))
     assert daemon.submitted == [("hi", None)]
 
 
@@ -452,9 +444,7 @@ async def test_empty_whitelist_allows_everyone(session_map: SessionMap) -> None:
     daemon = _FakeDaemonClient()
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(
-        _message_with_sender(42, "hi", user_id=7, username="random")
-    )
+    await gateway._handle_update(_message_with_sender(42, "hi", user_id=7, username="random"))
     assert daemon.submitted == [("hi", None)]
 
 
@@ -515,9 +505,7 @@ class _PromptingFakeDaemon(_FakeDaemonClient):
         yield {"type": "completed", "text": "done", "session_id": "ses-prompt"}
 
 
-def _callback_update(
-    chat_id: int, message_id: int, callback_id: str, data: str
-) -> dict[str, Any]:
+def _callback_update(chat_id: int, message_id: int, callback_id: str, data: str) -> dict[str, Any]:
     return {
         "update_id": 99,
         "callback_query": {
@@ -618,9 +606,7 @@ async def test_prompt_resolved_strips_buttons_on_original_message(
             if "cccc3333" in gateway._pending_prompts:
                 break
             await asyncio.sleep(0.01)
-        await gateway._handle_callback_query(
-            {"id": "cb-3", "from": {}, "data": "v:cccc3333:p"}
-        )
+        await gateway._handle_callback_query({"id": "cb-3", "from": {}, "data": "v:cccc3333:p"})
 
     driver = asyncio.create_task(drive())
     await gateway._handle_update(_message_update(42, "hi"))
@@ -631,8 +617,7 @@ async def test_prompt_resolved_strips_buttons_on_original_message(
     cleared_edits = [
         p
         for m, p in sends
-        if m == "editMessageText"
-        and p.get("reply_markup", {}).get("inline_keyboard") == []
+        if m == "editMessageText" and p.get("reply_markup", {}).get("inline_keyboard") == []
     ]
     assert cleared_edits, "prompt_resolved should clear the inline keyboard"
     # Pending entry was popped — a stale tap can't double-resolve.
@@ -645,9 +630,7 @@ async def test_unknown_callback_data_is_dismissed_quietly(
     daemon = _FakeDaemonClient(events=[])
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_callback_query(
-        {"id": "cb-x", "from": {}, "data": "v:missing:o"}
-    )
+    await gateway._handle_callback_query({"id": "cb-x", "from": {}, "data": "v:missing:o"})
     # No daemon call, but the spinner is still dismissed.
     assert any(m == "answerCallbackQuery" for m, _ in sends)
 
@@ -735,13 +718,15 @@ async def test_parse_error_falls_back_to_plain_text(
 def test_format_prompt_body_html_no_raw_dict() -> None:
     """Approval-prompt body must not dump the raw Python dict of args
     (`{'path': '/Users/...'}`) — neither the dict syntax nor abs paths."""
+    import tempfile
+
     from veles.channels.telegram import _format_prompt_body
     from veles.core.context import reset_active_project, set_active_project
     from veles.core.project import init_project
-    import tempfile
 
     with tempfile.TemporaryDirectory() as td:
         from pathlib import Path
+
         project = init_project(Path(td) / "mp", name="mind-palace")
         token = set_active_project(project)
         try:
@@ -774,7 +759,6 @@ def test_format_prompt_body_html_no_raw_dict() -> None:
 
 from veles.channels.telegram import (  # noqa: E402
     _build_combined_prompt,
-    _ChatBuffer,
     _classify,
     _forward_source,
     _has_forward,
@@ -784,7 +768,6 @@ from veles.channels.telegram import (  # noqa: E402
     _render_forwarded,
     _safe_filename,
 )
-
 
 # ---- unit: pure helpers ----
 
@@ -820,9 +803,7 @@ def test_reject_reason_size_then_type() -> None:
     assert _reject_reason("foo.md", "text/markdown", 6 * 1024 * 1024).startswith(
         "📎 File larger than 5 MB"
     )
-    assert _reject_reason("photo.jpg", "image/jpeg", 1024).startswith(
-        "📎 I only handle text files"
-    )
+    assert _reject_reason("photo.jpg", "image/jpeg", 1024).startswith("📎 I only handle text files")
     assert _reject_reason("ok.md", "text/markdown", 1024) is None
 
 
@@ -853,9 +834,7 @@ def test_forward_source_falls_back_to_sender_name() -> None:
 
 
 def test_render_forwarded_wraps_body_in_quote() -> None:
-    out = _render_forwarded(
-        {"forward_from_chat": {"title": "News"}, "text": "Line 1\nLine 2"}
-    )
+    out = _render_forwarded({"forward_from_chat": {"title": "News"}, "text": "Line 1\nLine 2"})
     assert out.startswith("↪️ Forwarded from News:")
     assert "> Line 1" in out
     assert "> Line 2" in out
@@ -937,9 +916,7 @@ def _gateway_with_attachments(
     return gateway
 
 
-async def test_plain_text_dispatched_immediately(
-    session_map: SessionMap, tmp_path: Path
-) -> None:
+async def test_plain_text_dispatched_immediately(session_map: SessionMap, tmp_path: Path) -> None:
     """Single text message with empty buffer — submit_run runs at once,
     no debounce delay (instant interactive feel)."""
     sends: list[tuple[str, dict[str, Any]]] = []

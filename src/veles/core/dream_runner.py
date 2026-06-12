@@ -38,7 +38,6 @@ from veles.core.dreaming import (
 
 if TYPE_CHECKING:
     from veles.core.project import Project
-    from veles.core.provider import Provider
 
 logger = logging.getLogger(__name__)
 
@@ -99,9 +98,7 @@ class DreamRunner:
 
     async def force_run(self, *, include_consolidation: bool = True) -> DreamResult:
         """Synchronous-ish trigger used by the daemon `/v1/dream/run` endpoint."""
-        return await asyncio.to_thread(
-            self._run_cycle, include_consolidation=include_consolidation
-        )
+        return await asyncio.to_thread(self._run_cycle, include_consolidation=include_consolidation)
 
     def _run_cycle(self, *, include_consolidation: bool) -> DreamResult:
         provider = None

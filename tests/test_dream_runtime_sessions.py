@@ -17,7 +17,6 @@ from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.core.runtime_sessions import RuntimeSessionStore, runtime_session_digest
 
-
 # ---- digest (pure) ----
 
 
@@ -77,8 +76,11 @@ def test_dream_cycle_replaces_prior_snapshot(tmp_path: Path):
     SessionStore(project.memory_db_path).close()
 
     common = dict(
-        skip_insights=True, skip_dedup=True, skip_promote=True,
-        skip_lint=True, skip_reindex=True,
+        skip_insights=True,
+        skip_dedup=True,
+        skip_promote=True,
+        skip_lint=True,
+        skip_reindex=True,
     )
     dream_cycle(project, runtime_session_loader=lambda: "v1", now=1000.0, **common)
     dream_cycle(project, runtime_session_loader=lambda: "v2", now=2000.0, **common)
@@ -93,8 +95,11 @@ def test_dream_cycle_no_loader_writes_nothing(tmp_path: Path):
     SessionStore(project.memory_db_path).close()
     dream_cycle(
         project,
-        skip_insights=True, skip_dedup=True, skip_promote=True,
-        skip_lint=True, skip_reindex=True,
+        skip_insights=True,
+        skip_dedup=True,
+        skip_promote=True,
+        skip_lint=True,
+        skip_reindex=True,
         now=1000.0,
     )
     assert _fleet_rows(project.memory_db_path) == []
@@ -105,8 +110,11 @@ def test_dream_cycle_loader_returns_none_writes_nothing(tmp_path: Path):
     SessionStore(project.memory_db_path).close()
     dream_cycle(
         project,
-        skip_insights=True, skip_dedup=True, skip_promote=True,
-        skip_lint=True, skip_reindex=True,
+        skip_insights=True,
+        skip_dedup=True,
+        skip_promote=True,
+        skip_lint=True,
+        skip_reindex=True,
         runtime_session_loader=lambda: None,
         now=1000.0,
     )

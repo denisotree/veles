@@ -22,7 +22,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-
 # Channel gateway factory: any callable (function or class) producing a
 # gateway with `start()` / `stop()`. Kept as `Any` instead of a strict
 # Protocol because dataclass `__init__` signatures don't match a `**kwargs`
@@ -124,9 +123,7 @@ def _register_builtins() -> None:
     """
     from veles.channels.telegram import TELEGRAM_CRED_FIELDS, TelegramGateway
 
-    register_platform(
-        "telegram", TelegramGateway, cred_fields=TELEGRAM_CRED_FIELDS, overwrite=True
-    )
+    register_platform("telegram", TelegramGateway, cred_fields=TELEGRAM_CRED_FIELDS, overwrite=True)
 
 
 def ensure_builtins_registered() -> None:

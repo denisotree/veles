@@ -68,9 +68,7 @@ def test_search_insights_excludes_superseded(tmp_path: Path) -> None:
         canonical = _insert_insight(
             store, title="canonical", body="redis ttl 300 seconds session keys"
         )
-        dup = _insert_insight(
-            store, title="duplicate", body="redis ttl 300 seconds session keys"
-        )
+        dup = _insert_insight(store, title="duplicate", body="redis ttl 300 seconds session keys")
         store._conn.execute(
             "INSERT INTO insight_refs(from_insight_id, to_insight_id) VALUES (?, ?)",
             (dup, canonical),
@@ -123,9 +121,7 @@ def test_recall_surfaces_insight_via_sql_path(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     store = SessionStore(project.memory_db_path)
     try:
-        _insert_insight(
-            store, title="ratelimit fix", body="bump nginx worker_connections to 4096"
-        )
+        _insert_insight(store, title="ratelimit fix", body="bump nginx worker_connections to 4096")
         hits = MemoryRouter(project, store=store).recall("worker_connections nginx", limit=5)
         summaries = " ".join(h.summary for h in hits)
         # last_referenced_at must have advanced as a side effect of recall

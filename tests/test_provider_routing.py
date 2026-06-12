@@ -6,7 +6,6 @@ import pytest
 
 from veles.core.provider_routing import detect_api_mode
 
-
 # ---------- host-driven matches ----------
 
 

@@ -24,7 +24,7 @@ class _ChatHost(App):
 
 def _content(static):
     """Static stores its renderable on a name-mangled `__content` attr."""
-    return static._Static__content  # noqa: SLF001
+    return static._Static__content
 
 
 async def _seal_with(text: str):
@@ -40,9 +40,7 @@ async def _seal_with(text: str):
 
 
 async def test_sealed_assistant_renders_through_markdown():
-    sealed = await _seal_with(
-        "# Heading\n\n| col | val |\n|-----|-----|\n| a   | 1   |\n"
-    )
+    sealed = await _seal_with("# Heading\n\n| col | val |\n|-----|-----|\n| a   | 1   |\n")
     # The Static's renderable is now a Rich Markdown instance, not a string.
     assert isinstance(_content(sealed), Markdown)
 

@@ -11,7 +11,6 @@ gateway suite.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -23,7 +22,6 @@ from veles.channels._telegram_commands import (
 )
 from veles.channels.session_map import SessionMap
 from veles.channels.telegram import TelegramGateway
-
 
 # ---- parse_command ----
 
@@ -116,10 +114,10 @@ def _make_gateway(
     attachment_dir: Path | None = None,
 ) -> TelegramGateway:
     class _NullClient:
-        async def submit_run(self, prompt: str, *, session_id=None):  # noqa: ARG002
+        async def submit_run(self, prompt: str, *, session_id=None):
             return {"run_id": "x", "session_id": session_id, "state": "running"}
 
-        async def stream_events(self, run_id):  # noqa: ARG002
+        async def stream_events(self, run_id):
             if False:
                 yield  # pragma: no cover
 
@@ -218,7 +216,7 @@ async def test_dispatch_goal_with_task_submits_run(session_map: SessionMap) -> N
             submitted.append((prompt, session_id))
             return {"run_id": "g1", "session_id": session_id, "state": "running"}
 
-        async def stream_events(self, run_id):  # noqa: ARG002
+        async def stream_events(self, run_id):
             if False:
                 yield
 
@@ -247,11 +245,11 @@ async def test_dispatch_dream_submits_consolidation_run(
     submitted: list[str] = []
 
     class _Client:
-        async def submit_run(self, prompt: str, *, session_id=None):  # noqa: ARG002
+        async def submit_run(self, prompt: str, *, session_id=None):
             submitted.append(prompt)
             return {"run_id": "d1", "session_id": session_id, "state": "running"}
 
-        async def stream_events(self, run_id):  # noqa: ARG002
+        async def stream_events(self, run_id):
             if False:
                 yield
 

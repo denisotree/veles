@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -16,7 +15,6 @@ from veles.cli.tui_theme import (
     save_custom_theme,
     themes_dir,
 )
-
 
 # ---- fixtures ----
 
@@ -226,7 +224,9 @@ def test_list_themes_no_duplicate_builtins() -> None:
 # ---- themes_dir ----
 
 
-def test_themes_dir_respects_veles_user_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_themes_dir_respects_veles_user_home(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     custom_home = tmp_path / "custom_home"
     monkeypatch.setenv("VELES_USER_HOME", str(custom_home))
     td = themes_dir()

@@ -24,7 +24,7 @@ from veles.daemon.runner import AgentFactory
 from veles.daemon.server import build_state, make_app
 
 
-def _StubProvider() -> StubProvider:
+def _stub_provider() -> StubProvider:
     resp = ProviderResponse(
         text="ok",
         tool_calls=[],
@@ -46,7 +46,7 @@ def _make_stub_factory(store: SessionStore) -> AgentFactory:
     def factory(session_id: str | None):
         sid = session_id or store.create_session()
         return Agent(
-            provider=_StubProvider(),
+            provider=_stub_provider(),
             registry=Registry(),
             model="stub-model",
             max_iterations=1,
@@ -115,9 +115,7 @@ async def test_status_reports_no_jobs_or_dream_when_unwired(
     assert "last_activity_at" in body
 
 
-async def test_status_reflects_runs_after_post(
-    aiohttp_client, app, good_token: str
-) -> None:
+async def test_status_reflects_runs_after_post(aiohttp_client, app, good_token: str) -> None:
     client = await aiohttp_client(app)
     await client.post(
         "/v1/runs",
@@ -131,9 +129,7 @@ async def test_status_reflects_runs_after_post(
     assert body["runs"]["total"] >= 1
 
 
-async def test_status_picks_up_runner_status_method(
-    aiohttp_client, app, good_token: str
-) -> None:
+async def test_status_picks_up_runner_status_method(aiohttp_client, app, good_token: str) -> None:
     class _Stub:
         def status(self) -> dict[str, object]:
             return {"enabled": True, "due": 3}
@@ -147,9 +143,7 @@ async def test_status_picks_up_runner_status_method(
     assert body["dream"] == {"enabled": True, "due": 3}
 
 
-async def test_status_reports_active_channels(
-    aiohttp_client, app, good_token: str
-) -> None:
+async def test_status_reports_active_channels(aiohttp_client, app, good_token: str) -> None:
     """The status docstring has always promised `channels`; it now surfaces
     the actually-running set (`state.active_channels`)."""
     client = await aiohttp_client(app)

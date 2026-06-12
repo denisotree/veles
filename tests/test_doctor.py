@@ -43,9 +43,7 @@ def test_check_result_is_failing() -> None:
 
 
 def test_report_to_json_round_trip() -> None:
-    report = DoctorReport(
-        results=[CheckResult(name="a", status="ok", message="fine")]
-    )
+    report = DoctorReport(results=[CheckResult(name="a", status="ok", message="fine")])
     obj = json.loads(report.to_json())
     assert obj["results"][0]["status"] == "ok"
     assert obj["results"][0]["name"] == "a"
@@ -238,9 +236,7 @@ def test_approval_audit_no_records(tmp_path: Path) -> None:
 
 def test_approval_audit_flags_recent_autopilot(tmp_path: Path) -> None:
     proj = _make_project(tmp_path)
-    record_approval(
-        proj.state_dir, tool_name="t", rule="trust_ladder", via_autopilot=True
-    )
+    record_approval(proj.state_dir, tool_name="t", rule="trust_ladder", via_autopilot=True)
     r = _check_approval_audit(proj)
     assert r.status == "info"
     assert "autopilot" in r.message

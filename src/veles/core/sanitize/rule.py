@@ -16,8 +16,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ class RegexRule:
     _compiled: re.Pattern[str]
 
     @classmethod
-    def build(cls, name: str, pattern: str, replacement: str) -> "RegexRule | None":
+    def build(cls, name: str, pattern: str, replacement: str) -> RegexRule | None:
         """Compile up-front; return None and log on bad pattern instead
         of letting the broken rule crash the sanitize call."""
         try:

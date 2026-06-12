@@ -60,7 +60,6 @@ from typing import Any
 import aiohttp
 
 from veles.channels.daemon_client import DaemonClientError
-from veles.core.i18n import t
 from veles.channels.protocols import RunBackend
 from veles.channels.session_map import SessionMap
 from veles.channels.telegram._api import TelegramApi
@@ -85,6 +84,7 @@ from veles.channels.telegram._prompts import (
     _PendingTelegramPrompt,
 )
 from veles.channels.telegram_format import escape_html
+from veles.core.i18n import t
 
 logger = logging.getLogger(__name__)
 
@@ -99,10 +99,10 @@ class TelegramGateway:
     # Where to drop documents the user uploads. None disables attachment
     # handling (the bot replies that attachments aren't configured).
     # Production daemon sets this to `<project>/.veles/tmp/`.
-    attachment_dir: "Path | None" = None
+    attachment_dir: Path | None = None
     # Project root for building `read_file(...)` paths inside the prompt.
     # When None we fall back to attachment basenames.
-    project_root: "Path | None" = None
+    project_root: Path | None = None
     _running: bool = field(default=False, init=False)
     _http: aiohttp.ClientSession | None = field(default=None, init=False)
     _telegram_send: Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]] | None = field(
@@ -110,16 +110,14 @@ class TelegramGateway:
     )
     _offset: int = field(default=0, init=False)
     _tasks: set = field(default_factory=set, init=False)
-    _pending_prompts: dict[str, _PendingTelegramPrompt] = field(
-        default_factory=dict, init=False
-    )
+    _pending_prompts: dict[str, _PendingTelegramPrompt] = field(default_factory=dict, init=False)
     # M127: the Telegram `/model` picker was removed (model/provider are
     # fixed at daemon launch), so the picker state fields
     # (`_model_callbacks`, `_daemon_provider`, `_daemon_default_model`,
     # `_model_refresh_pending`, `_model_list_cache`) are gone too.
     # Per-chat aggregation: forward+comment / document+comment arrive as
     # two separate updates; a debouncer merges them into one turn.
-    _buffers: "dict[str, _ChatBuffer]" = field(default_factory=dict, init=False)
+    _buffers: dict[str, _ChatBuffer] = field(default_factory=dict, init=False)
     # M155 collaborators. They hold a back-reference to the gateway and
     # call through `self._gw.<method>` so instance/class-level stubs on
     # the gateway keep working.
@@ -275,11 +273,10 @@ class TelegramGateway:
             chat_key,
             kind.value,
             len(text),
-            len((message.get("caption") or "")),
+            len(message.get("caption") or ""),
             text[:80] or (message.get("caption") or "")[:80],
         )
         await self._enqueue(chat_key, chat_id, message, kind)
-
 
     # ---- aggregation pipeline (DOC-4 / DOC-5) ----
 
@@ -386,14 +383,10 @@ class TelegramGateway:
 
     # ---- media (delegates → TelegramMedia, M155) ----
 
-    async def _transcribe_voice(
-        self, chat_id: int, voice: dict[str, Any]
-    ) -> str | None:
+    async def _transcribe_voice(self, chat_id: int, voice: dict[str, Any]) -> str | None:
         return await self._media.transcribe_voice(chat_id, voice)
 
-    async def _describe_photo(
-        self, chat_id: int, photo: list[dict[str, Any]]
-    ) -> str | None:
+    async def _describe_photo(self, chat_id: int, photo: list[dict[str, Any]]) -> str | None:
         return await self._media.describe_photo(chat_id, photo)
 
     async def _run_turn(self, chat_id: int, chat_key: str, text: str) -> None:
@@ -412,9 +405,7 @@ class TelegramGateway:
             outcome = await self._drain_stream(run_id, chat_id)
         await self._deliver(chat_id, chat_key, message_id, outcome)
 
-    async def _submit_or_report(
-        self, chat_id: int, chat_key: str, text: str
-    ) -> str | None:
+    async def _submit_or_report(self, chat_id: int, chat_key: str, text: str) -> str | None:
         """Submit the user's text to the daemon and return the run_id,
         or None after surfacing the failure to the user."""
         session_id = self.session_map.get(chat_key)
@@ -462,9 +453,7 @@ class TelegramGateway:
 
     # ---- Telegram wrappers ----
 
-    async def _send_manager_plan_notice(
-        self, chat_id: int, event: dict[str, Any]
-    ) -> None:
+    async def _send_manager_plan_notice(self, chat_id: int, event: dict[str, Any]) -> None:
         await self._delivery.send_manager_plan_notice(chat_id, event)
 
     async def _send_message(
@@ -492,9 +481,7 @@ class TelegramGateway:
             chat_id, message_id, text, reply_markup=reply_markup, parse_mode=parse_mode
         )
 
-    async def _answer_callback_query(
-        self, callback_id: str, *, text: str | None = None
-    ) -> None:
+    async def _answer_callback_query(self, callback_id: str, *, text: str | None = None) -> None:
         await self._api.answer_callback_query(callback_id, text=text)
 
     # M127: `_refresh_daemon_health` / `_get_daemon_provider` /
@@ -503,9 +490,7 @@ class TelegramGateway:
 
     # ---- prompt rendering / answering ----
 
-    async def _post_prompt(
-        self, chat_id: int, run_id: str, event: dict[str, Any]
-    ) -> None:
+    async def _post_prompt(self, chat_id: int, run_id: str, event: dict[str, Any]) -> None:
         """Render a `trust_prompt` / `approval_prompt` daemon event as a
         Telegram message with an inline keyboard. Cache the
         `prompt_id → (run, message, options)` mapping so an inbound
@@ -608,13 +593,9 @@ class TelegramGateway:
                 await self._answer_callback_query(callback_id, text="unknown choice")
                 return
             try:
-                await self.daemon_client.submit_prompt_answer(
-                    pending.run_id, prompt_id, full_key
-                )
+                await self.daemon_client.submit_prompt_answer(pending.run_id, prompt_id, full_key)
             except DaemonClientError as exc:
-                await self._answer_callback_query(
-                    callback_id, text=f"daemon error: {exc}"
-                )
+                await self._answer_callback_query(callback_id, text=f"daemon error: {exc}")
                 return
             await self._answer_callback_query(callback_id, text="✓")
             return
@@ -663,9 +644,7 @@ class TelegramGateway:
                     session_id, mode=mode
                 )
             except (DaemonClientError, AttributeError) as exc:
-                await self._answer_callback_query(
-                    callback_id, text=f"could not set mode: {exc}"
-                )
+                await self._answer_callback_query(callback_id, text=f"could not set mode: {exc}")
                 return
             await self._answer_callback_query(callback_id, text=f"✓ mode → {mode}")
             return
@@ -709,7 +688,5 @@ class TelegramGateway:
     def _persist_attachment(self, name: str, data: bytes) -> Path:
         return self._media.persist_attachment(name, data)
 
-    async def _save_telegram_document(
-        self, chat_id: int, document: dict[str, Any]
-    ) -> Path | None:
+    async def _save_telegram_document(self, chat_id: int, document: dict[str, Any]) -> Path | None:
         return await self._media.save_telegram_document(chat_id, document)

@@ -75,7 +75,7 @@ class _CapturingClient:
         self.submitted.append((prompt, session_id))
         return {"run_id": "r1", "session_id": session_id, "state": "running"}
 
-    async def stream_events(self, run_id):  # noqa: ARG002
+    async def stream_events(self, run_id):
         if False:
             yield
 
@@ -140,7 +140,7 @@ async def test_voice_with_adapter_transcribes_and_submits(
 
     # Mock the file download — return canned bytes. Unbound method
     # signature (`self, file_id, expected_size`) for class-level patch.
-    async def fake_download(self, file_id: str, expected_size: int) -> bytes:  # noqa: ARG001
+    async def fake_download(self, file_id: str, expected_size: int) -> bytes:
         return b"\x00fake-audio\xff"
 
     monkeypatch.setattr(TelegramGateway, "_download_telegram_file", fake_download)
@@ -177,7 +177,7 @@ async def test_voice_with_caption_combines(
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway, client = _make_gateway(session_map, sends)
 
-    async def fake_download(self, *_a, **_kw):  # noqa: ARG001
+    async def fake_download(self, *_a, **_kw):
         return b"audio"
 
     monkeypatch.setattr(TelegramGateway, "_download_telegram_file", fake_download)
@@ -206,7 +206,7 @@ async def test_voice_adapter_failure_sends_friendly_notice(
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway, client = _make_gateway(session_map, sends)
 
-    async def fake_download(self, *_a, **_kw):  # noqa: ARG001
+    async def fake_download(self, *_a, **_kw):
         return b"audio"
 
     monkeypatch.setattr(TelegramGateway, "_download_telegram_file", fake_download)
@@ -217,8 +217,8 @@ async def test_voice_adapter_failure_sends_friendly_notice(
     notices = [
         p["text"]
         for m, p in sends
-        if m == "sendMessage" and "couldn&#x27;t transcribe" in p.get("text", "")
-        or m == "sendMessage" and "couldn't transcribe" in p.get("text", "")
+        if (m == "sendMessage" and "couldn&#x27;t transcribe" in p.get("text", ""))
+        or (m == "sendMessage" and "couldn't transcribe" in p.get("text", ""))
     ]
     assert notices
     assert client.submitted == []  # type: ignore[attr-defined]
@@ -282,7 +282,7 @@ async def test_photo_picks_largest_variant(
 
     downloaded_file_ids: list[str] = []
 
-    async def fake_download(self, file_id: str, expected_size: int) -> bytes:  # noqa: ARG001
+    async def fake_download(self, file_id: str, expected_size: int) -> bytes:
         downloaded_file_ids.append(file_id)
         return b"\xff\xd8\xff" + b"image"
 
@@ -312,7 +312,7 @@ async def test_photo_with_caption_combines(
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway, client = _make_gateway(session_map, sends)
 
-    async def fake_download(self, *_a, **_kw):  # noqa: ARG001
+    async def fake_download(self, *_a, **_kw):
         return b"img"
 
     monkeypatch.setattr(TelegramGateway, "_download_telegram_file", fake_download)
@@ -341,7 +341,7 @@ async def test_vision_failure_sends_friendly_notice(
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway, client = _make_gateway(session_map, sends)
 
-    async def fake_download(self, *_a, **_kw):  # noqa: ARG001
+    async def fake_download(self, *_a, **_kw):
         return b"img"
 
     monkeypatch.setattr(TelegramGateway, "_download_telegram_file", fake_download)
@@ -352,8 +352,8 @@ async def test_vision_failure_sends_friendly_notice(
     notices = [
         p["text"]
         for m, p in sends
-        if m == "sendMessage" and "couldn't describe" in p.get("text", "")
-        or m == "sendMessage" and "couldn&#x27;t describe" in p.get("text", "")
+        if (m == "sendMessage" and "couldn't describe" in p.get("text", ""))
+        or (m == "sendMessage" and "couldn&#x27;t describe" in p.get("text", ""))
     ]
     assert notices
     assert client.submitted == []  # type: ignore[attr-defined]

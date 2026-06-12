@@ -21,9 +21,7 @@ def project(tmp_path: Path) -> Project:
 
 def _seed_wiki_and_turn(project: Project, store: SessionStore) -> None:
     wiki = Wiki(project.wiki_root)
-    wiki.write_page(
-        category="concepts", slug="theme", title="Theme A", content="commontoken body"
-    )
+    wiki.write_page(category="concepts", slug="theme", title="Theme A", content="commontoken body")
     sid = store.create_session()
     store.append_turn(sid, Message(role="user", content="commontoken happened just now in chat"))
 

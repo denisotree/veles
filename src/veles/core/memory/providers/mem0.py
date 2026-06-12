@@ -43,7 +43,7 @@ class Mem0MemoryProvider:
             if self.agent_id:
                 kwargs["agent_id"] = self.agent_id
             response = client.search(**kwargs)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _warn_once(f"Mem0 recall failed: {type(exc).__name__}: {exc}")
             return []
         return [_to_recall_hit(item) for item in _iter_items(response)]

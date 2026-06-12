@@ -58,7 +58,7 @@ def recency_score(ts: float | None, now: float, half_life_sec: float) -> float:
     return 0.5 ** (age / half_life_sec)
 
 
-def rerank(
+def rerank[H](
     streams: list[list[_H]],
     *,
     now: float,

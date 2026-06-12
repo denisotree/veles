@@ -76,6 +76,8 @@ def ask_for_approval(tool_name: str, arguments: dict[str, Any], reason: str) -> 
     """
     from veles.core.permission.prompt import (
         PromptRequest,
+    )
+    from veles.core.permission.prompt import (
         current_prompter as _unified_prompter,
     )
 
@@ -92,7 +94,7 @@ def ask_for_approval(tool_name: str, arguments: dict[str, Any], reason: str) -> 
             approved = answer.approved
         else:
             approved = _default_prompter(tool_name, arguments, reason)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(
             f"warning: approval prompter raised {type(exc).__name__}: {exc}; denying",
             file=sys.stderr,

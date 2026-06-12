@@ -84,9 +84,7 @@ def test_recall_skips_old_turns(project: Project) -> None:
         sid = store.create_session()
         store.append_turn(sid, Message(role="user", content="ancient timestamptest token"))
         old_ts = time.time() - 90 * 86400
-        store._conn.execute(
-            "UPDATE turns SET created_at = ? WHERE session_id = ?", (old_ts, sid)
-        )
+        store._conn.execute("UPDATE turns SET created_at = ? WHERE session_id = ?", (old_ts, sid))
         out = MemoryRouter(project, store=store).recall("timestamptest", limit=5)
     finally:
         store.close()

@@ -165,9 +165,7 @@ async def test_ctrl_r_opens_session_picker_and_switches(
     assert app.state.session_id == sid
 
 
-async def test_slash_model_no_arg_opens_picker(
-    tmp_project, agent_factory_for, text_response
-):
+async def test_slash_model_no_arg_opens_picker(tmp_project, agent_factory_for, text_response):
     app = _new_app(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:
         from veles.tui.widgets.composer import Composer
@@ -179,9 +177,7 @@ async def test_slash_model_no_arg_opens_picker(
         await pilot.pause()
         # Picker is mounted on top of the chat screen — assertable by
         # screen-stack depth or by querying the ModelPickerScreen.
-        assert any(
-            isinstance(s, ModelPickerScreen) for s in pilot.app.screen_stack
-        )
+        assert any(isinstance(s, ModelPickerScreen) for s in pilot.app.screen_stack)
         await pilot.press("enter")  # take first row
         await pilot.pause()
     # First model in the openrouter list.
@@ -219,9 +215,7 @@ async def test_slash_model_refresh_opens_picker_with_refresh_flag(
         composer.text = "/model refresh"
         await pilot.press("enter")
         await pilot.pause()
-        assert any(
-            isinstance(s, ModelPickerScreen) for s in pilot.app.screen_stack
-        )
+        assert any(isinstance(s, ModelPickerScreen) for s in pilot.app.screen_stack)
     assert seen["provider"] == "openrouter"
     assert seen["refresh"] is True
 
@@ -243,9 +237,7 @@ async def test_ctrl_t_opens_theme_picker_and_sets_state(
     assert app.state.theme_name == "dracula"
 
 
-async def test_picker_escape_keeps_state_unchanged(
-    tmp_project, agent_factory_for, text_response
-):
+async def test_picker_escape_keeps_state_unchanged(tmp_project, agent_factory_for, text_response):
     app = _new_app(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:
         original_theme = app.state.theme_name

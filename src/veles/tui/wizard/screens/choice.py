@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import ClassVar
@@ -128,9 +129,9 @@ class ChoiceScreen(ModalScreen[str | None]):
             if item.description:
                 label = f"{item.label}  —  {item.description}"
             self._listview.append(ListItem(Label(label)))
-            if initial and self._default is not None and item.value == self._default:
-                default_idx = i
-            elif not initial and prev_value is not None and item.value == prev_value:
+            matches_default = initial and self._default is not None and item.value == self._default
+            matches_prev = not initial and prev_value is not None and item.value == prev_value
+            if matches_default or matches_prev:
                 default_idx = i
         if self._visible_items:
             self._listview.index = default_idx
@@ -143,9 +144,7 @@ class ChoiceScreen(ModalScreen[str | None]):
             self._visible_items = list(self._items)
         else:
             self._visible_items = [
-                it
-                for it in self._items
-                if query in it.label.lower() or query in it.value.lower()
+                it for it in self._items if query in it.label.lower() or query in it.value.lower()
             ]
         self._populate()
 
@@ -162,10 +161,8 @@ class ChoiceScreen(ModalScreen[str | None]):
             return
         index = self._listview.index or 0
         if 0 <= index < len(self._visible_items):
-            try:
+            with contextlib.suppress(Exception):
                 self._on_highlight_changed(self._visible_items[index].value)
-            except Exception:  # noqa: BLE001 — preview must never crash navigation
-                pass
 
     def on_key(self, event: events.Key) -> None:
         if event.key == "enter":
@@ -173,7 +170,12 @@ class ChoiceScreen(ModalScreen[str | None]):
             if 0 <= index < len(self._visible_items):
                 event.stop()
                 self.dismiss(self._visible_items[index].value)
-        elif event.key in ("down", "up") and self._filterable and self._filter_input is not None and self._filter_input.has_focus:
+        elif (
+            event.key in ("down", "up")
+            and self._filterable
+            and self._filter_input is not None
+            and self._filter_input.has_focus
+        ):
             # Hand keyboard focus to the ListView so arrows navigate items
             # without the user having to Tab. Forward the original key so
             # the cursor moves immediately, not on the next press.

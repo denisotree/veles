@@ -33,7 +33,7 @@ def test_run_toolset_inherits_from_builtin() -> None:
 def test_includes_pull_tools_transitively(tmp_path: Path) -> None:
     _write_toml(
         tmp_path / "ts.toml",
-        '\n'.join(
+        "\n".join(
             [
                 '[a]\ntools = ["t1"]',
                 '[b]\nincludes = ["a"]\ntools = ["t2"]',
@@ -48,7 +48,7 @@ def test_includes_pull_tools_transitively(tmp_path: Path) -> None:
 def test_duplicate_tool_names_dedup_preserves_order(tmp_path: Path) -> None:
     _write_toml(
         tmp_path / "ts.toml",
-        '\n'.join(
+        "\n".join(
             [
                 '[a]\ntools = ["t1", "t2"]',
                 '[b]\nincludes = ["a"]\ntools = ["t2", "t3"]',
@@ -62,7 +62,7 @@ def test_duplicate_tool_names_dedup_preserves_order(tmp_path: Path) -> None:
 def test_cycle_in_includes_raises(tmp_path: Path) -> None:
     _write_toml(
         tmp_path / "ts.toml",
-        '\n'.join(
+        "\n".join(
             [
                 '[a]\nincludes = ["b"]',
                 '[b]\nincludes = ["a"]',
@@ -94,5 +94,5 @@ def test_non_list_tools_raises(tmp_path: Path) -> None:
 def test_runtime_module_aliases_match_toolsets() -> None:
     from veles.cli._runtime import _INGEST_TOOLS, _RUN_TOOLS
 
-    assert _RUN_TOOLS == TOOLSETS["run"]
-    assert _INGEST_TOOLS == TOOLSETS["ingest"]
+    assert TOOLSETS["run"] == _RUN_TOOLS
+    assert TOOLSETS["ingest"] == _INGEST_TOOLS

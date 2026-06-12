@@ -313,7 +313,7 @@ class Inspector(Vertical):
             return ""
         tail = " ".join(self._reasoning.split())
         if len(tail) > _REASONING_TAIL_CHARS:
-            tail = "…" + tail[-(_REASONING_TAIL_CHARS - 1):]
+            tail = "…" + tail[-(_REASONING_TAIL_CHARS - 1) :]
         return f"  💭 {tail}"
 
     def _render_rows(self) -> list[str]:

@@ -148,7 +148,7 @@ def resolve_api_key(provider_name: str, *, explicit: str | None = None) -> str |
         proj = current_project()
         if proj is not None:
             project_name = proj.name
-    except Exception:  # noqa: BLE001 — never let context lookup crash adapter init
+    except Exception:
         project_name = None
     from veles.core.secrets import get_provider_key
 

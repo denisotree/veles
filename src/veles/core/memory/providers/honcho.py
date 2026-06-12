@@ -59,7 +59,7 @@ class HonchoMemoryProvider:
                 query=query,
                 limit=limit,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _warn_once(f"Honcho recall failed: {type(exc).__name__}: {exc}")
             return []
         return [_to_recall_hit(item) for item in _iter_items(response)]

@@ -80,9 +80,7 @@ def test_builtin_skills_show_up_via_discover_include_layout(
     assert {"tool_authoring", "tool_installer"} <= names
 
 
-def test_builtin_skills_omitted_without_include_layout(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_builtin_skills_omitted_without_include_layout(isolated_home: Path, tmp_path: Path) -> None:
     """Default discover_skills() doesn't include builtin skills —
     they only appear when callers explicitly opt in. Legacy tests
     that pre-date M120b still see an empty list on a fresh project."""
@@ -93,9 +91,7 @@ def test_builtin_skills_omitted_without_include_layout(
     assert "tool_installer" not in names
 
 
-def test_project_skill_shadows_builtin(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_project_skill_shadows_builtin(isolated_home: Path, tmp_path: Path) -> None:
     """A project-level `tool_authoring/SKILL.md` overrides the builtin."""
     project = init_project(tmp_path / "proj", name="proj")
     custom = project.skills_dir / "tool_authoring"

@@ -92,9 +92,7 @@ def test_popen_jsonl_drains_large_stderr_without_deadlock() -> None:
 
     def consume() -> None:
         try:
-            results.extend(
-                popen_jsonl([sys.executable, "-c", _NOISY_CHILD], timeout=30.0)
-            )
+            results.extend(popen_jsonl([sys.executable, "-c", _NOISY_CHILD], timeout=30.0))
         except BaseException as exc:  # relayed to the assert below
             errors.append(exc)
 
@@ -135,7 +133,7 @@ def test_popen_jsonl_stderr_tail_reaches_error_on_nonzero_exit() -> None:
     """Nonzero exit after huge stderr: error carries the stderr *tail*."""
     child = (
         "import sys\n"
-        "sys.stdout.write('{\"type\": \"a\"}\\n')\n"
+        'sys.stdout.write(\'{"type": "a"}\\n\')\n'
         "sys.stdout.flush()\n"
         "sys.stderr.write('padding' * 20000)\n"  # ~137KB, exceeds the 64KB tail
         "sys.stderr.write('FATAL-MARKER')\n"

@@ -249,9 +249,11 @@ def make_default_compressor(
         tokens_before = estimate_tokens(history)
         if not needs_compression(history, cfg):
             logger.info(
-                "compressor skip session=%s reason=below-threshold "
-                "tokens=%d threshold=%d turns=%d",
-                sid, tokens_before, cfg.threshold_tokens, len(history),
+                "compressor skip session=%s reason=below-threshold tokens=%d threshold=%d turns=%d",
+                sid,
+                tokens_before,
+                cfg.threshold_tokens,
+                len(history),
             )
             return history
         bounds = find_safe_boundaries(history, cfg)
@@ -259,7 +261,11 @@ def make_default_compressor(
             logger.info(
                 "compressor skip session=%s reason=no-safe-boundaries "
                 "tokens=%d turns=%d head_keep=%d tail_keep=%d",
-                sid, tokens_before, len(history), cfg.head_keep, cfg.tail_keep,
+                sid,
+                tokens_before,
+                len(history),
+                cfg.head_keep,
+                cfg.tail_keep,
             )
             return history
         head_end, tail_start = bounds
@@ -267,7 +273,8 @@ def make_default_compressor(
         if not middle:
             logger.info(
                 "compressor skip session=%s reason=empty-middle tokens=%d",
-                sid, tokens_before,
+                sid,
+                tokens_before,
             )
             return history
         # Trim middle from the front until rendered input fits the
@@ -287,8 +294,11 @@ def make_default_compressor(
                 "compressor summariser-input-truncated session=%s "
                 "dropped_from_front=%d kept_middle=%d input_tokens=%d "
                 "limit=%d",
-                sid, original_len - len(middle), len(middle),
-                rendered_tokens, cfg.max_summariser_input_tokens,
+                sid,
+                original_len - len(middle),
+                len(middle),
+                rendered_tokens,
+                cfg.max_summariser_input_tokens,
             )
             if not middle:
                 # Truncated middle to empty — nothing meaningful to
@@ -320,22 +330,21 @@ def make_default_compressor(
             summary = (result.text or "").strip() or "_(empty summary)_"
             if getattr(result, "stopped_reason", None) == "budget_exhausted":
                 logger.info(
-                    "compressor summariser-budget-exhausted session=%s — "
-                    "using partial summary",
+                    "compressor summariser-budget-exhausted session=%s — using partial summary",
                     sid,
                 )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning(
                 "compressor summariser-failed session=%s exc=%s: %s",
-                sid, type(exc).__name__, exc,
+                sid,
+                type(exc).__name__,
+                exc,
             )
             summary = f"(summary failed: {type(exc).__name__}; see daemon log)"
         slug_id = sid
         slug = f"{slug_id}-c-{_now_slug()}"
         title = f"Compressed segment of session {slug_id}"
-        summary_abs = write_session_summary(
-            project, slug=slug, title=title, content=summary
-        )
+        summary_abs = write_session_summary(project, slug=slug, title=title, content=summary)
         try:
             rel_path = summary_abs.relative_to(project.root).as_posix()
         except ValueError:
@@ -360,8 +369,11 @@ def make_default_compressor(
         logger.info(
             "compressor applied session=%s tokens_before=%d tokens_after=%d "
             "n_middle_dropped=%d summary_path=%s",
-            sid, tokens_before, estimate_tokens(result_history),
-            len(middle), rel_path,
+            sid,
+            tokens_before,
+            estimate_tokens(result_history),
+            len(middle),
+            rel_path,
         )
         return result_history
 

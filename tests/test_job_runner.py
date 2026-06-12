@@ -126,9 +126,7 @@ async def test_once_schedule_marks_done(store: JobsStore, output_root: Path) -> 
     assert refreshed.enabled is False
 
 
-async def test_repeat_times_marks_done_after_n(
-    store: JobsStore, output_root: Path
-) -> None:
+async def test_repeat_times_marks_done_after_n(store: JobsStore, output_root: Path) -> None:
     factory, _ = _make_factory()
     runner = JobRunner(store=store, agent_factory=factory, output_root=output_root)
     rec = store.add_job(

@@ -82,9 +82,7 @@ def test_user_pack_overrides_builtin(isolated_home: Path) -> None:
     assert entry.manifest.description == "user override"
 
 
-def test_project_pack_overrides_user_and_builtin(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_project_pack_overrides_user_and_builtin(isolated_home: Path, tmp_path: Path) -> None:
     project = init_project(tmp_path / "proj", name="proj")
     # User-level pack
     user_layouts = isolated_home / ".veles" / "layouts"  # mirrors user_home() path
@@ -102,9 +100,7 @@ def test_project_pack_overrides_user_and_builtin(
 # ---- discovery composition ----
 
 
-def test_discover_returns_one_entry_per_name(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_discover_returns_one_entry_per_name(isolated_home: Path, tmp_path: Path) -> None:
     """If both user and builtin have `llm-wiki`, discovery yields the
     user-level one once — not twice."""
     user_layouts = isolated_home / ".veles" / "layouts"  # mirrors user_home() path
@@ -126,16 +122,14 @@ def test_discover_includes_custom_user_packs(isolated_home: Path) -> None:
     assert LAYOUT_DEFAULT in names  # builtin still present
 
 
-def test_malformed_pack_silently_skipped(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_malformed_pack_silently_skipped(isolated_home: Path, tmp_path: Path) -> None:
     """A directory with a broken layout.toml shouldn't poison the whole
     discovery — the parser raises, the discovery layer drops the entry."""
     user_layouts = isolated_home / ".veles" / "layouts"  # mirrors user_home() path
     user_layouts.mkdir(parents=True)
     bad_pack = user_layouts / "broken"
     bad_pack.mkdir()
-    (bad_pack / "layout.toml").write_text("[layout\nname = \"x\"\n", encoding="utf-8")
+    (bad_pack / "layout.toml").write_text('[layout\nname = "x"\n', encoding="utf-8")
 
     # Discovery still works; LAYOUT_DEFAULT (builtin) is present.
     packs = discover_layouts(project=None)

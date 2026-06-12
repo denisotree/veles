@@ -8,11 +8,12 @@ caller didn't supply one."""
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 
 import pytest
 
-from veles.core.context import current_project, reset_active_project, set_active_project
+from veles.core.context import reset_active_project, set_active_project
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.core.tools.builtin.memory_save import (
@@ -30,10 +31,8 @@ def _clear_active_project():
     cases see a true None state."""
     token = set_active_project(None)
     yield
-    try:
+    with contextlib.suppress(Exception):
         reset_active_project(token)
-    except Exception:
-        pass
 
 
 @pytest.fixture()
@@ -72,9 +71,7 @@ def test_save_insight_writes_row(project) -> None:
 
 def test_save_insight_no_file_path_renders_view(project) -> None:
     """M161: empty file_path → backfilled with the rendered memory view."""
-    memory_save_insight(
-        title="Empty path", body="b", category="curated-session"
-    )
+    memory_save_insight(title="Empty path", body="b", category="curated-session")
     store = SessionStore(project.memory_db_path)
     row = store._conn.execute(
         "SELECT id, file_path FROM insights WHERE title=?", ("Empty path",)
@@ -158,9 +155,7 @@ def test_save_rule_no_active_project_errors_gracefully(tmp_path: Path) -> None:
 
 
 def test_save_insight_row_returns_id_on_success(project) -> None:
-    rid = save_insight_row(
-        title="t", body="b", category="x", file_path="wiki/x.md"
-    )
+    rid = save_insight_row(title="t", body="b", category="x", file_path="wiki/x.md")
     assert rid > 0
 
 

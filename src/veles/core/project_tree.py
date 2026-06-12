@@ -289,9 +289,7 @@ def _parent_path(rel: str) -> str | None:
 # ---------- recall API ----------
 
 
-def relevant(
-    conn: sqlite3.Connection, query: str, *, limit: int = 10
-) -> list[TreeEntry]:
+def relevant(conn: sqlite3.Connection, query: str, *, limit: int = 10) -> list[TreeEntry]:
     """Return the entries whose `semantic_tag` or `rel_path` best matches
     `query`. Ranking is a simple weighted score:
 
@@ -306,8 +304,7 @@ def relevant(
     """
     ensure_table(conn)
     rows = conn.execute(
-        "SELECT rel_path, kind, parent_path, semantic_tag, mtime, size"
-        " FROM project_tree"
+        "SELECT rel_path, kind, parent_path, semantic_tag, mtime, size FROM project_tree"
     ).fetchall()
     if not rows:
         return []
@@ -355,9 +352,7 @@ def _score(entry: TreeEntry, tokens: list[str]) -> float:
     return score
 
 
-def relevant_semantic(
-    conn: sqlite3.Connection, query: str, *, limit: int = 10
-) -> list[TreeEntry]:
+def relevant_semantic(conn: sqlite3.Connection, query: str, *, limit: int = 10) -> list[TreeEntry]:
     """Embedding-aware variant of `relevant`.
 
     Falls back to `relevant(...)` (token-based) when no embedding
@@ -390,8 +385,7 @@ def relevant_semantic(
 
     ensure_table(conn)
     rows = conn.execute(
-        "SELECT rel_path, kind, parent_path, semantic_tag, mtime, size"
-        " FROM project_tree"
+        "SELECT rel_path, kind, parent_path, semantic_tag, mtime, size FROM project_tree"
     ).fetchall()
     if not rows:
         return []
@@ -417,8 +411,7 @@ def relevant_semantic(
         return relevant(conn, query, limit=limit)
 
     scored = [
-        (_cosine(query_vec, vec), entry)
-        for vec, entry in zip(entry_vecs, entries, strict=True)
+        (_cosine(query_vec, vec), entry) for vec, entry in zip(entry_vecs, entries, strict=True)
     ]
     scored.sort(key=lambda x: (-x[0], x[1].rel_path))
     return [e for _, e in scored[:limit]]
@@ -440,7 +433,7 @@ def _cosine(a: list[float], b: list[float]) -> float:
 
     if not a or not b or len(a) != len(b):
         return 0.0
-    dot = math.fsum(x * y for x, y in zip(a, b))
+    dot = math.fsum(x * y for x, y in zip(a, b, strict=False))
     na = math.sqrt(math.fsum(x * x for x in a))
     nb = math.sqrt(math.fsum(x * x for x in b))
     if na == 0.0 or nb == 0.0:

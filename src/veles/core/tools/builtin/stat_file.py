@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from veles.core.path_guard import resolve_safe
@@ -42,18 +42,14 @@ def stat_file(path: str) -> str:
     try:
         stat = resolved.lstat()
     except OSError as exc:
-        return json.dumps(
-            {"path": str(path), "type": "missing", "error": str(exc)}
-        )
+        return json.dumps({"path": str(path), "type": "missing", "error": str(exc)})
 
     kind = _classify(resolved)
     payload: dict[str, object] = {
         "path": str(path),
         "type": kind,
         "size_bytes": stat.st_size,
-        "mtime_iso": datetime.fromtimestamp(
-            stat.st_mtime, tz=timezone.utc
-        ).isoformat(),
+        "mtime_iso": datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat(),
     }
     if kind == "file":
         payload["sha256_short"] = _hash_prefix(resolved)

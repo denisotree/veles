@@ -15,6 +15,7 @@ the rest live in the R3 backlog because they need bespoke validation.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import tempfile
@@ -24,7 +25,7 @@ from typing import Any, TypeVar
 T = TypeVar("T")
 
 
-def load_optional_json(path: Path, *, default: T | None = None) -> Any | T | None:
+def load_optional_json[T](path: Path, *, default: T | None = None) -> Any | T | None:
     """Read JSON from `path`. Missing file, decode error, OSError, or a
     non-dict top-level value all return `default`. Never raises.
 
@@ -56,16 +57,12 @@ def atomic_write_json(path: Path, data: Any, *, mode: int | None = None) -> None
         os.replace(tmp_name, path)
     except Exception:
         # Best-effort cleanup if the tmpfile lingered.
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp_name)
-        except OSError:
-            pass
         raise
     if mode is not None:
-        try:
+        with contextlib.suppress(OSError):
             os.chmod(path, mode)
-        except OSError:
-            pass
 
 
 __all__ = ["atomic_write_json", "load_optional_json"]

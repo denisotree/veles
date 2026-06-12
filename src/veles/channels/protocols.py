@@ -19,9 +19,7 @@ class RunBackend(Protocol):
     """Two-method surface the gateways need: submit a prompt, then
     follow its event stream until completion."""
 
-    async def submit_run(
-        self, prompt: str, *, session_id: str | None = None
-    ) -> dict[str, Any]:
+    async def submit_run(self, prompt: str, *, session_id: str | None = None) -> dict[str, Any]:
         """POST one turn. Returns at least `{"run_id": ..., "session_id": ...}`."""
         ...
 

@@ -29,10 +29,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-logger = logging.getLogger(__name__)
-
 from veles.core.file_lock import file_lock
 from veles.core.tools.registry import Registry, ToolEntry
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -402,9 +402,7 @@ def _load_skill(skill_path: Path, *, scope: str = "project") -> Skill | None:
         tools_raw = None
     tools = [str(t) for t in (tools_raw or _DEFAULT_TOOLS)]
 
-    parameters = [
-        p for p in _typed_or_default(fm, "parameters", list, []) if isinstance(p, dict)
-    ]
+    parameters = [p for p in _typed_or_default(fm, "parameters", list, []) if isinstance(p, dict)]
 
     extends_raw = fm.get("extends")
     extends_value = extends_raw if isinstance(extends_raw, str) and extends_raw.strip() else None

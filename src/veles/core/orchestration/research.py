@@ -118,7 +118,7 @@ def run_deep_research(
     """
     try:
         subs = [s.strip() for s in planner(question) if s and s.strip()]
-    except Exception:  # noqa: BLE001 — a broken planner must not abort research
+    except Exception:
         subs = []
     subs = subs[:max_subquestions] or [question]
     plan = build_research_plan(question, subs)

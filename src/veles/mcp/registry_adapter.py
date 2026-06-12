@@ -83,14 +83,10 @@ def result_to_text(result: Any) -> str:
     return text_out
 
 
-def _make_handler(
-    manager: McpClientManager, server: str, tool_name: str, timeout_s: float
-):
+def _make_handler(manager: McpClientManager, server: str, tool_name: str, timeout_s: float):
     def handler(**arguments: Any) -> str:
         try:
-            result = manager.call_tool(
-                server, tool_name, dict(arguments), timeout_s=timeout_s
-            )
+            result = manager.call_tool(server, tool_name, dict(arguments), timeout_s=timeout_s)
         except Exception as exc:
             return f"MCP call failed ({server}/{tool_name}): {exc}"
         return result_to_text(result)

@@ -90,7 +90,7 @@ def test_persisted_history_round_trip(tmp_path):
 
 def test_load_tolerates_legacy_plain_lines(tmp_path):
     path = tmp_path / "h.jsonl"
-    path.write_text("legacy line\n{\"text\": \"jsonl line\"}\n", encoding="utf-8")
+    path.write_text('legacy line\n{"text": "jsonl line"}\n', encoding="utf-8")
     h = InputHistory.load(path)
     assert h.items == ["legacy line", "jsonl line"]
 

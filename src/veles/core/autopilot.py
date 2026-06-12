@@ -136,8 +136,7 @@ def parse_until(raw: str) -> float:
             dt = dt.replace(tzinfo=_dt.UTC)
         return dt.timestamp()
     raise ValueError(
-        f"autopilot duration {raw!r} not understood; "
-        "use +30m / +2h / +1d / ISO timestamp"
+        f"autopilot duration {raw!r} not understood; use +30m / +2h / +1d / ISO timestamp"
     )
 
 

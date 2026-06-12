@@ -17,6 +17,7 @@ inject a stub that returns an Agent fed by a fake provider.
 
 from __future__ import annotations
 
+import contextlib
 from typing import ClassVar
 
 from textual.app import App, ComposeResult
@@ -170,9 +171,7 @@ class TuiApp(App[int]):
         # M84: keep the wiki FTS index fresh on every TUI boot. Runs in a
         # worker so a 500-page reindex doesn't stall first paint.
         if self._project is not None:
-            self.run_worker(
-                self._reindex_wiki_if_stale, exclusive=True, group="wiki-reindex"
-            )
+            self.run_worker(self._reindex_wiki_if_stale, exclusive=True, group="wiki-reindex")
 
     def _seed_inspector_errors(self, *, limit: int = 5) -> None:
         """Load the most recent ErrorEvents from the project's events.jsonl
@@ -212,11 +211,9 @@ class TuiApp(App[int]):
         assert self._project is not None
         if not wiki_enabled(self._project):
             return
-        try:
+        # Indexing is best-effort; never let it crash the TUI.
+        with contextlib.suppress(Exception):
             Wiki(self._project.wiki_root).reindex_if_stale()
-        except Exception:
-            # Indexing is best-effort; never let it crash the TUI.
-            pass
 
     # ---- input handling ----
 
@@ -257,11 +254,7 @@ class TuiApp(App[int]):
         if result is None:
             self._chat.append_error(f"unknown command {line.split()[0]!r}; try /help")
             return
-        if (
-            self._state.theme_name != prev_theme
-            and not result.is_error
-            and not result.open_picker
-        ):
+        if self._state.theme_name != prev_theme and not result.is_error and not result.open_picker:
             apply_theme(self, self._state.theme_name)
         self._apply_slash_result(result)
 
@@ -394,7 +387,7 @@ class TuiApp(App[int]):
             return
         from veles.core.tui_state import TuiPersistentState, save_for_project
 
-        try:
+        with contextlib.suppress(OSError):
             save_for_project(
                 self._project,
                 TuiPersistentState(
@@ -403,8 +396,6 @@ class TuiApp(App[int]):
                     model=self._state.model,
                 ),
             )
-        except OSError:
-            pass
 
     def _after_theme_pick(self, theme: str | None) -> None:
         if not theme:
@@ -561,11 +552,7 @@ class TuiApp(App[int]):
 
         new_mode = next_mode(self._state.mode)
         # Auto-abandon a stale active goal when re-entering goal mode.
-        if (
-            new_mode == "goal"
-            and self._state.active_goal_id
-            and self._project is not None
-        ):
+        if new_mode == "goal" and self._state.active_goal_id and self._project is not None:
             try:
                 from veles.core.goal import cancel as cancel_goal
 
@@ -576,9 +563,7 @@ class TuiApp(App[int]):
                     reason="user cycled back into goal mode",
                 )
                 if self._chat is not None:
-                    self._chat.append_system(
-                        f"abandoned previous goal {stale_id}; starting fresh"
-                    )
+                    self._chat.append_system(f"abandoned previous goal {stale_id}; starting fresh")
             except (KeyError, OSError, ValueError):
                 pass  # stale id → just clear; fresh interview will bootstrap
             self._state.active_goal_id = None

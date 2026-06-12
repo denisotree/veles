@@ -23,7 +23,9 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_cloud_provider_success_returns_live_models(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(_model_fetcher, "_try_live", lambda p: ["openai/gpt-4o", "openai/gpt-4o-mini"])
+    monkeypatch.setattr(
+        _model_fetcher, "_try_live", lambda p: ["openai/gpt-4o", "openai/gpt-4o-mini"]
+    )
     ok, models, msg = _model_fetcher.validate_and_fetch_models("openai", "sk-key")
     assert ok is True
     assert "openai/gpt-4o" in models
@@ -61,7 +63,7 @@ def test_local_provider_uses_live_endpoint(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(_model_fetcher, "_try_live", lambda p: ["llama3", "mistral"])
-    ok, models, msg = _model_fetcher.validate_and_fetch_models("ollama", "ignored")
+    ok, models, _msg = _model_fetcher.validate_and_fetch_models("ollama", "ignored")
     assert ok is True
     assert "llama3" in models
 

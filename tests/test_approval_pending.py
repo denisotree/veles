@@ -4,13 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from tests.conftest import StubProvider as _StubProvider
 from veles.core.agent import Agent
 from veles.core.agent_state import AgentState, current_state
 from veles.core.approval_prompter import ApprovalAnswer, ask_for_approval
-from veles.core.permission import Decision, evaluate
+from veles.core.permission import evaluate
 from veles.core.permission.prompt import (
     PromptAnswer,
     PromptRequest,
@@ -21,7 +19,6 @@ from veles.core.permission.prompt import (
 from veles.core.provider import ProviderResponse, TokenUsage, ToolCall
 from veles.core.risk import RiskClass
 from veles.core.tools.registry import Registry, ToolEntry
-
 
 # ---------- prompter ContextVar ----------
 
@@ -111,7 +108,7 @@ def test_engine_returns_approval_required_for_non_sensitive_external() -> None:
 # ---------- Agent end-to-end ----------
 
 
-def _registry_with_approval_tool(handler) -> Registry:  # noqa: ANN001
+def _registry_with_approval_tool(handler) -> Registry:
     reg = Registry()
     reg.register(
         ToolEntry(

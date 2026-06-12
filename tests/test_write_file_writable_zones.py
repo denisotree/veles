@@ -73,9 +73,7 @@ def test_refusal_message_lists_allowed_zones(project) -> None:
 # ---- permissive fallback ----
 
 
-def test_unknown_layout_falls_back_to_permissive(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_unknown_layout_falls_back_to_permissive(isolated_home: Path, tmp_path: Path) -> None:
     """When the layout-pack doesn't resolve, fall back to permissive
     (any path inside the project root is writable). Preserves the
     pre-M117 contract for projects on custom layouts."""

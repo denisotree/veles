@@ -138,9 +138,10 @@ class Wiki:
         if trust != "authoritative" or source_url is not None:
             from veles.core.untrusted import trust_frontmatter
 
-            frontmatter = trust_frontmatter(source_url or "", fetched=None) if trust == "external" else (
-                f"---\ntrust: {trust}\n---\n\n"
-            )
+            if trust == "external":
+                frontmatter = trust_frontmatter(source_url or "", fetched=None)
+            else:
+                frontmatter = f"---\ntrust: {trust}\n---\n\n"
             body = frontmatter + body
         page_path = self._root / _WIKI_DIR / category / f"{clean_slug}.md"
         page_path.write_text(body, encoding="utf-8")
@@ -283,6 +284,7 @@ class Wiki:
             return False
         try:
             import time as _time
+
             if _time.time() - db_mtime > max_age_sec:
                 return True
         except OSError:

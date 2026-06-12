@@ -48,12 +48,8 @@ def register(sub: argparse._SubParsersAction) -> None:
         "stop", help="Signal a running daemon to terminate (SIGTERM via pid file)."
     )
     daemon_stop.add_argument("--name", default=None, help="Named daemon session to stop.")
-    daemon_status = daemon_sub.add_parser(
-        "status", help="Report whether the daemon is running."
-    )
-    daemon_status.add_argument(
-        "--name", default=None, help="Named daemon session to inspect."
-    )
+    daemon_status = daemon_sub.add_parser("status", help="Report whether the daemon is running.")
+    daemon_status.add_argument("--name", default=None, help="Named daemon session to inspect.")
 
     # M97: multi-daemon control.
     daemon_sub.add_parser("list", help="List daemons registered across projects.")
@@ -91,15 +87,15 @@ def register(sub: argparse._SubParsersAction) -> None:
     )
     ds_create.add_argument("name", help="Session name (e.g. 'api', 'research').")
     ds_create.add_argument("--host", default="127.0.0.1", help="Bind host.")
-    ds_create.add_argument("--port", type=int, default=None, help="Bind port (distinct per session).")
+    ds_create.add_argument(
+        "--port", type=int, default=None, help="Bind port (distinct per session)."
+    )
     ds_create.add_argument("--model", default=None, help="Pin a model for this session.")
     ds_create.add_argument("--provider", default=None, help="Pin a provider for this session.")
     ds_create.add_argument("--mode", default=None, help="Default agent mode.")
 
     ds_list = ds_sub.add_parser("list", help="List this project's named daemon sessions.")
-    ds_list.add_argument(
-        "--all", action="store_true", help="Include soft-deleted sessions."
-    )
+    ds_list.add_argument("--all", action="store_true", help="Include soft-deleted sessions.")
 
     ds_delete = ds_sub.add_parser(
         "delete", help="Soft-delete a named daemon session (kept in DB for history)."

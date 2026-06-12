@@ -47,20 +47,21 @@ class _RecordingClient:
         self.update_calls.append(
             {"session_id": session_id, "model": model, "mode": mode, "provider": provider}
         )
-        return {"session_id": session_id, "overrides": {"model": model, "mode": mode, "provider": provider}}
+        return {
+            "session_id": session_id,
+            "overrides": {"model": model, "mode": mode, "provider": provider},
+        }
 
     async def submit_prompt_answer(
         self, run_id: str, prompt_id: str, choice: str
     ) -> dict[str, Any]:
-        self.submit_calls.append(
-            {"run_id": run_id, "prompt_id": prompt_id, "choice": choice}
-        )
+        self.submit_calls.append({"run_id": run_id, "prompt_id": prompt_id, "choice": choice})
         return {"ok": True}
 
-    async def submit_run(self, prompt: str, *, session_id=None):  # noqa: ARG002
+    async def submit_run(self, prompt: str, *, session_id=None):
         return {"run_id": "r", "session_id": session_id, "state": "running"}
 
-    async def stream_events(self, run_id):  # noqa: ARG002
+    async def stream_events(self, run_id):
         if False:
             yield
 
@@ -210,8 +211,6 @@ async def test_v_prefix_still_routes_to_trust_prompt_handler(
         "message": {"chat": {"id": 42}, "message_id": 99},
     }
     await gateway._handle_callback_query(callback)
-    assert client.submit_calls == [
-        {"run_id": "r1", "prompt_id": "pid-1", "choice": "once"}
-    ]
+    assert client.submit_calls == [{"run_id": "r1", "prompt_id": "pid-1", "choice": "once"}]
     # update_session should NOT have been called
     assert client.update_calls == []

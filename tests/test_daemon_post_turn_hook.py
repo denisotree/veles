@@ -7,8 +7,8 @@ called once.
 from __future__ import annotations
 
 import argparse
-import asyncio
 from pathlib import Path
+from typing import ClassVar
 
 import veles.cli as cli_mod
 from veles.cli.commands.daemon import _make_post_turn_hook
@@ -26,6 +26,7 @@ def test_post_turn_hook_fires_every_step(tmp_path: Path, monkeypatch) -> None:
     def _track(name: str):
         def _fn(*_args, **_kwargs):
             calls.append(name)
+
         return _fn
 
     monkeypatch.setattr(cli_mod, "_maybe_run_insight_extractor", _track("insight"))
@@ -38,7 +39,7 @@ def test_post_turn_hook_fires_every_step(tmp_path: Path, monkeypatch) -> None:
     hook = _make_post_turn_hook(_stub_args(), project)
 
     class _FakeResult:
-        history = []
+        history: ClassVar[list] = []
         session_id = "ses-test"
 
     hook(_FakeResult())
@@ -55,6 +56,7 @@ def test_post_turn_hook_keeps_going_when_one_step_fails(
     def _ok(name: str):
         def _fn(*_a, **_kw):
             calls.append(name)
+
         return _fn
 
     def _raise(*_a, **_kw):
@@ -70,7 +72,7 @@ def test_post_turn_hook_keeps_going_when_one_step_fails(
     hook = _make_post_turn_hook(_stub_args(), project)
 
     class _FakeResult:
-        history = []
+        history: ClassVar[list] = []
         session_id = "x"
 
     hook(_FakeResult())
@@ -94,13 +96,9 @@ async def test_run_agent_in_background_invokes_post_turn_hook(monkeypatch) -> No
     from tests.conftest import FakeAgent
 
     agent = FakeAgent(
-        RunResult(
-            text="ok", iterations=1, stopped_reason="completed", session_id="ses-x"
-        )
+        RunResult(text="ok", iterations=1, stopped_reason="completed", session_id="ses-x")
     )
     handle = new_run_handle()
-    await run_agent_in_background(
-        handle, agent=agent, prompt="hi", post_turn_hook=hook
-    )
+    await run_agent_in_background(handle, agent=agent, prompt="hi", post_turn_hook=hook)
     assert len(called) == 1
     assert called[0].text == "ok"

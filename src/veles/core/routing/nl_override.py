@@ -217,9 +217,7 @@ def parse_extractor_output(raw: str) -> list[_NLEntry]:
     if not isinstance(raw_entries, list):
         return []
     valid_tasks = set(DEFAULT_TASKS.keys())
-    return [
-        entry for entry in (_coerce_nl_entry(e, valid_tasks) for e in raw_entries) if entry
-    ]
+    return [entry for entry in (_coerce_nl_entry(e, valid_tasks) for e in raw_entries) if entry]
 
 
 def make_nl_extractor(*, provider, model: str):

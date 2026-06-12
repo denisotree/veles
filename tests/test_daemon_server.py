@@ -33,7 +33,7 @@ from veles.daemon.server import build_state, make_app
 # ---- stub provider + agent factory ----
 
 
-def _StubProvider(chunks: list[str] | None = None) -> StubProvider:
+def _stub_provider(chunks: list[str] | None = None) -> StubProvider:
     chunks = chunks or ["hello ", "world"]
     resp = ProviderResponse(
         text="".join(chunks),
@@ -45,8 +45,7 @@ def _StubProvider(chunks: list[str] | None = None) -> StubProvider:
         [resp],
         supports_tools=False,
         supports_streaming=True,
-        stream_events=[TextDelta(text=ch) for ch in chunks]
-        + [StreamEnd(response=resp)],
+        stream_events=[TextDelta(text=ch) for ch in chunks] + [StreamEnd(response=resp)],
         repeat_last=True,
     )
 
@@ -54,10 +53,10 @@ def _StubProvider(chunks: list[str] | None = None) -> StubProvider:
 def _make_stub_factory(store: SessionStore, *, chunks: list[str] | None = None) -> AgentFactory:
     from veles.core.agent import Agent
 
-    def factory(session_id: str | None, *, prompt: str | None = None):  # noqa: ARG001
+    def factory(session_id: str | None, *, prompt: str | None = None):
         sid = session_id or store.create_session()
         return Agent(
-            provider=_StubProvider(chunks=chunks),
+            provider=_stub_provider(chunks=chunks),
             registry=Registry(),
             model="stub-model",
             max_iterations=1,

@@ -24,7 +24,6 @@ from veles.core.orchestration.research import (
 )
 from veles.core.provider import ProviderResponse, TokenUsage
 
-
 # --- unit: build_research_plan --------------------------------------------
 
 
@@ -67,7 +66,7 @@ class _ScriptedAgent:
         self._system = system_prompt or ""
         self._calls = calls
 
-    def run(self, prompt: str, **_):  # noqa: ANN003
+    def run(self, prompt: str, **_):
         from veles.core.agent import RunResult
 
         self._calls.append(prompt)
@@ -85,7 +84,7 @@ class _ScriptedAgent:
 
 
 def _factory_with(calls: list):
-    def factory(**kwargs):  # noqa: ANN003
+    def factory(**kwargs):
         return _ScriptedAgent(kwargs.get("system_prompt", ""), calls)
 
     return factory
@@ -130,9 +129,7 @@ def test_planner_failure_falls_back_to_single_explorer() -> None:
 
 def test_empty_planner_falls_back_to_single_explorer() -> None:
     calls: list = []
-    result = run_deep_research(
-        "q", agent_factory=_factory_with(calls), planner=lambda _q: []
-    )
+    result = run_deep_research("q", agent_factory=_factory_with(calls), planner=lambda _q: [])
     assert result.final_text == "REPORT synthesised from 1 explorer(s)"
 
 
@@ -158,7 +155,7 @@ class _ListProvider:
     supports_tools = True
     supports_streaming = False
 
-    def create_message(self, messages, tools=None, *, model, max_tokens=4096):  # noqa: ANN001
+    def create_message(self, messages, tools=None, *, model, max_tokens=4096):
         del messages, tools, model, max_tokens
         return ProviderResponse(
             text='["angle one", "angle two", "angle three", "angle four"]',
@@ -177,7 +174,7 @@ def test_make_llm_planner_parses_and_caps() -> None:
 # --- CLI smoke: cmd_research wiring ----------------------------------------
 
 
-def test_cmd_research_prints_report_and_manages_trust_env(tmp_path, monkeypatch, capsys) -> None:  # noqa: ANN001
+def test_cmd_research_prints_report_and_manages_trust_env(tmp_path, monkeypatch, capsys) -> None:
     import argparse
     import os
 
@@ -189,7 +186,7 @@ def test_cmd_research_prints_report_and_manages_trust_env(tmp_path, monkeypatch,
 
     seen_env: dict = {}
 
-    def fake_run(question, *, agent_factory, planner, max_subquestions, **_):  # noqa: ANN001
+    def fake_run(question, *, agent_factory, planner, max_subquestions, **_):
         # The command must pre-authorise trust while research runs.
         seen_env["during"] = os.environ.get("VELES_TRUST_AUTO_ALLOW")
         return ManagerRunResult(

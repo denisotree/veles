@@ -25,6 +25,7 @@ the wizard from re-firing on the next invocation.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import sys
 from collections.abc import Callable
@@ -34,6 +35,13 @@ from shutil import copyfile
 
 from veles.core.i18n import t
 from veles.core.project import Project, ProjectAlreadyExists, init_project
+from veles.core.project_config import (
+    load_project_config as _load_project_toml,
+)
+from veles.core.project_config import (
+    save_project_config as _save_project_toml,
+)
+from veles.core.providers import PROVIDER_VALUES as _PROVIDER_CHOICES
 from veles.core.wiki import Wiki
 
 Prompter = Callable[[str, str | None], str]
@@ -46,11 +54,10 @@ def _project_config_path(project: Project) -> Path:
     (name, created_at). Mirrors `~/.veles/config.toml` shape."""
     return project.state_dir / "config.toml"
 
+
 # Commands that already own project scaffolding or are pure-global; the
 # wizard must not fire for them even if no project exists.
 _SKIP_COMMANDS: frozenset[str] = frozenset({"init", "import", "models", "doctor", "schema"})
-
-from veles.core.providers import PROVIDER_VALUES as _PROVIDER_CHOICES
 
 _project_wizard_prompter: ContextVar[Prompter | None] = ContextVar(
     "veles_project_wizard_prompter", default=None
@@ -128,9 +135,7 @@ def run_project_wizard(cwd: Path) -> Project | None:
 
 
 def _step_provider_override(project: Project, prompter: Prompter) -> None:
-    if not _ask_yes_no(
-        prompter, t("project_wizard.ask_provider_override"), default=False
-    ):
+    if not _ask_yes_no(prompter, t("project_wizard.ask_provider_override"), default=False):
         return
     provider = _ask_choice(
         prompter, t("project_wizard.ask_provider_label"), _PROVIDER_CHOICES, default="openrouter"
@@ -239,22 +244,11 @@ def _copy_seed_files(project: Project, candidates: list[Path]) -> int:
         except OSError as exc:
             print(f"  ! skipping {src}: {exc}", file=sys.stderr)
     if count:
-        try:
+        with contextlib.suppress(OSError):
             Wiki(project.wiki_root).append_log(
                 op="seed", summary=f"wizard copied {count} file(s) into sources/seed/"
             )
-        except OSError:
-            pass
     return count
-
-
-# Legacy aliases — call sites migrated to `core.project_config` directly.
-# Kept thin so external code (tests, plugins) that imported these names
-# from cli.project_wizard continues to work for one more release.
-from veles.core.project_config import (
-    load_project_config as _load_project_toml,
-    save_project_config as _save_project_toml,
-)
 
 
 def _ask_yes_no(prompter: Prompter, prompt: str, *, default: bool) -> bool:
@@ -308,9 +302,7 @@ def maybe_run_project_wizard(args: argparse.Namespace, cwd: Path) -> Project | N
             # M129: `veles daemon start` runs the wizard but starts the
             # daemon itself afterwards — don't let the wizard autostart a
             # second one (single-instance pid collision).
-            autostart_daemon = not getattr(
-                args, "_suppress_wizard_daemon_autostart", False
-            )
+            autostart_daemon = not getattr(args, "_suppress_wizard_daemon_autostart", False)
             project = run_project_wizard_tui(
                 cwd,
                 skip_bootstrap_confirm=skip_bootstrap,
@@ -321,11 +313,11 @@ def maybe_run_project_wizard(args: argparse.Namespace, cwd: Path) -> Project | N
             # TUI returned None — either cancelled or user declined the
             # bootstrap. Don't double-prompt via stdin. Mark the conscious
             # decline so main() exits 0 instead of the generic error.
-            args._wizard_user_chose_no_project = True  # noqa: SLF001
+            args._wizard_user_chose_no_project = True
             return None
         except ImportError:
             pass
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             print(
                 f"warning: TUI project wizard failed ({type(exc).__name__}: {exc}); "
                 "falling back to stdin prompts.",
@@ -338,7 +330,7 @@ def maybe_run_project_wizard(args: argparse.Namespace, cwd: Path) -> Project | N
             file=sys.stderr,
         )
         return None
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(
             f"warning: project wizard failed: {type(exc).__name__}: {exc}",
             file=sys.stderr,

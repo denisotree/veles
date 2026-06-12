@@ -10,7 +10,11 @@ from veles.core.approval import APPROVALS_DIRNAME, list_approvals
 from veles.core.critical_ops import reset_critical_confirmer, set_critical_confirmer
 from veles.core.permission.prompt import (
     PromptAnswer,
+)
+from veles.core.permission.prompt import (
     reset_prompter as reset_unified_prompter,
+)
+from veles.core.permission.prompt import (
     set_prompter as set_unified_prompter,
 )
 from veles.core.provider import ProviderResponse, TokenUsage, ToolCall

@@ -151,12 +151,8 @@ def test_nl_hint_beats_provider_base(tmp_path: Path) -> None:
     from veles.core.routing import RoutingConfig, save_nl_routing_config
 
     project = init_project(tmp_path / "p", name="p")
-    save_project_config(
-        project, {"provider": {"default": "ollama", "model": "qwen3"}}
-    )
-    save_nl_routing_config(
-        project, RoutingConfig(tasks={"compressor": "openai:gpt-4o-mini"})
-    )
+    save_project_config(project, {"provider": {"default": "ollama", "model": "qwen3"}})
+    save_nl_routing_config(project, RoutingConfig(tasks={"compressor": "openai:gpt-4o-mini"}))
     # NL wins for compressor; advisor (no NL) inherits the provider base.
     assert route("compressor", project) == ("openai", "gpt-4o-mini")
     assert route("advisor", project) == ("ollama", "qwen3")

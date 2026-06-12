@@ -21,7 +21,6 @@ from pathlib import Path
 
 from veles.core.user_paths import user_home
 
-
 _REGISTRY_FILENAME = "daemons.json"
 
 
@@ -84,9 +83,7 @@ class DaemonRegistry:
     def save(self) -> None:
         path = registry_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "daemons": {slug: asdict(entry) for slug, entry in self.entries.items()}
-        }
+        payload = {"daemons": {slug: asdict(entry) for slug, entry in self.entries.items()}}
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         os.replace(tmp, path)

@@ -112,7 +112,7 @@ def get_secret(name: str, *, env_fallback: bool = True) -> str | None:
         value = kr.get_password(_SERVICE, name)
     except errs.KeyringError:
         value = None
-    except Exception:  # noqa: BLE001 — backend bugs vary widely; never crash
+    except Exception:
         value = None
     if isinstance(value, str):
         return value
@@ -146,7 +146,7 @@ def delete_secret(name: str) -> bool:
         return True
     except errs.PasswordDeleteError:
         return False
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
 
@@ -262,7 +262,7 @@ def _read_keychain(name: str) -> str | None:
         value = kr.get_password(_SERVICE, name)
     except errs.KeyringError:
         return None
-    except Exception:  # noqa: BLE001
+    except Exception:
         return None
     return value if isinstance(value, str) and value else None
 

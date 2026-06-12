@@ -11,6 +11,8 @@ Returns the saved `UserConfig` on success or None on cancel.
 
 from __future__ import annotations
 
+import contextlib
+
 from veles.core.user_config import UserConfig, save_user_config
 from veles.tui.wizard.app import WizardApp
 from veles.tui.wizard.user_steps import user_wizard_steps
@@ -31,10 +33,8 @@ def run_user_wizard_tui() -> tuple[UserConfig | None, dict]:
         tui_theme=answers.get("tui_theme", "everforest"),
         default_model=answers.get("default_model"),
     )
-    try:
+    with contextlib.suppress(OSError):
         save_user_config(cfg)
-    except OSError:
-        pass
     return cfg, answers
 
 

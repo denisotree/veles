@@ -22,8 +22,8 @@ from veles.channels.telegram._buffer import (
     _BUFFER_HARD_CAP,
     _DEBOUNCE_SECONDS,
     _ChatBuffer,
-    _Kind,
     _classify,
+    _Kind,
 )
 from veles.channels.telegram._delivery import _TurnOutcome
 from veles.channels.telegram._forwarded import (
@@ -49,25 +49,21 @@ from veles.channels.telegram._helpers import (
 from veles.channels.telegram._prompts import (
     _APPROVAL_SHORT_BY_KEY,
     _TRUST_SHORT_BY_KEY,
-    _PendingTelegramPrompt,
     _build_buttons,
     _format_prompt_body,
+    _PendingTelegramPrompt,
     _render_prompt_args,
 )
 
 __all__ = [
-    "TelegramGateway",
     # private names intentionally re-exported — existing tests import them
     "_APPROVAL_SHORT_BY_KEY",
     "_BUFFER_HARD_CAP",
-    "_ChatBuffer",
     "_DEBOUNCE_SECONDS",
     "_FORWARD_KEYS",
-    "_Kind",
     "_LONG_POLL_TIMEOUT",
     "_MAX_ATTACHMENT_BYTES",
     "_PLACEHOLDER_TEXT",
-    "_PendingTelegramPrompt",
     "_SAFE_FILENAME_RE",
     "_TELEGRAM_API",
     "_TELEGRAM_TIER",
@@ -75,6 +71,10 @@ __all__ = [
     "_TEXTUAL_MIME_LITERALS",
     "_TEXTUAL_MIME_PREFIXES",
     "_TRUST_SHORT_BY_KEY",
+    "TelegramGateway",
+    "_ChatBuffer",
+    "_Kind",
+    "_PendingTelegramPrompt",
     "_TurnOutcome",
     "_build_buttons",
     "_build_combined_prompt",

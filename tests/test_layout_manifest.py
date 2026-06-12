@@ -154,14 +154,14 @@ def test_missing_file_raises_filenotfound(tmp_path: Path) -> None:
 
 
 def test_invalid_toml_raises_manifest_error(tmp_path: Path) -> None:
-    p = _write(tmp_path / "layout.toml", "[layout\nname = \"broken\"\n")
+    p = _write(tmp_path / "layout.toml", '[layout\nname = "broken"\n')
     with pytest.raises(LayoutManifestError) as ei:
         read_manifest(p)
     assert "valid TOML" in str(ei.value)
 
 
 def test_missing_layout_section(tmp_path: Path) -> None:
-    p = _write(tmp_path / "layout.toml", "name = \"x\"\n")
+    p = _write(tmp_path / "layout.toml", 'name = "x"\n')
     with pytest.raises(LayoutManifestError) as ei:
         read_manifest(p)
     assert "[layout] section" in str(ei.value)

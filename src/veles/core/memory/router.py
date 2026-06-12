@@ -29,7 +29,6 @@ import time
 from dataclasses import dataclass, replace
 
 from veles.core.memory import InsightHit, SessionStore, TurnHit
-from veles.core.safety import scan_for_injection
 from veles.core.memory.rerank import (
     DEFAULT_HALF_LIFE_SEC,
     DEFAULT_WEIGHTS,
@@ -37,6 +36,7 @@ from veles.core.memory.rerank import (
     rerank,
 )
 from veles.core.project import Project
+from veles.core.safety import scan_for_injection
 from veles.core.subproject import load_subprojects, resolve_subproject_path
 from veles.core.wiki import Wiki
 
@@ -85,8 +85,11 @@ class MemoryRouter:
         if _rerank_enabled():
             weights, half_life = _load_rerank_config(self._project)
             merged = rerank(
-                streams, now=time.time(), limit=limit,
-                weights=weights, half_life_sec=half_life,
+                streams,
+                now=time.time(),
+                limit=limit,
+                weights=weights,
+                half_life_sec=half_life,
             )
         else:
             merged = _interleave_many(streams, limit)
@@ -105,7 +108,7 @@ class MemoryRouter:
         for p in self._extra:
             try:
                 hits = p.recall(query, limit=per_provider)  # type: ignore[attr-defined]
-            except Exception:  # noqa: BLE001
+            except Exception:
                 continue
             out.extend(hits)
         return out
@@ -182,7 +185,7 @@ def _subproject_wiki_enabled(sub_root) -> bool:
 
     try:
         return wiki_enabled(load_project(sub_root))
-    except Exception:  # noqa: BLE001 — recall must never die on a broken child
+    except Exception:
         return False
 
 
@@ -219,7 +222,11 @@ def _interleave_many(streams: list[list[RecallHit]], limit: int) -> list[RecallH
 def _rerank_enabled() -> bool:
     """M141: rerank is on unless `VELES_MEMORY_RERANK` is a falsy string."""
     return os.environ.get("VELES_MEMORY_RERANK", "1").strip().lower() not in (
-        "0", "false", "no", "off", "",
+        "0",
+        "false",
+        "no",
+        "off",
+        "",
     )
 
 
@@ -230,7 +237,7 @@ def _load_rerank_config(project: Project) -> tuple[RerankWeights, float]:
         from veles.core.project_config import get_section, load_project_config
 
         sec = get_section(load_project_config(project), "memory", "rerank")
-    except Exception:  # noqa: BLE001 — config is optional
+    except Exception:
         return DEFAULT_WEIGHTS, DEFAULT_HALF_LIFE_SEC
     if not sec:
         return DEFAULT_WEIGHTS, DEFAULT_HALF_LIFE_SEC

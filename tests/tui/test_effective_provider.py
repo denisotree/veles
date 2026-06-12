@@ -31,7 +31,7 @@ def test_load_project_provider_present(tmp_path: Path) -> None:
 def test_load_project_provider_no_provider_section(tmp_path: Path) -> None:
     project = init_project(tmp_path, name=None, force=False)
     (project.state_dir / "config.toml").write_text(
-        '[daemon]\nenabled = true\n',
+        "[daemon]\nenabled = true\n",
         encoding="utf-8",
     )
     assert _load_project_default_provider(project) is None
@@ -39,8 +39,6 @@ def test_load_project_provider_no_provider_section(tmp_path: Path) -> None:
 
 def test_load_project_provider_malformed_toml(tmp_path: Path) -> None:
     project = init_project(tmp_path, name=None, force=False)
-    (project.state_dir / "config.toml").write_text(
-        "not valid toml [[[", encoding="utf-8"
-    )
+    (project.state_dir / "config.toml").write_text("not valid toml [[[", encoding="utf-8")
     # Malformed file is treated as absent — no crash.
     assert _load_project_default_provider(project) is None

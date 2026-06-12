@@ -37,6 +37,7 @@ context depending on phase). No Ctrl+C plumbing needed.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 from typing import Literal
@@ -108,7 +109,7 @@ _CHECK_SYSTEM = """\
 You are reviewing a single step that was just executed against a
 larger goal. Respond with EXACTLY one line of strict JSON:
 
-    {"verdict": "<one of: goal_reached, step_ok_continue, step_off_track>", "reason": "<one short sentence>"}
+    {"verdict": "goal_reached|step_ok_continue|step_off_track", "reason": "<one short sentence>"}
 
 - `goal_reached`     — the goal's done_condition is now satisfied.
 - `step_ok_continue` — the step succeeded; more steps are needed.
@@ -174,7 +175,7 @@ def _classify_confirm_reply(prompt: str) -> Literal["yes", "no", "cancel"]:
     p = (prompt or "").strip().lower()
     if p.startswith(("cancel", "отмен")):
         return "cancel"
-    if p.startswith(("yes", "y ", "y\n", "да", "ok", "ага")) or p in {"y", "yes!"}:
+    if p.startswith(("yes", "y ", "y\n", "да", "ok", "ага")) or p in {"y", "yes!"}:  # noqa: RUF001 — Russian replies are parsed bilingually
         return "yes"
     return "no"
 
@@ -217,9 +218,7 @@ class GoalMode:
                 done_condition="",
             )
             ctx.state.active_goal_id = goal.id
-            ctx.post(
-                SystemLine(text=f"[goal mode active — goal {goal.id} in interview]")
-            )
+            ctx.post(SystemLine(text=f"[goal mode active — goal {goal.id} in interview]"))
 
         # Budget guard — fires between phases. If the user has burned
         # through max_steps via repeated re-plans, bail rather than loop.
@@ -229,11 +228,7 @@ class GoalMode:
                 cancel(state_dir, goal.id, reason=f"budget: {exhausted}")
                 ctx.state.active_goal_id = None
                 ctx.state.mode = "auto"  # type: ignore[assignment]
-                ctx.post(
-                    SystemLine(
-                        text=f"[goal {goal.id} cancelled — {exhausted}; mode → auto]"
-                    )
-                )
+                ctx.post(SystemLine(text=f"[goal {goal.id} cancelled — {exhausted}; mode → auto]"))
                 ctx.post(
                     TurnDone(
                         result=RunResult(
@@ -261,23 +256,15 @@ class GoalMode:
             # Stale phase persisted while mode flipped back. Re-arm to
             # interview so the next turn starts a fresh goal.
             ctx.state.active_goal_id = None
-            ctx.post(SystemLine(text="[goal already done; cycle Shift+Tab → goal to start a new one]"))
             ctx.post(
-                TurnDone(
-                    result=RunResult(
-                        text="", iterations=0, stopped_reason="synthetic"
-                    )
-                )
+                SystemLine(text="[goal already done; cycle Shift+Tab → goal to start a new one]")
             )
+            ctx.post(TurnDone(result=RunResult(text="", iterations=0, stopped_reason="synthetic")))
         else:  # pragma: no cover - defensive
             ctx.post(SystemLine(text=f"[goal: unknown phase {phase!r}; abandoning]"))
             cancel(state_dir, goal.id, reason=f"unknown phase {phase!r}")
             ctx.state.active_goal_id = None
-            ctx.post(
-                TurnDone(
-                    result=RunResult(text="", iterations=0, stopped_reason="synthetic")
-                )
-            )
+            ctx.post(TurnDone(result=RunResult(text="", iterations=0, stopped_reason="synthetic")))
 
         ctx.state.last_mode_in_session = self.name  # type: ignore[assignment]
 
@@ -299,9 +286,7 @@ class GoalMode:
             mode_override="writing",
             extra_system=_INTERVIEW_SYSTEM,
         )
-        result = agent.run(
-            prompt, on_text_delta=ctx.on_text, event_listener=ctx.on_event
-        )
+        result = agent.run(prompt, on_text_delta=ctx.on_text, event_listener=ctx.on_event)
         if ctx.state.session_id is None and result.session_id is not None:
             ctx.state.session_id = result.session_id
 
@@ -353,13 +338,7 @@ class GoalMode:
             ctx.state.active_goal_id = None
             ctx.state.mode = "auto"  # type: ignore[assignment]
             ctx.post(SystemLine(text="[goal cancelled at confirm; mode → auto]"))
-            ctx.post(
-                TurnDone(
-                    result=RunResult(
-                        text="", iterations=0, stopped_reason="synthetic"
-                    )
-                )
-            )
+            ctx.post(TurnDone(result=RunResult(text="", iterations=0, stopped_reason="synthetic")))
             return
         # `no` — treat as edits. Append the prompt to the summary as
         # context, return to interview for another round of questions.
@@ -406,9 +385,7 @@ class GoalMode:
         from veles.core.goal import cancel, update_fsm
 
         sys_block = _PLAN_SYSTEM.format(summary=goal.interview_summary or "(no summary)")
-        agent = ctx.factory(
-            ctx.state, mode_override="planning", extra_system=sys_block
-        )
+        agent = ctx.factory(ctx.state, mode_override="planning", extra_system=sys_block)
         result = agent.run(
             prompt or "Continue with the plan.",
             on_text_delta=ctx.on_text,
@@ -455,13 +432,7 @@ class GoalMode:
             update_fsm(ctx.project.state_dir, goal.id, phase="plan")
             from veles.core.agent import RunResult
 
-            ctx.post(
-                TurnDone(
-                    result=RunResult(
-                        text="", iterations=0, stopped_reason="synthetic"
-                    )
-                )
-            )
+            ctx.post(TurnDone(result=RunResult(text="", iterations=0, stopped_reason="synthetic")))
             return
 
         step_idx = goal.steps_done  # we'll bump it via append_checkpoint
@@ -471,13 +442,7 @@ class GoalMode:
             update_fsm(ctx.project.state_dir, goal.id, phase="check")
             from veles.core.agent import RunResult
 
-            ctx.post(
-                TurnDone(
-                    result=RunResult(
-                        text="", iterations=0, stopped_reason="synthetic"
-                    )
-                )
-            )
+            ctx.post(TurnDone(result=RunResult(text="", iterations=0, stopped_reason="synthetic")))
             return
 
         step_text = plan.steps[step_idx]
@@ -500,9 +465,7 @@ class GoalMode:
                 step_text=step_text,
                 plan_summary=plan_summary,
             )
-            agent = ctx.factory(
-                ctx.state, mode_override="writing", extra_system=sys_block
-            )
+            agent = ctx.factory(ctx.state, mode_override="writing", extra_system=sys_block)
             result = agent.run(
                 prompt or "Execute the next step.",
                 on_text_delta=ctx.on_text,
@@ -585,9 +548,7 @@ class GoalMode:
 
         plan = read_plan(ctx.project.state_dir, goal.plan_id or "")
         plan_body = plan.objective if plan else "(plan missing)"
-        last_step = (
-            goal.progress[-1].description if goal.progress else "(no progress yet)"
-        )
+        last_step = goal.progress[-1].description if goal.progress else "(no progress yet)"
         check_input = (
             f"Goal objective: {goal.objective}\n"
             f"Done condition: {goal.done_condition}\n"
@@ -607,28 +568,21 @@ class GoalMode:
 
         if verdict == "goal_reached":
             if goal.plan_id:
-                try:
+                # Plan may already be marked done; non-fatal.
+                with contextlib.suppress(Exception):
                     mark_plan_done(ctx.project.state_dir, goal.plan_id)
-                except Exception:
-                    pass  # plan may already be marked done; non-fatal
             complete(ctx.project.state_dir, goal.id, evidence=reason)
             ctx.state.active_goal_id = None
             ctx.state.mode = "auto"  # type: ignore[assignment]
             ctx.post(SystemLine(text=f"[goal achieved — {reason}; mode → auto]"))
         elif verdict == "step_off_track":
             update_fsm(ctx.project.state_dir, goal.id, phase="plan")
-            ctx.post(
-                SystemLine(text=f"[goal: off-track ({reason}); re-planning]")
-            )
+            ctx.post(SystemLine(text=f"[goal: off-track ({reason}); re-planning]"))
         else:  # step_ok_continue
             update_fsm(ctx.project.state_dir, goal.id, phase="execute")
             ctx.post(SystemLine(text=f"[goal: step ok ({reason}); next step]"))
 
-        ctx.post(
-            TurnDone(
-                result=RunResult(text=raw, iterations=0, stopped_reason="synthetic")
-            )
-        )
+        ctx.post(TurnDone(result=RunResult(text=raw, iterations=0, stopped_reason="synthetic")))
 
 
 _: Mode = GoalMode()  # static protocol check

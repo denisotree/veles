@@ -70,10 +70,7 @@ def test_no_project_falls_to_user_then_default(tmp_path: Path) -> None:
 def test_explicit_model_wins(tmp_path: Path) -> None:
     project = init_project(tmp_path, name=None, force=False)
     args = _ns(model="custom-model-xyz")
-    assert (
-        resolve_effective_model(args, project, persisted_model=None)
-        == "custom-model-xyz"
-    )
+    assert resolve_effective_model(args, project, persisted_model=None) == "custom-model-xyz"
 
 
 def test_persisted_overrides_argparse_default(tmp_path: Path) -> None:
@@ -98,9 +95,7 @@ def test_project_config_model_overrides_persisted_and_user(tmp_path: Path) -> No
     )
     from veles.core.user_config import UserConfig, save_user_config
 
-    save_user_config(
-        UserConfig(language="en", default_provider="openai", default_model="gpt-4o")
-    )
+    save_user_config(UserConfig(language="en", default_provider="openai", default_model="gpt-4o"))
     args = _ns()
     assert (
         resolve_effective_model(args, project, persisted_model=None)
@@ -108,9 +103,7 @@ def test_project_config_model_overrides_persisted_and_user(tmp_path: Path) -> No
     )
     # Even an unrelated persisted_model must not eclipse the project pick.
     assert (
-        resolve_effective_model(
-            args, project, persisted_model="openrouter/some-other"
-        )
+        resolve_effective_model(args, project, persisted_model="openrouter/some-other")
         == "anthropic/claude-3.7-sonnet"
     )
 
@@ -119,13 +112,9 @@ def test_user_config_model_used_when_no_persisted(tmp_path: Path) -> None:
     project = init_project(tmp_path, name=None, force=False)
     from veles.core.user_config import UserConfig, save_user_config
 
-    save_user_config(
-        UserConfig(language="en", default_provider="openai", default_model="gpt-4o")
-    )
+    save_user_config(UserConfig(language="en", default_provider="openai", default_model="gpt-4o"))
     args = _ns()
-    assert (
-        resolve_effective_model(args, project, persisted_model=None) == "gpt-4o"
-    )
+    assert resolve_effective_model(args, project, persisted_model=None) == "gpt-4o"
 
 
 def test_default_model_when_nothing_set(tmp_path: Path) -> None:

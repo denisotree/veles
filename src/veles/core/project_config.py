@@ -87,9 +87,7 @@ def save_project_config(project: Project, data: dict[str, Any]) -> None:
     here on purpose — the wizard always reads first, the daemon never
     writes back, so we don't need read-modify-write atomicity yet."""
     project.state_dir.mkdir(parents=True, exist_ok=True)
-    project_config_path(project).write_text(
-        _emit_toml(data), encoding="utf-8"
-    )
+    project_config_path(project).write_text(_emit_toml(data), encoding="utf-8")
 
 
 def get_section(cfg: dict[str, Any], *path: str) -> dict[str, Any]:

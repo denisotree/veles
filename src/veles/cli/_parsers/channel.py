@@ -62,9 +62,7 @@ def register(sub: argparse._SubParsersAction) -> None:
     channel_add = channel_sub.add_parser(
         "add", help="Attach a channel to a daemon session (wizard; creds go to the keychain)."
     )
-    channel_add.add_argument(
-        "--channel", default=None, help="Channel type (asked if omitted)."
-    )
+    channel_add.add_argument("--channel", default=None, help="Channel type (asked if omitted).")
     channel_add.add_argument(
         "--session", default=None, help="Named daemon session (default daemon if omitted)."
     )

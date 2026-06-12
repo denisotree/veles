@@ -173,9 +173,7 @@ def test_has_api_key_uses_keychain_when_env_unset(monkeypatch: pytest.MonkeyPatc
     legacy env-named keychain entries (`veles:OPENROUTER_API_KEY`) are ignored."""
     from veles.core.provider_factory import has_api_key
 
-    _install_fake_keyring(
-        monkeypatch, store={("veles", "openrouter:default"): "k"}
-    )
+    _install_fake_keyring(monkeypatch, store={("veles", "openrouter:default"): "k"})
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     assert has_api_key("openrouter") is True
 

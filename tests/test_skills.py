@@ -318,11 +318,7 @@ class _StubProvider(StubProvider):
 
     def __init__(self, reply: str = "ok") -> None:
         super().__init__(
-            [
-                ProviderResponse(
-                    text=reply, tool_calls=[], usage=TokenUsage(), finish_reason="stop"
-                )
-            ],
+            [ProviderResponse(text=reply, tool_calls=[], usage=TokenUsage(), finish_reason="stop")],
             repeat_last=True,
         )
 

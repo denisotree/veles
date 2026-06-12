@@ -42,9 +42,7 @@ from pathlib import Path
 DEFAULT_MODULES_REGISTRY = (
     "https://raw.githubusercontent.com/veles-org/veles-modules/main/index.json"
 )
-DEFAULT_SKILLS_REGISTRY = (
-    "https://raw.githubusercontent.com/veles-org/veles-skills/main/index.json"
-)
+DEFAULT_SKILLS_REGISTRY = "https://raw.githubusercontent.com/veles-org/veles-skills/main/index.json"
 
 _MODULES_ENV = "VELES_MODULES_REGISTRY_URL"
 _SKILLS_ENV = "VELES_SKILLS_REGISTRY_URL"
@@ -105,9 +103,7 @@ def load_registry(source: str) -> list[RegistryEntry]:
                 )
             )
         except KeyError as exc:
-            raise RegistryFetchError(
-                f"registry entry #{i} missing required field {exc}"
-            ) from exc
+            raise RegistryFetchError(f"registry entry #{i} missing required field {exc}") from exc
     return out
 
 
@@ -133,10 +129,7 @@ def _read_source(source: str) -> bytes:
         except urllib.error.URLError as exc:
             raise RegistryFetchError(f"failed to fetch {source}: {exc}") from exc
     # `file://` and bare paths both end up as filesystem reads.
-    if parsed.scheme == "file":
-        path = Path(parsed.path)
-    else:
-        path = Path(source)
+    path = Path(parsed.path) if parsed.scheme == "file" else Path(source)
     if not path.exists():
         raise RegistryFetchError(f"registry file not found at {path}")
     return path.read_bytes()

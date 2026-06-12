@@ -14,9 +14,7 @@ from veles.core.project import Project
 from veles.core.wiki import Wiki
 
 
-def _run_ingest_cli(
-    args: argparse.Namespace, project: Project, *, source: str
-) -> int:
+def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) -> int:
     """Ingest runner used by `cmd_add` (read a source → write a wiki page)."""
     from veles.cli import (
         _INGEST_TOOLS,
@@ -36,7 +34,7 @@ def _run_ingest_cli(
             f"error: `veles add` needs the wiki content engine, but the active "
             f"layout pack {project.layout_name!r} does not enable it.\n"
             "Switch the project to a wiki layout (edit `layout` in "
-            ".veles/project.toml, e.g. to \"llm-wiki\") or store the source "
+            '.veles/project.toml, e.g. to "llm-wiki") or store the source '
             "yourself and reference it from AGENTS.md.",
             file=sys.stderr,
         )

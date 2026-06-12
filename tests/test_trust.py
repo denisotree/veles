@@ -16,7 +16,11 @@ from veles.core.context import (
 from veles.core.permission.prompt import (
     PromptAnswer,
     PromptRequest,
+)
+from veles.core.permission.prompt import (
     reset_prompter as reset_unified_prompter,
+)
+from veles.core.permission.prompt import (
     set_prompter as set_unified_prompter,
 )
 from veles.core.project import init_project

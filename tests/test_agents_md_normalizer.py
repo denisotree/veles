@@ -15,7 +15,6 @@ from veles.core.agents_md_normalizer import (
 )
 from veles.core.agents_md_schema import validate
 
-
 # ---------------- scan ----------------
 
 
@@ -47,7 +46,9 @@ def test_scan_does_not_need_merge_with_one_real_file(tmp_path: Path) -> None:
 
 
 def _info(name: str, content: str) -> ContextFileInfo:
-    return ContextFileInfo(name=name, path=Path(name), is_symlink=False, size=len(content), content=content)
+    return ContextFileInfo(
+        name=name, path=Path(name), is_symlink=False, size=len(content), content=content
+    )
 
 
 def test_merge_unions_sections() -> None:
@@ -105,7 +106,7 @@ class _StubAgent:
     def __init__(self, *_, **__) -> None:
         pass
 
-    def run(self, prompt: str):  # noqa: ARG002
+    def run(self, prompt: str):
         return _StubResult(
             "# Merged\n\n## Layout\n- merged\n\n## Conventions\n- ok\n\n## Workflows\n- run\n"
         )
@@ -128,7 +129,7 @@ def test_llm_merge_returns_agent_text(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_llm_merge_empty_response_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     class _EmptyAgent(_StubAgent):
-        def run(self, prompt: str):  # noqa: ARG002
+        def run(self, prompt: str):
             return _StubResult("")
 
     monkeypatch.setattr("veles.core.agent.Agent", _EmptyAgent)
@@ -149,9 +150,7 @@ def test_apply_symlink_mode_replaces_originals(tmp_path: Path) -> None:
     (tmp_path / "CLAUDE.md").write_text("claude", encoding="utf-8")
     (tmp_path / "GEMINI.md").write_text("gemini", encoding="utf-8")
     scan = scan_for_context_files(tmp_path)
-    actions = apply_merge(
-        tmp_path, "# Merged\n", originals=scan.conflicting, mode="symlink"
-    )
+    actions = apply_merge(tmp_path, "# Merged\n", originals=scan.conflicting, mode="symlink")
     assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") == "# Merged\n"
     assert (tmp_path / "CLAUDE.md").is_symlink()
     assert (tmp_path / "GEMINI.md").is_symlink()

@@ -10,7 +10,6 @@ import pytest
 from veles.cli.commands import daemon as daemon_cmd
 from veles.daemon.auth import TokenStore
 
-
 # `isolated_user_home` comes from tests/conftest.py (yields the
 # `<home>/.veles/` dir where daemon.pid / daemon.tokens.json land).
 
@@ -39,11 +38,9 @@ def test_daemon_start_runs_wizard_when_no_project(
 
     captured: dict[str, object] = {}
 
-    def _fake_wizard(args, cwd):  # noqa: ANN001, ANN202
+    def _fake_wizard(args, cwd):
         captured["called"] = True
-        captured["suppress"] = getattr(
-            args, "_suppress_wizard_daemon_autostart", None
-        )
+        captured["suppress"] = getattr(args, "_suppress_wizard_daemon_autostart", None)
         return None
 
     monkeypatch.setattr(pw_mod, "maybe_run_project_wizard", _fake_wizard)
@@ -77,8 +74,8 @@ def test_daemon_start_clean_decline_exits_zero(
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(cli_mod, "_resolve_active_project", lambda args: None)
 
-    def _fake_wizard(args, cwd):  # noqa: ANN001, ANN202
-        args._wizard_user_chose_no_project = True  # noqa: SLF001
+    def _fake_wizard(args, cwd):
+        args._wizard_user_chose_no_project = True
         return None
 
     monkeypatch.setattr(pw_mod, "maybe_run_project_wizard", _fake_wizard)
@@ -280,9 +277,7 @@ def test_daemon_delete_yes_flag_skips_prompt(
     assert DaemonRegistry.load().get("demo") is None
 
 
-def test_daemon_delete_unknown_returns_error(
-    isolated_user_home: Path, capsys
-) -> None:
+def test_daemon_delete_unknown_returns_error(isolated_user_home: Path, capsys) -> None:
     args = _ns(daemon_command="delete", target="ghost", yes=True)
     rc = daemon_cmd.cmd_daemon(args)
     assert rc == 1

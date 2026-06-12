@@ -230,8 +230,7 @@ def init_project(
     pack = find_layout(layout, project=None)
     if pack is None:
         print(
-            f"warning: layout pack {layout!r} not found; "
-            "initialising without a content scaffold",
+            f"warning: layout pack {layout!r} not found; initialising without a content scaffold",
             file=sys.stderr,
         )
     apply_scaffold(pack, root, resolved_name)

@@ -31,9 +31,7 @@ def test_bare_save_lists_candidates(slash_ctx):
 
 
 def test_save_commits_candidate_and_removes_from_list(slash_ctx):
-    slash_ctx.state.insight_candidates = [
-        ("alpha-note", "Alpha note", "First insight body.")
-    ]
+    slash_ctx.state.insight_candidates = [("alpha-note", "Alpha note", "First insight body.")]
     res = _reg().dispatch("/save alpha-note", slash_ctx)
     assert res is not None and not res.is_error
     assert "saved insight #" in res.text
@@ -41,9 +39,7 @@ def test_save_commits_candidate_and_removes_from_list(slash_ctx):
     conn = sqlite3.connect(str(slash_ctx.project.memory_db_path))
     conn.row_factory = sqlite3.Row
     try:
-        row = conn.execute(
-            "SELECT title, body, category, file_path FROM insights"
-        ).fetchone()
+        row = conn.execute("SELECT title, body, category, file_path FROM insights").fetchone()
     finally:
         conn.close()
     assert row is not None
@@ -59,17 +55,13 @@ def test_save_commits_candidate_and_removes_from_list(slash_ctx):
 
 def test_unknown_slug_falls_back_to_legacy_queries_save(slash_ctx):
     slash_ctx.state.last_assistant_text = "## Reply\n\nlegacy behaviour"
-    slash_ctx.state.insight_candidates = [
-        ("alpha-note", "Alpha note", "First insight.")
-    ]
+    slash_ctx.state.insight_candidates = [("alpha-note", "Alpha note", "First insight.")]
     res = _reg().dispatch("/save free-slug", slash_ctx)
     # Falls through to the legacy /save path → writes wiki/queries/.
     assert res is not None and not res.is_error
     assert "wiki/queries/free-slug.md" in res.text
     # The unrelated candidate stays in place.
-    assert slash_ctx.state.insight_candidates == [
-        ("alpha-note", "Alpha note", "First insight.")
-    ]
+    assert slash_ctx.state.insight_candidates == [("alpha-note", "Alpha note", "First insight.")]
 
 
 def test_status_bar_shows_insight_badge():

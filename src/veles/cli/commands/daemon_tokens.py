@@ -17,7 +17,7 @@ import time
 from veles.daemon.auth import TokenStore, _default_tokens_path
 
 
-def _initialise_token_store() -> "TokenStore":
+def _initialise_token_store() -> TokenStore:
     """Load `~/.veles/daemon.tokens.json`; if empty, auto-create a
     `default` token and print it to stderr so the user has something
     to paste into client `Authorization: Bearer <…>` headers."""

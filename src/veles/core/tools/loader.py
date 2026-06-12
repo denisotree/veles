@@ -134,9 +134,7 @@ def load_into_registry(
     # Persist whatever we just loaded (or refreshed).
     if conn is not None:
         for lt in loaded:
-            upsert_tool(
-                conn, lt.entry, scope=lt.scope, origin=lt.origin
-            )
+            upsert_tool(conn, lt.entry, scope=lt.scope, origin=lt.origin)
 
     return LoadReport(
         loaded=tuple(loaded),
@@ -192,16 +190,14 @@ def _load_one_file(
     try:
         spec = importlib.util.spec_from_file_location(mod_name, source)
         if spec is None or spec.loader is None:
-            return f"cannot build import spec"
+            return "cannot build import spec"
         module = importlib.util.module_from_spec(spec)
         sys.modules[mod_name] = module
         try:
             spec.loader.exec_module(module)
-        except BaseException as exc:  # noqa: BLE001
+        except BaseException as exc:
             sys.modules.pop(mod_name, None)
-            logger.warning(
-                "tools loader: failed to import %s: %s", source, exc
-            )
+            logger.warning("tools loader: failed to import %s: %s", source, exc)
             return f"{type(exc).__name__}: {exc}"
     finally:
         _registry_module.registry = saved_registry
@@ -232,14 +228,12 @@ def _load_one_file(
             registry._tools.pop(entry_name, None)
             overridden.append((entry_name, scope))
         registry.register(entry)
-        out.append(
-            LoadedTool(entry=entry, scope=scope, origin=origin, source=source)
-        )
+        out.append(LoadedTool(entry=entry, scope=scope, origin=origin, source=source))
     return out
 
 
 __all__ = [
-    "LoadedTool",
     "LoadReport",
+    "LoadedTool",
     "load_into_registry",
 ]

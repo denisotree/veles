@@ -192,9 +192,7 @@ def decompose_and_run(
     try:
         assert_plan_valid(plan)
     except PlanContractError as exc:
-        return ManagerRunResult(
-            final_text=None, handles=(), plan=plan, error=str(exc)
-        )
+        return ManagerRunResult(final_text=None, handles=(), plan=plan, error=str(exc))
 
     pre_writer = [s for s in plan.steps if s.role != "writer"]
     writer_step = next(s for s in plan.steps if s.role == "writer")
@@ -202,9 +200,7 @@ def decompose_and_run(
     pre_handles: list[WorkerHandle] = []
     if pre_writer:
         specs = [
-            WorkerSpec(
-                role=s.role, prompt=s.prompt, factory_kwargs=factory_kwargs
-            )
+            WorkerSpec(role=s.role, prompt=s.prompt, factory_kwargs=factory_kwargs)
             for s in pre_writer
         ]
         pre_handles = spawn_parallel(specs, agent_factory=agent_factory)
@@ -261,7 +257,7 @@ def decompose_and_run(
     if writer_handle.result:
         writer_step.result_summary = writer_handle.result[:200]
 
-    all_handles = tuple(pre_handles) + (writer_handle,)
+    all_handles = (*tuple(pre_handles), writer_handle)
     return ManagerRunResult(
         final_text=writer_handle.result,
         handles=all_handles,

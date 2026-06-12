@@ -71,9 +71,7 @@ def _maybe_run_via_manager(args: argparse.Namespace, project: Project) -> bool:
 
     result = decompose_and_run(args.prompt, agent_factory=factory)
     if result.error or not result.final_text:
-        sys.stderr.write(
-            f"<manager-spawn fell back to direct: {result.error or 'no output'}>\n"
-        )
+        sys.stderr.write(f"<manager-spawn fell back to direct: {result.error or 'no output'}>\n")
         return False
     # Print writer's text to stdout (matches direct-agent contract).
     sys.stdout.write(result.final_text)

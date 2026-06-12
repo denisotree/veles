@@ -43,8 +43,9 @@ def test_signature_stable_across_model_changes() -> None:
     re-renders the row's label (incl. the model column) on every
     refresh tick, so the new model is visible without a rebuild."""
     e = _entry()
-    assert DaemonRowFormatter.signature(e, model="openai/gpt-4o") == \
-        DaemonRowFormatter.signature(e, model="anthropic/claude-haiku")
+    assert DaemonRowFormatter.signature(e, model="openai/gpt-4o") == DaemonRowFormatter.signature(
+        e, model="anthropic/claude-haiku"
+    )
 
 
 def test_render_includes_core_fields() -> None:
@@ -63,9 +64,7 @@ def test_render_includes_uptime_field() -> None:
 
 
 def test_render_includes_model_when_supplied() -> None:
-    row = DaemonRowFormatter.render(
-        _entry(), now=10.0, model="anthropic/claude-3.7-sonnet"
-    )
+    row = DaemonRowFormatter.render(_entry(), now=10.0, model="anthropic/claude-3.7-sonnet")
     assert "anthropic/claude-3.7-sonnet" in row
 
 
@@ -123,9 +122,7 @@ def test_entry_model_returns_none_when_provider_section_missing(
     """Config exists but has no `[provider]` section — still `None`,
     not a crash, not a string-conversion of an empty dict."""
     (tmp_path / ".veles").mkdir()
-    (tmp_path / ".veles" / "config.toml").write_text(
-        '[daemon]\nport = 8765\n', encoding="utf-8"
-    )
+    (tmp_path / ".veles" / "config.toml").write_text("[daemon]\nport = 8765\n", encoding="utf-8")
     entry = _entry(project_path=str(tmp_path))
     assert _entry_model(entry) is None
 
@@ -144,9 +141,7 @@ def test_entry_model_prefers_live_active_model_when_daemon_alive(
     )
     entry = _entry(project_path=str(tmp_path), pid=4242)
     monkeypatch.setattr(picker, "is_alive", lambda pid: True)
-    monkeypatch.setattr(
-        picker, "_live_active_model", lambda e: "live-override-model"
-    )
+    monkeypatch.setattr(picker, "_live_active_model", lambda e: "live-override-model")
     assert _entry_model(entry) == "live-override-model"
 
 

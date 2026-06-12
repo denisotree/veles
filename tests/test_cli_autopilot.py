@@ -8,7 +8,6 @@ import time
 from veles.cli.commands import autopilot as autopilot_cmd
 from veles.core.autopilot import autopilot_path
 
-
 # User-home isolation is provided by the autouse `_hermetic_user_home`
 # fixture in tests/conftest.py.
 
@@ -79,9 +78,7 @@ def test_status_active(capsys) -> None:
 def test_status_after_expiry(capsys) -> None:
     # Manually write expired state.
     autopilot_path().parent.mkdir(parents=True, exist_ok=True)
-    autopilot_path().write_text(
-        json.dumps({"enabled_until": time.time() - 60}), encoding="utf-8"
-    )
+    autopilot_path().write_text(json.dumps({"enabled_until": time.time() - 60}), encoding="utf-8")
     rc = autopilot_cmd.cmd_autopilot(_ns(autopilot_command="status"))
     assert rc == 1
     out = capsys.readouterr().out

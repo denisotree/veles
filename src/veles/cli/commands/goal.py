@@ -44,7 +44,7 @@ def cmd_goal(args: argparse.Namespace, project: Project) -> int:
     return 2
 
 
-def _list(state, args):  # noqa: ANN001
+def _list(state, args):
     goals = list_goals(state, status=args.status)
     if not goals:
         print("(no goals)", file=sys.stderr)
@@ -63,7 +63,7 @@ def _list(state, args):  # noqa: ANN001
     return 0
 
 
-def _show(state, args):  # noqa: ANN001
+def _show(state, args):
     g = read_goal(state, args.id)
     if g is None:
         print(f"no goal with id {args.id!r}", file=sys.stderr)
@@ -101,7 +101,7 @@ def _show(state, args):  # noqa: ANN001
     return 0
 
 
-def _start(state, args):  # noqa: ANN001
+def _start(state, args):
     budget = GoalBudget(
         max_steps=args.max_steps,
         max_cost_usd=args.max_cost_usd,
@@ -124,7 +124,7 @@ def _start(state, args):  # noqa: ANN001
     return 0
 
 
-def _checkpoint(state, args):  # noqa: ANN001
+def _checkpoint(state, args):
     try:
         append_checkpoint(
             state,
@@ -141,7 +141,7 @@ def _checkpoint(state, args):  # noqa: ANN001
     return 0
 
 
-def _pause(state, args):  # noqa: ANN001
+def _pause(state, args):
     try:
         pause(state, args.id)
     except (KeyError, ValueError) as exc:
@@ -151,7 +151,7 @@ def _pause(state, args):  # noqa: ANN001
     return 0
 
 
-def _resume(state, args):  # noqa: ANN001
+def _resume(state, args):
     try:
         resume(state, args.id)
     except (KeyError, ValueError) as exc:
@@ -161,7 +161,7 @@ def _resume(state, args):  # noqa: ANN001
     return 0
 
 
-def _done(state, args):  # noqa: ANN001
+def _done(state, args):
     try:
         complete(state, args.id, evidence=args.evidence)
     except (KeyError, ValueError) as exc:
@@ -171,7 +171,7 @@ def _done(state, args):  # noqa: ANN001
     return 0
 
 
-def _cancel(state, args):  # noqa: ANN001
+def _cancel(state, args):
     try:
         cancel(state, args.id, reason=args.reason or "")
     except (KeyError, ValueError) as exc:

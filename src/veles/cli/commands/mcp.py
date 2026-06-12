@@ -49,9 +49,7 @@ def _list(args: argparse.Namespace, project: Project) -> int:
 
     probe_budget = max(float(getattr(args, "connect_timeout", 10.0)), 0.1)
     to_probe = {
-        name: dataclasses.replace(
-            cfg, connect_timeout_s=min(cfg.connect_timeout_s, probe_budget)
-        )
+        name: dataclasses.replace(cfg, connect_timeout_s=min(cfg.connect_timeout_s, probe_budget))
         for name, cfg in configs.items()
         if cfg.enabled
     }

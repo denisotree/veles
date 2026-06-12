@@ -32,11 +32,10 @@ def _insight_rows(project: Project) -> list[sqlite3.Row]:
     conn = sqlite3.connect(str(project.memory_db_path))
     conn.row_factory = sqlite3.Row
     try:
-        return conn.execute(
-            "SELECT id, title, body, category, file_path FROM insights"
-        ).fetchall()
+        return conn.execute("SELECT id, title, body, category, file_path FROM insights").fetchall()
     finally:
         conn.close()
+
 
 # ---- find_remember_triggers ----
 

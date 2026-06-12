@@ -41,10 +41,10 @@ class _ReasoningProvider:
     supports_tools: bool = True
     supports_streaming: bool = True
 
-    def create_message(self, *a, **k):  # noqa: ANN002, ANN003
+    def create_message(self, *a, **k):
         raise NotImplementedError
 
-    def stream_message(self, messages, tools=None, *, model, max_tokens=4096):  # noqa: ANN001
+    def stream_message(self, messages, tools=None, *, model, max_tokens=4096):
         del messages, tools, model, max_tokens
         yield ReasoningDelta(text="let me think… ")
         yield ReasoningDelta(text="2+2 is 4.")
@@ -57,9 +57,7 @@ def test_agent_forwards_reasoning_as_thinking_event_not_to_chat():
     chat_text: list[str] = []
     agent = Agent(_ReasoningProvider(), Registry(), model="m")
 
-    result = agent.run(
-        "2+2?", on_text_delta=chat_text.append, event_listener=seen_events.append
-    )
+    result = agent.run("2+2?", on_text_delta=chat_text.append, event_listener=seen_events.append)
 
     thinking = [e for e in seen_events if isinstance(e, ThinkingDelta)]
     assert [t.text for t in thinking] == ["let me think… ", "2+2 is 4."]
@@ -94,19 +92,19 @@ class _Chunk:
 
 
 class _StreamChat:
-    def __init__(self, chunks):  # noqa: ANN001
+    def __init__(self, chunks):
         self._chunks = chunks
 
-    def create(self, **kwargs):  # noqa: ANN003
+    def create(self, **kwargs):
         return iter(self._chunks)
 
 
 class _NS:
-    def __init__(self, **kw):  # noqa: ANN003
+    def __init__(self, **kw):
         self.__dict__.update(kw)
 
 
-def _provider_streaming(chunks) -> OpenAIProvider:  # noqa: ANN001
+def _provider_streaming(chunks) -> OpenAIProvider:
     client = _NS(base_url="http://x/v1", chat=_NS(completions=_StreamChat(chunks)))
     return OpenAIProvider(client=client)
 

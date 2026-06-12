@@ -297,7 +297,7 @@ def _read_markdown(path: Path) -> PlanArtifact | None:
             continue
         k, _, v = line.partition(":")
         fm[k.strip()] = v.strip()
-    body = text[m.end():]
+    body = text[m.end() :]
     obj_match = re.match(r"\s*#\s+(.+?)\s*$", body, re.MULTILINE)
     objective = obj_match.group(1).strip() if obj_match else "(no objective)"
     sections = _split_sections(body)

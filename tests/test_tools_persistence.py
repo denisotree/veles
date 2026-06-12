@@ -61,9 +61,7 @@ def _entry(
 
 
 def test_upsert_creates_new_row(conn) -> None:
-    tid = upsert_tool(
-        conn, _entry("read_file", description="read file contents")
-    )
+    tid = upsert_tool(conn, _entry("read_file", description="read file contents"))
     assert tid > 0
     rec = get_tool(conn, "read_file")
     assert rec is not None
@@ -181,9 +179,7 @@ def test_record_use_writes_telemetry_row(conn) -> None:
     upsert_tool(conn, _entry("read_file"))
     uid = record_use(conn, tool_name="read_file", ok=True, latency_ms=12)
     assert uid > 0
-    row = conn.execute(
-        "SELECT ok, latency_ms FROM tool_uses WHERE id = ?", (uid,)
-    ).fetchone()
+    row = conn.execute("SELECT ok, latency_ms FROM tool_uses WHERE id = ?", (uid,)).fetchone()
     assert row["ok"] == 1
     assert row["latency_ms"] == 12
 
@@ -204,9 +200,7 @@ def test_record_use_carries_error_kind(conn) -> None:
         latency_ms=5,
         error_kind="permission_denied",
     )
-    row = conn.execute(
-        "SELECT ok, error_kind FROM tool_uses ORDER BY id DESC LIMIT 1"
-    ).fetchone()
+    row = conn.execute("SELECT ok, error_kind FROM tool_uses ORDER BY id DESC LIMIT 1").fetchone()
     assert row["ok"] == 0
     assert row["error_kind"] == "permission_denied"
 
@@ -219,9 +213,7 @@ def test_record_use_with_session_link(conn) -> None:
     )
     upsert_tool(conn, _entry("read_file"))
     record_use(conn, tool_name="read_file", ok=True, session_id="sess-1")
-    row = conn.execute(
-        "SELECT session_id FROM tool_uses ORDER BY id DESC LIMIT 1"
-    ).fetchone()
+    row = conn.execute("SELECT session_id FROM tool_uses ORDER BY id DESC LIMIT 1").fetchone()
     assert row["session_id"] == "sess-1"
 
 

@@ -108,9 +108,7 @@ def test_embedding_clusters_high_cosine_neighbours(project: Project) -> None:
             "billing": [0.0, 0.0, 1.0],
         }
     )
-    clusters = find_duplicates_embedding(
-        skills, provider=provider, project=project, threshold=0.9
-    )
+    clusters = find_duplicates_embedding(skills, provider=provider, project=project, threshold=0.9)
     assert len(clusters) == 1
     names = {s.name for s in clusters[0].skills}
     assert names == {"auth", "authentication"}
@@ -128,18 +126,14 @@ def test_embedding_threshold_separates_clusters(project: Project) -> None:
         }
     )
     # High threshold → no cluster.
-    clusters = find_duplicates_embedding(
-        skills, provider=provider, project=project, threshold=0.9
-    )
+    clusters = find_duplicates_embedding(skills, provider=provider, project=project, threshold=0.9)
     assert clusters == []
 
 
 # ---- auto mode ----
 
 
-def test_auto_mode_falls_back_to_tfidf_without_api_key(
-    project: Project, monkeypatch
-) -> None:
+def test_auto_mode_falls_back_to_tfidf_without_api_key(project: Project, monkeypatch) -> None:
     """Auto mode degrades to TF-IDF when the routed embedding provider has no key."""
     for env in ("OPENAI_API_KEY", "OPENROUTER_API_KEY"):
         monkeypatch.delenv(env, raising=False)
@@ -171,17 +165,13 @@ def test_explicit_embedding_mode_propagates_error(project: Project, monkeypatch)
         find_duplicate_skills(skills, project=project, mode="embedding")
 
 
-def test_auto_mode_uses_embedding_when_provider_available(
-    project: Project, monkeypatch
-) -> None:
+def test_auto_mode_uses_embedding_when_provider_available(project: Project, monkeypatch) -> None:
     """If a stubbed embedding adapter works, auto mode picks it."""
     monkeypatch.setenv("OPENAI_API_KEY", "stub")
     from veles.core import skill_dedup
 
     def _fake_builder(_project):
-        return _StubEmbedProvider(
-            {"auth": [1.0, 0.1], "authentication": [0.99, 0.05]}
-        )
+        return _StubEmbedProvider({"auth": [1.0, 0.1], "authentication": [0.99, 0.05]})
 
     monkeypatch.setattr(skill_dedup, "_build_embedding_provider", _fake_builder)
     skills = [

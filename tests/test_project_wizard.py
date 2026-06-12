@@ -4,7 +4,6 @@ stdin / TTY is required."""
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -46,9 +45,7 @@ def test_gate_blocks_when_no_wizard_flag(tmp_cwd: Path) -> None:
     assert pw.should_run_project_wizard(_args(no_wizard=True), tmp_cwd) is False
 
 
-def test_gate_blocks_when_env_opt_out(
-    tmp_cwd: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_gate_blocks_when_env_opt_out(tmp_cwd: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("VELES_NO_WIZARD", "1")
     assert pw.should_run_project_wizard(_args(), tmp_cwd) is False
 
@@ -80,9 +77,7 @@ def test_gate_does_not_block_on_bare_veles_dir_without_project_toml(
     fake_home = tmp_path / "home"
     user_veles = fake_home / ".veles"
     user_veles.mkdir(parents=True)
-    (user_veles / "config.toml").write_text(
-        'language = "en"\n', encoding="utf-8"
-    )
+    (user_veles / "config.toml").write_text('language = "en"\n', encoding="utf-8")
     # Now run the gate from a sub-directory of fake_home — like cwd
     # being `~/code/whatever` for a real user.
     sub = fake_home / "code" / "anywhere"
@@ -284,10 +279,10 @@ def test_run_project_wizard_tui_respects_autostart_flag(
     )
 
     class _FakeApp:
-        def __init__(self, *a, **k) -> None:  # noqa: ANN002, ANN003
+        def __init__(self, *a, **k) -> None:
             pass
 
-        def run(self):  # noqa: ANN201
+        def run(self):
             return {"project": proj, "daemon": {"host": "127.0.0.1", "port": 8765}}
 
     monkeypatch.setattr(pr, "WizardApp", _FakeApp)
@@ -318,13 +313,11 @@ def test_maybe_wrapper_threads_suppress_flag_into_tui(
 
     captured: dict[str, object] = {}
 
-    def _fake_tui(cwd, *, skip_bootstrap_confirm=False, autostart_daemon=True):  # noqa: ANN001, ANN202
+    def _fake_tui(cwd, *, skip_bootstrap_confirm=False, autostart_daemon=True):
         captured["autostart_daemon"] = autostart_daemon
         return None
 
     monkeypatch.setattr(pr, "run_project_wizard_tui", _fake_tui)
 
-    pw.maybe_run_project_wizard(
-        _args(_suppress_wizard_daemon_autostart=True), tmp_cwd
-    )
+    pw.maybe_run_project_wizard(_args(_suppress_wizard_daemon_autostart=True), tmp_cwd)
     assert captured.get("autostart_daemon") is False

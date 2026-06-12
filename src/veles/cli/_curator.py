@@ -22,6 +22,7 @@ gets patched in idle / post-turn tests.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as _dt
 import sys
 import time
@@ -29,7 +30,6 @@ import time
 from veles.core.agent import Agent
 from veles.core.curator import (
     _CURATE_CHARS_LIMIT,
-    _CURATE_DEFAULT_LIMIT,
     _CURATE_QUIET_WINDOW_SEC,
     _CURATE_TOOLS,
     _CURATE_TURN_LIMIT,
@@ -37,7 +37,6 @@ from veles.core.curator import (
     _CURATOR_IDLE_THRESHOLD_SEC,
     _CURATOR_POSTRUN_LIMIT,
     _CuratorPassResult,
-    _render_message,
     _truncate_session_messages,
 )
 from veles.core.curator_state import CuratorState
@@ -239,14 +238,12 @@ def _maybe_surface_skill_suggestions(project: Project) -> None:
         surface_skill_suggestions(store._conn)
     except Exception as exc:
         # Same posture as the curator-skip log: don't fail the turn.
-        try:
+        with contextlib.suppress(Exception):
             append_memory_log(
                 project,
                 op="skill-suggest-skip",
                 summary=f"{type(exc).__name__}: {exc}",
             )
-        except Exception:
-            pass
 
     # Embedding setup-hint: when no embedding backend is configured,
     # write a one-time setup hint into `insights` so the user
@@ -501,7 +498,6 @@ def _curate_one_session(
         _qualify_for_provider,
         _run_agent_streaming_aware,
     )
-
     from veles.core.layout.engines import wiki_enabled
 
     messages = store.load_messages(session.id)
@@ -602,10 +598,6 @@ def _maybe_refresh_self_doc(project: Project) -> None:
         from veles.core.self_doc import refresh_self_doc
 
         refresh_self_doc(project)
-        state_path.write_text(
-            json.dumps({"refreshed_at": now}), encoding="utf-8"
-        )
+        state_path.write_text(json.dumps({"refreshed_at": now}), encoding="utf-8")
     except Exception:
         pass
-
-

@@ -14,14 +14,34 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Callable
+from collections.abc import Callable
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 _STOPWORDS = frozenset(
     {
-        "the", "and", "for", "with", "from", "into", "this", "that", "page",
-        "skill", "tool", "use", "uses", "used", "using", "when", "what",
-        "where", "how", "via", "are", "you", "your",
+        "the",
+        "and",
+        "for",
+        "with",
+        "from",
+        "into",
+        "this",
+        "that",
+        "page",
+        "skill",
+        "tool",
+        "use",
+        "uses",
+        "used",
+        "using",
+        "when",
+        "what",
+        "where",
+        "how",
+        "via",
+        "are",
+        "you",
+        "your",
     }
 )
 

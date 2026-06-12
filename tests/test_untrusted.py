@@ -8,7 +8,6 @@ from veles.core.untrusted import (
     wrap_untrusted,
 )
 
-
 # ---------- redaction ----------
 
 
@@ -53,11 +52,7 @@ def test_redacts_google_api_key() -> None:
 
 
 def test_redacts_pem_private_key() -> None:
-    text = (
-        "-----BEGIN RSA PRIVATE KEY-----\n"
-        "MIIEpAIBAAKCAQEA1Z1Z\n"
-        "-----END RSA PRIVATE KEY-----"
-    )
+    text = "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA1Z1Z\n-----END RSA PRIVATE KEY-----"
     clean, _ = redact_secrets(text)
     assert "BEGIN RSA PRIVATE KEY" not in clean
     assert "[REDACTED:pem-private-key]" in clean
@@ -79,7 +74,10 @@ def test_does_not_redact_short_or_normal_text() -> None:
 
 
 def test_redaction_findings_count_correctly() -> None:
-    text = "key1: ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa key2: ghp_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    text = (
+        "key1: ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "
+        "key2: ghp_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    )
     clean, findings = redact_secrets(text)
     gh_finds = [f for f in findings if f.pattern == "github-token"]
     assert gh_finds and gh_finds[0].count == 2

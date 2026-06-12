@@ -101,9 +101,7 @@ def test_since_filter_drops_old_turns() -> None:
     store.append_turn(sid, Message(role="user", content="ancient unique-token-xyz"))
     # Backdate the row by 30 days via direct SQL — public API only writes now().
     old_ts = time.time() - 30 * 86400
-    store._conn.execute(
-        "UPDATE turns SET created_at = ? WHERE session_id = ?", (old_ts, sid)
-    )
+    store._conn.execute("UPDATE turns SET created_at = ? WHERE session_id = ?", (old_ts, sid))
     # since=7d ago → should miss it.
     cutoff = time.time() - 7 * 86400
     hits = store.search_turns("unique-token-xyz", since=cutoff)
@@ -123,9 +121,7 @@ def test_empty_query_returns_empty(store: SessionStore) -> None:
 def test_search_turns_preserves_bm25_ordering(store: SessionStore) -> None:
     sid = store.create_session()
     # Higher term frequency should rank first.
-    store.append_turn(
-        sid, Message(role="user", content="alpha alpha alpha sometext")
-    )
+    store.append_turn(sid, Message(role="user", content="alpha alpha alpha sometext"))
     store.append_turn(sid, Message(role="user", content="alpha one mention"))
     hits = store.search_turns("alpha")
     assert len(hits) == 2

@@ -56,34 +56,26 @@ def active_project(tmp_path: Path):
     reset_active_project(token)
 
 
-def test_builtin_override_allows_fetch_url_by_default(
-    isolated_home: Path, active_project
-) -> None:
+def test_builtin_override_allows_fetch_url_by_default(isolated_home: Path, active_project) -> None:
     """fetch_url is risk-class NETWORK_OPEN_WORLD (floor=approval_required)
     but builtin override sets it to `allow`."""
     assert BUILTIN_TOOL_POLICY_OVERRIDES["fetch_url"] == "allow"
     assert effective_policy(_entry("fetch_url")) == "allow"
 
 
-def test_builtin_override_allows_search_files(
-    isolated_home: Path, active_project
-) -> None:
+def test_builtin_override_allows_search_files(isolated_home: Path, active_project) -> None:
     e = _entry("search_files", risk=RiskClass.SEARCH_ONLY)
     assert effective_policy(e) == "allow"
 
 
-def test_user_override_tightens_fetch_url(
-    isolated_home: Path, active_project
-) -> None:
+def test_user_override_tightens_fetch_url(isolated_home: Path, active_project) -> None:
     user_config_path().write_text(
         '[permissions]\nfetch_url = "approval_required"\n', encoding="utf-8"
     )
     assert effective_policy(_entry("fetch_url")) == "approval_required"
 
 
-def test_project_override_beats_user_override(
-    isolated_home: Path, active_project
-) -> None:
+def test_project_override_beats_user_override(isolated_home: Path, active_project) -> None:
     user_config_path().write_text(
         '[permissions]\nfetch_url = "approval_required"\n', encoding="utf-8"
     )
@@ -130,15 +122,11 @@ def test_destructive_floor_can_still_be_set_to_always_confirm(
     assert effective_policy(e) == "always_confirm"
 
 
-def test_tool_with_no_risk_class_defaults_allow(
-    isolated_home: Path, active_project
-) -> None:
+def test_tool_with_no_risk_class_defaults_allow(isolated_home: Path, active_project) -> None:
     assert effective_policy(_entry("misc", risk=None)) == "allow"
 
 
-def test_unknown_tool_with_network_risk_falls_to_floor(
-    isolated_home: Path, active_project
-) -> None:
+def test_unknown_tool_with_network_risk_falls_to_floor(isolated_home: Path, active_project) -> None:
     # Not in BUILTIN_TOOL_POLICY_OVERRIDES; no config overrides → risk floor.
     e = _entry("custom_post", risk=RiskClass.NETWORK_OPEN_WORLD)
     assert effective_policy(e) == "approval_required"

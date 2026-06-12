@@ -16,7 +16,6 @@ from veles.core.skill_promotion import (
     write_promote_proposals,
 )
 
-
 # User-home isolation is provided by the autouse `_hermetic_user_home`
 # fixture in tests/conftest.py.
 
@@ -102,13 +101,7 @@ def test_skip_user_scope_skills(project: Project, tmp_path: Path) -> None:
     user_skill = user_skills_dir() / "user-only"
     user_skill.mkdir(parents=True, exist_ok=True)
     (user_skill / "SKILL.md").write_text(
-        "---\n"
-        "name: user-only\n"
-        "description: desc\n"
-        "use_count: 50\n"
-        "success_count: 45\n"
-        "---\n"
-        "body\n",
+        "---\nname: user-only\ndescription: desc\nuse_count: 50\nsuccess_count: 45\n---\nbody\n",
         encoding="utf-8",
     )
     assert find_promote_candidates(project) == []

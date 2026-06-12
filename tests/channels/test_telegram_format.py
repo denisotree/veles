@@ -8,7 +8,6 @@ from veles.channels.telegram_format import (
     markdown_to_telegram_html,
 )
 
-
 # ---- escape_html ----
 
 

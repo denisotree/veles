@@ -74,10 +74,7 @@ def test_find_hints_inline_fallback() -> None:
 
 
 def test_find_hints_dedupes() -> None:
-    text = (
-        "## Routing\n\nUse opus for planning.\n\n"
-        "## Models\n\nUse opus for planning.\n"
-    )
+    text = "## Routing\n\nUse opus for planning.\n\n## Models\n\nUse opus for planning.\n"
     out = find_routing_hints(text)
     assert len(out) == 2  # different section headings = different chunks
 
@@ -87,8 +84,7 @@ def test_find_hints_dedupes() -> None:
 
 def test_parse_strict_json() -> None:
     raw = (
-        '{"entries": [{"task": "default", "provider": "anthropic", '
-        '"model": "claude-sonnet-4-6"}]}'
+        '{"entries": [{"task": "default", "provider": "anthropic", "model": "claude-sonnet-4-6"}]}'
     )
     out = parse_extractor_output(raw)
     assert out == [_NLEntry(task="default", provider="anthropic", model="claude-sonnet-4-6")]
@@ -169,9 +165,7 @@ def test_nl_overrides_default(project: Project) -> None:
 
 
 def test_manual_overrides_nl(project: Project) -> None:
-    save_nl_routing_config(
-        project, RoutingConfig(tasks={"compressor": "anthropic:nl-haiku"})
-    )
+    save_nl_routing_config(project, RoutingConfig(tasks={"compressor": "anthropic:nl-haiku"}))
     set_project_route(project, "compressor", "anthropic:manual-haiku")
     assert route("compressor", project) == ("anthropic", "manual-haiku")
 
@@ -194,9 +188,7 @@ def test_nl_default_used_for_unknown_task(project: Project) -> None:
 
 def test_nl_per_task_does_not_leak_to_other_tasks(project: Project) -> None:
     """Setting only `compressor` in nl-toml must NOT touch other tasks."""
-    save_nl_routing_config(
-        project, RoutingConfig(tasks={"compressor": "openai:gpt-4o-mini"})
-    )
+    save_nl_routing_config(project, RoutingConfig(tasks={"compressor": "openai:gpt-4o-mini"}))
     assert route("compressor", project) == ("openai", "gpt-4o-mini")
     # advisor falls through to DEFAULT_TASKS.
     assert route("advisor", project) == ("openrouter", "anthropic/claude-sonnet-4.6")

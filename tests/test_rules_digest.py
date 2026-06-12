@@ -27,8 +27,14 @@ def _insert_rule(
     store._conn.execute(
         "INSERT INTO rules(kind, body, source, created_at, last_applied_at, decay_score)"
         " VALUES (?, ?, ?, ?, ?, ?)",
-        (kind, body, "extracted", created_at if created_at is not None else time.time(),
-         last_applied_at, decay_score),
+        (
+            kind,
+            body,
+            "extracted",
+            created_at if created_at is not None else time.time(),
+            last_applied_at,
+            decay_score,
+        ),
     )
     store._conn.commit()
 
@@ -109,7 +115,9 @@ def test_rules_digest_respects_char_budget(tmp_path: Path) -> None:
         # high-decay rule must survive; low-decay long ones get dropped under budget
         _insert_rule(store, kind="preference", body="KEEP ME", decay_score=1.0)
         for i in range(40):
-            _insert_rule(store, kind="do", body=f"dropme padding rule number {i} " * 5, decay_score=0.1)
+            _insert_rule(
+                store, kind="do", body=f"dropme padding rule number {i} " * 5, decay_score=0.1
+            )
         digest = build_rules_digest(store, limit=50, char_budget=400)
     finally:
         store.close()

@@ -544,8 +544,7 @@ class SessionStore:
         if not escaped:
             return []
         sql_parts = [
-            "SELECT t.session_id, t.seq, t.role, t.content, t.created_at,"
-            " turns_fts.rank AS rank",
+            "SELECT t.session_id, t.seq, t.role, t.content, t.created_at, turns_fts.rank AS rank",
             "FROM turns_fts JOIN turns t ON turns_fts.rowid = t.id",
             "WHERE turns_fts MATCH ?",
         ]

@@ -59,16 +59,10 @@ class OpenAIProvider(OpenAICompatibleProvider):
         from veles.core.provider_factory import require_api_key
 
         key = require_api_key("openai", explicit=api_key)
-        super().__init__(
-            client=OpenAI(api_key=key, base_url=base_url, timeout=timeout)
-        )
+        super().__init__(client=OpenAI(api_key=key, base_url=base_url, timeout=timeout))
 
-    def _prepare_messages(
-        self, messages: list[Message], model: str
-    ) -> list[dict[str, Any]]:
-        return apply_cache_hints(
-            [to_openai_message(m) for m in messages], model
-        )
+    def _prepare_messages(self, messages: list[Message], model: str) -> list[dict[str, Any]]:
+        return apply_cache_hints([to_openai_message(m) for m in messages], model)
 
     def _extract_usage(self, usage_obj: Any) -> TokenUsage:
         return extract_usage_with_cache(usage_obj)

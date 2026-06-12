@@ -59,7 +59,7 @@ class OpenAIEmbeddingProviderAdapter:
         )
         try:
             vecs = delegate.embed(texts)
-        except Exception as exc:  # noqa: BLE001 — openai SDK has many error types
+        except Exception as exc:
             raise EmbeddingError(f"openai embed failed: {exc}") from exc
         if vecs and self.dim != len(vecs[0]):
             self.dim = len(vecs[0])

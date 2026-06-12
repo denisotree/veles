@@ -10,7 +10,6 @@ from veles.cli.commands import trust as trust_cmd
 from veles.core.project import Project, init_project
 from veles.core.trust_store import TrustStore, user_trust_path
 
-
 # User-home isolation is provided by the autouse `_hermetic_user_home`
 # fixture in tests/conftest.py.
 

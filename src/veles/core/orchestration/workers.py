@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class WorkerRole(str, enum.Enum):
+class WorkerRole(enum.StrEnum):
     """The four shipped roles. New roles can be plugged in by passing
     a role string not in the enum — `spawn` accepts either; the enum
     just gives discoverability."""
@@ -147,13 +147,13 @@ def spawn(
 
     try:
         agent = agent_factory(**factory_kwargs)
-    except Exception as exc:  # noqa: BLE001 — orchestration layer is the boundary
+    except Exception as exc:
         logger.warning("spawn(%s): factory raised %s", role, exc)
         return WorkerHandle(role=role, prompt=prompt, error=f"factory: {exc}")
 
     try:
         result = agent.run(prompt)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("spawn(%s): run() raised %s", role, exc)
         return WorkerHandle(role=role, prompt=prompt, error=f"run: {exc}")
 
@@ -253,9 +253,7 @@ def _to_spec(item: WorkerSpec | tuple | Iterable) -> WorkerSpec:
     if len(seq) == 4:
         role, prompt, sysp, fkw = seq
         return WorkerSpec(role=role, prompt=prompt, system_prompt=sysp, factory_kwargs=fkw)
-    raise ValueError(
-        f"spawn_parallel: tuple specs must be length 2, 3, or 4; got {len(seq)}"
-    )
+    raise ValueError(f"spawn_parallel: tuple specs must be length 2, 3, or 4; got {len(seq)}")
 
 
 # ---------- worker-to-worker session hand-off (M122c) ----------
@@ -283,7 +281,7 @@ def make_session_digest_loader(
             if not store.session_exists(session_id):
                 return None
             messages = store.load_messages(session_id)
-        except Exception:  # noqa: BLE001 — hand-off is best-effort enrichment
+        except Exception:
             return None
         lines: list[str] = []
         for m in messages:
@@ -405,8 +403,7 @@ def mini_report(
         body_parts.extend(["", "## Challenges", challenges.strip()])
     body = "\n".join(body_parts)
     cur = conn.execute(
-        "INSERT INTO insights(title, body, category, created_at)"
-        " VALUES (?, ?, ?, ?)",
+        "INSERT INTO insights(title, body, category, created_at) VALUES (?, ?, ?, ?)",
         (title, body, category, wall),
     )
     return int(cur.lastrowid or 0)

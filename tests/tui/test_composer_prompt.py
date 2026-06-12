@@ -148,9 +148,7 @@ async def test_freeform_option_opens_input_then_resolves_with_text() -> None:
         PromptOption(key="b", label="Variant B", hotkey="2"),
         PromptOption(key="__free__", label="Enter your own answer", hotkey="3", freeform=True),
     ]
-    prompt, future = _make_prompt(
-        loop=loop, options=options, default_key="a", question="Pick one"
-    )
+    prompt, future = _make_prompt(loop=loop, options=options, default_key="a", question="Pick one")
     app = _Host(prompt)
     async with app.run_test() as pilot:
         await pilot.press("3")
@@ -176,9 +174,7 @@ async def test_non_freeform_option_still_resolves_immediately() -> None:
         PromptOption(key="a", label="Variant A", hotkey="1"),
         PromptOption(key="__free__", label="Type your own", hotkey="2", freeform=True),
     ]
-    prompt, future = _make_prompt(
-        loop=loop, options=options, default_key="a", question="Pick"
-    )
+    prompt, future = _make_prompt(loop=loop, options=options, default_key="a", question="Pick")
     app = _Host(prompt)
     async with app.run_test() as pilot:
         await pilot.press("1")
@@ -194,9 +190,7 @@ async def test_escape_in_freeform_input_returns_default() -> None:
         PromptOption(key="cancel", label="Cancel", hotkey="c"),
         PromptOption(key="__free__", label="Custom", hotkey="f", freeform=True),
     ]
-    prompt, future = _make_prompt(
-        loop=loop, options=options, default_key="cancel", question="Pick"
-    )
+    prompt, future = _make_prompt(loop=loop, options=options, default_key="cancel", question="Pick")
     app = _Host(prompt)
     async with app.run_test() as pilot:
         await pilot.press("f")  # open freeform input

@@ -34,9 +34,8 @@ from veles.core.modes.goal import (
 )
 from veles.core.plan_artifact import active_dir, create_plan, list_active
 from veles.core.project import init_project
-from veles.tui.messages import SystemLine, TurnDone
+from veles.tui.messages import SystemLine
 from veles.tui.state import AppState
-
 
 # ---------- pure parser tests ----------
 
@@ -186,9 +185,7 @@ def test_goal_interview_to_confirm_on_ready_marker(project, state) -> None:
     and the summary is persisted on the Goal."""
     token = set_active_project(project)
     try:
-        goal = create_goal(
-            project.state_dir, objective="placeholder", done_condition=""
-        )
+        goal = create_goal(project.state_dir, objective="placeholder", done_condition="")
         state.active_goal_id = goal.id
         update_fsm(project.state_dir, goal.id, phase="interview")
 
@@ -210,9 +207,7 @@ def test_goal_interview_to_confirm_on_ready_marker(project, state) -> None:
     assert "dark theme" in goal.interview_summary
 
 
-def test_goal_interview_uses_writing_registry_and_interview_prompt(
-    project, state
-) -> None:
+def test_goal_interview_uses_writing_registry_and_interview_prompt(project, state) -> None:
     token = set_active_project(project)
     try:
         goal = create_goal(project.state_dir, objective="x", done_condition="")
@@ -446,9 +441,7 @@ def test_goal_execute_runs_one_step_then_check(project, state) -> None:
         rec = _Recorder(
             state=state,
             project=project,
-            next_result=RunResult(
-                text="wired variables", iterations=2, session_id="s1"
-            ),
+            next_result=RunResult(text="wired variables", iterations=2, session_id="s1"),
         )
         GoalMode().run_turn("continue", rec.make_ctx())
     finally:
@@ -457,9 +450,7 @@ def test_goal_execute_runs_one_step_then_check(project, state) -> None:
     goal_after = read_goal(project.state_dir, goal.id)
     assert goal_after.current_phase == "check"
     # One checkpoint recorded for the executed step.
-    assert any(
-        "step 1/2" in cp.description for cp in goal_after.progress
-    )
+    assert any("step 1/2" in cp.description for cp in goal_after.progress)
 
 
 def test_goal_execute_via_manager_when_manager_mode_on(project, state, monkeypatch) -> None:
@@ -504,23 +495,15 @@ def _txt(msg) -> str:
 def test_goal_check_goal_reached_completes(project, state) -> None:
     token = set_active_project(project)
     try:
-        goal = create_goal(
-            project.state_dir, objective="x", done_condition="all green"
-        )
-        plan = create_plan(
-            project.state_dir, objective="ship dark theme", steps=["a", "b"]
-        )
+        goal = create_goal(project.state_dir, objective="x", done_condition="all green")
+        plan = create_plan(project.state_dir, objective="ship dark theme", steps=["a", "b"])
         state.active_goal_id = goal.id
-        update_fsm(
-            project.state_dir, goal.id, phase="check", plan_id=plan.id
-        )
+        update_fsm(project.state_dir, goal.id, phase="check", plan_id=plan.id)
 
         rec = _Recorder(
             state=state,
             project=project,
-            next_result=RunResult(
-                text="", iterations=0, stopped_reason="synthetic"
-            ),
+            next_result=RunResult(text="", iterations=0, stopped_reason="synthetic"),
         )
         with patch(
             "veles.core.tools.builtin.advisor.call_advisor",
@@ -540,9 +523,7 @@ def test_goal_check_step_ok_continue_loops_to_execute(project, state) -> None:
     token = set_active_project(project)
     try:
         goal = create_goal(project.state_dir, objective="x", done_condition="")
-        plan = create_plan(
-            project.state_dir, objective="ship", steps=["a", "b"]
-        )
+        plan = create_plan(project.state_dir, objective="ship", steps=["a", "b"])
         state.active_goal_id = goal.id
         update_fsm(project.state_dir, goal.id, phase="check", plan_id=plan.id)
         rec = _Recorder(

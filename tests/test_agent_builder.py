@@ -50,14 +50,10 @@ def test_returns_wired_agent(project, monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr("veles.cli._ensure_api_key", lambda *a, **kw: True)
     monkeypatch.setattr("veles.cli._make_provider", lambda name: stub_provider)
-    monkeypatch.setattr(
-        "veles.cli._build_compressor", lambda args, proj, prov: sentinel_compressor
-    )
+    monkeypatch.setattr("veles.cli._build_compressor", lambda args, proj, prov: sentinel_compressor)
 
     def fake_load_skills(proj, tools, *, provider, model):
-        load_calls.append(
-            {"tools": tools, "provider": provider, "model": model}
-        )
+        load_calls.append({"tools": tools, "provider": provider, "model": model})
         return sentinel_registry
 
     monkeypatch.setattr("veles.cli._load_skills", fake_load_skills)
@@ -106,37 +102,27 @@ def test_missing_api_key_returns_none(
     monkeypatch.setattr("veles.cli._make_provider", boom)
     monkeypatch.setattr("veles.cli._load_skills", boom)
 
-    agent = build_command_agent(
-        _args(provider="openrouter"), project, tools=("read_file",)
-    )
+    agent = build_command_agent(_args(provider="openrouter"), project, tools=("read_file",))
 
     assert agent is None
     assert "no API key" in capsys.readouterr().err
 
 
-def test_check_api_key_false_skips_gate(
-    project, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_check_api_key_false_skips_gate(project, monkeypatch: pytest.MonkeyPatch) -> None:
     """Commands that gated the key earlier pass check_api_key=False and the
     factory must not consult `_ensure_api_key` again (call-count parity)."""
     monkeypatch.setattr(
         "veles.cli._ensure_api_key",
-        lambda *a, **kw: (_ for _ in ()).throw(
-            AssertionError("factory must not re-check the key")
-        ),
+        lambda *a, **kw: (_ for _ in ()).throw(AssertionError("factory must not re-check the key")),
     )
     monkeypatch.setattr("veles.cli._make_provider", lambda name: StubProvider())
     monkeypatch.setattr("veles.cli._load_skills", lambda *a, **kw: object())
 
-    agent = build_command_agent(
-        _args(), project, tools=("read_file",), check_api_key=False
-    )
+    agent = build_command_agent(_args(), project, tools=("read_file",), check_api_key=False)
     assert isinstance(agent, Agent)
 
 
-def test_monkeypatch_contract_is_lazy(
-    project, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_monkeypatch_contract_is_lazy(project, monkeypatch: pytest.MonkeyPatch) -> None:
     """(c) `build_command_agent` was imported directly from `_agent_builder`
     at module-import time — yet a later patch of `veles.cli._make_provider`
     must still be picked up (the factory resolves helpers at call time)."""

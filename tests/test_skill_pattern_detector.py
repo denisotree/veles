@@ -27,8 +27,9 @@ def _entry(name: str) -> ToolEntry:
     )
 
 
-def _seed_session(conn, session_id: str, sequence: list[tuple[str, bool]],
-                  base_time: float = 100.0) -> None:
+def _seed_session(
+    conn, session_id: str, sequence: list[tuple[str, bool]], base_time: float = 100.0
+) -> None:
     """Create a session row + tool_uses rows for the given sequence."""
     conn.execute(
         "INSERT OR IGNORE INTO sessions(id, created_at, last_activity_at) VALUES (?, ?, ?)",

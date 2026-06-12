@@ -49,9 +49,7 @@ def test_read_task_md_smoke(project):
         "and tell me in one sentence what Veles is."
     )
     assert result.text, "agent returned empty text"
-    assert "Veles" in result.text, (
-        f"answer should mention Veles; got: {result.text!r}"
-    )
+    assert "Veles" in result.text, f"answer should mention Veles; got: {result.text!r}"
     used_read_file = any(
         m.role == "assistant" and any(tc.name == "read_file" for tc in m.tool_calls)
         for m in result.history

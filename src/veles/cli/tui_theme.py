@@ -39,13 +39,13 @@ class TuiTheme:
     error: str
     success: str
     warning: str
-    accent: str       # banner, panel borders, info highlights
-    muted: str        # secondary / dimmed text
+    accent: str  # banner, panel borders, info highlights
+    muted: str  # secondary / dimmed text
     # Rich Panel border style string
     border: str
     # prompt_toolkit FormattedText style strings
     pt_selected: str  # highlighted menu item
-    pt_hint: str      # navigation hint line
+    pt_hint: str  # navigation hint line
     pt_header: str = field(default="bold")
 
 

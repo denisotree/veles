@@ -32,9 +32,7 @@ def test_autostart_called_when_daemon_answered(tmp_path: Path, monkeypatch) -> N
 
     runner_mod._autostart_daemon(project, {"host": "127.0.0.1", "port": 8765})
 
-    assert calls == [
-        {"project_root": str(project.root), "host": "127.0.0.1", "port": 8765}
-    ]
+    assert calls == [{"project_root": str(project.root), "host": "127.0.0.1", "port": 8765}]
 
 
 def test_autostart_handles_spawn_failure(tmp_path: Path, monkeypatch, capsys) -> None:

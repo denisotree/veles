@@ -159,9 +159,7 @@ class RuntimeSessionStore:
         return rec
 
     def get(self, rid: str) -> RuntimeSessionRecord | None:
-        r = self._conn.execute(
-            "SELECT * FROM runtime_sessions WHERE id = ?", (rid,)
-        ).fetchone()
+        r = self._conn.execute("SELECT * FROM runtime_sessions WHERE id = ?", (rid,)).fetchone()
         return _row(r) if r is not None else None
 
     def get_by_name(
@@ -232,15 +230,12 @@ class RuntimeSessionStore:
             (pid, ts, rid),
         )
 
-    def mark_stopped(
-        self, rid: str, *, status: str = "stopped", now: float | None = None
-    ) -> None:
+    def mark_stopped(self, rid: str, *, status: str = "stopped", now: float | None = None) -> None:
         if status not in VALID_STATUS:
             raise ValueError(f"invalid status: {status!r}")
         ts = time.time() if now is None else now
         self._conn.execute(
-            "UPDATE runtime_sessions SET status = ?, pid = NULL, last_stopped_at = ? "
-            "WHERE id = ?",
+            "UPDATE runtime_sessions SET status = ?, pid = NULL, last_stopped_at = ? WHERE id = ?",
             (status, ts, rid),
         )
 
@@ -277,7 +272,5 @@ def runtime_session_digest(records: list[RuntimeSessionRecord]) -> str | None:
         flag = " — DELETED" if r.deleted else ""
         model = f"{r.provider or '?'}:{r.model}" if r.model else (r.provider or "—")
         port = f" port={r.port}" if r.port is not None else ""
-        lines.append(
-            f"- **{r.name}** ({r.kind}){flag}: status={r.status} model={model}{port}"
-        )
+        lines.append(f"- **{r.name}** ({r.kind}){flag}: status={r.status} model={model}{port}")
     return "\n".join(lines)

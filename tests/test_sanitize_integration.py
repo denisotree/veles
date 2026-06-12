@@ -86,9 +86,7 @@ def test_write_file_returns_relative_path_inside_project(tmp_path: Path) -> None
     assert msg == "wrote 2 bytes to wiki/notes.md"
 
 
-def test_write_file_outside_project_sanitizes_path(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_write_file_outside_project_sanitizes_path(monkeypatch, tmp_path: Path) -> None:
     """Writing to `~/.veles/skills/...` is allowed via critical-confirm;
     the returned path must be the sanitized form `~/.veles/skills/...`,
     not the absolute one."""
@@ -127,9 +125,7 @@ def test_write_file_outside_project_sanitizes_path(
 # ---------- SandboxViolation ----------
 
 
-def test_sandbox_violation_message_strips_abs_path(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_sandbox_violation_message_strips_abs_path(monkeypatch, tmp_path: Path) -> None:
     fake_home = tmp_path / "home"
     fake_home.mkdir()
     monkeypatch.setattr(
@@ -168,9 +164,7 @@ def test_sandbox_violation_message_strips_abs_path(
 # ---------- daemon endpoints ----------
 
 
-def test_daemon_health_endpoint_redacts_project_root(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_daemon_health_endpoint_redacts_project_root(monkeypatch, tmp_path: Path) -> None:
     from aiohttp.test_utils import make_mocked_request
 
     from veles.daemon.auth import TokenStore

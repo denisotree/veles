@@ -87,8 +87,6 @@ def _status(args: argparse.Namespace) -> int:
         else:
             print("autopilot inactive.")
         return 1
-    iso = _dt.datetime.fromtimestamp(state.enabled_until, tz=_dt.UTC).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
+    iso = _dt.datetime.fromtimestamp(state.enabled_until, tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     print(f"autopilot active until {iso} ({format_remaining(state.seconds_remaining)} left).")
     return 0

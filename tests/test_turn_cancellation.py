@@ -58,10 +58,10 @@ class _GatedStreamProvider:
     supports_tools: bool = True
     supports_streaming: bool = True
 
-    def create_message(self, *a, **k):  # noqa: ANN002, ANN003
+    def create_message(self, *a, **k):
         raise NotImplementedError
 
-    def stream_message(self, messages, tools=None, *, model, max_tokens=4096):  # noqa: ANN001
+    def stream_message(self, messages, tools=None, *, model, max_tokens=4096):
         del messages, tools, model, max_tokens
         yield TextDelta(text="a")
         self.gate.wait(timeout=10.0)
@@ -77,10 +77,10 @@ class _ExplodingProvider:
     supports_tools: bool = True
     supports_streaming: bool = True
 
-    def create_message(self, *a, **k):  # noqa: ANN002, ANN003
+    def create_message(self, *a, **k):
         raise AssertionError("provider must not be called after cancel")
 
-    def stream_message(self, *a, **k):  # noqa: ANN002, ANN003
+    def stream_message(self, *a, **k):
         raise AssertionError("provider must not be called after cancel")
 
 
@@ -90,15 +90,15 @@ class _OneShotProvider:
     supports_tools: bool = True
     supports_streaming: bool = False
 
-    def create_message(self, messages, tools=None, *, model, max_tokens=4096):  # noqa: ANN001
+    def create_message(self, messages, tools=None, *, model, max_tokens=4096):
         del messages, tools, model, max_tokens
         return _final("done")
 
-    def stream_message(self, *a, **k):  # noqa: ANN002, ANN003
+    def stream_message(self, *a, **k):
         raise NotImplementedError
 
 
-def _agent(provider) -> Agent:  # noqa: ANN001
+def _agent(provider) -> Agent:
     return Agent(provider, Registry(), model="m", max_iterations=5)
 
 
@@ -165,10 +165,10 @@ class _StalledStreamProvider:
     supports_tools: bool = True
     supports_streaming: bool = True
 
-    def create_message(self, *a, **k):  # noqa: ANN002, ANN003
+    def create_message(self, *a, **k):
         raise NotImplementedError
 
-    def stream_message(self, messages, tools=None, *, model, max_tokens=4096):  # noqa: ANN001
+    def stream_message(self, messages, tools=None, *, model, max_tokens=4096):
         del messages, tools, model, max_tokens
         self.started.set()
         # Stall until released (or a generous safety timeout). A correct

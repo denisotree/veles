@@ -19,6 +19,4 @@ def register(sub: argparse._SubParsersAction) -> None:
             metavar="URL_OR_PATH",
             help="Override the registry source (defaults to canonical URL).",
         )
-        sp.add_argument(
-            "--json", action="store_true", help="Emit JSON instead of human text."
-        )
+        sp.add_argument("--json", action="store_true", help="Emit JSON instead of human text.")

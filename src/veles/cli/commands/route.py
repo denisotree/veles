@@ -120,9 +120,7 @@ def _refresh(args: argparse.Namespace, project: Project) -> int:
         return 2
 
     extractor = make_nl_extractor(provider=provider_obj, model=routed_model)
-    state = refresh_nl_routing(
-        project, agents_md, extractor=extractor, force=bool(args.force)
-    )
+    state = refresh_nl_routing(project, agents_md, extractor=extractor, force=bool(args.force))
     if state.entries_count:
         print(
             f"<refreshed nl routing: {state.entries_count} entries from AGENTS.md>",

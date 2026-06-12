@@ -33,7 +33,6 @@ from veles.core.openai_wire import (
     to_openai_message,
 )
 
-
 # Re-export for tests that import the function from this module.
 _to_openai_message = to_openai_message
 

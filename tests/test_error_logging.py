@@ -17,10 +17,9 @@ from openai import APITimeoutError
 
 from veles.adapters.openai_direct import OpenAIProvider
 from veles.core.agent import Agent
-from veles.core.cancel import CancelToken, set_cancel_token, reset_cancel_token
+from veles.core.cancel import CancelToken, reset_cancel_token, set_cancel_token
 from veles.core.provider import Message, ProviderTimeout
 from veles.core.tools.registry import Registry
-
 
 # ---- agent emits ErrorEvent on a failed turn ----
 
@@ -30,10 +29,10 @@ class _RaisingProvider:
     supports_tools = True
     supports_streaming = False
 
-    def create_message(self, *a, **k):  # noqa: ANN002, ANN003
+    def create_message(self, *a, **k):
         raise RuntimeError("boom")
 
-    def stream_message(self, *a, **k):  # noqa: ANN002, ANN003
+    def stream_message(self, *a, **k):
         raise NotImplementedError
 
 
@@ -57,10 +56,10 @@ def test_cancelled_turn_does_not_emit_error_event():
         supports_tools = True
         supports_streaming = False
 
-        def create_message(self, *a, **k):  # noqa: ANN002, ANN003
+        def create_message(self, *a, **k):
             raise AssertionError("must short-circuit before the provider call")
 
-        def stream_message(self, *a, **k):  # noqa: ANN002, ANN003
+        def stream_message(self, *a, **k):
             raise NotImplementedError
 
     seen = []
@@ -83,12 +82,12 @@ def _timeout_error() -> APITimeoutError:
 
 
 class _TimeoutChat:
-    def create(self, **kwargs):  # noqa: ANN003
+    def create(self, **kwargs):
         raise _timeout_error()
 
 
 class _TimeoutStreamChat:
-    def create(self, **kwargs):  # noqa: ANN003
+    def create(self, **kwargs):
         def _gen():
             raise _timeout_error()
             yield  # pragma: no cover - generator marker
@@ -97,11 +96,11 @@ class _TimeoutStreamChat:
 
 
 class _Namespace:
-    def __init__(self, **kw):  # noqa: ANN003
+    def __init__(self, **kw):
         self.__dict__.update(kw)
 
 
-def _provider_with_chat(chat) -> OpenAIProvider:  # noqa: ANN001
+def _provider_with_chat(chat) -> OpenAIProvider:
     client = _Namespace(chat=_Namespace(completions=chat))
     return OpenAIProvider(client=client)
 

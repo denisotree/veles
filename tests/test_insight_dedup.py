@@ -70,7 +70,9 @@ def test_insight_dedup_links_duplicate_to_canonical(tmp_path: Path) -> None:
 def test_insight_dedup_idempotent(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     _insert(project, title="a", body="bump nginx worker_connections concurrent sockets", ts=100.0)
-    _insert(project, title="b", body="increase nginx worker_connections concurrent sockets", ts=200.0)
+    _insert(
+        project, title="b", body="increase nginx worker_connections concurrent sockets", ts=200.0
+    )
     _step_insight_dedup(project, DreamResult(), dry_run=False)
     _step_insight_dedup(project, DreamResult(), dry_run=False)
     assert len(_refs(project)) == 1  # INSERT OR IGNORE → no duplicate ref
@@ -79,7 +81,9 @@ def test_insight_dedup_idempotent(tmp_path: Path) -> None:
 def test_insight_dedup_dry_run_writes_nothing(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     _insert(project, title="a", body="bump nginx worker_connections concurrent sockets", ts=100.0)
-    _insert(project, title="b", body="increase nginx worker_connections concurrent sockets", ts=200.0)
+    _insert(
+        project, title="b", body="increase nginx worker_connections concurrent sockets", ts=200.0
+    )
     _step_insight_dedup(project, DreamResult(), dry_run=True)
     assert _refs(project) == []
 
@@ -91,7 +95,9 @@ def test_deep_dream_cycle_runs_insight_dedup(tmp_path: Path) -> None:
 
     project = init_project(tmp_path / "p", name="p")
     _insert(project, title="a", body="bump nginx worker_connections concurrent sockets", ts=100.0)
-    _insert(project, title="b", body="increase nginx worker_connections concurrent sockets", ts=200.0)
+    _insert(
+        project, title="b", body="increase nginx worker_connections concurrent sockets", ts=200.0
+    )
     result = dream_cycle(project, include_consolidation=True)
     assert result.insight_dedup_clusters == 1
     assert _refs(project) == [(1, 2)]
@@ -103,7 +109,9 @@ def test_post_turn_cycle_skips_insight_dedup(tmp_path: Path) -> None:
 
     project = init_project(tmp_path / "p", name="p")
     _insert(project, title="a", body="bump nginx worker_connections concurrent sockets", ts=100.0)
-    _insert(project, title="b", body="increase nginx worker_connections concurrent sockets", ts=200.0)
+    _insert(
+        project, title="b", body="increase nginx worker_connections concurrent sockets", ts=200.0
+    )
     dream_cycle(project, include_consolidation=False)
     assert _refs(project) == []
 

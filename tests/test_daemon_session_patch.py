@@ -20,7 +20,7 @@ from veles.daemon.state import SessionOverrides
 
 
 def _noop_agent_factory(store: SessionStore) -> AgentFactory:
-    def factory(session_id: str | None, *, prompt: str | None = None):  # noqa: ARG001
+    def factory(session_id: str | None, *, prompt: str | None = None):
         raise RuntimeError("not invoked in patch tests")
 
     return factory
@@ -49,9 +49,7 @@ def good_token(token_store: TokenStore) -> str:
 
 
 @pytest.fixture()
-def app(
-    project: Project, store: SessionStore, token_store: TokenStore
-) -> web.Application:
+def app(project: Project, store: SessionStore, token_store: TokenStore) -> web.Application:
     state = build_state(
         project=project,
         store=store,
@@ -106,9 +104,7 @@ async def test_patch_rejects_provider(aiohttp_client, app, good_token: str) -> N
     assert "fixed at daemon launch" in body["error"]
 
 
-async def test_patch_rejects_model_even_with_mode(
-    aiohttp_client, app, good_token: str
-) -> None:
+async def test_patch_rejects_model_even_with_mode(aiohttp_client, app, good_token: str) -> None:
     """A model field poisons the whole request — no partial apply."""
     client = await aiohttp_client(app)
     resp = await client.patch(
@@ -122,9 +118,7 @@ async def test_patch_rejects_model_even_with_mode(
 # ---- validation ----
 
 
-async def test_patch_rejects_invalid_mode(
-    aiohttp_client, app, good_token: str
-) -> None:
+async def test_patch_rejects_invalid_mode(aiohttp_client, app, good_token: str) -> None:
     client = await aiohttp_client(app)
     resp = await client.patch(
         "/v1/sessions/x",
@@ -137,9 +131,7 @@ async def test_patch_rejects_invalid_mode(
     assert "auto" in body["valid_modes"]
 
 
-async def test_patch_rejects_empty_body(
-    aiohttp_client, app, good_token: str
-) -> None:
+async def test_patch_rejects_empty_body(aiohttp_client, app, good_token: str) -> None:
     client = await aiohttp_client(app)
     resp = await client.patch(
         "/v1/sessions/x",
@@ -151,9 +143,7 @@ async def test_patch_rejects_empty_body(
     assert "mode required" in body["error"]
 
 
-async def test_patch_rejects_malformed_json(
-    aiohttp_client, app, good_token: str
-) -> None:
+async def test_patch_rejects_malformed_json(aiohttp_client, app, good_token: str) -> None:
     client = await aiohttp_client(app)
     resp = await client.patch(
         "/v1/sessions/x",

@@ -66,8 +66,7 @@ def surface_skill_suggestions(
             continue
         body = _render_suggestion(pattern)
         conn.execute(
-            "INSERT INTO insights(title, body, category, created_at)"
-            " VALUES (?, ?, ?, ?)",
+            "INSERT INTO insights(title, body, category, created_at) VALUES (?, ?, ?, ?)",
             (title, body, SKILL_SUGGESTION_CATEGORY, wall),
         )
         fresh.append(pattern)

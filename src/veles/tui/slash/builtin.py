@@ -11,6 +11,7 @@ text in `line`.
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 
 from veles.tui.slash.registry import SlashContext, SlashRegistry, SlashResult
@@ -100,22 +101,20 @@ def _session(line: str, ctx: SlashContext) -> SlashResult:
 
 def _save(line: str, ctx: SlashContext) -> SlashResult:
     """M87 shapes:
-      - `/save` (no args) — list pending insight candidates the periodic
-        extractor surfaced; user reruns with a slug to commit.
-      - `/save <slug>` — if the slug matches a pending candidate, save
-        it into the project's insight memory (M161: SQL row + rendered
-        view under `.veles/memory/insights/`). Otherwise fall back to
-        the legacy behaviour: save the last assistant reply to
-        `wiki/queries/<slug>.md` (user content).
+    - `/save` (no args) — list pending insight candidates the periodic
+      extractor surfaced; user reruns with a slug to commit.
+    - `/save <slug>` — if the slug matches a pending candidate, save
+      it into the project's insight memory (M161: SQL row + rendered
+      view under `.veles/memory/insights/`). Otherwise fall back to
+      the legacy behaviour: save the last assistant reply to
+      `wiki/queries/<slug>.md` (user content).
     """
     from veles.core.wiki import Wiki
 
     candidates = list(ctx.state.insight_candidates)
     if not line:
         if not candidates:
-            return SlashResult.err(
-                "/save needs a slug, e.g. `/save graph-traversal-notes`"
-            )
+            return SlashResult.err("/save needs a slug, e.g. `/save graph-traversal-notes`")
         rows = [f"insight candidates ({len(candidates)}). Run `/save <slug>` to keep one:"]
         for slug, title, _body in candidates:
             rows.append(f"  - {slug}  —  {title}")
@@ -128,20 +127,12 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
             from veles.core.memory.artefacts import append_memory_log
             from veles.core.tools.builtin.memory_save import save_insight_row
 
-            rid = save_insight_row(
-                title=title, body=body, category="tui-save", project=ctx.project
-            )
+            rid = save_insight_row(title=title, body=body, category="tui-save", project=ctx.project)
             if rid == 0:
                 return SlashResult.err("/save failed: could not write insight to memory.db")
-            try:
-                append_memory_log(
-                    ctx.project, op="tui-save-insight", summary=f"-> insight #{rid}"
-                )
-            except Exception:
-                pass
-            ctx.state.insight_candidates = [
-                c for c in candidates if c[0] != slug
-            ]
+            with contextlib.suppress(Exception):
+                append_memory_log(ctx.project, op="tui-save-insight", summary=f"-> insight #{rid}")
+            ctx.state.insight_candidates = [c for c in candidates if c[0] != slug]
             return SlashResult.ok(f"saved insight #{rid}")
     # Legacy path: save the last assistant reply under wiki/queries/.
     last = ctx.state.last_assistant_text
@@ -167,8 +158,7 @@ def _history(line: str, ctx: SlashContext) -> SlashResult:
         marker = " *" if info.id == ctx.state.session_id else "  "
         title = info.title or "(untitled)"
         rows.append(
-            f"{marker}{info.id}  {_fmt_ts(info.last_activity_at)}  "
-            f"turns={info.turn_count}  {title}"
+            f"{marker}{info.id}  {_fmt_ts(info.last_activity_at)}  turns={info.turn_count}  {title}"
         )
     return SlashResult.ok("\n".join(rows))
 
@@ -231,10 +221,10 @@ def _wiki_query(question: str) -> SlashResult:
 
 def _model(line: str, ctx: SlashContext) -> SlashResult:
     """Three shapes:
-      - `/model` — open the picker (cached when available).
-      - `/model refresh` — open the picker and force a live re-fetch
-        (relevant for cloud providers; local providers are always live).
-      - `/model <id>` — set the model directly without opening the picker.
+    - `/model` — open the picker (cached when available).
+    - `/model refresh` — open the picker and force a live re-fetch
+      (relevant for cloud providers; local providers are always live).
+    - `/model <id>` — set the model directly without opening the picker.
     """
     new = line.split()[0] if line else ""
     if not new:
@@ -298,11 +288,10 @@ def _mode(line: str, ctx: SlashContext) -> SlashResult:
         return SlashResult.ok("\n".join(rows))
     new = arg[0]
     if new not in CYCLE_ORDER:
-        return SlashResult.err(
-            f"/mode: unknown mode {new!r}; one of: {', '.join(CYCLE_ORDER)}"
-        )
+        return SlashResult.err(f"/mode: unknown mode {new!r}; one of: {', '.join(CYCLE_ORDER)}")
     ctx.state.mode = new  # type: ignore[assignment]
-    try:
+    # Best-effort persistence; the in-memory switch already succeeded.
+    with contextlib.suppress(OSError):
         save_for_project(
             ctx.project,
             TuiPersistentState(
@@ -311,9 +300,6 @@ def _mode(line: str, ctx: SlashContext) -> SlashResult:
                 model=ctx.state.model,
             ),
         )
-    except OSError:
-        # Best-effort persistence; the in-memory switch already succeeded.
-        pass
     return SlashResult.ok(f"mode set to {new}")
 
 
@@ -436,7 +422,7 @@ def _insights(line: str, ctx: SlashContext) -> SlashResult:
 
     try:
         store = SessionStore(ctx.project.memory_db_path)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return SlashResult.err(f"/insights: cannot open memory.db: {exc}")
     try:
         if category_filter:
@@ -470,10 +456,7 @@ def _insights(line: str, ctx: SlashContext) -> SlashResult:
         title = row["title"] or "(no title)"
         out_lines.append(f"  [{cat}] {title}  · {ts}")
     out_lines.append("")
-    out_lines.append(
-        "Filter by category: /insights setup-hint | skill-suggestion | "
-        "manager-report"
-    )
+    out_lines.append("Filter by category: /insights setup-hint | skill-suggestion | manager-report")
     return SlashResult.ok("\n".join(out_lines))
 
 
@@ -508,7 +491,7 @@ def _rules(line: str, ctx: SlashContext) -> SlashResult:
 
     try:
         store = SessionStore(ctx.project.memory_db_path)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return SlashResult.err(f"/rules: cannot open memory.db: {exc}")
     try:
         if kind_filter:
@@ -545,9 +528,7 @@ def _rules(line: str, ctx: SlashContext) -> SlashResult:
         src = row["source"] or "—"
         out_lines.append(f"  [{kind}] {body}  · {src} · {ts}")
     out_lines.append("")
-    out_lines.append(
-        "Filter by kind: /rules format | do | dont | preference"
-    )
+    out_lines.append("Filter by kind: /rules format | do | dont | preference")
     return SlashResult.ok("\n".join(out_lines))
 
 

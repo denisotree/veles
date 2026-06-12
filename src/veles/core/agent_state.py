@@ -33,9 +33,7 @@ class AgentState(enum.Enum):
     DONE = "done"
 
 
-_active_state: ContextVar[AgentState] = ContextVar(
-    "veles_agent_state", default=AgentState.IDLE
-)
+_active_state: ContextVar[AgentState] = ContextVar("veles_agent_state", default=AgentState.IDLE)
 
 
 def current_state() -> AgentState:
@@ -62,9 +60,7 @@ def is_planning() -> bool:
 # paired commit tool proceed. We track that as a per-session set of tool
 # names, populated by the agent loop right before each dispatch.
 
-_invoked_tools: ContextVar[frozenset[str]] = ContextVar(
-    "veles_invoked_tools", default=frozenset()
-)
+_invoked_tools: ContextVar[frozenset[str]] = ContextVar("veles_invoked_tools", default=frozenset())
 
 
 def invoked_tools() -> frozenset[str]:

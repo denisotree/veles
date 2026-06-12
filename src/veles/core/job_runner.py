@@ -219,10 +219,7 @@ class JobRunner:
     ) -> None:
         completed = job.repeat_completed + 1
         next_at = compute_next_run(job.schedule, now=now)
-        done = (
-            next_at is None
-            or (job.repeat_times is not None and completed >= job.repeat_times)
-        )
+        done = next_at is None or (job.repeat_times is not None and completed >= job.repeat_times)
         updates: dict[str, object] = {
             "last_run_at": now,
             "last_status": status,

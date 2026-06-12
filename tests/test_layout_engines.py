@@ -36,9 +36,7 @@ def nowiki_project(tmp_path: Path, user_home: Path) -> Project:
     """A project whose layout pack does NOT enable the wiki engine."""
     pack_dir = user_home / "layouts" / "plain"
     pack_dir.mkdir(parents=True)
-    (pack_dir / "layout.toml").write_text(
-        '[layout]\nname = "plain"\n', encoding="utf-8"
-    )
+    (pack_dir / "layout.toml").write_text('[layout]\nname = "plain"\n', encoding="utf-8")
     return init_project(tmp_path / "p", name="p", layout="plain")
 
 
@@ -58,9 +56,7 @@ class _StubProvider:
 def test_wiki_tools_dropped_when_engine_off(nowiki_project: Project) -> None:
     from veles.cli._runtime import _RUN_TOOLS, _load_skills
 
-    reg = _load_skills(
-        nowiki_project, _RUN_TOOLS, provider=_StubProvider(), model="m"
-    )
+    reg = _load_skills(nowiki_project, _RUN_TOOLS, provider=_StubProvider(), model="m")
     names = set(reg.list_names())
     assert not any(n.startswith("wiki_") for n in names)
     assert "read_file" in names
@@ -70,9 +66,7 @@ def test_wiki_tools_dropped_when_engine_off(nowiki_project: Project) -> None:
 def test_wiki_tools_present_when_engine_on(wiki_project: Project) -> None:
     from veles.cli._runtime import _RUN_TOOLS, _load_skills
 
-    reg = _load_skills(
-        wiki_project, _RUN_TOOLS, provider=_StubProvider(), model="m"
-    )
+    reg = _load_skills(wiki_project, _RUN_TOOLS, provider=_StubProvider(), model="m")
     names = set(reg.list_names())
     assert "wiki_search" in names
     assert "wiki_write_page" in names
@@ -126,9 +120,7 @@ def test_recall_works_without_wiki(nowiki_project: Project) -> None:
     assert rid > 0
     store = SessionStore(nowiki_project.memory_db_path)
     try:
-        hits = MemoryRouter(nowiki_project, store=store).recall(
-            "worker_connections nginx", limit=5
-        )
+        hits = MemoryRouter(nowiki_project, store=store).recall("worker_connections nginx", limit=5)
     finally:
         store.close()
     assert any("worker_connections" in h.summary for h in hits)

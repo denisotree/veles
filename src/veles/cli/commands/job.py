@@ -62,7 +62,8 @@ def _cmd_add(args: argparse.Namespace, store: JobsStore) -> int:
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    print(f"created job {rec.id}  next_run_at={time.strftime('%Y-%m-%d %H:%M', time.localtime(rec.next_run_at))}")
+    next_run = time.strftime("%Y-%m-%d %H:%M", time.localtime(rec.next_run_at))
+    print(f"created job {rec.id}  next_run_at={next_run}")
     return 0
 
 
@@ -91,9 +92,7 @@ def _cmd_show(args: argparse.Namespace, store: JobsStore) -> int:
     return 0
 
 
-def _cmd_set_enabled(
-    args: argparse.Namespace, store: JobsStore, *, enabled: bool
-) -> int:
+def _cmd_set_enabled(args: argparse.Namespace, store: JobsStore, *, enabled: bool) -> int:
     ok = store.update_job(args.id, enabled=enabled, state="scheduled" if enabled else "paused")
     if not ok:
         print(f"error: no job {args.id!r}", file=sys.stderr)
@@ -136,7 +135,7 @@ def _cmd_history(args: argparse.Namespace, store: JobsStore) -> int:
 
 def _cmd_tick(args: argparse.Namespace, store: JobsStore, project) -> int:
     """Synchronous one-shot tick — for testing / cron-less environments."""
-    from veles.cli import _make_provider, _RUN_TOOLS, DEFAULT_MODEL, _load_skills
+    from veles.cli import _RUN_TOOLS, DEFAULT_MODEL, _load_skills, _make_provider
     from veles.core.agent import Agent
     from veles.core.job_runner import JobRunner
     from veles.core.memory import SessionStore

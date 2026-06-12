@@ -101,7 +101,7 @@ def test_parse_single_block() -> None:
 def test_parse_multiple_blocks_in_order() -> None:
     text = (
         '```veles-tool\n{"name": "read_file", "arguments": {"path": "a"}}\n```\n'
-        'and then\n'
+        "and then\n"
         '```veles-tool\n{"name": "read_file", "arguments": {"path": "b"}}\n```'
     )
     calls = parse_tool_calls(text)
@@ -131,7 +131,7 @@ class _NativeProvider:
     supports_streaming: bool = False
     n: int = 0
 
-    def create_message(self, messages, tools=None, *, model, max_tokens=4096):  # noqa: ANN001
+    def create_message(self, messages, tools=None, *, model, max_tokens=4096):
         del messages, tools, model, max_tokens
         r = self.responses[self.n]
         self.n += 1
@@ -150,7 +150,7 @@ class _LocalProvider:
     n: int = 0
     tools_seen: list = field(default_factory=list)
 
-    def create_message(self, messages, tools=None, *, model, max_tokens=4096):  # noqa: ANN001
+    def create_message(self, messages, tools=None, *, model, max_tokens=4096):
         del messages, model, max_tokens
         self.tools_seen.append(tools)
         r = self.responses[self.n]
@@ -180,8 +180,7 @@ def test_native_illustrative_block_is_not_executed() -> None:
 
 def test_local_model_calls_tool_via_fenced_block() -> None:
     call_block = (
-        'I will read it.\n'
-        '```veles-tool\n{"name": "read_file", "arguments": {"path": "a.py"}}\n```'
+        'I will read it.\n```veles-tool\n{"name": "read_file", "arguments": {"path": "a.py"}}\n```'
     )
     provider = _LocalProvider(responses=[_final(call_block), _final("the file says hello")])
     agent = Agent(provider, _registry_with_read(), model="m")
@@ -204,7 +203,7 @@ def test_local_model_calls_tool_via_fenced_block() -> None:
     assert any(m.role == "system" and FENCED_SENTINEL in (m.content or "") for m in result.history)
 
 
-def test_env_kill_switch_disables_fenced(monkeypatch) -> None:  # noqa: ANN001
+def test_env_kill_switch_disables_fenced(monkeypatch) -> None:
     monkeypatch.setenv("VELES_FENCED_TOOLS", "0")
     block = '```veles-tool\n{"name": "read_file", "arguments": {"path": "a.py"}}\n```'
     provider = _LocalProvider(responses=[_final(block)])

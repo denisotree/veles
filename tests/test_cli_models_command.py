@@ -48,9 +48,7 @@ def test_models_json_output(capsys: pytest.CaptureFixture[str]) -> None:
     assert "only-one" in payload["models"]
 
 
-def test_models_refresh_writes_cache(
-    capsys: pytest.CaptureFixture[str], tmp_path: Path
-) -> None:
+def test_models_refresh_writes_cache(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
     """`--refresh` triggers a live fetch and persists the result to disk."""
     cache_file = tmp_path / "veles_home" / ".veles" / "cache" / "models" / "openrouter.json"
     assert not cache_file.exists()

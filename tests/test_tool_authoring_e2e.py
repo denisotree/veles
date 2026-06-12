@@ -87,9 +87,7 @@ def test_tool_authoring_skill_is_discoverable() -> None:
     assert "tool_authoring" in names
 
 
-def test_agent_generated_file_loads_into_registry(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_agent_generated_file_loads_into_registry(isolated_home: Path, tmp_path: Path) -> None:
     """Step 1: a .py file the agent wrote becomes a registered tool."""
     project = init_project(tmp_path / "proj", name="proj")
     tools_dir = project.state_dir / "tools"
@@ -108,9 +106,7 @@ def test_agent_generated_file_loads_into_registry(
     assert "count_substrings" in registry.list_names()
 
 
-def test_loaded_tool_dispatchable(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_loaded_tool_dispatchable(isolated_home: Path, tmp_path: Path) -> None:
     """Step 2: agent calls the loaded tool through the registry's
     dispatch path. Returns the function's actual result."""
     project = init_project(tmp_path / "proj", name="proj")
@@ -121,16 +117,12 @@ def test_loaded_tool_dispatchable(
     registry = Registry()
     load_into_registry(registry, project_tools_dir=tools_dir)
 
-    result = registry.dispatch(
-        "count_substrings", {"haystack": "abcabcabc", "needle": "abc"}
-    )
+    result = registry.dispatch("count_substrings", {"haystack": "abcabcabc", "needle": "abc"})
     # `dispatch` returns the str form
     assert result == "3"
 
 
-def test_tool_catalogued_with_correct_scope_and_origin(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_tool_catalogued_with_correct_scope_and_origin(isolated_home: Path, tmp_path: Path) -> None:
     """Step 3: persistence layer records scope/origin so `veles tool
     list` shows it as agent-generated and project-scoped."""
     project = init_project(tmp_path / "proj", name="proj")
@@ -150,9 +142,7 @@ def test_tool_catalogued_with_correct_scope_and_origin(
     assert rec.description and rec.description.startswith("Return how many")
 
 
-def test_telemetry_accumulates_after_invocations(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_telemetry_accumulates_after_invocations(isolated_home: Path, tmp_path: Path) -> None:
     """Step 4: every dispatch increments use_count via record_use; the
     catalogue's success_rate / last_used reflect actual usage."""
     project = init_project(tmp_path / "proj", name="proj")
@@ -177,9 +167,7 @@ def test_telemetry_accumulates_after_invocations(
     assert t.success_rate == pytest.approx(2 / 3)
 
 
-def test_promote_round_trip(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_promote_round_trip(isolated_home: Path, tmp_path: Path) -> None:
     """Step 5: `veles tool promote <name>` moves the file to user
     scope and rewrites the catalogue row. Tools survive across
     projects after promotion (the next project's loader picks them
@@ -231,9 +219,7 @@ def test_promote_round_trip(
 # ---- the full surface ----
 
 
-def test_full_lifecycle_in_one_go(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_full_lifecycle_in_one_go(isolated_home: Path, tmp_path: Path) -> None:
     """The condensed VISION §5.4 success path:
     write → load → dispatch → telemetry → catalogue → promote."""
     project = init_project(tmp_path / "proj", name="proj")
@@ -249,9 +235,7 @@ def test_full_lifecycle_in_one_go(
     output = registry.dispatch(
         "count_substrings", {"haystack": "the quick brown fox", "needle": " "}
     )
-    record_use(
-        store._conn, tool_name="count_substrings", ok=True, latency_ms=2
-    )
+    record_use(store._conn, tool_name="count_substrings", ok=True, latency_ms=2)
 
     assert output == "3"  # three spaces in "the quick brown fox"
     rows = list_tools(store._conn)

@@ -27,6 +27,13 @@ from shutil import copyfile
 
 from veles.core.i18n import t
 from veles.core.project import Project, ProjectAlreadyExists, init_project, load_project
+from veles.core.project_config import (
+    load_project_config as _load_project_toml,
+)
+from veles.core.project_config import (
+    save_project_config as _save_project_toml,
+)
+from veles.core.providers import ALL_PROVIDERS as _ALL_PROVIDERS
 from veles.core.wiki import Wiki
 from veles.tui.wizard.screens import (
     ChoiceScreen,
@@ -38,18 +45,18 @@ from veles.tui.wizard.screens import (
 from veles.tui.wizard.screens.choice import ChoiceItem
 from veles.tui.wizard.step import (
     CANCEL_SENTINEL as _CANCEL_SENTINEL,
+)
+from veles.tui.wizard.step import (
     WizardContext,
     WizardOutcome,
+)
+from veles.tui.wizard.step import (
     outcome_from_dismiss as _nav,
 )
 
-from veles.core.providers import ALL_PROVIDERS as _ALL_PROVIDERS
-
 # Project picker keeps labels compact — the user has seen the tagline
 # explanations in the first-run wizard already.
-_PROVIDER_CHOICES = [
-    ChoiceItem(label=spec.label, value=spec.value) for spec in _ALL_PROVIDERS
-]
+_PROVIDER_CHOICES = [ChoiceItem(label=spec.label, value=spec.value) for spec in _ALL_PROVIDERS]
 
 
 # ---------------- Step 1: Bootstrap ----------------
@@ -215,9 +222,7 @@ async def _pick_project_model(
     return str(result)
 
 
-async def _project_api_key_flow(
-    ctx: WizardContext, project: Project, provider: str
-) -> None:
+async def _project_api_key_flow(ctx: WizardContext, project: Project, provider: str) -> None:
     """Same shape as user-level ApiKeyStep but writes to the project scope."""
     from veles.core.provider_factory import LOCAL_PROVIDERS, PROVIDER_API_KEY_ENVS
     from veles.core.secrets import (
@@ -517,7 +522,8 @@ class RecapStep:
         lines = [f"  · project '{project.name}' at {project.root}"]
         if ctx.answers.get("provider_override"):
             ov = ctx.answers["provider_override"]
-            lines.append(f"  · provider override: {ov['provider']}/{ov['model'] or '<inherit-model>'}")
+            model = ov["model"] or "<inherit-model>"
+            lines.append(f"  · provider override: {ov['provider']}/{model}")
         if ctx.answers.get("wiki_seed_count"):
             lines.append(f"  · seeded {ctx.answers['wiki_seed_count']} file(s) into wiki/sources/")
         d = ctx.answers.get("daemon")
@@ -536,9 +542,7 @@ class RecapStep:
                 pages = 0
         if pages:
             lines.append(f"  · indexed {pages} wiki page(s)")
-        await ctx.app.push_screen_wait(
-            ProgressScreen(title=self.title, lines=lines)
-        )
+        await ctx.app.push_screen_wait(ProgressScreen(title=self.title, lines=lines))
         return WizardOutcome.NEXT
 
 
@@ -585,14 +589,6 @@ def _copy_seed_files(project: Project, candidates: list[Path]) -> int:
         except OSError:
             continue
     return count
-
-
-# Thin aliases — historic name kept for in-file call sites; the real
-# loader/saver lives in `core.project_config` (M-R1.2).
-from veles.core.project_config import (
-    load_project_config as _load_project_toml,
-    save_project_config as _save_project_toml,
-)
 
 
 def project_wizard_steps(cwd: Path) -> list:

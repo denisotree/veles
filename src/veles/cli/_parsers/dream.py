@@ -30,19 +30,27 @@ def register(sub: argparse._SubParsersAction) -> None:
         help="Execute all steps but skip the final wiki/state writes.",
     )
     dream.add_argument(
-        "--skip-insights", dest="skip_insights", action="store_true",
+        "--skip-insights",
+        dest="skip_insights",
+        action="store_true",
         help="Skip extracting insights from recent sessions.",
     )
     dream.add_argument(
-        "--skip-dedup", dest="skip_dedup", action="store_true",
+        "--skip-dedup",
+        dest="skip_dedup",
+        action="store_true",
         help="Skip the skill-deduplication step.",
     )
     dream.add_argument(
-        "--skip-promote", dest="skip_promote", action="store_true",
+        "--skip-promote",
+        dest="skip_promote",
+        action="store_true",
         help="Skip generating skill-promotion suggestions.",
     )
     dream.add_argument(
-        "--skip-lint", dest="skip_lint", action="store_true",
+        "--skip-lint",
+        dest="skip_lint",
+        action="store_true",
         help="Skip linting the wiki for orphan / stale / duplicate pages.",
     )
     dream.add_argument(
@@ -55,5 +63,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         "--consolidation-model",
         dest="consolidation_model",
         default=None,
-        help="Override the cheap-model used for consolidation (default: anthropic/claude-haiku-4.5).",
+        help=(
+            "Override the cheap-model used for consolidation (default: anthropic/claude-haiku-4.5)."
+        ),
     )

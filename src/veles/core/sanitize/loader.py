@@ -89,9 +89,7 @@ def _build_rule_from_dict(raw: Any, source: str) -> Rule | None:
         return LiteralRule(name=name, pattern=pattern, replacement=replacement)
     if rule_type == "regex":
         return RegexRule.build(name, pattern, replacement)
-    logger.warning(
-        "sanitize: %s — unknown `type` %r (expected literal|regex)", source, rule_type
-    )
+    logger.warning("sanitize: %s — unknown `type` %r (expected literal|regex)", source, rule_type)
     return None
 
 

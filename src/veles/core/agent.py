@@ -15,8 +15,6 @@ import logging
 import sys
 import time
 import uuid
-
-logger = logging.getLogger(__name__)
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -42,6 +40,13 @@ from veles.core.events import (
 from veles.core.events import (
     UserMessage as UserMessageEvent,
 )
+from veles.core.fenced_tools import (
+    FENCED_RESULT_HEADER,
+    FENCED_SENTINEL,
+    fenced_tools_enabled_by_env,
+    parse_tool_calls,
+    render_tools_prompt,
+)
 from veles.core.memory import SessionStore
 from veles.core.modules import fire_hook
 from veles.core.provider import (
@@ -50,16 +55,11 @@ from veles.core.provider import (
     ProviderResponse,
     ToolCall,
 )
-from veles.core.fenced_tools import (
-    FENCED_RESULT_HEADER,
-    FENCED_SENTINEL,
-    fenced_tools_enabled_by_env,
-    parse_tool_calls,
-    render_tools_prompt,
-)
 from veles.core.stall_guard import STALL_NUDGE, StallGuard
+
 # M156: streaming response consumer extracted to `stream_consumer.py`.
 from veles.core.stream_consumer import consume_stream
+
 # M156: tool dispatch + permission/approval pipeline extracted to
 # `tool_dispatch.py`. Re-imported here both for the Agent loop's own use
 # (`_dispatch`, `_emit`) and as back-compat re-exports — tests import these
@@ -83,6 +83,8 @@ from veles.core.trace import (
     now_iso,
     trace_path_for_project,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -461,9 +463,7 @@ class Agent:
         user_message = Message(role="user", content=user_msg)
         history.append(user_message)
         self._persist(user_message)
-        self._emit_event(
-            UserMessageEvent(ts=now_iso(), session_id=self._session_id, text=user_msg)
-        )
+        self._emit_event(UserMessageEvent(ts=now_iso(), session_id=self._session_id, text=user_msg))
         return history
 
     def _request_completion(
@@ -522,9 +522,7 @@ class Agent:
             )
         )
 
-    def _dispatch_tool_calls(
-        self, response: ProviderResponse, history: list[Message]
-    ) -> None:
+    def _dispatch_tool_calls(self, response: ProviderResponse, history: list[Message]) -> None:
         """Dispatch every tool the model asked for, appending tool-role messages."""
         project = current_project()
         artifact_dir = project.state_dir if project is not None else None
@@ -566,9 +564,7 @@ class Agent:
             )
         )
 
-    def _dispatch_fenced_calls(
-        self, calls: list[ToolCall], history: list[Message]
-    ) -> None:
+    def _dispatch_fenced_calls(self, calls: list[ToolCall], history: list[Message]) -> None:
         """M143: execute fenced tool calls and feed every result back as ONE
         user-role message. Reuses `_dispatch` (permission / veto / event
         machinery) but discards its `role=tool` Message — that shape would
@@ -714,7 +710,7 @@ class Agent:
         )
         try:
             self._trace_writer.write(record)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # Tracing must never break a run. Log to stderr if verbose.
             self._log(f"   trace write failed: {exc}")
 

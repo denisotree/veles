@@ -21,16 +21,12 @@ def test_user_home_default(monkeypatch: pytest.MonkeyPatch) -> None:
     assert user_home() == Path.home() / ".veles"
 
 
-def test_user_home_env_override(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_user_home_env_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(USER_HOME_ENV, str(tmp_path))
     assert user_home() == tmp_path / ".veles"
 
 
-def test_subdir_helpers_compose(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_subdir_helpers_compose(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(USER_HOME_ENV, str(tmp_path))
     assert user_logs_dir() == tmp_path / ".veles" / "logs"
     assert user_themes_dir() == tmp_path / ".veles" / "themes"
@@ -38,9 +34,7 @@ def test_subdir_helpers_compose(
     assert user_skills_dir() == tmp_path / ".veles" / "skills"
 
 
-def test_helpers_do_not_create_dirs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_helpers_do_not_create_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The helpers are pure path math — callers control creation."""
     monkeypatch.setenv(USER_HOME_ENV, str(tmp_path))
     user_home()

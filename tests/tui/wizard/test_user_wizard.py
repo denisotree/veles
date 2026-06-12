@@ -11,25 +11,14 @@ from pathlib import Path
 
 import pytest
 
-from veles.core import secrets
-from veles.tui.wizard.app import WizardApp
-from veles.tui.wizard.user_steps import (
-    ApiKeyStep,
-    InitProjectStep,
-    LanguageStep,
-    ProviderStep,
-    ThemeStep,
-)
-
-
 # M-R1.8: FakeKeyring centralised in tests/conftest.py.
 from tests.conftest import FakeKeyring as _FakeKeyring
+from veles.core import secrets
+from veles.tui.wizard.app import WizardApp
 
 
 @pytest.fixture(autouse=True)
-def _isolate(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> _FakeKeyring:
+def _isolate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeKeyring:
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "veles"))
     for env in ("OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
         monkeypatch.delenv(env, raising=False)
@@ -82,7 +71,12 @@ async def test_local_provider_skips_api_key_step():
     keys = [
         "enter",  # language: en (default)
         # provider: go down to "ollama" from "openrouter" (positions 0..6)
-        "down", "down", "down", "down", "down", "down",
+        "down",
+        "down",
+        "down",
+        "down",
+        "down",
+        "down",
         "enter",  # confirm ollama
         # api key step auto-skips (local provider)
         # model picker: pick default (first model from fake fetch)
@@ -105,10 +99,17 @@ async def test_api_key_input_saves_to_keychain():
     keys = [
         "enter",  # language en
         # provider: down*2 → openai
-        "down", "down",
+        "down",
+        "down",
         "enter",  # confirm openai
         # api-key InputScreen — type sk + Enter
-        "s", "k", "-", "t", "e", "s", "t",
+        "s",
+        "k",
+        "-",
+        "t",
+        "e",
+        "s",
+        "t",
         "enter",
         # model picker: pick default (first fake model)
         "enter",

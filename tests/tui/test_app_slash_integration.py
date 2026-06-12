@@ -87,9 +87,7 @@ async def test_clear_drops_transcript_and_resets_session(
         assert pilot.app.state.last_assistant_text is None
 
 
-async def test_model_set_updates_status_bar(
-    tmp_project, agent_factory_for, text_response
-):
+async def test_model_set_updates_status_bar(tmp_project, agent_factory_for, text_response):
     app = _new_app(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:
         composer = pilot.app.query_one(Composer)
@@ -106,9 +104,7 @@ async def test_model_set_updates_status_bar(
         assert "stub/gpt-4o" in status.last_text
 
 
-async def test_save_uses_last_assistant_text(
-    tmp_project, agent_factory_for, text_response
-):
+async def test_save_uses_last_assistant_text(tmp_project, agent_factory_for, text_response):
     """`on_turn_done` mirrors the chat-log tail into
     `state.last_assistant_text`; `/save` then writes that to the wiki."""
     app = _new_app(tmp_project, agent_factory_for, text_response, reply="Hello\n\nWorld.")

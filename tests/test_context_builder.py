@@ -8,9 +8,8 @@ from veles.core.context_builder import (
     assemble_system_prompt,
     stable_text,
 )
-from veles.core.trace import hash_text, hash_tools
 from veles.core.tools.registry import Registry, ToolEntry
-
+from veles.core.trace import hash_text, hash_tools
 
 # ---------- assemble_system_prompt ----------
 

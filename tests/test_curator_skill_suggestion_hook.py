@@ -49,9 +49,7 @@ def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 # ---- happy path ----
 
 
-def test_hook_surfaces_repeated_pattern(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_hook_surfaces_repeated_pattern(isolated_home: Path, tmp_path: Path) -> None:
     """A 3x-repeated tool sequence becomes an insight row after the
     hook fires."""
     project = init_project(tmp_path / "proj", name="proj")
@@ -74,9 +72,7 @@ def test_hook_surfaces_repeated_pattern(
     assert "wiki_search" in row["title"]
 
 
-def test_hook_no_patterns_no_writes(
-    isolated_home: Path, tmp_path: Path
-) -> None:
+def test_hook_no_patterns_no_writes(isolated_home: Path, tmp_path: Path) -> None:
     """Empty tool_uses table → no insights written, no error."""
     project = init_project(tmp_path / "proj", name="proj")
     _maybe_surface_skill_suggestions(project)

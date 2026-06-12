@@ -4,7 +4,7 @@ no-telephone-game and manager-never-writes invariants enforced."""
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 
@@ -18,7 +18,6 @@ from veles.core.orchestration import (
     decompose_and_run,
     needs_decomposition,
 )
-
 
 # ---- stub Agent ----
 
@@ -44,7 +43,7 @@ class _RoleAgent:
     """Returns a role-specific canned reply tagged with the prompt
     head so tests can verify which prompt landed in which agent."""
 
-    _counter = [0]
+    _counter: ClassVar[list[int]] = [0]
 
     def __init__(self, *, system_prompt: str | None = None) -> None:
         self.system_prompt = system_prompt or ""
@@ -53,8 +52,10 @@ class _RoleAgent:
 
     def run(self, prompt: str) -> _FakeResult:
         # Tag reply with role + first 30 chars of prompt for assertion
-        role = "writer" if "writer worker" in self.system_prompt else (
-            "explorer" if "explorer worker" in self.system_prompt else "other"
+        role = (
+            "writer"
+            if "writer worker" in self.system_prompt
+            else ("explorer" if "explorer worker" in self.system_prompt else "other")
         )
         return _FakeResult(
             text=f"[{role}] sees: {prompt[:50]}",
@@ -107,9 +108,7 @@ def test_session_digest_loader_renders_transcript() -> None:
         ),
         SimpleNamespace(role="assistant", content="found it in a.py", tool_calls=[]),
     ]
-    store = SimpleNamespace(
-        session_exists=lambda sid: True, load_messages=lambda sid: msgs
-    )
+    store = SimpleNamespace(session_exists=lambda sid: True, load_messages=lambda sid: msgs)
     digest = make_session_digest_loader(store)("s1")
     assert "[user] find X" in digest
     assert "(tool calls: read_file)" in digest
@@ -148,9 +147,7 @@ def test_decompose_passes_session_transcript_to_writer() -> None:
 def test_decompose_without_loader_still_pastes_result() -> None:
     """No loader → backward-compatible: writer prompt has the pasted output,
     no transcript section."""
-    result = decompose_and_run(
-        "research the thing thoroughly", agent_factory=_role_factory()
-    )
+    result = decompose_and_run("research the thing thoroughly", agent_factory=_role_factory())
     writer_handle = result.handles[-1]
     assert "Session transcript" not in writer_handle.prompt
     assert "Output from explorer" in writer_handle.prompt
@@ -338,9 +335,7 @@ def test_plan_without_writer_via_custom_builder_rejected() -> None:
         return plan
 
     factory = _role_factory()
-    result = decompose_and_run(
-        "task", agent_factory=factory, plan_builder=bad_builder
-    )
+    result = decompose_and_run("task", agent_factory=factory, plan_builder=bad_builder)
     assert result.final_text is None
     assert result.error is not None
     assert "writer" in result.error.lower()

@@ -16,4 +16,4 @@ from veles.adapters.local.llamacpp import LlamaCppProvider
 from veles.adapters.local.ollama import OllamaProvider
 from veles.adapters.local.openai_compatible import OpenAICompatibleProvider
 
-__all__ = ["OllamaProvider", "LlamaCppProvider", "OpenAICompatibleProvider"]
+__all__ = ["LlamaCppProvider", "OllamaProvider", "OpenAICompatibleProvider"]

@@ -169,9 +169,7 @@ def load_cache(project: Project, *, model: str) -> dict[str, _CacheEntry]:
     return out
 
 
-def save_cache(
-    project: Project, *, model: str, vectors: dict[str, _CacheEntry]
-) -> None:
+def save_cache(project: Project, *, model: str, vectors: dict[str, _CacheEntry]) -> None:
     path = cache_path(project)
     project.state_dir.mkdir(parents=True, exist_ok=True)
     body = {

@@ -17,7 +17,11 @@ from veles.core.agent import Agent
 from veles.core.events import EventWriter, filter_events, read_events
 from veles.core.permission.prompt import (
     PromptAnswer,
+)
+from veles.core.permission.prompt import (
     reset_prompter as reset_unified_prompter,
+)
+from veles.core.permission.prompt import (
     set_prompter as set_unified_prompter,
 )
 from veles.core.provider import ProviderResponse, TokenUsage, ToolCall
@@ -71,13 +75,9 @@ def test_emits_user_and_assistant_events(tmp_path: Path) -> None:
 
 
 def test_emits_tool_call_and_tool_result(tmp_path: Path) -> None:
-    provider = _StubProvider(
-        responses=[_tool("echo", {"text": "x"}), _final("done")]
-    )
+    provider = _StubProvider(responses=[_tool("echo", {"text": "x"}), _final("done")])
     writer = EventWriter(tmp_path / "events.jsonl")
-    agent = Agent(
-        provider, _registry_with_echo(), model="m", event_writer=writer
-    )
+    agent = Agent(provider, _registry_with_echo(), model="m", event_writer=writer)
     agent.run("hi")
     events = read_events(tmp_path / "events.jsonl")
     types = [e["type"] for e in events]
@@ -98,9 +98,7 @@ def test_emits_permission_decision_for_sensitive_tool(tmp_path: Path) -> None:
     token = begin_trust_turn()
     pt = set_unified_prompter(lambda _req: PromptAnswer("allow_once"))
     try:
-        provider = _StubProvider(
-            responses=[_tool("echo", {"text": "x"}), _final("ok")]
-        )
+        provider = _StubProvider(responses=[_tool("echo", {"text": "x"}), _final("ok")])
         writer = EventWriter(tmp_path / "events.jsonl")
         agent = Agent(
             provider,
@@ -124,9 +122,7 @@ def test_emits_permission_decision_deny_on_refusal(tmp_path: Path) -> None:
     token = begin_trust_turn()
     pt = set_unified_prompter(lambda _req: PromptAnswer("deny"))
     try:
-        provider = _StubProvider(
-            responses=[_tool("echo", {"text": "x"}), _final("ok")]
-        )
+        provider = _StubProvider(responses=[_tool("echo", {"text": "x"}), _final("ok")])
         writer = EventWriter(tmp_path / "events.jsonl")
         agent = Agent(
             provider,
@@ -159,7 +155,7 @@ def test_no_events_when_no_writer_and_no_project(tmp_path: Path) -> None:
 
 def test_event_writer_failure_does_not_break_run(tmp_path: Path) -> None:
     class _BadEventWriter:
-        def write(self, event):  # noqa: ANN001
+        def write(self, event):
             raise OSError("disk full")
 
     provider = _StubProvider(responses=[_final("hi")])

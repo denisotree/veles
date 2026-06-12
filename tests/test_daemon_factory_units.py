@@ -7,9 +7,9 @@ import argparse
 from pathlib import Path
 
 from veles.cli.commands.daemon import (
-    _FactorySettings,
     _build_agent_for_turn,
     _factory_settings_from_args,
+    _FactorySettings,
     _make_agent_factory,
 )
 from veles.core.context import reset_active_project, set_active_project
@@ -56,9 +56,7 @@ def test_factory_settings_compressor_model_defers_to_route(tmp_path: Path) -> No
     from veles.core.project_config import save_project_config
 
     project = init_project(tmp_path, name=None, force=False)
-    save_project_config(
-        project, {"provider": {"default": "ollama", "model": "qwen3:4b-instruct"}}
-    )
+    save_project_config(project, {"provider": {"default": "ollama", "model": "qwen3:4b-instruct"}})
     # The daemon-start parser sets model/provider=None and omits
     # --compressor-model entirely.
     args = argparse.Namespace(model=None, provider=None)
@@ -127,9 +125,7 @@ def test_factory_settings_inherits_user_level_model(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     project = init_project(tmp_path, name=None, force=False)  # no [provider]
-    s = _factory_settings_from_args(
-        argparse.Namespace(model=None, provider=None), project
-    )
+    s = _factory_settings_from_args(argparse.Namespace(model=None, provider=None), project)
     assert s.provider_name == "ollama"
     assert s.model == "qwen3:4b-instruct"
 
@@ -150,9 +146,7 @@ def test_factory_settings_project_provider_beats_user_level(tmp_path: Path) -> N
     (project.state_dir / "config.toml").write_text(
         '[provider]\ndefault = "openai"\nmodel = "gpt-4o"\n', encoding="utf-8"
     )
-    s = _factory_settings_from_args(
-        argparse.Namespace(model=None, provider=None), project
-    )
+    s = _factory_settings_from_args(argparse.Namespace(model=None, provider=None), project)
     assert s.provider_name == "openai"
     assert s.model == "gpt-4o"
 
@@ -191,9 +185,7 @@ def test_settings_dataclass_is_frozen() -> None:
         s.model = "other"  # type: ignore[misc]
 
 
-def test_build_agent_for_turn_uses_settings_model(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_build_agent_for_turn_uses_settings_model(tmp_path: Path, monkeypatch) -> None:
     """End-to-end smoke: `_build_agent_for_turn` constructs an Agent
     with `settings.model` and the active session id."""
     project = init_project(tmp_path, name=None, force=False)
@@ -254,9 +246,7 @@ def test_build_agent_for_turn_uses_settings_model(
         reset_active_project(token)
 
 
-def test_build_agent_for_turn_reallocates_stale_session_id(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_build_agent_for_turn_reallocates_stale_session_id(tmp_path: Path, monkeypatch) -> None:
     """Channel session maps can hold an id whose row no longer exists
     in the daemon's memory.db (db reset, migration, multi-daemon
     setup). The factory must detect that and allocate a fresh session
@@ -288,9 +278,7 @@ def test_build_agent_for_turn_reallocates_stale_session_id(
         monkeypatch.setattr(
             cli_mod, "build_run_system_prompt", lambda p, *, prompt="", **_kw: "STUB"
         )
-        monkeypatch.setattr(
-            cli_mod, "build_compressor", lambda p, prov, **_kw: None
-        )
+        monkeypatch.setattr(cli_mod, "build_compressor", lambda p, prov, **_kw: None)
         monkeypatch.setattr(agent_mod, "Agent", _StubAgent)
 
         settings = _FactorySettings(

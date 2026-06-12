@@ -20,7 +20,6 @@ from veles.core.tool_result import (
     truncate_with_artifact,
 )
 
-
 # ---------- ToolResult dataclass ----------
 
 

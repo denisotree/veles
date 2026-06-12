@@ -25,7 +25,7 @@ from veles.daemon.state import DaemonState
 
 
 def _noop_factory() -> AgentFactory:
-    def factory(session_id: str | None, *, prompt: str | None = None):  # noqa: ARG001
+    def factory(session_id: str | None, *, prompt: str | None = None):
         raise RuntimeError("not invoked here")
 
     return factory
@@ -43,9 +43,7 @@ def token_store(tmp_path: Path) -> TokenStore:
     return ts
 
 
-def test_build_state_starts_with_empty_overrides(
-    project: Project, token_store: TokenStore
-) -> None:
+def test_build_state_starts_with_empty_overrides(project: Project, token_store: TokenStore) -> None:
     store = SessionStore(project.memory_db_path)
     state = build_state(
         project=project,
@@ -70,9 +68,7 @@ def test_store_has_no_model_override_api(project: Project) -> None:
         assert not hasattr(store, gone), f"{gone} should be removed in M127"
 
 
-def test_set_overrides_does_not_touch_store(
-    project: Project, token_store: TokenStore
-) -> None:
+def test_set_overrides_does_not_touch_store(project: Project, token_store: TokenStore) -> None:
     store = SessionStore(project.memory_db_path)
     state = DaemonState(
         project=project,

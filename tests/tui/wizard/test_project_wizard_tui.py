@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+# M-R1.8: FakeKeyring centralised in tests/conftest.py.
+from tests.conftest import FakeKeyring as _FakeKeyring
 from veles.core import secrets
 from veles.tui.wizard.app import WizardApp
 from veles.tui.wizard.project_steps import (
@@ -19,14 +21,8 @@ from veles.tui.wizard.project_steps import (
 )
 
 
-# M-R1.8: FakeKeyring centralised in tests/conftest.py.
-from tests.conftest import FakeKeyring as _FakeKeyring
-
-
 @pytest.fixture(autouse=True)
-def _isolate(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> _FakeKeyring:
+def _isolate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeKeyring:
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "veles"))
     for env in ("OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
         monkeypatch.delenv(env, raising=False)
@@ -90,9 +86,11 @@ async def test_daemon_no_skips_telegram(tmp_cwd: Path) -> None:
     """Telegram step lives INSIDE DaemonModeStep — declining daemon means
     no Telegram questions appear at all."""
     steps = [BootstrapStep(cwd=tmp_cwd), DaemonModeStep(), RecapStep()]
-    keys = ["y",  # bootstrap
-            "n",  # daemon? no
-            "enter"]  # recap close
+    keys = [
+        "y",  # bootstrap
+        "n",  # daemon? no
+        "enter",
+    ]  # recap close
     answers = await _drive(steps, keys)
     assert answers["daemon"] is None
     assert answers.get("telegram") is None
@@ -106,10 +104,18 @@ async def test_daemon_yes_with_telegram(tmp_cwd: Path) -> None:
         "enter",  # host default 127.0.0.1
         "enter",  # port default 8765
         "y",  # telegram? yes
-        "t", "o", "k", "e", "n", "enter",  # bot token
+        "t",
+        "o",
+        "k",
+        "e",
+        "n",
+        "enter",  # bot token
         # MultiSelect: items list is empty, so after M106 the freeform
         # Input is focused automatically — no Tab needed.
-        "@", "f", "o", "o",
+        "@",
+        "f",
+        "o",
+        "o",
         "ctrl+s",
         "enter",  # recap close
     ]

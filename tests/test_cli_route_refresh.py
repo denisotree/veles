@@ -138,9 +138,7 @@ def test_show_marks_nl_source(project, capsys, monkeypatch) -> None:
     """`veles route show` should label entries from routing.nl.toml as `nl`."""
     from veles.core.routing import RoutingConfig, save_nl_routing_config
 
-    save_nl_routing_config(
-        project, RoutingConfig(tasks={"compressor": "openai:gpt-4o-mini"})
-    )
+    save_nl_routing_config(project, RoutingConfig(tasks={"compressor": "openai:gpt-4o-mini"}))
     rc = route_cmd.cmd_route(_ns(route_command="show"), project)
     assert rc == 0
     out = capsys.readouterr().out
@@ -152,9 +150,7 @@ def test_show_marks_nl_source(project, capsys, monkeypatch) -> None:
 def test_show_manual_wins_over_nl_label(project, capsys) -> None:
     from veles.core.routing import RoutingConfig, save_nl_routing_config
 
-    save_nl_routing_config(
-        project, RoutingConfig(tasks={"compressor": "openai:gpt-4o-mini-NL"})
-    )
+    save_nl_routing_config(project, RoutingConfig(tasks={"compressor": "openai:gpt-4o-mini-NL"}))
     set_project_route(project, "compressor", "openai:gpt-4o-mini-MANUAL")
     route_cmd.cmd_route(_ns(route_command="show"), project)
     out = capsys.readouterr().out

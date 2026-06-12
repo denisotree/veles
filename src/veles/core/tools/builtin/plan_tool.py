@@ -46,7 +46,8 @@ def create_plan(
     you provide, the more useful the artifact is for later execution.
     """
     from veles.core.context import current_project
-    from veles.core.plan_artifact import active_dir, create_plan as _create_plan
+    from veles.core.plan_artifact import active_dir
+    from veles.core.plan_artifact import create_plan as _create_plan
 
     project = current_project()
     if project is None:

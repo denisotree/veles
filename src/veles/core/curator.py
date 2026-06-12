@@ -71,9 +71,7 @@ def _render_message(m: Message) -> str:
     return " ".join(parts)
 
 
-def _truncate_session_messages(
-    messages: list[Message], max_turns: int, max_chars: int
-) -> str:
+def _truncate_session_messages(messages: list[Message], max_turns: int, max_chars: int) -> str:
     """Render messages as plain text with first/last truncation if too large."""
     rendered = [_render_message(m) for m in messages]
     head_keep = 4

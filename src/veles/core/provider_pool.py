@@ -51,9 +51,7 @@ def is_transient(exc: BaseException) -> bool:
         return True
     # HTTPX/openai/anthropic: status_code attribute exists on response errors.
     status = getattr(exc, "status_code", None)
-    if isinstance(status, int) and status >= 500:
-        return True
-    return False
+    return bool(isinstance(status, int) and status >= 500)
 
 
 class FailoverProvider:
@@ -167,7 +165,7 @@ class FailoverProvider:
                 )
                 self._mark_success(idx)
                 return resp
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 if not is_transient(exc):
                     raise
                 last = exc
@@ -202,7 +200,7 @@ class FailoverProvider:
                 )
                 self._mark_success(idx)
                 return
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 if not is_transient(exc):
                     raise
                 last = exc

@@ -61,9 +61,7 @@ def register(sub: argparse._SubParsersAction) -> None:
 
     job_history = job_sub.add_parser("history", help="Show recent runs of a job.")
     job_history.add_argument("id", help="Job id.")
-    job_history.add_argument(
-        "--limit", type=int, default=20, help="Max runs to show (default 20)."
-    )
+    job_history.add_argument("--limit", type=int, default=20, help="Max runs to show (default 20).")
 
     job_tick = job_sub.add_parser(
         "tick",

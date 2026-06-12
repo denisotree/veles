@@ -75,9 +75,7 @@ def upsert_tool(
     is UNIQUE, so this is a natural-key upsert.
     """
     wall = time.time() if now is None else now
-    base_id = (
-        _id_for_name(conn, base_tool_name) if base_tool_name else None
-    )
+    base_id = _id_for_name(conn, base_tool_name) if base_tool_name else None
     manifest = json.dumps(
         {
             "side_effects": entry.side_effects,
@@ -89,9 +87,7 @@ def upsert_tool(
         },
         sort_keys=True,
     )
-    existing = conn.execute(
-        "SELECT id FROM tools WHERE name = ?", (entry.name,)
-    ).fetchone()
+    existing = conn.execute("SELECT id FROM tools WHERE name = ?", (entry.name,)).fetchone()
     if existing is None:
         cur = conn.execute(
             "INSERT INTO tools("
@@ -218,9 +214,7 @@ def telemetry(conn: sqlite3.Connection, name: str) -> ToolTelemetry:
     )
 
 
-def telemetry_batch(
-    conn: sqlite3.Connection, names: list[str]
-) -> dict[str, ToolTelemetry]:
+def telemetry_batch(conn: sqlite3.Connection, names: list[str]) -> dict[str, ToolTelemetry]:
     """Bulk variant. One SQL round-trip per call instead of len(names)."""
     if not names:
         return {}

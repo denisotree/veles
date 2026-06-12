@@ -55,9 +55,7 @@ class CancelToken:
             raise TurnCancelled
 
 
-_cancel_token: ContextVar[CancelToken | None] = ContextVar(
-    "veles_cancel_token", default=None
-)
+_cancel_token: ContextVar[CancelToken | None] = ContextVar("veles_cancel_token", default=None)
 
 
 def current_cancel_token() -> CancelToken | None:

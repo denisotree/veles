@@ -26,6 +26,7 @@ event safely.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import secrets
 import time
 from collections.abc import Callable
@@ -97,8 +98,8 @@ async def run_agent_in_background(
     *,
     agent: Agent,
     prompt: str,
-    on_finished: "Callable[[RunHandle], None] | None" = None,
-    post_turn_hook: "Callable[[RunResult], None] | None" = None,
+    on_finished: Callable[[RunHandle], None] | None = None,
+    post_turn_hook: Callable[[RunResult], None] | None = None,
 ) -> None:
     """Drive `agent.run(prompt)` to completion, mirroring events into `handle`.
 
@@ -194,10 +195,8 @@ async def run_agent_in_background(
         if post_turn_hook is not None:
             # Run the learning loop off the event loop — it may hit the LLM
             # (insight extractor) and shouldn't block aiohttp request handlers.
-            try:
+            with contextlib.suppress(Exception):
                 await asyncio.to_thread(post_turn_hook, result)
-            except Exception:  # noqa: BLE001 — hook owns its own error reporting
-                pass
     finally:
         end_trust_turn(turn_token)
         reset_unified_prompter(unified_token)
@@ -218,9 +217,9 @@ def new_run_handle(*, session_id: str | None = None) -> RunHandle:
 async def run_manager_in_background(
     handle: RunHandle,
     *,
-    worker_agent_factory: "Callable[..., Agent]",
+    worker_agent_factory: Callable[..., Agent],
     prompt: str,
-    on_finished: "Callable[[RunHandle], None] | None" = None,
+    on_finished: Callable[[RunHandle], None] | None = None,
 ) -> None:
     """M124: drive `decompose_and_run(prompt)` to completion, mirroring
     plan/step events into `handle`.

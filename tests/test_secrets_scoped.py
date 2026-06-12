@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import pytest
 
-from veles.core import secrets
-
-
 # M-R1.8: FakeKeyring + fake_keyring fixture live in tests/conftest.py.
 from tests.conftest import FakeKeyring as _FakeKeyring
+from veles.core import secrets
 
 
 @pytest.fixture
@@ -51,17 +48,13 @@ def test_env_fallback_when_no_keychain(
     assert secrets.get_provider_key("openrouter") == "env-key"
 
 
-def test_keychain_wins_over_env(
-    fake_kr: _FakeKeyring, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_keychain_wins_over_env(fake_kr: _FakeKeyring, monkeypatch: pytest.MonkeyPatch) -> None:
     secrets.set_provider_key("openrouter", "kc-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "env-key")
     assert secrets.get_provider_key("openrouter") == "kc-key"
 
 
-def test_env_fallback_disabled(
-    fake_kr: _FakeKeyring, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_env_fallback_disabled(fake_kr: _FakeKeyring, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "env-key")
     assert secrets.get_provider_key("openrouter", env_fallback=False) is None
 

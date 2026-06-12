@@ -7,9 +7,8 @@ keeps the side-effects identical regardless of why a call did or didn't run.
 
 from __future__ import annotations
 
+import contextlib
 import logging
-
-logger = logging.getLogger(__name__)
 from collections.abc import Callable
 
 from veles.core.agent_state import record_invocation
@@ -33,6 +32,8 @@ from veles.core.permission import evaluate as evaluate_permission
 from veles.core.provider import Message, ToolCall
 from veles.core.tools.registry import Registry
 from veles.core.trace import now_iso
+
+logger = logging.getLogger(__name__)
 
 
 def _emit_tool_refusal(
@@ -131,9 +132,7 @@ def _run_approval_prompt(
         kind="allow" if answer.approved else "deny",
         rule="approval_prompt",
         reason=(
-            "user approved interactively"
-            if answer.approved
-            else f"user denied: {answer.reason}"
+            "user approved interactively" if answer.approved else f"user denied: {answer.reason}"
         ),
     )
 
@@ -208,9 +207,7 @@ def _dispatch(
     try:
         from veles.daemon.logging import truncate_for_log
 
-        logger.info(
-            "tool.call name=%s args=%s", call.name, truncate_for_log(call.arguments)
-        )
+        logger.info("tool.call name=%s args=%s", call.name, truncate_for_log(call.arguments))
     except Exception:
         pass
     _emit(
@@ -281,9 +278,7 @@ def _dispatch(
             ),
             event_listener,
         )
-        _persist_approval_if_grant(
-            decision, call, approval_dir=approval_dir, session_id=session_id
-        )
+        _persist_approval_if_grant(decision, call, approval_dir=approval_dir, session_id=session_id)
         if not decision.allowed:
             log(f"   refused by {decision.rule}: {decision.reason}")
             return _emit_tool_refusal(
@@ -349,15 +344,11 @@ def _emit(
     catch a missing event log via assertion rather than propagation.
     """
     if writer is not None:
-        try:
+        with contextlib.suppress(Exception):
             writer.write(event)
-        except Exception:  # noqa: BLE001
-            pass
     if listener is not None:
-        try:
+        with contextlib.suppress(Exception):
             listener(event)
-        except Exception:  # noqa: BLE001
-            pass
 
 
 def _audit_autopilot_dispatch(tool_name: str, error: str | None) -> None:

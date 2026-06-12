@@ -24,10 +24,14 @@ from veles.core.events import (
     AssistantMessage,
     Event,
     EventWriter,
-    ToolCall as ToolCallEvent,
-    ToolResult as ToolResultEvent,
     UserMessage,
     read_events,
+)
+from veles.core.events import (
+    ToolCall as ToolCallEvent,
+)
+from veles.core.events import (
+    ToolResult as ToolResultEvent,
 )
 from veles.core.provider import ProviderResponse, TokenUsage, ToolCall
 from veles.core.tools.registry import Registry, ToolEntry

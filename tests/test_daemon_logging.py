@@ -19,9 +19,7 @@ from veles.daemon.paths import daemon_log_path
 
 
 @pytest.fixture(autouse=True)
-def _isolate_home(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> Iterator[Path]:
+def _isolate_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "veles"))
     yield tmp_path
     # Each test rewires loggers; tear down so we don't leak between tests.
@@ -62,9 +60,7 @@ def test_setup_is_idempotent_no_duplicate_handlers(tmp_path: Path) -> None:
     _setup_daemon_logging("alpha")
     _setup_daemon_logging("alpha")
     log = logging.getLogger("veles.daemon")
-    tagged = [
-        h for h in log.handlers if (h.get_name() or "").startswith("veles-daemon-alpha")
-    ]
+    tagged = [h for h in log.handlers if (h.get_name() or "").startswith("veles-daemon-alpha")]
     assert len(tagged) == 1
 
 
@@ -89,9 +85,7 @@ def test_level_from_argument_enables_debug(tmp_path: Path) -> None:
     assert "debug-line-1" in log_path.read_text(encoding="utf-8")
 
 
-def test_env_log_level_overrides_config(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_env_log_level_overrides_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A one-off `VELES_LOG_LEVEL=DEBUG veles daemon start` beats whatever
     is sitting in project.toml."""
     monkeypatch.setenv("VELES_LOG_LEVEL", "DEBUG")
