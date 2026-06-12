@@ -370,6 +370,35 @@ async def test_seed_errors_from_events_log_on_mount(tmp_project, agent_factory_f
         assert any("timeout:" in row for row in insp.activity_log)
 
 
+async def test_seed_skips_stale_errors_from_events_log(
+    tmp_project, agent_factory_for, text_response
+):
+    """M132 follow-up: a days-old error must NOT be resurrected onto a
+    fresh session — only recent failures survive a restart."""
+    from veles.core.events import ErrorEvent as _ErrorEvent
+    from veles.core.events import (
+        EventWriter,
+        events_path_for_project,
+    )
+
+    project, _store = tmp_project
+    writer = EventWriter(events_path_for_project(project.state_dir))
+    writer.write(
+        _ErrorEvent(
+            ts="2020-01-01T00:00:00Z",  # ancient, far outside the window
+            session_id=None,
+            where="agent.run",
+            error_type="ProviderError",
+            message="stale 404 from an already-fixed bug",
+        )
+    )
+
+    app = _new_app(tmp_project, agent_factory_for, text_response)
+    async with app.run_test() as pilot:
+        insp = pilot.app.query_one(Inspector)
+        assert "error" not in insp.header_text
+
+
 # ---------------- M133: reasoning display ----------------
 
 

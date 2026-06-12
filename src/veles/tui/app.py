@@ -45,6 +45,11 @@ from veles.tui.widgets.inspector import Inspector
 from veles.tui.widgets.queue_panel import QueuePanel
 from veles.tui.widgets.status_bar import StatusBar
 
+# How far back the inspector resurrects persisted errors on boot. A recent
+# failure should survive a restart (M132); a days-old, already-fixed one
+# should not haunt a fresh session (M132 follow-up).
+_SEED_ERROR_MAX_AGE_SECONDS = 24 * 60 * 60
+
 
 class TuiApp(App[int]):
     CSS = """
@@ -174,21 +179,25 @@ class TuiApp(App[int]):
             self.run_worker(self._reindex_wiki_if_stale, exclusive=True, group="wiki-reindex")
 
     def _seed_inspector_errors(self, *, limit: int = 5) -> None:
-        """Load the most recent ErrorEvents from the project's events.jsonl
-        and hand them to the inspector so failures survive a TUI restart.
-        Best-effort: a missing/corrupt log is silently skipped (M132)."""
+        """Load recent ErrorEvents from the project's events.jsonl and hand
+        them to the inspector so a failure survives a TUI restart. Errors
+        older than `_SEED_ERROR_MAX_AGE_SECONDS` are skipped so a days-old,
+        already-fixed failure doesn't show up on a fresh session (M132 +
+        follow-up). Best-effort: a missing/corrupt log is silently skipped."""
         if self._project is None or self._inspector is None:
             return
         try:
             from veles.core.events import (
                 ErrorEvent,
                 events_path_for_project,
-                filter_events,
                 read_events,
+                recent_error_events,
             )
 
             events = read_events(events_path_for_project(self._project.state_dir))
-            recent = filter_events(events, type_="error")[-limit:]
+            recent = recent_error_events(
+                events, within_seconds=_SEED_ERROR_MAX_AGE_SECONDS, limit=limit
+            )
             seeded = [
                 ErrorEvent(
                     ts=e.get("ts", ""),

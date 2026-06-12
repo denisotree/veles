@@ -25,6 +25,7 @@ import json
 import os
 import time
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -264,6 +265,53 @@ def read_events(path: Path) -> list[dict[str, Any]]:
 def filter_events(events: list[dict[str, Any]], *, type_: str) -> list[dict[str, Any]]:
     """Convenience filter for tests + future `veles stats` consumers."""
     return [e for e in events if e.get("type") == type_]
+
+
+def _parse_event_ts(ts: str) -> float | None:
+    """Best-effort parse of an event `ts` to an epoch float.
+
+    Returns None when the value is missing or unrecognisable — callers
+    treat an undatable event as "cannot prove it's stale" and keep it.
+    """
+    if not ts:
+        return None
+    dt: datetime | None = None
+    try:
+        dt = datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+    except (ValueError, TypeError):
+        try:
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.timestamp()
+
+
+def recent_error_events(
+    events: list[dict[str, Any]],
+    *,
+    within_seconds: float,
+    limit: int,
+    now_epoch: float | None = None,
+) -> list[dict[str, Any]]:
+    """Up to `limit` most-recent `type="error"` events no older than
+    `within_seconds`.
+
+    Seeds the TUI inspector so a *recent* failure survives a restart
+    (M132) without resurrecting days-old, already-fixed errors onto a
+    fresh session. Events whose `ts` can't be parsed are kept — we can't
+    prove they're stale. `now_epoch` defaults to wall-clock time.
+    """
+    if now_epoch is None:
+        now_epoch = time.time()
+    cutoff = now_epoch - within_seconds
+    fresh: list[dict[str, Any]] = []
+    for event in filter_events(events, type_="error"):
+        ts_epoch = _parse_event_ts(event.get("ts", ""))
+        if ts_epoch is None or ts_epoch >= cutoff:
+            fresh.append(event)
+    return fresh[-limit:]
 
 
 def now_iso() -> str:

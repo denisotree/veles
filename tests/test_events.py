@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time as _time
 from pathlib import Path
 
 from veles.core.events import (
@@ -23,6 +24,7 @@ from veles.core.events import (
     filter_events,
     now_iso,
     read_events,
+    recent_error_events,
 )
 
 # ---------- type discriminators ----------
@@ -157,3 +159,55 @@ def test_jsonl_round_trip_preserves_all_fields(tmp_path: Path) -> None:
 def test_events_path_for_project(tmp_path: Path) -> None:
     state = tmp_path / ".veles"
     assert events_path_for_project(state) == state / "events.jsonl"
+
+
+# ---------- recent_error_events (M132 follow-up: recency cutoff) ----------
+
+_NOW = 1_700_000_000.0
+_DAY = 86_400.0
+
+
+def _err_at(epoch: float, message: str = "boom") -> dict:
+    return {
+        "type": "error",
+        "ts": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime(epoch)),
+        "session_id": None,
+        "where": "agent.run",
+        "error_type": "ProviderError",
+        "message": message,
+    }
+
+
+def test_recent_error_events_drops_stale() -> None:
+    events = [_err_at(_NOW - 2 * _DAY, "stale"), _err_at(_NOW - 1000, "fresh")]
+    got = recent_error_events(events, within_seconds=_DAY, limit=5, now_epoch=_NOW)
+    assert [e["message"] for e in got] == ["fresh"]
+
+
+def test_recent_error_events_keeps_within_window() -> None:
+    events = [_err_at(_NOW - 100), _err_at(_NOW - 200)]
+    got = recent_error_events(events, within_seconds=_DAY, limit=5, now_epoch=_NOW)
+    assert len(got) == 2
+
+
+def test_recent_error_events_respects_limit_keeping_newest() -> None:
+    events = [_err_at(_NOW - i, f"e{i}") for i in (300, 200, 100)]
+    got = recent_error_events(events, within_seconds=_DAY, limit=2, now_epoch=_NOW)
+    # Last `limit` in log order → the two most recently appended.
+    assert [e["message"] for e in got] == ["e200", "e100"]
+
+
+def test_recent_error_events_keeps_undatable_events() -> None:
+    """A missing/unparseable ts can't be proven stale → keep it."""
+    events = [
+        {"type": "error", "ts": "", "message": "no-ts"},
+        {"type": "error", "message": "absent"},
+    ]
+    got = recent_error_events(events, within_seconds=_DAY, limit=5, now_epoch=_NOW)
+    assert {e["message"] for e in got} == {"no-ts", "absent"}
+
+
+def test_recent_error_events_ignores_non_error_types() -> None:
+    events = [_err_at(_NOW - 100), {"type": "user_message", "ts": _err_at(_NOW)["ts"]}]
+    got = recent_error_events(events, within_seconds=_DAY, limit=5, now_epoch=_NOW)
+    assert len(got) == 1 and got[0]["type"] == "error"
