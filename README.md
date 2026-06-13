@@ -6,6 +6,10 @@
 
 **A minimal CLI agent framework that gets smarter with every session.**
 
+<p align="center">
+  <img src="docs/assets/tui-hero.gif" alt="Veles TUI — ask a question, get an answer grounded in the project's own memory" width="800">
+</p>
+
 Unlike chat tools that start fresh every time, Veles maintains **structured project memory** — insights, rules, and curated knowledge that accumulate across sessions and make the agent more useful the longer you use it. How your *content* is organised is pluggable: a Karpathy-style LLM wiki by default, flat notes, or no structure at all for code repos. Built clean: no god-files, no vendor lock-in, no cloud sync.
 
 ```bash
@@ -196,6 +200,12 @@ veles module list
 veles tui                    # new session
 veles tui --resume <id>      # continue a session
 ```
+
+<p align="center">
+  <img src="docs/assets/tui-tour.gif" alt="Veles TUI — slash inspectors (/status, /context), mode switching, and the command palette" width="800">
+</p>
+
+Slash commands surface everything live — `/status`, `/tokens`, `/context`, `/mode`, `/help` — and `Shift+Tab` cycles modes (auto / planning / writing / goal).
 
 | Key | Action |
 |---|---|
