@@ -24,7 +24,12 @@ transport = "http"
 url = "http://localhost:3000/mcp"
 ```
 
-To hide specific tools from a server, use `[mcp] disabled_tools = ["..."]`.
+To hide specific tools, set `[mcp] disabled_tools` — a table mapping each server to the tool names to skip:
+
+```toml
+[mcp]
+disabled_tools = { github = ["delete_repository"], search = ["raw_query"] }
+```
 
 ## Inspect and test
 

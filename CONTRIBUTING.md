@@ -19,7 +19,7 @@ uv run mypy                  # strict-typed module tier
 Optional live-API smoke tests (skipped by default):
 
 ```bash
-VELES_LIVE_TESTS=1 OPENROUTER_API_KEY=sk-or-... uv run pytest -m live
+VELES_LIVE_TESTS=1 OPENROUTER_API_KEY=sk-or-... uv run pytest tests/test_smoke.py
 ```
 
 ## Code conventions

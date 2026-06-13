@@ -119,7 +119,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 ### `project.toml`
 
 `<project>/.veles/project.toml` хранит неизменяемые метаданные проекта (`name`,
-`created_at`, `schema_version`, `layout_name`). Обычно вы не редактируете его вручную.
+`created_at`, `schema_version`, `layout`). Обычно вы не редактируете его вручную.
 
 ---
 

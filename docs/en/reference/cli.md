@@ -30,7 +30,6 @@ Create a new Veles project in the current directory (a `.veles/` state directory
 | `name` (positional) | cwd basename | Project name |
 | `--layout <name>` | `llm-wiki` | Layout pack for the content scaffold (`llm-wiki`, `notes`, `bare`, or a custom pack from `~/.veles/layouts/`) |
 | `--force` | off | Recreate `.veles/` even if it already exists |
-| `--project-root <path>` | discover from cwd | Operate on a project elsewhere |
 
 ### `veles schema {validate,edit,fix}`
 Validate or edit `AGENTS.md` (the project context file).

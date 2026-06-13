@@ -8,7 +8,7 @@ project you can talk to.
 
 ## Prerequisites
 
-- **Python 3.13** (Veles pins `>=3.13,<3.14`).
+- **Python 3.13+** (Veles requires `>=3.13`).
 - An LLM API key. We'll use **OpenRouter** (the default provider); any of the
   [other providers](../reference/providers.md) works too, including fully local
   ones with no key.

@@ -30,7 +30,6 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `name` (positional) | cwd basename | Имя проекта |
 | `--layout <name>` | `llm-wiki` | Layout-пакет для контент-скаффолда (`llm-wiki`, `notes`, `bare` или кастомный пакет из `~/.veles/layouts/`) |
 | `--force` | off | Пересоздать `.veles/`, даже если он уже существует |
-| `--project-root <path>` | discover from cwd | Работать с проектом в другом месте |
 
 ### `veles schema {validate,edit,fix}`
 Проверить или отредактировать `AGENTS.md` (файл контекста проекта).

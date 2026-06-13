@@ -48,7 +48,7 @@ as subprojects:
 
 ```bash
 veles subproject suggest            # print candidates
-veles subproject suggest --save     # save each to wiki/proposals/ for recall
+veles subproject suggest --save     # save each to .veles/memory/proposals/ for recall
 ```
 
 ## When to use which

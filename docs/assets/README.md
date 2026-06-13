@@ -6,6 +6,7 @@ Demo GIFs used by the top-level `README.md`, recorded with
 - `tui-hero.gif` — ask a question, get an answer grounded in project memory.
 - `tui-tour.gif` — slash inspectors (`/status`, `/context`), mode switch, `/help`.
 - `kb-ingest.gif` — `veles add` a source into a wiki page, then query it with a cited answer.
+- `tui-daemon.gif` — the `/daemon` control panel: daemons and channels across projects.
 
 ## Regenerate
 

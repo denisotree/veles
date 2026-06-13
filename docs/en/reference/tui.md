@@ -38,10 +38,10 @@ Type `/` in the composer; `Tab` completes. The registered commands are:
 | `/history` | Show session history |
 | `/tokens` | Token usage (in / out / per-turn / per-session) |
 | `/context` | Current context size vs the limit |
-| `/status` | Summary: model, mode, session, autopilot |
+| `/status` | Snapshot: model, provider, mode, session, busy, queue |
 | `/insights` | Show learned insights for the project |
 | `/rules` | Show the project's rules digest |
-| `/schema` | Show / validate `AGENTS.md` |
+| `/schema` | Validate / fix `AGENTS.md` |
 | `/wiki` | Wiki operations for the active layout |
 | `/daemon` | Open the daemon control panel (project → daemons → channels) |
 

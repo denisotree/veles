@@ -24,8 +24,13 @@ transport = "http"
 url = "http://localhost:3000/mcp"
 ```
 
-Чтобы скрыть отдельные инструменты сервера, используйте
-`[mcp] disabled_tools = ["..."]`.
+Чтобы скрыть отдельные инструменты, задайте `[mcp] disabled_tools` — таблицу,
+сопоставляющую каждому серверу список имён инструментов:
+
+```toml
+[mcp]
+disabled_tools = { github = ["delete_repository"], search = ["raw_query"] }
+```
 
 ## Просмотр и проверка
 

@@ -147,7 +147,7 @@ veles goal checkpoint <id> "Completed step 1: identified all call sites"
 ### Scheduled jobs
 
 ```bash
-veles job add "weekly-review" --schedule "0 9 * * 1" --prompt "Generate a weekly progress summary"
+veles job add --name "weekly-review" --schedule "0 9 * * 1" --prompt "Generate a weekly progress summary"
 veles job list
 ```
 
@@ -222,7 +222,7 @@ Slash commands surface everything live — `/status`, `/tokens`, `/context`, `/m
 | `Tab` | Slash-command autocomplete |
 | `Ctrl+D` | Quit |
 
-Slash commands: `/help` · `/model` · `/save <slug>` · `/load` · `/wiki search <q>` · `/search <q>` · `/history` · `/theme` and more.
+Slash commands: `/help` · `/model` · `/mode` · `/status` · `/tokens` · `/context` · `/wiki` · `/save <slug>` · `/history` · `/insights` · `/rules` · `/daemon` and more.
 
 ---
 
@@ -236,6 +236,12 @@ veles daemon start                        # starts on 127.0.0.1:8765
 veles daemon status
 veles daemon list                         # daemons across all projects
 ```
+
+`/daemon` in the TUI opens a live control panel — start, stop, restart, and attach channels to daemons across every project without leaving the REPL:
+
+<p align="center">
+  <img src="docs/assets/tui-daemon.gif" alt="Veles TUI daemon panel — start/stop/restart daemons and manage channels across projects" width="800">
+</p>
 
 API endpoints: `POST /v1/runs` to submit a prompt, `WS /v1/runs/{id}/events` to stream the response, `GET /v1/sessions` to list sessions. All except `GET /v1/health` require `Authorization: Bearer <token>`.
 
@@ -342,16 +348,24 @@ Full documentation — Diátaxis-organized (tutorials · how-to guides · refere
 
 ## Contributing
 
+Contributions are very welcome — Veles is **built to be extended**. The core stays small (agent loop + project memory + provider protocol); almost everything else is a pluggable extension point, so adding a capability rarely means touching the core:
+
+- **Provider adapters** (`src/veles/adapters/`) — wire up a new model backend.
+- **Skills** — reusable prompt-blocks and tools with `extends:` inheritance, promotable from a project to user-global.
+- **Tools** — typed Python the agent writes and reuses, under `<project>/.veles/tools/`.
+- **Layout packs** — a single `layout.toml` in `~/.veles/layouts/<name>/` defines a whole content layout.
+- **Module hooks** — observability, logging, and policy via `pre_turn` / `post_turn` hooks (`src/veles/core/modules.py`).
+- **Channels & MCP servers** — new gateways and external tool sources.
+- **Locales** — translations in `src/veles/locales/`.
+
 ```bash
 git clone https://github.com/denisotree/veles.git && cd veles
-uv sync                    # install dev dependencies
-pytest                     # run the test suite (3200+ tests)
-VELES_LIVE_TESTS=1 pytest -m live   # opt-in live-API smoke tests
+uv sync                              # runtime + dev dependencies
+uv run pytest                        # the full suite (3200+ tests, no network)
+uv run ruff check src tests && uv run mypy
 ```
 
-The codebase is deliberately decomposed — single responsibility throughout, no files exceeding a few hundred lines. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for project conventions before opening a PR.
-
-Contributions welcome: provider adapters, skills for common workflows, module hooks (observability, logging, policy enforcement), and platform packaging.
+The codebase is deliberately decomposed — single responsibility, no god-files. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for conventions and [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) before opening a PR. Good first contributions: provider adapters, workflow skills, module hooks, and locale files.
 
 ---
 

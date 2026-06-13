@@ -118,7 +118,7 @@ Task types for `[routing.tasks]`: `default`, `curator`, `compressor`, `insights`
 ### `project.toml`
 
 `<project>/.veles/project.toml` holds immutable project metadata (`name`,
-`created_at`, `schema_version`, `layout_name`). You normally don't edit it by hand.
+`created_at`, `schema_version`, `layout`). You normally don't edit it by hand.
 
 ---
 
