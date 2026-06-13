@@ -4,6 +4,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Only refresh uv.lock; keep pyproject's loose lower bounds intact so the
+    # package stays broadly co-installable (no creeping `>=latest` floors).
+    versioning-strategy: lockfile-only
     # One grouped PR for all Python dependency bumps instead of one per package.
     groups:
       python-dependencies:
