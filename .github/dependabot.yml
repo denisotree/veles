@@ -4,7 +4,15 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # One grouped PR for all Python dependency bumps instead of one per package.
+    groups:
+      python-dependencies:
+        patterns: ["*"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    # One grouped PR for all GitHub Actions bumps.
+    groups:
+      github-actions:
+        patterns: ["*"]
