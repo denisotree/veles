@@ -1,6 +1,7 @@
 # Veles
 
 [![CI](https://github.com/denisotree/veles/actions/workflows/ci.yml/badge.svg)](https://github.com/denisotree/veles/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/veles-ai.svg)](https://pypi.org/project/veles-ai/)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue.svg)](pyproject.toml)
 
@@ -120,6 +121,10 @@ veles add https://example.com/post    # web pages, PDFs, plain text
 veles run "What do we know about the authentication design?"
 veles curate                          # explicit session → memory consolidation
 ```
+
+<p align="center">
+  <img src="docs/assets/kb-ingest.gif" alt="Veles knowledge base — ingest a source into a wiki page, then ask a question and get an answer that cites it" width="800">
+</p>
 
 The Curator runs automatically after sessions. Insight extraction catches phrases like "always prefer X" or "never do Y" and writes them as persistent project insights.
 
