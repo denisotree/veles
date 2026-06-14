@@ -87,7 +87,14 @@ class InProcessRunBackend:
                 if event.get("type") in ("completed", "error"):
                     return
             if handle.done.is_set() and cursor >= len(handle.events):
-                return
+                # The terminal event is appended via call_soon_threadsafe just
+                # before `done` is set, so it may still be queued. Drain pending
+                # callbacks before closing, else a fast run's completion event
+                # is lost to this subscriber.
+                await asyncio.sleep(0)
+                if cursor >= len(handle.events):
+                    return
+                continue
             await handle.event_added.wait()
 
     async def get_session(self, session_id: str) -> dict[str, Any]:

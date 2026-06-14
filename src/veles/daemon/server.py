@@ -360,7 +360,15 @@ async def _handle_run_events_ws(request: web.Request) -> web.StreamResponse:
                 cursor += 1
                 await ws.send_json(event)
             if handle.done.is_set() and cursor >= len(handle.events):
-                break
+                # The terminal "completed"/"error" event is appended via
+                # call_soon_threadsafe immediately before `done` is set, so it
+                # may still be queued (not yet in `handle.events`). Yield once to
+                # drain pending loop callbacks, then re-check — otherwise a fast
+                # run's completion event is never delivered to this subscriber.
+                await asyncio.sleep(0)
+                if cursor >= len(handle.events):
+                    break
+                continue
             try:
                 await asyncio.wait_for(handle.event_added.wait(), timeout=30.0)
             except TimeoutError:
