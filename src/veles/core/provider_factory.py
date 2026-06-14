@@ -16,9 +16,11 @@ chat-only sub-agents.
 Local-model providers (`ollama`, `llamacpp`, `openai-compat`) introduced
 in M78 don't need any credentials; `has_api_key` returns True for them
 unconditionally so the agent loop doesn't gate them behind a key check.
-Tool calling is opt-in via the `VELES_LOCAL_TOOLS=1` env var (default off
-because many open-weights models don't speak OpenAI tool-call format
-reliably).
+Tool calling is **auto-detected** from the model's advertised capabilities
+(ollama `/api/show` reports `capabilities: ["tools", ...]`): pass the model
+to `make_provider(name, model=...)` and tools turn on iff the model speaks
+the OpenAI tool-call format. `VELES_LOCAL_TOOLS=1|0` remains an explicit
+override (force on/off) when set; unset means auto-detect.
 """
 
 from __future__ import annotations
@@ -37,14 +39,47 @@ PROVIDER_API_KEY_ENVS: dict[str, tuple[str, ...]] = {
 LOCAL_PROVIDERS: frozenset[str] = frozenset({"ollama", "llamacpp", "openai-compat"})
 
 
-def _local_tools_enabled() -> bool:
-    """`VELES_LOCAL_TOOLS=1|true|yes` ⇒ enable tool calling on local providers."""
+def _local_tools_override() -> bool | None:
+    """Explicit `VELES_LOCAL_TOOLS` override, or None to auto-detect.
+
+    Returns True/False when the env var is set to a recognised truthy/falsy
+    value (force tool calling on/off), or None when unset — in which case the
+    factory auto-detects from the model's advertised capabilities."""
     raw = os.environ.get("VELES_LOCAL_TOOLS", "").strip().lower()
+    if raw == "":
+        return None
     return raw in {"1", "true", "yes", "on"}
 
 
-def make_provider(name: str) -> Provider:
-    """Build a chat-only provider (no MCP bridging) from its CLI name."""
+def _apply_local_tool_policy(provider: Provider, model: str | None) -> None:
+    """Set `provider.supports_tools` for a freshly-built local provider.
+
+    An explicit `VELES_LOCAL_TOOLS` value wins (force on/off). Otherwise
+    auto-detect: when the provider can probe a model's capabilities (ollama
+    exposes `model_supports_tools` via `/api/show`) and the model is known,
+    enable tools iff the model advertises them. When the capability can't be
+    determined (no probe, no model, or probe error) default to off — a
+    tool-blind model that's handed tool schemas can stall the agent loop."""
+    override = _local_tools_override()
+    if override is not None:
+        provider.supports_tools = override
+        return
+    detect = getattr(provider, "model_supports_tools", None)
+    if callable(detect) and model:
+        try:
+            provider.supports_tools = bool(detect(model))
+        except Exception:
+            provider.supports_tools = False
+    else:
+        provider.supports_tools = False
+
+
+def make_provider(name: str, model: str | None = None) -> Provider:
+    """Build a chat-only provider (no MCP bridging) from its CLI name.
+
+    `model` (when given) lets local providers auto-detect tool-call support
+    from the model's advertised capabilities — see `_apply_local_tool_policy`.
+    """
     if name == "openrouter":
         from veles.adapters.openrouter import OpenRouterProvider
 
@@ -72,15 +107,21 @@ def make_provider(name: str) -> Provider:
     if name == "ollama":
         from veles.adapters.local.ollama import OllamaProvider
 
-        return OllamaProvider(enable_tools=_local_tools_enabled())
+        prov: Provider = OllamaProvider()
+        _apply_local_tool_policy(prov, model)
+        return prov
     if name == "llamacpp":
         from veles.adapters.local.llamacpp import LlamaCppProvider
 
-        return LlamaCppProvider(enable_tools=_local_tools_enabled())
+        prov = LlamaCppProvider()
+        _apply_local_tool_policy(prov, model)
+        return prov
     if name == "openai-compat":
         from veles.adapters.local.openai_compatible import OpenAICompatibleProvider
 
-        return OpenAICompatibleProvider(enable_tools=_local_tools_enabled())
+        prov = OpenAICompatibleProvider()
+        _apply_local_tool_policy(prov, model)
+        return prov
     raise ValueError(f"unknown provider: {name!r}")
 
 

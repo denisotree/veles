@@ -420,8 +420,12 @@ def _maybe_refresh_nl_routing(args: argparse.Namespace, project: Project) -> Non
         return
 
     from veles.cli import _has_api_key_for_provider, _make_provider
+    from veles.core.model_resolver import ConfigurationError
 
-    routed_provider, routed_model = route("default", project)
+    try:
+        routed_provider, routed_model = route("default", project)
+    except ConfigurationError:
+        return
     if not _has_api_key_for_provider(routed_provider):
         return
     try:
@@ -464,14 +468,19 @@ def _maybe_run_insight_extractor(
         return
     if getattr(args, "resume", None) is not None:
         return
-    routed_provider, routed_model = route("insights", project)
+    from veles.core.model_resolver import ConfigurationError
+
+    try:
+        routed_provider, routed_model = route("insights", project)
+    except ConfigurationError:
+        return
     if not has_api_key(routed_provider):
         return
     explicit_model = getattr(args, "compressor_model", None)
     model = explicit_model or routed_model
     try:
         extractor = make_insight_extractor(
-            provider=make_provider(routed_provider),
+            provider=make_provider(routed_provider, model=model),
             model=model,
             project=project,
         )

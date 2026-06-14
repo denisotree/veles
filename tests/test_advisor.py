@@ -12,6 +12,7 @@ from veles.core.context import (
     set_active_project,
 )
 from veles.core.project import init_project
+from veles.core.project_config import save_project_config
 from veles.core.provider import ProviderResponse, TokenUsage
 from veles.core.tools.builtin.advisor import (
     Verdict,
@@ -162,6 +163,12 @@ def test_advisor_review_returns_unavailable_when_no_api_key(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     project = init_project(tmp_path / "p", name="p")
+    # M165c: routing has no cloud fallback — give the project a base so
+    # `route("advisor")` resolves (these tests exercise the advisor flow, not
+    # the unconfigured-routing path).
+    save_project_config(
+        project, {"provider": {"default": "openrouter", "model": "anthropic/claude-sonnet-4.6"}}
+    )
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     token = set_active_project(project)
@@ -178,9 +185,15 @@ def test_advisor_review_renders_stub_verdict(
 ) -> None:
     """End-to-end: stub the routed provider's make_provider, return canned JSON."""
     project = init_project(tmp_path / "p", name="p")
+    # M165c: routing has no cloud fallback — give the project a base so
+    # `route("advisor")` resolves (these tests exercise the advisor flow, not
+    # the unconfigured-routing path).
+    save_project_config(
+        project, {"provider": {"default": "openrouter", "model": "anthropic/claude-sonnet-4.6"}}
+    )
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
     stub = _stub_provider('{"ok": false, "concerns": ["scope unclear"], "suggestions": []}')
-    monkeypatch.setattr("veles.core.provider_factory.make_provider", lambda name: stub)
+    monkeypatch.setattr("veles.core.provider_factory.make_provider", lambda name, model=None: stub)
     token = set_active_project(project)
     try:
         out = advisor_review("ship the new auth flow on Monday")
@@ -197,9 +210,15 @@ def test_advisor_review_handles_provider_construction_failure(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     project = init_project(tmp_path / "p", name="p")
+    # M165c: routing has no cloud fallback — give the project a base so
+    # `route("advisor")` resolves (these tests exercise the advisor flow, not
+    # the unconfigured-routing path).
+    save_project_config(
+        project, {"provider": {"default": "openrouter", "model": "anthropic/claude-sonnet-4.6"}}
+    )
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
 
-    def boom(name: str):
+    def boom(name: str, model: str | None = None):
         raise RuntimeError("kaboom")
 
     monkeypatch.setattr("veles.core.provider_factory.make_provider", boom)
@@ -216,6 +235,12 @@ def test_advisor_review_handles_subagent_exception(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     project = init_project(tmp_path / "p", name="p")
+    # M165c: routing has no cloud fallback — give the project a base so
+    # `route("advisor")` resolves (these tests exercise the advisor flow, not
+    # the unconfigured-routing path).
+    save_project_config(
+        project, {"provider": {"default": "openrouter", "model": "anthropic/claude-sonnet-4.6"}}
+    )
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
 
     class _BoomProvider:
@@ -226,7 +251,9 @@ def test_advisor_review_handles_subagent_exception(
         def create_message(self, *_a, **_kw):
             raise RuntimeError("network down")
 
-    monkeypatch.setattr("veles.core.provider_factory.make_provider", lambda name: _BoomProvider())
+    monkeypatch.setattr(
+        "veles.core.provider_factory.make_provider", lambda name, model=None: _BoomProvider()
+    )
     token = set_active_project(project)
     try:
         out = advisor_review("plan")
@@ -239,10 +266,9 @@ def test_advisor_review_handles_subagent_exception(
 # ---------- routing default ----------
 
 
-def test_advisor_default_routing_present() -> None:
-    from veles.core.routing import DEFAULT_TASKS, parse_spec
+def test_advisor_is_a_known_routable_task() -> None:
+    # M165c: advisor is a routable task but has no hardcoded cloud default —
+    # it resolves from the configured base/route or raises.
+    from veles.core.routing import KNOWN_TASKS
 
-    assert "advisor" in DEFAULT_TASKS
-    provider, model = parse_spec(DEFAULT_TASKS["advisor"])
-    assert provider
-    assert model
+    assert "advisor" in KNOWN_TASKS

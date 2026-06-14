@@ -49,7 +49,7 @@ def test_returns_wired_agent(project, monkeypatch: pytest.MonkeyPatch) -> None:
     load_calls: list[dict] = []
 
     monkeypatch.setattr("veles.cli._ensure_api_key", lambda *a, **kw: True)
-    monkeypatch.setattr("veles.cli._make_provider", lambda name: stub_provider)
+    monkeypatch.setattr("veles.cli._make_provider", lambda name, model=None: stub_provider)
     monkeypatch.setattr("veles.cli._build_compressor", lambda args, proj, prov: sentinel_compressor)
 
     def fake_load_skills(proj, tools, *, provider, model):
@@ -115,7 +115,7 @@ def test_check_api_key_false_skips_gate(project, monkeypatch: pytest.MonkeyPatch
         "veles.cli._ensure_api_key",
         lambda *a, **kw: (_ for _ in ()).throw(AssertionError("factory must not re-check the key")),
     )
-    monkeypatch.setattr("veles.cli._make_provider", lambda name: StubProvider())
+    monkeypatch.setattr("veles.cli._make_provider", lambda name, model=None: StubProvider())
     monkeypatch.setattr("veles.cli._load_skills", lambda *a, **kw: object())
 
     agent = build_command_agent(_args(), project, tools=("read_file",), check_api_key=False)
@@ -128,7 +128,7 @@ def test_monkeypatch_contract_is_lazy(project, monkeypatch: pytest.MonkeyPatch) 
     must still be picked up (the factory resolves helpers at call time)."""
     seen: list[str] = []
 
-    def recording_make_provider(name):
+    def recording_make_provider(name, model=None):
         seen.append(name)
         return StubProvider()
 

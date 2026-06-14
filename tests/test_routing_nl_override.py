@@ -154,7 +154,11 @@ def test_entries_empty_produces_empty_config() -> None:
 
 
 def test_default_when_no_files(project: Project) -> None:
-    assert route("default", project) == ("openrouter", "anthropic/claude-sonnet-4.6")
+    """M165c: no config anywhere → no cloud fallback, routing raises."""
+    from veles.core.model_resolver import ConfigurationError
+
+    with pytest.raises(ConfigurationError):
+        route("default", project)
 
 
 def test_nl_overrides_default(project: Project) -> None:
@@ -190,8 +194,11 @@ def test_nl_per_task_does_not_leak_to_other_tasks(project: Project) -> None:
     """Setting only `compressor` in nl-toml must NOT touch other tasks."""
     save_nl_routing_config(project, RoutingConfig(tasks={"compressor": "openai:gpt-4o-mini"}))
     assert route("compressor", project) == ("openai", "gpt-4o-mini")
-    # advisor falls through to DEFAULT_TASKS.
-    assert route("advisor", project) == ("openrouter", "anthropic/claude-sonnet-4.6")
+    # advisor has no NL hint and no base → raises (M165c: no cloud fallback).
+    from veles.core.model_resolver import ConfigurationError
+
+    with pytest.raises(ConfigurationError):
+        route("advisor", project)
 
 
 # ---- refresh_nl_routing ----

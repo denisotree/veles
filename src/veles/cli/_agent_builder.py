@@ -73,7 +73,7 @@ def build_command_agent(
     if tool_aware:
         provider = cli._make_tool_aware_provider(args.provider, project, skill_model=args.model)
     else:
-        provider = cli._make_provider(args.provider)
+        provider = cli._make_provider(args.provider, args.model)
 
     if callable(system_prompt):
         system_prompt = system_prompt(provider)

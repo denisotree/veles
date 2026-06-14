@@ -41,7 +41,8 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 
 [mcp.servers.my-server]          # optional user-scope MCP servers
 transport = "stdio"
-command = "python -m my_mcp_server"
+command = "python"               # executable only — arguments go in `args`
+args = ["-m", "my_mcp_server"]
 ```
 
 | Ключ | Тип | Назначение |
@@ -91,7 +92,8 @@ whitelist = ["@bob"]
 
 [mcp.servers.github]             # external MCP servers (project scope)
 transport = "stdio"             # stdio | http | sse
-command = "npx -y @modelcontextprotocol/server-github"
+command = "npx"                  # executable only — arguments go in `args`
+args = ["-y", "@modelcontextprotocol/server-github"]
 env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the environment
 ```
 

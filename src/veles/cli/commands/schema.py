@@ -63,7 +63,13 @@ def _fix(project: Project) -> int:
         print(f"error: AGENTS.md not found at {p}", file=sys.stderr)
         return 2
 
-    provider_name, model = route("compressor", project)
+    from veles.core.model_resolver import ConfigurationError
+
+    try:
+        provider_name, model = route("compressor", project)
+    except ConfigurationError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
     def ask_question(q: Question) -> str:
         if q.choices:

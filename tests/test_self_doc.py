@@ -79,7 +79,12 @@ def test_generate_self_doc_lists_skills(tmp_path: Path) -> None:
 
 
 def test_generate_self_doc_routing_has_default(tmp_path: Path) -> None:
+    from veles.core.project_config import save_project_config
+
     project = _make_project(tmp_path)
+    # M165c: routing only resolves with a configured base — give it one so the
+    # self-doc routing block has entries.
+    save_project_config(project, {"provider": {"default": "ollama", "model": "qwen3:4b"}})
     report = generate_self_doc(project)
     assert "default" in report.routing
 

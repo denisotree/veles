@@ -320,3 +320,45 @@ def test_to_openai_message_assistant_with_tool_calls() -> None:
 def test_to_openai_message_tool_requires_id() -> None:
     with pytest.raises(ValueError, match="tool_call_id"):
         _to_openai_message(Message(role="tool", content="r"))
+
+
+# ---------- model_supports_tools (tool-capability auto-detect) ----------
+
+
+def test_model_supports_tools_true() -> None:
+    fake_resp = MagicMock()
+    fake_resp.json.return_value = {"capabilities": ["completion", "tools", "thinking"]}
+    fake_resp.raise_for_status = MagicMock()
+    fake_post = MagicMock(return_value=fake_resp)
+    p = OllamaProvider(client=_StubClient())
+    with patch("veles.adapters.local.ollama.httpx.post", fake_post):
+        assert p.model_supports_tools("qwen3:4b-instruct") is True
+    # /v1 suffix stripped before calling /api/show, model passed in the body
+    assert fake_post.call_args.args[0] == "http://localhost:11434/api/show"
+    assert fake_post.call_args.kwargs["json"] == {"model": "qwen3:4b-instruct"}
+
+
+def test_model_supports_tools_false_when_capability_absent() -> None:
+    fake_resp = MagicMock()
+    fake_resp.json.return_value = {"capabilities": ["completion", "embedding"]}
+    fake_resp.raise_for_status = MagicMock()
+    p = OllamaProvider(client=_StubClient())
+    with patch("veles.adapters.local.ollama.httpx.post", MagicMock(return_value=fake_resp)):
+        assert p.model_supports_tools("nomic-embed-text") is False
+
+
+def test_model_supports_tools_false_on_error() -> None:
+    """Server down / model not pulled / old Ollama with no field ⇒ conservative False."""
+    p = OllamaProvider(client=_StubClient())
+    with patch(
+        "veles.adapters.local.ollama.httpx.post", MagicMock(side_effect=RuntimeError("boom"))
+    ):
+        assert p.model_supports_tools("whatever") is False
+
+
+def test_model_supports_tools_empty_model_skips_probe() -> None:
+    p = OllamaProvider(client=_StubClient())
+    fake_post = MagicMock()
+    with patch("veles.adapters.local.ollama.httpx.post", fake_post):
+        assert p.model_supports_tools("") is False
+    fake_post.assert_not_called()

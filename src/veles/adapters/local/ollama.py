@@ -66,3 +66,28 @@ class OllamaProvider(_OpenAICompatibleBase):
         resp = httpx.get(f"{base}/api/tags", timeout=10.0)
         resp.raise_for_status()
         return [m["name"] for m in resp.json().get("models", [])]
+
+    def model_supports_tools(self, model: str) -> bool:
+        """Return True iff Ollama advertises the `tools` capability for `model`.
+
+        Ollama's native `/api/show` returns a `capabilities` array that lists
+        `"tools"` for models that speak the OpenAI tool-call format (e.g.
+        `qwen3`, `llama3.1`, `qwen2.5`). The provider factory uses this to
+        enable tool calling automatically — no `VELES_LOCAL_TOOLS` flag needed.
+
+        Conservative on failure: a missing model, an old Ollama without the
+        `capabilities` field, or an unreachable server all return False so
+        auto-detection never wrongly enables tools or blocks startup.
+        """
+        if not model:
+            return False
+        base = str(self._client.base_url).rstrip("/")
+        if base.endswith("/v1"):
+            base = base[:-3].rstrip("/")
+        try:
+            resp = httpx.post(f"{base}/api/show", json={"model": model}, timeout=10.0)
+            resp.raise_for_status()
+            caps = resp.json().get("capabilities") or []
+        except Exception:
+            return False
+        return "tools" in caps

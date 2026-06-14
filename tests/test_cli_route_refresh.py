@@ -25,7 +25,16 @@ def isolated(tmp_path: Path, monkeypatch):
 
 @pytest.fixture()
 def project(tmp_path: Path) -> Project:
-    return init_project(tmp_path / "demo", name="demo")
+    from veles.core.project_config import save_project_config
+
+    p = init_project(tmp_path / "demo", name="demo")
+    # M165c: routing has no cloud fallback — give the project a `[provider]`
+    # base so `route("default")` resolves (these tests exercise NL refresh,
+    # not the unconfigured-routing path).
+    save_project_config(
+        p, {"provider": {"default": "openrouter", "model": "anthropic/claude-sonnet-4.6"}}
+    )
+    return p
 
 
 def _ns(**fields):

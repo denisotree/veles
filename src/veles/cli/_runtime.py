@@ -379,7 +379,13 @@ def build_compressor(
             "will eventually hit the model context limit",
         )
         return None
-    routed_provider, routed_model = route("compressor", project)
+    from veles.core.model_resolver import ConfigurationError
+
+    try:
+        routed_provider, routed_model = route("compressor", project)
+    except ConfigurationError as exc:
+        _compressor_logger.warning("compressor disabled: %s", exc)
+        return None
     if not has_api_key(routed_provider):
         _compressor_logger.warning(
             "compressor disabled: no API key for routed provider %r; "
@@ -394,7 +400,7 @@ def build_compressor(
     if hard_ceiling_tokens is not None:
         cfg_kwargs["hard_ceiling_tokens"] = hard_ceiling_tokens
     cfg = CompressionConfig(**cfg_kwargs)
-    summariser_provider = make_provider(routed_provider)
+    summariser_provider = make_provider(routed_provider, model=model)
     return make_default_compressor(
         provider=summariser_provider,
         model=model,
@@ -466,7 +472,30 @@ def _load_skills(
         mcp_names = mount_mcp_tools(full, project)
     except Exception as exc:
         logger.warning("MCP tools unavailable: %s", exc)
-    return full.subset(list(base_tools) + skill_names + mcp_names)
+
+    # M165b: provision MCP-driven project tools (e.g. graphify rebuild when a
+    # `graphify` MCP server is configured), then load file-based project/user
+    # tools (`<project>/.veles/tools/`, `~/.veles/tools/`) into the registry —
+    # the M120 loader, previously never wired into the runtime.
+    tool_names: list[str] = []
+    try:
+        from veles.core.tools.loader import load_into_registry
+        from veles.core.user_paths import user_home
+        from veles.mcp.provision import ensure_mcp_project_tools
+
+        ensure_mcp_project_tools(project)
+        report = load_into_registry(
+            full,
+            project_tools_dir=project.state_dir / "tools",
+            user_tools_dir=user_home() / "tools",
+        )
+        tool_names = [lt.entry.name for lt in report.loaded]
+        for name, scope in report.errors:
+            logger.warning("project tool %s failed to load: %s", name, scope)
+    except Exception as exc:
+        logger.warning("project tools unavailable: %s", exc)
+
+    return full.subset(list(base_tools) + skill_names + mcp_names + tool_names)
 
 
 def _qualify_for_provider(prompt: str, provider: Provider, tool_names: tuple[str, ...]) -> str:
@@ -529,11 +558,12 @@ def _make_tool_aware_provider(
     if name in {"ollama", "llamacpp", "openai-compat"}:
         # Local providers don't bridge MCP — they run plain HTTP chat, the
         # agent loop wires Veles tools through the standard tool-call path.
-        # Tool-call support is opt-in via VELES_LOCAL_TOOLS env var (see
-        # provider_factory._local_tools_enabled).
+        # Pass the model so tool-call support is auto-detected from the
+        # model's capabilities (see provider_factory._apply_local_tool_policy);
+        # VELES_LOCAL_TOOLS still forces on/off when set.
         from veles.core.provider_factory import make_provider
 
-        return make_provider(name)
+        return make_provider(name, model=skill_model)
     raise ValueError(f"provider {name!r} cannot bridge tools")
 
 

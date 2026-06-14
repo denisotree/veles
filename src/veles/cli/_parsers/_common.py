@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import argparse
 
-DEFAULT_MODEL = "anthropic/claude-sonnet-4.6"
+# Empty by design (M165): no hardcoded fallback model. The effective model is
+# resolved from explicit `--model`, the project `[provider] model`, or the user
+# `default_model`; when none is configured veles raises a clear "model not
+# configured" error instead of silently using a cloud model.
+DEFAULT_MODEL = ""
 DEFAULT_MAX_ITERATIONS = 30
 DEFAULT_MAX_TOKENS_TOTAL = 100_000
 DEFAULT_PROVIDER = "openrouter"
@@ -42,7 +46,8 @@ def add_common_run_flags(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--model",
         default=DEFAULT_MODEL,
-        help=f"Model id (default: {DEFAULT_MODEL}).",
+        help="Model id (default: resolved from project [provider] model or user "
+        "default_model; required if neither is configured).",
     )
     p.add_argument(
         "--max-iterations",

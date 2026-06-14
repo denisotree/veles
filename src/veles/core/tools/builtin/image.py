@@ -117,7 +117,12 @@ def image_describe(path: str, prompt: str = _DEFAULT_DESCRIBE_PROMPT) -> str:
     project = current_project()
     if project is None:
         return "<error: image_describe needs an active project for routing>"
-    provider_name, model = route("vision", project)
+    from veles.core.model_resolver import ConfigurationError
+
+    try:
+        provider_name, model = route("vision", project)
+    except ConfigurationError as exc:
+        return f"<error: {exc}>"
     if not has_api_key(provider_name):
         return (
             f"<error: no API key for routed vision provider {provider_name!r}; "

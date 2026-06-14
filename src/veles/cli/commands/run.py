@@ -101,6 +101,23 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
         _warn_if_agents_md_invalid,
         build_command_agent,
     )
+    from veles.core.model_resolver import (
+        ConfigurationError,
+        ensure_model_configured,
+        resolve_effective_model,
+        resolve_effective_provider,
+    )
+
+    # M165: resolve provider + model from config (explicit flag → project
+    # `[provider]` → user defaults) instead of letting the bare argparse
+    # default through. An unconfigured model errors clearly rather than
+    # silently booting on a cloud model.
+    args.provider = resolve_effective_provider(args, project)
+    try:
+        args.model = ensure_model_configured(resolve_effective_model(args, project))
+    except ConfigurationError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
     if args.provider in _PROVIDER_API_KEY_ENVS and not _ensure_api_key(args.provider):
         return 2

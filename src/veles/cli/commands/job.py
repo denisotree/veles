@@ -135,19 +135,30 @@ def _cmd_history(args: argparse.Namespace, store: JobsStore) -> int:
 
 def _cmd_tick(args: argparse.Namespace, store: JobsStore, project) -> int:
     """Synchronous one-shot tick — for testing / cron-less environments."""
-    from veles.cli import _RUN_TOOLS, DEFAULT_MODEL, _load_skills, _make_provider
+    from veles.cli import _RUN_TOOLS, _load_skills, _make_provider
     from veles.core.agent import Agent
     from veles.core.job_runner import JobRunner
     from veles.core.memory import SessionStore
+    from veles.core.model_resolver import (
+        ConfigurationError,
+        ensure_model_configured,
+        resolve_effective_model,
+        resolve_effective_provider,
+    )
 
     session_store = SessionStore(project.memory_db_path)
-    provider_name = getattr(args, "provider", "openrouter")
-    model = getattr(args, "model", DEFAULT_MODEL)
+    # M165: resolve provider+model from config; error clearly when no model set.
+    provider_name = resolve_effective_provider(args, project)
+    try:
+        model = ensure_model_configured(resolve_effective_model(args, project))
+    except ConfigurationError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     max_iterations = int(getattr(args, "max_iterations", 30))
     max_tokens = int(getattr(args, "max_tokens", 4096))
 
     def factory(session_id: str | None):
-        provider = _make_provider(provider_name)
+        provider = _make_provider(provider_name, model)
         registry = _load_skills(project, _RUN_TOOLS, provider=provider, model=model)
         sid = session_id or session_store.create_session()
         return Agent(

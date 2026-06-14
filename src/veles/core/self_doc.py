@@ -40,7 +40,7 @@ def generate_self_doc(
     """Collect all project self-knowledge into a `SelfDocReport`."""
     from veles.core.layout.engines import wiki_enabled
     from veles.core.memory import SessionStore
-    from veles.core.routing import DEFAULT_TASKS, route
+    from veles.core.routing import KNOWN_TASKS, route
     from veles.core.skills import discover_skills
 
     # --- project meta ---
@@ -74,7 +74,7 @@ def generate_self_doc(
 
     # --- routing: one line per task in DEFAULT_TASKS ---
     routing: dict[str, str] = {}
-    for task in DEFAULT_TASKS:
+    for task in sorted(KNOWN_TASKS):
         try:
             provider, model = route(task, project)
             routing[task] = f"{provider}:{model}"
