@@ -120,6 +120,10 @@ def test_leftover_routing_toml_is_ignored(tmp_path: Path) -> None:
     (project.state_dir / "routing.toml").write_text(
         '[routing.tasks]\ncompressor = "ollama:qwen3"\n', encoding="utf-8"
     )
-    from veles.core.routing import DEFAULT_TASKS, parse_spec, route
+    from veles.core.model_resolver import ConfigurationError
+    from veles.core.routing import route
 
-    assert route("compressor", project) == parse_spec(DEFAULT_TASKS["compressor"])
+    # The leftover routing.toml is ignored, so compressor is unconfigured and
+    # routing raises (M165c) — proving config.toml is the only source.
+    with pytest.raises(ConfigurationError):
+        route("compressor", project)

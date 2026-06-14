@@ -379,7 +379,13 @@ def build_compressor(
             "will eventually hit the model context limit",
         )
         return None
-    routed_provider, routed_model = route("compressor", project)
+    from veles.core.model_resolver import ConfigurationError
+
+    try:
+        routed_provider, routed_model = route("compressor", project)
+    except ConfigurationError as exc:
+        _compressor_logger.warning("compressor disabled: %s", exc)
+        return None
     if not has_api_key(routed_provider):
         _compressor_logger.warning(
             "compressor disabled: no API key for routed provider %r; "

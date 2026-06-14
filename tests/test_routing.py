@@ -117,11 +117,13 @@ def test_set_route_writes_config_toml(tmp_path: Path) -> None:
 # ---------- route() ----------
 
 
-def test_route_falls_back_to_default_tasks_when_no_override(tmp_path: Path) -> None:
+def test_route_raises_when_unconfigured(tmp_path: Path) -> None:
+    """M165c: no cloud fallback — an unconfigured chat task raises clearly."""
+    from veles.core.model_resolver import ConfigurationError
+
     project = init_project(tmp_path / "p", name="p")
-    provider, model = route("compressor", project)
-    expected = parse_spec(DEFAULT_TASKS["compressor"])
-    assert (provider, model) == expected
+    with pytest.raises(ConfigurationError, match="no model configured"):
+        route("compressor", project)
 
 
 def test_route_uses_project_override(tmp_path: Path) -> None:
@@ -137,10 +139,12 @@ def test_route_falls_back_to_project_default_then_to_static(tmp_path: Path) -> N
     assert route("never-defined-task", project) == ("openai", "gpt-4o-mini")
 
 
-def test_route_unknown_task_with_no_overrides_uses_static_default(tmp_path: Path) -> None:
+def test_route_unknown_task_with_no_overrides_raises(tmp_path: Path) -> None:
+    from veles.core.model_resolver import ConfigurationError
+
     project = init_project(tmp_path / "p", name="p")
-    expected = parse_spec(DEFAULT_TASKS["default"])
-    assert route("absent-task", project) == expected
+    with pytest.raises(ConfigurationError):
+        route("absent-task", project)
 
 
 def test_nl_hint_beats_provider_base(tmp_path: Path) -> None:
@@ -169,6 +173,12 @@ def test_default_tasks_all_parse_cleanly() -> None:
         assert model, f"task {task!r} has empty model in {spec!r}"
 
 
-def test_default_tasks_contains_required_entries() -> None:
-    expected = {"default", "curator", "compressor", "insights", "skills"}
-    assert expected.issubset(set(DEFAULT_TASKS.keys()))
+def test_known_tasks_contains_required_entries() -> None:
+    from veles.core.routing import KNOWN_TASKS
+
+    assert {"default", "curator", "compressor", "insights", "skills", "advisor", "vision"}.issubset(
+        KNOWN_TASKS
+    )
+    # M165c: DEFAULT_TASKS now carries only the embedding default (a distinct
+    # model type); chat tasks have no hardcoded cloud fallback.
+    assert set(DEFAULT_TASKS) == {"embedding"}

@@ -37,17 +37,23 @@ Resolution order in `effective_route(task_type, project)` — first hit wins:
 6.  user `[routing.tasks][task_type]`  (M125)    (`user-route`)
 7.  user `[routing.tasks].default`  (M125)       (`user-route-default`)
 8.  user `[user] default_provider/model`  (M125) (`user-provider`)
-9.  `DEFAULT_TASKS[task_type]`                    (`default`)
-10. `DEFAULT_TASKS["default"]`                    (`default`)
-11. `_DEFAULT_FALLBACK`                           (`fallback`)
+
+M165c: there is **no hardcoded cloud catch-all** below layer 8 for chat
+tasks — consistent with M165's empty `DEFAULT_MODEL`. When none of layers
+1–8 resolve, `effective_route` raises `ConfigurationError` (the same error
+type System A raises) instead of silently using `openrouter:claude-*`.
+Sub-agent callers (compressor, advisor, insights, vision, …) catch it and
+degrade — the feature goes off, never silently cloud.
 
 NL sits *above* the `[provider]` base on purpose: a complete `[provider]`
 yields a spec for every task, so placed above NL it would shadow every
-per-task AGENTS.md hint. `embedding` bypasses all catch-alls (see
-`effective_route`) — a chat base model is not an embedding model.
+per-task AGENTS.md hint. `embedding` bypasses the base AND the raise (see
+`effective_route`): a chat base model is not an embedding model, so it keeps
+its own hardcoded default (`DEFAULT_TASKS["embedding"]`) and its sole
+consumer degrades to tfidf.
 
-Missing or malformed config degrades to defaults silently — routing
-should never block an agent run.
+Missing or malformed *config* degrades to the next layer silently — routing
+should never block on a typo; only a fully-unconfigured chat task raises.
 """
 
 from __future__ import annotations
@@ -57,28 +63,29 @@ from typing import Any
 
 from veles.core.project import Project
 
-_DEFAULT_FALLBACK = "openrouter:anthropic/claude-sonnet-4.6"
-
-
+# M165c: no hardcoded cloud fallback for chat tasks — consistent with M165's
+# empty `DEFAULT_MODEL`. Chat tasks (default/curator/compressor/insights/skills/
+# advisor/vision) resolve from `[routing.tasks]`, the `[provider]` base, or
+# `default_provider/model`; when nothing is configured `effective_route` raises
+# `ConfigurationError` instead of silently using a cloud model. Sub-agent callers
+# catch it and degrade (skip the feature).
 DEFAULT_TASKS: dict[str, str] = {
-    "default": "openrouter:anthropic/claude-sonnet-4.6",
-    "curator": "openrouter:anthropic/claude-sonnet-4.6",
-    "compressor": "openrouter:anthropic/claude-haiku-4.5",
-    "insights": "openrouter:anthropic/claude-haiku-4.5",
-    "skills": "openrouter:anthropic/claude-sonnet-4.6",
-    # Advisor (M44): default to a strong-but-not-extreme tier so review is
-    # cheap enough to call frequently. Users can route to opus explicitly.
-    "advisor": "openrouter:anthropic/claude-sonnet-4.6",
-    # Vision (M50): used by `image_describe`. Sonnet handles diagrams /
-    # photos well; users can switch to opus / gpt-4o / gemini-2.5-pro
-    # via `veles route set vision <provider>:<model>`.
-    "vision": "openrouter:anthropic/claude-sonnet-4.6",
-    # Embedding (M61): used by `veles skill dedup` for synonym-aware
-    # similarity. text-embedding-3-small is OpenAI-shape, ~$0.02 / 1M
-    # tokens, 1536-dim. OpenRouter relays it through their endpoint
-    # too. Cache lives at `<project>/.veles/skill_embeddings.json`.
+    # `embedding` keeps a hardcoded default on purpose: it's a distinct model
+    # *type* (a chat base can't serve it — see the embedding bypass in
+    # `effective_route`) and its sole consumer (`skill_dedup`) already degrades
+    # to tfidf. Making embedding configurable-or-raise is a clean follow-up
+    # gated on a consumer audit. text-embedding-3-small is OpenAI-shape,
+    # ~$0.02 / 1M tokens, 1536-dim; OpenRouter relays it too.
     "embedding": "openai:text-embedding-3-small",
 }
+
+# The canonical set of routable task names. Kept separate from DEFAULT_TASKS
+# (which now only carries the embedding default) because several consumers —
+# NL-route validation, `veles route show`, the self-doc routing block — need
+# "is this a known task?" independent of whether the task has a hardcoded model.
+KNOWN_TASKS: frozenset[str] = frozenset(
+    {"default", "curator", "compressor", "insights", "skills", "advisor", "vision", "embedding"}
+)
 
 
 @dataclass(slots=True)
@@ -158,10 +165,15 @@ def provider_to_spec(provider: str | None, model: str | None) -> str | None:
 
 def _first_spec(
     candidates: list[tuple[str | None, str]],
+    task_type: str,
 ) -> tuple[str, str, str]:
     """Return `(provider, model, source_label)` for the first candidate
     whose spec is non-empty and parses cleanly. Malformed specs (e.g. a
-    user typo like `anthropic:`) are skipped rather than crashing a turn."""
+    user typo like `anthropic:`) are skipped rather than crashing a turn.
+
+    M165c: when no candidate resolves there is no hardcoded cloud fallback —
+    raise `ConfigurationError` (lazy import to keep `ensemble` free of the
+    cli/config stack). Sub-agent callers catch it and degrade."""
     for spec, label in candidates:
         if not spec:
             continue
@@ -170,8 +182,14 @@ def _first_spec(
         except ValueError:
             continue
         return (provider, model, label)
-    provider, model = parse_spec(_DEFAULT_FALLBACK)
-    return (provider, model, "fallback")
+    from veles.core.model_resolver import ConfigurationError
+
+    raise ConfigurationError(
+        f"no model configured for routed task {task_type!r}. Set `[provider]` "
+        "(default + model) or `default_provider`/`default_model` in "
+        f"~/.veles/config.toml, or `[routing.tasks].{task_type}` in "
+        "<project>/.veles/config.toml."
+    )
 
 
 def effective_route(task_type: str, project: Project) -> tuple[str, str, str]:
@@ -198,7 +216,8 @@ def effective_route(task_type: str, project: Project) -> tuple[str, str, str]:
                 (proj_routes.get("embedding"), "project-route"),
                 (user_routes.get("embedding"), "user-route"),
                 (DEFAULT_TASKS.get("embedding"), "default"),
-            ]
+            ],
+            task_type,
         )
 
     # Lazy import — `nl_override` imports back from `ensemble`, would
@@ -230,10 +249,10 @@ def effective_route(task_type: str, project: Project) -> tuple[str, str, str]:
             (user_routes.get(task_type), "user-route"),
             (user_routes.get("default"), "user-route-default"),
             (user_base, "user-provider"),
-            (DEFAULT_TASKS.get(task_type), "default"),
-            (DEFAULT_TASKS.get("default"), "default"),
-            (_DEFAULT_FALLBACK, "fallback"),
-        ]
+            # No hardcoded cloud catch-all (M165c): if none of the above
+            # resolved, `_first_spec` raises ConfigurationError.
+        ],
+        task_type,
     )
 
 

@@ -47,7 +47,12 @@ def graphify_rebuild(token_budget: int = 0) -> str:
     if project is None:
         return "<graphify_rebuild unavailable: no active project>"
 
-    provider, model = route("default", project)
+    from veles.core.model_resolver import ConfigurationError
+
+    try:
+        provider, model = route("default", project)
+    except ConfigurationError as exc:
+        return f"<graphify_rebuild unavailable: {exc}>"
     backend = _GRAPHIFY_BACKEND.get(provider)
     if backend is None:
         return (

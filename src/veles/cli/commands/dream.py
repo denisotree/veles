@@ -26,7 +26,6 @@ def cmd_dream(args: argparse.Namespace, project) -> int:
     consolidation_model = getattr(args, "consolidation_model", None)
     if include_consolidation:
         from veles.cli import _make_provider
-        from veles.core.routing.ensemble import route
 
         # Resolve the consolidation provider+model through routing (M125) so
         # they stay consistent. A bare `veles dream --include-consolidation`
@@ -34,7 +33,15 @@ def cmd_dream(args: argparse.Namespace, project) -> int:
         # backend for the hardcoded `anthropic/claude-haiku-4.5` slug → 404.
         # An explicit `--provider` still wins; the routed model is adopted
         # only when it belongs to that same provider.
-        routed_provider, routed_model = route("insights", project)
+        from veles.core.model_resolver import ConfigurationError
+        from veles.core.routing.ensemble import route
+
+        try:
+            routed_provider, routed_model = route("insights", project)
+        except ConfigurationError:
+            # Unconfigured + no explicit --provider → empty routed spec makes
+            # `_make_provider("")` fail below and consolidation is skipped.
+            routed_provider, routed_model = "", ""
         provider_name = getattr(args, "provider", None) or routed_provider
         if consolidation_model is None and provider_name == routed_provider:
             consolidation_model = routed_model

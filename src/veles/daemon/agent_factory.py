@@ -43,7 +43,15 @@ def _attach_background_runners(state, project, agent_factory, provider_name: str
     # an OpenRouter slug and got HTTP 404 on every deep-dream cycle. Routing
     # both keeps them consistent (ollama → an ollama model, etc.).
     del provider_name
-    dream_provider_name, dream_model = route("insights", project)
+    from veles.core.model_resolver import ConfigurationError
+
+    try:
+        dream_provider_name, dream_model = route("insights", project)
+    except ConfigurationError:
+        # Unconfigured: the background dream runner gets an empty spec and
+        # skips at dream-time (lazy `_provider_for_dream`); daemon start is
+        # unaffected.
+        dream_provider_name, dream_model = "", ""
 
     jobs_store = JobsStore(project.memory_db_path)
     state.job_runner = JobRunner(

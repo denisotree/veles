@@ -15,7 +15,7 @@ import sys
 
 from veles.core.project import Project
 from veles.core.routing import (
-    DEFAULT_TASKS,
+    KNOWN_TASKS,
     effective_route,
     load_nl_routing_config,
     load_routing_config,
@@ -48,16 +48,21 @@ def _show(project: Project) -> int:
     user_routes = get_user_section("routing", "tasks")
     task_names = sorted(
         {
-            *DEFAULT_TASKS.keys(),
+            *KNOWN_TASKS,
             *manual.tasks.keys(),
             *nl_config.tasks.keys(),
             *user_routes.keys(),
         }
     )
+    from veles.core.model_resolver import ConfigurationError
+
     print(f"{'task':<14}  {'spec':<40}  source")
     for task in task_names:
-        provider, model, source = effective_route(task, project)
-        print(f"{task:<14}  {f'{provider}:{model}':<40}  {source}")
+        try:
+            provider, model, source = effective_route(task, project)
+            print(f"{task:<14}  {f'{provider}:{model}':<40}  {source}")
+        except ConfigurationError:
+            print(f"{task:<14}  {'(unconfigured)':<40}  -")
 
     # Surface an incomplete `[provider]` base — a common footgun where
     # `default` is set but `model` is not, so the base layer is skipped.
@@ -105,7 +110,13 @@ def _refresh(args: argparse.Namespace, project: Project) -> int:
     # Route the extractor itself via the `default` task so the user can
     # cheap-it-out by setting the default to a haiku-tier model via
     # `veles route set default <provider>:<haiku-model>`.
-    routed_provider, routed_model = route("default", project)
+    from veles.core.model_resolver import ConfigurationError
+
+    try:
+        routed_provider, routed_model = route("default", project)
+    except ConfigurationError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     if not _has_api_key_for_provider(routed_provider):
         print(
             f"error: no API key for routed provider {routed_provider!r}; "

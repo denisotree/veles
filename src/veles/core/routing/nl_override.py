@@ -55,7 +55,7 @@ from pathlib import Path
 from typing import Any
 
 from veles.core.project import Project
-from veles.core.routing.ensemble import DEFAULT_TASKS, RoutingConfig, parse_spec
+from veles.core.routing.ensemble import KNOWN_TASKS, RoutingConfig, parse_spec
 
 _NL_TOML_FILENAME = "routing.nl.toml"
 _NL_STATE_FILENAME = "routing.nl.state.json"
@@ -216,7 +216,7 @@ def parse_extractor_output(raw: str) -> list[_NLEntry]:
     raw_entries = data.get("entries")
     if not isinstance(raw_entries, list):
         return []
-    valid_tasks = set(DEFAULT_TASKS.keys())
+    valid_tasks = set(KNOWN_TASKS)
     return [entry for entry in (_coerce_nl_entry(e, valid_tasks) for e in raw_entries) if entry]
 
 

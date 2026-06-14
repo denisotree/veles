@@ -76,7 +76,12 @@ def call_advisor(input_text: str, *, system_prompt: str | None = None) -> str:
     project = current_project()
     if project is None:
         return "<advisor unavailable: no active project>"
-    provider_name, model = route("advisor", project)
+    from veles.core.model_resolver import ConfigurationError
+
+    try:
+        provider_name, model = route("advisor", project)
+    except ConfigurationError as exc:
+        return f"<advisor unavailable: {exc}>"
     if not has_api_key(provider_name):
         return f"<advisor unavailable: no API key for routed provider {provider_name!r}>"
     try:

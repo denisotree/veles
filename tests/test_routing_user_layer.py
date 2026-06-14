@@ -47,12 +47,14 @@ def test_provider_base_feeds_ensemble_tasks(tmp_path: Path) -> None:
 
 def test_incomplete_provider_base_is_skipped(tmp_path: Path) -> None:
     """`[provider] default` without `model` must NOT synthesize
-    `ollama:<openrouter-slug>` — it falls through to DEFAULT_TASKS."""
+    `ollama:<openrouter-slug>` — it falls through, and with no other layer
+    configured, routing raises (M165c: no cloud fallback)."""
+    from veles.core.model_resolver import ConfigurationError
+
     project = init_project(tmp_path / "p", name="p")
     save_project_config(project, {"provider": {"default": "ollama"}})
-    provider, _model, source = effective_route("compressor", project)
-    assert provider == "openrouter"  # DEFAULT_TASKS["compressor"]
-    assert source == "default"
+    with pytest.raises(ConfigurationError):
+        effective_route("compressor", project)
 
 
 def test_explicit_route_beats_provider_base(tmp_path: Path) -> None:

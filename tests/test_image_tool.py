@@ -177,6 +177,10 @@ def test_describe_requires_active_project(_sandbox) -> None:
 
 
 def test_describe_requires_api_key(_project, monkeypatch: pytest.MonkeyPatch) -> None:
+    from veles.core.routing import set_project_route
+
+    set_project_route(_project, "vision", "openrouter:anthropic/claude-sonnet-4.6")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     p = _make_image_file(_project.root.parent)
     out = image_describe(str(p))
     assert "<error" in out
@@ -250,6 +254,9 @@ def test_describe_openai_wire_format(_project, monkeypatch: pytest.MonkeyPatch) 
 def test_describe_openrouter_uses_openai_with_base_url(
     _project, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from veles.core.routing import set_project_route
+
+    set_project_route(_project, "vision", "openrouter:anthropic/claude-sonnet-4.6")
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
     p = _make_image_file(_project.root, "x.png")
 
@@ -359,7 +366,7 @@ def test_image_tools_registered() -> None:
     assert "image_describe" in names
 
 
-def test_vision_in_default_routing() -> None:
-    from veles.core.routing import DEFAULT_TASKS
+def test_vision_in_known_routing() -> None:
+    from veles.core.routing import KNOWN_TASKS
 
-    assert "vision" in DEFAULT_TASKS
+    assert "vision" in KNOWN_TASKS
