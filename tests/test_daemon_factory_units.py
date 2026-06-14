@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import pytest
+
 from veles.cli.commands.daemon import (
     _build_agent_for_turn,
     _factory_settings_from_args,
@@ -18,15 +20,26 @@ from veles.core.project import init_project
 
 
 def test_factory_settings_extracts_defaults(tmp_path: Path) -> None:
-    """Empty Namespace + project without config: documented defaults."""
+    """Namespace with a model + project without config: documented defaults
+    for everything else (provider, budgets, flags)."""
     project = init_project(tmp_path, name=None, force=False)
-    s = _factory_settings_from_args(argparse.Namespace(), project)
+    s = _factory_settings_from_args(argparse.Namespace(model="test/model"), project)
     assert s.provider_name == "openrouter"
-    assert s.model == "anthropic/claude-sonnet-4.6"
+    assert s.model == "test/model"
     assert s.max_tokens == 4096
     assert s.verbose is False
     assert s.no_compress is False
     assert s.skills_cache_ttl == 600.0  # M158-followup default
+
+
+def test_factory_settings_requires_a_configured_model(tmp_path: Path) -> None:
+    """M165: no model anywhere (empty Namespace, no project/user config) ⇒ a
+    clear ConfigurationError, never a silent cloud-model fallback."""
+    from veles.core.model_resolver import ConfigurationError
+
+    project = init_project(tmp_path, name=None, force=False)
+    with pytest.raises(ConfigurationError, match="no model configured"):
+        _factory_settings_from_args(argparse.Namespace(), project)
 
 
 def test_factory_settings_skills_cache_ttl_from_config(tmp_path: Path) -> None:
@@ -36,11 +49,11 @@ def test_factory_settings_skills_cache_ttl_from_config(tmp_path: Path) -> None:
 
     project = init_project(tmp_path, name=None, force=False)
     save_project_config(project, {"daemon": {"skills_cache_ttl": 900}})
-    s = _factory_settings_from_args(argparse.Namespace(model=None, provider=None), project)
+    s = _factory_settings_from_args(argparse.Namespace(model="test/model", provider=None), project)
     assert s.skills_cache_ttl == 900.0
 
     save_project_config(project, {"daemon": {"skills_cache_ttl": 0}})
-    s0 = _factory_settings_from_args(argparse.Namespace(model=None, provider=None), project)
+    s0 = _factory_settings_from_args(argparse.Namespace(model="test/model", provider=None), project)
     assert s0.skills_cache_ttl == 0.0
 
 
@@ -199,7 +212,7 @@ def test_build_agent_for_turn_uses_settings_model(tmp_path: Path, monkeypatch) -
         class _StubProvider:
             pass
 
-        def _fake_provider(name):
+        def _fake_provider(name, model=None):
             return _StubProvider()
 
         def _fake_load_skills(project, tools, *, provider, model, **_kw):
@@ -271,7 +284,7 @@ def test_build_agent_for_turn_reallocates_stale_session_id(tmp_path: Path, monke
         import veles.cli as cli_mod
         import veles.core.agent as agent_mod
 
-        monkeypatch.setattr(cli_mod, "_make_provider", lambda name: _StubProvider())
+        monkeypatch.setattr(cli_mod, "_make_provider", lambda name, model=None: _StubProvider())
         monkeypatch.setattr(
             cli_mod, "_load_skills", lambda p, t, *, provider, model, **_kw: object()
         )
@@ -338,7 +351,7 @@ def test_make_agent_factory_reuses_provider_and_compressor_across_turns(
         import veles.cli as cli_mod
         import veles.core.agent as agent_mod
 
-        def _count_provider(name):
+        def _count_provider(name, model=None):
             provider_builds["n"] += 1
             return _StubProvider()
 
@@ -357,7 +370,7 @@ def test_make_agent_factory_reuses_provider_and_compressor_across_turns(
         monkeypatch.setattr(agent_mod, "Agent", _StubAgent)
 
         factory = _make_agent_factory(
-            argparse.Namespace(model=None, provider=None), project=project, store=store
+            argparse.Namespace(model="test/model", provider=None), project=project, store=store
         )
         for _ in range(3):
             factory(None, prompt="hi")
@@ -366,6 +379,6 @@ def test_make_agent_factory_reuses_provider_and_compressor_across_turns(
         assert provider_builds["n"] == 1
         assert compressor_builds["n"] == 1
         # The model is still handed to every turn's Agent (reuse ≠ pinning).
-        assert models_seen == ["anthropic/claude-sonnet-4.6"] * 3
+        assert models_seen == ["test/model"] * 3
     finally:
         reset_active_project(token)

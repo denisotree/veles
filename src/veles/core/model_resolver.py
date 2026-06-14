@@ -39,6 +39,27 @@ from veles.core.project import Project
 from veles.core.project_config import get_section, load_project_config
 
 
+class ConfigurationError(Exception):
+    """Required configuration is missing (e.g. no model set anywhere).
+
+    Raised instead of silently falling back to a hardcoded cloud model
+    (M165) so the user gets an actionable message at the entry point."""
+
+
+def ensure_model_configured(model: str) -> str:
+    """Return `model` if it's a non-empty id, else raise `ConfigurationError`.
+
+    The chokepoint for "no model configured": `DEFAULT_MODEL` is empty by
+    design, so `resolve_effective_model` returns `""` when nothing is set in
+    `--model`, the project `[provider] model`, or the user `default_model`."""
+    if model and model.strip():
+        return model
+    raise ConfigurationError(
+        "no model configured. Pass --model, set `[provider] model` in "
+        "<project>/.veles/config.toml, or `default_model` in ~/.veles/config.toml."
+    )
+
+
 def resolve_effective_provider(
     args: argparse.Namespace,
     project: Project | None,
@@ -109,4 +130,9 @@ def resolve_effective_model(
     return DEFAULT_MODEL
 
 
-__all__ = ["resolve_effective_model", "resolve_effective_provider"]
+__all__ = [
+    "ConfigurationError",
+    "ensure_model_configured",
+    "resolve_effective_model",
+    "resolve_effective_provider",
+]

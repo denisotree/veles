@@ -180,7 +180,7 @@ def test_advisor_review_renders_stub_verdict(
     project = init_project(tmp_path / "p", name="p")
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
     stub = _stub_provider('{"ok": false, "concerns": ["scope unclear"], "suggestions": []}')
-    monkeypatch.setattr("veles.core.provider_factory.make_provider", lambda name: stub)
+    monkeypatch.setattr("veles.core.provider_factory.make_provider", lambda name, model=None: stub)
     token = set_active_project(project)
     try:
         out = advisor_review("ship the new auth flow on Monday")
@@ -199,7 +199,7 @@ def test_advisor_review_handles_provider_construction_failure(
     project = init_project(tmp_path / "p", name="p")
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
 
-    def boom(name: str):
+    def boom(name: str, model: str | None = None):
         raise RuntimeError("kaboom")
 
     monkeypatch.setattr("veles.core.provider_factory.make_provider", boom)
@@ -226,7 +226,9 @@ def test_advisor_review_handles_subagent_exception(
         def create_message(self, *_a, **_kw):
             raise RuntimeError("network down")
 
-    monkeypatch.setattr("veles.core.provider_factory.make_provider", lambda name: _BoomProvider())
+    monkeypatch.setattr(
+        "veles.core.provider_factory.make_provider", lambda name, model=None: _BoomProvider()
+    )
     token = set_active_project(project)
     try:
         out = advisor_review("plan")

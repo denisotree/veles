@@ -394,7 +394,7 @@ def build_compressor(
     if hard_ceiling_tokens is not None:
         cfg_kwargs["hard_ceiling_tokens"] = hard_ceiling_tokens
     cfg = CompressionConfig(**cfg_kwargs)
-    summariser_provider = make_provider(routed_provider)
+    summariser_provider = make_provider(routed_provider, model=model)
     return make_default_compressor(
         provider=summariser_provider,
         model=model,
@@ -529,11 +529,12 @@ def _make_tool_aware_provider(
     if name in {"ollama", "llamacpp", "openai-compat"}:
         # Local providers don't bridge MCP — they run plain HTTP chat, the
         # agent loop wires Veles tools through the standard tool-call path.
-        # Tool-call support is opt-in via VELES_LOCAL_TOOLS env var (see
-        # provider_factory._local_tools_enabled).
+        # Pass the model so tool-call support is auto-detected from the
+        # model's capabilities (see provider_factory._apply_local_tool_policy);
+        # VELES_LOCAL_TOOLS still forces on/off when set.
         from veles.core.provider_factory import make_provider
 
-        return make_provider(name)
+        return make_provider(name, model=skill_model)
     raise ValueError(f"provider {name!r} cannot bridge tools")
 
 

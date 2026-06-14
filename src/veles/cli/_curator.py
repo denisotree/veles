@@ -471,7 +471,7 @@ def _maybe_run_insight_extractor(
     model = explicit_model or routed_model
     try:
         extractor = make_insight_extractor(
-            provider=make_provider(routed_provider),
+            provider=make_provider(routed_provider, model=model),
             model=model,
             project=project,
         )

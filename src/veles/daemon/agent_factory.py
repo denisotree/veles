@@ -127,6 +127,7 @@ def _factory_settings_from_args(
         DEFAULT_MAX_ITERATIONS,
     )
     from veles.core.model_resolver import (
+        ensure_model_configured,
         resolve_effective_model,
         resolve_effective_provider,
     )
@@ -144,7 +145,11 @@ def _factory_settings_from_args(
     # flag correctly defers to the cascade rather than counting as
     # explicit.
     provider_name = resolve_effective_provider(args, project, daemon_session=daemon_session)
-    model = resolve_effective_model(args, project, daemon_session=daemon_session)
+    # M165: a daemon must not boot on a silent cloud fallback — fail clearly
+    # when no model is configured anywhere.
+    model = ensure_model_configured(
+        resolve_effective_model(args, project, daemon_session=daemon_session)
+    )
 
     _cfg = load_project_config(project)
     compressor_section = get_section(_cfg, "compressor")
@@ -268,7 +273,7 @@ def _build_agent_for_turn(
     from veles.core.agent import Agent
 
     if provider is None:
-        provider = _make_provider(settings.provider_name)
+        provider = _make_provider(settings.provider_name, settings.model)
     registry = _load_skills(
         project,
         _RUN_TOOLS,

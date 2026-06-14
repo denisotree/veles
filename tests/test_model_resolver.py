@@ -9,6 +9,8 @@ import pytest
 
 from veles.cli._parsers._common import DEFAULT_MODEL, DEFAULT_PROVIDER
 from veles.core.model_resolver import (
+    ConfigurationError,
+    ensure_model_configured,
     resolve_effective_model,
     resolve_effective_provider,
 )
@@ -120,3 +122,32 @@ def test_user_config_model_used_when_no_persisted(tmp_path: Path) -> None:
 def test_default_model_when_nothing_set(tmp_path: Path) -> None:
     args = _ns()
     assert resolve_effective_model(args, None, persisted_model=None) == DEFAULT_MODEL
+
+
+# ---- M165: empty DEFAULT_MODEL + explicit "not configured" error ----
+
+
+def test_default_model_is_empty() -> None:
+    """No hardcoded cloud fallback — the argparse default is the empty string."""
+    assert DEFAULT_MODEL == ""
+
+
+def test_ensure_model_configured_passes_through_nonempty() -> None:
+    assert ensure_model_configured("ollama:qwen3:4b-instruct") == "ollama:qwen3:4b-instruct"
+
+
+def test_ensure_model_configured_raises_on_empty_or_blank() -> None:
+    with pytest.raises(ConfigurationError, match="no model configured"):
+        ensure_model_configured("")
+    with pytest.raises(ConfigurationError):
+        ensure_model_configured("   ")
+
+
+def test_resolve_then_ensure_errors_when_unconfigured(tmp_path: Path) -> None:
+    """With nothing set anywhere the resolver yields '' and the guard raises —
+    a clear error instead of a silent cloud-model fallback."""
+    project = init_project(tmp_path, name=None, force=False)
+    resolved = resolve_effective_model(_ns(), project, persisted_model=None)
+    assert resolved == ""
+    with pytest.raises(ConfigurationError):
+        ensure_model_configured(resolved)

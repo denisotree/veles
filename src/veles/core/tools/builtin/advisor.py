@@ -80,7 +80,7 @@ def call_advisor(input_text: str, *, system_prompt: str | None = None) -> str:
     if not has_api_key(provider_name):
         return f"<advisor unavailable: no API key for routed provider {provider_name!r}>"
     try:
-        provider = make_provider(provider_name)
+        provider = make_provider(provider_name, model=model)
     except Exception as exc:
         return f"<advisor unavailable: failed to build {provider_name!r}: {exc}>"
 
