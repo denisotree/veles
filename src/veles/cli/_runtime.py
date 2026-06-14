@@ -466,7 +466,30 @@ def _load_skills(
         mcp_names = mount_mcp_tools(full, project)
     except Exception as exc:
         logger.warning("MCP tools unavailable: %s", exc)
-    return full.subset(list(base_tools) + skill_names + mcp_names)
+
+    # M165b: provision MCP-driven project tools (e.g. graphify rebuild when a
+    # `graphify` MCP server is configured), then load file-based project/user
+    # tools (`<project>/.veles/tools/`, `~/.veles/tools/`) into the registry —
+    # the M120 loader, previously never wired into the runtime.
+    tool_names: list[str] = []
+    try:
+        from veles.core.tools.loader import load_into_registry
+        from veles.core.user_paths import user_home
+        from veles.mcp.provision import ensure_mcp_project_tools
+
+        ensure_mcp_project_tools(project)
+        report = load_into_registry(
+            full,
+            project_tools_dir=project.state_dir / "tools",
+            user_tools_dir=user_home() / "tools",
+        )
+        tool_names = [lt.entry.name for lt in report.loaded]
+        for name, scope in report.errors:
+            logger.warning("project tool %s failed to load: %s", name, scope)
+    except Exception as exc:
+        logger.warning("project tools unavailable: %s", exc)
+
+    return full.subset(list(base_tools) + skill_names + mcp_names + tool_names)
 
 
 def _qualify_for_provider(prompt: str, provider: Provider, tool_names: tuple[str, ...]) -> str:
