@@ -37,3 +37,36 @@ jobs:
           path: dist/
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  # Create the GitHub Release page only after PyPI publish succeeds, so a failed
+  # upload never leaves a Release pointing at a version that isn't on PyPI. Notes
+  # come from the matching `## [x.y.z]` section in CHANGELOG.md (auto-generated
+  # from commits as a fallback); the built sdist + wheel are attached.
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" { grab = 1; next }
+            grab && /^## \[/ { exit }
+            grab { print }
+          ' CHANGELOG.md > notes.md
+          if [ -s notes.md ]; then
+            gh release create "$GITHUB_REF_NAME" --verify-tag \
+              --title "$GITHUB_REF_NAME" --notes-file notes.md dist/*
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag \
+              --title "$GITHUB_REF_NAME" --generate-notes dist/*
+          fi
