@@ -4,7 +4,6 @@ Re-exports the public surface from `ensemble`.
 """
 
 from veles.core.routing.ensemble import (
-    DEFAULT_TASKS,
     KNOWN_TASKS,
     RoutingConfig,
     effective_route,
@@ -28,7 +27,6 @@ from veles.core.routing.nl_override import (
 )
 
 __all__ = [
-    "DEFAULT_TASKS",
     "KNOWN_TASKS",
     "RoutingConfig",
     "agents_md_sha256",

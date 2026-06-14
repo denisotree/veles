@@ -121,6 +121,12 @@ def test_project_scope_beats_user_scope(tmp_path: Path, monkeypatch: pytest.Monk
 
 
 def test_embedding_never_inherits_any_base(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Embedding ignores every chat layer (provider base, `default` route, user
+    base): with all of them set to ollama and no explicit `[routing.tasks].
+    embedding`, it raises rather than inheriting a chat model (M165d removed the
+    hardcoded embedding default)."""
+    from veles.core.model_resolver import ConfigurationError
+
     project = init_project(tmp_path / "p", name="p")
     save_project_config(
         project,
@@ -135,9 +141,8 @@ def test_embedding_never_inherits_any_base(tmp_path: Path, monkeypatch: pytest.M
         home,
         '[user]\nlanguage = "en"\ndefault_provider = "ollama"\ndefault_model = "qwen3"\n',
     )
-    provider, model, source = effective_route("embedding", project)
-    assert (provider, model) == ("openai", "text-embedding-3-small")
-    assert source == "default"
+    with pytest.raises(ConfigurationError):
+        effective_route("embedding", project)
 
 
 def test_embedding_explicit_route_honored(tmp_path: Path) -> None:

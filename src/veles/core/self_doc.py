@@ -72,7 +72,7 @@ def generate_self_doc(
     if tools is None:
         tools = []
 
-    # --- routing: one line per task in DEFAULT_TASKS ---
+    # --- routing: one line per configured task in KNOWN_TASKS ---
     routing: dict[str, str] = {}
     for task in sorted(KNOWN_TASKS):
         try:

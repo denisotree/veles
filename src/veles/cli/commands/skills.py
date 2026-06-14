@@ -41,6 +41,7 @@ def cmd_skill(args: argparse.Namespace, project: Project) -> int:
 
 def _dedup(args: argparse.Namespace, project: Project) -> int:
     """M61 — find near-duplicate skills via embedding or TF-IDF similarity."""
+    from veles.core.model_resolver import ConfigurationError
     from veles.core.skill_dedup import find_duplicate_skills
 
     skills = discover_skills(project)
@@ -49,13 +50,25 @@ def _dedup(args: argparse.Namespace, project: Project) -> int:
         return 0
     threshold_embedding = args.embedding_threshold
     threshold_tfidf = args.tfidf_threshold
-    clusters, mode = find_duplicate_skills(
-        skills,
-        project=project,
-        mode=args.mode,
-        embedding_threshold=threshold_embedding,
-        tfidf_threshold=threshold_tfidf,
-    )
+    try:
+        clusters, mode = find_duplicate_skills(
+            skills,
+            project=project,
+            mode=args.mode,
+            embedding_threshold=threshold_embedding,
+            tfidf_threshold=threshold_tfidf,
+        )
+    except (ConfigurationError, RuntimeError) as exc:
+        # `--mode embedding` (explicit) needs a configured embedding model;
+        # `--mode auto` would have degraded to tfidf. Clean error, not a
+        # traceback. (M165d: there is no hardcoded embedding default.)
+        print(
+            f"error: embedding similarity is unavailable: {exc}\n"
+            "Set `[routing.tasks].embedding` (e.g. openai:text-embedding-3-small) "
+            "in <project>/.veles/config.toml, or use `--mode tfidf`.",
+            file=sys.stderr,
+        )
+        return 2
     if not clusters:
         print(f"no duplicate clusters found (mode={mode}).")
         return 0

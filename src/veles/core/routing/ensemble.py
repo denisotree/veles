@@ -47,10 +47,10 @@ degrade — the feature goes off, never silently cloud.
 
 NL sits *above* the `[provider]` base on purpose: a complete `[provider]`
 yields a spec for every task, so placed above NL it would shadow every
-per-task AGENTS.md hint. `embedding` bypasses the base AND the raise (see
-`effective_route`): a chat base model is not an embedding model, so it keeps
-its own hardcoded default (`DEFAULT_TASKS["embedding"]`) and its sole
-consumer degrades to tfidf.
+per-task AGENTS.md hint. `embedding` bypasses the base (see `effective_route`):
+a chat base model is not an embedding model, so only an explicit
+`[routing.tasks].embedding` answers it — with none set it raises like any other
+task (M165d), and its sole consumer (skill_dedup) degrades to tfidf in auto mode.
 
 Missing or malformed *config* degrades to the next layer silently — routing
 should never block on a typo; only a fully-unconfigured chat task raises.
@@ -63,26 +63,16 @@ from typing import Any
 
 from veles.core.project import Project
 
-# M165c: no hardcoded cloud fallback for chat tasks — consistent with M165's
-# empty `DEFAULT_MODEL`. Chat tasks (default/curator/compressor/insights/skills/
-# advisor/vision) resolve from `[routing.tasks]`, the `[provider]` base, or
-# `default_provider/model`; when nothing is configured `effective_route` raises
-# `ConfigurationError` instead of silently using a cloud model. Sub-agent callers
-# catch it and degrade (skip the feature).
-DEFAULT_TASKS: dict[str, str] = {
-    # `embedding` keeps a hardcoded default on purpose: it's a distinct model
-    # *type* (a chat base can't serve it — see the embedding bypass in
-    # `effective_route`) and its sole consumer (`skill_dedup`) already degrades
-    # to tfidf. Making embedding configurable-or-raise is a clean follow-up
-    # gated on a consumer audit. text-embedding-3-small is OpenAI-shape,
-    # ~$0.02 / 1M tokens, 1536-dim; OpenRouter relays it too.
-    "embedding": "openai:text-embedding-3-small",
-}
+# M165c/M165d: no hardcoded cloud fallback anywhere. Every task — chat tasks
+# (default/curator/compressor/insights/skills/advisor/vision) and `embedding` —
+# resolves from `[routing.tasks]`, the `[provider]` base (chat tasks only; see
+# the embedding bypass in `effective_route`), or `default_provider/model`. When
+# nothing is configured `effective_route` raises `ConfigurationError` instead of
+# silently using a cloud model; callers catch it and degrade (skip the feature).
 
-# The canonical set of routable task names. Kept separate from DEFAULT_TASKS
-# (which now only carries the embedding default) because several consumers —
-# NL-route validation, `veles route show`, the self-doc routing block — need
-# "is this a known task?" independent of whether the task has a hardcoded model.
+# The canonical set of routable task names — used by NL-route validation,
+# `veles route show`, and the self-doc routing block to answer "is this a known
+# task?" (independent of whether the task is actually configured).
 KNOWN_TASKS: frozenset[str] = frozenset(
     {"default", "curator", "compressor", "insights", "skills", "advisor", "vision", "embedding"}
 )
@@ -207,15 +197,16 @@ def effective_route(task_type: str, project: Project) -> tuple[str, str, str]:
     user_routes = get_user_section("routing", "tasks")
 
     # EMBEDDING BYPASS — a chat base model (e.g. ollama:qwen3) is not an
-    # embedding model, so `embedding` must never inherit a `[provider]`/
-    # `[user]` base or any `default` catch-all; only an explicit per-task
-    # route or the hardcoded embedding default may answer it.
+    # embedding model, so `embedding` must never inherit a `[provider]`/`[user]`
+    # base or any `default` catch-all. Only an explicit per-task route answers
+    # it; with none configured `_first_spec` raises (M165d removed the hardcoded
+    # `openai:text-embedding-3-small` default — its one consumer, skill_dedup,
+    # degrades to tfidf in auto mode and errors clearly under `--mode embedding`).
     if task_type == "embedding":
         return _first_spec(
             [
                 (proj_routes.get("embedding"), "project-route"),
                 (user_routes.get("embedding"), "user-route"),
-                (DEFAULT_TASKS.get("embedding"), "default"),
             ],
             task_type,
         )
