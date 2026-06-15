@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-06-15
+
+### Fixed
+
+- `veles daemon` picker: the interactive `tui` session row is now shown only
+  while its REPL is actually alive. A clean exit, and especially a crash /
+  SIGKILL (which leaves the reused row stuck at `running` with a now-dead pid),
+  used to leave a phantom `tui` entry that displayed a nonexistent pid and could
+  not be removed (the row is reused and never deleted). Stopped/orphaned tui rows
+  are filtered out of the tree; a live REPL still appears beside the daemons.
+
 ## [0.3.1] — 2026-06-15
 
 ### Fixed
@@ -102,7 +113,8 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/denisotree/veles/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/denisotree/veles/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/denisotree/veles/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/denisotree/veles/compare/v0.1.0...v0.2.0

@@ -345,7 +345,9 @@ def _runtime_channels(project, record) -> list[str]:
 #   - a named daemon session → `runtime_sessions` (`RuntimeSessionRecord`,
 #     project-local); its channels are `[daemon.<name>.channels.*]`.
 #
-# Plus the `kind=tui` runtime row (no channels) so Enter still opens its log.
+# Plus the `kind=tui` runtime row (no channels) so Enter still opens its log —
+# shown only while the interactive REPL is actually live (a stopped/orphaned tui
+# row is filtered out: it isn't manageable here and the row is never deleted).
 
 
 def _resolve_path(p: str | Path | None) -> Path | None:
@@ -464,7 +466,19 @@ def build_daemon_tree(project) -> DaemonTree:
         tui: list[DaemonNode] = []
         for record in runtime_session_records(project):
             node = _node_from_record(project, record)
-            (tui if node.kind == "tui" else named).append(node)
+            if node.kind == "tui":
+                # The interactive session row is meaningful only while the REPL
+                # is actually alive (M138: see it beside the daemons, open its
+                # log). When stopped it is unmanageable noise — and because the
+                # tui row is a single reused record that's never deleted, a row
+                # would otherwise linger after *every* exit. Worse, a REPL that
+                # was SIGKILLed/crashed never ran `mark_stopped`, leaving a stale
+                # `running`/dead-pid row the user can't clear. So show tui only
+                # when its pid is live (`_runtime_status` == "running").
+                if node.status == "running":
+                    tui.append(node)
+            else:
+                named.append(node)
         named.sort(key=lambda n: n.name)
         # Order: unnamed/default daemon(s) first, then named daemons, then tui.
         current.extend(named)

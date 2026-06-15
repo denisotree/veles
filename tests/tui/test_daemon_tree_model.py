@@ -93,13 +93,18 @@ def test_channels_attach_to_daemon_node(tmp_path):
     assert tree.current[0].channels == ["telegram"]
 
 
-def test_named_and_tui_sessions_under_current_project(tmp_path):
+def test_named_and_live_tui_sessions_under_current_project(tmp_path, monkeypatch):
     project = init_project(tmp_path / "p", name="p")
     _seed_registry(_entry("p", str(tmp_path / "p")))
     store = RuntimeSessionStore(project.memory_db_path)
     store.create("api", "daemon", provider="ollama", model="qwen3:4b", port=8801)
-    store.create("tui", "tui")
+    tui = store.create("tui", "tui")
+    store.mark_started(tui.id, pid=999_001)  # a live REPL
     store.close()
+    # The tui row shows only while its pid is alive.
+    monkeypatch.setattr(
+        "veles.tui.screens._daemon_picker_data.is_alive", lambda pid: pid == 999_001
+    )
 
     tree = build_daemon_tree(project)
     by_name = {n.name: n for n in tree.current}
@@ -110,6 +115,27 @@ def test_named_and_tui_sessions_under_current_project(tmp_path):
     assert by_name["tui"].channels == []
     # Order: default first, then named, then tui last.
     assert [n.name for n in tree.current] == ["default", "api", "tui"]
+
+
+def test_stopped_or_orphaned_tui_is_hidden(tmp_path, monkeypatch):
+    """Regression: a tui REPL that exited (or was SIGKILLed, leaving a stale
+    `running`/dead-pid row) must not linger in the picker. The row is reused
+    and never deleted, so a visible stopped tui would be permanent, unmanageable
+    clutter showing a pid that no longer exists."""
+    project = init_project(tmp_path / "p", name="p")
+    _seed_registry(_entry("p", str(tmp_path / "p")))
+    store = RuntimeSessionStore(project.memory_db_path)
+    # Orphaned crash: status left at 'running' with a now-dead pid (mark_stopped
+    # never ran). `created` (never started) and a clean-exit 'stopped' are both
+    # covered by the same is_alive→False path.
+    tui = store.create("tui", "tui")
+    store.mark_started(tui.id, pid=45_171)
+    store.close()
+    monkeypatch.setattr("veles.tui.screens._daemon_picker_data.is_alive", lambda pid: False)
+
+    tree = build_daemon_tree(project)
+    assert [n.name for n in tree.current] == ["default"]
+    assert all(n.kind != "tui" for n in tree.current)
 
 
 def test_named_daemon_channels_from_daemon_block(tmp_path):
