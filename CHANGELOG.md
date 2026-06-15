@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-06-15
+
+### Fixed
+
+- TUI: the active project (and module registry) is now re-installed inside
+  the per-turn worker thread. `veles tui` runs each turn on a Textual
+  `run_worker(thread=True)` executor, which — unlike the daemon's
+  `asyncio.to_thread` — does not propagate `ContextVar`s, so the agent loop
+  saw `current_project() == None`. Tools that hard-require a project
+  (`wiki_search`, `wiki_list_pages`, `wiki_read_page`, `memory_save`) then
+  failed every call with "no active Veles project"; path-sandboxed tools
+  silently fell back to the cwd. Both vars are now captured on the main
+  thread and set on the worker thread for the duration of the turn.
+
 ## [0.3.0] — 2026-06-15
 
 ### Changed
@@ -88,7 +102,8 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/denisotree/veles/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/denisotree/veles/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/denisotree/veles/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/denisotree/veles/releases/tag/v0.1.0

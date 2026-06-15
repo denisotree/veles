@@ -149,7 +149,20 @@ class TuiApp(App[int]):
             yield self._status
 
     def on_mount(self) -> None:
-        self._bridge = AgentBridge(self, self._state, self._factory, project=self._project)
+        # `on_mount` runs on the main thread, still inside the CLI entry's
+        # `set_active_project` / `set_module_registry` scope — so capture the
+        # module registry here and hand it to the bridge, which re-installs
+        # both ContextVars on its worker thread (Textual doesn't propagate
+        # them). See `AgentBridge.__init__`.
+        from veles.core.modules import current_module_registry
+
+        self._bridge = AgentBridge(
+            self,
+            self._state,
+            self._factory,
+            project=self._project,
+            module_registry=current_module_registry(),
+        )
         assert self._composer is not None and self._status is not None
         assert self._inspector is not None and self._queue_panel is not None
         # Wire the queue-pop hook into the composer now that the bridge
