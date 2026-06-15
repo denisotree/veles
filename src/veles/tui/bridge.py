@@ -28,6 +28,7 @@ from textual.app import App
 
 from veles.core.agent import Agent
 from veles.core.events import Event
+from veles.core.modules import ModuleRegistry
 from veles.core.project import Project
 from veles.tui.messages import AgentError, AgentEvent, ChatDelta
 from veles.tui.state import AppState
@@ -50,11 +51,22 @@ class AgentBridge:
         state: AppState,
         factory: AgentFactory,
         project: Project | None = None,
+        module_registry: ModuleRegistry | None = None,
     ) -> None:
         self._app = app
         self._state = state
         self._factory = factory
         self._project = project
+        # The active project + module registry live in main-thread
+        # ContextVars (set by the CLI entry point). Textual runs each turn
+        # on a ThreadPoolExecutor worker (`run_worker(thread=True)`), which
+        # does NOT propagate ContextVars — so the agent loop and its tools
+        # would see `current_project() == None` (wiki_* / memory_save then
+        # hard-raise "no active Veles project"). We capture both here, on
+        # the main thread where they're live, and re-install them inside
+        # `_run_turn` (the worker thread). The daemon avoids this because
+        # `asyncio.to_thread` copies the context for it.
+        self._module_registry = module_registry
         # Set while a turn is in flight so the UI thread can stop it
         # cooperatively (Ctrl+C). Created per turn in `_run_turn`, cleared
         # in its `finally`. `CancelToken.cancel()` is thread-safe, so the
@@ -131,6 +143,14 @@ class AgentBridge:
             reset_cancel_token,
             set_cancel_token,
         )
+        from veles.core.context import (
+            reset_active_project,
+            set_active_project,
+        )
+        from veles.core.modules import (
+            reset_module_registry,
+            set_module_registry,
+        )
         from veles.core.permission.prompt import (
             reset_prompter as reset_unified_prompter,
         )
@@ -157,6 +177,11 @@ class AgentBridge:
         cancel = CancelToken()
         self._cancel_token = cancel
         cancel_ctx_token = set_cancel_token(cancel)
+        # Re-install the main-thread ContextVars Textual's worker thread
+        # dropped (see __init__): without this the agent's tools resolve
+        # `current_project()` to None and wiki_* / memory_save hard-raise.
+        project_ctx_token = set_active_project(self._project)
+        module_ctx_token = set_module_registry(self._module_registry)
         unified_token = set_unified_prompter(self._handle_prompt)
         # M148: ask_user must never reach the default stdin prompter under
         # Textual (input() would fight the TUI for the terminal). Install a
@@ -184,6 +209,8 @@ class AgentBridge:
         finally:
             self._cancel_token = None
             reset_cancel_token(cancel_ctx_token)
+            reset_active_project(project_ctx_token)
+            reset_module_registry(module_ctx_token)
             end_trust_turn(turn_token)
             reset_unified_prompter(unified_token)
             reset_question_prompter(question_token)
