@@ -35,7 +35,7 @@ Design notes:
   + safer + keeps the LLM's attention on the routing-relevant context.
 
 - `parse_extractor_output(raw)` is JSON-tolerant: strips ```json fences,
-  ignores unknown keys, validates task names against `DEFAULT_TASKS`,
+  ignores unknown keys, validates task names against `KNOWN_TASKS`,
   validates provider names against `PROVIDER_API_KEY_ENVS`. Garbage
   entries are dropped silently so a noisy LLM run doesn't poison the
   TOML.

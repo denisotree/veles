@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking (niche):** routing no longer has *any* hardcoded cloud default —
+  the `embedding` task (used by `veles skill dedup`) now resolves only from an
+  explicit `[routing.tasks].embedding`, matching the other tasks. `--mode auto`
+  still degrades to TF-IDF when unset; `--mode embedding` errors clearly instead
+  of silently using `openai:text-embedding-3-small`.
+
+### Fixed
+
+- The release workflow now creates the GitHub Release on a version tag
+  (previously it only published to PyPI; the Release page was manual).
+
 ## [0.2.0] — 2026-06-14
 
 ### Added

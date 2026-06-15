@@ -7,8 +7,9 @@ no tools, no persistence, no continuation — its job is to flag concerns
 and suggest improvements without doing the work itself.
 
 This tool spawns a tool-less, single-iteration sub-agent on the routed
-`advisor` task (default in `routing.DEFAULT_TASKS`). The sub-agent is
-prompted to return strict JSON of shape:
+`advisor` task (resolved from `[routing.tasks].advisor` or the `[provider]`
+base; advisor degrades to "<unavailable>" when nothing is configured). The
+sub-agent is prompted to return strict JSON of shape:
 
     {"ok": true|false, "concerns": ["..."], "suggestions": ["..."]}
 

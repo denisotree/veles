@@ -178,10 +178,9 @@ def test_nl_default_used_for_unknown_task(project: Project) -> None:
     """nl-default is a *user-stated* preference for tasks the user hasn't pinned.
 
     Resolution order in route(): manual-task → manual-default → nl-task →
-    nl-default → DEFAULT_TASKS[task] → DEFAULT_TASKS['default']. So an
-    nl-default *does* shadow DEFAULT_TASKS for tasks not explicitly set
-    anywhere — that's the user's stated preference winning over a hardcoded
-    fallback, which is the intended behaviour.
+    nl-default → [provider] base → user layers (M165d: no hardcoded fallback
+    below that — an unconfigured task raises). So an nl-default *does* answer
+    tasks not explicitly pinned anywhere, which is the intended behaviour.
     """
     save_nl_routing_config(project, RoutingConfig(tasks={"default": "openai:gpt-4o"}))
     # advisor isn't manually set; nl-default applies (user-stated > hardcoded).

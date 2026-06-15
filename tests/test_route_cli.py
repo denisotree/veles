@@ -95,11 +95,11 @@ def test_show_prints_source_labels(tmp_path: Path, capsys: pytest.CaptureFixture
     out = capsys.readouterr().out
     assert rc == 0
     # explicit route → project-route; inherited → project-provider;
-    # embedding bypasses the base → default.
+    # embedding bypasses the base and, with no route set, shows (unconfigured).
     assert "compressor" in out and "openai:gpt-4o-mini" in out and "project-route" in out
     assert "project-provider" in out  # e.g. advisor inherits ollama:qwen3
     assert "ollama:qwen3" in out
-    assert "openai:text-embedding-3-small" in out  # embedding default
+    assert "(unconfigured)" in out  # embedding has no route → unconfigured (M165d)
 
 
 def test_show_warns_on_incomplete_provider(

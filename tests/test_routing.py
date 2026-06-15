@@ -9,7 +9,6 @@ import pytest
 from veles.core.project import init_project
 from veles.core.project_config import project_config_path
 from veles.core.routing import (
-    DEFAULT_TASKS,
     load_routing_config,
     parse_spec,
     route,
@@ -132,8 +131,8 @@ def test_route_uses_project_override(tmp_path: Path) -> None:
     assert route("compressor", project) == ("anthropic", "claude-haiku-4-5-20251001")
 
 
-def test_route_falls_back_to_project_default_then_to_static(tmp_path: Path) -> None:
-    """Unknown task type → project's "default" → DEFAULT_TASKS["default"]."""
+def test_route_falls_back_to_project_default(tmp_path: Path) -> None:
+    """An unknown task type resolves to the project's `default` route."""
     project = init_project(tmp_path / "p", name="p")
     set_project_route(project, "default", "openai:gpt-4o-mini")
     assert route("never-defined-task", project) == ("openai", "gpt-4o-mini")
@@ -162,23 +161,40 @@ def test_nl_hint_beats_provider_base(tmp_path: Path) -> None:
     assert route("advisor", project) == ("ollama", "qwen3")
 
 
-# ---------- DEFAULT_TASKS sanity ----------
-
-
-def test_default_tasks_all_parse_cleanly() -> None:
-    """Every entry in DEFAULT_TASKS must be a valid <provider>:<model> spec."""
-    for task, spec in DEFAULT_TASKS.items():
-        provider, model = parse_spec(spec)
-        assert provider, f"task {task!r} has empty provider in {spec!r}"
-        assert model, f"task {task!r} has empty model in {spec!r}"
+# ---------- task set + embedding (M165d: no hardcoded defaults) ----------
 
 
 def test_known_tasks_contains_required_entries() -> None:
     from veles.core.routing import KNOWN_TASKS
 
-    assert {"default", "curator", "compressor", "insights", "skills", "advisor", "vision"}.issubset(
-        KNOWN_TASKS
-    )
-    # M165c: DEFAULT_TASKS now carries only the embedding default (a distinct
-    # model type); chat tasks have no hardcoded cloud fallback.
-    assert set(DEFAULT_TASKS) == {"embedding"}
+    assert {
+        "default",
+        "curator",
+        "compressor",
+        "insights",
+        "skills",
+        "advisor",
+        "vision",
+        "embedding",
+    }.issubset(KNOWN_TASKS)
+
+
+def test_route_embedding_raises_when_unconfigured(tmp_path: Path) -> None:
+    """M165d: `embedding` has no hardcoded default — it raises like any task
+    when no explicit `[routing.tasks].embedding` is set (the base never feeds
+    it; a chat model is not an embedding model)."""
+    from veles.core.model_resolver import ConfigurationError
+
+    project = init_project(tmp_path / "p", name="p")
+    # A `[provider]` base must NOT satisfy embedding (bypass).
+    from veles.core.project_config import save_project_config
+
+    save_project_config(project, {"provider": {"default": "ollama", "model": "qwen3"}})
+    with pytest.raises(ConfigurationError):
+        route("embedding", project)
+
+
+def test_route_embedding_resolves_from_explicit_route(tmp_path: Path) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    set_project_route(project, "embedding", "openai:text-embedding-3-small")
+    assert route("embedding", project) == ("openai", "text-embedding-3-small")

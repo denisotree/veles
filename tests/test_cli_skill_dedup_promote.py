@@ -81,6 +81,24 @@ def test_dedup_reports_no_clusters_when_skills_distinct(project, capsys) -> None
     assert "no duplicate" in capsys.readouterr().out.lower()
 
 
+def test_dedup_embedding_mode_errors_cleanly_when_unconfigured(project, capsys) -> None:
+    """M165d: `--mode embedding` with no `[routing.tasks].embedding` configured
+    returns a clean error (rc 2) pointing at the fix — not a traceback."""
+    _write_skill(project, "alpha", description="alpha", body="alpha alpha alpha")
+    _write_skill(project, "bravo", description="bravo", body="alpha alpha alpha")
+    args = _ns(
+        skill_command="dedup",
+        mode="embedding",
+        embedding_threshold=0.85,
+        tfidf_threshold=0.5,
+    )
+    rc = skills_cmd.cmd_skill(args, project)
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "embedding" in err
+    assert "tfidf" in err  # suggests the --mode tfidf alternative
+
+
 def test_dedup_finds_clusters_with_tfidf(project, capsys) -> None:
     _write_skill(
         project,

@@ -157,11 +157,13 @@ def test_explicit_tfidf_mode_does_not_touch_embedding(project: Project) -> None:
 
 
 def test_explicit_embedding_mode_propagates_error(project: Project, monkeypatch) -> None:
-    """`mode='embedding'` refuses to fall back — propagates the construction error."""
+    """`mode='embedding'` refuses to fall back — propagates the error. With no
+    `[routing.tasks].embedding` configured (M165d: no hardcoded default) that's a
+    clear ConfigurationError, not a silent tfidf fallback."""
     for env in ("OPENAI_API_KEY", "OPENROUTER_API_KEY"):
         monkeypatch.delenv(env, raising=False)
     skills = [_make_skill("a", "x"), _make_skill("b", "x")]
-    with pytest.raises(Exception, match="API key"):
+    with pytest.raises(Exception, match="no model configured"):
         find_duplicate_skills(skills, project=project, mode="embedding")
 
 
