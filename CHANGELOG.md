@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-06-15
+
 ### Changed
 
 - **Breaking (niche):** routing no longer has *any* hardcoded cloud default —
@@ -17,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Daemon event streams now deliver a run's terminal `completed`/`error` event
+  before closing: it was appended asynchronously while the run was marked done
+  synchronously, so a subscriber streaming a fast run could miss the completion
+  event.
 - The release workflow now creates the GitHub Release on a version tag
   (previously it only published to PyPI; the Release page was manual).
 
@@ -82,6 +88,7 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/denisotree/veles/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/denisotree/veles/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/denisotree/veles/releases/tag/v0.1.0
