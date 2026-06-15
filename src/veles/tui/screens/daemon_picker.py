@@ -10,7 +10,8 @@ has several channels. Layout:
         chan: telegram              ← channels as leaves
       api       stopped …           ← a named daemon session
         chan: discord
-      tui  (tui) …                  ← the interactive session row (no channels)
+      tui  (tui) …                  ← the live interactive session (no channels;
+                                      shown only while the REPL is running)
     Other projects                  ← section
       other-proj  running …
         chan: telegram
