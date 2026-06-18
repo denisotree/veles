@@ -14,6 +14,7 @@ from veles.core.tools.builtin import (  # noqa: F401
     run_shell,
     search_files,
     stat_file,
+    task_tools,
     web_search,
     wiki_tools,
     write_file,
