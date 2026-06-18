@@ -65,6 +65,7 @@ tools = [
     "wiki_ingest",
     "memory_save_insight",
     "memory_save_rule",
+    "memory_query",
     "task_add",
     "task_list",
     "task_done",

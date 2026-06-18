@@ -7,6 +7,7 @@ from veles.core.tools.builtin import (  # noqa: F401
     fetch_url,
     image,
     list_files,
+    memory_query,
     memory_save,
     pdf,
     plan_tool,
