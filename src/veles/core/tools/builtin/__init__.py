@@ -3,6 +3,7 @@
 from veles.core.tools.builtin import (  # noqa: F401
     advisor,
     ask_user,
+    edit_file,
     fetch_url,
     image,
     list_files,
