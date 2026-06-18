@@ -92,13 +92,15 @@ def test_pass_keeps_base_and_never_escalates(monkeypatch):
     import veles.core.routing as rmod
     import veles.core.verify as vmod
 
-    monkeypatch.setattr(vmod, "advisor_verifier", lambda p, a, evidence="": (VerifyVerdict.PASS, []))
+    monkeypatch.setattr(
+        vmod, "advisor_verifier", lambda p, a, evidence="": (VerifyVerdict.PASS, [])
+    )
     monkeypatch.setattr(rmod, "route", lambda task, project: ("claude-cli", "sonnet"))
     invoked = []
     monkeypatch.setattr(
         runmod,
         "_build_escalator",
-        lambda *a, **k: (lambda prompt: invoked.append(1) or _FakeResult("ESC")),
+        lambda *a, **k: lambda prompt: invoked.append(1) or _FakeResult("ESC"),
     )
     base = _FakeResult("good answer")
     out = _maybe_verify_and_escalate(_args(), object(), base, store=None)
@@ -129,7 +131,7 @@ def test_fail_escalates_and_rebinds(monkeypatch):
     )
     monkeypatch.setattr(rmod, "route", lambda task, project: ("claude-cli", "sonnet"))
     escalated = _FakeResult("STRONG ANSWER", session_id="s2")
-    monkeypatch.setattr(runmod, "_build_escalator", lambda *a, **k: (lambda prompt: escalated))
+    monkeypatch.setattr(runmod, "_build_escalator", lambda *a, **k: lambda prompt: escalated)
     base = _FakeResult("weak answer")
     out = _maybe_verify_and_escalate(_args(), object(), base, store=None)
     assert out is escalated  # printed answer + hooks use the corrected run
@@ -139,11 +141,15 @@ def test_fail_with_same_advisor_model_warns_and_keeps_base(monkeypatch, capsys):
     import veles.core.routing as rmod
     import veles.core.verify as vmod
 
-    monkeypatch.setattr(vmod, "advisor_verifier", lambda p, a, evidence="": (VerifyVerdict.FAIL, ["x"]))
+    monkeypatch.setattr(
+        vmod, "advisor_verifier", lambda p, a, evidence="": (VerifyVerdict.FAIL, ["x"])
+    )
     # advisor route resolves to the SAME provider/model as the base run.
     monkeypatch.setattr(rmod, "route", lambda task, project: ("ollama", "m"))
     base = _FakeResult("weak")
-    out = _maybe_verify_and_escalate(_args(provider="ollama", model="m"), object(), base, store=None)
+    out = _maybe_verify_and_escalate(
+        _args(provider="ollama", model="m"), object(), base, store=None
+    )
     assert out is base  # no distinct stronger model → no escalation
     assert "equals the base model" in capsys.readouterr().err
 

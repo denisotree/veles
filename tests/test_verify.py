@@ -16,7 +16,6 @@ from veles.core.verify import (
     verify_and_maybe_escalate,
 )
 
-
 # ---- pure decision logic ----
 
 

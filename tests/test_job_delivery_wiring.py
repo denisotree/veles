@@ -18,8 +18,6 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from veles.channels.delivery import DeliveryRouter
 from veles.channels.session_map import SessionMap
 from veles.channels.telegram import TelegramGateway

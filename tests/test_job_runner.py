@@ -144,9 +144,7 @@ async def test_repeat_times_marks_done_after_n(store: JobsStore, output_root: Pa
     assert store.get_job(rec.id).state == "done"
 
 
-async def test_deliver_to_pushes_output_via_router(
-    store: JobsStore, output_root: Path
-) -> None:
+async def test_deliver_to_pushes_output_via_router(store: JobsStore, output_root: Path) -> None:
     """M165: a due job with `deliver_to` set hands its output to the
     DeliveryRouter, which dispatches to the registered platform deliverer.
     This is the production push path (runner → router → gateway.deliver)."""
@@ -204,9 +202,7 @@ async def test_no_deliver_to_skips_router(store: JobsStore, output_root: Path) -
     assert seen == []
 
 
-async def test_delivery_failure_does_not_break_run(
-    store: JobsStore, output_root: Path
-) -> None:
+async def test_delivery_failure_does_not_break_run(store: JobsStore, output_root: Path) -> None:
     """A broken deliverer is best-effort: the run still completes 'ok' and
     the schedule advances — a dead Telegram bot can't wedge a schedule."""
     from veles.channels.delivery import DeliveryRouter
@@ -224,9 +220,7 @@ async def test_delivery_failure_does_not_break_run(
         output_root=output_root,
         delivery_router=router,
     )
-    rec = store.add_job(
-        name="m", prompt="x", schedule_expr="30m", deliver_to="telegram:9", now=100
-    )
+    rec = store.add_job(name="m", prompt="x", schedule_expr="30m", deliver_to="telegram:9", now=100)
     summaries = await runner._tick_once(200_000.0)
     assert summaries[0].status == "ok"
     refreshed = store.get_job(rec.id)

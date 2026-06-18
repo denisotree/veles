@@ -122,7 +122,9 @@ def _parse_judge(raw: str) -> tuple[VerifyVerdict, list[str]]:
     return (VerifyVerdict.PASS, []) if bool(data.get("ok")) else (VerifyVerdict.FAIL, concerns)
 
 
-def advisor_verifier(prompt: str, answer: str, *, evidence: str = "") -> tuple[VerifyVerdict, list[str]]:
+def advisor_verifier(
+    prompt: str, answer: str, *, evidence: str = ""
+) -> tuple[VerifyVerdict, list[str]]:
     """Default verifier: ask the routed advisor model to judge the answer.
 
     Feeds the gathered `evidence` (tool-call trace) alongside the answer so
@@ -140,9 +142,9 @@ def advisor_verifier(prompt: str, answer: str, *, evidence: str = "") -> tuple[V
 
 __all__ = [
     "Escalator",
+    "Verifier",
     "VerifyOutcome",
     "VerifyVerdict",
-    "Verifier",
     "advisor_verifier",
     "verify_and_maybe_escalate",
 ]

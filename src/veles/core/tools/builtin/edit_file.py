@@ -40,10 +40,7 @@ def edit_file(path: str, old_string: str, new_string: str, replace_all: bool = F
     p = resolve_safe(path)
     project = current_project()
     if not p.is_file():
-        return (
-            f"<error: {display_path(p, project)} does not exist; "
-            "use write_file to create it>"
-        )
+        return f"<error: {display_path(p, project)} does not exist; use write_file to create it>"
     refusal = guard_write(p, project)
     if refusal is not None:
         return refusal
@@ -57,8 +54,10 @@ def edit_file(path: str, old_string: str, new_string: str, replace_all: bool = F
             f"<error: old_string appears {count} times in {display}; "
             "add surrounding context to make it unique, or pass replace_all=true>"
         )
-    updated = original.replace(old_string, new_string) if replace_all else original.replace(
-        old_string, new_string, 1
+    updated = (
+        original.replace(old_string, new_string)
+        if replace_all
+        else original.replace(old_string, new_string, 1)
     )
     n = count if replace_all else 1
     p.write_text(updated, encoding="utf-8")
