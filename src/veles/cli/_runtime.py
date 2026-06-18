@@ -575,16 +575,23 @@ def _run_agent_streaming_aware(
     prompt: str,
     args: argparse.Namespace,
     project: Project | None = None,
+    *,
+    emit_output: bool = True,
 ):
     """Run the agent, streaming chunks to stdout when args.stream is set.
 
-    Returns (result, budget). Helper for run/ingest/query/lint commands.
+    Returns (result, budget). Helper for run/ingest commands.
+
+    `emit_output=False` (M170): run silently — no streaming, no final
+    `print(result.text)`. The caller owns output. `--verify` uses this so
+    the base answer isn't shown before verification can supersede it, and
+    so an escalated re-run doesn't print twice.
     """
     from veles.core.trust import begin_trust_turn, end_trust_turn
 
     trust_turn_token = begin_trust_turn()
     try:
-        if getattr(args, "stream", False):
+        if getattr(args, "stream", False) and emit_output:
 
             def _emit(chunk: str) -> None:
                 sys.stdout.write(chunk)
@@ -597,7 +604,8 @@ def _run_agent_streaming_aware(
         else:
             with _budget_scope(args, project=project) as budget:
                 result = agent.run(prompt)
-            print(result.text)
+            if emit_output:
+                print(result.text)
     finally:
         end_trust_turn(trust_turn_token)
     return result, budget

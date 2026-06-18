@@ -53,6 +53,16 @@ def _register_run(sub: argparse._SubParsersAction) -> None:
         ),
     )
     run.add_argument(
+        "--verify",
+        action="store_true",
+        help=(
+            "After the run, have the routed advisor model judge the answer; on a "
+            "confident failure, re-run the prompt on that stronger model (fallback "
+            "on hallucinations). Forces buffered output. Off by default; also "
+            "enabled by VELES_VERIFY_MODE=1."
+        ),
+    )
+    run.add_argument(
         "--no-agents-md",
         action="store_true",
         help="Skip auto-injection of AGENTS.md into the system prompt.",
