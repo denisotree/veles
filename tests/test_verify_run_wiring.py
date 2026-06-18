@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 
 from veles.cli.commands.run import (
+    _build_escalator,
     _maybe_verify_and_escalate,
     _render_evidence,
     _verify_enabled,
@@ -27,7 +28,14 @@ class _FakeResult:
 
 
 def _args(**kw):
-    base = {"verify": True, "provider": "ollama", "model": "m", "prompt": "q"}
+    base = {
+        "verify": True,
+        "provider": "ollama",
+        "model": "m",
+        "prompt": "q",
+        "max_tokens_total": 0,
+        "stream": False,
+    }
     base.update(kw)
     return argparse.Namespace(**base)
 
@@ -138,6 +146,73 @@ def test_fail_with_same_advisor_model_warns_and_keeps_base(monkeypatch, capsys):
     out = _maybe_verify_and_escalate(_args(provider="ollama", model="m"), object(), base, store=None)
     assert out is base  # no distinct stronger model → no escalation
     assert "equals the base model" in capsys.readouterr().err
+
+
+# ---- escalator mechanism (the real _build_escalator body) ----
+
+
+def test_build_escalator_runs_on_advisor_route_and_returns_result(monkeypatch):
+    """Exercise the REAL _build_escalator: it must build the agent on the
+    advisor provider/model with the run toolset and run it buffered."""
+    import veles.cli as cli
+
+    stub_result = _FakeResult("STRONGER ANSWER", session_id="esc")
+    captured = {}
+
+    class _StubAgent:
+        def run(self, prompt, on_text_delta=None):
+            captured["prompt"] = prompt
+            return stub_result
+
+    def fake_build(args, project, **kw):
+        captured["provider"] = args.provider
+        captured["model"] = args.model
+        captured["tool_aware"] = kw.get("tool_aware")
+        return _StubAgent()
+
+    monkeypatch.setattr(cli, "build_command_agent", fake_build)
+    monkeypatch.setattr(cli, "_build_run_system_prompt", lambda a, p: "")
+
+    esc = _build_escalator(_args(), object(), "claude-cli", "sonnet", store=None)
+    out = esc("redo this")
+
+    assert out is stub_result
+    assert captured["prompt"] == "redo this"
+    assert captured["provider"] == "claude-cli"
+    assert captured["model"] == "sonnet"
+    assert captured["tool_aware"] is True  # cli-delegate → MCP-bridged tools
+
+
+def test_build_escalator_tool_aware_false_for_direct_provider(monkeypatch):
+    import veles.cli as cli
+
+    captured = {}
+
+    class _StubAgent:
+        def run(self, prompt, on_text_delta=None):
+            return _FakeResult("x")
+
+    def fake_build(args, project, **kw):
+        captured["tool_aware"] = kw.get("tool_aware")
+        return _StubAgent()
+
+    monkeypatch.setattr(cli, "build_command_agent", fake_build)
+    monkeypatch.setattr(cli, "_build_run_system_prompt", lambda a, p: "")
+
+    _build_escalator(_args(), object(), "anthropic", "claude-x", store=None)("p")
+    assert captured["tool_aware"] is False
+
+
+def test_build_escalator_returns_none_when_agent_unbuildable(monkeypatch):
+    """Missing key etc. → build_command_agent returns None → escalator None,
+    which the caller treats as 'no escalation route' (keeps the base answer)."""
+    import veles.cli as cli
+
+    monkeypatch.setattr(cli, "build_command_agent", lambda *a, **k: None)
+    monkeypatch.setattr(cli, "_build_run_system_prompt", lambda a, p: "")
+
+    esc = _build_escalator(_args(), object(), "claude-cli", "sonnet", store=None)
+    assert esc("p") is None
 
 
 # ---- buffered-output suppression ----
