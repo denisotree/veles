@@ -70,6 +70,9 @@ tools = [
     "task_list",
     "task_done",
     "task_snooze",
+    "job_add",
+    "job_list",
+    "job_remove",
 ]
 
 [ingest]
