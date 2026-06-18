@@ -22,11 +22,14 @@ import dataclasses
 import logging
 import sys
 
+logger = logging.getLogger(__name__)
+
 
 def _attach_background_runners(state, project, agent_factory, provider_name: str):
     """Wire the JobRunner + DreamRunner onto `state` so the daemon's
     aiohttp lifecycle picks them up. Returns the `JobsStore` so the
     caller can close it in `finally`."""
+    from veles.channels.delivery import DeliveryRouter
     from veles.cli import _make_provider as _make_provider_for_dream
     from veles.core.dream_runner import DreamRunner
     from veles.core.job_runner import JobRunner
@@ -53,11 +56,23 @@ def _attach_background_runners(state, project, agent_factory, provider_name: str
         # unaffected.
         dream_provider_name, dream_model = "", ""
 
+    # M165: build the router NOW (runner construction) but leave it empty —
+    # platform deliverers are registered later, once channels actually start
+    # (`server._start_channel_runners`). The router is mutable, so a job that
+    # fires before its channel is up just hits "no deliverer wired" (logged,
+    # best-effort) rather than losing the wiring. `local`-target output is
+    # already persisted under `.veles/jobs/`; the sink only echoes it to the log.
+    delivery_router = DeliveryRouter(
+        local_sink=lambda text: logger.info("job delivery [local]: %.200s", text or ""),
+    )
+    state.delivery_router = delivery_router
+
     jobs_store = JobsStore(project.memory_db_path)
     state.job_runner = JobRunner(
         store=jobs_store,
         agent_factory=agent_factory,
         output_root=project.jobs_dir,
+        delivery_router=delivery_router,
     )
 
     def _provider_for_dream():

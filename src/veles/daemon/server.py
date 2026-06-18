@@ -823,6 +823,13 @@ def _start_channel_runners(state: DaemonState) -> None:
             continue
         state.channel_runners.append(gateway)
         state.active_channels.append(platform)
+        # M165: expose this channel as an outbound delivery target for the
+        # scheduler. Any gateway implementing `deliver(chat_id, text,
+        # thread_id)` becomes reachable via `deliver_to = "<platform>:<chat>"`.
+        if state.delivery_router is not None:
+            deliver_fn = getattr(gateway, "deliver", None)
+            if callable(deliver_fn):
+                state.delivery_router.register_deliverer(platform, deliver_fn)
         task = asyncio.create_task(_run_channel_gateway(gateway))
         state.channel_tasks.append(task)
 

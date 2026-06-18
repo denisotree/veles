@@ -76,6 +76,9 @@ class DaemonState:
     last_override_session_id: str | None = None
     job_runner: Any | None = None  # M75 JobRunner; lazy import to avoid cycles
     dream_runner: Any | None = None  # M76 DreamRunner
+    # M165 DeliveryRouter: built at runner-attach time, deliverers registered
+    # when channels start, used by the JobRunner to push `deliver_to` output.
+    delivery_router: Any | None = None
     channel_runners: list[Any] = field(default_factory=list)
     channel_tasks: list[asyncio.Task] = field(default_factory=list)
     # Platform names of the channels that actually *started* (a declared
