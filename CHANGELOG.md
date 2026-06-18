@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-06-18
+
+### Added
+
+- Scheduled jobs can now **deliver their output to a channel**. A job created
+  with `--deliver-to telegram:<chat-id>` (or `deliver_to` via the API) posts its
+  result to that chat when it runs — previously the target was recorded but
+  never used, so a job only wrote a file under `.veles/jobs/`. Delivery is
+  best-effort: a failing channel is logged on the run but never wedges the
+  schedule. This is the foundation for proactive reminders and monitoring
+  alerts.
+- New **`edit_file`** tool for surgical edits: the agent replaces an exact
+  string in an existing file instead of rewriting the whole file. The match
+  must be unique unless `replace_all` is set, so it can't silently edit the
+  wrong occurrence. Useful for correcting scripts, data models, or queries.
+- **Verify → escalate** (`veles run --verify`, the `[verify] enabled` daemon
+  config, or `VELES_VERIFY_MODE=1`): after a run, the routed advisor model judges
+  the answer against the evidence the agent gathered; on a confident failure it
+  re-runs the prompt on that stronger model (which may be a `claude`/`gemini` CLI)
+  and returns the corrected answer — a fallback for hallucinations on cheap/local
+  models. Works for `veles run` and for daemon/channel turns (e.g. Telegram), where
+  escalation preserves the chat's session so history isn't lost. Off by default.
+
 ## [0.3.2] — 2026-06-15
 
 ### Fixed

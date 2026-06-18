@@ -144,6 +144,90 @@ async def test_repeat_times_marks_done_after_n(store: JobsStore, output_root: Pa
     assert store.get_job(rec.id).state == "done"
 
 
+async def test_deliver_to_pushes_output_via_router(store: JobsStore, output_root: Path) -> None:
+    """M165: a due job with `deliver_to` set hands its output to the
+    DeliveryRouter, which dispatches to the registered platform deliverer.
+    This is the production push path (runner → router → gateway.deliver)."""
+    from veles.channels.delivery import DeliveryRouter
+
+    seen: list[tuple[str, str, str | None]] = []
+
+    async def fake_telegram(chat_id: str, text: str, thread_id: str | None) -> None:
+        seen.append((chat_id, text, thread_id))
+
+    router = DeliveryRouter()
+    router.register_deliverer("telegram", fake_telegram)
+
+    factory, _ = _make_factory(text="DB looks healthy")
+    runner = JobRunner(
+        store=store,
+        agent_factory=factory,
+        output_root=output_root,
+        delivery_router=router,
+    )
+    store.add_job(
+        name="monitor",
+        prompt="check db",
+        schedule_expr="30m",
+        deliver_to="telegram:42",
+        now=100,
+    )
+    summaries = await runner._tick_once(200_000.0)
+
+    assert summaries[0].status == "ok"
+    assert seen == [("42", "DB looks healthy", None)]
+
+
+async def test_no_deliver_to_skips_router(store: JobsStore, output_root: Path) -> None:
+    """A job without `deliver_to` never touches the router."""
+    from veles.channels.delivery import DeliveryRouter
+
+    seen: list[str] = []
+
+    async def fake(chat_id: str, text: str, thread_id: str | None) -> None:
+        seen.append(text)
+
+    router = DeliveryRouter()
+    router.register_deliverer("telegram", fake)
+
+    factory, _ = _make_factory(text="out")
+    runner = JobRunner(
+        store=store,
+        agent_factory=factory,
+        output_root=output_root,
+        delivery_router=router,
+    )
+    store.add_job(name="silent", prompt="x", schedule_expr="30m", now=100)
+    await runner._tick_once(200_000.0)
+    assert seen == []
+
+
+async def test_delivery_failure_does_not_break_run(store: JobsStore, output_root: Path) -> None:
+    """A broken deliverer is best-effort: the run still completes 'ok' and
+    the schedule advances — a dead Telegram bot can't wedge a schedule."""
+    from veles.channels.delivery import DeliveryRouter
+
+    async def boom(chat_id: str, text: str, thread_id: str | None) -> None:
+        raise RuntimeError("telegram down")
+
+    router = DeliveryRouter()
+    router.register_deliverer("telegram", boom)
+
+    factory, _ = _make_factory(text="out")
+    runner = JobRunner(
+        store=store,
+        agent_factory=factory,
+        output_root=output_root,
+        delivery_router=router,
+    )
+    rec = store.add_job(name="m", prompt="x", schedule_expr="30m", deliver_to="telegram:9", now=100)
+    summaries = await runner._tick_once(200_000.0)
+    assert summaries[0].status == "ok"
+    refreshed = store.get_job(rec.id)
+    assert refreshed.last_status == "ok"
+    assert refreshed.next_run_at > 200_000.0  # schedule still advanced
+
+
 async def test_status_returns_dict(store: JobsStore, output_root: Path) -> None:
     factory, _ = _make_factory()
     runner = JobRunner(store=store, agent_factory=factory, output_root=output_root)

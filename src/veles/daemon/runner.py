@@ -100,6 +100,7 @@ async def run_agent_in_background(
     prompt: str,
     on_finished: Callable[[RunHandle], None] | None = None,
     post_turn_hook: Callable[[RunResult], None] | None = None,
+    verify_hook: Callable[[str, RunResult], RunResult] | None = None,
 ) -> None:
     """Drive `agent.run(prompt)` to completion, mirroring events into `handle`.
 
@@ -172,6 +173,15 @@ async def run_agent_in_background(
             if on_finished is not None:
                 on_finished(handle)
             return
+
+        # M170b: opt-in verify→escalate before the `completed` event, so
+        # channels render the corrected answer and `post_turn_hook` ingests
+        # it. Runs off the event loop (the advisor + escalation re-run hit
+        # the LLM). Best-effort: a hook failure keeps the base result — a
+        # broken advisor must never wedge a turn.
+        if verify_hook is not None:
+            with contextlib.suppress(Exception):
+                result = await asyncio.to_thread(verify_hook, prompt, result)
 
         handle.state = "completed"
         handle.iterations = result.iterations

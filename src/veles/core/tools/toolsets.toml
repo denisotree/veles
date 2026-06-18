@@ -51,6 +51,7 @@ tools = [
 includes = ["builtin"]
 tools = [
     "write_file",
+    "edit_file",
     "run_shell",
     "fetch_url",
     "web_search",

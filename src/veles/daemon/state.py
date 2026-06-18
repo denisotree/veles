@@ -76,6 +76,9 @@ class DaemonState:
     last_override_session_id: str | None = None
     job_runner: Any | None = None  # M75 JobRunner; lazy import to avoid cycles
     dream_runner: Any | None = None  # M76 DreamRunner
+    # M165 DeliveryRouter: built at runner-attach time, deliverers registered
+    # when channels start, used by the JobRunner to push `deliver_to` output.
+    delivery_router: Any | None = None
     channel_runners: list[Any] = field(default_factory=list)
     channel_tasks: list[asyncio.Task] = field(default_factory=list)
     # Platform names of the channels that actually *started* (a declared
@@ -86,6 +89,9 @@ class DaemonState:
     # Kept in lockstep with `channel_runners` — cleared together on stop.
     active_channels: list[str] = field(default_factory=list)
     post_turn_hook: Any | None = None  # Callable[[RunResult], None] — runs curator/insights/etc.
+    # M170b: Callable[[str, RunResult], RunResult] — opt-in verify→escalate run
+    # before the `completed` event. None = off (the default).
+    verify_hook: Any | None = None
     # M124: optional `(**kwargs) -> Agent` factory used by manager-spawn
     # in daemon path. When None, manager-mode is skipped and runs always
     # go through the regular `agent_factory` (legacy single-agent path).

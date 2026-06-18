@@ -484,6 +484,26 @@ class TelegramGateway:
     async def _answer_callback_query(self, callback_id: str, *, text: str | None = None) -> None:
         await self._api.answer_callback_query(callback_id, text=text)
 
+    async def deliver(self, chat_id: str, text: str, thread_id: str | None = None) -> None:
+        """M165: outbound delivery entry point for the `DeliveryRouter`.
+
+        Send `text` (agent Markdown, e.g. a scheduled job's report or a
+        reminder) to `chat_id`, rendered through the Telegram-allowed HTML
+        subset like a normal turn. Registered onto the daemon's router by
+        `_start_channel_runners`, so `deliver_to = "telegram:<chat>"` jobs
+        actually reach the user instead of only landing in `.veles/jobs/`.
+
+        `thread_id` (forum topics) is accepted to satisfy the
+        `PlatformDeliverer` signature but unused for direct chats."""
+        from veles.channels.telegram_format import (
+            html_safe_truncate,
+            markdown_to_telegram_html,
+        )
+
+        del thread_id  # forum topics unsupported for direct delivery (M165)
+        rendered = html_safe_truncate(markdown_to_telegram_html(text or ""))
+        await self._send_message(int(chat_id), rendered)
+
     # M127: `_refresh_daemon_health` / `_get_daemon_provider` /
     # `_get_active_model_for` were removed with the Telegram `/model`
     # picker — model/provider are fixed at daemon launch from config.
