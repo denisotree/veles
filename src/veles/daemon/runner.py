@@ -101,6 +101,7 @@ async def run_agent_in_background(
     on_finished: Callable[[RunHandle], None] | None = None,
     post_turn_hook: Callable[[RunResult], None] | None = None,
     verify_hook: Callable[[str, RunResult], RunResult] | None = None,
+    origin: str | None = None,
 ) -> None:
     """Drive `agent.run(prompt)` to completion, mirroring events into `handle`.
 
@@ -132,6 +133,7 @@ async def run_agent_in_background(
     # Channels that subscribe to the WS stream see `trust_prompt` /
     # `approval_prompt` events and POST the user's answer back via
     # `/v1/runs/{run_id}/prompts/{prompt_id}` — see channel_prompter.py.
+    from veles.core.context import reset_origin, set_origin
     from veles.core.permission.prompt import (
         reset_prompter as reset_unified_prompter,
     )
@@ -145,6 +147,11 @@ async def run_agent_in_background(
     )
     from veles.daemon.channel_prompter import make_unified_prompter
 
+    # M166: the originating chat (e.g. "telegram:<id>") as a delivery target,
+    # so tools like `task_add` can default `deliver_to` to "this chat". Set
+    # before the worker thread starts — `asyncio.to_thread` copies the context,
+    # so the agent's tools see it.
+    origin_token = set_origin(origin)
     # The unified prompter carries `arguments` and `reason` to the
     # Telegram trust-prompt render and serves both trust and approval.
     unified_token = set_unified_prompter(make_unified_prompter(handle, loop))
@@ -209,6 +216,7 @@ async def run_agent_in_background(
                 await asyncio.to_thread(post_turn_hook, result)
     finally:
         end_trust_turn(turn_token)
+        reset_origin(origin_token)
         reset_unified_prompter(unified_token)
         reset_question_prompter(question_token)
         # Any prompt still pending at this point is orphaned (the agent

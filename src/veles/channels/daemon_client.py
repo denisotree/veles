@@ -72,10 +72,14 @@ class DaemonClient:
         async with self.session.get(f"{self._base}/v1/health") as resp:
             return await _read_json(resp)
 
-    async def submit_run(self, prompt: str, *, session_id: str | None = None) -> dict[str, Any]:
+    async def submit_run(
+        self, prompt: str, *, session_id: str | None = None, origin: str | None = None
+    ) -> dict[str, Any]:
         body: dict[str, Any] = {"prompt": prompt}
         if session_id is not None:
             body["session_id"] = session_id
+        if origin is not None:
+            body["origin"] = origin
         async with self.session.post(
             f"{self._base}/v1/runs", json=body, headers=self._auth
         ) as resp:

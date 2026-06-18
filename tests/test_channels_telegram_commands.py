@@ -114,7 +114,7 @@ def _make_gateway(
     attachment_dir: Path | None = None,
 ) -> TelegramGateway:
     class _NullClient:
-        async def submit_run(self, prompt: str, *, session_id=None):
+        async def submit_run(self, prompt: str, *, session_id=None, origin=None):
             return {"run_id": "x", "session_id": session_id, "state": "running"}
 
         async def stream_events(self, run_id):
@@ -212,7 +212,7 @@ async def test_dispatch_goal_with_task_submits_run(session_map: SessionMap) -> N
     submitted: list[tuple[str, str | None]] = []
 
     class _Client:
-        async def submit_run(self, prompt: str, *, session_id=None):
+        async def submit_run(self, prompt: str, *, session_id=None, origin=None):
             submitted.append((prompt, session_id))
             return {"run_id": "g1", "session_id": session_id, "state": "running"}
 
@@ -245,7 +245,7 @@ async def test_dispatch_dream_submits_consolidation_run(
     submitted: list[str] = []
 
     class _Client:
-        async def submit_run(self, prompt: str, *, session_id=None):
+        async def submit_run(self, prompt: str, *, session_id=None, origin=None):
             submitted.append(prompt)
             return {"run_id": "d1", "session_id": session_id, "state": "running"}
 

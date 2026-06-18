@@ -42,7 +42,9 @@ class _FakeDaemonClient:
         self.submit_error = submit_error
         self.submitted: list[tuple[str, str | None]] = []
 
-    async def submit_run(self, prompt: str, *, session_id: str | None = None):
+    async def submit_run(
+        self, prompt: str, *, session_id: str | None = None, origin: str | None = None
+    ):
         if self.submit_error is not None:
             raise self.submit_error
         self.submitted.append((prompt, session_id))
@@ -873,7 +875,9 @@ class _StubBackend:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str | None]] = []
 
-    async def submit_run(self, prompt: str, *, session_id: str | None = None):
+    async def submit_run(
+        self, prompt: str, *, session_id: str | None = None, origin: str | None = None
+    ):
         self.calls.append((prompt, session_id))
         return {"run_id": "run-x", "session_id": session_id, "state": "running"}
 

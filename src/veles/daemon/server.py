@@ -205,6 +205,9 @@ async def _handle_create_run(request: web.Request) -> web.Response:
     session_id = body.get("session_id")
     if session_id is not None and not isinstance(session_id, str):
         return web.json_response({"error": "'session_id' must be a string"}, status=400)
+    origin = body.get("origin")  # M166: originating chat as a delivery target
+    if origin is not None and not isinstance(origin, str):
+        return web.json_response({"error": "'origin' must be a string"}, status=400)
 
     handle = new_run_handle(session_id=session_id)
     state.add_run(handle)
@@ -260,6 +263,7 @@ async def _handle_create_run(request: web.Request) -> web.Response:
             on_finished=_on_finished,
             post_turn_hook=state.post_turn_hook,
             verify_hook=state.verify_hook,
+            origin=origin,
         )
     )
     state.run_tasks.add(task)
