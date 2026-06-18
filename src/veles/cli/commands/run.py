@@ -17,21 +17,6 @@ def _verify_enabled(args: argparse.Namespace) -> bool:
     return bool(getattr(args, "verify", False)) or os.environ.get("VELES_VERIFY_MODE") == "1"
 
 
-def _render_evidence(history, *, max_chars: int = 4000) -> str:
-    """Render the agent's tool-call trace (calls + their results) into a
-    compact block for the verifier — so the judge checks grounding, not just
-    plausibility. Truncated to keep the judge prompt bounded."""
-    lines: list[str] = []
-    for msg in history:
-        for tc in getattr(msg, "tool_calls", None) or []:
-            arg_str = ", ".join(f"{k}={v!r}" for k, v in (tc.arguments or {}).items())
-            lines.append(f"-> {tc.name}({arg_str})")
-        if getattr(msg, "role", "") == "tool" and msg.content:
-            snippet = msg.content.strip().replace("\n", " ")
-            lines.append(f"   = {snippet[:500]}")
-    return "\n".join(lines)[:max_chars]
-
-
 def _build_escalator(args, project, adv_provider, adv_model, store):
     """Return `escalator(prompt) -> RunResult` that re-runs the prompt on the
     advisor-tier model with the full run tool surface. None when the advisor
@@ -89,10 +74,11 @@ def _maybe_verify_and_escalate(args: argparse.Namespace, project: Project, resul
     from veles.core.verify import (
         VerifyVerdict,
         advisor_verifier,
+        render_evidence,
         verify_and_maybe_escalate,
     )
 
-    evidence = _render_evidence(result.history)
+    evidence = render_evidence(result.history)
 
     def verifier(p: str, a: str):
         return advisor_verifier(p, a, evidence=evidence)

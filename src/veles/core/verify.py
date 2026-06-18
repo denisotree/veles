@@ -140,11 +140,31 @@ def advisor_verifier(
     return _parse_judge(raw)
 
 
+def render_evidence(history, *, max_chars: int = 4000) -> str:
+    """Render an agent run's tool-call trace (calls + their results) into a
+    compact block for the verifier — so the judge checks grounding, not just
+    plausibility. Shared by the CLI and daemon verify paths. Truncated to keep
+    the judge prompt bounded.
+
+    `history` is a list of provider `Message`s; tool calls live on assistant
+    messages and results on `role == "tool"` messages."""
+    lines: list[str] = []
+    for msg in history:
+        for tc in getattr(msg, "tool_calls", None) or []:
+            arg_str = ", ".join(f"{k}={v!r}" for k, v in (tc.arguments or {}).items())
+            lines.append(f"-> {tc.name}({arg_str})")
+        if getattr(msg, "role", "") == "tool" and msg.content:
+            snippet = msg.content.strip().replace("\n", " ")
+            lines.append(f"   = {snippet[:500]}")
+    return "\n".join(lines)[:max_chars]
+
+
 __all__ = [
     "Escalator",
     "Verifier",
     "VerifyOutcome",
     "VerifyVerdict",
     "advisor_verifier",
+    "render_evidence",
     "verify_and_maybe_escalate",
 ]

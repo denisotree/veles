@@ -510,3 +510,81 @@ def _make_post_turn_hook(args: argparse.Namespace, project):
                 )
 
     return hook
+
+
+def _verify_enabled(project) -> bool:
+    """M170b gate: `VELES_VERIFY_MODE=1` env override, else `[verify] enabled`
+    in the project config. Default off. Config is the primary switch (a global
+    env that doubles token spend on every channel message is a footgun)."""
+    import os
+
+    if os.environ.get("VELES_VERIFY_MODE") == "1":
+        return True
+    from veles.core.project_config import get_section, load_project_config
+
+    section = get_section(load_project_config(project), "verify")
+    return bool(section.get("enabled", False))
+
+
+def _make_verify_hook(
+    args: argparse.Namespace, *, project, store, daemon_session: str | None = None
+):
+    """M170b: build the daemon `verify_hook(prompt, result) -> result`, or
+    None when verify is off for this project.
+
+    Mirrors the `veles run` wiring but daemon-side: the routed advisor judges
+    the answer against its evidence trace; a confident FAIL re-runs the prompt
+    on the advisor-tier model. The re-run uses the **base session_id** so a
+    persistent channel chat keeps its history (a fresh session would make the
+    bot "forget everything" on the first escalation). Same-model advisor routes
+    are skipped (no real escalation). Everything is best-effort — the caller in
+    `run_agent_in_background` suppresses exceptions and keeps the base answer.
+    """
+    if not _verify_enabled(project):
+        return None
+    settings = _factory_settings_from_args(args, project, daemon_session=daemon_session)
+
+    def hook(prompt: str, result):
+        from veles.core.model_resolver import ConfigurationError
+        from veles.core.routing import route
+        from veles.core.verify import (
+            advisor_verifier,
+            render_evidence,
+            verify_and_maybe_escalate,
+        )
+
+        evidence = render_evidence(result.history)
+
+        def verifier(p: str, a: str):
+            return advisor_verifier(p, a, evidence=evidence)
+
+        def escalator(p: str):
+            try:
+                adv_provider, adv_model = route("advisor", project)
+            except ConfigurationError:
+                return None
+            if (adv_provider, adv_model) == (settings.provider_name, settings.model):
+                return None  # advisor == base model — re-running it is pointless
+            adv_settings = dataclasses.replace(
+                settings, provider_name=adv_provider, model=adv_model
+            )
+            try:
+                adv_agent = _build_agent_for_turn(
+                    adv_settings,
+                    project=project,
+                    store=store,
+                    session_id=result.session_id,  # continuity: same chat session
+                    prompt=p,
+                )
+                return adv_agent.run(p)
+            except Exception:
+                return None
+
+        outcome = verify_and_maybe_escalate(
+            prompt, result.text, verifier=verifier, escalator=escalator
+        )
+        if outcome.escalated and outcome.escalated_result is not None:
+            return outcome.escalated_result
+        return result
+
+    return hook

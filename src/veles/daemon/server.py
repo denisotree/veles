@@ -259,6 +259,7 @@ async def _handle_create_run(request: web.Request) -> web.Response:
             prompt=prompt,
             on_finished=_on_finished,
             post_turn_hook=state.post_turn_hook,
+            verify_hook=state.verify_hook,
         )
     )
     state.run_tasks.add(task)

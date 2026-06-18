@@ -12,10 +12,9 @@ import argparse
 from veles.cli.commands.run import (
     _build_escalator,
     _maybe_verify_and_escalate,
-    _render_evidence,
     _verify_enabled,
 )
-from veles.core.verify import VerifyVerdict
+from veles.core.verify import VerifyVerdict, render_evidence
 
 
 class _FakeResult:
@@ -53,7 +52,7 @@ def test_render_evidence_includes_calls_and_results():
         ),
         Message(role="tool", content="file1\nfile2", tool_call_id="1"),
     ]
-    ev = _render_evidence(history)
+    ev = render_evidence(history)
     assert "run_shell" in ev
     assert "command='ls'" in ev
     assert "file1" in ev
@@ -63,7 +62,7 @@ def test_render_evidence_truncates():
     from veles.core.provider import Message
 
     history = [Message(role="tool", content="x" * 9000, tool_call_id="1")]
-    assert len(_render_evidence(history, max_chars=100)) <= 100
+    assert len(render_evidence(history, max_chars=100)) <= 100
 
 
 # ---- flag gating ----

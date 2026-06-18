@@ -89,6 +89,9 @@ class DaemonState:
     # Kept in lockstep with `channel_runners` — cleared together on stop.
     active_channels: list[str] = field(default_factory=list)
     post_turn_hook: Any | None = None  # Callable[[RunResult], None] — runs curator/insights/etc.
+    # M170b: Callable[[str, RunResult], RunResult] — opt-in verify→escalate run
+    # before the `completed` event. None = off (the default).
+    verify_hook: Any | None = None
     # M124: optional `(**kwargs) -> Agent` factory used by manager-spawn
     # in daemon path. When None, manager-mode is skipped and runs always
     # go through the regular `agent_factory` (legacy single-agent path).
