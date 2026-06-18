@@ -69,12 +69,15 @@ class JobRunner:
         output_root: Path,
         max_parallel: int = 2,
         delivery_router=None,
+        tz=None,
     ) -> None:
         self._store = store
         self._agent_factory = agent_factory
         self._output_root = Path(output_root)
         self._sem = asyncio.Semaphore(max_parallel)
         self._delivery = delivery_router
+        # M167: timezone for calendar schedules (daily@09:00 …); None → host-local.
+        self._tz = tz
         self._loop_task: asyncio.Task | None = None
         self._running = False
         self._inflight: set[asyncio.Task] = set()
@@ -218,7 +221,7 @@ class JobRunner:
         last_error: str | None = None,
     ) -> None:
         completed = job.repeat_completed + 1
-        next_at = compute_next_run(job.schedule, now=now)
+        next_at = compute_next_run(job.schedule, now=now, tz=self._tz)
         done = next_at is None or (job.repeat_times is not None and completed >= job.repeat_times)
         updates: dict[str, object] = {
             "last_run_at": now,
