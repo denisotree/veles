@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-06-18
+
+### Added
+
+- **Human-readable recurring schedules** — cron is no longer the way you set up
+  a recurring job. Use `daily@09:00`, `weekdays@18:00`, `weekend@10:00`,
+  `weekly:mon,fri@09:00`, `every:2h`, or `once:2026-07-01 18:00`. In chat the
+  bot understands plain language ("каждый будний день в 18:00") and translates
+  it for you. Times are in the project's timezone — the host's by default, or
+  set `[schedule] timezone = "Europe/Moscow"` in config.toml to override; they
+  stay correct across daylight-saving changes. (Raw cron still works but is no
+  longer documented.)
+- **The bot can schedule recurring work from chat** — `job_add` (plus
+  `job_list` / `job_remove`) lets it set up a daily digest or a periodic
+  monitoring check itself. Because a recurring job runs autonomously with full
+  tools, creating one asks for your confirmation first.
+- **`memory_query`** — the agent can read back its own recorded insights,
+  rules, telemetry, tasks, and session log with a read-only SQL `SELECT`
+  (previously it could only write to memory, never read it).
+
 ## [0.5.0] — 2026-06-18
 
 ### Added

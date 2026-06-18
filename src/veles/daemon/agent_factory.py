@@ -67,12 +67,17 @@ def _attach_background_runners(state, project, agent_factory, provider_name: str
     )
     state.delivery_router = delivery_router
 
+    from veles.core.job_schedule import resolve_schedule_tz
+
     jobs_store = JobsStore(project.memory_db_path)
     state.job_runner = JobRunner(
         store=jobs_store,
         agent_factory=agent_factory,
         output_root=project.jobs_dir,
         delivery_router=delivery_router,
+        # M167: calendar schedules fire in the project's configured zone
+        # (`[schedule] timezone`), host-local by default.
+        tz=resolve_schedule_tz(project),
     )
 
     # M166: the reminder sweep shares the SAME delivery_router (the one channels

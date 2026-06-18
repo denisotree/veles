@@ -16,6 +16,7 @@ embedded scheduling logic: callers (JobRunner, CLI) own the tick loop.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import secrets
 import sqlite3
@@ -152,6 +153,7 @@ class JobsStore:
         deliver_to: str | None = None,
         enabled: bool = True,
         now: float | None = None,
+        tz: dt.tzinfo | None = None,
     ) -> JobRecord:
         if not name.strip():
             raise ValueError("job name must be non-empty")
@@ -159,7 +161,9 @@ class JobsStore:
             raise ValueError("job prompt must be non-empty")
         sched = parse_schedule(schedule_expr)
         at = now if now is not None else time.time()
-        next_at = initial_next_run(sched, now=at)
+        # M167: calendar schedules (daily@09:00 …) fire in `tz` (the project's
+        # configured zone, host-local by default). None → host-local.
+        next_at = initial_next_run(sched, now=at, tz=tz)
         jid = _make_job_id()
         meta = (
             json.dumps({"fire_at": sched.fire_at, "interval_seconds": sched.interval_seconds})
