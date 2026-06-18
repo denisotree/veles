@@ -75,6 +75,17 @@ def _attach_background_runners(state, project, agent_factory, provider_name: str
         delivery_router=delivery_router,
     )
 
+    # M166: the reminder sweep shares the SAME delivery_router (the one channels
+    # register their deliverers on — a fresh router would never reach Telegram).
+    # The runner owns its TasksStore and closes it on stop().
+    from veles.core.reminder_runner import ReminderRunner
+    from veles.core.tasks_store import TasksStore
+
+    state.reminder_runner = ReminderRunner(
+        store=TasksStore(project.memory_db_path),
+        delivery_router=delivery_router,
+    )
+
     def _provider_for_dream():
         return _make_provider_for_dream(dream_provider_name)
 

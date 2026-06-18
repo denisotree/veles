@@ -712,12 +712,16 @@ async def _start_background_runners(app: web.Application) -> None:
         start_fn = getattr(state.dream_runner, "start", None)
         if callable(start_fn):
             await start_fn()
+    if state.reminder_runner is not None:
+        start_fn = getattr(state.reminder_runner, "start", None)
+        if callable(start_fn):
+            await start_fn()
     _start_channel_runners(state)
 
 
 async def _stop_background_runners(app: web.Application) -> None:
     state: DaemonState = app["state"]
-    for runner in (state.job_runner, state.dream_runner):
+    for runner in (state.job_runner, state.dream_runner, state.reminder_runner):
         if runner is None:
             continue
         stop_fn = getattr(runner, "stop", None)
