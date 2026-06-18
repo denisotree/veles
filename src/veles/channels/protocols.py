@@ -19,8 +19,13 @@ class RunBackend(Protocol):
     """Two-method surface the gateways need: submit a prompt, then
     follow its event stream until completion."""
 
-    async def submit_run(self, prompt: str, *, session_id: str | None = None) -> dict[str, Any]:
-        """POST one turn. Returns at least `{"run_id": ..., "session_id": ...}`."""
+    async def submit_run(
+        self, prompt: str, *, session_id: str | None = None, origin: str | None = None
+    ) -> dict[str, Any]:
+        """POST one turn. Returns at least `{"run_id": ..., "session_id": ...}`.
+
+        `origin` (M166) is the originating chat as a delivery target
+        (e.g. "telegram:<id>") so reminder tools can default to "this chat"."""
         ...
 
     def stream_events(self, run_id: str) -> AsyncIterator[dict[str, Any]]:

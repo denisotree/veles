@@ -41,7 +41,9 @@ class InProcessRunBackend:
     def __init__(self, state: DaemonState) -> None:
         self._state = state
 
-    async def submit_run(self, prompt: str, *, session_id: str | None = None) -> dict[str, Any]:
+    async def submit_run(
+        self, prompt: str, *, session_id: str | None = None, origin: str | None = None
+    ) -> dict[str, Any]:
         handle = new_run_handle(session_id=session_id)
         self._state.add_run(handle)
         # M122f: channel turns route through the manager-spawn orchestrator
@@ -68,6 +70,8 @@ class InProcessRunBackend:
                 agent=agent,
                 prompt=prompt,
                 post_turn_hook=self._state.post_turn_hook,
+                verify_hook=self._state.verify_hook,
+                origin=origin,
             )
         )
         self._state.run_tasks.add(task)

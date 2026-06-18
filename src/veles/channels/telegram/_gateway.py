@@ -410,7 +410,9 @@ class TelegramGateway:
         or None after surfacing the failure to the user."""
         session_id = self.session_map.get(chat_key)
         try:
-            run = await self.daemon_client.submit_run(text, session_id=session_id)
+            run = await self.daemon_client.submit_run(
+                text, session_id=session_id, origin=f"telegram:{chat_id}"
+            )
         except DaemonClientError as exc:
             await self._send_message(chat_id, f"<daemon error: {exc}>")
             return None

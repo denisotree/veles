@@ -71,7 +71,7 @@ class _CapturingClient:
     def __init__(self) -> None:
         self.submitted: list[tuple[str, str | None]] = []
 
-    async def submit_run(self, prompt: str, *, session_id=None):
+    async def submit_run(self, prompt: str, *, session_id=None, origin=None):
         self.submitted.append((prompt, session_id))
         return {"run_id": "r1", "session_id": session_id, "state": "running"}
 

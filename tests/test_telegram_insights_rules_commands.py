@@ -30,7 +30,7 @@ def session_map(tmp_path: Path) -> SessionMap:
 
 def _make_gateway(session_map: SessionMap, project_root: Path) -> TelegramGateway:
     class _NullClient:
-        async def submit_run(self, prompt: str, *, session_id=None):
+        async def submit_run(self, prompt: str, *, session_id=None, origin=None):
             return {"run_id": "x", "session_id": session_id, "state": "running"}
 
         async def stream_events(self, run_id):

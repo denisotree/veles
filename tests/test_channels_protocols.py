@@ -30,7 +30,7 @@ def test_runtime_checkable_isinstance() -> None:
     structural typing keeps the contract loose enough for adapters."""
 
     class Stub:
-        async def submit_run(self, prompt, *, session_id=None):
+        async def submit_run(self, prompt, *, session_id=None, origin=None):
             return {"run_id": "x"}
 
         def stream_events(self, run_id):

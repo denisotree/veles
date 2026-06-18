@@ -58,7 +58,7 @@ class _RecordingClient:
         self.submit_calls.append({"run_id": run_id, "prompt_id": prompt_id, "choice": choice})
         return {"ok": True}
 
-    async def submit_run(self, prompt: str, *, session_id=None):
+    async def submit_run(self, prompt: str, *, session_id=None, origin=None):
         return {"run_id": "r", "session_id": session_id, "state": "running"}
 
     async def stream_events(self, run_id):

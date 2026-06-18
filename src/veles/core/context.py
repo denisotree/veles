@@ -27,6 +27,26 @@ def reset_active_project(token: Token) -> None:
     _active_project.reset(token)
 
 
+# ---- origin delivery target (M166) ----
+# The channel/chat a turn originated from, as a DeliveryTarget string
+# (e.g. "telegram:12345"). Set by the channel run path so tools like
+# `task_add` can default `deliver_to` to "reply on this chat" without the
+# model having to know the chat id. None outside a channel turn (CLI runs).
+_current_origin: ContextVar[str | None] = ContextVar("veles_current_origin", default=None)
+
+
+def current_origin() -> str | None:
+    return _current_origin.get()
+
+
+def set_origin(origin: str | None) -> Token:
+    return _current_origin.set(origin)
+
+
+def reset_origin(token: Token) -> None:
+    _current_origin.reset(token)
+
+
 # ---- skill call stack (cycle / depth guard for cross-skill composition) ----
 
 _skill_stack: ContextVar[tuple[str, ...]] = ContextVar("veles_skill_stack", default=())

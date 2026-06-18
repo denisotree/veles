@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-06-18
+
+### Added
+
+- **Personal tasks with proactive reminders.** The agent can keep a personal
+  todo list with optional reminders: `task_add` (with a due time like `+2h`,
+  `+1d`, or an ISO timestamp), plus `task_list`, `task_done`, and `task_snooze`.
+  When a reminder is due, a running daemon pushes it to the chat the task came
+  from — so "remind me to review the PR at 18:00" in Telegram pings *that* chat
+  at 18:00. Tasks are distinct from scheduled jobs (which run prompts): a task
+  is "remind me about X at time T". Reminders fire only while a daemon is
+  running.
+
+### Fixed
+
+- Co-hosted channel turns (the daemon's own Telegram bot) now run the
+  `--verify` → escalate pass too. Previously verification only applied to
+  external HTTP clients, so the bot most users run didn't get the
+  hallucination fallback.
+
 ## [0.4.0] — 2026-06-18
 
 ### Added
