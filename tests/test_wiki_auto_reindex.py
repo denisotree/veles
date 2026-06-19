@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 from veles.core.dreaming import DreamResult, _step_reindex
-from veles.core.wiki import Wiki
+from veles.modules.wiki.wiki import Wiki
 
 
 def _make_wiki(tmp_path: Path) -> Wiki:

@@ -57,7 +57,7 @@ def generate_self_doc(
     wiki_page_count = 0
     wiki_categories: dict[str, int] = {}
     if wiki_enabled(project):
-        from veles.core.wiki import Wiki
+        from veles.modules.wiki.wiki import Wiki
 
         pages = Wiki(project.wiki_root).list_pages()
         wiki_page_count = len(pages)
@@ -230,7 +230,7 @@ def refresh_self_doc(
     report = generate_self_doc(project, tools=tools)
     content = render_self_doc(report)
     if wiki_enabled(project):
-        from veles.core.wiki import Wiki
+        from veles.modules.wiki.wiki import Wiki
 
         wiki = Wiki(project.wiki_root)
         rel_path = wiki.write_page(

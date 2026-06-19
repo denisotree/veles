@@ -23,7 +23,7 @@ from veles.core.subproject import (
     subprojects_path,
     unregister_subproject,
 )
-from veles.core.wiki import Wiki
+from veles.modules.wiki.wiki import Wiki
 
 
 def _make_root(tmp_path: Path, *, name: str = "root") -> Project:

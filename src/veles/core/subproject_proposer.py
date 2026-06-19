@@ -53,7 +53,7 @@ from veles.core.memory.artefacts import (
     write_proposal,
 )
 from veles.core.project import Project
-from veles.core.wiki import Wiki, WikiPageInfo
+from veles.modules.wiki.wiki import Wiki, WikiPageInfo
 
 _CLUSTER_CATEGORIES = frozenset({"concepts", "entities"})
 _DEFAULT_MIN_PAGES = 4

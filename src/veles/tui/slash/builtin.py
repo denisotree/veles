@@ -109,7 +109,7 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
       the legacy behaviour: save the last assistant reply to
       `wiki/queries/<slug>.md` (user content).
     """
-    from veles.core.wiki import Wiki
+    from veles.modules.wiki.wiki import Wiki
 
     candidates = list(ctx.state.insight_candidates)
     if not line:
@@ -192,7 +192,7 @@ def _wiki(line: str, ctx: SlashContext) -> SlashResult:
 
 
 def _wiki_add(source: str) -> SlashResult:
-    from veles.core.ingest import ingest_user_message
+    from veles.modules.wiki.ingest import ingest_user_message
 
     if not source:
         return SlashResult.err("/wiki add needs a path or URL")

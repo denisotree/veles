@@ -42,7 +42,7 @@ def _refresh(project: Project) -> int:
 
 
 def _show(project: Project) -> int:
-    from veles.core.wiki import Wiki
+    from veles.modules.wiki.wiki import Wiki
 
     wiki = Wiki(project.wiki_root)
     try:

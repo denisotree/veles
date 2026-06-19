@@ -1,11 +1,11 @@
-"""Unit tests for the SQLite FTS5 layer in veles.core.wiki."""
+"""Unit tests for the SQLite FTS5 layer in veles.modules.wiki.wiki."""
 
 from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
 
-from veles.core.wiki import Wiki, _fts_escape
+from veles.modules.wiki.wiki import Wiki, _fts_escape
 
 
 def _make_wiki(tmp_path: Path) -> Wiki:

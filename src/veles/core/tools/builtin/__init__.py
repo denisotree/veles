@@ -1,5 +1,9 @@
 """Builtin tools — imported for their @tool registration side effects."""
 
+# Wiki tools live in the wiki content-engine module (extracted from core,
+# 2026-06-19); import for their @tool registration side effect. The toolset
+# gating (`engine-wiki`) still hides them for non-wiki layouts.
+import veles.modules.wiki.tools  # noqa: F401
 from veles.core.tools.builtin import (  # noqa: F401
     advisor,
     ask_user,
@@ -18,6 +22,5 @@ from veles.core.tools.builtin import (  # noqa: F401
     stat_file,
     task_tools,
     web_search,
-    wiki_tools,
     write_file,
 )

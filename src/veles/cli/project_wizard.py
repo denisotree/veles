@@ -42,7 +42,7 @@ from veles.core.project_config import (
     save_project_config as _save_project_toml,
 )
 from veles.core.providers import PROVIDER_VALUES as _PROVIDER_CHOICES
-from veles.core.wiki import Wiki
+from veles.modules.wiki.wiki import Wiki
 
 Prompter = Callable[[str, str | None], str]
 """(prompt_label, default_value) -> raw_answer."""

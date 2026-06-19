@@ -49,7 +49,7 @@ from typing import TYPE_CHECKING
 from veles.core.curator_state import CuratorState, load, save_atomic
 from veles.core.file_lock import file_lock
 from veles.core.memory.artefacts import append_memory_log, write_proposal
-from veles.core.wiki import Wiki
+from veles.modules.wiki.wiki import Wiki
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -444,7 +444,7 @@ def _step_promote(project: Project, result: DreamResult, *, dry_run: bool) -> No
 
 
 def _step_lint(project: Project, wiki: Wiki, result: DreamResult, *, dry_run: bool) -> None:
-    from veles.core.wiki_linter import render_report, run_lint
+    from veles.modules.wiki.linter import render_report, run_lint
 
     report = run_lint(wiki)
     result.lint_findings = len(report.all_findings)

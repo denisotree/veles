@@ -3,7 +3,7 @@ the CLI (`veles add`, `veles ingest`) and the TUI (`/wiki add` from M83)."""
 
 from __future__ import annotations
 
-from veles.core.ingest import INGEST_SYSTEM_PROMPT, ingest_user_message
+from veles.modules.wiki.ingest import INGEST_SYSTEM_PROMPT, ingest_user_message
 
 
 def test_system_prompt_mentions_required_tools():

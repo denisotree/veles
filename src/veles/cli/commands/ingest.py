@@ -1,5 +1,5 @@
 """Shared ingest runner for `veles add` — read a source and write a wiki page
-via agent. M85: kernel logic lives in `veles.core.ingest`; this file is a thin
+via agent. M85: kernel logic lives in `veles.modules.wiki.ingest`; this file is a thin
 CLI wrapper. (The `veles ingest` deprecated alias was removed in
 M117c-removal; `cmd_add` is the only caller of `_run_ingest_cli`.)"""
 
@@ -8,10 +8,10 @@ from __future__ import annotations
 import argparse
 import sys
 
-from veles.core.ingest import INGEST_SYSTEM_PROMPT, ingest_user_message
 from veles.core.layout.engines import wiki_enabled
 from veles.core.project import Project
-from veles.core.wiki import Wiki
+from veles.modules.wiki.ingest import INGEST_SYSTEM_PROMPT, ingest_user_message
+from veles.modules.wiki.wiki import Wiki
 
 
 def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) -> int:

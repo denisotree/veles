@@ -138,7 +138,7 @@ def test_recall_returns_insight_alongside_wiki_pages(tmp_path: Path) -> None:
     """M161: insights live only in SQL; wiki pages and insight rows are
     distinct sources that both surface without any title de-dup pass."""
     from veles.core.memory.router import MemoryRouter
-    from veles.core.wiki import Wiki
+    from veles.modules.wiki.wiki import Wiki
 
     project = init_project(tmp_path / "p", name="p")
     wiki = Wiki(project.wiki_root)
