@@ -553,8 +553,9 @@ def _make_verify_hook(
     on the advisor-tier model. The re-run uses the **base session_id** so a
     persistent channel chat keeps its history (a fresh session would make the
     bot "forget everything" on the first escalation). Same-model advisor routes
-    are skipped (no real escalation). Everything is best-effort — the caller in
-    `run_agent_in_background` suppresses exceptions and keeps the base answer.
+    are skipped (no real escalation). Everything is best-effort — the callers
+    (`run_agent_in_background` and, M170c, `run_manager_in_background`) suppress
+    exceptions and keep the base answer.
     """
     if not _verify_enabled(project):
         return None
@@ -564,15 +565,12 @@ def _make_verify_hook(
         from veles.core.model_resolver import ConfigurationError
         from veles.core.routing import route
         from veles.core.verify import (
-            advisor_verifier,
+            make_advisor_verifier,
             render_evidence,
             verify_and_maybe_escalate,
         )
 
-        evidence = render_evidence(result.history)
-
-        def verifier(p: str, a: str):
-            return advisor_verifier(p, a, evidence=evidence)
+        verifier = make_advisor_verifier(render_evidence(result.history))
 
         def escalator(p: str):
             try:

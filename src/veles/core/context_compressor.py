@@ -32,7 +32,6 @@ Two surfaces:
 
 from __future__ import annotations
 
-import datetime as _dt
 import json
 import logging
 from collections.abc import Callable
@@ -40,6 +39,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from veles.core.provider import Message
+from veles.core.slug import now_timestamp_slug
 
 if TYPE_CHECKING:
     from veles.core.project import Project
@@ -216,10 +216,6 @@ def apply_compression(
     return head + list(history[tail_start:])
 
 
-def _now_slug() -> str:
-    return _dt.datetime.now(tz=_dt.UTC).strftime("%Y%m%dT%H%M%SZ")
-
-
 def make_default_compressor(
     *,
     provider: Provider,
@@ -342,7 +338,7 @@ def make_default_compressor(
             )
             summary = f"(summary failed: {type(exc).__name__}; see daemon log)"
         slug_id = sid
-        slug = f"{slug_id}-c-{_now_slug()}"
+        slug = f"{slug_id}-c-{now_timestamp_slug()}"
         title = f"Compressed segment of session {slug_id}"
         summary_abs = write_session_summary(project, slug=slug, title=title, content=summary)
         try:

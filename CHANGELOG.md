@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] — 2026-06-19
+
+### Changed
+
+- **Verify → escalate now also covers manager-orchestrated runs.** Previously the
+  advisor judge-and-escalate pass ran only on direct agent turns; when a run was
+  decomposed across manager/worker agents (`--manager`), the synthesised answer
+  skipped verification. Now the two compose: with verify enabled, the manager's
+  final answer is judged and, on a confident failure, escalated to the stronger
+  model — exactly like a direct run. No new flags (opt-in stays `--verify` /
+  `[verify] enabled` / `VELES_VERIFY_MODE=1`).
+
+### Internal
+
+- Audit-remediation pass over the 0.4.0–0.6.1 work: removed dead config left by
+  the wiki-to-module move, deduplicated two small helpers into shared homes, and
+  added the optional vector-search backends (numpy / sqlite-vec) to the dev/test
+  matrix so their tests run instead of skipping. No user-facing behaviour change.
+
 ## [0.6.1] — 2026-06-19
 
 ### Changed

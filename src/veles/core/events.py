@@ -1,6 +1,6 @@
 """Typed event log (Tier ε, M69) — machine-readable companion to `LOG.md`.
 
-`LOG.md` (managed by `core/wiki.py`) is curated, human-readable, and lives
+`LOG.md` (managed by `modules/wiki/`) is curated, human-readable, and lives
 inside the wiki's append-only journal. It's great for reading at a glance
 but bad for replay / eval-grading / regression: timestamps drift, ad-hoc
 strings make queries fragile, and the lint-agent rewrites it on demand.

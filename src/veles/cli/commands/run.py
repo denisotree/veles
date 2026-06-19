@@ -73,15 +73,12 @@ def _maybe_verify_and_escalate(args: argparse.Namespace, project: Project, resul
     from veles.core.routing import route
     from veles.core.verify import (
         VerifyVerdict,
-        advisor_verifier,
+        make_advisor_verifier,
         render_evidence,
         verify_and_maybe_escalate,
     )
 
-    evidence = render_evidence(result.history)
-
-    def verifier(p: str, a: str):
-        return advisor_verifier(p, a, evidence=evidence)
+    verifier = make_advisor_verifier(render_evidence(result.history))
 
     escalator = None
     adv_provider = adv_model = None

@@ -232,6 +232,24 @@ def _has_module(name: str) -> bool:
     return importlib.util.find_spec(name) is not None
 
 
+def test_python_backend_smoke(conn, monkeypatch) -> None:
+    """Pin the pure-Python tier explicitly. The generic knn tests above run on
+    whatever `available_backend()` picks — once numpy/sqlite-vec are installed
+    (dev/CI), that's the accelerated backend, so the python fallback would lose
+    coverage. This keeps it deterministically exercised, including the two
+    edge cases (mismatched dim skipped, empty query short-circuits)."""
+    import veles.core.memory.vector as mv
+
+    monkeypatch.setattr(mv, "_BACKEND", "python")
+    upsert_embedding(conn, ref_kind="skill", ref_id=1, vec=[1.0, 0.0])
+    upsert_embedding(conn, ref_kind="skill", ref_id=2, vec=[0.7, 0.7])
+    upsert_embedding(conn, ref_kind="skill", ref_id=3, vec=[1.0, 0.0, 0.0])  # wrong dim
+    hits = mv.knn(conn, [1.0, 0.0], limit=5)
+    assert [h.ref_id for h in hits] == [1, 2]  # exact match first; id=3 dim-mismatch dropped
+    assert hits[0].distance == pytest.approx(0.0, abs=1e-6)
+    assert mv.knn(conn, [], limit=5) == []  # empty query short-circuits before dispatch
+
+
 @pytest.mark.skipif(not _has_module("numpy"), reason="numpy not installed")
 def test_numpy_backend_smoke(conn, monkeypatch) -> None:
     # Force numpy backend even if sqlite-vec is also installed.
