@@ -74,6 +74,11 @@ dev-dependencies = [
     "pytest-asyncio>=0.24",
     "pytest-aiohttp>=1.0",
     "mypy>=1.10",
+    # Optional vector-search accelerators — runtime-optional (3-tier graceful
+    # degradation in core/memory/vector.py), but installed in dev/CI so the
+    # numpy + sqlite-vec backend smoke tests actually run instead of skipping.
+    "numpy>=2.0",
+    "sqlite-vec>=0.1",
 ]
 
 [tool.ruff]
