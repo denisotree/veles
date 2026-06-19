@@ -49,6 +49,7 @@ from typing import TYPE_CHECKING
 from veles.core.curator_state import CuratorState, load, save_atomic
 from veles.core.file_lock import file_lock
 from veles.core.memory.artefacts import append_memory_log, write_proposal
+from veles.core.slug import now_timestamp_slug
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -428,7 +429,7 @@ def _step_dedup(project: Project, result: DreamResult, *, dry_run: bool) -> None
     for cluster in clusters:
         names = ", ".join(sorted(s.name for s in cluster.skills))
         body_lines.append(f"- **cluster** ({len(cluster.skills)}): {names}")
-    slug = f"dream-dedup-{_now_slug()}"
+    slug = f"dream-dedup-{now_timestamp_slug()}"
     write_proposal(
         project,
         slug=slug,
@@ -456,7 +457,7 @@ def _step_lint(project: Project, wiki: Wiki, result: DreamResult, *, dry_run: bo
     if result.lint_findings == 0 or dry_run:
         return
     rendered = render_report(report)
-    slug = f"dream-lint-{_now_slug()}"
+    slug = f"dream-lint-{now_timestamp_slug()}"
     write_proposal(
         project,
         slug=slug,
@@ -543,7 +544,7 @@ def _step_consolidate(
         result.consolidated = True
         return
 
-    slug = f"dream-consolidate-{_now_slug()}"
+    slug = f"dream-consolidate-{now_timestamp_slug()}"
     page_path = write_proposal(
         project,
         slug=slug,
@@ -553,10 +554,6 @@ def _step_consolidate(
     result.consolidated = True
     result.consolidation_path = str(page_path)
     append_memory_log(project, op="dream_consolidate", summary=f"-> {page_path}")
-
-
-def _now_slug() -> str:
-    return _dt.datetime.now(tz=_dt.UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
 def _now_iso() -> str:
