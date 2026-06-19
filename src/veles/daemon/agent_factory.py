@@ -553,8 +553,9 @@ def _make_verify_hook(
     on the advisor-tier model. The re-run uses the **base session_id** so a
     persistent channel chat keeps its history (a fresh session would make the
     bot "forget everything" on the first escalation). Same-model advisor routes
-    are skipped (no real escalation). Everything is best-effort — the caller in
-    `run_agent_in_background` suppresses exceptions and keeps the base answer.
+    are skipped (no real escalation). Everything is best-effort — the callers
+    (`run_agent_in_background` and, M170c, `run_manager_in_background`) suppress
+    exceptions and keep the base answer.
     """
     if not _verify_enabled(project):
         return None

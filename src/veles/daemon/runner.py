@@ -32,9 +32,12 @@ import time
 from collections.abc import Callable
 from concurrent.futures import Future
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from veles.core.agent import Agent, RunResult
+
+if TYPE_CHECKING:
+    from veles.core.provider import Message
 
 
 @dataclass(slots=True)
@@ -238,6 +241,9 @@ async def run_manager_in_background(
     worker_agent_factory: Callable[..., Agent],
     prompt: str,
     on_finished: Callable[[RunHandle], None] | None = None,
+    verify_hook: Callable[[str, RunResult], RunResult] | None = None,
+    origin: str | None = None,
+    store: Any | None = None,
 ) -> None:
     """M124: drive `decompose_and_run(prompt)` to completion, mirroring
     plan/step events into `handle`.
@@ -251,10 +257,18 @@ async def run_manager_in_background(
     - Errors fall through: caller decides whether to retry via the
       legacy direct path.
 
-    Skips `post_turn_hook` — workers' own sessions get curated on
-    their next idle cycle; aggregating one parent RunResult across N
-    sub-sessions is a M124b problem.
+    M170c: the opt-in `verify_hook` now applies here too — the writer's
+    `final_text` is adapted into a `RunResult` (evidence = the writer
+    session's messages, loaded best-effort from `store`) so the same
+    advisor judge+escalate as the direct path runs on the synthesised
+    answer. `origin` is set for the worker context so a worker's
+    `task_add`/`job_add` can default `deliver_to` to the originating chat.
+
+    Still skips `post_turn_hook` — aggregating one parent RunResult across
+    N sub-sessions for the learning loop is a M124b problem; workers' own
+    sessions get curated on their next idle cycle.
     """
+    from veles.core.context import reset_origin, set_origin
     from veles.core.orchestration import decompose_and_run
 
     loop = asyncio.get_running_loop()
@@ -274,73 +288,103 @@ async def run_manager_in_background(
     def _worker():
         return decompose_and_run(prompt, agent_factory=worker_agent_factory)
 
+    # M170c: set origin before the worker thread starts — `asyncio.to_thread`
+    # copies the context, so workers' tools see the originating chat.
+    origin_token = set_origin(origin)
     try:
-        result = await asyncio.to_thread(_worker)
-    except Exception as exc:
-        handle.state = "failed"
-        handle.error = f"manager: {type(exc).__name__}: {exc}"
+        try:
+            result = await asyncio.to_thread(_worker)
+        except Exception as exc:
+            handle.state = "failed"
+            handle.error = f"manager: {type(exc).__name__}: {exc}"
+            handle.finished_at = time.time()
+            _post({"type": "error", "error": handle.error})
+            handle.done.set()
+            handle.event_added.set()
+            if on_finished is not None:
+                on_finished(handle)
+            return
+
+        # Plan event — channels show "🧠 Decomposing into N workers..."
+        plan = result.plan
+        _post(
+            {
+                "type": "manager_plan",
+                "objective": plan.objective,
+                "steps": [
+                    {
+                        "role": step.role,
+                        "status": step.status,
+                        "session_id": step.session_id,
+                        "rationale": step.rationale,
+                    }
+                    for step in plan.steps
+                ],
+            }
+        )
+
+        if result.error or not result.final_text:
+            handle.state = "failed"
+            handle.error = result.error or "manager produced no output"
+            handle.finished_at = time.time()
+            _post({"type": "error", "error": handle.error})
+            handle.done.set()
+            handle.event_added.set()
+            if on_finished is not None:
+                on_finished(handle)
+            return
+
+        writer_handle = result.handles[-1] if result.handles else None
+        writer_session = writer_handle.session_id if writer_handle else None
+        final_text = result.final_text
+
+        # M170c: opt-in verify→escalate on the manager's synthesised answer.
+        # Adapt the manager result into a RunResult so the same verify_hook as
+        # the direct path judges it. Evidence = the writer session's messages
+        # (best-effort; verify still judges text-only if unavailable). The
+        # escalation re-runs the prompt on the advisor model continuing the
+        # writer session. Best-effort: a broken advisor keeps the base answer.
+        if verify_hook is not None:
+            history: list[Message] = []
+            if store is not None and writer_session:
+                with contextlib.suppress(Exception):
+                    history = store.load_messages(writer_session)
+            synth = RunResult(
+                text=final_text,
+                iterations=len(result.handles),
+                history=history,
+                session_id=writer_session,
+            )
+            with contextlib.suppress(Exception):
+                verified = await asyncio.to_thread(verify_hook, prompt, synth)
+                final_text = verified.text
+                writer_session = verified.session_id or writer_session
+
+        # Emit the (possibly escalated) text as one final delta + completed
+        # event so channels' existing buffering machinery picks it up unchanged.
+        _post({"type": "text_delta", "delta": final_text})
+
+        handle.state = "completed"
+        handle.iterations = len(result.handles)
+        handle.stopped_reason = "completed"
+        handle.final_text = final_text
+        handle.session_id = writer_session or handle.session_id
         handle.finished_at = time.time()
-        _post({"type": "error", "error": handle.error})
+        _post(
+            {
+                "type": "completed",
+                "stopped_reason": "completed",
+                "iterations": handle.iterations,
+                "text": final_text,
+                "session_id": handle.session_id,
+            }
+        )
         handle.done.set()
         handle.event_added.set()
         if on_finished is not None:
             on_finished(handle)
-        return
-
-    # Plan event — channels show "🧠 Decomposing into N workers..."
-    plan = result.plan
-    _post(
-        {
-            "type": "manager_plan",
-            "objective": plan.objective,
-            "steps": [
-                {
-                    "role": step.role,
-                    "status": step.status,
-                    "session_id": step.session_id,
-                    "rationale": step.rationale,
-                }
-                for step in plan.steps
-            ],
-        }
-    )
-
-    if result.error or not result.final_text:
-        handle.state = "failed"
-        handle.error = result.error or "manager produced no output"
-        handle.finished_at = time.time()
-        _post({"type": "error", "error": handle.error})
-        handle.done.set()
-        handle.event_added.set()
-        if on_finished is not None:
-            on_finished(handle)
-        return
-
-    # Emit the writer's text as one final delta + completed event so
-    # channels' existing buffering machinery picks it up unchanged.
-    _post({"type": "text_delta", "delta": result.final_text})
-
-    writer_handle = result.handles[-1] if result.handles else None
-    writer_session = writer_handle.session_id if writer_handle else None
-    handle.state = "completed"
-    handle.iterations = len(result.handles)
-    handle.stopped_reason = "completed"
-    handle.final_text = result.final_text
-    handle.session_id = writer_session or handle.session_id
-    handle.finished_at = time.time()
-    _post(
-        {
-            "type": "completed",
-            "stopped_reason": "completed",
-            "iterations": handle.iterations,
-            "text": result.final_text,
-            "session_id": handle.session_id,
-        }
-    )
-    handle.done.set()
-    handle.event_added.set()
-    if on_finished is not None:
-        on_finished(handle)
+    finally:
+        reset_origin(origin_token)
 
 
 __all__ = [

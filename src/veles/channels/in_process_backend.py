@@ -58,6 +58,9 @@ class InProcessRunBackend:
                     handle,
                     worker_agent_factory=self._state.worker_agent_factory,
                     prompt=prompt,
+                    verify_hook=self._state.verify_hook,
+                    origin=origin,
+                    store=self._state.store,
                 )
             )
             self._state.run_tasks.add(task)

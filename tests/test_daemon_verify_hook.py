@@ -177,3 +177,92 @@ def test_make_verify_hook_same_model_no_escalation(monkeypatch, tmp_path):
         assert hook("q", base) is base  # no distinct stronger model → keep base
     finally:
         store.close()
+
+
+# ---- M170c: manager-path verify→escalate ----
+
+
+def _manager_result(*, final_text="weak answer", writer_session="sess-writer"):
+    from veles.core.orchestration.manager import ManagerRunResult
+    from veles.core.orchestration.workers import WorkerHandle, WorkerPlan, WorkerStep
+
+    plan = WorkerPlan(objective="obj")
+    plan.add(WorkerStep(role="writer", prompt="…", status="done"))
+    writer = WorkerHandle(role="writer", prompt="…", result=final_text, session_id=writer_session)
+    return ManagerRunResult(final_text=final_text, handles=(writer,), plan=plan, error=None)
+
+
+async def test_manager_verify_hook_rebinds_final_text(monkeypatch):
+    """M170c: the manager's synthesised answer runs through verify→escalate.
+    A FAIL→escalate rebinds the completed text; the synthetic RunResult carries
+    the writer session as the evidence anchor; and `origin` reaches workers."""
+    from veles.core.context import current_origin
+    from veles.daemon.runner import new_run_handle, run_manager_in_background
+
+    seen = {}
+
+    def fake_decompose(prompt, *, agent_factory):
+        seen["origin"] = current_origin()  # set before the worker thread starts
+        return _manager_result()
+
+    monkeypatch.setattr("veles.core.orchestration.decompose_and_run", fake_decompose)
+
+    def hook(prompt, result):
+        seen["verify_text"] = result.text
+        seen["verify_session"] = result.session_id
+        return RunResult(text="STRONG", iterations=2, session_id=result.session_id)
+
+    handle = new_run_handle()
+    await run_manager_in_background(
+        handle,
+        worker_agent_factory=lambda **kw: None,
+        prompt="q",
+        verify_hook=hook,
+        origin="telegram:42",
+        store=None,
+    )
+
+    assert seen["origin"] == "telegram:42"  # origin threaded into the worker context
+    assert seen["verify_text"] == "weak answer"  # verify judged the manager's own answer
+    assert seen["verify_session"] == "sess-writer"  # writer session = evidence anchor
+    assert handle.final_text == "STRONG"  # escalated text rebinds the completed event
+    assert handle.state == "completed"
+
+
+async def test_manager_no_verify_hook_keeps_base(monkeypatch):
+    from veles.daemon.runner import new_run_handle, run_manager_in_background
+
+    monkeypatch.setattr(
+        "veles.core.orchestration.decompose_and_run",
+        lambda *a, **kw: _manager_result(final_text="base answer"),
+    )
+    handle = new_run_handle()
+    await run_manager_in_background(
+        handle, worker_agent_factory=lambda **kw: None, prompt="q", verify_hook=None
+    )
+    assert handle.final_text == "base answer"
+    assert handle.state == "completed"
+
+
+async def test_manager_verify_hook_failure_keeps_base(monkeypatch):
+    """Best-effort: a raising verify hook must not wedge the manager turn."""
+    from veles.daemon.runner import new_run_handle, run_manager_in_background
+
+    monkeypatch.setattr(
+        "veles.core.orchestration.decompose_and_run",
+        lambda *a, **kw: _manager_result(final_text="base answer"),
+    )
+
+    def hook(prompt, result):
+        raise RuntimeError("advisor down")
+
+    handle = new_run_handle()
+    await run_manager_in_background(
+        handle,
+        worker_agent_factory=lambda **kw: None,
+        prompt="q",
+        verify_hook=hook,
+        store=None,
+    )
+    assert handle.final_text == "base answer"
+    assert handle.state == "completed"

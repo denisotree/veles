@@ -232,6 +232,9 @@ async def _handle_create_run(request: web.Request) -> web.Response:
                 worker_agent_factory=state.worker_agent_factory,
                 prompt=prompt,
                 on_finished=_on_finished,
+                verify_hook=state.verify_hook,
+                origin=origin,
+                store=state.store,
             )
         )
         state.run_tasks.add(task)
