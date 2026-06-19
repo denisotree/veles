@@ -48,7 +48,7 @@ from veles.core.memory.artefacts import append_memory_log
 from veles.core.project import Project
 from veles.core.provider import Message
 from veles.core.routing import route
-from veles.core.wiki import Wiki
+from veles.modules.wiki.wiki import Wiki
 
 # ---- CLI-only state file constants ----
 # These remain in CLI because they describe argparse-driven state files

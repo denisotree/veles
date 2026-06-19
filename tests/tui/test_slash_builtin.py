@@ -10,7 +10,7 @@ pages or recorded sessions seed them inline.
 from __future__ import annotations
 
 from veles.core.provider import Message
-from veles.core.wiki import Wiki
+from veles.modules.wiki.wiki import Wiki
 from veles.tui.slash import build_default_registry
 
 

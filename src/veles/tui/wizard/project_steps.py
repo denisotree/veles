@@ -34,7 +34,7 @@ from veles.core.project_config import (
     save_project_config as _save_project_toml,
 )
 from veles.core.providers import ALL_PROVIDERS as _ALL_PROVIDERS
-from veles.core.wiki import Wiki
+from veles.modules.wiki.wiki import Wiki
 from veles.tui.wizard.screens import (
     ChoiceScreen,
     ConfirmScreen,

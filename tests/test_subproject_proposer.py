@@ -15,7 +15,7 @@ from veles.core.subproject_proposer import (
     recent_proposals,
     write_proposals,
 )
-from veles.core.wiki import Wiki
+from veles.modules.wiki.wiki import Wiki
 
 
 @pytest.fixture()

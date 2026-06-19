@@ -16,7 +16,7 @@ from __future__ import annotations
 from veles.core.context import current_project
 from veles.core.risk import RiskClass
 from veles.core.tools.registry import tool
-from veles.core.wiki import Wiki
+from veles.modules.wiki.wiki import Wiki
 
 
 def _default_wiki() -> Wiki:

@@ -1,4 +1,10 @@
-"""Builtin tools — imported for their @tool registration side effects."""
+"""Builtin tools — imported for their @tool registration side effects.
+
+Wiki tools are NOT registered here: they live in the wiki content-engine
+module (`veles.modules.wiki.tools`) and register lazily at agent-build time
+only when the project's layout enables the wiki engine (`_load_skills` in
+cli/_runtime.py). A non-wiki project never imports the wiki module.
+"""
 
 from veles.core.tools.builtin import (  # noqa: F401
     advisor,
@@ -18,6 +24,5 @@ from veles.core.tools.builtin import (  # noqa: F401
     stat_file,
     task_tools,
     web_search,
-    wiki_tools,
     write_file,
 )

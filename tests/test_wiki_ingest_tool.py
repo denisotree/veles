@@ -10,7 +10,7 @@ import pytest
 
 from veles.core.context import set_active_project
 from veles.core.project import init_project
-from veles.core.tools.builtin.wiki_tools import _infer_title_from_text, _kebab
+from veles.modules.wiki.tools import _infer_title_from_text, _kebab
 
 
 def _project(tmp_path: Path):
@@ -39,7 +39,7 @@ def test_wiki_ingest_local_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     try:
         src = tmp_path / "note.md"
         src.write_text("# My Note\n\nSome content.", encoding="utf-8")
-        from veles.core.tools.builtin.wiki_tools import wiki_ingest
+        from veles.modules.wiki.tools import wiki_ingest
 
         result = wiki_ingest(str(src), slug="my-note", title="My Note")
         assert "wiki/sources/my-note.md" in result
@@ -62,7 +62,7 @@ def test_wiki_ingest_url_calls_fetch_and_writes(
             return f"# Fetched\n\nfrom {url}"
 
         monkeypatch.setattr("veles.core.tools.builtin.fetch_url.fetch_url", fake_fetch)
-        from veles.core.tools.builtin.wiki_tools import wiki_ingest
+        from veles.modules.wiki.tools import wiki_ingest
 
         result = wiki_ingest("https://example.com/post")
         assert "wiki/sources/fetched.md" in result
@@ -80,7 +80,7 @@ def test_wiki_ingest_respects_explicit_category(tmp_path: Path) -> None:
     try:
         src = tmp_path / "framework.md"
         src.write_text("# Framework\n\ndetails", encoding="utf-8")
-        from veles.core.tools.builtin.wiki_tools import wiki_ingest
+        from veles.modules.wiki.tools import wiki_ingest
 
         result = wiki_ingest(str(src), category="concepts", slug="framework", title="Framework")
         assert "wiki/concepts/framework.md" in result

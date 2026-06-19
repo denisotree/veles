@@ -41,7 +41,7 @@ from veles.core.safety import scan_for_injection
 from veles.core.tools.builtin import fetch_url as fetch_url_mod
 from veles.core.tools.registry import Registry, ToolEntry
 from veles.core.untrusted import wrap_untrusted
-from veles.core.wiki import Wiki
+from veles.modules.wiki.wiki import Wiki
 
 # ---------- shared stubs ----------
 

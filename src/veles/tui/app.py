@@ -228,7 +228,7 @@ class TuiApp(App[int]):
 
     async def _reindex_wiki_if_stale(self) -> None:
         from veles.core.layout.engines import wiki_enabled
-        from veles.core.wiki import Wiki
+        from veles.modules.wiki.wiki import Wiki
 
         assert self._project is not None
         if not wiki_enabled(self._project):

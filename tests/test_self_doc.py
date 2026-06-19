@@ -11,7 +11,7 @@ from veles.core.self_doc import (
     refresh_self_doc,
     render_self_doc,
 )
-from veles.core.wiki import Wiki
+from veles.modules.wiki.wiki import Wiki
 
 # ---- helpers ----
 

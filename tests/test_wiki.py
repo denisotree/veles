@@ -1,4 +1,4 @@
-"""Unit tests for veles.core.wiki — tmp_path-based, no LLM."""
+"""Unit tests for veles.modules.wiki.wiki — tmp_path-based, no LLM."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from veles.core.wiki import Wiki, _normalize_slug
+from veles.modules.wiki.wiki import Wiki, _normalize_slug
 
 
 def _make_wiki(tmp_path: Path) -> Wiki:

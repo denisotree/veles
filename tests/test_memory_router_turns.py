@@ -11,7 +11,7 @@ from veles.core.memory import SessionStore
 from veles.core.memory.router import MemoryRouter
 from veles.core.project import Project, init_project
 from veles.core.provider import Message
-from veles.core.wiki import Wiki
+from veles.modules.wiki.wiki import Wiki
 
 
 @pytest.fixture()

@@ -31,7 +31,7 @@ def apply_scaffold(pack: LayoutDirectory | None, root: Path, name: str) -> None:
         for rel in pack.manifest.scaffold_dirs:
             (root / rel).mkdir(parents=True, exist_ok=True)
         if pack.manifest.engine_enabled("wiki"):
-            from veles.core.wiki import Wiki
+            from veles.modules.wiki.wiki import Wiki
 
             Wiki(root).ensure_layout()
 

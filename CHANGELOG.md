@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-06-19
+
+### Changed
+
+- **Internal:** the LLM-wiki is now a pluggable content-engine module
+  (`veles.modules.wiki`) instead of living in the core. The core no longer
+  imports or privileges the wiki — it loads only when a project's layout
+  enables the wiki engine. No user-facing behaviour change: wiki tools and the
+  `llm-wiki` layout work exactly as before. This keeps the core minimal and
+  makes room for other content patterns (e.g. an Obsidian connector) as peer
+  modules.
+
 ## [0.6.0] — 2026-06-18
 
 ### Added

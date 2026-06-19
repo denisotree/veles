@@ -49,13 +49,13 @@ from typing import TYPE_CHECKING
 from veles.core.curator_state import CuratorState, load, save_atomic
 from veles.core.file_lock import file_lock
 from veles.core.memory.artefacts import append_memory_log, write_proposal
-from veles.core.wiki import Wiki
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from veles.core.project import Project
     from veles.core.provider import Provider
+    from veles.modules.wiki.wiki import Wiki
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +223,12 @@ def dream_cycle(
     # M163: wiki-facing steps (lint, FTS reindex) run only when the
     # layout pack enables the wiki engine; the rest of the dream operates
     # on layout-independent memory.
-    wiki = Wiki(project.wiki_root) if wiki_enabled(project) else None
+    if wiki_enabled(project):
+        from veles.modules.wiki.wiki import Wiki
+
+        wiki = Wiki(project.wiki_root)
+    else:
+        wiki = None
     model = consolidation_model or _DEFAULT_CONSOLIDATION_MODEL
 
     with _maybe_lock(project, blocking=True):
@@ -444,7 +449,7 @@ def _step_promote(project: Project, result: DreamResult, *, dry_run: bool) -> No
 
 
 def _step_lint(project: Project, wiki: Wiki, result: DreamResult, *, dry_run: bool) -> None:
-    from veles.core.wiki_linter import render_report, run_lint
+    from veles.modules.wiki.linter import render_report, run_lint
 
     report = run_lint(wiki)
     result.lint_findings = len(report.all_findings)

@@ -448,7 +448,12 @@ def _load_skills(
     """
     from veles.core.layout.engines import wiki_enabled
 
-    if not wiki_enabled(project):
+    if wiki_enabled(project):
+        # Register the wiki engine's tools lazily — a non-wiki project never
+        # imports the wiki module (it lives in modules/, not core; the
+        # wiki-extraction refactor, 2026-06-19).
+        import veles.modules.wiki.tools  # noqa: F401
+    else:
         gated = set(_TOOLSETS.get("engine-wiki", ()))
         base_tools = tuple(t for t in base_tools if t not in gated)
     # M117b: include layout-pack skills (`ingest`/`query`/`lint` for the

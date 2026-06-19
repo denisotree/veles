@@ -14,7 +14,7 @@ from pathlib import Path
 from veles.core.memory.injector import build_memory_context_block
 from veles.core.memory.router import MemoryRouter, RecallHit
 from veles.core.project import init_project
-from veles.core.wiki import Wiki
+from veles.modules.wiki.wiki import Wiki
 
 
 def _seed_wiki(project_root: Path, pages: list[tuple[str, str, str, str]]) -> Wiki:

@@ -10,8 +10,7 @@ from __future__ import annotations
 import datetime as _dt
 from pathlib import Path
 
-from veles.core.wiki import Wiki
-from veles.core.wiki_linter import (
+from veles.modules.wiki.linter import (
     _find_oldest_date,
     _title_tokens,
     find_duplicates,
@@ -20,6 +19,7 @@ from veles.core.wiki_linter import (
     render_report,
     run_lint,
 )
+from veles.modules.wiki.wiki import Wiki
 
 
 def _seed_wiki(tmp_path: Path) -> Wiki:

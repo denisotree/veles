@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from veles.core.wiki import Wiki, WikiPageInfo
+    from veles.modules.wiki.wiki import Wiki, WikiPageInfo
 
 
 _DEFAULT_STALE_DAYS = 365
