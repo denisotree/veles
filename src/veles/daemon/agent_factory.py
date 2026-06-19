@@ -564,15 +564,12 @@ def _make_verify_hook(
         from veles.core.model_resolver import ConfigurationError
         from veles.core.routing import route
         from veles.core.verify import (
-            advisor_verifier,
+            make_advisor_verifier,
             render_evidence,
             verify_and_maybe_escalate,
         )
 
-        evidence = render_evidence(result.history)
-
-        def verifier(p: str, a: str):
-            return advisor_verifier(p, a, evidence=evidence)
+        verifier = make_advisor_verifier(render_evidence(result.history))
 
         def escalator(p: str):
             try:

@@ -140,6 +140,19 @@ def advisor_verifier(
     return _parse_judge(raw)
 
 
+def make_advisor_verifier(evidence: str = "") -> Verifier:
+    """Bind an `evidence` trace into the default advisor verifier, yielding a
+    `(prompt, answer) -> (verdict, concerns)` Verifier.
+
+    Both the CLI (`veles run`) and daemon verify paths build the same closure;
+    this is the single source so they don't re-declare it."""
+
+    def verifier(prompt: str, answer: str) -> tuple[VerifyVerdict, list[str]]:
+        return advisor_verifier(prompt, answer, evidence=evidence)
+
+    return verifier
+
+
 def render_evidence(history, *, max_chars: int = 4000) -> str:
     """Render an agent run's tool-call trace (calls + their results) into a
     compact block for the verifier — so the judge checks grounding, not just
@@ -165,6 +178,7 @@ __all__ = [
     "VerifyOutcome",
     "VerifyVerdict",
     "advisor_verifier",
+    "make_advisor_verifier",
     "render_evidence",
     "verify_and_maybe_escalate",
 ]
