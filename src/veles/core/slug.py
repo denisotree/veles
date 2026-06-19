@@ -1,7 +1,7 @@
 """Slug normalisation — shared by wiki pages, memory artefacts, skills,
 modules, and project names.
 
-Extracted from `core/wiki.py` (M160): slugging is core text
+Extracted from the wiki code (M160): slugging is core text
 infrastructure, not a wiki concern — five non-wiki modules need it.
 """
 

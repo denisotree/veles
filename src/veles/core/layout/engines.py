@@ -2,7 +2,7 @@
 content engine active in this project?" (M162).
 
 Core ships optional *content engines* (today: `wiki` — the Karpathy
-LLM-Wiki machinery in `core/wiki.py` and its `wiki_*` tools). A layout
+LLM-Wiki machinery in `modules/wiki/` and its `wiki_*` tools). A layout
 pack activates an engine by declaring it in its manifest:
 
     [layout.engines]

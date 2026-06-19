@@ -657,7 +657,7 @@ class SessionStore:
 def _fts_escape_query(query: str) -> str:
     """Wrap each whitespace-separated token in double quotes for FTS5 MATCH safety.
 
-    Matches the convention used by `core/wiki.py::_fts_escape`. Empty
+    Matches the convention used by `modules/wiki/wiki.py::_fts_escape`. Empty
     queries (or whitespace-only) return ''. Embedded double quotes are
     escaped as '""' per FTS5 grammar so user input never breaks the
     query parser.
