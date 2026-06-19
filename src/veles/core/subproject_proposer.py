@@ -44,6 +44,7 @@ import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from veles.core.memory.artefacts import (
     ProposalInfo,
@@ -53,7 +54,9 @@ from veles.core.memory.artefacts import (
     write_proposal,
 )
 from veles.core.project import Project
-from veles.modules.wiki.wiki import Wiki, WikiPageInfo
+
+if TYPE_CHECKING:
+    from veles.modules.wiki.wiki import WikiPageInfo
 
 _CLUSTER_CATEGORIES = frozenset({"concepts", "entities"})
 _DEFAULT_MIN_PAGES = 4
@@ -117,6 +120,8 @@ def detect_clusters(
     is ≥ `min_similarity`. Connected components of size ≥ `min_pages`
     become clusters. Returns clusters sorted by score descending.
     """
+    from veles.modules.wiki.wiki import Wiki
+
     wiki = Wiki(project.wiki_root)
     pages = [p for p in wiki.list_pages() if p.category in _CLUSTER_CATEGORIES]
     if len(pages) < min_pages:

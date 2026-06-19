@@ -38,7 +38,6 @@ from veles.core.memory.rerank import (
 from veles.core.project import Project
 from veles.core.safety import scan_for_injection
 from veles.core.subproject import load_subprojects, resolve_subproject_path
-from veles.modules.wiki.wiki import Wiki
 
 _TURN_SUMMARY_CAP = 200
 _TURN_RECENCY_WINDOW_SEC = 30 * 86_400  # only recall turns from the last 30 days
@@ -122,6 +121,7 @@ class MemoryRouter:
         same check applies per subproject — each child's own layout
         decides."""
         from veles.core.layout.engines import wiki_enabled
+        from veles.modules.wiki.wiki import Wiki
 
         hits: list[RecallHit] = []
         if wiki_enabled(self._project):
