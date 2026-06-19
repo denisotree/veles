@@ -127,5 +127,5 @@ files = [
 # remaining type gaps. Once those modules get retrofitted we can drop
 # the override per-path.
 [[tool.mypy.overrides]]
-module = ["veles.core.tools.registry", "veles.core.project", "veles.core.wiki"]
+module = ["veles.core.tools.registry", "veles.core.project"]
 follow_imports = "silent"

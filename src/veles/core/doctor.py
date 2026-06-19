@@ -272,7 +272,7 @@ def _check_wiki_files(project: Project | None) -> CheckResult:
             name="wiki_files",
             status="warn",
             message=f"missing: {', '.join(missing)}",
-            fix_hint="run `veles wiki reindex` to regenerate INDEX.md",
+            fix_hint="run `veles dream` to regenerate INDEX.md",
         )
     return CheckResult(name="wiki_files", status="ok", message="INDEX.md and LOG.md present")
 
