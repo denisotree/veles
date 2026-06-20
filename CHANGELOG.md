@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] — 2026-06-20
+
 ### Fixed
 
 - **TUI approval prompt: controls no longer scroll off-screen.** When a sensitive
