@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] — 2026-06-20
+
+### Changed
+
+- **The agent can now edit `AGENTS.md`.** Veles generates the project's `AGENTS.md`
+  context file for every layout, but its own `write_file` / `edit_file` tools refused
+  to touch it under content layouts (e.g. the default LLM-wiki, whose writable zones
+  are `wiki/` + `sources/`). `AGENTS.md` now sits in the always-writable set alongside
+  `.veles/`, so the agent maintains it like any other file it generates. Matched by
+  exact name, so lookalikes (`AGENTS.md.bak`) and arbitrary root files (`README.md`)
+  stay protected; shell writes (`run_shell`) are unchanged.
+
 ## [0.6.2] — 2026-06-19
 
 ### Changed
