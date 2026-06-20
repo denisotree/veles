@@ -42,6 +42,15 @@ def test_veles_state_write_succeeds(project) -> None:
     assert "wrote" in msg
 
 
+def test_agents_md_write_succeeds(project) -> None:
+    """AGENTS.md is writable like any other file Veles generates, even
+    under llm-wiki whose zones are wiki/ + sources/."""
+    target = project.root / "AGENTS.md"
+    msg = write_file(str(target), "# AGENTS\n")
+    assert "wrote" in msg
+    assert target.read_text(encoding="utf-8") == "# AGENTS\n"
+
+
 # ---- refused paths ----
 
 
