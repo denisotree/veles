@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Internal
+
+- Removed the dead `ApprovalScreen` / `TrustScreen` modal overlays
+  (`tui/screens/approval_screen.py`) and their tests. The inline `ComposerPrompt`
+  (above the Composer) has been the only approval/trust surface since M115; the
+  modals were never instantiated. No user-facing change.
+
 ## [0.6.4] — 2026-06-20
 
 ### Fixed
