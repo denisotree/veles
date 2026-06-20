@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **TUI approval prompt: controls no longer scroll off-screen.** When a sensitive
+  tool's approval/trust prompt carried a long body (e.g. a big `run_shell` command or
+  file-content arguments), the body grew unbounded and pushed the option list and the
+  key hint below the visible area, making it impossible to approve or deny. The body is
+  now confined to a bounded, scrollable region so the controls stay visible at all times;
+  the full text remains reachable by scrolling.
+
 ## [0.6.3] — 2026-06-20
 
 ### Changed

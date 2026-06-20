@@ -27,7 +27,7 @@ from typing import Any, ClassVar
 
 from textual import events
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.widgets import Input, Label, ListItem, ListView, Static
 
 
@@ -60,16 +60,25 @@ class ComposerPrompt(Vertical):
         border-top: thick $warning;
         padding: 0 1;
         height: auto;
-        max-height: 14;
+        max-height: 18;
     }
     ComposerPrompt Label.veles-prompt-title {
         color: $warning;
         text-style: bold;
     }
+    /* The body can be an arbitrarily long tool-arguments dump. Confine it
+       to a bounded, scrollable region so it can never push the option list
+       or the hint off-screen — the controls must always stay visible. */
+    ComposerPrompt VerticalScroll.veles-prompt-body-scroll {
+        height: auto;
+        max-height: 8;
+        margin-bottom: 1;
+        scrollbar-size-vertical: 1;
+        overflow-x: hidden;
+    }
     ComposerPrompt Static.veles-prompt-body {
         color: $text;
         height: auto;
-        margin-bottom: 1;
     }
     ComposerPrompt ListView {
         height: auto;
@@ -110,7 +119,10 @@ class ComposerPrompt(Vertical):
     def compose(self) -> ComposeResult:
         yield Label(self._question, classes="veles-prompt-title")
         if self._body:
-            yield Static(self._body, classes="veles-prompt-body")
+            # Scrollable so a long body never pushes the controls off-screen;
+            # the user can still scroll to read the full text it confines.
+            with VerticalScroll(classes="veles-prompt-body-scroll"):
+                yield Static(self._body, classes="veles-prompt-body")
         items: list[ListItem] = []
         for opt in self._options:
             tag = f"[{opt.hotkey}] " if opt.hotkey else ""
