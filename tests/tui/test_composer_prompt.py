@@ -118,6 +118,35 @@ async def test_escape_returns_default_key_for_approval() -> None:
     assert future.result() is False
 
 
+async def test_long_body_keeps_options_and_hint_visible() -> None:
+    """A long body (e.g. a huge tool-arguments dump) must not push the
+    option list or the hint off-screen. The controls stay fully visible
+    and the body is confined to a bounded, scrollable region."""
+    from textual.widgets import Label, ListView
+
+    loop = asyncio.get_running_loop()
+    huge_body = "Arguments:\n" + "\n".join(f"  line {i}: " + ("x" * 120) for i in range(80))
+    prompt, future = _make_prompt(
+        loop=loop,
+        options=_trust_options(),
+        default_key=TrustChoice.REFUSE,
+        body=huge_body,
+    )
+    app = _Host(prompt)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        list_view = prompt.query_one(ListView)
+        hint = prompt.query_one(".veles-prompt-hint", Label)
+        screen_bottom = app.screen.region.bottom
+        # The option list and the hint must both be fully on-screen.
+        assert list_view.region.height > 0, "option list was clipped off-screen"
+        assert list_view.region.bottom <= screen_bottom, "option list runs past the screen"
+        assert hint.region.height > 0, "hint was clipped off-screen"
+        assert hint.region.bottom <= screen_bottom, "hint runs past the screen"
+    # Still resolvable by hotkey after layout.
+    assert not future.done()
+
+
 async def test_empty_options_rejected() -> None:
     loop = asyncio.get_running_loop()
     future: asyncio.Future[Any] = loop.create_future()
