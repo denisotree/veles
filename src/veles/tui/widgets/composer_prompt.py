@@ -1,9 +1,8 @@
 """Inline approval / trust prompt anchored above the Composer.
 
 When the agent's permission gate trips (sensitive-tool trust ladder or
-risk-class approval), the TUI replaces the centred `ApprovalScreen` /
-`TrustScreen` modals with this widget mounted right above the Composer.
-The user sees:
+risk-class approval), the TUI mounts this widget right above the Composer
+to ask the user. The user sees:
 
 - a one-line title (what is being asked),
 - an optional body (tool name, reason, arguments),
