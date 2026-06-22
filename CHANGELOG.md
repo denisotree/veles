@@ -7,12 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.5] — 2026-06-22
+
+### Changed
+
+- **Unified channel-setup wizards (M172).** Connecting a chat channel (Telegram) now
+  follows the same flow everywhere — `veles channel add`, the `veles daemon` control
+  panel (key `c`), and the project setup wizard inside `veles daemon start`: first pick a
+  channel *type* from the platform registry, then fill that channel's fields (token,
+  whitelist). The project wizards previously hardcoded a Telegram-specific prompt;
+  they're now registry-driven, so adding a channel platform needs zero wizard code.
+- **`veles daemon start` connects a channel on existing projects too (M173).** In a fresh
+  directory the setup wizard already offers a channel; on an already-initialised project
+  with none configured, `daemon start` now asks once and runs the same channel wizard
+  before the daemon comes up (interactive only; skipped with `--no-wizard`).
+
+### Fixed
+
+- **`veles daemon start` honours the configured port (M173).** The unnamed daemon ignored
+  the `[daemon] host`/`port` written by the setup wizard and always bound `127.0.0.1:8765`.
+  It now applies the cascade explicit `--host`/`--port` > config > the default.
+
 ### Internal
 
 - Removed the dead `ApprovalScreen` / `TrustScreen` modal overlays
   (`tui/screens/approval_screen.py`) and their tests. The inline `ComposerPrompt`
   (above the Composer) has been the only approval/trust surface since M115; the
   modals were never instantiated. No user-facing change.
+- Refreshed the README demo GIFs: the TUI launches with bare `veles`, and the daemon
+  flow is shown by two new clips (`veles daemon start` wizard + the `veles daemon`
+  control panel), replacing the old `/daemon`-in-TUI clip.
 
 ## [0.6.4] — 2026-06-20
 
