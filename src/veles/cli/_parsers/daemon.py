@@ -18,8 +18,11 @@ def register(sub: argparse._SubParsersAction) -> None:
         "start",
         help="Start the daemon (detaches by default; --foreground keeps it attached).",
     )
-    daemon_start.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1).")
-    daemon_start.add_argument("--port", type=int, default=8765, help="Bind port (default: 8765).")
+    # None sentinel (not the literal default) so the runtime can apply the
+    # cascade explicit CLI flag > `[daemon(.name)] host/port` in config > the
+    # hardcoded 127.0.0.1:8765. See `daemon.py::_resolve_daemon_bind` (M173).
+    daemon_start.add_argument("--host", default=None, help="Bind host (default: 127.0.0.1).")
+    daemon_start.add_argument("--port", type=int, default=None, help="Bind port (default: 8765).")
     daemon_start.add_argument(
         "--foreground",
         action="store_true",
