@@ -10,7 +10,7 @@ Set Theme "Catppuccin Mocha"
 Set TypingSpeed 55ms
 Set PlaybackSpeed 1.3
 
-Type "veles tui" Enter
+Type "veles" Enter
 Sleep 4s
 Type "/status" Enter
 Sleep 2.5s

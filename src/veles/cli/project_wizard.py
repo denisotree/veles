@@ -14,8 +14,9 @@ Steps (each gated by its own y/N, default `n` = skip):
   3. Wiki seed from existing docs — copy `README.md`, `*.md` in `docs/`,
      and top-level `*.md` files into `wiki/sources/`. Pure file copy;
      no LLM ingest at wizard time (offline-friendly, no API key needed).
-  4. Telegram channel — optional bot token + chat_id, written to
-     `.veles/config.toml`. No online validation.
+  4. Channel — optional. Pick a type from the platform registry (M172),
+     then fill that platform's cred fields; secret → keychain, the rest →
+     `.veles/config.toml`. Shared `apply_channel` path; no online validation.
 
 The wizard creates `.veles/` early (step 1), so a partial completion
 (Ctrl+C between steps) is idempotent — the directory check below stops
@@ -113,7 +114,7 @@ def run_project_wizard(cwd: Path) -> Project | None:
     _step_provider_override(project, prompter)
     if wiki_enabled(project):
         _step_wiki_seed(project, prompter, cwd)
-    _step_telegram(project, prompter)
+    _step_channel(project, prompter)
 
     # Seed the FTS index so the post-init promise — "files will be
     # indexed" — actually holds. Cheap (empty / few-page) wiki rebuild.
@@ -169,30 +170,49 @@ def _step_wiki_seed(project: Project, prompter: Prompter, cwd: Path) -> None:
     print(t("project_wizard.wiki_seed_done", count=seeded), file=sys.stderr)
 
 
-def _step_telegram(project: Project, prompter: Prompter) -> None:
-    if not _ask_yes_no(prompter, t("project_wizard.ask_telegram"), default=False):
-        return
-    token_input = prompter(t("project_wizard.ask_telegram_token"), None).strip()
-    if not token_input:
-        return
-    chat_id = prompter(t("project_wizard.ask_telegram_chat"), None).strip()
-    if not chat_id:
-        print(t("project_wizard.telegram_chat_required"), file=sys.stderr)
-        return
-    from veles.core.secrets import KeyringUnavailable, set_provider_key
+def _step_channel(project: Project, prompter: Prompter) -> None:
+    """Registry-driven channel step (M172). Asks once whether to add a channel,
+    then picks a type from the platform registry and drives that platform's
+    `cred_fields` — the same `collect_channel_fields`/`apply_channel` path used
+    by `veles channel add` and the TUI flows, so no telegram is hardcoded. The
+    type prompt is always shown (even with one platform): it is the seam new
+    channels register on."""
+    from veles.channels.platform_registry import (
+        ensure_builtins_registered,
+        get_platform,
+        list_platforms,
+    )
+    from veles.cli.channel_wizard import apply_channel, collect_channel_fields
+    from veles.core.secrets import KeyringUnavailable
 
-    try:
-        set_provider_key("telegram", token_input, project=project.name)
-    except KeyringUnavailable as exc:
-        print(f"warning: keychain unavailable ({exc}); aborting telegram step", file=sys.stderr)
+    ensure_builtins_registered()
+    platforms = tuple(list_platforms())
+    if not platforms:
         return
-    cfg = _load_project_toml(project)
-    cfg.setdefault("channels", {}).setdefault("telegram", {})
-    cfg["channels"]["telegram"]["enabled"] = True
-    cfg["channels"]["telegram"]["whitelist"] = [chat_id]
-    _save_project_toml(project, cfg)
+    if not _ask_yes_no(prompter, t("project_wizard.ask_channel"), default=False):
+        return
+    channel = _ask_choice(
+        prompter, t("project_wizard.ask_channel_type"), platforms, default=platforms[0]
+    )
+    try:
+        entry = get_platform(channel)
+    except KeyError as exc:
+        print(f"  ! {exc}", file=sys.stderr)
+        return
+    collected = collect_channel_fields(entry, prompter)
+    if collected is None:
+        print(t("project_wizard.channel_field_required", channel=channel), file=sys.stderr)
+        return
+    secrets, config_fields = collected
+    try:
+        apply_channel(
+            project, session=None, channel=channel, secrets=secrets, config_fields=config_fields
+        )
+    except KeyringUnavailable as exc:
+        print(f"warning: keychain unavailable ({exc}); aborting {channel} step", file=sys.stderr)
+        return
     print(
-        t("project_wizard.telegram_written", path=_project_config_path(project)),
+        t("project_wizard.channel_written", channel=channel, path=_project_config_path(project)),
         file=sys.stderr,
     )
 

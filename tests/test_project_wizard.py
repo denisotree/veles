@@ -208,16 +208,19 @@ def test_wiki_seed_copies_docs_into_sources_seed(tmp_cwd: Path) -> None:
     assert any(p.name == "intro.md" for p in found)
 
 
-def test_telegram_writes_token_and_chat_id(tmp_cwd: Path) -> None:
+def test_channel_writes_token_and_whitelist(tmp_cwd: Path) -> None:
+    # M172: the channel step is registry-driven — pick a type, then fill the
+    # platform's cred fields (telegram: bot_token, then whitelist).
     token_p = pw.set_project_wizard_prompter(
         _scripted(
             [
                 "y",  # bootstrap
                 "n",  # provider override
                 "n",  # wiki seed
-                "y",  # telegram
-                "bot-abc",  # token
-                "42",  # chat id (promoted to a single-entry whitelist)
+                "y",  # add a channel?
+                "telegram",  # channel type (only registered platform)
+                "bot-abc",  # bot_token cred
+                "42",  # whitelist (comma-separated → single-entry list)
             ]
         )
     )
@@ -237,16 +240,18 @@ def test_telegram_writes_token_and_chat_id(tmp_cwd: Path) -> None:
     delete_provider_key("telegram", project=project.name)
 
 
-def test_telegram_skips_when_chat_id_blank(tmp_cwd: Path) -> None:
+def test_channel_skips_when_required_field_blank(tmp_cwd: Path) -> None:
+    # A blank value for a required cred (telegram bot_token) aborts the step
+    # and writes nothing — no half-configured channel block.
     token_p = pw.set_project_wizard_prompter(
         _scripted(
             [
                 "y",  # bootstrap
                 "n",  # provider
                 "n",  # seed
-                "y",  # telegram on
-                "bot-zzz",  # token
-                "",  # chat id blank → skip
+                "y",  # add a channel?
+                "telegram",  # channel type
+                "",  # bot_token blank (required) → abort
             ]
         )
     )

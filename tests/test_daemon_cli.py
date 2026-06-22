@@ -353,3 +353,186 @@ def test_daemon_picker_runs_with_mouse_disabled(
     rc = daemon_cmd._cmd_daemon_picker(_ns())
     assert rc == 0
     assert captured["kwargs"].get("mouse") is False
+
+
+# ---------------- M173: host/port cascade + channel offer ----------------
+
+
+def test_daemon_start_honours_config_port(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The unnamed daemon must honour `[daemon] host/port` from config (what
+    the project wizard writes) instead of always binding the argparse default.
+    Cascade: explicit flag (None here) > config block > 127.0.0.1:8765."""
+    import argparse
+
+    import veles.cli as cli_mod
+    from veles.core.project import init_project
+    from veles.core.project_config import load_project_config, save_project_config
+
+    monkeypatch.chdir(tmp_path)
+    project = init_project(tmp_path, name="p")
+    cfg = load_project_config(project)
+    cfg.setdefault("daemon", {})
+    cfg["daemon"]["host"] = "0.0.0.0"
+    cfg["daemon"]["port"] = 8799
+    save_project_config(project, cfg)
+
+    monkeypatch.setattr(cli_mod, "_resolve_active_project", lambda args: project)
+    monkeypatch.setattr(cli_mod, "_ensure_api_key", lambda *a, **k: True)
+    captured: dict[str, object] = {}
+
+    def _fake_detach(args, project, *, name=None):
+        captured["host"] = args.host
+        captured["port"] = args.port
+        return 0
+
+    monkeypatch.setattr(daemon_cmd, "_detach_and_report", _fake_detach)
+
+    args = argparse.Namespace(
+        command="daemon",
+        foreground=False,
+        host=None,
+        port=None,
+        provider="ollama",
+        model=None,
+        name=None,
+        no_wizard=True,
+    )
+    rc = daemon_cmd._cmd_daemon_start(args)
+    assert rc == 0
+    assert captured["host"] == "0.0.0.0"
+    assert captured["port"] == 8799
+
+
+def test_daemon_start_explicit_port_beats_config(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An explicit `--port` outranks the config block."""
+    import argparse
+
+    import veles.cli as cli_mod
+    from veles.core.project import init_project
+    from veles.core.project_config import load_project_config, save_project_config
+
+    monkeypatch.chdir(tmp_path)
+    project = init_project(tmp_path, name="p")
+    cfg = load_project_config(project)
+    cfg.setdefault("daemon", {})["port"] = 8799
+    save_project_config(project, cfg)
+
+    monkeypatch.setattr(cli_mod, "_resolve_active_project", lambda args: project)
+    monkeypatch.setattr(cli_mod, "_ensure_api_key", lambda *a, **k: True)
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        daemon_cmd,
+        "_detach_and_report",
+        lambda args, project, *, name=None: captured.update(port=args.port) or 0,
+    )
+
+    args = argparse.Namespace(
+        command="daemon",
+        foreground=False,
+        host=None,
+        port=9001,  # explicit
+        provider="ollama",
+        model=None,
+        name=None,
+        no_wizard=True,
+    )
+    assert daemon_cmd._cmd_daemon_start(args) == 0
+    assert captured["port"] == 9001
+
+
+def test_resolve_daemon_bind_defaults_when_no_config(
+    isolated_user_home: Path, tmp_path: Path
+) -> None:
+    import argparse
+
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path, name="p")
+    args = argparse.Namespace(host=None, port=None)
+    daemon_cmd._resolve_daemon_bind(args, project, None)
+    assert args.host == "127.0.0.1"
+    assert args.port == 8765
+
+
+def _interactive(monkeypatch: pytest.MonkeyPatch) -> None:
+    import sys as _sys
+
+    monkeypatch.setattr(_sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(_sys.stdout, "isatty", lambda: True)
+
+
+def test_maybe_offer_channel_runs_wizard_when_accepted(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import veles.cli.channel_wizard as cw
+    import veles.cli.project_wizard as pw
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path, name="p")
+    _interactive(monkeypatch)
+    monkeypatch.setattr(pw, "_ask_yes_no", lambda *a, **k: True)
+    calls: dict[str, object] = {}
+    monkeypatch.setattr(
+        cw,
+        "add_channel",
+        lambda project, *, session=None: calls.update(called=True, session=session),
+    )
+
+    daemon_cmd._maybe_offer_channel(_ns(no_wizard=False), project, session=None)
+    assert calls.get("called") is True
+    assert calls.get("session") is None
+
+
+def test_maybe_offer_channel_skips_when_channel_exists(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import veles.cli.channel_wizard as cw
+    from veles.cli.channel_wizard import apply_channel
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path, name="p")
+    apply_channel(
+        project, session=None, channel="telegram", secrets={"bot_token": "t"}, config_fields={}
+    )
+    _interactive(monkeypatch)
+    calls: dict[str, object] = {}
+    monkeypatch.setattr(cw, "add_channel", lambda *a, **k: calls.update(called=True))
+
+    daemon_cmd._maybe_offer_channel(_ns(no_wizard=False), project, session=None)
+    assert calls.get("called") is None  # a channel already exists → no offer
+
+
+def test_maybe_offer_channel_skips_when_declined(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import veles.cli.channel_wizard as cw
+    import veles.cli.project_wizard as pw
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path, name="p")
+    _interactive(monkeypatch)
+    monkeypatch.setattr(pw, "_ask_yes_no", lambda *a, **k: False)
+    calls: dict[str, object] = {}
+    monkeypatch.setattr(cw, "add_channel", lambda *a, **k: calls.update(called=True))
+
+    daemon_cmd._maybe_offer_channel(_ns(no_wizard=False), project, session=None)
+    assert calls.get("called") is None
+
+
+def test_maybe_offer_channel_skips_when_no_wizard(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import veles.cli.channel_wizard as cw
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path, name="p")
+    _interactive(monkeypatch)
+    calls: dict[str, object] = {}
+    monkeypatch.setattr(cw, "add_channel", lambda *a, **k: calls.update(called=True))
+
+    daemon_cmd._maybe_offer_channel(_ns(no_wizard=True), project, session=None)
+    assert calls.get("called") is None

@@ -186,10 +186,12 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 2
-        if block.get("host"):
-            args.host = str(block["host"])
-        if block.get("port") is not None:
-            args.port = int(block["port"])
+
+    # M173: host/port cascade — explicit flag > config block > 127.0.0.1:8765.
+    # Generalised from the named-session-only override so the unnamed daemon
+    # honours the `[daemon] host/port` the project wizard writes (previously it
+    # silently ignored them and always bound the argparse default).
+    _resolve_daemon_bind(args, project, name)
 
     # M130: resolve via the unified cascade (project [provider] → user
     # [user] → DEFAULT) so the API-key check targets the provider the
@@ -201,6 +203,14 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     provider_name = resolve_effective_provider(args, project, daemon_session=name)
     if not _ensure_api_key(provider_name, project=project.name):
         return 2
+
+    # M173: in an already-initialised project with no channel configured, offer
+    # to connect one before we detach. The fresh-project path already offers a
+    # channel inside the wizard; this closes the gap for `daemon start` on an
+    # existing project. Parent only — the detached child re-enters with
+    # `--foreground` and must not re-prompt.
+    if not getattr(args, "foreground", False):
+        _maybe_offer_channel(args, project, session=name)
 
     # M113: detach by default. The child re-enters this function with
     # `--foreground` set and falls through to the real server loop.
@@ -271,6 +281,64 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
             name=name,
         )
     return 0
+
+
+def _resolve_daemon_bind(args: argparse.Namespace, project, name: str | None) -> None:
+    """Apply the host/port cascade in place on `args` (M173): an explicit
+    `--host`/`--port` wins; else the project's `[daemon]` (unnamed) or
+    `[daemon.<name>]` (named session) config block; else 127.0.0.1:8765.
+
+    Argparse defaults host/port to None so "not given" is distinguishable from
+    a value that equals the hardcoded default — mirroring the model/provider
+    cascade."""
+    from veles.core.project_config import load_project_config
+
+    cfg = load_project_config(project)
+    if name:
+        from veles.core.project_config import get_daemon_session_config
+
+        block = get_daemon_session_config(cfg, name)
+    else:
+        block = cfg.get("daemon")
+        if not isinstance(block, dict):
+            block = {}
+    if args.host is None:
+        args.host = str(block.get("host") or "127.0.0.1")
+    if args.port is None:
+        cfg_port = block.get("port")
+        args.port = int(cfg_port) if cfg_port is not None else 8765
+
+
+def _maybe_offer_channel(args: argparse.Namespace, project, *, session: str | None) -> None:
+    """M173: offer the registry-driven channel wizard when this daemon has no
+    channel configured. Skips silently when non-interactive, opted out
+    (`--no-wizard` / `VELES_NO_WIZARD=1`), or a channel already exists. Shares
+    the `add_channel` flow with `veles channel add` and the TUI picker, so the
+    'pick a type, then configure it' shape is identical everywhere (M172)."""
+    if getattr(args, "no_wizard", False) or os.environ.get("VELES_NO_WIZARD") == "1":
+        return
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return
+    from veles.core.project_config import get_section, load_project_config
+
+    cfg = load_project_config(project)
+    channels = (
+        get_section(cfg, "daemon", session, "channels") if session else get_section(cfg, "channels")
+    )
+    if any(isinstance(v, dict) for v in channels.values()):
+        return  # a channel is already configured for this daemon
+
+    from veles.cli.project_wizard import _ask_yes_no, _default_prompter
+
+    if not _ask_yes_no(
+        _default_prompter,
+        "No channel is connected to this daemon. Connect one now (e.g. Telegram)?",
+        default=False,
+    ):
+        return
+    from veles.cli.channel_wizard import add_channel
+
+    add_channel(project, session=session)
 
 
 def _cmd_daemon_stop(args: argparse.Namespace) -> int:

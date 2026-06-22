@@ -13,8 +13,8 @@ Step order:
     4. AGENTS.md normalize  (only when CLAUDE.md/GEMINI.md conflicts exist;
                              stub here — full implementation lands in M96)
     5. Wiki seed            (only with the wiki engine + seed candidates)
-    6. Daemon mode          (optional; if accepted → host/port + Telegram
-                             token + whitelist; else skipped)
+    6. Daemon mode          (optional; if accepted → host/port + a channel
+                             via the shared registry-driven flow; else skipped)
     7. Recap                (always shown)
 """
 
@@ -39,7 +39,6 @@ from veles.tui.wizard.screens import (
     ChoiceScreen,
     ConfirmScreen,
     InputScreen,
-    MultiSelectScreen,
     ProgressScreen,
 )
 from veles.tui.wizard.screens.choice import ChoiceItem
@@ -391,7 +390,7 @@ class WikiSeedStep:
         return WizardOutcome.NEXT
 
 
-# ---------------- Step 5: Daemon mode + Telegram ----------------
+# ---------------- Step 5: Daemon mode + channel ----------------
 
 
 @dataclass
@@ -406,7 +405,7 @@ class DaemonModeStep:
                 question=(
                     "Run this project as a long-lived daemon? "
                     "A daemon enables `veles daemon` picker control, "
-                    "remote sessions, and Telegram-channel integration."
+                    "remote sessions, and channel integration (e.g. Telegram)."
                 ),
                 default=False,
             )
@@ -453,58 +452,47 @@ class DaemonModeStep:
         cfg["daemon"]["port"] = port_clean
         cfg["daemon"]["autostart"] = True
         _save_project_toml(project, cfg)
-        await _telegram_subflow(ctx)
+        await _channel_subflow(ctx)
         return WizardOutcome.NEXT
 
 
-async def _telegram_subflow(ctx: WizardContext) -> None:
+async def _channel_subflow(ctx: WizardContext) -> None:
+    """Registry-driven channel sub-flow (M172). Asks whether to add a channel,
+    then runs the shared pick-type → collect-creds modal flow
+    (`wizard/channel_flow.py`, the same one the daemon picker's `c` uses) and
+    persists via `apply_channel`. No telegram hardcoded — the channel-type
+    choice is always shown so new platforms appear with zero wizard code."""
+    from veles.cli.channel_wizard import apply_channel
+    from veles.tui.wizard.channel_flow import collect_channel_via_modals
+
     wants = await ctx.app.push_screen_wait(
         ConfirmScreen(
-            title="Telegram channel",
-            question=t("project_wizard.ask_telegram"),
+            title="Channel",
+            question=t("project_wizard.ask_channel"),
             default=False,
         )
     )
     if not wants or wants == _CANCEL_SENTINEL:
-        ctx.answers["telegram"] = None
+        ctx.answers["channel"] = None
         return
-    token_input = await ctx.app.push_screen_wait(
-        InputScreen(
-            title="Telegram channel",
-            prompt=t("project_wizard.ask_telegram_token"),
-            password=True,
-        )
-    )
-    if token_input is None or token_input == _CANCEL_SENTINEL or not token_input.strip():
-        ctx.answers["telegram"] = None
+    collected = await collect_channel_via_modals(ctx.app, title="Add channel")
+    if collected is None:
+        ctx.answers["channel"] = None
         return
-    whitelist = await ctx.app.push_screen_wait(
-        MultiSelectScreen(
-            title="Telegram whitelist",
-            items=[],  # populate from prior projects later (M97+)
-            allow_freeform=True,
-            freeform_placeholder="@username or numeric user id, comma-separated",
-        )
-    )
-    if whitelist is None or _CANCEL_SENTINEL in (whitelist or []):
-        whitelist = []
+    channel, secrets, config_fields = collected
     project: Project = ctx.answers["project"]
-    # Token goes to the keychain; chat_id / whitelist stay in project config.
-    from veles.core.secrets import KeyringUnavailable, set_provider_key
-
+    # Secrets → keychain, the rest → config block; all via the shared writer.
     try:
-        set_provider_key("telegram", token_input.strip(), project=project.name)
-        token_status = "saved-keychain"
-    except KeyringUnavailable as exc:
-        token_status = f"keychain-unavailable: {exc}"
-    cfg = _load_project_toml(project)
-    cfg.setdefault("channels", {}).setdefault("telegram", {})
-    cfg["channels"]["telegram"]["enabled"] = True
-    cfg["channels"]["telegram"]["whitelist"] = list(whitelist or [])
-    _save_project_toml(project, cfg)
-    ctx.answers["telegram"] = {
-        "whitelist": list(whitelist or []),
-        "token_status": token_status,
+        apply_channel(
+            project, session=None, channel=channel, secrets=secrets, config_fields=config_fields
+        )
+        status = "saved"
+    except Exception as exc:  # keychain unavailable etc. — report, don't crash.
+        status = f"failed: {type(exc).__name__}: {exc}"
+    ctx.answers["channel"] = {
+        "channel": channel,
+        "config_fields": config_fields,
+        "status": status,
     }
 
 
@@ -529,9 +517,9 @@ class RecapStep:
         d = ctx.answers.get("daemon")
         if d:
             lines.append(f"  · daemon: {d['host']}:{d['port']}")
-        if ctx.answers.get("telegram"):
-            wl = ctx.answers["telegram"]["whitelist"]
-            lines.append(f"  · telegram: {len(wl)} user(s) whitelisted")
+        ch = ctx.answers.get("channel")
+        if ch:
+            lines.append(f"  · channel: {ch['channel']} ({ch['status']})")
         from veles.core.layout.engines import wiki_enabled
 
         pages = 0

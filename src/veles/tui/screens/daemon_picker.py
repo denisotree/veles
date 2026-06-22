@@ -460,54 +460,16 @@ class DaemonPickerScreen(Screen[None]):
     async def _add_channel_flow(self, project, session, label) -> None:
         """Modal channel wizard: pick type → collect creds → write the channel
         block (global `[channels.<type>]` when session is None, else
-        `[daemon.<name>.channels.<type>]`) + keychain secret."""
-        from veles.channels.platform_registry import (
-            ensure_builtins_registered,
-            get_platform,
-            list_platforms,
-        )
+        `[daemon.<name>.channels.<type>]`) + keychain secret. The pick→collect
+        modal flow is shared with the project wizard (M172,
+        `wizard/channel_flow.py`)."""
         from veles.cli.channel_wizard import apply_channel
-        from veles.tui.wizard.screens.choice import ChoiceItem, ChoiceScreen
-        from veles.tui.wizard.screens.input import InputScreen
-        from veles.tui.wizard.step import CANCEL_SENTINEL
+        from veles.tui.wizard.channel_flow import collect_channel_via_modals
 
-        ensure_builtins_registered()
-        platforms = list_platforms()
-        if not platforms:
-            self._set_action("no channel platforms registered", severity="warning")
+        collected = await collect_channel_via_modals(self.app, title=f"Add channel to {label}")
+        if collected is None:
             return
-        channel = await self.app.push_screen_wait(
-            ChoiceScreen(
-                f"Add channel to {label}",
-                [ChoiceItem(p, p) for p in platforms],
-                default=platforms[0],
-            )
-        )
-        if not channel or channel == CANCEL_SENTINEL:
-            return
-        entry = get_platform(channel)
-        secrets: dict[str, str] = {}
-        config_fields: dict[str, object] = {}
-        for cred in entry.cred_fields:
-            value = await self.app.push_screen_wait(
-                InputScreen(f"{channel}: {cred.label}", password=cred.secret)
-            )
-            if value == CANCEL_SENTINEL:
-                return
-            value = (value or "").strip()
-            if not value:
-                if cred.required:
-                    self._set_action(
-                        f"{label}: {cred.label} required — cancelled", severity="warning"
-                    )
-                    return
-                continue
-            if cred.secret:
-                secrets[cred.key] = value
-            elif cred.list_value:
-                config_fields[cred.key] = [x.strip() for x in value.split(",") if x.strip()]
-            else:
-                config_fields[cred.key] = value
+        channel, secrets, config_fields = collected
         try:
             apply_channel(
                 project,

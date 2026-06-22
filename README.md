@@ -16,7 +16,7 @@ Unlike chat tools that start fresh every time, Veles maintains **structured proj
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles tui   # interactive REPL
+veles        # interactive REPL (bare `veles` == `veles tui`)
 ```
 
 ---
@@ -61,10 +61,10 @@ veles init
 veles run "Read AGENTS.md and describe this project."
 ```
 
-Open the interactive TUI instead:
+Open the interactive TUI instead (bare `veles` does the same):
 
 ```bash
-veles tui
+veles
 ```
 
 On first run, a setup wizard will ask for your preferred language, provider, and project name.
@@ -202,7 +202,7 @@ veles module list
 ## TUI
 
 ```bash
-veles tui                    # new session
+veles                        # new session (bare `veles` launches the TUI)
 veles tui --resume <id>      # continue a session
 ```
 
@@ -228,32 +228,27 @@ Slash commands: `/help` · `/model` · `/mode` · `/status` · `/tokens` · `/co
 
 ## Daemon + Telegram
 
-Run Veles as a persistent daemon with an HTTP/WebSocket API:
+Run Veles as a persistent daemon with an HTTP/WebSocket API. In a fresh project directory, `veles daemon start` walks you through the setup — initialize the project, enable the daemon, and **connect a channel**: first pick a channel *type* (Telegram is the only platform today, but the picker is the seam new channels register on), then fill that channel's fields (bot token, whitelist). No need to open the TUI first.
+
+<p align="center">
+  <img src="docs/assets/daemon-setup.gif" alt="veles daemon start — wizard that brings up the daemon and connects a Telegram channel (channel type first, then its token and whitelist)" width="800">
+</p>
 
 ```bash
-veles daemon token add default            # create a bearer token (once)
-veles daemon start                        # starts on 127.0.0.1:8765
-veles daemon status
+veles daemon start                        # wizard (fresh dir) → starts on 127.0.0.1:8765
+veles daemon status                       # is it running?
 veles daemon list                         # daemons across all projects
 ```
 
-`/daemon` in the TUI opens a live control panel — start, stop, restart, and attach channels to daemons across every project without leaving the REPL:
+Bare `veles daemon` opens a live control panel — a tree of project → daemons → channels. Start, stop, restart, or delete daemons, and add/remove channels (the same channel-type-first flow, key `c`) across every project, all from the keyboard:
 
 <p align="center">
-  <img src="docs/assets/tui-daemon.gif" alt="Veles TUI daemon panel — start/stop/restart daemons and manage channels across projects" width="800">
+  <img src="docs/assets/daemon-panel.gif" alt="veles daemon — control-panel TUI: a project → daemons → channels tree with start/stop/restart/delete and inline channel management" width="800">
 </p>
 
-API endpoints: `POST /v1/runs` to submit a prompt, `WS /v1/runs/{id}/events` to stream the response, `GET /v1/sessions` to list sessions. All except `GET /v1/health` require `Authorization: Bearer <token>`.
+The same channel wizard is also available standalone (`veles channel add`) on an already-running project.
 
-Connect a Telegram bot:
-
-```bash
-export TELEGRAM_BOT_TOKEN=<from @BotFather>
-export VELES_DAEMON_URL=http://127.0.0.1:8765
-export VELES_DAEMON_TOKEN=vd_...
-
-veles channel run --channel telegram
-```
+API endpoints: `POST /v1/runs` to submit a prompt, `WS /v1/runs/{id}/events` to stream the response, `GET /v1/sessions` to list sessions. All except `GET /v1/health` require `Authorization: Bearer <token>` (mint one with `veles daemon token add <name>`).
 
 Each Telegram user gets a persistent session. Use `veles channel list-sessions` / `reset-session` to manage mappings.
 
