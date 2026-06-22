@@ -10,7 +10,7 @@ Set Theme "Catppuccin Mocha"
 Set TypingSpeed 55ms
 Set PlaybackSpeed 1.6
 
-Type "veles tui" Enter
+Type "veles" Enter
 Sleep 4s
 Type "In one sentence, what is this project about?"
 Sleep 800ms
