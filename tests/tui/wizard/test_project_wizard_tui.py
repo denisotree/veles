@@ -82,9 +82,9 @@ async def test_bootstrap_no_cancels(tmp_cwd: Path) -> None:
 # ---------------- Daemon gating Telegram ----------------
 
 
-async def test_daemon_no_skips_telegram(tmp_cwd: Path) -> None:
-    """Telegram step lives INSIDE DaemonModeStep — declining daemon means
-    no Telegram questions appear at all."""
+async def test_daemon_no_skips_channel(tmp_cwd: Path) -> None:
+    """The channel step lives INSIDE DaemonModeStep — declining daemon means
+    no channel questions appear at all."""
     steps = [BootstrapStep(cwd=tmp_cwd), DaemonModeStep(), RecapStep()]
     keys = [
         "y",  # bootstrap
@@ -93,39 +93,44 @@ async def test_daemon_no_skips_telegram(tmp_cwd: Path) -> None:
     ]  # recap close
     answers = await _drive(steps, keys)
     assert answers["daemon"] is None
-    assert answers.get("telegram") is None
+    assert answers.get("channel") is None
 
 
-async def test_daemon_yes_with_telegram(tmp_cwd: Path) -> None:
+async def test_daemon_yes_with_channel(tmp_cwd: Path) -> None:
+    # M172: registry-driven channel sub-flow. After daemon host/port, the
+    # wizard asks to add a channel, shows the channel-TYPE picker (telegram is
+    # the only platform → it's the default), then drives that platform's cred
+    # fields (bot_token, then whitelist) via the shared modal collector.
     steps = [BootstrapStep(cwd=tmp_cwd), DaemonModeStep(), RecapStep()]
     keys = [
         "y",  # bootstrap
         "y",  # daemon? yes
         "enter",  # host default 127.0.0.1
         "enter",  # port default 8765
-        "y",  # telegram? yes
+        "y",  # add a channel? yes
+        "enter",  # channel type picker → telegram (default)
         "t",
         "o",
         "k",
         "e",
         "n",
-        "enter",  # bot token
-        # MultiSelect: items list is empty, so after M106 the freeform
-        # Input is focused automatically — no Tab needed.
+        "enter",  # bot_token cred
         "@",
         "f",
         "o",
         "o",
-        "ctrl+s",
+        "enter",  # whitelist cred (comma-separated input)
         "enter",  # recap close
     ]
     answers = await _drive(steps, keys, poll=120)
     assert answers["daemon"] == {"host": "127.0.0.1", "port": 8765, "autostart": True}
-    assert answers["telegram"]["whitelist"] == ["@foo"]
+    assert answers["channel"]["channel"] == "telegram"
+    assert answers["channel"]["status"] == "saved"
+    assert answers["channel"]["config_fields"]["whitelist"] == ["@foo"]
     # Token landed in the keychain under project scope.
     project = answers["project"]
     assert secrets.get_provider_key("telegram", project=project.name) == "token"
-    # Daemon + telegram settings persisted to .veles/config.toml.
+    # Daemon + channel settings persisted to .veles/config.toml.
     import tomllib
 
     with open(project.state_dir / "config.toml", "rb") as fh:
