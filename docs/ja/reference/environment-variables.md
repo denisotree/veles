@@ -1,0 +1,76 @@
+# 環境変数
+
+> 🌐 **言語:** [English](../../en/reference/environment-variables.md) · **日本語** · [Русский](../../ru/reference/environment-variables.md)
+
+Veles は実行時にこれらを読み取ります。API キーとトークンは OS キーチェーン
+（`veles secret set …`）に保存するのが最適です。環境変数はフォールバックおよび上書き用です。
+
+## プロバイダの API キー
+
+API キーの参照カスケード: OS キーチェーン（プロジェクトスコープ）→ OS キーチェーン（デフォルトスコープ）
+→ 環境変数。
+
+| Variable | Provider | Notes |
+|---|---|---|
+| `OPENROUTER_API_KEY` | openrouter | デフォルトのプロバイダ |
+| `ANTHROPIC_API_KEY` | anthropic | Anthropic API への直接接続 |
+| `OPENAI_API_KEY` | openai | OpenAI API への直接接続 |
+| `GEMINI_API_KEY` | gemini | Google Gemini の主キー |
+| `GOOGLE_API_KEY` | gemini | Google Gemini のフォールバック |
+
+`claude-cli` と `gemini-cli` は各自のバイナリを通じて認証します。環境変数は不要です。
+
+## ローカルプロバイダ
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `OLLAMA_BASE_URL` | `http://localhost:11434/v1` | Ollama のエンドポイント |
+| `OLLAMA_HOST` | follows `OLLAMA_BASE_URL` | 埋め込み用の Ollama ホスト |
+| `LLAMACPP_BASE_URL` | `http://localhost:8080/v1` | llama.cpp サーバーのエンドポイント |
+| `OPENAI_COMPAT_BASE_URL` | — (required) | `openai-compat` プロバイダのエンドポイント |
+| `VELES_LOCAL_TOOLS` | off | ローカルプロバイダでツール呼び出しを有効にする（`1`/`true`） |
+| `VELES_OLLAMA_EMBED_MODEL` | provider default | Ollama の埋め込みモデルを上書きする |
+
+## チャンネルとデーモン
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | — | `veles channel run --channel telegram` 用の Telegram ボットトークン |
+| `VELES_DAEMON_URL` | `http://127.0.0.1:8765` | チャンネルゲートウェイが使うデーモンのベース URL |
+| `VELES_DAEMON_TOKEN` | — | デーモン認証用のベアラートークン |
+
+## パスとロケール
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `VELES_USER_HOME` | `~` | `~/.veles/`（状態、キャッシュ、キーチェーンインデックス）を保持するホームを上書きする |
+| `VELES_HOME` | — | `VELES_USER_HOME` の旧名エイリアス |
+| `VELES_REGISTRY_PATH` | `~/.veles/…` | マルチプロジェクトレジストリのパスを上書きする |
+| `VELES_LOCALE` | `[user] language` or `en` | 1 回の実行に対してアクティブな UI ロケールを上書きする |
+| `VELES_LOG_LEVEL` | `INFO` | デーモン／ログの詳細度（`DEBUG`/`INFO`/`WARNING`/`ERROR`） |
+| `VELES_CONFIG_FILENAME` | `config.toml` | 設定ファイル名を上書きする（テスト用） |
+
+## 挙動とフィーチャーフラグ
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `VELES_NO_WIZARD` | off | 初回ウィザードをスキップする（TTY も必要） |
+| `VELES_MANAGER_MODE` | off | `veles run` でマルチエージェントマネージャーを強制する（`1` で有効 / `0` でキルスイッチ） |
+| `VELES_FENCED_TOOLS` | off | ツールをフェンス化／サンドボックス化された実行経路で実行する |
+| `VELES_TRUST_AUTO_ALLOW` | off | 信頼ラダーをバイパスする（CI / オートパイロット / 事前承認済みサブエージェント） |
+| `VELES_SANDBOX_ROOTS` | project + `~/.veles` | 読み取り／書き込みサンドボックスのルートを `:` 区切りで上書きする |
+| `VELES_FETCH_ALLOW_PRIVATE` | off | ツールが RFC-1918 / プライベートアドレスを取得するのを許可する |
+| `VELES_MEMORY_RERANK` | on | メモリ想起のベクトルリランキング（`0`/`false` で無効化） |
+| `VELES_WEB_SEARCH_BACKEND` | auto | `research` と `web_search` 用の Web 検索バックエンド |
+
+## レジストリ
+
+| Variable | Purpose |
+|---|---|
+| `VELES_SKILLS_REGISTRY_URL` | `veles browse skills` のソース |
+| `VELES_MODULES_REGISTRY_URL` | `veles browse modules` のソース |
+
+## 内部 / テスト用
+
+`VELES_BUNDLE_VERSION`、`VELES_CACHE_BREAKPOINT` — 内部用です。これらを設定する必要は
+ないはずです。

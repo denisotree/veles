@@ -1,6 +1,6 @@
 # Veles documentation
 
-> 🌐 **Languages:** **English** · [Русский](../ru/index.md)
+> 🌐 **Languages:** **English** · [简体中文](../zh-CN/index.md) · [繁體中文](../zh-TW/index.md) · [日本語](../ja/index.md) · [한국어](../ko/index.md) · [Español](../es/index.md) · [Français](../fr/index.md) · [Italiano](../it/index.md) · [Português (BR)](../pt-BR/index.md) · [Português (PT)](../pt-PT/index.md) · [Русский](../ru/index.md) · [العربية](../ar/index.md) · [हिन्दी](../hi/index.md) · [বাংলা](../bn/index.md) · [Tiếng Việt](../vi/index.md)
 
 Veles is a minimalist, local-first CLI agent framework. You point it at a project
 directory; it keeps a structured **project memory**, **learns** from your
