@@ -21,14 +21,15 @@ Veles installs as a global `veles` command via [uv](https://docs.astral.sh/uv/):
 # install uv if you don't have it
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# from the Veles source directory
-uv tool install .
+# install veles (published as `veles-ai`; the command is `veles`)
+uv tool install veles-ai
+# …or from a source checkout: uv tool install .
 
 # verify
 veles --help
 ```
 
-To update later: `uv tool install . --reinstall`.
+To update later: `uv tool upgrade veles-ai`.
 
 ## 2. Give Veles an API key
 
