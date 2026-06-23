@@ -354,8 +354,9 @@ Mọi lệnh đều có `--help`.
 
 Tài liệu đầy đủ — tổ chức theo Diátaxis (hướng dẫn nhập môn · hướng dẫn thực hành · tham chiếu · giải thích):
 
-- **English:** [`docs/en/index.md`](docs/en/index.md)
-- **Русский:** [`docs/ru/index.md`](docs/ru/index.md)
+- **Tiếng Việt:** [`docs/vi/index.md`](docs/vi/index.md)
+
+Ngôn ngữ khác: dùng bộ chuyển 🌐 ở đầu bất kỳ trang tài liệu nào.
 
 ---
 

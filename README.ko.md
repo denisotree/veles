@@ -354,8 +354,9 @@ veles import ./backup.tar.gz --into ./new-dir
 
 전체 문서 — Diátaxis 방식으로 구성(튜토리얼 · 사용 가이드 · 레퍼런스 · 설명):
 
-- **English:** [`docs/en/index.md`](docs/en/index.md)
-- **Русский:** [`docs/ru/index.md`](docs/ru/index.md)
+- **한국어:** [`docs/ko/index.md`](docs/ko/index.md)
+
+다른 언어: 모든 문서 페이지 상단의 🌐 전환기를 사용하세요.
 
 ---
 

@@ -354,8 +354,9 @@ veles import ./backup.tar.gz --into ./new-dir
 
 完整文件——以 Diátaxis 方式組織（教學 · 操作指南 · 參考 · 解說）：
 
-- **English：** [`docs/en/index.md`](docs/en/index.md)
-- **Русский：** [`docs/ru/index.md`](docs/ru/index.md)
+- **繁體中文：** [`docs/zh-TW/index.md`](docs/zh-TW/index.md)
+
+其他語言：使用任意文件頁面頂部的 🌐 切換器。
 
 ---
 

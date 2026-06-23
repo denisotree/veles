@@ -354,8 +354,9 @@ veles import ./backup.tar.gz --into ./new-dir
 
 Полная документация — организована по Diátaxis (учебники · практические руководства · справочник · пояснения):
 
-- **English:** [`docs/en/index.md`](docs/en/index.md)
 - **Русский:** [`docs/ru/index.md`](docs/ru/index.md)
+
+Другие языки: переключатель 🌐 вверху любой страницы документации.
 
 ---
 

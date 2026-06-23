@@ -354,8 +354,9 @@ veles import ./backup.tar.gz --into ./new-dir
 
 التوثيق الكامل — منظّم وفق Diátaxis (دروس تعليمية · أدلة إرشادية · مرجع · شرح):
 
-- **English:** [`docs/en/index.md`](docs/en/index.md)
-- **Русский:** [`docs/ru/index.md`](docs/ru/index.md)
+- **العربية:** [`docs/ar/index.md`](docs/ar/index.md)
+
+لغات أخرى: استخدم محوّل 🌐 أعلى أي صفحة من صفحات التوثيق.
 
 ---
 

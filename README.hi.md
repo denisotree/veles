@@ -354,8 +354,9 @@ veles import ./backup.tar.gz --into ./new-dir
 
 पूर्ण documentation — Diátaxis-संगठित (tutorials · how-to guides · reference · explanation):
 
-- **English:** [`docs/en/index.md`](docs/en/index.md)
-- **Русский:** [`docs/ru/index.md`](docs/ru/index.md)
+- **हिन्दी:** [`docs/hi/index.md`](docs/hi/index.md)
+
+अन्य भाषाएँ: किसी भी दस्तावेज़ पृष्ठ के शीर्ष पर दिए गए 🌐 स्विचर का उपयोग करें।
 
 ---
 

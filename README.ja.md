@@ -354,8 +354,9 @@ veles import ./backup.tar.gz --into ./new-dir
 
 完全なドキュメント — Diátaxis に沿って整理(チュートリアル · ハウツーガイド · リファレンス · 解説):
 
-- **English:** [`docs/en/index.md`](docs/en/index.md)
-- **Русский:** [`docs/ru/index.md`](docs/ru/index.md)
+- **日本語:** [`docs/ja/index.md`](docs/ja/index.md)
+
+他の言語: 各ドキュメントページ上部の 🌐 言語切り替えをご利用ください。
 
 ---
 

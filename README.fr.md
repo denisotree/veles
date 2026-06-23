@@ -354,8 +354,9 @@ Chaque commande dispose de `--help`.
 
 Documentation complète — organisée selon Diátaxis (tutoriels · guides pratiques · référence · explication) :
 
-- **English :** [`docs/en/index.md`](docs/en/index.md)
-- **Русский :** [`docs/ru/index.md`](docs/ru/index.md)
+- **Français :** [`docs/fr/index.md`](docs/fr/index.md)
+
+Autres langues : utilisez le sélecteur 🌐 en haut de n'importe quelle page de la documentation.
 
 ---
 

@@ -354,8 +354,9 @@ veles import ./backup.tar.gz --into ./new-dir
 
 সম্পূর্ণ ডকুমেন্টেশন — Diátaxis-সংগঠিত (টিউটোরিয়াল · হাউ-টু গাইড · রেফারেন্স · ব্যাখ্যা):
 
-- **English:** [`docs/en/index.md`](docs/en/index.md)
-- **Русский:** [`docs/ru/index.md`](docs/ru/index.md)
+- **বাংলা:** [`docs/bn/index.md`](docs/bn/index.md)
+
+অন্যান্য ভাষা: যেকোনো ডকুমেন্টেশন পৃষ্ঠার শীর্ষে থাকা 🌐 সুইচার ব্যবহার করুন।
 
 ---
 
