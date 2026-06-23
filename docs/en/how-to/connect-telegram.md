@@ -1,6 +1,6 @@
 # How to connect a Telegram channel
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/connect-telegram.md)
+> 🌐 **Languages:** **English** · [简体中文](../../zh-CN/how-to/connect-telegram.md) · [繁體中文](../../zh-TW/how-to/connect-telegram.md) · [日本語](../../ja/how-to/connect-telegram.md) · [한국어](../../ko/how-to/connect-telegram.md) · [Español](../../es/how-to/connect-telegram.md) · [Français](../../fr/how-to/connect-telegram.md) · [Italiano](../../it/how-to/connect-telegram.md) · [Português (BR)](../../pt-BR/how-to/connect-telegram.md) · [Português (PT)](../../pt-PT/how-to/connect-telegram.md) · [Русский](../../ru/how-to/connect-telegram.md) · [العربية](../../ar/how-to/connect-telegram.md) · [हिन्दी](../../hi/how-to/connect-telegram.md) · [বাংলা](../../bn/how-to/connect-telegram.md) · [Tiếng Việt](../../vi/how-to/connect-telegram.md)
 
 Talk to a Veles project from Telegram. A channel is a gateway that forwards
 messages to a [daemon](run-as-daemon.md) and streams replies back. Each chat gets

@@ -1,0 +1,50 @@
+# Skills ও tools — সঞ্চয়মান সক্ষমতা হিসেবে
+
+> 🌐 **ভাষা:** [English](../../en/explanation/skills-and-tools.md) · [简体中文](../../zh-CN/explanation/skills-and-tools.md) · [繁體中文](../../zh-TW/explanation/skills-and-tools.md) · [日本語](../../ja/explanation/skills-and-tools.md) · [한국어](../../ko/explanation/skills-and-tools.md) · [Español](../../es/explanation/skills-and-tools.md) · [Français](../../fr/explanation/skills-and-tools.md) · [Italiano](../../it/explanation/skills-and-tools.md) · [Português (BR)](../../pt-BR/explanation/skills-and-tools.md) · [Português (PT)](../../pt-PT/explanation/skills-and-tools.md) · [Русский](../../ru/explanation/skills-and-tools.md) · [العربية](../../ar/explanation/skills-and-tools.md) · [हिन्दी](../../hi/explanation/skills-and-tools.md) · **বাংলা** · [Tiếng Việt](../../vi/explanation/skills-and-tools.md)
+
+Veles খুবই অল্পসংখ্যক tools ও skills নিয়ে শুরু করে এবং কাজ করতে করতে এগুলো **বাড়িয়ে তোলে**।
+এই পেজে দুটোর মধ্যে পার্থক্য এবং কীভাবে এগুলো সঞ্চিত হয় তা ব্যাখ্যা করা হয়েছে। কমান্ডগুলোর জন্য
+দেখুন [manage skills & tools](../how-to/manage-skills-and-tools.md)।
+
+## Tools বনাম skills
+
+- একটি **tool** হলো একটি একক executable action — একটি ফাইল পড়া, একটি shell কমান্ড চালানো,
+  একটি URL fetch করা, ওয়েবে সার্চ করা, একটি wiki পেজ লেখা। মডেল যেগুলো call করে, সেগুলোই tool।
+- একটি **skill** হলো একটি আনুষ্ঠানিক *process* — একটি `SKILL.md` যাতে থাকে একটি prompt body এবং একটি
+  অনুমোদিত-tool তালিকা, যা একটি ফোকাসড সাব-এজেন্ট হিসেবে চলে। Skill একাধিক tool-কে একটি
+  পুনরাবৃত্তিযোগ্য workflow-এ যুক্ত করে (যেমন LLM-Wiki-এর `ingest`/`query`/`lint`)।
+
+## ন্যূনতম startup, প্রয়োজনমাফিক বিস্তার
+
+Veles কাজে লাগার মতো ঠিক যতটুকু দরকার ততটুকু নিয়ে boot করে, সাথে আরও টানার জন্য একটি পরিচিত জায়গা থাকে।
+অতিরিক্ত কিছু (একটি skill, একটি tool, একটি module) ইনস্টল করতে গেলে ডিফল্টভাবে অনুমোদন চাওয়া হয়; আপনি
+স্থায়ী স্বায়ত্তশাসন দিতে পারেন। এতে একটি নতুন প্রজেক্ট হালকা থাকে, অথচ যেখানে দরকার সেখানেই সক্ষমতা
+বাড়তে পারে।
+
+## সক্ষমতা কীভাবে সঞ্চিত হয়
+
+1. **Veles নিজের tools নিজেই লেখে।** যখন এটি কোনো পুনরাবৃত্ত কাজ লক্ষ্য করে, তখন এটি
+   `<project>/.veles/tools/`-এ একটি পরিষ্কার, typed, পুনঃব্যবহারযোগ্য Python tool লিখতে পারে (একটি
+   advisor কোড-রিভিউ পাসসহ)। tool-টি telemetry-সহ registry-তে যুক্ত হয়।
+2. **পুনরাবৃত্ত process-গুলো skill হয়ে ওঠে।** একটি pattern detector পুনরাবৃত্ত tool
+   সিকোয়েন্স শনাক্ত করে এবং সেগুলোকে skill হিসেবে আনুষ্ঠানিক করার প্রস্তাব দেয়; একটি skill অন্য একটি
+   skill-কে `extends:` করে তার body ও tools উত্তরাধিকারসূত্রে নিতে পারে।
+3. **Telemetry ranking চালায়।** প্রতিটি tool/skill use/success/error কাউন্ট বহন করে। এগুলো
+   dedup (`veles skill dedup`) এবং promotion পরামর্শকে খাওয়ায়।
+
+## দুটি scope, promotion-সহ
+
+Tools ও skills উভয়েই দুটি স্তরে থাকে:
+
+- **Project-local** (`<project>/.veles/`) — শুধু এখানেই দৃশ্যমান।
+- **User-global** (`~/.veles/`) — প্রতিটি প্রজেক্টে উপলব্ধ।
+
+কোনো একটি প্রজেক্টে নিজেকে প্রমাণ করা একটি সক্ষমতাকে user scope-এ **promote** করা যায় যাতে সব
+প্রজেক্ট উপকৃত হয় (`veles skill promote`, `veles tool promote`), অথবা আবার **demote** করা যায়।
+এভাবেই Veles কষ্টার্জিত workflow-গুলো প্রজেক্টের মধ্যে বহন করে।
+
+## ফাইল নয়, registry কেন
+
+Skills/tools-কে সাধারণ ফাইল হিসেবে রাখলে সেগুলো পরিদর্শনযোগ্য ও সম্পাদনযোগ্য থাকে; এদের *telemetry*
+`memory.db`-তে রাখলে Veles যুক্তি দিতে পারে কোনগুলো আসলে কাজ করে। এই সমন্বয়ই "স্ক্রিপ্টের একটি ফোল্ডার"-কে
+সঞ্চয়মান, স্ব-সংকলিত সক্ষমতায় রূপান্তরিত করে।

@@ -1,6 +1,6 @@
 # Навыки и инструменты как накапливающаяся способность
 
-> 🌐 **Языки:** [English](../../en/explanation/skills-and-tools.md) · **Русский**
+> 🌐 **Языки:** [English](../../en/explanation/skills-and-tools.md) · [简体中文](../../zh-CN/explanation/skills-and-tools.md) · [繁體中文](../../zh-TW/explanation/skills-and-tools.md) · [日本語](../../ja/explanation/skills-and-tools.md) · [한국어](../../ko/explanation/skills-and-tools.md) · [Español](../../es/explanation/skills-and-tools.md) · [Français](../../fr/explanation/skills-and-tools.md) · [Italiano](../../it/explanation/skills-and-tools.md) · [Português (BR)](../../pt-BR/explanation/skills-and-tools.md) · [Português (PT)](../../pt-PT/explanation/skills-and-tools.md) · **Русский** · [العربية](../../ar/explanation/skills-and-tools.md) · [हिन्दी](../../hi/explanation/skills-and-tools.md) · [বাংলা](../../bn/explanation/skills-and-tools.md) · [Tiếng Việt](../../vi/explanation/skills-and-tools.md)
 
 Veles стартует с минимального набора инструментов и навыков и **наращивает** его по
 ходу работы. Эта страница объясняет различие между ними и то, как они накапливаются.

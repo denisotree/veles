@@ -1,6 +1,6 @@
 # Документация Veles
 
-> 🌐 **Языки:** [English](../en/index.md) · **Русский**
+> 🌐 **Языки:** [English](../en/index.md) · [简体中文](../zh-CN/index.md) · [繁體中文](../zh-TW/index.md) · [日本語](../ja/index.md) · [한국어](../ko/index.md) · [Español](../es/index.md) · [Français](../fr/index.md) · [Italiano](../it/index.md) · [Português (BR)](../pt-BR/index.md) · [Português (PT)](../pt-PT/index.md) · **Русский** · [العربية](../ar/index.md) · [हिन्दी](../hi/index.md) · [বাংলা](../bn/index.md) · [Tiếng Việt](../vi/index.md)
 
 Veles — это минималистичный, local-first фреймворк CLI-агента. Вы указываете ему
 на каталог проекта; он ведёт структурированную **проектную память**, **учится** на

@@ -1,6 +1,6 @@
 # How to route tasks to different models
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/per-task-routing.md)
+> 🌐 **Languages:** **English** · [简体中文](../../zh-CN/how-to/per-task-routing.md) · [繁體中文](../../zh-TW/how-to/per-task-routing.md) · [日本語](../../ja/how-to/per-task-routing.md) · [한국어](../../ko/how-to/per-task-routing.md) · [Español](../../es/how-to/per-task-routing.md) · [Français](../../fr/how-to/per-task-routing.md) · [Italiano](../../it/how-to/per-task-routing.md) · [Português (BR)](../../pt-BR/how-to/per-task-routing.md) · [Português (PT)](../../pt-PT/how-to/per-task-routing.md) · [Русский](../../ru/how-to/per-task-routing.md) · [العربية](../../ar/how-to/per-task-routing.md) · [हिन्दी](../../hi/how-to/per-task-routing.md) · [বাংলা](../../bn/how-to/per-task-routing.md) · [Tiếng Việt](../../vi/how-to/per-task-routing.md)
 
 Veles isn't pinned to one model. Each internal **task** can use a different
 `provider:model` — a cheap model for context compression, a strong one for the
@@ -74,6 +74,10 @@ For each task, the first layer that yields a spec wins:
 4. project `[provider]` base
 5. user `[routing.tasks][task]` / `.default`
 6. user `[user] default_provider` + `default_model`
-7. built-in default for that task
 
-(`embedding` skips the catch-alls — a chat model is not an embedding model.)
+If none of these resolves, there is **no hardcoded fallback** — the task is left
+unset and its caller degrades (skips the feature) or errors clearly, rather than
+silently reaching for a cloud model.
+
+(`embedding` skips the catch-alls — a chat model is not an embedding model — so
+only an explicit `[routing.tasks].embedding` answers it.)

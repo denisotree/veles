@@ -1,11 +1,12 @@
 # Как настроить провайдеров
 
-> 🌐 **Языки:** [English](../../en/how-to/configure-providers.md) · **Русский**
+> 🌐 **Языки:** [English](../../en/how-to/configure-providers.md) · [简体中文](../../zh-CN/how-to/configure-providers.md) · [繁體中文](../../zh-TW/how-to/configure-providers.md) · [日本語](../../ja/how-to/configure-providers.md) · [한국어](../../ko/how-to/configure-providers.md) · [Español](../../es/how-to/configure-providers.md) · [Français](../../fr/how-to/configure-providers.md) · [Italiano](../../it/how-to/configure-providers.md) · [Português (BR)](../../pt-BR/how-to/configure-providers.md) · [Português (PT)](../../pt-PT/how-to/configure-providers.md) · **Русский** · [العربية](../../ar/how-to/configure-providers.md) · [हिन्दी](../../hi/how-to/configure-providers.md) · [বাংলা](../../bn/how-to/configure-providers.md) · [Tiếng Việt](../../vi/how-to/configure-providers.md)
 
-Переключайте Veles между OpenRouter, Anthropic, OpenAI, Gemini, локальными моделями
-или подпиской на CLI. Полный список провайдеров: [справочник по провайдерам](../reference/providers.md).
+Переключайте Veles между OpenRouter, Anthropic, OpenAI, Gemini, локальными
+моделями или подпиской на CLI. Полный список провайдеров:
+[справочник провайдеров](../reference/providers.md).
 
-## Выбор провайдера для отдельной команды
+## Выбор провайдера на одну команду
 
 ```bash
 veles run --provider anthropic --model claude-sonnet-4.6 "..."
@@ -13,16 +14,17 @@ veles run --provider openai     --model gpt-4o            "..."
 veles run --provider gemini     --model gemini-2.5-pro    "..."
 ```
 
-## Значение по умолчанию для проекта
+## Задать значение по умолчанию для проекта
 
-Задайте базовую настройку в `<project>/.veles/config.toml`:
+Укажите базу в `<project>/.veles/config.toml`:
 
 ```toml
 [provider]
-default = "openrouter:anthropic/claude-sonnet-4.6"
+default = "openrouter"                 # provider name
+model = "anthropic/claude-sonnet-4.6"  # model id
 ```
 
-Или глобальное для пользователя значение в `~/.veles/config.toml`:
+Или user-global значение по умолчанию в `~/.veles/config.toml`:
 
 ```toml
 [user]
@@ -30,22 +32,22 @@ default_provider = "openrouter"
 default_model = "anthropic/claude-sonnet-4.6"
 ```
 
-## Указание API-ключа
+## Указать API-ключ
 
-Облачным провайдерам нужен ключ. Сохраните его один раз в системном keychain:
+Облачным провайдерам нужен ключ. Сохраните его один раз в keychain ОС:
 
 ```bash
 veles secret set OPENROUTER_API_KEY
 veles secret set ANTHROPIC_API_KEY
 ```
 
-…либо экспортируйте [переменную окружения](../reference/environment-variables.md):
+…или экспортируйте [переменную окружения](../reference/environment-variables.md):
 
 ```bash
 export OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-Порядок поиска: keychain (область проекта) → keychain (по умолчанию) → переменная
+Порядок поиска: keychain (область проекта) → keychain (default) → переменная
 окружения. Ключи **никогда** не записываются в файлы конфигурации.
 
 ## Использование полностью локальной модели (без ключа)
@@ -58,14 +60,14 @@ veles models ollama                     # confirm it's listed
 veles run --provider ollama --model qwen3:4b-instruct "Hello"
 ```
 
-Вызов инструментов у локальных провайдеров **по умолчанию выключен**. Включите его,
-когда выберете модель с поддержкой инструментов:
+Вызов инструментов **по умолчанию выключен** на локальных провайдерах. Включите
+его, когда выберете модель, поддерживающую инструменты:
 
 ```bash
 export VELES_LOCAL_TOOLS=1
 ```
 
-Переопределите эндпоинты, если ваш сервер работает не на порту по умолчанию:
+Переопределите эндпоинты, если ваш сервер не на порту по умолчанию:
 
 ```bash
 export OLLAMA_BASE_URL=http://localhost:11434/v1
@@ -75,14 +77,14 @@ export OPENAI_COMPAT_BASE_URL=http://my-host:8000/v1   # required for openai-com
 
 ## Делегирование подписке на CLI Claude / Gemini
 
-Если у вас аутентифицирован CLI `claude` или `gemini`, Veles может управлять им:
+Если у вас аутентифицирован CLI `claude` или `gemini`, Veles может им управлять:
 
 ```bash
 veles run --provider claude-cli "..."
 veles run --provider gemini-cli "..."
 ```
 
-API-ключ не нужен — аутентификацию берёт на себя CLI.
+API-ключ не нужен — аутентификацию выполняет сам CLI.
 
 ## Список доступных моделей
 
@@ -92,7 +94,7 @@ veles models openrouter --refresh  # force re-fetch
 veles models ollama                # local: always live
 ```
 
-## Далее
+## Дальше
 
-- [Маршрутизация разных задач на разные модели](per-task-routing.md) — дешёвая
-  модель для сжатия, мощная для планирования.
+- [Направляйте разные задачи на разные модели](per-task-routing.md) — дешёвая
+  модель для компрессии, сильная для планирования.

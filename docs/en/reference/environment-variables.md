@@ -1,6 +1,6 @@
 # Environment variables
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/environment-variables.md)
+> 🌐 **Languages:** **English** · [简体中文](../../zh-CN/reference/environment-variables.md) · [繁體中文](../../zh-TW/reference/environment-variables.md) · [日本語](../../ja/reference/environment-variables.md) · [한국어](../../ko/reference/environment-variables.md) · [Español](../../es/reference/environment-variables.md) · [Français](../../fr/reference/environment-variables.md) · [Italiano](../../it/reference/environment-variables.md) · [Português (BR)](../../pt-BR/reference/environment-variables.md) · [Português (PT)](../../pt-PT/reference/environment-variables.md) · [Русский](../../ru/reference/environment-variables.md) · [العربية](../../ar/reference/environment-variables.md) · [हिन्दी](../../hi/reference/environment-variables.md) · [বাংলা](../../bn/reference/environment-variables.md) · [Tiếng Việt](../../vi/reference/environment-variables.md)
 
 Veles reads these at runtime. API keys and tokens are best stored in the OS
 keychain (`veles secret set …`); env vars are the fallback and the override.
@@ -56,6 +56,7 @@ API-key lookup cascade: OS keychain (project scope) → OS keychain (default sco
 |---|---|---|
 | `VELES_NO_WIZARD` | off | Skip the first-run wizard (also needs a TTY) |
 | `VELES_MANAGER_MODE` | off | Force multi-agent manager for `veles run` (`1` on / `0` kill switch) |
+| `VELES_VERIFY_MODE` | off | Force the verify→escalate pass for `veles run` (`1` on / `0` kill switch) |
 | `VELES_FENCED_TOOLS` | off | Run tools in the fenced/sandboxed execution path |
 | `VELES_TRUST_AUTO_ALLOW` | off | Bypass the trust ladder (CI / autopilot / pre-authorised sub-agents) |
 | `VELES_SANDBOX_ROOTS` | project + `~/.veles` | `:`-separated override of the read/write sandbox roots |

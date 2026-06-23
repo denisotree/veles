@@ -1,6 +1,6 @@
 # Getting started
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/tutorials/getting-started.md)
+> 🌐 **Languages:** **English** · [简体中文](../../zh-CN/tutorials/getting-started.md) · [繁體中文](../../zh-TW/tutorials/getting-started.md) · [日本語](../../ja/tutorials/getting-started.md) · [한국어](../../ko/tutorials/getting-started.md) · [Español](../../es/tutorials/getting-started.md) · [Français](../../fr/tutorials/getting-started.md) · [Italiano](../../it/tutorials/getting-started.md) · [Português (BR)](../../pt-BR/tutorials/getting-started.md) · [Português (PT)](../../pt-PT/tutorials/getting-started.md) · [Русский](../../ru/tutorials/getting-started.md) · [العربية](../../ar/tutorials/getting-started.md) · [हिन्दी](../../hi/tutorials/getting-started.md) · [বাংলা](../../bn/tutorials/getting-started.md) · [Tiếng Việt](../../vi/tutorials/getting-started.md)
 
 In this tutorial you install Veles, give it an API key, create your first project,
 and run your first prompt. About 10 minutes. You'll end with a working Veles
@@ -21,14 +21,15 @@ Veles installs as a global `veles` command via [uv](https://docs.astral.sh/uv/):
 # install uv if you don't have it
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# from the Veles source directory
-uv tool install .
+# install veles (published as `veles-ai`; the command is `veles`)
+uv tool install veles-ai
+# …or from a source checkout: uv tool install .
 
 # verify
 veles --help
 ```
 
-To update later: `uv tool install . --reinstall`.
+To update later: `uv tool upgrade veles-ai`.
 
 ## 2. Give Veles an API key
 

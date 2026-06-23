@@ -1,58 +1,63 @@
 # Провайдеры
 
-> 🌐 **Языки:** [English](../../en/reference/providers.md) · **Русский**
+> 🌐 **Языки:** [English](../../en/reference/providers.md) · [简体中文](../../zh-CN/reference/providers.md) · [繁體中文](../../zh-TW/reference/providers.md) · [日本語](../../ja/reference/providers.md) · [한국어](../../ko/reference/providers.md) · [Español](../../es/reference/providers.md) · [Français](../../fr/reference/providers.md) · [Italiano](../../it/reference/providers.md) · [Português (BR)](../../pt-BR/reference/providers.md) · [Português (PT)](../../pt-PT/reference/providers.md) · **Русский** · [العربية](../../ar/reference/providers.md) · [हिन्दी](../../hi/reference/providers.md) · [বাংলা](../../bn/reference/providers.md) · [Tiếng Việt](../../vi/reference/providers.md)
 
-Veles не привязан к провайдеру. Передайте `--provider <name>` любой команде агента
-или задайте значение по умолчанию в конфигурации. ID моделей используют собственное
-именование провайдера.
+Veles не привязан к конкретному провайдеру. Передайте `--provider <name>` любой
+команде агента или задайте провайдер по умолчанию в конфиге. ID моделей
+используют собственные имена провайдера.
 
 | Провайдер | Тип | API-ключ | Примечания |
 |---|---|---|---|
-| `openrouter` | Cloud gateway | `OPENROUTER_API_KEY` | **По умолчанию.** Ретранслирует сотни моделей; ID моделей вида `anthropic/claude-sonnet-4.6` |
-| `anthropic` | Cloud direct | `ANTHROPIC_API_KEY` | Claude Messages API, кэширование промптов |
-| `openai` | Cloud direct | `OPENAI_API_KEY` | Chat completions GPT |
-| `gemini` | Cloud direct | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
-| `claude-cli` | Subprocess | — (CLI session) | Делегирует локальному `claude` CLI в режиме JSON-stream |
-| `gemini-cli` | Subprocess | — (CLI session) | Делегирует локальному `gemini` CLI |
-| `ollama` | Local | none | `OLLAMA_BASE_URL` (по умолчанию `http://localhost:11434/v1`) |
-| `llamacpp` | Local | none | `LLAMACPP_BASE_URL` (по умолчанию `http://localhost:8080/v1`) |
-| `openai-compat` | Local/custom | none | `OPENAI_COMPAT_BASE_URL` (обязателен, без значения по умолчанию) |
+| `openrouter` | Облачный шлюз | `OPENROUTER_API_KEY` | **По умолчанию.** Ретранслирует сотни моделей; ID моделей вида `anthropic/claude-sonnet-4.6` |
+| `anthropic` | Облачный прямой | `ANTHROPIC_API_KEY` | API Claude Messages, prompt caching |
+| `openai` | Облачный прямой | `OPENAI_API_KEY` | Chat completions GPT |
+| `gemini` | Облачный прямой | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
+| `claude-cli` | Подпроцесс | — (сессия CLI) | Делегирует локальному CLI `claude` в режиме JSON-stream |
+| `gemini-cli` | Подпроцесс | — (сессия CLI) | Делегирует локальному CLI `gemini` |
+| `ollama` | Локальный | нет | `OLLAMA_BASE_URL` (по умолчанию `http://localhost:11434/v1`) |
+| `llamacpp` | Локальный | нет | `LLAMACPP_BASE_URL` (по умолчанию `http://localhost:8080/v1`) |
+| `openai-compat` | Локальный/кастомный | нет | `OPENAI_COMPAT_BASE_URL` (обязателен, без значения по умолчанию) |
 
-По умолчанию: провайдер `openrouter`, модель `anthropic/claude-sonnet-4.6`, компрессор
-`anthropic/claude-haiku-4.5`.
+Провайдер по умолчанию: `openrouter`. **Жёстко зашитой модели по умолчанию нет** —
+задайте её через мастер настройки, `[provider] model` или `--model` (иначе агент
+сообщит «no model configured»). Маршруты по задачам наследуют `[provider]` как
+базу, если не переопределены в `[routing.tasks]` — см.
+[маршрутизацию по задачам](../how-to/per-task-routing.md).
 
 ## Локальные провайдеры
 
-`ollama`, `llamacpp` и `openai-compat` не требуют API-ключа. Список установленных
-моделей — `veles models <provider>` (всегда живой для локальных провайдеров).
+`ollama`, `llamacpp` и `openai-compat` не требуют API-ключа. Получите список
+установленных моделей командой `veles models <provider>` (для локальных
+провайдеров всегда актуальные данные).
 
-**Вызов инструментов выключен по умолчанию** на локальных провайдерах — многие локальные
-модели выдают некорректные вызовы инструментов. Включите его, как только выбрали
-модель, способную к вызову инструментов:
+**Вызов инструментов по умолчанию выключен** на локальных провайдерах — многие
+локальные модели формируют некорректные вызовы инструментов. Включите его, когда
+выберете модель, поддерживающую инструменты:
 
 ```bash
 export VELES_LOCAL_TOOLS=1
 veles run --provider ollama --model qwen3:4b-instruct "..."
 ```
 
-Переопределяйте эндпоинты через env-переменные `*_BASE_URL` (см.
+Переопределите эндпоинты переменными окружения `*_BASE_URL` (см.
 [переменные окружения](environment-variables.md)).
 
 ## Делегирование CLI (`claude-cli`, `gemini-cli`)
 
-Если у вас есть подписка на Claude или Gemini CLI, Veles может запускать бинарник в
-режиме JSON-стриминга и действовать как координатор — сохраняя цикл local-first без
-отдельного API-ключа. Инструменты Veles достигают подпроцесса только при настроенном
-MCP-мосте.
+Если у вас есть подписка на CLI Claude или Gemini, Veles может запускать бинарник
+в режиме JSON-стриминга и выступать координатором — удерживая цикл local-first без
+отдельного API-ключа. Инструменты Veles доходят до подпроцесса только при
+настроенном мосте MCP.
 
-## Статус мультимодальности (vision / speech-to-text)
+## Статус мультимодальности (зрение / распознавание речи)
 
 Veles определяет `VisionAdapter` и протокол STT-адаптера (`modules/vision.py`,
-`modules/stt.py`) плюс глобальный реестр процесса, **но ни один конкретный адаптер не
-поставляется и ничего не регистрируется при старте демона**. Поэтому фото или голосовое
-сообщение, отправленное в канал, сейчас возвращает уведомление «не настроено», а не
-анализируется. Задача маршрутизации `vision` существует на случай, когда адаптер будет
-подключён. См. [подключение Telegram](../how-to/connect-telegram.md).
+`modules/stt.py`) плюс глобальный для процесса реестр, **но ни одного конкретного
+адаптера не поставляется и ни один не регистрируется при старте демона**. Поэтому
+фото или голосовое сообщение, отправленное в канал, сейчас возвращает уведомление
+«not configured», а не анализируется. Задача маршрутизации `vision` существует на
+случай, когда адаптер будет подключён. См.
+[подключение Telegram](../how-to/connect-telegram.md#multimodal-limitation).
 
 ## Выбор модели
 
@@ -62,5 +67,5 @@ veles models openrouter --refresh  # bypass cache
 veles models ollama                # always live
 ```
 
-Чтобы использовать разные модели для разных задач (дешёвую для компрессии, сильную для
-планирования), см. [маршрутизацию по задачам](../how-to/per-task-routing.md).
+Чтобы использовать разные модели для разных задач (дешёвую для компрессии, сильную
+для планирования), см. [маршрутизацию по задачам](../how-to/per-task-routing.md).

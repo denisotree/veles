@@ -1,0 +1,41 @@
+# 멀티 에이전트 오케스트레이션
+
+> 🌐 **언어:** [English](../../en/explanation/multi-agent-orchestration.md) · [简体中文](../../zh-CN/explanation/multi-agent-orchestration.md) · [繁體中文](../../zh-TW/explanation/multi-agent-orchestration.md) · [日本語](../../ja/explanation/multi-agent-orchestration.md) · **한국어** · [Español](../../es/explanation/multi-agent-orchestration.md) · [Français](../../fr/explanation/multi-agent-orchestration.md) · [Italiano](../../it/explanation/multi-agent-orchestration.md) · [Português (BR)](../../pt-BR/explanation/multi-agent-orchestration.md) · [Português (PT)](../../pt-PT/explanation/multi-agent-orchestration.md) · [Русский](../../ru/explanation/multi-agent-orchestration.md) · [العربية](../../ar/explanation/multi-agent-orchestration.md) · [हिन्दी](../../hi/explanation/multi-agent-orchestration.md) · [বাংলা](../../bn/explanation/multi-agent-orchestration.md) · [Tiếng Việt](../../vi/explanation/multi-agent-orchestration.md)
+
+복잡한 작업의 경우, Veles는 모든 것을 하나의 컨텍스트에서 처리하는 대신 **매니저**와
+전문화된 **워커** 서브 에이전트 간에 작업을 분할할 수 있습니다. 이 페이지는 그 모델을
+설명합니다. 활성화 방법은
+[매니저 모드](../how-to/long-running-tasks.md#manager-mode--decompose-any-prompt)를
+참조하세요.
+
+## 구조
+
+```
+            매니저  (작업을 분해하며, 최종 답변을 절대 직접 작성하지 않음)
+           /    |    \
+    탐색자  작성자  어드바이저   (전문화된 워커, 병렬로 실행)
+```
+
+- **매니저**는 분해를 계획하고 조율하지만 — 최종 결과물을 **직접** 작성하지는 않습니다.
+- **워커**는 역할별 시스템 프롬프트를 가집니다: `explorer`는 수집하고, `writer`는
+  답변을 생성하고, `advisor`는 검토합니다. 이 세트는 확장 가능합니다.
+- 마지막에 매니저는 짧은 보고서를 메모리에 기록합니다.
+
+## 전화놀이 없음
+
+핵심 규칙: 중간 아티팩트는 매니저의 바꿔 말하기가 아닌 **원문 그대로** 합성자에게
+전달됩니다. 탐색자의 발견이 작성자에게 직접 전달되므로 요약 체인을 거치면서 세부 사항이
+손실되지 않습니다. 이것이 분해가 품질을 희석하는 대신 향상시키는 이유입니다.
+
+## "매니저는 절대 쓰지 않는다"는 이유
+
+조율자가 답변도 작성한다면 워커를 생략하고 전문화의 이점을 잃고 싶은 유혹을 받을 것입니다.
+합성을 전용 `writer`에 유지하고 (원문 입력을 받아), 분업을 강제합니다. Veles는 이것을
+런타임 보장으로 만듭니다.
+
+## 도움이 되는 경우 — 그리고 그렇지 않은 경우
+
+분해는 광범위하거나 다면적인 작업에 효과적입니다 (이 코드베이스를 감사하라, 여러 각도에서
+이 질문을 조사하라). 빠른 단일 컨텍스트 요청에는 그냥 오버헤드만 추가됩니다 — 이것이
+매니저 모드가 **명시적 옵트인**이고, 기본적으로 꺼져 있는 이유입니다
+(`veles run --manager` 또는 `VELES_MANAGER_MODE=1`).

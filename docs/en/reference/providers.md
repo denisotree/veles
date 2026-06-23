@@ -1,6 +1,6 @@
 # Providers
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/providers.md)
+> 🌐 **Languages:** **English** · [简体中文](../../zh-CN/reference/providers.md) · [繁體中文](../../zh-TW/reference/providers.md) · [日本語](../../ja/reference/providers.md) · [한국어](../../ko/reference/providers.md) · [Español](../../es/reference/providers.md) · [Français](../../fr/reference/providers.md) · [Italiano](../../it/reference/providers.md) · [Português (BR)](../../pt-BR/reference/providers.md) · [Português (PT)](../../pt-PT/reference/providers.md) · [Русский](../../ru/reference/providers.md) · [العربية](../../ar/reference/providers.md) · [हिन्दी](../../hi/reference/providers.md) · [বাংলা](../../bn/reference/providers.md) · [Tiếng Việt](../../vi/reference/providers.md)
 
 Veles is provider-agnostic. Pass `--provider <name>` to any agent command, or set
 a default in config. Model IDs use the provider's own naming.
@@ -17,8 +17,10 @@ a default in config. Model IDs use the provider's own naming.
 | `llamacpp` | Local | none | `LLAMACPP_BASE_URL` (default `http://localhost:8080/v1`) |
 | `openai-compat` | Local/custom | none | `OPENAI_COMPAT_BASE_URL` (required, no default) |
 
-Defaults: provider `openrouter`, model `anthropic/claude-sonnet-4.6`, compressor
-`anthropic/claude-haiku-4.5`.
+Default provider: `openrouter`. There is **no hardcoded default model** — set one
+via the setup wizard, `[provider] model`, or `--model` (otherwise the agent reports
+"no model configured"). Per-task routes inherit `[provider]` as their base unless
+overridden in `[routing.tasks]` — see [per-task routing](../how-to/per-task-routing.md).
 
 ## Local providers
 

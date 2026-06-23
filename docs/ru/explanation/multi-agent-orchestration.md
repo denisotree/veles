@@ -1,6 +1,6 @@
 # Многоагентная оркестрация
 
-> 🌐 **Языки:** [English](../../en/explanation/multi-agent-orchestration.md) · **Русский**
+> 🌐 **Языки:** [English](../../en/explanation/multi-agent-orchestration.md) · [简体中文](../../zh-CN/explanation/multi-agent-orchestration.md) · [繁體中文](../../zh-TW/explanation/multi-agent-orchestration.md) · [日本語](../../ja/explanation/multi-agent-orchestration.md) · [한국어](../../ko/explanation/multi-agent-orchestration.md) · [Español](../../es/explanation/multi-agent-orchestration.md) · [Français](../../fr/explanation/multi-agent-orchestration.md) · [Italiano](../../it/explanation/multi-agent-orchestration.md) · [Português (BR)](../../pt-BR/explanation/multi-agent-orchestration.md) · [Português (PT)](../../pt-PT/explanation/multi-agent-orchestration.md) · **Русский** · [العربية](../../ar/explanation/multi-agent-orchestration.md) · [हिन्दी](../../hi/explanation/multi-agent-orchestration.md) · [বাংলা](../../bn/explanation/multi-agent-orchestration.md) · [Tiếng Việt](../../vi/explanation/multi-agent-orchestration.md)
 
 Для сложной работы Veles может разбить задачу между **менеджером** и
 специализированными субагентами-**воркерами**, вместо того чтобы делать всё в одном
@@ -37,7 +37,7 @@
 
 ## Когда это помогает — а когда нет
 
-Декомпозиция окупается на широких или многогранных задачах (провести аудит этого
+Декомпозиция окупается на широких или многогранных задачах (провести аудит этой
 кодовой базы, исследовать этот вопрос с нескольких сторон). Для быстрого запроса в
 одном контексте она лишь добавляет накладные расходы — поэтому режим менеджера
 **включается явно** и по умолчанию выключен (`veles run --manager` или

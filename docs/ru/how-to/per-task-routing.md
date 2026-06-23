@@ -1,34 +1,35 @@
 # Как направлять задачи на разные модели
 
-> 🌐 **Языки:** [English](../../en/how-to/per-task-routing.md) · **Русский**
+> 🌐 **Языки:** [English](../../en/how-to/per-task-routing.md) · [简体中文](../../zh-CN/how-to/per-task-routing.md) · [繁體中文](../../zh-TW/how-to/per-task-routing.md) · [日本語](../../ja/how-to/per-task-routing.md) · [한국어](../../ko/how-to/per-task-routing.md) · [Español](../../es/how-to/per-task-routing.md) · [Français](../../fr/how-to/per-task-routing.md) · [Italiano](../../it/how-to/per-task-routing.md) · [Português (BR)](../../pt-BR/how-to/per-task-routing.md) · [Português (PT)](../../pt-PT/how-to/per-task-routing.md) · **Русский** · [العربية](../../ar/how-to/per-task-routing.md) · [हिन्दी](../../hi/how-to/per-task-routing.md) · [বাংলা](../../bn/how-to/per-task-routing.md) · [Tiếng Việt](../../vi/how-to/per-task-routing.md)
 
 Veles не привязан к одной модели. Каждая внутренняя **задача** может использовать
-свою пару `provider:model` — дешёвую модель для сжатия контекста, мощную для
-основного агента, vision-модель для изображений. Это система *ensemble routing*.
+свой `provider:model` — дешёвую модель для компрессии контекста, сильную для
+основного агента, vision-модель для изображений. Это система *ансамблевой
+маршрутизации*.
 
 ## Типы задач
 
-| Задача | Применяется для |
+| Задача | Используется для |
 |---|---|
 | `default` | Основной цикл агента |
-| `curator` | Консолидация сессии → wiki |
-| `compressor` | Сжатие контекста по скользящему окну |
+| `curator` | Консолидация сессий → wiki |
+| `compressor` | Компрессия контекста скользящим окном |
 | `insights` | Извлечение инсайтов после запуска |
 | `skills` | Выполнение навыков |
 | `advisor` | Самопроверка `advisor_review` |
 | `vision` | `image_describe` (когда подключён vision-адаптер) |
-| `embedding` | Сходство в `veles skill dedup` |
+| `embedding` | Сходство для `veles skill dedup` |
 
-## Просмотр текущей маршрутизации
+## Посмотреть текущую маршрутизацию
 
 ```bash
 veles route show
 ```
 
-Команда печатает разрешённую пару `provider:model` для каждой задачи и метку
-`source`, указывающую, какой слой её определил.
+Это печатает разрешённый `provider:model` для каждой задачи и метку `source`,
+указывающую, какой слой принял решение.
 
-## Закрепление задачи за моделью
+## Закрепить задачу за моделью
 
 ```bash
 veles route set compressor openrouter:anthropic/claude-haiku-4.5
@@ -36,7 +37,7 @@ veles route set advisor    openrouter:anthropic/claude-opus-4.8
 veles route set vision     openai:gpt-4o
 ```
 
-Это записывает `[routing.tasks]` в `<project>/.veles/config.toml`:
+Эти команды записывают `[routing.tasks]` в `<project>/.veles/config.toml`:
 
 ```toml
 [routing.tasks]
@@ -54,28 +55,31 @@ veles route reset              # all tasks back to default
 
 ## Подсказки на естественном языке в AGENTS.md
 
-Маршрутизацию можно выразить прозой в `AGENTS.md` (например, «use a cheap model for
-compression»). Veles разбирает такие подсказки в автоматически генерируемый
-`routing.nl.toml`:
+Маршрутизацию можно выразить прозой в `AGENTS.md` (например, «использовать дешёвую
+модель для компрессии»). Veles разбирает их в автогенерируемый `routing.nl.toml`:
 
 ```bash
 veles route refresh            # re-parse AGENTS.md hints
 veles route refresh --force    # even if AGENTS.md hasn't changed
 ```
 
-Явные записи `[routing.tasks]` всегда имеют приоритет над NL-подсказками.
+Явные записи `[routing.tasks]` всегда побеждают подсказки на естественном языке.
 
 ## Порядок разрешения
 
-Для каждой задачи побеждает первый слой, который выдаёт спецификацию:
+Для каждой задачи побеждает первый слой, дающий спецификацию:
 
-1. проектный `[routing.tasks][task]`
-2. проектный `[routing.tasks].default`
-3. проектная NL-подсказка (`routing.nl.toml`)
-4. проектная база `[provider]`
-5. пользовательский `[routing.tasks][task]` / `.default`
-6. пользовательские `[user] default_provider` + `default_model`
-7. встроенное значение по умолчанию для этой задачи
+1. project `[routing.tasks][task]`
+2. project `[routing.tasks].default`
+3. project NL-подсказка (`routing.nl.toml`)
+4. project `[provider]` база
+5. user `[routing.tasks][task]` / `.default`
+6. user `[user] default_provider` + `default_model`
 
-(`embedding` пропускает универсальные правила — chat-модель не является
-embedding-моделью.)
+Если ничего из этого не разрешилось, **жёстко зашитого запасного варианта нет** —
+задача остаётся незаданной, и её вызывающая сторона деградирует (пропускает
+функцию) или выдаёт явную ошибку, вместо того чтобы молча обратиться к облачной
+модели.
+
+(`embedding` пропускает catch-all-слои — чат-модель не является моделью
+эмбеддингов — поэтому на неё отвечает только явный `[routing.tasks].embedding`.)

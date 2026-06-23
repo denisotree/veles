@@ -1,6 +1,6 @@
 # Обзор архитектуры
 
-> 🌐 **Языки:** [English](../../en/explanation/architecture.md) · **Русский**
+> 🌐 **Языки:** [English](../../en/explanation/architecture.md) · [简体中文](../../zh-CN/explanation/architecture.md) · [繁體中文](../../zh-TW/explanation/architecture.md) · [日本語](../../ja/explanation/architecture.md) · [한국어](../../ko/explanation/architecture.md) · [Español](../../es/explanation/architecture.md) · [Français](../../fr/explanation/architecture.md) · [Italiano](../../it/explanation/architecture.md) · [Português (BR)](../../pt-BR/explanation/architecture.md) · [Português (PT)](../../pt-PT/explanation/architecture.md) · **Русский** · [العربية](../../ar/explanation/architecture.md) · [हिन्दी](../../hi/explanation/architecture.md) · [বাংলা](../../bn/explanation/architecture.md) · [Tiếng Việt](../../vi/explanation/architecture.md)
 
 Эта страница объясняет, что Veles *представляет собой* и как его части сочетаются
 друг с другом, чтобы остальная документация обрела смысл. За авторитетным

@@ -1,6 +1,6 @@
 # How to run Veles as a daemon
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/run-as-daemon.md)
+> 🌐 **Languages:** **English** · [简体中文](../../zh-CN/how-to/run-as-daemon.md) · [繁體中文](../../zh-TW/how-to/run-as-daemon.md) · [日本語](../../ja/how-to/run-as-daemon.md) · [한국어](../../ko/how-to/run-as-daemon.md) · [Español](../../es/how-to/run-as-daemon.md) · [Français](../../fr/how-to/run-as-daemon.md) · [Italiano](../../it/how-to/run-as-daemon.md) · [Português (BR)](../../pt-BR/how-to/run-as-daemon.md) · [Português (PT)](../../pt-PT/how-to/run-as-daemon.md) · [Русский](../../ru/how-to/run-as-daemon.md) · [العربية](../../ar/how-to/run-as-daemon.md) · [हिन्दी](../../hi/how-to/run-as-daemon.md) · [বাংলা](../../bn/how-to/run-as-daemon.md) · [Tiếng Việt](../../vi/how-to/run-as-daemon.md)
 
 The daemon is an optional long-lived HTTP+WS server that exposes the agent as an
 API — the foundation for [channels](connect-telegram.md) (Telegram, …), scheduled
@@ -27,7 +27,8 @@ its lifetime** — set them before starting:
 ```toml
 # <project>/.veles/config.toml
 [provider]
-default = "ollama:qwen3:4b-instruct"
+default = "ollama"            # provider name
+model = "qwen3:4b-instruct"   # model id
 ```
 
 ## Authentication tokens
