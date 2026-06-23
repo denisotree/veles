@@ -1,6 +1,6 @@
 # TUI 快捷键与斜杠命令
 
-> 🌐 **Languages:** [English](../../en/reference/tui.md) · [Русский](../../ru/reference/tui.md) · **简体中文**
+> 🌐 **语言：** [English](../../en/reference/tui.md) · **简体中文** · [繁體中文](../../zh-TW/reference/tui.md) · [日本語](../../ja/reference/tui.md) · [한국어](../../ko/reference/tui.md) · [Español](../../es/reference/tui.md) · [Français](../../fr/reference/tui.md) · [Italiano](../../it/reference/tui.md) · [Português (BR)](../../pt-BR/reference/tui.md) · [Português (PT)](../../pt-PT/reference/tui.md) · [Русский](../../ru/reference/tui.md) · [العربية](../../ar/reference/tui.md) · [हिन्दी](../../hi/reference/tui.md) · [বাংলা](../../bn/reference/tui.md) · [Tiếng Việt](../../vi/reference/tui.md)
 
 `veles tui`（或直接 `veles`）会打开交互式 REPL。它是一个带回滚的聊天界面，
 包含一个多行输入框、一个状态栏和一个可折叠的检查器。

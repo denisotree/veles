@@ -1,6 +1,6 @@
 # CLI রেফারেন্স
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/cli.md)
+> 🌐 **ভাষা:** [English](../../en/reference/cli.md) · [简体中文](../../zh-CN/reference/cli.md) · [繁體中文](../../zh-TW/reference/cli.md) · [日本語](../../ja/reference/cli.md) · [한국어](../../ko/reference/cli.md) · [Español](../../es/reference/cli.md) · [Français](../../fr/reference/cli.md) · [Italiano](../../it/reference/cli.md) · [Português (BR)](../../pt-BR/reference/cli.md) · [Português (PT)](../../pt-PT/reference/cli.md) · [Русский](../../ru/reference/cli.md) · [العربية](../../ar/reference/cli.md) · [हिन्दी](../../hi/reference/cli.md) · **বাংলা** · [Tiếng Việt](../../vi/reference/cli.md)
 
 Veles-এর প্রতিটি কমান্ড, সাবকমান্ড এবং ফ্ল্যাগ। নির্ভরযোগ্য, সর্বদা-হালনাগাদ
 সিগনেচার পেতে `veles <command> --help` চালান — এই পৃষ্ঠাটি

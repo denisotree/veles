@@ -1,6 +1,6 @@
 # Configuration संदर्भ
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/configuration.md)
+> 🌐 **भाषाएँ:** [English](../../en/reference/configuration.md) · [简体中文](../../zh-CN/reference/configuration.md) · [繁體中文](../../zh-TW/reference/configuration.md) · [日本語](../../ja/reference/configuration.md) · [한국어](../../ko/reference/configuration.md) · [Español](../../es/reference/configuration.md) · [Français](../../fr/reference/configuration.md) · [Italiano](../../it/reference/configuration.md) · [Português (BR)](../../pt-BR/reference/configuration.md) · [Português (PT)](../../pt-PT/reference/configuration.md) · [Русский](../../ru/reference/configuration.md) · [العربية](../../ar/reference/configuration.md) · **हिन्दी** · [বাংলা](../../bn/reference/configuration.md) · [Tiếng Việt](../../vi/reference/configuration.md)
 
 Veles को दो TOML files और कुछ state directories के ज़रिए configure किया जाता है।
 Secrets (API keys, bot tokens) इन files में **कभी** नहीं लिखे जाते — वे OS keychain

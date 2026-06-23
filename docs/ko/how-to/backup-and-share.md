@@ -1,6 +1,6 @@
 # 프로젝트 백업 및 공유 방법
 
-> 🌐 **언어:** **English** · [Русский](../../ru/how-to/backup-and-share.md)
+> 🌐 **언어:** [English](../../en/how-to/backup-and-share.md) · [简体中文](../../zh-CN/how-to/backup-and-share.md) · [繁體中文](../../zh-TW/how-to/backup-and-share.md) · [日本語](../../ja/how-to/backup-and-share.md) · **한국어** · [Español](../../es/how-to/backup-and-share.md) · [Français](../../fr/how-to/backup-and-share.md) · [Italiano](../../it/how-to/backup-and-share.md) · [Português (BR)](../../pt-BR/how-to/backup-and-share.md) · [Português (PT)](../../pt-PT/how-to/backup-and-share.md) · [Русский](../../ru/how-to/backup-and-share.md) · [العربية](../../ar/how-to/backup-and-share.md) · [हिन्दी](../../hi/how-to/backup-and-share.md) · [বাংলা](../../bn/how-to/backup-and-share.md) · [Tiếng Việt](../../vi/how-to/backup-and-share.md)
 
 Veles 프로젝트는 이식 가능합니다. 백업이나 마이그레이션을 위해 프로젝트 전체를
 단일 `.tar.gz` 번들로 내보내거나, 데이터 유출 없이 공유할 수 있는 정제된 템플릿으로

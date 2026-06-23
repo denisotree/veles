@@ -1,6 +1,6 @@
 # Cómo respaldar y compartir un proyecto
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/backup-and-share.md)
+> 🌐 **Idiomas:** [English](../../en/how-to/backup-and-share.md) · [简体中文](../../zh-CN/how-to/backup-and-share.md) · [繁體中文](../../zh-TW/how-to/backup-and-share.md) · [日本語](../../ja/how-to/backup-and-share.md) · [한국어](../../ko/how-to/backup-and-share.md) · **Español** · [Français](../../fr/how-to/backup-and-share.md) · [Italiano](../../it/how-to/backup-and-share.md) · [Português (BR)](../../pt-BR/how-to/backup-and-share.md) · [Português (PT)](../../pt-PT/how-to/backup-and-share.md) · [Русский](../../ru/how-to/backup-and-share.md) · [العربية](../../ar/how-to/backup-and-share.md) · [हिन्दी](../../hi/how-to/backup-and-share.md) · [বাংলা](../../bn/how-to/backup-and-share.md) · [Tiếng Việt](../../vi/how-to/backup-and-share.md)
 
 Los proyectos de Veles son portátiles. Exporta un proyecto a un único paquete
 `.tar.gz` para respaldarlo o migrarlo, o a una plantilla saneada para compartirla

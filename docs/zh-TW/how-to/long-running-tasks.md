@@ -1,6 +1,6 @@
 # 如何執行長時間運行的任務：goals、jobs、dreaming、research
 
-> 🌐 **語言：** **English** · [Русский](../../ru/how-to/long-running-tasks.md)
+> 🌐 **語言：** [English](../../en/how-to/long-running-tasks.md) · [简体中文](../../zh-CN/how-to/long-running-tasks.md) · **繁體中文** · [日本語](../../ja/how-to/long-running-tasks.md) · [한국어](../../ko/how-to/long-running-tasks.md) · [Español](../../es/how-to/long-running-tasks.md) · [Français](../../fr/how-to/long-running-tasks.md) · [Italiano](../../it/how-to/long-running-tasks.md) · [Português (BR)](../../pt-BR/how-to/long-running-tasks.md) · [Português (PT)](../../pt-PT/how-to/long-running-tasks.md) · [Русский](../../ru/how-to/long-running-tasks.md) · [العربية](../../ar/how-to/long-running-tasks.md) · [हिन्दी](../../hi/how-to/long-running-tasks.md) · [বাংলা](../../bn/how-to/long-running-tasks.md) · [Tiếng Việt](../../vi/how-to/long-running-tasks.md)
 
 除了單次 prompt 之外，Veles 還能追求帶有預算的多步驟 **goals**、執行
 **排程 jobs**、透過 **dream** 來整併記憶、平行地在網路上做 **research**，並把工作

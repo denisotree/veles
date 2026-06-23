@@ -1,6 +1,6 @@
 # 如何管理安全性：trust、autopilot、secrets
 
-> 🌐 **語言：** **English** · [Русский](../../ru/how-to/security-and-permissions.md)
+> 🌐 **語言：** [English](../../en/how-to/security-and-permissions.md) · [简体中文](../../zh-CN/how-to/security-and-permissions.md) · **繁體中文** · [日本語](../../ja/how-to/security-and-permissions.md) · [한국어](../../ko/how-to/security-and-permissions.md) · [Español](../../es/how-to/security-and-permissions.md) · [Français](../../fr/how-to/security-and-permissions.md) · [Italiano](../../it/how-to/security-and-permissions.md) · [Português (BR)](../../pt-BR/how-to/security-and-permissions.md) · [Português (PT)](../../pt-PT/how-to/security-and-permissions.md) · [Русский](../../ru/how-to/security-and-permissions.md) · [العربية](../../ar/how-to/security-and-permissions.md) · [हिन्दी](../../hi/how-to/security-and-permissions.md) · [বাংলা](../../bn/how-to/security-and-permissions.md) · [Tiếng Việt](../../vi/how-to/security-and-permissions.md)
 
 Veles 透過 **trust ladder（信任階梯）** 把關危險操作、對檔案存取進行沙箱化，
 並將 secrets 保存在作業系統的 keychain 中。其背後的理念請參閱

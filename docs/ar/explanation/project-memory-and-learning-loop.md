@@ -1,6 +1,6 @@
 # ذاكرة المشروع وحلقة التعلّم
 
-> 🌐 **اللغات:** **English** · [Русский](../../ru/explanation/project-memory-and-learning-loop.md)
+> 🌐 **اللغات:** [English](../../en/explanation/project-memory-and-learning-loop.md) · [简体中文](../../zh-CN/explanation/project-memory-and-learning-loop.md) · [繁體中文](../../zh-TW/explanation/project-memory-and-learning-loop.md) · [日本語](../../ja/explanation/project-memory-and-learning-loop.md) · [한국어](../../ko/explanation/project-memory-and-learning-loop.md) · [Español](../../es/explanation/project-memory-and-learning-loop.md) · [Français](../../fr/explanation/project-memory-and-learning-loop.md) · [Italiano](../../it/explanation/project-memory-and-learning-loop.md) · [Português (BR)](../../pt-BR/explanation/project-memory-and-learning-loop.md) · [Português (PT)](../../pt-PT/explanation/project-memory-and-learning-loop.md) · [Русский](../../ru/explanation/project-memory-and-learning-loop.md) · **العربية** · [हिन्दी](../../hi/explanation/project-memory-and-learning-loop.md) · [বাংলা](../../bn/explanation/project-memory-and-learning-loop.md) · [Tiếng Việt](../../vi/explanation/project-memory-and-learning-loop.md)
 
 السمة المميِّزة لـ Veles هي أنه **يتذكّر** و**يتعلّم** لكل مشروع على حدة. تشرح هذه
 الصفحة ما هي تلك الذاكرة وكيف تُبقيها حلقة التعلّم نافعة.

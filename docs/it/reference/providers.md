@@ -1,6 +1,6 @@
 # Provider
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/providers.md)
+> 🌐 **Lingue:** [English](../../en/reference/providers.md) · [简体中文](../../zh-CN/reference/providers.md) · [繁體中文](../../zh-TW/reference/providers.md) · [日本語](../../ja/reference/providers.md) · [한국어](../../ko/reference/providers.md) · [Español](../../es/reference/providers.md) · [Français](../../fr/reference/providers.md) · **Italiano** · [Português (BR)](../../pt-BR/reference/providers.md) · [Português (PT)](../../pt-PT/reference/providers.md) · [Русский](../../ru/reference/providers.md) · [العربية](../../ar/reference/providers.md) · [हिन्दी](../../hi/reference/providers.md) · [বাংলা](../../bn/reference/providers.md) · [Tiếng Việt](../../vi/reference/providers.md)
 
 Veles è agnostico rispetto al provider. Passa `--provider <name>` a qualsiasi
 comando dell'agente, oppure imposta un default nella config. Gli ID dei modelli

@@ -1,6 +1,6 @@
 # マルチエージェントオーケストレーション
 
-> 🌐 **言語:** [English](../../en/explanation/multi-agent-orchestration.md) · [Русский](../../ru/explanation/multi-agent-orchestration.md)
+> 🌐 **言語:** [English](../../en/explanation/multi-agent-orchestration.md) · [简体中文](../../zh-CN/explanation/multi-agent-orchestration.md) · [繁體中文](../../zh-TW/explanation/multi-agent-orchestration.md) · **日本語** · [한국어](../../ko/explanation/multi-agent-orchestration.md) · [Español](../../es/explanation/multi-agent-orchestration.md) · [Français](../../fr/explanation/multi-agent-orchestration.md) · [Italiano](../../it/explanation/multi-agent-orchestration.md) · [Português (BR)](../../pt-BR/explanation/multi-agent-orchestration.md) · [Português (PT)](../../pt-PT/explanation/multi-agent-orchestration.md) · [Русский](../../ru/explanation/multi-agent-orchestration.md) · [العربية](../../ar/explanation/multi-agent-orchestration.md) · [हिन्दी](../../hi/explanation/multi-agent-orchestration.md) · [বাংলা](../../bn/explanation/multi-agent-orchestration.md) · [Tiếng Việt](../../vi/explanation/multi-agent-orchestration.md)
 
 複雑な作業に対して、Veles はすべてを 1 つのコンテキストで行う代わりに、タスクを **マネージャー** と専門化された **ワーカー** サブエージェントに分割できます。このページではそのモデルを説明します。有効化するには、[マネージャーモード](../how-to/long-running-tasks.md#manager-mode--decompose-any-prompt)を参照してください。
 

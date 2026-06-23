@@ -1,6 +1,6 @@
 # Skill, tool, ও module কীভাবে পরিচালনা করবেন
 
-> 🌐 **Languages:** [English](../../en/how-to/manage-skills-and-tools.md) · [Русский](../../ru/how-to/manage-skills-and-tools.md) · **বাংলা**
+> 🌐 **ভাষা:** [English](../../en/how-to/manage-skills-and-tools.md) · [简体中文](../../zh-CN/how-to/manage-skills-and-tools.md) · [繁體中文](../../zh-TW/how-to/manage-skills-and-tools.md) · [日本語](../../ja/how-to/manage-skills-and-tools.md) · [한국어](../../ko/how-to/manage-skills-and-tools.md) · [Español](../../es/how-to/manage-skills-and-tools.md) · [Français](../../fr/how-to/manage-skills-and-tools.md) · [Italiano](../../it/how-to/manage-skills-and-tools.md) · [Português (BR)](../../pt-BR/how-to/manage-skills-and-tools.md) · [Português (PT)](../../pt-PT/how-to/manage-skills-and-tools.md) · [Русский](../../ru/how-to/manage-skills-and-tools.md) · [العربية](../../ar/how-to/manage-skills-and-tools.md) · [हिन्दी](../../hi/how-to/manage-skills-and-tools.md) · **বাংলা** · [Tiếng Việt](../../vi/how-to/manage-skills-and-tools.md)
 
 Veles সময়ের সাথে সাথে সক্ষমতা সঞ্চয় করে। **Skill** হলো পুনঃব্যবহারযোগ্য workflow, **tool** হলো executable action, **module** হলো ঐচ্ছিক plug-in। প্রতিটি দুটি scope-এ থাকে: project-local (`<project>/.veles/`) এবং user-global (`~/.veles/`)। ধারণাগুলোর জন্য দেখুন [skills & tools](../explanation/skills-and-tools.md)।
 

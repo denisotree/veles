@@ -1,6 +1,6 @@
 # 如何管理技能、工具与模块
 
-> 🌐 **语言：** [English](../../en/how-to/manage-skills-and-tools.md) · [Русский](../../ru/how-to/manage-skills-and-tools.md) · **简体中文**
+> 🌐 **语言：** [English](../../en/how-to/manage-skills-and-tools.md) · **简体中文** · [繁體中文](../../zh-TW/how-to/manage-skills-and-tools.md) · [日本語](../../ja/how-to/manage-skills-and-tools.md) · [한국어](../../ko/how-to/manage-skills-and-tools.md) · [Español](../../es/how-to/manage-skills-and-tools.md) · [Français](../../fr/how-to/manage-skills-and-tools.md) · [Italiano](../../it/how-to/manage-skills-and-tools.md) · [Português (BR)](../../pt-BR/how-to/manage-skills-and-tools.md) · [Português (PT)](../../pt-PT/how-to/manage-skills-and-tools.md) · [Русский](../../ru/how-to/manage-skills-and-tools.md) · [العربية](../../ar/how-to/manage-skills-and-tools.md) · [हिन्दी](../../hi/how-to/manage-skills-and-tools.md) · [বাংলা](../../bn/how-to/manage-skills-and-tools.md) · [Tiếng Việt](../../vi/how-to/manage-skills-and-tools.md)
 
 Veles 会随时间累积能力。**技能（skills）**是可复用的工作流，**工具（tools）**是可执行的动作，**模块（modules）**是可选的插件。每一种都存在于两个作用域：项目本地（`<project>/.veles/`）和用户全局（`~/.veles/`）。关于这些概念，参见[技能与工具](../explanation/skills-and-tools.md)。
 

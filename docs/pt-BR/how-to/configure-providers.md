@@ -1,6 +1,6 @@
 # Como configurar provedores
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/configure-providers.md)
+> 🌐 **Idiomas:** [English](../../en/how-to/configure-providers.md) · [简体中文](../../zh-CN/how-to/configure-providers.md) · [繁體中文](../../zh-TW/how-to/configure-providers.md) · [日本語](../../ja/how-to/configure-providers.md) · [한국어](../../ko/how-to/configure-providers.md) · [Español](../../es/how-to/configure-providers.md) · [Français](../../fr/how-to/configure-providers.md) · [Italiano](../../it/how-to/configure-providers.md) · **Português (BR)** · [Português (PT)](../../pt-PT/how-to/configure-providers.md) · [Русский](../../ru/how-to/configure-providers.md) · [العربية](../../ar/how-to/configure-providers.md) · [हिन्दी](../../hi/how-to/configure-providers.md) · [বাংলা](../../bn/how-to/configure-providers.md) · [Tiếng Việt](../../vi/how-to/configure-providers.md)
 
 Alterne o Veles entre OpenRouter, Anthropic, OpenAI, Gemini, modelos locais ou uma
 assinatura de CLI. Lista completa de provedores: [referência de provedores](../reference/providers.md).

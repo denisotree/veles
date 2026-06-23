@@ -1,6 +1,6 @@
 # Atalhos de teclado e comandos de barra da TUI
 
-> 🌐 **Idiomas:** **English** · [Русский](../../ru/reference/tui.md)
+> 🌐 **Idiomas:** [English](../../en/reference/tui.md) · [简体中文](../../zh-CN/reference/tui.md) · [繁體中文](../../zh-TW/reference/tui.md) · [日本語](../../ja/reference/tui.md) · [한국어](../../ko/reference/tui.md) · [Español](../../es/reference/tui.md) · [Français](../../fr/reference/tui.md) · [Italiano](../../it/reference/tui.md) · **Português (BR)** · [Português (PT)](../../pt-PT/reference/tui.md) · [Русский](../../ru/reference/tui.md) · [العربية](../../ar/reference/tui.md) · [हिन्दी](../../hi/reference/tui.md) · [বাংলা](../../bn/reference/tui.md) · [Tiếng Việt](../../vi/reference/tui.md)
 
 `veles tui` (ou `veles` puro) abre o REPL interativo. É um chat com scrollback,
 um compositor de várias linhas, uma barra de status e um inspetor recolhível.

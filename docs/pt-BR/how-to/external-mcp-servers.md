@@ -1,6 +1,6 @@
 # Como conectar servidores MCP externos
 
-> 🌐 **Idiomas:** **English** · [Русский](../../ru/how-to/external-mcp-servers.md)
+> 🌐 **Idiomas:** [English](../../en/how-to/external-mcp-servers.md) · [简体中文](../../zh-CN/how-to/external-mcp-servers.md) · [繁體中文](../../zh-TW/how-to/external-mcp-servers.md) · [日本語](../../ja/how-to/external-mcp-servers.md) · [한국어](../../ko/how-to/external-mcp-servers.md) · [Español](../../es/how-to/external-mcp-servers.md) · [Français](../../fr/how-to/external-mcp-servers.md) · [Italiano](../../it/how-to/external-mcp-servers.md) · **Português (BR)** · [Português (PT)](../../pt-PT/how-to/external-mcp-servers.md) · [Русский](../../ru/how-to/external-mcp-servers.md) · [العربية](../../ar/how-to/external-mcp-servers.md) · [हिन्दी](../../hi/how-to/external-mcp-servers.md) · [বাংলা](../../bn/how-to/external-mcp-servers.md) · [Tiếng Việt](../../vi/how-to/external-mcp-servers.md)
 
 O Veles é um **cliente** [MCP](https://modelcontextprotocol.io/): ele pode se conectar a
 servidores MCP externos e expor as ferramentas deles ao agente como se fossem nativas

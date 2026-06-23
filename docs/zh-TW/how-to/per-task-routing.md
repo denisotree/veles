@@ -1,6 +1,6 @@
 # 如何將任務路由到不同的模型
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/per-task-routing.md)
+> 🌐 **語言：** [English](../../en/how-to/per-task-routing.md) · [简体中文](../../zh-CN/how-to/per-task-routing.md) · **繁體中文** · [日本語](../../ja/how-to/per-task-routing.md) · [한국어](../../ko/how-to/per-task-routing.md) · [Español](../../es/how-to/per-task-routing.md) · [Français](../../fr/how-to/per-task-routing.md) · [Italiano](../../it/how-to/per-task-routing.md) · [Português (BR)](../../pt-BR/how-to/per-task-routing.md) · [Português (PT)](../../pt-PT/how-to/per-task-routing.md) · [Русский](../../ru/how-to/per-task-routing.md) · [العربية](../../ar/how-to/per-task-routing.md) · [हिन्दी](../../hi/how-to/per-task-routing.md) · [বাংলা](../../bn/how-to/per-task-routing.md) · [Tiếng Việt](../../vi/how-to/per-task-routing.md)
 
 Veles 並未被綁死在單一模型上。每一個內部**任務**都可以使用不同的 `provider:model`——脈絡壓縮用便宜的模型、主代理用強的模型、影像用視覺模型。這就是*集成路由*系統。
 

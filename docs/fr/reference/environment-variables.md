@@ -1,6 +1,6 @@
 # Variables d'environnement
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/environment-variables.md)
+> 🌐 **Langues :** [English](../../en/reference/environment-variables.md) · [简体中文](../../zh-CN/reference/environment-variables.md) · [繁體中文](../../zh-TW/reference/environment-variables.md) · [日本語](../../ja/reference/environment-variables.md) · [한국어](../../ko/reference/environment-variables.md) · [Español](../../es/reference/environment-variables.md) · **Français** · [Italiano](../../it/reference/environment-variables.md) · [Português (BR)](../../pt-BR/reference/environment-variables.md) · [Português (PT)](../../pt-PT/reference/environment-variables.md) · [Русский](../../ru/reference/environment-variables.md) · [العربية](../../ar/reference/environment-variables.md) · [हिन्दी](../../hi/reference/environment-variables.md) · [বাংলা](../../bn/reference/environment-variables.md) · [Tiếng Việt](../../vi/reference/environment-variables.md)
 
 Veles lit ces variables à l'exécution. Les clés d'API et les jetons sont à stocker
 de préférence dans le trousseau du système d'exploitation (`veles secret set …`) ;

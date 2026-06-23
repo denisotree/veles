@@ -1,6 +1,6 @@
 # 프로바이더 구성 방법
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/configure-providers.md)
+> 🌐 **언어:** [English](../../en/how-to/configure-providers.md) · [简体中文](../../zh-CN/how-to/configure-providers.md) · [繁體中文](../../zh-TW/how-to/configure-providers.md) · [日本語](../../ja/how-to/configure-providers.md) · **한국어** · [Español](../../es/how-to/configure-providers.md) · [Français](../../fr/how-to/configure-providers.md) · [Italiano](../../it/how-to/configure-providers.md) · [Português (BR)](../../pt-BR/how-to/configure-providers.md) · [Português (PT)](../../pt-PT/how-to/configure-providers.md) · [Русский](../../ru/how-to/configure-providers.md) · [العربية](../../ar/how-to/configure-providers.md) · [हिन्दी](../../hi/how-to/configure-providers.md) · [বাংলা](../../bn/how-to/configure-providers.md) · [Tiếng Việt](../../vi/how-to/configure-providers.md)
 
 Veles를 OpenRouter, Anthropic, OpenAI, Gemini, 로컬 모델, 또는 CLI 구독 사이에서 전환합니다. 전체 프로바이더 목록은 [프로바이더 레퍼런스](../reference/providers.md)를 참고하세요.
 

@@ -1,6 +1,6 @@
 # 如何備份與分享專案
 
-> 🌐 **語言：** **English** · [Русский](../../ru/how-to/backup-and-share.md)
+> 🌐 **語言：** [English](../../en/how-to/backup-and-share.md) · [简体中文](../../zh-CN/how-to/backup-and-share.md) · **繁體中文** · [日本語](../../ja/how-to/backup-and-share.md) · [한국어](../../ko/how-to/backup-and-share.md) · [Español](../../es/how-to/backup-and-share.md) · [Français](../../fr/how-to/backup-and-share.md) · [Italiano](../../it/how-to/backup-and-share.md) · [Português (BR)](../../pt-BR/how-to/backup-and-share.md) · [Português (PT)](../../pt-PT/how-to/backup-and-share.md) · [Русский](../../ru/how-to/backup-and-share.md) · [العربية](../../ar/how-to/backup-and-share.md) · [हिन्दी](../../hi/how-to/backup-and-share.md) · [বাংলা](../../bn/how-to/backup-and-share.md) · [Tiếng Việt](../../vi/how-to/backup-and-share.md)
 
 Veles 專案是可攜的。你可以把專案匯出成單一的 `.tar.gz` 套件以供
 備份或遷移，或匯出成一份去敏感化的範本，以便分享而不外洩你的資料。

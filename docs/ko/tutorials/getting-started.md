@@ -1,6 +1,6 @@
 # 시작하기
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/tutorials/getting-started.md)
+> 🌐 **언어:** [English](../../en/tutorials/getting-started.md) · [简体中文](../../zh-CN/tutorials/getting-started.md) · [繁體中文](../../zh-TW/tutorials/getting-started.md) · [日本語](../../ja/tutorials/getting-started.md) · **한국어** · [Español](../../es/tutorials/getting-started.md) · [Français](../../fr/tutorials/getting-started.md) · [Italiano](../../it/tutorials/getting-started.md) · [Português (BR)](../../pt-BR/tutorials/getting-started.md) · [Português (PT)](../../pt-PT/tutorials/getting-started.md) · [Русский](../../ru/tutorials/getting-started.md) · [العربية](../../ar/tutorials/getting-started.md) · [हिन्दी](../../hi/tutorials/getting-started.md) · [বাংলা](../../bn/tutorials/getting-started.md) · [Tiếng Việt](../../vi/tutorials/getting-started.md)
 
 이 튜토리얼에서는 Veles를 설치하고, API 키를 등록하고, 첫 프로젝트를 만들고, 첫 프롬프트를 실행합니다. 약 10분 정도 걸립니다. 마치고 나면 대화할 수 있는 동작하는 Veles 프로젝트가 생깁니다.
 

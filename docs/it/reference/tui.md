@@ -1,6 +1,6 @@
 # Scorciatoie da tastiera e comandi slash della TUI
 
-> 🌐 **Lingue:** [English](../../en/reference/tui.md) · [Русский](../../ru/reference/tui.md) · **Italiano**
+> 🌐 **Lingue:** [English](../../en/reference/tui.md) · [简体中文](../../zh-CN/reference/tui.md) · [繁體中文](../../zh-TW/reference/tui.md) · [日本語](../../ja/reference/tui.md) · [한국어](../../ko/reference/tui.md) · [Español](../../es/reference/tui.md) · [Français](../../fr/reference/tui.md) · **Italiano** · [Português (BR)](../../pt-BR/reference/tui.md) · [Português (PT)](../../pt-PT/reference/tui.md) · [Русский](../../ru/reference/tui.md) · [العربية](../../ar/reference/tui.md) · [हिन्दी](../../hi/reference/tui.md) · [বাংলা](../../bn/reference/tui.md) · [Tiếng Việt](../../vi/reference/tui.md)
 
 `veles tui` (o `veles` da solo) apre il REPL interattivo. È una chat con scrollback,
 un composer multilinea, una barra di stato e un inspector richiudibile.

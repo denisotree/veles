@@ -1,6 +1,6 @@
 # اختصارات لوحة المفاتيح وأوامر الشرطة المائلة في TUI
 
-> 🌐 **اللغات:** [English](../../en/reference/tui.md) · [Русский](../../ru/reference/tui.md)
+> 🌐 **اللغات:** [English](../../en/reference/tui.md) · [简体中文](../../zh-CN/reference/tui.md) · [繁體中文](../../zh-TW/reference/tui.md) · [日本語](../../ja/reference/tui.md) · [한국어](../../ko/reference/tui.md) · [Español](../../es/reference/tui.md) · [Français](../../fr/reference/tui.md) · [Italiano](../../it/reference/tui.md) · [Português (BR)](../../pt-BR/reference/tui.md) · [Português (PT)](../../pt-PT/reference/tui.md) · [Русский](../../ru/reference/tui.md) · **العربية** · [हिन्दी](../../hi/reference/tui.md) · [বাংলা](../../bn/reference/tui.md) · [Tiếng Việt](../../vi/reference/tui.md)
 
 يفتح `veles tui` (أو `veles` المجرّد) واجهة REPL التفاعلية. وهي محادثة قابلة
 للتمرير للخلف مع مُحرِّر متعدّد الأسطر، وشريط حالة، ومفتّش قابل للطي.

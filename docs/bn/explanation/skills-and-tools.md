@@ -1,6 +1,6 @@
 # Skills ও tools — সঞ্চয়মান সক্ষমতা হিসেবে
 
-> 🌐 **Languages:** [English](../../en/explanation/skills-and-tools.md) · [Русский](../../ru/explanation/skills-and-tools.md) · **বাংলা**
+> 🌐 **ভাষা:** [English](../../en/explanation/skills-and-tools.md) · [简体中文](../../zh-CN/explanation/skills-and-tools.md) · [繁體中文](../../zh-TW/explanation/skills-and-tools.md) · [日本語](../../ja/explanation/skills-and-tools.md) · [한국어](../../ko/explanation/skills-and-tools.md) · [Español](../../es/explanation/skills-and-tools.md) · [Français](../../fr/explanation/skills-and-tools.md) · [Italiano](../../it/explanation/skills-and-tools.md) · [Português (BR)](../../pt-BR/explanation/skills-and-tools.md) · [Português (PT)](../../pt-PT/explanation/skills-and-tools.md) · [Русский](../../ru/explanation/skills-and-tools.md) · [العربية](../../ar/explanation/skills-and-tools.md) · [हिन्दी](../../hi/explanation/skills-and-tools.md) · **বাংলা** · [Tiếng Việt](../../vi/explanation/skills-and-tools.md)
 
 Veles খুবই অল্পসংখ্যক tools ও skills নিয়ে শুরু করে এবং কাজ করতে করতে এগুলো **বাড়িয়ে তোলে**।
 এই পেজে দুটোর মধ্যে পার্থক্য এবং কীভাবে এগুলো সঞ্চিত হয় তা ব্যাখ্যা করা হয়েছে। কমান্ডগুলোর জন্য

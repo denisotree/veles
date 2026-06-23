@@ -1,6 +1,6 @@
 # Referência de configuração
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/configuration.md)
+> 🌐 **Idiomas:** [English](../../en/reference/configuration.md) · [简体中文](../../zh-CN/reference/configuration.md) · [繁體中文](../../zh-TW/reference/configuration.md) · [日本語](../../ja/reference/configuration.md) · [한국어](../../ko/reference/configuration.md) · [Español](../../es/reference/configuration.md) · [Français](../../fr/reference/configuration.md) · [Italiano](../../it/reference/configuration.md) · [Português (BR)](../../pt-BR/reference/configuration.md) · **Português (PT)** · [Русский](../../ru/reference/configuration.md) · [العربية](../../ar/reference/configuration.md) · [हिन्दी](../../hi/reference/configuration.md) · [বাংলা](../../bn/reference/configuration.md) · [Tiếng Việt](../../vi/reference/configuration.md)
 
 O Veles é configurado por dois ficheiros TOML e um conjunto de directórios de estado.
 Os segredos (chaves de API, tokens de bot) **nunca** são escritos nestes ficheiros —

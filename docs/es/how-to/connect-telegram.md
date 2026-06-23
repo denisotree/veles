@@ -1,6 +1,6 @@
 # Cómo conectar un canal de Telegram
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/connect-telegram.md)
+> 🌐 **Idiomas:** [English](../../en/how-to/connect-telegram.md) · [简体中文](../../zh-CN/how-to/connect-telegram.md) · [繁體中文](../../zh-TW/how-to/connect-telegram.md) · [日本語](../../ja/how-to/connect-telegram.md) · [한국어](../../ko/how-to/connect-telegram.md) · **Español** · [Français](../../fr/how-to/connect-telegram.md) · [Italiano](../../it/how-to/connect-telegram.md) · [Português (BR)](../../pt-BR/how-to/connect-telegram.md) · [Português (PT)](../../pt-PT/how-to/connect-telegram.md) · [Русский](../../ru/how-to/connect-telegram.md) · [العربية](../../ar/how-to/connect-telegram.md) · [हिन्दी](../../hi/how-to/connect-telegram.md) · [বাংলা](../../bn/how-to/connect-telegram.md) · [Tiếng Việt](../../vi/how-to/connect-telegram.md)
 
 Habla con un proyecto de Veles desde Telegram. Un canal es una pasarela que
 reenvía los mensajes a un [daemon](run-as-daemon.md) y devuelve las respuestas en

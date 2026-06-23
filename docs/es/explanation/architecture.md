@@ -1,6 +1,6 @@
 # Visión general de la arquitectura
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/explanation/architecture.md)
+> 🌐 **Idiomas:** [English](../../en/explanation/architecture.md) · [简体中文](../../zh-CN/explanation/architecture.md) · [繁體中文](../../zh-TW/explanation/architecture.md) · [日本語](../../ja/explanation/architecture.md) · [한국어](../../ko/explanation/architecture.md) · **Español** · [Français](../../fr/explanation/architecture.md) · [Italiano](../../it/explanation/architecture.md) · [Português (BR)](../../pt-BR/explanation/architecture.md) · [Português (PT)](../../pt-PT/explanation/architecture.md) · [Русский](../../ru/explanation/architecture.md) · [العربية](../../ar/explanation/architecture.md) · [हिन्दी](../../hi/explanation/architecture.md) · [বাংলা](../../bn/explanation/architecture.md) · [Tiếng Việt](../../vi/explanation/architecture.md)
 
 Esta página explica qué *es* Veles y cómo encajan sus partes, para que el resto de
 la documentación tenga sentido. Para conocer la visión de producto autorizada,

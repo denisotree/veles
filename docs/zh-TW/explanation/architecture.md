@@ -1,6 +1,6 @@
 # 架構總覽
 
-> 🌐 **語言:** **English** · [Русский](../../ru/explanation/architecture.md)
+> 🌐 **語言：** [English](../../en/explanation/architecture.md) · [简体中文](../../zh-CN/explanation/architecture.md) · **繁體中文** · [日本語](../../ja/explanation/architecture.md) · [한국어](../../ko/explanation/architecture.md) · [Español](../../es/explanation/architecture.md) · [Français](../../fr/explanation/architecture.md) · [Italiano](../../it/explanation/architecture.md) · [Português (BR)](../../pt-BR/explanation/architecture.md) · [Português (PT)](../../pt-PT/explanation/architecture.md) · [Русский](../../ru/explanation/architecture.md) · [العربية](../../ar/explanation/architecture.md) · [हिन्दी](../../hi/explanation/architecture.md) · [বাংলা](../../bn/explanation/architecture.md) · [Tiếng Việt](../../vi/explanation/architecture.md)
 
 本頁說明 Veles *是什麼*，以及它的各個部分如何組合在一起，好讓其餘文件更容易理解。權威的產品願景請參閱倉庫根目錄的 `VISION.md`。
 

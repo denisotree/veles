@@ -1,6 +1,6 @@
 # 레이아웃 팩 & LLM-Wiki
 
-> 🌐 **언어:** **English** · [Русский](../../ru/explanation/layout-packs-and-llm-wiki.md)
+> 🌐 **언어:** [English](../../en/explanation/layout-packs-and-llm-wiki.md) · [简体中文](../../zh-CN/explanation/layout-packs-and-llm-wiki.md) · [繁體中文](../../zh-TW/explanation/layout-packs-and-llm-wiki.md) · [日本語](../../ja/explanation/layout-packs-and-llm-wiki.md) · **한국어** · [Español](../../es/explanation/layout-packs-and-llm-wiki.md) · [Français](../../fr/explanation/layout-packs-and-llm-wiki.md) · [Italiano](../../it/explanation/layout-packs-and-llm-wiki.md) · [Português (BR)](../../pt-BR/explanation/layout-packs-and-llm-wiki.md) · [Português (PT)](../../pt-PT/explanation/layout-packs-and-llm-wiki.md) · [Русский](../../ru/explanation/layout-packs-and-llm-wiki.md) · [العربية](../../ar/explanation/layout-packs-and-llm-wiki.md) · [हिन्दी](../../hi/explanation/layout-packs-and-llm-wiki.md) · [বাংলা](../../bn/explanation/layout-packs-and-llm-wiki.md) · [Tiếng Việt](../../vi/explanation/layout-packs-and-llm-wiki.md)
 
 **레이아웃 팩**은 프로젝트의 *사용자 콘텐츠*를 어떻게 구성할지 정의합니다 — 어떤
 디렉터리가 존재하는지, 에이전트가 어디에 쓸 수 있는지, 어떤 작업을 제공하는지.

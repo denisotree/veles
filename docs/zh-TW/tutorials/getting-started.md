@@ -1,6 +1,6 @@
 # 開始上手
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/tutorials/getting-started.md)
+> 🌐 **語言：** [English](../../en/tutorials/getting-started.md) · [简体中文](../../zh-CN/tutorials/getting-started.md) · **繁體中文** · [日本語](../../ja/tutorials/getting-started.md) · [한국어](../../ko/tutorials/getting-started.md) · [Español](../../es/tutorials/getting-started.md) · [Français](../../fr/tutorials/getting-started.md) · [Italiano](../../it/tutorials/getting-started.md) · [Português (BR)](../../pt-BR/tutorials/getting-started.md) · [Português (PT)](../../pt-PT/tutorials/getting-started.md) · [Русский](../../ru/tutorials/getting-started.md) · [العربية](../../ar/tutorials/getting-started.md) · [हिन्दी](../../hi/tutorials/getting-started.md) · [বাংলা](../../bn/tutorials/getting-started.md) · [Tiếng Việt](../../vi/tutorials/getting-started.md)
 
 在本教學中，你會安裝 Veles、提供一個 API 金鑰、建立你的第一個專案，並執行你的第一個提示。約需 10 分鐘。完成後你會擁有一個可與之對話、能運作的 Veles 專案。
 

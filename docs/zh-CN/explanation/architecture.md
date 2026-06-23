@@ -1,6 +1,6 @@
 # 架构概览
 
-> 🌐 **Languages:** [English](../../en/explanation/architecture.md) · [Русский](../../ru/explanation/architecture.md) · **简体中文**
+> 🌐 **语言：** [English](../../en/explanation/architecture.md) · **简体中文** · [繁體中文](../../zh-TW/explanation/architecture.md) · [日本語](../../ja/explanation/architecture.md) · [한국어](../../ko/explanation/architecture.md) · [Español](../../es/explanation/architecture.md) · [Français](../../fr/explanation/architecture.md) · [Italiano](../../it/explanation/architecture.md) · [Português (BR)](../../pt-BR/explanation/architecture.md) · [Português (PT)](../../pt-PT/explanation/architecture.md) · [Русский](../../ru/explanation/architecture.md) · [العربية](../../ar/explanation/architecture.md) · [हिन्दी](../../hi/explanation/architecture.md) · [বাংলা](../../bn/explanation/architecture.md) · [Tiếng Việt](../../vi/explanation/architecture.md)
 
 本页解释 Veles *是什么* 以及它的各个部分如何组合在一起，从而帮助你理解其余文档。关于权威的产品愿景，请参阅仓库根目录中的 `VISION.md`。
 

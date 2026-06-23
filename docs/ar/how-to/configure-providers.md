@@ -1,6 +1,6 @@
 # كيفية تهيئة المزوّدين
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/configure-providers.md)
+> 🌐 **اللغات:** [English](../../en/how-to/configure-providers.md) · [简体中文](../../zh-CN/how-to/configure-providers.md) · [繁體中文](../../zh-TW/how-to/configure-providers.md) · [日本語](../../ja/how-to/configure-providers.md) · [한국어](../../ko/how-to/configure-providers.md) · [Español](../../es/how-to/configure-providers.md) · [Français](../../fr/how-to/configure-providers.md) · [Italiano](../../it/how-to/configure-providers.md) · [Português (BR)](../../pt-BR/how-to/configure-providers.md) · [Português (PT)](../../pt-PT/how-to/configure-providers.md) · [Русский](../../ru/how-to/configure-providers.md) · **العربية** · [हिन्दी](../../hi/how-to/configure-providers.md) · [বাংলা](../../bn/how-to/configure-providers.md) · [Tiếng Việt](../../vi/how-to/configure-providers.md)
 
 بدّل Veles بين OpenRouter و Anthropic و OpenAI و Gemini والنماذج المحلية أو اشتراك
 CLI. قائمة المزوّدين الكاملة: [مرجع المزوّدين](../reference/providers.md).

@@ -1,6 +1,6 @@
 # 配置参考
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/configuration.md)
+> 🌐 **语言：** [English](../../en/reference/configuration.md) · **简体中文** · [繁體中文](../../zh-TW/reference/configuration.md) · [日本語](../../ja/reference/configuration.md) · [한국어](../../ko/reference/configuration.md) · [Español](../../es/reference/configuration.md) · [Français](../../fr/reference/configuration.md) · [Italiano](../../it/reference/configuration.md) · [Português (BR)](../../pt-BR/reference/configuration.md) · [Português (PT)](../../pt-PT/reference/configuration.md) · [Русский](../../ru/reference/configuration.md) · [العربية](../../ar/reference/configuration.md) · [हिन्दी](../../hi/reference/configuration.md) · [বাংলা](../../bn/reference/configuration.md) · [Tiếng Việt](../../vi/reference/configuration.md)
 
 Veles 由两个 TOML 文件和一组状态目录进行配置。密钥（API key、bot token）**绝不会**写入这些文件——它们存放在操作系统钥匙串或环境变量中（参见[环境变量](environment-variables.md)）。
 

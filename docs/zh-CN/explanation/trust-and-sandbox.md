@@ -1,6 +1,6 @@
 # 信任与沙箱
 
-> 🌐 **Languages:** [English](../../en/explanation/trust-and-sandbox.md) · [Русский](../../ru/explanation/trust-and-sandbox.md) · **简体中文**
+> 🌐 **语言：** [English](../../en/explanation/trust-and-sandbox.md) · **简体中文** · [繁體中文](../../zh-TW/explanation/trust-and-sandbox.md) · [日本語](../../ja/explanation/trust-and-sandbox.md) · [한국어](../../ko/explanation/trust-and-sandbox.md) · [Español](../../es/explanation/trust-and-sandbox.md) · [Français](../../fr/explanation/trust-and-sandbox.md) · [Italiano](../../it/explanation/trust-and-sandbox.md) · [Português (BR)](../../pt-BR/explanation/trust-and-sandbox.md) · [Português (PT)](../../pt-PT/explanation/trust-and-sandbox.md) · [Русский](../../ru/explanation/trust-and-sandbox.md) · [العربية](../../ar/explanation/trust-and-sandbox.md) · [हिन्दी](../../hi/explanation/trust-and-sandbox.md) · [বাংলা](../../bn/explanation/trust-and-sandbox.md) · [Tiếng Việt](../../vi/explanation/trust-and-sandbox.md)
 
 Veles 在你的机器上运行一个自主智能体，因此它会约束该智能体能做什么。两套机制协同工作：用于敏感动作的 **信任阶梯**，以及用于文件系统的 **沙箱**。关于相关命令，请参阅 [安全与权限](../how-to/security-and-permissions.md)。
 

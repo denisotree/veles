@@ -1,6 +1,6 @@
 # 실행 모드
 
-> 🌐 **언어:** **English** · [Русский](../../ru/explanation/modes.md)
+> 🌐 **언어:** [English](../../en/explanation/modes.md) · [简体中文](../../zh-CN/explanation/modes.md) · [繁體中文](../../zh-TW/explanation/modes.md) · [日本語](../../ja/explanation/modes.md) · **한국어** · [Español](../../es/explanation/modes.md) · [Français](../../fr/explanation/modes.md) · [Italiano](../../it/explanation/modes.md) · [Português (BR)](../../pt-BR/explanation/modes.md) · [Português (PT)](../../pt-PT/explanation/modes.md) · [Русский](../../ru/explanation/modes.md) · [العربية](../../ar/explanation/modes.md) · [हिन्दी](../../hi/explanation/modes.md) · [বাংলা](../../bn/explanation/modes.md) · [Tiếng Việt](../../vi/explanation/modes.md)
 
 TUI에서 각 프롬프트는 **실행 모드**로 처리됩니다 — 해당 턴이 얼마나 많은 자율성을
 가지고 어떤 도구를 사용할지 결정하는 전략입니다. `Shift+Tab`으로 모드를 순환합니다.

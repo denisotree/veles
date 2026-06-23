@@ -1,6 +1,6 @@
 # タスクごとに異なるモデルへルーティングする方法
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/per-task-routing.md)
+> 🌐 **言語:** [English](../../en/how-to/per-task-routing.md) · [简体中文](../../zh-CN/how-to/per-task-routing.md) · [繁體中文](../../zh-TW/how-to/per-task-routing.md) · **日本語** · [한국어](../../ko/how-to/per-task-routing.md) · [Español](../../es/how-to/per-task-routing.md) · [Français](../../fr/how-to/per-task-routing.md) · [Italiano](../../it/how-to/per-task-routing.md) · [Português (BR)](../../pt-BR/how-to/per-task-routing.md) · [Português (PT)](../../pt-PT/how-to/per-task-routing.md) · [Русский](../../ru/how-to/per-task-routing.md) · [العربية](../../ar/how-to/per-task-routing.md) · [हिन्दी](../../hi/how-to/per-task-routing.md) · [বাংলা](../../bn/how-to/per-task-routing.md) · [Tiếng Việt](../../vi/how-to/per-task-routing.md)
 
 Veles は 1 つのモデルに固定されているわけではありません。内部の各**タスク**は異なる `provider:model` を使えます。コンテキスト圧縮には安価なモデル、メインエージェントには強力なモデル、画像にはビジョンモデル、といった具合です。これが*アンサンブルルーティング*システムです。
 

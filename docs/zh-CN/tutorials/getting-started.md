@@ -1,6 +1,6 @@
 # 快速上手
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/tutorials/getting-started.md)
+> 🌐 **语言：** [English](../../en/tutorials/getting-started.md) · **简体中文** · [繁體中文](../../zh-TW/tutorials/getting-started.md) · [日本語](../../ja/tutorials/getting-started.md) · [한국어](../../ko/tutorials/getting-started.md) · [Español](../../es/tutorials/getting-started.md) · [Français](../../fr/tutorials/getting-started.md) · [Italiano](../../it/tutorials/getting-started.md) · [Português (BR)](../../pt-BR/tutorials/getting-started.md) · [Português (PT)](../../pt-PT/tutorials/getting-started.md) · [Русский](../../ru/tutorials/getting-started.md) · [العربية](../../ar/tutorials/getting-started.md) · [हिन्दी](../../hi/tutorials/getting-started.md) · [বাংলা](../../bn/tutorials/getting-started.md) · [Tiếng Việt](../../vi/tutorials/getting-started.md)
 
 在本教程中，你将安装 Veles、给它一个 API key、创建你的第一个项目，并运行你的第一个 prompt。大约 10 分钟。完成后你将得到一个可以对话的、可用的 Veles 项目。
 

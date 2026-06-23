@@ -1,6 +1,6 @@
 # 如何备份和分享项目
 
-> 🌐 **语言：** [English](../../en/how-to/backup-and-share.md) · [Русский](../../ru/how-to/backup-and-share.md) · **简体中文**
+> 🌐 **语言：** [English](../../en/how-to/backup-and-share.md) · **简体中文** · [繁體中文](../../zh-TW/how-to/backup-and-share.md) · [日本語](../../ja/how-to/backup-and-share.md) · [한국어](../../ko/how-to/backup-and-share.md) · [Español](../../es/how-to/backup-and-share.md) · [Français](../../fr/how-to/backup-and-share.md) · [Italiano](../../it/how-to/backup-and-share.md) · [Português (BR)](../../pt-BR/how-to/backup-and-share.md) · [Português (PT)](../../pt-PT/how-to/backup-and-share.md) · [Русский](../../ru/how-to/backup-and-share.md) · [العربية](../../ar/how-to/backup-and-share.md) · [हिन्दी](../../hi/how-to/backup-and-share.md) · [বাংলা](../../bn/how-to/backup-and-share.md) · [Tiếng Việt](../../vi/how-to/backup-and-share.md)
 
 Veles 项目是可移植的。你可以将项目导出为单个 `.tar.gz` 包用于备份或迁移，也可以导出一份经过脱敏处理的模板，在不泄露你的数据的前提下分享。
 

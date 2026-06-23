@@ -1,6 +1,6 @@
 # Cómo ejecutar Veles como daemon
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/run-as-daemon.md)
+> 🌐 **Idiomas:** [English](../../en/how-to/run-as-daemon.md) · [简体中文](../../zh-CN/how-to/run-as-daemon.md) · [繁體中文](../../zh-TW/how-to/run-as-daemon.md) · [日本語](../../ja/how-to/run-as-daemon.md) · [한국어](../../ko/how-to/run-as-daemon.md) · **Español** · [Français](../../fr/how-to/run-as-daemon.md) · [Italiano](../../it/how-to/run-as-daemon.md) · [Português (BR)](../../pt-BR/how-to/run-as-daemon.md) · [Português (PT)](../../pt-PT/how-to/run-as-daemon.md) · [Русский](../../ru/how-to/run-as-daemon.md) · [العربية](../../ar/how-to/run-as-daemon.md) · [हिन्दी](../../hi/how-to/run-as-daemon.md) · [বাংলা](../../bn/how-to/run-as-daemon.md) · [Tiếng Việt](../../vi/how-to/run-as-daemon.md)
 
 El daemon es un servidor HTTP+WS opcional de larga duración que expone el agente como
 una API — la base para los [canales](connect-telegram.md) (Telegram, …), los

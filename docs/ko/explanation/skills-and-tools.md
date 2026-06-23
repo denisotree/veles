@@ -1,6 +1,6 @@
 # 누적되는 역량으로서의 스킬과 툴
 
-> 🌐 **언어:** **English** · [Русский](../../ru/explanation/skills-and-tools.md)
+> 🌐 **언어:** [English](../../en/explanation/skills-and-tools.md) · [简体中文](../../zh-CN/explanation/skills-and-tools.md) · [繁體中文](../../zh-TW/explanation/skills-and-tools.md) · [日本語](../../ja/explanation/skills-and-tools.md) · **한국어** · [Español](../../es/explanation/skills-and-tools.md) · [Français](../../fr/explanation/skills-and-tools.md) · [Italiano](../../it/explanation/skills-and-tools.md) · [Português (BR)](../../pt-BR/explanation/skills-and-tools.md) · [Português (PT)](../../pt-PT/explanation/skills-and-tools.md) · [Русский](../../ru/explanation/skills-and-tools.md) · [العربية](../../ar/explanation/skills-and-tools.md) · [हिन्दी](../../hi/explanation/skills-and-tools.md) · [বাংলা](../../bn/explanation/skills-and-tools.md) · [Tiếng Việt](../../vi/explanation/skills-and-tools.md)
 
 Veles는 최소한의 툴과 스킬 세트로 시작하여 작업을 수행하면서 **점차 성장**합니다.
 이 페이지에서는 둘의 차이점과 누적 방식을 설명합니다. 관련 명령어는

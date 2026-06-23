@@ -1,6 +1,6 @@
 # 项目布局与状态
 
-> 🌐 **Languages:** [English](../../en/reference/project-layout.md) · [Русский](../../ru/reference/project-layout.md) · **简体中文**
+> 🌐 **语言：** [English](../../en/reference/project-layout.md) · **简体中文** · [繁體中文](../../zh-TW/reference/project-layout.md) · [日本語](../../ja/reference/project-layout.md) · [한국어](../../ko/reference/project-layout.md) · [Español](../../es/reference/project-layout.md) · [Français](../../fr/reference/project-layout.md) · [Italiano](../../it/reference/project-layout.md) · [Português (BR)](../../pt-BR/reference/project-layout.md) · [Português (PT)](../../pt-PT/reference/project-layout.md) · [Русский](../../ru/reference/project-layout.md) · [العربية](../../ar/reference/project-layout.md) · [हिन्दी](../../hi/reference/project-layout.md) · [বাংলা](../../bn/reference/project-layout.md) · [Tiếng Việt](../../vi/reference/project-layout.md)
 
 `veles init` 会创建什么、Veles 把状态保存在哪里，以及项目记忆的架构。
 

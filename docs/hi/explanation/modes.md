@@ -1,6 +1,6 @@
 # Run modes
 
-> 🌐 **भाषाएँ:** **English** · [Русский](../../ru/explanation/modes.md)
+> 🌐 **भाषाएँ:** [English](../../en/explanation/modes.md) · [简体中文](../../zh-CN/explanation/modes.md) · [繁體中文](../../zh-TW/explanation/modes.md) · [日本語](../../ja/explanation/modes.md) · [한국어](../../ko/explanation/modes.md) · [Español](../../es/explanation/modes.md) · [Français](../../fr/explanation/modes.md) · [Italiano](../../it/explanation/modes.md) · [Português (BR)](../../pt-BR/explanation/modes.md) · [Português (PT)](../../pt-PT/explanation/modes.md) · [Русский](../../ru/explanation/modes.md) · [العربية](../../ar/explanation/modes.md) · **हिन्दी** · [বাংলা](../../bn/explanation/modes.md) · [Tiếng Việt](../../vi/explanation/modes.md)
 
 TUI में, प्रत्येक prompt को एक **run mode** द्वारा संभाला जाता है — एक रणनीति जो
 तय करती है कि उस turn को कितनी स्वायत्तता और कौन-से tools मिलें। modes को

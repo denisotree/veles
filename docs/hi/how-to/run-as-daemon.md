@@ -1,6 +1,6 @@
 # Veles को daemon के रूप में कैसे चलाएँ
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/run-as-daemon.md)
+> 🌐 **भाषाएँ:** [English](../../en/how-to/run-as-daemon.md) · [简体中文](../../zh-CN/how-to/run-as-daemon.md) · [繁體中文](../../zh-TW/how-to/run-as-daemon.md) · [日本語](../../ja/how-to/run-as-daemon.md) · [한국어](../../ko/how-to/run-as-daemon.md) · [Español](../../es/how-to/run-as-daemon.md) · [Français](../../fr/how-to/run-as-daemon.md) · [Italiano](../../it/how-to/run-as-daemon.md) · [Português (BR)](../../pt-BR/how-to/run-as-daemon.md) · [Português (PT)](../../pt-PT/how-to/run-as-daemon.md) · [Русский](../../ru/how-to/run-as-daemon.md) · [العربية](../../ar/how-to/run-as-daemon.md) · **हिन्दी** · [বাংলা](../../bn/how-to/run-as-daemon.md) · [Tiếng Việt](../../vi/how-to/run-as-daemon.md)
 
 daemon एक वैकल्पिक, दीर्घजीवी HTTP+WS server है जो agent को एक API के रूप में उजागर
 करता है — यह [channels](connect-telegram.md) (Telegram, …), scheduled

@@ -1,6 +1,6 @@
 # 多 agent 編排
 
-> 🌐 **語言:** **English** · [Русский](../../ru/explanation/multi-agent-orchestration.md)
+> 🌐 **語言：** [English](../../en/explanation/multi-agent-orchestration.md) · [简体中文](../../zh-CN/explanation/multi-agent-orchestration.md) · **繁體中文** · [日本語](../../ja/explanation/multi-agent-orchestration.md) · [한국어](../../ko/explanation/multi-agent-orchestration.md) · [Español](../../es/explanation/multi-agent-orchestration.md) · [Français](../../fr/explanation/multi-agent-orchestration.md) · [Italiano](../../it/explanation/multi-agent-orchestration.md) · [Português (BR)](../../pt-BR/explanation/multi-agent-orchestration.md) · [Português (PT)](../../pt-PT/explanation/multi-agent-orchestration.md) · [Русский](../../ru/explanation/multi-agent-orchestration.md) · [العربية](../../ar/explanation/multi-agent-orchestration.md) · [हिन्दी](../../hi/explanation/multi-agent-orchestration.md) · [বাংলা](../../bn/explanation/multi-agent-orchestration.md) · [Tiếng Việt](../../vi/explanation/multi-agent-orchestration.md)
 
 對於複雜的工作,Veles 可以把一個任務分散到一個 **manager** 與多個專門的 **worker** 子 agent 上,而不是在單一 context 中做完所有事。本頁說明這個模型;要啟用它,請參見[manager 模式](../how-to/long-running-tasks.md#manager-mode--decompose-any-prompt)。
 

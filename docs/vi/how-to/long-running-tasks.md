@@ -1,6 +1,6 @@
 # Cách chạy các tác vụ dài hạn: goals, jobs, dreaming, research
 
-> 🌐 **Ngôn ngữ:** [English](../../en/how-to/long-running-tasks.md) · [Русский](../../ru/how-to/long-running-tasks.md) · **Tiếng Việt**
+> 🌐 **Ngôn ngữ:** [English](../../en/how-to/long-running-tasks.md) · [简体中文](../../zh-CN/how-to/long-running-tasks.md) · [繁體中文](../../zh-TW/how-to/long-running-tasks.md) · [日本語](../../ja/how-to/long-running-tasks.md) · [한국어](../../ko/how-to/long-running-tasks.md) · [Español](../../es/how-to/long-running-tasks.md) · [Français](../../fr/how-to/long-running-tasks.md) · [Italiano](../../it/how-to/long-running-tasks.md) · [Português (BR)](../../pt-BR/how-to/long-running-tasks.md) · [Português (PT)](../../pt-PT/how-to/long-running-tasks.md) · [Русский](../../ru/how-to/long-running-tasks.md) · [العربية](../../ar/how-to/long-running-tasks.md) · [हिन्दी](../../hi/how-to/long-running-tasks.md) · [বাংলা](../../bn/how-to/long-running-tasks.md) · **Tiếng Việt**
 
 Vượt ra ngoài các prompt đơn lẻ, Veles có thể theo đuổi các **mục tiêu (goals)** nhiều bước với ngân sách, chạy
 các **tác vụ theo lịch (jobs)**, **mơ (dream)** để củng cố bộ nhớ, **nghiên cứu (research)** web song song,

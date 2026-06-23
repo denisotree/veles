@@ -1,6 +1,6 @@
 # Skills, tools, और modules कैसे manage करें
 
-> 🌐 **भाषाएँ:** **English** · [Русский](../../ru/how-to/manage-skills-and-tools.md)
+> 🌐 **भाषाएँ:** [English](../../en/how-to/manage-skills-and-tools.md) · [简体中文](../../zh-CN/how-to/manage-skills-and-tools.md) · [繁體中文](../../zh-TW/how-to/manage-skills-and-tools.md) · [日本語](../../ja/how-to/manage-skills-and-tools.md) · [한국어](../../ko/how-to/manage-skills-and-tools.md) · [Español](../../es/how-to/manage-skills-and-tools.md) · [Français](../../fr/how-to/manage-skills-and-tools.md) · [Italiano](../../it/how-to/manage-skills-and-tools.md) · [Português (BR)](../../pt-BR/how-to/manage-skills-and-tools.md) · [Português (PT)](../../pt-PT/how-to/manage-skills-and-tools.md) · [Русский](../../ru/how-to/manage-skills-and-tools.md) · [العربية](../../ar/how-to/manage-skills-and-tools.md) · **हिन्दी** · [বাংলা](../../bn/how-to/manage-skills-and-tools.md) · [Tiếng Việt](../../vi/how-to/manage-skills-and-tools.md)
 
 Veles समय के साथ capability जमा करता है। **Skills** पुनः-उपयोग योग्य workflows हैं,
 **tools** executable actions हैं, **modules** वैकल्पिक plug-ins हैं। हर एक दो

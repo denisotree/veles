@@ -1,6 +1,6 @@
 # حِزم التخطيط وLLM-Wiki
 
-> 🌐 **اللغات:** **English** · [Русский](../../ru/explanation/layout-packs-and-llm-wiki.md)
+> 🌐 **اللغات:** [English](../../en/explanation/layout-packs-and-llm-wiki.md) · [简体中文](../../zh-CN/explanation/layout-packs-and-llm-wiki.md) · [繁體中文](../../zh-TW/explanation/layout-packs-and-llm-wiki.md) · [日本語](../../ja/explanation/layout-packs-and-llm-wiki.md) · [한국어](../../ko/explanation/layout-packs-and-llm-wiki.md) · [Español](../../es/explanation/layout-packs-and-llm-wiki.md) · [Français](../../fr/explanation/layout-packs-and-llm-wiki.md) · [Italiano](../../it/explanation/layout-packs-and-llm-wiki.md) · [Português (BR)](../../pt-BR/explanation/layout-packs-and-llm-wiki.md) · [Português (PT)](../../pt-PT/explanation/layout-packs-and-llm-wiki.md) · [Русский](../../ru/explanation/layout-packs-and-llm-wiki.md) · **العربية** · [हिन्दी](../../hi/explanation/layout-packs-and-llm-wiki.md) · [বাংলা](../../bn/explanation/layout-packs-and-llm-wiki.md) · [Tiếng Việt](../../vi/explanation/layout-packs-and-llm-wiki.md)
 
 تُعرّف **حزمة التخطيط** كيفية تنظيم *محتوى المستخدم* في المشروع — أي
 الأدلة الموجودة، وأيّها يجوز للوكيل الكتابة فيها، وأي العمليات يقدّمها.

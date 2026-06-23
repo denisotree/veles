@@ -1,6 +1,6 @@
 # Riferimento CLI
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/cli.md)
+> 🌐 **Lingue:** [English](../../en/reference/cli.md) · [简体中文](../../zh-CN/reference/cli.md) · [繁體中文](../../zh-TW/reference/cli.md) · [日本語](../../ja/reference/cli.md) · [한국어](../../ko/reference/cli.md) · [Español](../../es/reference/cli.md) · [Français](../../fr/reference/cli.md) · **Italiano** · [Português (BR)](../../pt-BR/reference/cli.md) · [Português (PT)](../../pt-PT/reference/cli.md) · [Русский](../../ru/reference/cli.md) · [العربية](../../ar/reference/cli.md) · [हिन्दी](../../hi/reference/cli.md) · [বাংলা](../../bn/reference/cli.md) · [Tiếng Việt](../../vi/reference/cli.md)
 
 Ogni comando, sottocomando e flag di Veles. Esegui `veles <command> --help` per
 ottenere la firma autorevole e sempre aggiornata — questa pagina rispecchia i

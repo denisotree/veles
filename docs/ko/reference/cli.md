@@ -1,6 +1,6 @@
 # CLI 레퍼런스
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/cli.md)
+> 🌐 **언어:** [English](../../en/reference/cli.md) · [简体中文](../../zh-CN/reference/cli.md) · [繁體中文](../../zh-TW/reference/cli.md) · [日本語](../../ja/reference/cli.md) · **한국어** · [Español](../../es/reference/cli.md) · [Français](../../fr/reference/cli.md) · [Italiano](../../it/reference/cli.md) · [Português (BR)](../../pt-BR/reference/cli.md) · [Português (PT)](../../pt-PT/reference/cli.md) · [Русский](../../ru/reference/cli.md) · [العربية](../../ar/reference/cli.md) · [हिन्दी](../../hi/reference/cli.md) · [বাংলা](../../bn/reference/cli.md) · [Tiếng Việt](../../vi/reference/cli.md)
 
 Veles의 모든 명령, 하위 명령, 플래그를 정리했습니다. 언제나 최신이며 권위 있는 시그니처를 보려면 `veles <command> --help`를 실행하세요. 이 페이지는 `src/veles/cli/_parsers/`에 있는 인자 파서를 그대로 반영합니다.
 

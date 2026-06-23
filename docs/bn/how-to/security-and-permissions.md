@@ -1,6 +1,6 @@
 # নিরাপত্তা ব্যবস্থাপনা: trust, autopilot, secrets
 
-> 🌐 **Languages:** [English](../../en/how-to/security-and-permissions.md) · [Русский](../../ru/how-to/security-and-permissions.md) · **বাংলা**
+> 🌐 **ভাষা:** [English](../../en/how-to/security-and-permissions.md) · [简体中文](../../zh-CN/how-to/security-and-permissions.md) · [繁體中文](../../zh-TW/how-to/security-and-permissions.md) · [日本語](../../ja/how-to/security-and-permissions.md) · [한국어](../../ko/how-to/security-and-permissions.md) · [Español](../../es/how-to/security-and-permissions.md) · [Français](../../fr/how-to/security-and-permissions.md) · [Italiano](../../it/how-to/security-and-permissions.md) · [Português (BR)](../../pt-BR/how-to/security-and-permissions.md) · [Português (PT)](../../pt-PT/how-to/security-and-permissions.md) · [Русский](../../ru/how-to/security-and-permissions.md) · [العربية](../../ar/how-to/security-and-permissions.md) · [हिन्दी](../../hi/how-to/security-and-permissions.md) · **বাংলা** · [Tiếng Việt](../../vi/how-to/security-and-permissions.md)
 
 Veles বিপজ্জনক কাজগুলোকে একটি **trust ladder**-এর পেছনে আটকে রাখে, ফাইল অ্যাক্সেসকে sandbox-এ সীমাবদ্ধ করে, এবং secrets গুলোকে OS keychain-এ রাখে। এর যুক্তি জানতে দেখুন
 [trust ও sandbox](../explanation/trust-and-sandbox.md)।

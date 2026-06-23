@@ -1,6 +1,6 @@
 # বাহ্যিক MCP সার্ভার কীভাবে সংযুক্ত করবেন
 
-> 🌐 **Languages:** [English](../../en/how-to/external-mcp-servers.md) · [Русский](../../ru/how-to/external-mcp-servers.md) · **বাংলা**
+> 🌐 **ভাষা:** [English](../../en/how-to/external-mcp-servers.md) · [简体中文](../../zh-CN/how-to/external-mcp-servers.md) · [繁體中文](../../zh-TW/how-to/external-mcp-servers.md) · [日本語](../../ja/how-to/external-mcp-servers.md) · [한국어](../../ko/how-to/external-mcp-servers.md) · [Español](../../es/how-to/external-mcp-servers.md) · [Français](../../fr/how-to/external-mcp-servers.md) · [Italiano](../../it/how-to/external-mcp-servers.md) · [Português (BR)](../../pt-BR/how-to/external-mcp-servers.md) · [Português (PT)](../../pt-PT/how-to/external-mcp-servers.md) · [Русский](../../ru/how-to/external-mcp-servers.md) · [العربية](../../ar/how-to/external-mcp-servers.md) · [हिन्दी](../../hi/how-to/external-mcp-servers.md) · **বাংলা** · [Tiếng Việt](../../vi/how-to/external-mcp-servers.md)
 
 Veles একটি [MCP](https://modelcontextprotocol.io/) **client**: এটি বাহ্যিক MCP সার্ভারের সাথে সংযোগ করতে পারে এবং তাদের টুলগুলোকে এজেন্টের কাছে এমনভাবে তুলে ধরতে পারে যেন সেগুলো বিল্ট-ইন (GitHub, লাইব্রেরি ডকুমেন্টেশন, ওয়েব সার্চ, আপনার নিজের সার্ভিস, …)।
 

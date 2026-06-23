@@ -1,6 +1,6 @@
 # দীর্ঘ-সময়ের কাজ কীভাবে চালাবেন: goals, jobs, dreaming, research
 
-> 🌐 **Languages:** [English](../../en/how-to/long-running-tasks.md) · [Русский](../../ru/how-to/long-running-tasks.md) · **বাংলা**
+> 🌐 **ভাষা:** [English](../../en/how-to/long-running-tasks.md) · [简体中文](../../zh-CN/how-to/long-running-tasks.md) · [繁體中文](../../zh-TW/how-to/long-running-tasks.md) · [日本語](../../ja/how-to/long-running-tasks.md) · [한국어](../../ko/how-to/long-running-tasks.md) · [Español](../../es/how-to/long-running-tasks.md) · [Français](../../fr/how-to/long-running-tasks.md) · [Italiano](../../it/how-to/long-running-tasks.md) · [Português (BR)](../../pt-BR/how-to/long-running-tasks.md) · [Português (PT)](../../pt-PT/how-to/long-running-tasks.md) · [Русский](../../ru/how-to/long-running-tasks.md) · [العربية](../../ar/how-to/long-running-tasks.md) · [हिन्दी](../../hi/how-to/long-running-tasks.md) · **বাংলা** · [Tiếng Việt](../../vi/how-to/long-running-tasks.md)
 
 একক প্রম্পটের বাইরেও Veles বাজেটসহ বহু-ধাপের **goal** অনুসরণ করতে পারে, **scheduled job** চালাতে পারে, মেমরি একত্রীকরণের জন্য **dream** করতে পারে, সমান্তরালে ওয়েব **research** করতে পারে, এবং একটি **manager** ও sub-agent-দের মধ্যে কাজ ভাগ করে দিতে পারে।
 

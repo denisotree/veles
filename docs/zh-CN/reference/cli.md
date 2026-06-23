@@ -1,6 +1,6 @@
 # CLI 参考
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/cli.md)
+> 🌐 **语言：** [English](../../en/reference/cli.md) · **简体中文** · [繁體中文](../../zh-TW/reference/cli.md) · [日本語](../../ja/reference/cli.md) · [한국어](../../ko/reference/cli.md) · [Español](../../es/reference/cli.md) · [Français](../../fr/reference/cli.md) · [Italiano](../../it/reference/cli.md) · [Português (BR)](../../pt-BR/reference/cli.md) · [Português (PT)](../../pt-PT/reference/cli.md) · [Русский](../../ru/reference/cli.md) · [العربية](../../ar/reference/cli.md) · [हिन्दी](../../hi/reference/cli.md) · [বাংলা](../../bn/reference/cli.md) · [Tiếng Việt](../../vi/reference/cli.md)
 
 Veles 的所有命令、子命令和参数。运行 `veles <command> --help` 可获取最权威、始终保持最新的命令签名——本页镜像了 `src/veles/cli/_parsers/` 中的参数解析器。
 

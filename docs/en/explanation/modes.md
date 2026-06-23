@@ -1,6 +1,6 @@
 # Run modes
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/explanation/modes.md)
+> 🌐 **Languages:** **English** · [简体中文](../../zh-CN/explanation/modes.md) · [繁體中文](../../zh-TW/explanation/modes.md) · [日本語](../../ja/explanation/modes.md) · [한국어](../../ko/explanation/modes.md) · [Español](../../es/explanation/modes.md) · [Français](../../fr/explanation/modes.md) · [Italiano](../../it/explanation/modes.md) · [Português (BR)](../../pt-BR/explanation/modes.md) · [Português (PT)](../../pt-PT/explanation/modes.md) · [Русский](../../ru/explanation/modes.md) · [العربية](../../ar/explanation/modes.md) · [हिन्दी](../../hi/explanation/modes.md) · [বাংলা](../../bn/explanation/modes.md) · [Tiếng Việt](../../vi/explanation/modes.md)
 
 In the TUI, each prompt is handled by a **run mode** — a strategy that decides how
 much autonomy and which tools the turn gets. Cycle modes with `Shift+Tab`; the

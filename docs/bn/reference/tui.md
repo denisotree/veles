@@ -1,6 +1,6 @@
 # TUI কীবাইন্ডিং ও slash কমান্ড
 
-> 🌐 **ভাষা:** [English](../../en/reference/tui.md) · [Русский](../../ru/reference/tui.md)
+> 🌐 **ভাষা:** [English](../../en/reference/tui.md) · [简体中文](../../zh-CN/reference/tui.md) · [繁體中文](../../zh-TW/reference/tui.md) · [日本語](../../ja/reference/tui.md) · [한국어](../../ko/reference/tui.md) · [Español](../../es/reference/tui.md) · [Français](../../fr/reference/tui.md) · [Italiano](../../it/reference/tui.md) · [Português (BR)](../../pt-BR/reference/tui.md) · [Português (PT)](../../pt-PT/reference/tui.md) · [Русский](../../ru/reference/tui.md) · [العربية](../../ar/reference/tui.md) · [हिन्दी](../../hi/reference/tui.md) · **বাংলা** · [Tiếng Việt](../../vi/reference/tui.md)
 
 `veles tui` (অথবা শুধু `veles`) ইন্টারঅ্যাক্টিভ REPL খোলে। এটি একটি scrollback চ্যাট — সঙ্গে থাকে মাল্টি-লাইন composer, একটি status bar এবং একটি collapsible inspector।
 

@@ -1,6 +1,6 @@
 # التنسيق متعدد الوكلاء
 
-> 🌐 **اللغات:** **English** · [Русский](../../ru/explanation/multi-agent-orchestration.md)
+> 🌐 **اللغات:** [English](../../en/explanation/multi-agent-orchestration.md) · [简体中文](../../zh-CN/explanation/multi-agent-orchestration.md) · [繁體中文](../../zh-TW/explanation/multi-agent-orchestration.md) · [日本語](../../ja/explanation/multi-agent-orchestration.md) · [한국어](../../ko/explanation/multi-agent-orchestration.md) · [Español](../../es/explanation/multi-agent-orchestration.md) · [Français](../../fr/explanation/multi-agent-orchestration.md) · [Italiano](../../it/explanation/multi-agent-orchestration.md) · [Português (BR)](../../pt-BR/explanation/multi-agent-orchestration.md) · [Português (PT)](../../pt-PT/explanation/multi-agent-orchestration.md) · [Русский](../../ru/explanation/multi-agent-orchestration.md) · **العربية** · [हिन्दी](../../hi/explanation/multi-agent-orchestration.md) · [বাংলা](../../bn/explanation/multi-agent-orchestration.md) · [Tiếng Việt](../../vi/explanation/multi-agent-orchestration.md)
 
 للعمل المعقّد، يستطيع Veles تقسيم المهمة بين **مدير** ووكلاء
 **عمّال** فرعيين متخصصين بدلًا من فعل كل شيء في سياق واحد. تشرح هذه الصفحة

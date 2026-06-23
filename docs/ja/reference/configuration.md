@@ -1,6 +1,6 @@
 # 設定リファレンス
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/configuration.md)
+> 🌐 **言語:** [English](../../en/reference/configuration.md) · [简体中文](../../zh-CN/reference/configuration.md) · [繁體中文](../../zh-TW/reference/configuration.md) · **日本語** · [한국어](../../ko/reference/configuration.md) · [Español](../../es/reference/configuration.md) · [Français](../../fr/reference/configuration.md) · [Italiano](../../it/reference/configuration.md) · [Português (BR)](../../pt-BR/reference/configuration.md) · [Português (PT)](../../pt-PT/reference/configuration.md) · [Русский](../../ru/reference/configuration.md) · [العربية](../../ar/reference/configuration.md) · [हिन्दी](../../hi/reference/configuration.md) · [বাংলা](../../bn/reference/configuration.md) · [Tiếng Việt](../../vi/reference/configuration.md)
 
 Veles は 2 つの TOML ファイルと一連の状態ディレクトリで設定されます。シークレット（API キー、ボットトークン）は**決して**これらのファイルに書き込まれません。OS キーチェーンまたは環境変数に保存されます（[環境変数](environment-variables.md)を参照）。
 

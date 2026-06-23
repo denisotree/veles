@@ -1,6 +1,6 @@
 # মাল্টি-এজেন্ট অর্কেস্ট্রেশন
 
-> 🌐 **ভাষা:** [English](../../en/explanation/multi-agent-orchestration.md) · [Русский](../../ru/explanation/multi-agent-orchestration.md) · **বাংলা**
+> 🌐 **ভাষা:** [English](../../en/explanation/multi-agent-orchestration.md) · [简体中文](../../zh-CN/explanation/multi-agent-orchestration.md) · [繁體中文](../../zh-TW/explanation/multi-agent-orchestration.md) · [日本語](../../ja/explanation/multi-agent-orchestration.md) · [한국어](../../ko/explanation/multi-agent-orchestration.md) · [Español](../../es/explanation/multi-agent-orchestration.md) · [Français](../../fr/explanation/multi-agent-orchestration.md) · [Italiano](../../it/explanation/multi-agent-orchestration.md) · [Português (BR)](../../pt-BR/explanation/multi-agent-orchestration.md) · [Português (PT)](../../pt-PT/explanation/multi-agent-orchestration.md) · [Русский](../../ru/explanation/multi-agent-orchestration.md) · [العربية](../../ar/explanation/multi-agent-orchestration.md) · [हिन्दी](../../hi/explanation/multi-agent-orchestration.md) · **বাংলা** · [Tiếng Việt](../../vi/explanation/multi-agent-orchestration.md)
 
 জটিল কাজের জন্য, Veles একটি টাস্ককে একটিমাত্র কন্টেক্সটে সবকিছু করার বদলে একটি **manager**
 এবং বিশেষায়িত **worker** সাব-এজেন্টের মধ্যে ভাগ করতে পারে। এই পেজে মডেলটি ব্যাখ্যা করা হয়েছে;

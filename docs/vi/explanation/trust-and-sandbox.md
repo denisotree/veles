@@ -1,6 +1,6 @@
 # Tin cậy & sandbox
 
-> 🌐 **Ngôn ngữ:** [English](../../en/explanation/trust-and-sandbox.md) · **Tiếng Việt**
+> 🌐 **Ngôn ngữ:** [English](../../en/explanation/trust-and-sandbox.md) · [简体中文](../../zh-CN/explanation/trust-and-sandbox.md) · [繁體中文](../../zh-TW/explanation/trust-and-sandbox.md) · [日本語](../../ja/explanation/trust-and-sandbox.md) · [한국어](../../ko/explanation/trust-and-sandbox.md) · [Español](../../es/explanation/trust-and-sandbox.md) · [Français](../../fr/explanation/trust-and-sandbox.md) · [Italiano](../../it/explanation/trust-and-sandbox.md) · [Português (BR)](../../pt-BR/explanation/trust-and-sandbox.md) · [Português (PT)](../../pt-PT/explanation/trust-and-sandbox.md) · [Русский](../../ru/explanation/trust-and-sandbox.md) · [العربية](../../ar/explanation/trust-and-sandbox.md) · [हिन्दी](../../hi/explanation/trust-and-sandbox.md) · [বাংলা](../../bn/explanation/trust-and-sandbox.md) · **Tiếng Việt**
 
 Veles chạy một agent tự chủ trên máy của bạn, nên nó giới hạn những gì agent đó có
 thể làm. Hai cơ chế phối hợp với nhau: một **bậc thang tin cậy** (trust ladder) cho

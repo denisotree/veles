@@ -1,6 +1,6 @@
 # 如何將 Veles 作為 daemon 執行
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/run-as-daemon.md)
+> 🌐 **語言：** [English](../../en/how-to/run-as-daemon.md) · [简体中文](../../zh-CN/how-to/run-as-daemon.md) · **繁體中文** · [日本語](../../ja/how-to/run-as-daemon.md) · [한국어](../../ko/how-to/run-as-daemon.md) · [Español](../../es/how-to/run-as-daemon.md) · [Français](../../fr/how-to/run-as-daemon.md) · [Italiano](../../it/how-to/run-as-daemon.md) · [Português (BR)](../../pt-BR/how-to/run-as-daemon.md) · [Português (PT)](../../pt-PT/how-to/run-as-daemon.md) · [Русский](../../ru/how-to/run-as-daemon.md) · [العربية](../../ar/how-to/run-as-daemon.md) · [हिन्दी](../../hi/how-to/run-as-daemon.md) · [বাংলা](../../bn/how-to/run-as-daemon.md) · [Tiếng Việt](../../vi/how-to/run-as-daemon.md)
 
 daemon 是一個可選的、長時間存活的 HTTP+WS 伺服器，將代理以 API 形式對外提供——是 [channel](connect-telegram.md)（Telegram…）、排程[工作](long-running-tasks.md)以及遠端／無頭使用的基礎。
 

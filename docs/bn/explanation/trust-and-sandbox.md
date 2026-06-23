@@ -1,6 +1,6 @@
 # Trust ও sandbox
 
-> 🌐 **Languages:** [English](../../en/explanation/trust-and-sandbox.md) · [Русский](../../ru/explanation/trust-and-sandbox.md) · **বাংলা**
+> 🌐 **ভাষা:** [English](../../en/explanation/trust-and-sandbox.md) · [简体中文](../../zh-CN/explanation/trust-and-sandbox.md) · [繁體中文](../../zh-TW/explanation/trust-and-sandbox.md) · [日本語](../../ja/explanation/trust-and-sandbox.md) · [한국어](../../ko/explanation/trust-and-sandbox.md) · [Español](../../es/explanation/trust-and-sandbox.md) · [Français](../../fr/explanation/trust-and-sandbox.md) · [Italiano](../../it/explanation/trust-and-sandbox.md) · [Português (BR)](../../pt-BR/explanation/trust-and-sandbox.md) · [Português (PT)](../../pt-PT/explanation/trust-and-sandbox.md) · [Русский](../../ru/explanation/trust-and-sandbox.md) · [العربية](../../ar/explanation/trust-and-sandbox.md) · [हिन्दी](../../hi/explanation/trust-and-sandbox.md) · **বাংলা** · [Tiếng Việt](../../vi/explanation/trust-and-sandbox.md)
 
 Veles আপনার মেশিনে একটি স্বায়ত্তশাসিত এজেন্ট চালায়, তাই সেই এজেন্ট কী করতে পারবে তা সীমিত করে।
 দুটি ব্যবস্থা একসাথে কাজ করে: সংবেদনশীল কাজের জন্য একটি **trust ladder** এবং ফাইলসিস্টেমের জন্য

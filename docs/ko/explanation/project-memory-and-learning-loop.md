@@ -1,6 +1,6 @@
 # 프로젝트 메모리 & 학습 루프
 
-> 🌐 **언어:** **English** · [Русский](../../ru/explanation/project-memory-and-learning-loop.md)
+> 🌐 **언어:** [English](../../en/explanation/project-memory-and-learning-loop.md) · [简体中文](../../zh-CN/explanation/project-memory-and-learning-loop.md) · [繁體中文](../../zh-TW/explanation/project-memory-and-learning-loop.md) · [日本語](../../ja/explanation/project-memory-and-learning-loop.md) · **한국어** · [Español](../../es/explanation/project-memory-and-learning-loop.md) · [Français](../../fr/explanation/project-memory-and-learning-loop.md) · [Italiano](../../it/explanation/project-memory-and-learning-loop.md) · [Português (BR)](../../pt-BR/explanation/project-memory-and-learning-loop.md) · [Português (PT)](../../pt-PT/explanation/project-memory-and-learning-loop.md) · [Русский](../../ru/explanation/project-memory-and-learning-loop.md) · [العربية](../../ar/explanation/project-memory-and-learning-loop.md) · [हिन्दी](../../hi/explanation/project-memory-and-learning-loop.md) · [বাংলা](../../bn/explanation/project-memory-and-learning-loop.md) · [Tiếng Việt](../../vi/explanation/project-memory-and-learning-loop.md)
 
 Veles의 결정적인 특징은 프로젝트별로 **기억**하고 **학습**한다는 것입니다. 이 페이지는
 그 메모리가 무엇인지, 그리고 학습 루프가 어떻게 유용하게 유지되는지 설명합니다.

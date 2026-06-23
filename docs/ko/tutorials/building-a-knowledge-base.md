@@ -1,6 +1,6 @@
 # 지식 베이스 구축하기
 
-> 🌐 **언어:** **English** · [Русский](../../ru/tutorials/building-a-knowledge-base.md)
+> 🌐 **언어:** [English](../../en/tutorials/building-a-knowledge-base.md) · [简体中文](../../zh-CN/tutorials/building-a-knowledge-base.md) · [繁體中文](../../zh-TW/tutorials/building-a-knowledge-base.md) · [日本語](../../ja/tutorials/building-a-knowledge-base.md) · **한국어** · [Español](../../es/tutorials/building-a-knowledge-base.md) · [Français](../../fr/tutorials/building-a-knowledge-base.md) · [Italiano](../../it/tutorials/building-a-knowledge-base.md) · [Português (BR)](../../pt-BR/tutorials/building-a-knowledge-base.md) · [Português (PT)](../../pt-PT/tutorials/building-a-knowledge-base.md) · [Русский](../../ru/tutorials/building-a-knowledge-base.md) · [العربية](../../ar/tutorials/building-a-knowledge-base.md) · [हिन्दी](../../hi/tutorials/building-a-knowledge-base.md) · [বাংলা](../../bn/tutorials/building-a-knowledge-base.md) · [Tiếng Việt](../../vi/tutorials/building-a-knowledge-base.md)
 
 이 튜토리얼에서는 Veles 프로젝트를 살아있는 지식 베이스로 만듭니다: 몇 가지 소스를 인제스트하고, Veles가 위키 페이지를 작성하게 하고, 질문을 던지고, 학습한 내용을 통합합니다. 이것이 기본 **LLM-Wiki** 워크플로입니다. 약 15분 소요됩니다.
 

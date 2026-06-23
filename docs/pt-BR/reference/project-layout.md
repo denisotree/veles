@@ -1,6 +1,6 @@
 # Layout e estado do projeto
 
-> 🌐 **Idiomas:** **English** · [Русский](../../ru/reference/project-layout.md)
+> 🌐 **Idiomas:** [English](../../en/reference/project-layout.md) · [简体中文](../../zh-CN/reference/project-layout.md) · [繁體中文](../../zh-TW/reference/project-layout.md) · [日本語](../../ja/reference/project-layout.md) · [한국어](../../ko/reference/project-layout.md) · [Español](../../es/reference/project-layout.md) · [Français](../../fr/reference/project-layout.md) · [Italiano](../../it/reference/project-layout.md) · **Português (BR)** · [Português (PT)](../../pt-PT/reference/project-layout.md) · [Русский](../../ru/reference/project-layout.md) · [العربية](../../ar/reference/project-layout.md) · [हिन्दी](../../hi/reference/project-layout.md) · [বাংলা](../../bn/reference/project-layout.md) · [Tiếng Việt](../../vi/reference/project-layout.md)
 
 O que o `veles init` cria, onde o Veles guarda o estado e o schema da memória do projeto.
 

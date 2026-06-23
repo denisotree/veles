@@ -1,6 +1,6 @@
 # Biến môi trường
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/environment-variables.md)
+> 🌐 **Ngôn ngữ:** [English](../../en/reference/environment-variables.md) · [简体中文](../../zh-CN/reference/environment-variables.md) · [繁體中文](../../zh-TW/reference/environment-variables.md) · [日本語](../../ja/reference/environment-variables.md) · [한국어](../../ko/reference/environment-variables.md) · [Español](../../es/reference/environment-variables.md) · [Français](../../fr/reference/environment-variables.md) · [Italiano](../../it/reference/environment-variables.md) · [Português (BR)](../../pt-BR/reference/environment-variables.md) · [Português (PT)](../../pt-PT/reference/environment-variables.md) · [Русский](../../ru/reference/environment-variables.md) · [العربية](../../ar/reference/environment-variables.md) · [हिन्दी](../../hi/reference/environment-variables.md) · [বাংলা](../../bn/reference/environment-variables.md) · **Tiếng Việt**
 
 Veles đọc các biến này lúc chạy. API key và token tốt nhất nên được lưu trong
 keychain của hệ điều hành (`veles secret set …`); biến môi trường là phương án

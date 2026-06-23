@@ -1,6 +1,6 @@
 # একটি knowledge base তৈরি করা
 
-> 🌐 **ভাষা:** [English](../../en/tutorials/building-a-knowledge-base.md) · [Русский](../../ru/tutorials/building-a-knowledge-base.md)
+> 🌐 **ভাষা:** [English](../../en/tutorials/building-a-knowledge-base.md) · [简体中文](../../zh-CN/tutorials/building-a-knowledge-base.md) · [繁體中文](../../zh-TW/tutorials/building-a-knowledge-base.md) · [日本語](../../ja/tutorials/building-a-knowledge-base.md) · [한국어](../../ko/tutorials/building-a-knowledge-base.md) · [Español](../../es/tutorials/building-a-knowledge-base.md) · [Français](../../fr/tutorials/building-a-knowledge-base.md) · [Italiano](../../it/tutorials/building-a-knowledge-base.md) · [Português (BR)](../../pt-BR/tutorials/building-a-knowledge-base.md) · [Português (PT)](../../pt-PT/tutorials/building-a-knowledge-base.md) · [Русский](../../ru/tutorials/building-a-knowledge-base.md) · [العربية](../../ar/tutorials/building-a-knowledge-base.md) · [हिन्दी](../../hi/tutorials/building-a-knowledge-base.md) · **বাংলা** · [Tiếng Việt](../../vi/tutorials/building-a-knowledge-base.md)
 
 এই টিউটোরিয়ালে আপনি একটি Veles প্রজেক্টকে একটি জীবন্ত knowledge base-এ পরিণত করবেন: কয়েকটি source ingest করবেন, Veles-কে wiki page লিখতে দেবেন, প্রশ্ন করবেন, এবং যা শিখলেন তা একত্রিত করবেন। এটাই হলো ডিফল্ট **LLM-Wiki** workflow। প্রায় ১৫ মিনিট।
 

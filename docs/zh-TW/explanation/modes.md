@@ -1,6 +1,6 @@
 # 執行模式
 
-> 🌐 **語言:** **English** · [Русский](../../ru/explanation/modes.md)
+> 🌐 **語言：** [English](../../en/explanation/modes.md) · [简体中文](../../zh-CN/explanation/modes.md) · **繁體中文** · [日本語](../../ja/explanation/modes.md) · [한국어](../../ko/explanation/modes.md) · [Español](../../es/explanation/modes.md) · [Français](../../fr/explanation/modes.md) · [Italiano](../../it/explanation/modes.md) · [Português (BR)](../../pt-BR/explanation/modes.md) · [Português (PT)](../../pt-PT/explanation/modes.md) · [Русский](../../ru/explanation/modes.md) · [العربية](../../ar/explanation/modes.md) · [हिन्दी](../../hi/explanation/modes.md) · [বাংলা](../../bn/explanation/modes.md) · [Tiếng Việt](../../vi/explanation/modes.md)
 
 在 TUI 中,每個 prompt 都由一個**執行模式**處理——這是一種策略,決定該回合獲得多少自主權與哪些 tools。用 `Shift+Tab` 循環切換模式;順序為 `auto → planning → writing → goal`。
 

@@ -1,6 +1,6 @@
 # प्रोजेक्ट लेआउट और स्टेट
 
-> 🌐 **भाषाएँ:** **English** · [Русский](../../ru/reference/project-layout.md)
+> 🌐 **भाषाएँ:** [English](../../en/reference/project-layout.md) · [简体中文](../../zh-CN/reference/project-layout.md) · [繁體中文](../../zh-TW/reference/project-layout.md) · [日本語](../../ja/reference/project-layout.md) · [한국어](../../ko/reference/project-layout.md) · [Español](../../es/reference/project-layout.md) · [Français](../../fr/reference/project-layout.md) · [Italiano](../../it/reference/project-layout.md) · [Português (BR)](../../pt-BR/reference/project-layout.md) · [Português (PT)](../../pt-PT/reference/project-layout.md) · [Русский](../../ru/reference/project-layout.md) · [العربية](../../ar/reference/project-layout.md) · **हिन्दी** · [বাংলা](../../bn/reference/project-layout.md) · [Tiếng Việt](../../vi/reference/project-layout.md)
 
 `veles init` क्या बनाता है, Veles अपना स्टेट कहाँ रखता है, और प्रोजेक्ट मेमोरी का schema।
 

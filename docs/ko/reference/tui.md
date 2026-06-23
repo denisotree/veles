@@ -1,6 +1,6 @@
 # TUI 키 바인딩 및 슬래시 명령
 
-> 🌐 **언어:** **English** · [Русский](../../ru/reference/tui.md)
+> 🌐 **언어:** [English](../../en/reference/tui.md) · [简体中文](../../zh-CN/reference/tui.md) · [繁體中文](../../zh-TW/reference/tui.md) · [日本語](../../ja/reference/tui.md) · **한국어** · [Español](../../es/reference/tui.md) · [Français](../../fr/reference/tui.md) · [Italiano](../../it/reference/tui.md) · [Português (BR)](../../pt-BR/reference/tui.md) · [Português (PT)](../../pt-PT/reference/tui.md) · [Русский](../../ru/reference/tui.md) · [العربية](../../ar/reference/tui.md) · [हिन्दी](../../hi/reference/tui.md) · [বাংলা](../../bn/reference/tui.md) · [Tiếng Việt](../../vi/reference/tui.md)
 
 `veles tui`(또는 단순히 `veles`)는 인터랙티브 REPL을 엽니다. 멀티라인 컴포저, 상태 표시줄, 접을 수 있는 인스펙터를 갖춘 스크롤백 채팅 인터페이스입니다.
 

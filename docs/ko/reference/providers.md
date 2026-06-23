@@ -1,6 +1,6 @@
 # 프로바이더
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/providers.md)
+> 🌐 **언어:** [English](../../en/reference/providers.md) · [简体中文](../../zh-CN/reference/providers.md) · [繁體中文](../../zh-TW/reference/providers.md) · [日本語](../../ja/reference/providers.md) · **한국어** · [Español](../../es/reference/providers.md) · [Français](../../fr/reference/providers.md) · [Italiano](../../it/reference/providers.md) · [Português (BR)](../../pt-BR/reference/providers.md) · [Português (PT)](../../pt-PT/reference/providers.md) · [Русский](../../ru/reference/providers.md) · [العربية](../../ar/reference/providers.md) · [हिन्दी](../../hi/reference/providers.md) · [বাংলা](../../bn/reference/providers.md) · [Tiếng Việt](../../vi/reference/providers.md)
 
 Veles는 프로바이더에 종속되지 않습니다. 어떤 에이전트 명령에든 `--provider <name>`을 전달하거나 설정에서 기본값을 지정하세요. 모델 ID는 각 프로바이더 자체 명명 규칙을 따릅니다.
 

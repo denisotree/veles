@@ -1,6 +1,6 @@
 # 如何接入外部 MCP 服务器
 
-> 🌐 **语言：** [English](../../en/how-to/external-mcp-servers.md) · [Русский](../../ru/how-to/external-mcp-servers.md) · **简体中文**
+> 🌐 **语言：** [English](../../en/how-to/external-mcp-servers.md) · **简体中文** · [繁體中文](../../zh-TW/how-to/external-mcp-servers.md) · [日本語](../../ja/how-to/external-mcp-servers.md) · [한국어](../../ko/how-to/external-mcp-servers.md) · [Español](../../es/how-to/external-mcp-servers.md) · [Français](../../fr/how-to/external-mcp-servers.md) · [Italiano](../../it/how-to/external-mcp-servers.md) · [Português (BR)](../../pt-BR/how-to/external-mcp-servers.md) · [Português (PT)](../../pt-PT/how-to/external-mcp-servers.md) · [Русский](../../ru/how-to/external-mcp-servers.md) · [العربية](../../ar/how-to/external-mcp-servers.md) · [हिन्दी](../../hi/how-to/external-mcp-servers.md) · [বাংলা](../../bn/how-to/external-mcp-servers.md) · [Tiếng Việt](../../vi/how-to/external-mcp-servers.md)
 
 Veles 是一个 [MCP](https://modelcontextprotocol.io/) **客户端**：它可以连接到外部 MCP 服务器，并把它们的工具暴露给智能体，就好像这些工具是内置的一样（GitHub、库文档、网络搜索、你自己的服务……）。
 

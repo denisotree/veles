@@ -1,6 +1,6 @@
 # Cómo enrutar tareas a diferentes modelos
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/per-task-routing.md)
+> 🌐 **Idiomas:** [English](../../en/how-to/per-task-routing.md) · [简体中文](../../zh-CN/how-to/per-task-routing.md) · [繁體中文](../../zh-TW/how-to/per-task-routing.md) · [日本語](../../ja/how-to/per-task-routing.md) · [한국어](../../ko/how-to/per-task-routing.md) · **Español** · [Français](../../fr/how-to/per-task-routing.md) · [Italiano](../../it/how-to/per-task-routing.md) · [Português (BR)](../../pt-BR/how-to/per-task-routing.md) · [Português (PT)](../../pt-PT/how-to/per-task-routing.md) · [Русский](../../ru/how-to/per-task-routing.md) · [العربية](../../ar/how-to/per-task-routing.md) · [हिन्दी](../../hi/how-to/per-task-routing.md) · [বাংলা](../../bn/how-to/per-task-routing.md) · [Tiếng Việt](../../vi/how-to/per-task-routing.md)
 
 Veles no está atado a un único modelo. Cada **tarea** interna puede usar un
 `provider:model` distinto — un modelo barato para la compresión de contexto, uno fuerte

@@ -1,6 +1,6 @@
 # Cách quản lý bảo mật: trust, autopilot, secret
 
-> 🌐 **Ngôn ngữ:** [English](../../en/how-to/security-and-permissions.md) · **Tiếng Việt**
+> 🌐 **Ngôn ngữ:** [English](../../en/how-to/security-and-permissions.md) · [简体中文](../../zh-CN/how-to/security-and-permissions.md) · [繁體中文](../../zh-TW/how-to/security-and-permissions.md) · [日本語](../../ja/how-to/security-and-permissions.md) · [한국어](../../ko/how-to/security-and-permissions.md) · [Español](../../es/how-to/security-and-permissions.md) · [Français](../../fr/how-to/security-and-permissions.md) · [Italiano](../../it/how-to/security-and-permissions.md) · [Português (BR)](../../pt-BR/how-to/security-and-permissions.md) · [Português (PT)](../../pt-PT/how-to/security-and-permissions.md) · [Русский](../../ru/how-to/security-and-permissions.md) · [العربية](../../ar/how-to/security-and-permissions.md) · [हिन्दी](../../hi/how-to/security-and-permissions.md) · [বাংলা](../../bn/how-to/security-and-permissions.md) · **Tiếng Việt**
 
 Veles kiểm soát các hành động nguy hiểm thông qua một **thang trust**, đặt việc
 truy cập tệp trong sandbox, và giữ secret trong keychain của hệ điều hành. Để hiểu

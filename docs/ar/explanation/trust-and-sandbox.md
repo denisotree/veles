@@ -1,6 +1,6 @@
 # الثقة وصندوق الرمل
 
-> 🌐 **اللغات:** **English** · [Русский](../../ru/explanation/trust-and-sandbox.md)
+> 🌐 **اللغات:** [English](../../en/explanation/trust-and-sandbox.md) · [简体中文](../../zh-CN/explanation/trust-and-sandbox.md) · [繁體中文](../../zh-TW/explanation/trust-and-sandbox.md) · [日本語](../../ja/explanation/trust-and-sandbox.md) · [한국어](../../ko/explanation/trust-and-sandbox.md) · [Español](../../es/explanation/trust-and-sandbox.md) · [Français](../../fr/explanation/trust-and-sandbox.md) · [Italiano](../../it/explanation/trust-and-sandbox.md) · [Português (BR)](../../pt-BR/explanation/trust-and-sandbox.md) · [Português (PT)](../../pt-PT/explanation/trust-and-sandbox.md) · [Русский](../../ru/explanation/trust-and-sandbox.md) · **العربية** · [हिन्दी](../../hi/explanation/trust-and-sandbox.md) · [বাংলা](../../bn/explanation/trust-and-sandbox.md) · [Tiếng Việt](../../vi/explanation/trust-and-sandbox.md)
 
 يُشغّل Veles وكيلًا مستقلًا على جهازك، لذا فهو يقيّد ما يستطيع ذلك الوكيل
 فعله. تعمل آليتان معًا: **سلّم ثقة** للأفعال الحساسة و

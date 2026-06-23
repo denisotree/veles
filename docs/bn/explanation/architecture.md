@@ -1,6 +1,6 @@
 # আর্কিটেকচার ওভারভিউ
 
-> 🌐 **ভাষা:** [English](../../en/explanation/architecture.md) · [Русский](../../ru/explanation/architecture.md) · **বাংলা**
+> 🌐 **ভাষা:** [English](../../en/explanation/architecture.md) · [简体中文](../../zh-CN/explanation/architecture.md) · [繁體中文](../../zh-TW/explanation/architecture.md) · [日本語](../../ja/explanation/architecture.md) · [한국어](../../ko/explanation/architecture.md) · [Español](../../es/explanation/architecture.md) · [Français](../../fr/explanation/architecture.md) · [Italiano](../../it/explanation/architecture.md) · [Português (BR)](../../pt-BR/explanation/architecture.md) · [Português (PT)](../../pt-PT/explanation/architecture.md) · [Русский](../../ru/explanation/architecture.md) · [العربية](../../ar/explanation/architecture.md) · [हिन्दी](../../hi/explanation/architecture.md) · **বাংলা** · [Tiếng Việt](../../vi/explanation/architecture.md)
 
 এই পেজে ব্যাখ্যা করা হয়েছে Veles আসলে *কী* এবং এর অংশগুলো কীভাবে একসাথে কাজ করে, যাতে বাকি
 ডকুমেন্টেশন বোধগম্য হয়। আনুষ্ঠানিক প্রোডাক্ট ভিশনের জন্য রিপোর রুটে থাকা `VISION.md`

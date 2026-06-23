@@ -1,6 +1,6 @@
 # सुरक्षा कैसे संभालें: trust, autopilot, secrets
 
-> 🌐 **भाषाएँ:** **English** · [Русский](../../ru/how-to/security-and-permissions.md)
+> 🌐 **भाषाएँ:** [English](../../en/how-to/security-and-permissions.md) · [简体中文](../../zh-CN/how-to/security-and-permissions.md) · [繁體中文](../../zh-TW/how-to/security-and-permissions.md) · [日本語](../../ja/how-to/security-and-permissions.md) · [한국어](../../ko/how-to/security-and-permissions.md) · [Español](../../es/how-to/security-and-permissions.md) · [Français](../../fr/how-to/security-and-permissions.md) · [Italiano](../../it/how-to/security-and-permissions.md) · [Português (BR)](../../pt-BR/how-to/security-and-permissions.md) · [Português (PT)](../../pt-PT/how-to/security-and-permissions.md) · [Русский](../../ru/how-to/security-and-permissions.md) · [العربية](../../ar/how-to/security-and-permissions.md) · **हिन्दी** · [বাংলা](../../bn/how-to/security-and-permissions.md) · [Tiếng Việt](../../vi/how-to/security-and-permissions.md)
 
 Veles खतरनाक कार्रवाइयों को एक **trust ladder** के पीछे रखता है, file access को
 sandbox करता है, और secrets को OS keychain में रखता है। इसके पीछे की वजह जानने के

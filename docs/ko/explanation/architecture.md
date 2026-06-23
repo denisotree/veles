@@ -1,6 +1,6 @@
 # 아키텍처 개요
 
-> 🌐 **언어:** **English** · [Русский](../../ru/explanation/architecture.md)
+> 🌐 **언어:** [English](../../en/explanation/architecture.md) · [简体中文](../../zh-CN/explanation/architecture.md) · [繁體中文](../../zh-TW/explanation/architecture.md) · [日本語](../../ja/explanation/architecture.md) · **한국어** · [Español](../../es/explanation/architecture.md) · [Français](../../fr/explanation/architecture.md) · [Italiano](../../it/explanation/architecture.md) · [Português (BR)](../../pt-BR/explanation/architecture.md) · [Português (PT)](../../pt-PT/explanation/architecture.md) · [Русский](../../ru/explanation/architecture.md) · [العربية](../../ar/explanation/architecture.md) · [हिन्दी](../../hi/explanation/architecture.md) · [বাংলা](../../bn/explanation/architecture.md) · [Tiếng Việt](../../vi/explanation/architecture.md)
 
 이 페이지는 Veles가 *무엇인지*, 그리고 각 구성 요소가 어떻게 맞물려 있는지 설명합니다.
 나머지 문서를 이해하는 데 도움이 됩니다. 공식적인 제품 비전은 저장소 루트의 `VISION.md`를

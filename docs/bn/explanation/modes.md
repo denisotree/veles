@@ -1,6 +1,6 @@
 # Run modes
 
-> 🌐 **ভাষা:** [English](../../en/explanation/modes.md) · [Русский](../../ru/explanation/modes.md) · **বাংলা**
+> 🌐 **ভাষা:** [English](../../en/explanation/modes.md) · [简体中文](../../zh-CN/explanation/modes.md) · [繁體中文](../../zh-TW/explanation/modes.md) · [日本語](../../ja/explanation/modes.md) · [한국어](../../ko/explanation/modes.md) · [Español](../../es/explanation/modes.md) · [Français](../../fr/explanation/modes.md) · [Italiano](../../it/explanation/modes.md) · [Português (BR)](../../pt-BR/explanation/modes.md) · [Português (PT)](../../pt-PT/explanation/modes.md) · [Русский](../../ru/explanation/modes.md) · [العربية](../../ar/explanation/modes.md) · [हिन्दी](../../hi/explanation/modes.md) · **বাংলা** · [Tiếng Việt](../../vi/explanation/modes.md)
 
 TUI-তে প্রতিটি prompt একটি **run mode** দ্বারা পরিচালিত হয় — একটি স্ট্র্যাটেজি যা ঠিক করে টার্নটি
 কতটা স্বায়ত্তশাসন এবং কোন tools পাবে। `Shift+Tab` দিয়ে modes ঘোরান; ক্রমটি হলো

@@ -1,6 +1,6 @@
 # প্রোভাইডার
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/providers.md)
+> 🌐 **ভাষা:** [English](../../en/reference/providers.md) · [简体中文](../../zh-CN/reference/providers.md) · [繁體中文](../../zh-TW/reference/providers.md) · [日本語](../../ja/reference/providers.md) · [한국어](../../ko/reference/providers.md) · [Español](../../es/reference/providers.md) · [Français](../../fr/reference/providers.md) · [Italiano](../../it/reference/providers.md) · [Português (BR)](../../pt-BR/reference/providers.md) · [Português (PT)](../../pt-PT/reference/providers.md) · [Русский](../../ru/reference/providers.md) · [العربية](../../ar/reference/providers.md) · [हिन्दी](../../hi/reference/providers.md) · **বাংলা** · [Tiếng Việt](../../vi/reference/providers.md)
 
 Veles প্রোভাইডার-অজ্ঞেয়বাদী। যেকোনো এজেন্ট কমান্ডে `--provider <name>` দিন, অথবা
 কনফিগে একটি ডিফল্ট সেট করুন। মডেল ID প্রোভাইডারের নিজস্ব নামকরণ ব্যবহার করে।

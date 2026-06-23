@@ -1,6 +1,6 @@
 # 如何管理安全：信任、自动驾驶、密钥
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/security-and-permissions.md)
+> 🌐 **语言：** [English](../../en/how-to/security-and-permissions.md) · **简体中文** · [繁體中文](../../zh-TW/how-to/security-and-permissions.md) · [日本語](../../ja/how-to/security-and-permissions.md) · [한국어](../../ko/how-to/security-and-permissions.md) · [Español](../../es/how-to/security-and-permissions.md) · [Français](../../fr/how-to/security-and-permissions.md) · [Italiano](../../it/how-to/security-and-permissions.md) · [Português (BR)](../../pt-BR/how-to/security-and-permissions.md) · [Português (PT)](../../pt-PT/how-to/security-and-permissions.md) · [Русский](../../ru/how-to/security-and-permissions.md) · [العربية](../../ar/how-to/security-and-permissions.md) · [हिन्दी](../../hi/how-to/security-and-permissions.md) · [বাংলা](../../bn/how-to/security-and-permissions.md) · [Tiếng Việt](../../vi/how-to/security-and-permissions.md)
 
 Veles 将危险操作置于**信任阶梯**之后进行管控，对文件访问做沙箱隔离，
 并将密钥保存在操作系统钥匙串中。关于其设计原理，参见

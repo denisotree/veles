@@ -1,6 +1,6 @@
 # Skill e strumenti come capacità che si accumula
 
-> 🌐 **Lingue:** [English](../../en/explanation/skills-and-tools.md) · [Русский](../../ru/explanation/skills-and-tools.md) · **Italiano**
+> 🌐 **Lingue:** [English](../../en/explanation/skills-and-tools.md) · [简体中文](../../zh-CN/explanation/skills-and-tools.md) · [繁體中文](../../zh-TW/explanation/skills-and-tools.md) · [日本語](../../ja/explanation/skills-and-tools.md) · [한국어](../../ko/explanation/skills-and-tools.md) · [Español](../../es/explanation/skills-and-tools.md) · [Français](../../fr/explanation/skills-and-tools.md) · **Italiano** · [Português (BR)](../../pt-BR/explanation/skills-and-tools.md) · [Português (PT)](../../pt-PT/explanation/skills-and-tools.md) · [Русский](../../ru/explanation/skills-and-tools.md) · [العربية](../../ar/explanation/skills-and-tools.md) · [हिन्दी](../../hi/explanation/skills-and-tools.md) · [বাংলা](../../bn/explanation/skills-and-tools.md) · [Tiếng Việt](../../vi/explanation/skills-and-tools.md)
 
 Veles parte con un insieme minimo di strumenti e skill e lo **fa crescere** mentre
 lavora. Questa pagina spiega la differenza tra i due e come si accumulano. Per i

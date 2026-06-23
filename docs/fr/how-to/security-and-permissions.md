@@ -1,6 +1,6 @@
 # Comment gérer la sécurité : confiance, pilote automatique, secrets
 
-> 🌐 **Langues :** [English](../../en/how-to/security-and-permissions.md) · [Русский](../../ru/how-to/security-and-permissions.md)
+> 🌐 **Langues :** [English](../../en/how-to/security-and-permissions.md) · [简体中文](../../zh-CN/how-to/security-and-permissions.md) · [繁體中文](../../zh-TW/how-to/security-and-permissions.md) · [日本語](../../ja/how-to/security-and-permissions.md) · [한국어](../../ko/how-to/security-and-permissions.md) · [Español](../../es/how-to/security-and-permissions.md) · **Français** · [Italiano](../../it/how-to/security-and-permissions.md) · [Português (BR)](../../pt-BR/how-to/security-and-permissions.md) · [Português (PT)](../../pt-PT/how-to/security-and-permissions.md) · [Русский](../../ru/how-to/security-and-permissions.md) · [العربية](../../ar/how-to/security-and-permissions.md) · [हिन्दी](../../hi/how-to/security-and-permissions.md) · [বাংলা](../../bn/how-to/security-and-permissions.md) · [Tiếng Việt](../../vi/how-to/security-and-permissions.md)
 
 Veles protège les actions dangereuses derrière une **échelle de confiance**, met
 l'accès aux fichiers en bac à sable et conserve les secrets dans le trousseau du

@@ -1,6 +1,6 @@
 # 長時間タスクを実行する方法: ゴール、ジョブ、ドリーミング、リサーチ
 
-> 🌐 **言語:** **English** · [Русский](../../ru/how-to/long-running-tasks.md)
+> 🌐 **言語:** [English](../../en/how-to/long-running-tasks.md) · [简体中文](../../zh-CN/how-to/long-running-tasks.md) · [繁體中文](../../zh-TW/how-to/long-running-tasks.md) · **日本語** · [한국어](../../ko/how-to/long-running-tasks.md) · [Español](../../es/how-to/long-running-tasks.md) · [Français](../../fr/how-to/long-running-tasks.md) · [Italiano](../../it/how-to/long-running-tasks.md) · [Português (BR)](../../pt-BR/how-to/long-running-tasks.md) · [Português (PT)](../../pt-PT/how-to/long-running-tasks.md) · [Русский](../../ru/how-to/long-running-tasks.md) · [العربية](../../ar/how-to/long-running-tasks.md) · [हिन्दी](../../hi/how-to/long-running-tasks.md) · [বাংলা](../../bn/how-to/long-running-tasks.md) · [Tiếng Việt](../../vi/how-to/long-running-tasks.md)
 
 単一のプロンプトを超えて、Veles は予算付きの複数ステップの **ゴール** を追求し、
 **スケジュールされたジョブ** を実行し、メモリを統合するために **ドリーミング** し、ウェブを並列で

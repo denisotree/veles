@@ -1,6 +1,6 @@
 # 如何連接 Telegram channel
 
-> 🌐 **語言：** **English** · [Русский](../../ru/how-to/connect-telegram.md)
+> 🌐 **語言：** [English](../../en/how-to/connect-telegram.md) · [简体中文](../../zh-CN/how-to/connect-telegram.md) · **繁體中文** · [日本語](../../ja/how-to/connect-telegram.md) · [한국어](../../ko/how-to/connect-telegram.md) · [Español](../../es/how-to/connect-telegram.md) · [Français](../../fr/how-to/connect-telegram.md) · [Italiano](../../it/how-to/connect-telegram.md) · [Português (BR)](../../pt-BR/how-to/connect-telegram.md) · [Português (PT)](../../pt-PT/how-to/connect-telegram.md) · [Русский](../../ru/how-to/connect-telegram.md) · [العربية](../../ar/how-to/connect-telegram.md) · [हिन्दी](../../hi/how-to/connect-telegram.md) · [বাংলা](../../bn/how-to/connect-telegram.md) · [Tiếng Việt](../../vi/how-to/connect-telegram.md)
 
 從 Telegram 與一個 Veles 專案對話。channel 是一個 gateway，會把
 訊息轉發到一個 [daemon](run-as-daemon.md)，並把回覆串流回來。每個聊天都會擁有

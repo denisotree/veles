@@ -1,6 +1,6 @@
 # 如何使用多個專案與子專案
 
-> 🌐 **語言：** **English** · [Русский](../../ru/how-to/multi-project-and-subprojects.md)
+> 🌐 **語言：** [English](../../en/how-to/multi-project-and-subprojects.md) · [简体中文](../../zh-CN/how-to/multi-project-and-subprojects.md) · **繁體中文** · [日本語](../../ja/how-to/multi-project-and-subprojects.md) · [한국어](../../ko/how-to/multi-project-and-subprojects.md) · [Español](../../es/how-to/multi-project-and-subprojects.md) · [Français](../../fr/how-to/multi-project-and-subprojects.md) · [Italiano](../../it/how-to/multi-project-and-subprojects.md) · [Português (BR)](../../pt-BR/how-to/multi-project-and-subprojects.md) · [Português (PT)](../../pt-PT/how-to/multi-project-and-subprojects.md) · [Русский](../../ru/how-to/multi-project-and-subprojects.md) · [العربية](../../ar/how-to/multi-project-and-subprojects.md) · [हिन्दी](../../hi/how-to/multi-project-and-subprojects.md) · [বাংলা](../../bn/how-to/multi-project-and-subprojects.md) · [Tiếng Việt](../../vi/how-to/multi-project-and-subprojects.md)
 
 Veles 在一個 agent loop 中運行多個專案。每個專案都有自己的記憶、skills 與 tools。
 **Subprojects** 是巢狀在某個母專案底下的專案 — 適合用來把一個龐大的 monorepo 或

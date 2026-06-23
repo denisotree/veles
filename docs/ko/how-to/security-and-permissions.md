@@ -1,6 +1,6 @@
 # 보안 관리 방법: 신뢰, 자동 조종, 시크릿
 
-> 🌐 **언어:** **English** · [Русский](../../ru/how-to/security-and-permissions.md)
+> 🌐 **언어:** [English](../../en/how-to/security-and-permissions.md) · [简体中文](../../zh-CN/how-to/security-and-permissions.md) · [繁體中文](../../zh-TW/how-to/security-and-permissions.md) · [日本語](../../ja/how-to/security-and-permissions.md) · **한국어** · [Español](../../es/how-to/security-and-permissions.md) · [Français](../../fr/how-to/security-and-permissions.md) · [Italiano](../../it/how-to/security-and-permissions.md) · [Português (BR)](../../pt-BR/how-to/security-and-permissions.md) · [Português (PT)](../../pt-PT/how-to/security-and-permissions.md) · [Русский](../../ru/how-to/security-and-permissions.md) · [العربية](../../ar/how-to/security-and-permissions.md) · [हिन्दी](../../hi/how-to/security-and-permissions.md) · [বাংলা](../../bn/how-to/security-and-permissions.md) · [Tiếng Việt](../../vi/how-to/security-and-permissions.md)
 
 Veles는 위험한 작업을 **신뢰 계층**으로 제어하고, 파일 접근을 샌드박스로 격리하며, 시크릿을 OS 키체인에 안전하게 보관합니다. 설계 근거는 [신뢰와 샌드박스](../explanation/trust-and-sandbox.md)를 참고하세요.
 

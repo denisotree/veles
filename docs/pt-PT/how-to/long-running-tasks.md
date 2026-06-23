@@ -1,6 +1,6 @@
 # Como executar tarefas de longa duração: objetivos, jobs, sonho, investigação
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/long-running-tasks.md)
+> 🌐 **Idiomas:** [English](../../en/how-to/long-running-tasks.md) · [简体中文](../../zh-CN/how-to/long-running-tasks.md) · [繁體中文](../../zh-TW/how-to/long-running-tasks.md) · [日本語](../../ja/how-to/long-running-tasks.md) · [한국어](../../ko/how-to/long-running-tasks.md) · [Español](../../es/how-to/long-running-tasks.md) · [Français](../../fr/how-to/long-running-tasks.md) · [Italiano](../../it/how-to/long-running-tasks.md) · [Português (BR)](../../pt-BR/how-to/long-running-tasks.md) · **Português (PT)** · [Русский](../../ru/how-to/long-running-tasks.md) · [العربية](../../ar/how-to/long-running-tasks.md) · [हिन्दी](../../hi/how-to/long-running-tasks.md) · [বাংলা](../../bn/how-to/long-running-tasks.md) · [Tiếng Việt](../../vi/how-to/long-running-tasks.md)
 
 Para além de prompts isolados, o Veles pode perseguir **objetivos** de vários
 passos com orçamentos, executar **jobs agendados**, **sonhar** para consolidar a

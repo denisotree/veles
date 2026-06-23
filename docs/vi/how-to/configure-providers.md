@@ -1,6 +1,6 @@
 # Cách cấu hình nhà cung cấp
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/configure-providers.md)
+> 🌐 **Ngôn ngữ:** [English](../../en/how-to/configure-providers.md) · [简体中文](../../zh-CN/how-to/configure-providers.md) · [繁體中文](../../zh-TW/how-to/configure-providers.md) · [日本語](../../ja/how-to/configure-providers.md) · [한국어](../../ko/how-to/configure-providers.md) · [Español](../../es/how-to/configure-providers.md) · [Français](../../fr/how-to/configure-providers.md) · [Italiano](../../it/how-to/configure-providers.md) · [Português (BR)](../../pt-BR/how-to/configure-providers.md) · [Português (PT)](../../pt-PT/how-to/configure-providers.md) · [Русский](../../ru/how-to/configure-providers.md) · [العربية](../../ar/how-to/configure-providers.md) · [हिन्दी](../../hi/how-to/configure-providers.md) · [বাংলা](../../bn/how-to/configure-providers.md) · **Tiếng Việt**
 
 Chuyển Veles giữa OpenRouter, Anthropic, OpenAI, Gemini, các model cục bộ, hoặc
 một gói đăng ký CLI. Danh sách nhà cung cấp đầy đủ: [tham khảo nhà cung cấp](../reference/providers.md).

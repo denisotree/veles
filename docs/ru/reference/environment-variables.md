@@ -1,6 +1,6 @@
 # Переменные окружения
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/environment-variables.md)
+> 🌐 **Языки:** [English](../../en/reference/environment-variables.md) · [简体中文](../../zh-CN/reference/environment-variables.md) · [繁體中文](../../zh-TW/reference/environment-variables.md) · [日本語](../../ja/reference/environment-variables.md) · [한국어](../../ko/reference/environment-variables.md) · [Español](../../es/reference/environment-variables.md) · [Français](../../fr/reference/environment-variables.md) · [Italiano](../../it/reference/environment-variables.md) · [Português (BR)](../../pt-BR/reference/environment-variables.md) · [Português (PT)](../../pt-PT/reference/environment-variables.md) · **Русский** · [العربية](../../ar/reference/environment-variables.md) · [हिन्दी](../../hi/reference/environment-variables.md) · [বাংলা](../../bn/reference/environment-variables.md) · [Tiếng Việt](../../vi/reference/environment-variables.md)
 
 Veles читает их во время работы. API-ключи и токены лучше хранить в keychain ОС
 (`veles secret set …`); переменные окружения — это запасной вариант и средство

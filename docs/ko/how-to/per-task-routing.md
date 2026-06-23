@@ -1,6 +1,6 @@
 # 작업별 모델 라우팅 방법
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/per-task-routing.md)
+> 🌐 **언어:** [English](../../en/how-to/per-task-routing.md) · [简体中文](../../zh-CN/how-to/per-task-routing.md) · [繁體中文](../../zh-TW/how-to/per-task-routing.md) · [日本語](../../ja/how-to/per-task-routing.md) · **한국어** · [Español](../../es/how-to/per-task-routing.md) · [Français](../../fr/how-to/per-task-routing.md) · [Italiano](../../it/how-to/per-task-routing.md) · [Português (BR)](../../pt-BR/how-to/per-task-routing.md) · [Português (PT)](../../pt-PT/how-to/per-task-routing.md) · [Русский](../../ru/how-to/per-task-routing.md) · [العربية](../../ar/how-to/per-task-routing.md) · [हिन्दी](../../hi/how-to/per-task-routing.md) · [বাংলা](../../bn/how-to/per-task-routing.md) · [Tiếng Việt](../../vi/how-to/per-task-routing.md)
 
 Veles는 하나의 모델에 묶여 있지 않습니다. 각 내부 **태스크**는 서로 다른 `provider:model`을 사용할 수 있습니다 — 컨텍스트 압축에는 저렴한 모델, 메인 에이전트에는 강력한 모델, 이미지에는 비전 모델. 이것이 *앙상블 라우팅* 시스템입니다.
 

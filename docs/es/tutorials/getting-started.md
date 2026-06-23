@@ -1,6 +1,6 @@
 # Primeros pasos
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/tutorials/getting-started.md)
+> 🌐 **Idiomas:** [English](../../en/tutorials/getting-started.md) · [简体中文](../../zh-CN/tutorials/getting-started.md) · [繁體中文](../../zh-TW/tutorials/getting-started.md) · [日本語](../../ja/tutorials/getting-started.md) · [한국어](../../ko/tutorials/getting-started.md) · **Español** · [Français](../../fr/tutorials/getting-started.md) · [Italiano](../../it/tutorials/getting-started.md) · [Português (BR)](../../pt-BR/tutorials/getting-started.md) · [Português (PT)](../../pt-PT/tutorials/getting-started.md) · [Русский](../../ru/tutorials/getting-started.md) · [العربية](../../ar/tutorials/getting-started.md) · [हिन्दी](../../hi/tutorials/getting-started.md) · [বাংলা](../../bn/tutorials/getting-started.md) · [Tiếng Việt](../../vi/tutorials/getting-started.md)
 
 En este tutorial instalarás Veles, le darás una clave de API, crearás tu primer proyecto
 y ejecutarás tu primer prompt. Unos 10 minutos. Terminarás con un proyecto Veles funcional

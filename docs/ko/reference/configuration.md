@@ -1,6 +1,6 @@
 # 설정 레퍼런스
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/configuration.md)
+> 🌐 **언어:** [English](../../en/reference/configuration.md) · [简体中文](../../zh-CN/reference/configuration.md) · [繁體中文](../../zh-TW/reference/configuration.md) · [日本語](../../ja/reference/configuration.md) · **한국어** · [Español](../../es/reference/configuration.md) · [Français](../../fr/reference/configuration.md) · [Italiano](../../it/reference/configuration.md) · [Português (BR)](../../pt-BR/reference/configuration.md) · [Português (PT)](../../pt-PT/reference/configuration.md) · [Русский](../../ru/reference/configuration.md) · [العربية](../../ar/reference/configuration.md) · [हिन्दी](../../hi/reference/configuration.md) · [বাংলা](../../bn/reference/configuration.md) · [Tiếng Việt](../../vi/reference/configuration.md)
 
 Veles는 두 개의 TOML 파일과 일련의 상태 디렉터리로 설정됩니다. 시크릿(API 키, 봇 토큰)은 이 파일들에 **절대** 기록되지 않으며, OS 키체인이나 환경 변수에 저장됩니다([환경 변수](environment-variables.md) 참고).
 

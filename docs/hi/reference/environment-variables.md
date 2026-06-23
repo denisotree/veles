@@ -1,6 +1,6 @@
 # Environment variables
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/environment-variables.md)
+> 🌐 **भाषाएँ:** [English](../../en/reference/environment-variables.md) · [简体中文](../../zh-CN/reference/environment-variables.md) · [繁體中文](../../zh-TW/reference/environment-variables.md) · [日本語](../../ja/reference/environment-variables.md) · [한국어](../../ko/reference/environment-variables.md) · [Español](../../es/reference/environment-variables.md) · [Français](../../fr/reference/environment-variables.md) · [Italiano](../../it/reference/environment-variables.md) · [Português (BR)](../../pt-BR/reference/environment-variables.md) · [Português (PT)](../../pt-PT/reference/environment-variables.md) · [Русский](../../ru/reference/environment-variables.md) · [العربية](../../ar/reference/environment-variables.md) · **हिन्दी** · [বাংলা](../../bn/reference/environment-variables.md) · [Tiếng Việt](../../vi/reference/environment-variables.md)
 
 Veles इन्हें runtime पर पढ़ता है। API keys और tokens को OS keychain में रखना सबसे
 अच्छा है (`veles secret set …`); env vars fallback और override के रूप में हैं।

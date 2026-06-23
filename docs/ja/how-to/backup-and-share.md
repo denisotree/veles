@@ -1,6 +1,6 @@
 # プロジェクトをバックアップして共有する方法
 
-> 🌐 **言語:** [English](../../en/how-to/backup-and-share.md) · **日本語**
+> 🌐 **言語:** [English](../../en/how-to/backup-and-share.md) · [简体中文](../../zh-CN/how-to/backup-and-share.md) · [繁體中文](../../zh-TW/how-to/backup-and-share.md) · **日本語** · [한국어](../../ko/how-to/backup-and-share.md) · [Español](../../es/how-to/backup-and-share.md) · [Français](../../fr/how-to/backup-and-share.md) · [Italiano](../../it/how-to/backup-and-share.md) · [Português (BR)](../../pt-BR/how-to/backup-and-share.md) · [Português (PT)](../../pt-PT/how-to/backup-and-share.md) · [Русский](../../ru/how-to/backup-and-share.md) · [العربية](../../ar/how-to/backup-and-share.md) · [हिन्दी](../../hi/how-to/backup-and-share.md) · [বাংলা](../../bn/how-to/backup-and-share.md) · [Tiếng Việt](../../vi/how-to/backup-and-share.md)
 
 Veles プロジェクトはポータブルです。バックアップや移行のためにプロジェクトを単一の
 `.tar.gz` バンドルにエクスポートしたり、データを漏らさずに共有するためにサニタイズされた

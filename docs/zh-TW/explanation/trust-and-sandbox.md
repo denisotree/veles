@@ -1,6 +1,6 @@
 # 信任機制與 sandbox
 
-> 🌐 **語言：** **English** · [Русский](../../ru/explanation/trust-and-sandbox.md)
+> 🌐 **語言：** [English](../../en/explanation/trust-and-sandbox.md) · [简体中文](../../zh-CN/explanation/trust-and-sandbox.md) · **繁體中文** · [日本語](../../ja/explanation/trust-and-sandbox.md) · [한국어](../../ko/explanation/trust-and-sandbox.md) · [Español](../../es/explanation/trust-and-sandbox.md) · [Français](../../fr/explanation/trust-and-sandbox.md) · [Italiano](../../it/explanation/trust-and-sandbox.md) · [Português (BR)](../../pt-BR/explanation/trust-and-sandbox.md) · [Português (PT)](../../pt-PT/explanation/trust-and-sandbox.md) · [Русский](../../ru/explanation/trust-and-sandbox.md) · [العربية](../../ar/explanation/trust-and-sandbox.md) · [हिन्दी](../../hi/explanation/trust-and-sandbox.md) · [বাংলা](../../bn/explanation/trust-and-sandbox.md) · [Tiếng Việt](../../vi/explanation/trust-and-sandbox.md)
 
 Veles 會在你的機器上執行一個自主的 agent，因此它會限制該 agent
 能做的事。有兩套機制協同運作：用於敏感動作的**信任階梯（trust ladder）**與

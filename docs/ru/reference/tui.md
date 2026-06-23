@@ -1,6 +1,6 @@
 # Горячие клавиши TUI и слэш-команды
 
-> 🌐 **Языки:** [English](../../en/reference/tui.md) · **Русский**
+> 🌐 **Языки:** [English](../../en/reference/tui.md) · [简体中文](../../zh-CN/reference/tui.md) · [繁體中文](../../zh-TW/reference/tui.md) · [日本語](../../ja/reference/tui.md) · [한국어](../../ko/reference/tui.md) · [Español](../../es/reference/tui.md) · [Français](../../fr/reference/tui.md) · [Italiano](../../it/reference/tui.md) · [Português (BR)](../../pt-BR/reference/tui.md) · [Português (PT)](../../pt-PT/reference/tui.md) · **Русский** · [العربية](../../ar/reference/tui.md) · [हिन्दी](../../hi/reference/tui.md) · [বাংলা](../../bn/reference/tui.md) · [Tiếng Việt](../../vi/reference/tui.md)
 
 `veles tui` (или просто `veles`) открывает интерактивный REPL. Это чат со скроллбэком,
 многострочным композером, строкой состояния и сворачиваемым инспектором.

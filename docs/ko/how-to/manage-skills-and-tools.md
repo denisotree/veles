@@ -1,6 +1,6 @@
 # 스킬, 도구, 모듈 관리 방법
 
-> 🌐 **언어:** **English** · [Русский](../../ru/how-to/manage-skills-and-tools.md)
+> 🌐 **언어:** [English](../../en/how-to/manage-skills-and-tools.md) · [简体中文](../../zh-CN/how-to/manage-skills-and-tools.md) · [繁體中文](../../zh-TW/how-to/manage-skills-and-tools.md) · [日本語](../../ja/how-to/manage-skills-and-tools.md) · **한국어** · [Español](../../es/how-to/manage-skills-and-tools.md) · [Français](../../fr/how-to/manage-skills-and-tools.md) · [Italiano](../../it/how-to/manage-skills-and-tools.md) · [Português (BR)](../../pt-BR/how-to/manage-skills-and-tools.md) · [Português (PT)](../../pt-PT/how-to/manage-skills-and-tools.md) · [Русский](../../ru/how-to/manage-skills-and-tools.md) · [العربية](../../ar/how-to/manage-skills-and-tools.md) · [हिन्दी](../../hi/how-to/manage-skills-and-tools.md) · [বাংলা](../../bn/how-to/manage-skills-and-tools.md) · [Tiếng Việt](../../vi/how-to/manage-skills-and-tools.md)
 
 Veles는 시간이 지남에 따라 역량을 축적합니다. **스킬**은 재사용 가능한 워크플로우이고, **도구**는 실행 가능한 액션이며, **모듈**은 선택적 플러그인입니다. 각각은 프로젝트 로컬(`<project>/.veles/`)과 사용자 전역(`~/.veles/`) 두 가지 범위에 존재합니다. 개념에 대한 자세한 내용은 [스킬 & 도구](../explanation/skills-and-tools.md)를 참고하세요.
 

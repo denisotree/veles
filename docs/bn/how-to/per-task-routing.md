@@ -1,6 +1,6 @@
 # বিভিন্ন মডেলে টাস্ক কীভাবে রাউট করবেন
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/per-task-routing.md)
+> 🌐 **ভাষা:** [English](../../en/how-to/per-task-routing.md) · [简体中文](../../zh-CN/how-to/per-task-routing.md) · [繁體中文](../../zh-TW/how-to/per-task-routing.md) · [日本語](../../ja/how-to/per-task-routing.md) · [한국어](../../ko/how-to/per-task-routing.md) · [Español](../../es/how-to/per-task-routing.md) · [Français](../../fr/how-to/per-task-routing.md) · [Italiano](../../it/how-to/per-task-routing.md) · [Português (BR)](../../pt-BR/how-to/per-task-routing.md) · [Português (PT)](../../pt-PT/how-to/per-task-routing.md) · [Русский](../../ru/how-to/per-task-routing.md) · [العربية](../../ar/how-to/per-task-routing.md) · [हिन्दी](../../hi/how-to/per-task-routing.md) · **বাংলা** · [Tiếng Việt](../../vi/how-to/per-task-routing.md)
 
 Veles একটিমাত্র মডেলে আটকে নেই। প্রতিটি ইন্টারনাল **টাস্ক** একটি ভিন্ন
 `provider:model` ব্যবহার করতে পারে — কনটেক্সট কম্প্রেশনের জন্য একটি সস্তা মডেল, মূল

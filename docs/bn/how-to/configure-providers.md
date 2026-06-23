@@ -1,6 +1,6 @@
 # প্রোভাইডার কীভাবে কনফিগার করবেন
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/configure-providers.md)
+> 🌐 **ভাষা:** [English](../../en/how-to/configure-providers.md) · [简体中文](../../zh-CN/how-to/configure-providers.md) · [繁體中文](../../zh-TW/how-to/configure-providers.md) · [日本語](../../ja/how-to/configure-providers.md) · [한국어](../../ko/how-to/configure-providers.md) · [Español](../../es/how-to/configure-providers.md) · [Français](../../fr/how-to/configure-providers.md) · [Italiano](../../it/how-to/configure-providers.md) · [Português (BR)](../../pt-BR/how-to/configure-providers.md) · [Português (PT)](../../pt-PT/how-to/configure-providers.md) · [Русский](../../ru/how-to/configure-providers.md) · [العربية](../../ar/how-to/configure-providers.md) · [हिन्दी](../../hi/how-to/configure-providers.md) · **বাংলা** · [Tiếng Việt](../../vi/how-to/configure-providers.md)
 
 Veles-কে OpenRouter, Anthropic, OpenAI, Gemini, লোকাল মডেল, বা একটি CLI
 সাবস্ক্রিপশনের মধ্যে স্যুইচ করুন। সম্পূর্ণ প্রোভাইডার তালিকা: [প্রোভাইডার রেফারেন্স](../reference/providers.md)।

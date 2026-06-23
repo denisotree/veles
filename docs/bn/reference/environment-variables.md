@@ -1,6 +1,6 @@
 # এনভায়রনমেন্ট ভ্যারিয়েবল
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/environment-variables.md)
+> 🌐 **ভাষা:** [English](../../en/reference/environment-variables.md) · [简体中文](../../zh-CN/reference/environment-variables.md) · [繁體中文](../../zh-TW/reference/environment-variables.md) · [日本語](../../ja/reference/environment-variables.md) · [한국어](../../ko/reference/environment-variables.md) · [Español](../../es/reference/environment-variables.md) · [Français](../../fr/reference/environment-variables.md) · [Italiano](../../it/reference/environment-variables.md) · [Português (BR)](../../pt-BR/reference/environment-variables.md) · [Português (PT)](../../pt-PT/reference/environment-variables.md) · [Русский](../../ru/reference/environment-variables.md) · [العربية](../../ar/reference/environment-variables.md) · [हिन्दी](../../hi/reference/environment-variables.md) · **বাংলা** · [Tiếng Việt](../../vi/reference/environment-variables.md)
 
 Veles রানটাইমে এগুলো পড়ে। API কী ও টোকেন OS keychain-এ রাখাই সবচেয়ে ভালো
 (`veles secret set …`); env ভ্যারিয়েবল হলো ফলব্যাক ও ওভাররাইড।

@@ -1,6 +1,6 @@
 # Trust और sandbox
 
-> 🌐 **भाषाएँ:** **English** · [Русский](../../ru/explanation/trust-and-sandbox.md)
+> 🌐 **भाषाएँ:** [English](../../en/explanation/trust-and-sandbox.md) · [简体中文](../../zh-CN/explanation/trust-and-sandbox.md) · [繁體中文](../../zh-TW/explanation/trust-and-sandbox.md) · [日本語](../../ja/explanation/trust-and-sandbox.md) · [한국어](../../ko/explanation/trust-and-sandbox.md) · [Español](../../es/explanation/trust-and-sandbox.md) · [Français](../../fr/explanation/trust-and-sandbox.md) · [Italiano](../../it/explanation/trust-and-sandbox.md) · [Português (BR)](../../pt-BR/explanation/trust-and-sandbox.md) · [Português (PT)](../../pt-PT/explanation/trust-and-sandbox.md) · [Русский](../../ru/explanation/trust-and-sandbox.md) · [العربية](../../ar/explanation/trust-and-sandbox.md) · **हिन्दी** · [বাংলা](../../bn/explanation/trust-and-sandbox.md) · [Tiếng Việt](../../vi/explanation/trust-and-sandbox.md)
 
 Veles आपकी मशीन पर एक स्वायत्त agent चलाता है, इसलिए वह agent क्या कर सकता है उसे
 सीमित करता है। दो तंत्र मिलकर काम करते हैं: संवेदनशील क्रियाओं के लिए एक **trust

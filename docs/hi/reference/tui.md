@@ -1,6 +1,6 @@
 # TUI keybindings और slash commands
 
-> 🌐 **भाषाएँ:** **English** · [Русский](../../ru/reference/tui.md)
+> 🌐 **भाषाएँ:** [English](../../en/reference/tui.md) · [简体中文](../../zh-CN/reference/tui.md) · [繁體中文](../../zh-TW/reference/tui.md) · [日本語](../../ja/reference/tui.md) · [한국어](../../ko/reference/tui.md) · [Español](../../es/reference/tui.md) · [Français](../../fr/reference/tui.md) · [Italiano](../../it/reference/tui.md) · [Português (BR)](../../pt-BR/reference/tui.md) · [Português (PT)](../../pt-PT/reference/tui.md) · [Русский](../../ru/reference/tui.md) · [العربية](../../ar/reference/tui.md) · **हिन्दी** · [বাংলা](../../bn/reference/tui.md) · [Tiếng Việt](../../vi/reference/tui.md)
 
 `veles tui` (या केवल `veles`) interactive REPL खोलता है। यह एक scrollback chat है जिसमें
 multi-line composer, एक status bar, और एक collapsible inspector होता है।

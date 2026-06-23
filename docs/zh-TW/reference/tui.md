@@ -1,6 +1,6 @@
 # TUI 按鍵綁定與 slash 指令
 
-> 🌐 **語言：** **English** · [Русский](../../ru/reference/tui.md)
+> 🌐 **語言：** [English](../../en/reference/tui.md) · [简体中文](../../zh-CN/reference/tui.md) · **繁體中文** · [日本語](../../ja/reference/tui.md) · [한국어](../../ko/reference/tui.md) · [Español](../../es/reference/tui.md) · [Français](../../fr/reference/tui.md) · [Italiano](../../it/reference/tui.md) · [Português (BR)](../../pt-BR/reference/tui.md) · [Português (PT)](../../pt-PT/reference/tui.md) · [Русский](../../ru/reference/tui.md) · [العربية](../../ar/reference/tui.md) · [हिन्दी](../../hi/reference/tui.md) · [বাংলা](../../bn/reference/tui.md) · [Tiếng Việt](../../vi/reference/tui.md)
 
 `veles tui`（或直接執行 `veles`）會開啟互動式 REPL。它是一個帶有多行 composer、狀態列以及可摺疊 inspector 的捲動聊天介面。
 

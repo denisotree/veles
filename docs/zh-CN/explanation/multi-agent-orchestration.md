@@ -1,6 +1,6 @@
 # 多智能体编排
 
-> 🌐 **Languages:** [English](../../en/explanation/multi-agent-orchestration.md) · [Русский](../../ru/explanation/multi-agent-orchestration.md) · **简体中文**
+> 🌐 **语言：** [English](../../en/explanation/multi-agent-orchestration.md) · **简体中文** · [繁體中文](../../zh-TW/explanation/multi-agent-orchestration.md) · [日本語](../../ja/explanation/multi-agent-orchestration.md) · [한국어](../../ko/explanation/multi-agent-orchestration.md) · [Español](../../es/explanation/multi-agent-orchestration.md) · [Français](../../fr/explanation/multi-agent-orchestration.md) · [Italiano](../../it/explanation/multi-agent-orchestration.md) · [Português (BR)](../../pt-BR/explanation/multi-agent-orchestration.md) · [Português (PT)](../../pt-PT/explanation/multi-agent-orchestration.md) · [Русский](../../ru/explanation/multi-agent-orchestration.md) · [العربية](../../ar/explanation/multi-agent-orchestration.md) · [हिन्दी](../../hi/explanation/multi-agent-orchestration.md) · [বাংলা](../../bn/explanation/multi-agent-orchestration.md) · [Tiếng Việt](../../vi/explanation/multi-agent-orchestration.md)
 
 对于复杂工作，Veles 可以将一个任务拆分给一个 **管理者** 和若干专门的 **工作者** 子智能体，而不是在单一上下文中包揽一切。本页解释这一模型；要开启它，请参阅 [管理者模式](../how-to/long-running-tasks.md#manager-mode--decompose-any-prompt)。
 

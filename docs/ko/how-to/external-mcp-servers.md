@@ -1,6 +1,6 @@
 # 외부 MCP 서버 연결 방법
 
-> 🌐 **언어:** **English** · [Русский](../../ru/how-to/external-mcp-servers.md)
+> 🌐 **언어:** [English](../../en/how-to/external-mcp-servers.md) · [简体中文](../../zh-CN/how-to/external-mcp-servers.md) · [繁體中文](../../zh-TW/how-to/external-mcp-servers.md) · [日本語](../../ja/how-to/external-mcp-servers.md) · **한국어** · [Español](../../es/how-to/external-mcp-servers.md) · [Français](../../fr/how-to/external-mcp-servers.md) · [Italiano](../../it/how-to/external-mcp-servers.md) · [Português (BR)](../../pt-BR/how-to/external-mcp-servers.md) · [Português (PT)](../../pt-PT/how-to/external-mcp-servers.md) · [Русский](../../ru/how-to/external-mcp-servers.md) · [العربية](../../ar/how-to/external-mcp-servers.md) · [हिन्दी](../../hi/how-to/external-mcp-servers.md) · [বাংলা](../../bn/how-to/external-mcp-servers.md) · [Tiếng Việt](../../vi/how-to/external-mcp-servers.md)
 
 Veles는 [MCP](https://modelcontextprotocol.io/) **클라이언트**입니다. 외부 MCP 서버에 연결하여 해당 서버의 도구를 마치 내장 도구처럼 에이전트에 노출할 수 있습니다 (GitHub, 라이브러리 문서, 웹 검색, 직접 만든 서비스 등).
 

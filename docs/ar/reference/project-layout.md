@@ -1,6 +1,6 @@
 # بنية المشروع وحالته
 
-> 🌐 **اللغات:** [English](../../en/reference/project-layout.md) · [Русский](../../ru/reference/project-layout.md)
+> 🌐 **اللغات:** [English](../../en/reference/project-layout.md) · [简体中文](../../zh-CN/reference/project-layout.md) · [繁體中文](../../zh-TW/reference/project-layout.md) · [日本語](../../ja/reference/project-layout.md) · [한국어](../../ko/reference/project-layout.md) · [Español](../../es/reference/project-layout.md) · [Français](../../fr/reference/project-layout.md) · [Italiano](../../it/reference/project-layout.md) · [Português (BR)](../../pt-BR/reference/project-layout.md) · [Português (PT)](../../pt-PT/reference/project-layout.md) · [Русский](../../ru/reference/project-layout.md) · **العربية** · [हिन्दी](../../hi/reference/project-layout.md) · [বাংলা](../../bn/reference/project-layout.md) · [Tiếng Việt](../../vi/reference/project-layout.md)
 
 ما الذي ينشئه `veles init`، وأين يحتفظ Veles بحالته، ومخطط ذاكرة المشروع.
 

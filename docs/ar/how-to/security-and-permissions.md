@@ -1,6 +1,6 @@
 # كيفية إدارة الأمان: الثقة، الطيّار الآلي، الأسرار
 
-> 🌐 **اللغات:** [English](../../en/how-to/security-and-permissions.md) · [Русский](../../ru/how-to/security-and-permissions.md) · **العربية**
+> 🌐 **اللغات:** [English](../../en/how-to/security-and-permissions.md) · [简体中文](../../zh-CN/how-to/security-and-permissions.md) · [繁體中文](../../zh-TW/how-to/security-and-permissions.md) · [日本語](../../ja/how-to/security-and-permissions.md) · [한국어](../../ko/how-to/security-and-permissions.md) · [Español](../../es/how-to/security-and-permissions.md) · [Français](../../fr/how-to/security-and-permissions.md) · [Italiano](../../it/how-to/security-and-permissions.md) · [Português (BR)](../../pt-BR/how-to/security-and-permissions.md) · [Português (PT)](../../pt-PT/how-to/security-and-permissions.md) · [Русский](../../ru/how-to/security-and-permissions.md) · **العربية** · [हिन्दी](../../hi/how-to/security-and-permissions.md) · [বাংলা](../../bn/how-to/security-and-permissions.md) · [Tiếng Việt](../../vi/how-to/security-and-permissions.md)
 
 تحجز Veles الإجراءات الخطرة خلف **سلّم الثقة**، وتعزل الوصول إلى الملفات في صندوق
 رمليّ (sandbox)، وتحفظ الأسرار في سلسلة مفاتيح نظام التشغيل. للاطلاع على المبرّرات،

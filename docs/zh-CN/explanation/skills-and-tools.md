@@ -1,6 +1,6 @@
 # 作为可累积能力的技能与工具
 
-> 🌐 **Languages:** [English](../../en/explanation/skills-and-tools.md) · [Русский](../../ru/explanation/skills-and-tools.md) · **简体中文**
+> 🌐 **语言：** [English](../../en/explanation/skills-and-tools.md) · **简体中文** · [繁體中文](../../zh-TW/explanation/skills-and-tools.md) · [日本語](../../ja/explanation/skills-and-tools.md) · [한국어](../../ko/explanation/skills-and-tools.md) · [Español](../../es/explanation/skills-and-tools.md) · [Français](../../fr/explanation/skills-and-tools.md) · [Italiano](../../it/explanation/skills-and-tools.md) · [Português (BR)](../../pt-BR/explanation/skills-and-tools.md) · [Português (PT)](../../pt-PT/explanation/skills-and-tools.md) · [Русский](../../ru/explanation/skills-and-tools.md) · [العربية](../../ar/explanation/skills-and-tools.md) · [हिन्दी](../../hi/explanation/skills-and-tools.md) · [বাংলা](../../bn/explanation/skills-and-tools.md) · [Tiếng Việt](../../vi/explanation/skills-and-tools.md)
 
 Veles 以一组极简的工具和技能起步，并随着工作 **不断壮大** 它们。本页解释二者的区别以及它们如何累积。关于相关命令，请参阅 [管理技能与工具](../how-to/manage-skills-and-tools.md)。
 

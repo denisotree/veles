@@ -1,6 +1,6 @@
 # 장기 실행 작업 처리 방법: 목표, 작업, 드리밍, 리서치
 
-> 🌐 **언어:** **English** · [Русский](../../ru/how-to/long-running-tasks.md)
+> 🌐 **언어:** [English](../../en/how-to/long-running-tasks.md) · [简体中文](../../zh-CN/how-to/long-running-tasks.md) · [繁體中文](../../zh-TW/how-to/long-running-tasks.md) · [日本語](../../ja/how-to/long-running-tasks.md) · **한국어** · [Español](../../es/how-to/long-running-tasks.md) · [Français](../../fr/how-to/long-running-tasks.md) · [Italiano](../../it/how-to/long-running-tasks.md) · [Português (BR)](../../pt-BR/how-to/long-running-tasks.md) · [Português (PT)](../../pt-PT/how-to/long-running-tasks.md) · [Русский](../../ru/how-to/long-running-tasks.md) · [العربية](../../ar/how-to/long-running-tasks.md) · [हिन्दी](../../hi/how-to/long-running-tasks.md) · [বাংলা](../../bn/how-to/long-running-tasks.md) · [Tiếng Việt](../../vi/how-to/long-running-tasks.md)
 
 단순한 단일 프롬프트를 넘어, Veles는 예산이 설정된 다단계 **목표(goal)**를 추구하고, **예약 작업(job)**을 실행하며, **드림(dream)**을 통해 메모리를 정리하고, 웹을 병렬로 **리서치**하며, **매니저**와 하위 에이전트에 작업을 분배할 수 있습니다.
 

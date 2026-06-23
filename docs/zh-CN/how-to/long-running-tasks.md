@@ -1,6 +1,6 @@
 # 如何运行长时间任务：目标、作业、做梦、研究
 
-> 🌐 **语言：** [English](../../en/how-to/long-running-tasks.md) · [Русский](../../ru/how-to/long-running-tasks.md) · **简体中文**
+> 🌐 **语言：** [English](../../en/how-to/long-running-tasks.md) · **简体中文** · [繁體中文](../../zh-TW/how-to/long-running-tasks.md) · [日本語](../../ja/how-to/long-running-tasks.md) · [한국어](../../ko/how-to/long-running-tasks.md) · [Español](../../es/how-to/long-running-tasks.md) · [Français](../../fr/how-to/long-running-tasks.md) · [Italiano](../../it/how-to/long-running-tasks.md) · [Português (BR)](../../pt-BR/how-to/long-running-tasks.md) · [Português (PT)](../../pt-PT/how-to/long-running-tasks.md) · [Русский](../../ru/how-to/long-running-tasks.md) · [العربية](../../ar/how-to/long-running-tasks.md) · [हिन्दी](../../hi/how-to/long-running-tasks.md) · [বাংলা](../../bn/how-to/long-running-tasks.md) · [Tiếng Việt](../../vi/how-to/long-running-tasks.md)
 
 除了单条提示之外，Veles 还能带着预算去推进多步骤的**目标（goals）**、运行**定时作业（scheduled jobs）**、通过**做梦（dream）**来整合内存、并行地在网络上做**研究（research）**，并把工作拆解到一个**管理者（manager）**和子智能体之间。
 

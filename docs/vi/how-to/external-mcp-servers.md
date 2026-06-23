@@ -1,6 +1,6 @@
 # Cách kết nối các máy chủ MCP bên ngoài
 
-> 🌐 **Ngôn ngữ:** [English](../../en/how-to/external-mcp-servers.md) · [Русский](../../ru/how-to/external-mcp-servers.md) · **Tiếng Việt**
+> 🌐 **Ngôn ngữ:** [English](../../en/how-to/external-mcp-servers.md) · [简体中文](../../zh-CN/how-to/external-mcp-servers.md) · [繁體中文](../../zh-TW/how-to/external-mcp-servers.md) · [日本語](../../ja/how-to/external-mcp-servers.md) · [한국어](../../ko/how-to/external-mcp-servers.md) · [Español](../../es/how-to/external-mcp-servers.md) · [Français](../../fr/how-to/external-mcp-servers.md) · [Italiano](../../it/how-to/external-mcp-servers.md) · [Português (BR)](../../pt-BR/how-to/external-mcp-servers.md) · [Português (PT)](../../pt-PT/how-to/external-mcp-servers.md) · [Русский](../../ru/how-to/external-mcp-servers.md) · [العربية](../../ar/how-to/external-mcp-servers.md) · [हिन्दी](../../hi/how-to/external-mcp-servers.md) · [বাংলা](../../bn/how-to/external-mcp-servers.md) · **Tiếng Việt**
 
 Veles là một **client** [MCP](https://modelcontextprotocol.io/): nó có thể kết nối tới
 các máy chủ MCP bên ngoài và cung cấp các công cụ của chúng cho agent như thể chúng được tích hợp sẵn

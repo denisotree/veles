@@ -1,6 +1,6 @@
 # 프로젝트 레이아웃 및 상태
 
-> 🌐 **언어:** **English** · [Русский](../../ru/reference/project-layout.md)
+> 🌐 **언어:** [English](../../en/reference/project-layout.md) · [简体中文](../../zh-CN/reference/project-layout.md) · [繁體中文](../../zh-TW/reference/project-layout.md) · [日本語](../../ja/reference/project-layout.md) · **한국어** · [Español](../../es/reference/project-layout.md) · [Français](../../fr/reference/project-layout.md) · [Italiano](../../it/reference/project-layout.md) · [Português (BR)](../../pt-BR/reference/project-layout.md) · [Português (PT)](../../pt-PT/reference/project-layout.md) · [Русский](../../ru/reference/project-layout.md) · [العربية](../../ar/reference/project-layout.md) · [हिन्दी](../../hi/reference/project-layout.md) · [বাংলা](../../bn/reference/project-layout.md) · [Tiếng Việt](../../vi/reference/project-layout.md)
 
 `veles init`이 생성하는 파일들, Veles가 상태를 저장하는 위치, 그리고 프로젝트 메모리 스키마를 설명합니다.
 

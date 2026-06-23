@@ -1,6 +1,6 @@
 # External MCP servers कैसे connect करें
 
-> 🌐 **भाषाएँ:** **English** · [Русский](../../ru/how-to/external-mcp-servers.md)
+> 🌐 **भाषाएँ:** [English](../../en/how-to/external-mcp-servers.md) · [简体中文](../../zh-CN/how-to/external-mcp-servers.md) · [繁體中文](../../zh-TW/how-to/external-mcp-servers.md) · [日本語](../../ja/how-to/external-mcp-servers.md) · [한국어](../../ko/how-to/external-mcp-servers.md) · [Español](../../es/how-to/external-mcp-servers.md) · [Français](../../fr/how-to/external-mcp-servers.md) · [Italiano](../../it/how-to/external-mcp-servers.md) · [Português (BR)](../../pt-BR/how-to/external-mcp-servers.md) · [Português (PT)](../../pt-PT/how-to/external-mcp-servers.md) · [Русский](../../ru/how-to/external-mcp-servers.md) · [العربية](../../ar/how-to/external-mcp-servers.md) · **हिन्दी** · [বাংলা](../../bn/how-to/external-mcp-servers.md) · [Tiếng Việt](../../vi/how-to/external-mcp-servers.md)
 
 Veles एक [MCP](https://modelcontextprotocol.io/) **client** है: यह external MCP servers से
 connect कर सकता है और उनके tools को agent के सामने ऐसे expose कर सकता है मानो वे built-in हों

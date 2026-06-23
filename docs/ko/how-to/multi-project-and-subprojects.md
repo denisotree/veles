@@ -1,6 +1,6 @@
 # 멀티 프로젝트 및 서브프로젝트 사용 방법
 
-> 🌐 **언어:** **English** · [Русский](../../ru/how-to/multi-project-and-subprojects.md)
+> 🌐 **언어:** [English](../../en/how-to/multi-project-and-subprojects.md) · [简体中文](../../zh-CN/how-to/multi-project-and-subprojects.md) · [繁體中文](../../zh-TW/how-to/multi-project-and-subprojects.md) · [日本語](../../ja/how-to/multi-project-and-subprojects.md) · **한국어** · [Español](../../es/how-to/multi-project-and-subprojects.md) · [Français](../../fr/how-to/multi-project-and-subprojects.md) · [Italiano](../../it/how-to/multi-project-and-subprojects.md) · [Português (BR)](../../pt-BR/how-to/multi-project-and-subprojects.md) · [Português (PT)](../../pt-PT/how-to/multi-project-and-subprojects.md) · [Русский](../../ru/how-to/multi-project-and-subprojects.md) · [العربية](../../ar/how-to/multi-project-and-subprojects.md) · [हिन्दी](../../hi/how-to/multi-project-and-subprojects.md) · [বাংলা](../../bn/how-to/multi-project-and-subprojects.md) · [Tiếng Việt](../../vi/how-to/multi-project-and-subprojects.md)
 
 Veles는 하나의 에이전트 루프에서 여러 프로젝트를 실행합니다. 각 프로젝트는 자체 메모리, 스킬, 도구를 가집니다. **서브프로젝트**는 부모 아래에 중첩된 프로젝트로, 대규모 모노레포나 지식 베이스를 범위가 지정된 메모리로 분해할 때 유용합니다.
 

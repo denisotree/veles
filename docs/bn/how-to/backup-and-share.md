@@ -1,6 +1,6 @@
 # একটি প্রজেক্ট কীভাবে ব্যাকআপ ও শেয়ার করবেন
 
-> 🌐 **Languages:** [English](../../en/how-to/backup-and-share.md) · [Русский](../../ru/how-to/backup-and-share.md) · **বাংলা**
+> 🌐 **ভাষা:** [English](../../en/how-to/backup-and-share.md) · [简体中文](../../zh-CN/how-to/backup-and-share.md) · [繁體中文](../../zh-TW/how-to/backup-and-share.md) · [日本語](../../ja/how-to/backup-and-share.md) · [한국어](../../ko/how-to/backup-and-share.md) · [Español](../../es/how-to/backup-and-share.md) · [Français](../../fr/how-to/backup-and-share.md) · [Italiano](../../it/how-to/backup-and-share.md) · [Português (BR)](../../pt-BR/how-to/backup-and-share.md) · [Português (PT)](../../pt-PT/how-to/backup-and-share.md) · [Русский](../../ru/how-to/backup-and-share.md) · [العربية](../../ar/how-to/backup-and-share.md) · [हिन्दी](../../hi/how-to/backup-and-share.md) · **বাংলা** · [Tiếng Việt](../../vi/how-to/backup-and-share.md)
 
 Veles প্রজেক্টগুলো পোর্টেবল। ব্যাকআপ বা migration-এর জন্য একটি প্রজেক্টকে একটিমাত্র `.tar.gz`
 bundle-এ export করুন, অথবা আপনার ডেটা ফাঁস না করে শেয়ার করার জন্য একটি sanitised template export করুন।

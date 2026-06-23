@@ -1,6 +1,6 @@
 # CLI 參考
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/cli.md)
+> 🌐 **語言：** [English](../../en/reference/cli.md) · [简体中文](../../zh-CN/reference/cli.md) · **繁體中文** · [日本語](../../ja/reference/cli.md) · [한국어](../../ko/reference/cli.md) · [Español](../../es/reference/cli.md) · [Français](../../fr/reference/cli.md) · [Italiano](../../it/reference/cli.md) · [Português (BR)](../../pt-BR/reference/cli.md) · [Português (PT)](../../pt-PT/reference/cli.md) · [Русский](../../ru/reference/cli.md) · [العربية](../../ar/reference/cli.md) · [हिन्दी](../../hi/reference/cli.md) · [বাংলা](../../bn/reference/cli.md) · [Tiếng Việt](../../vi/reference/cli.md)
 
 涵蓋每一個 Veles 命令、子命令與旗標。執行 `veles <command> --help` 可取得權威且永遠最新的簽章——本頁面對應 `src/veles/cli/_parsers/` 中的引數解析器。
 

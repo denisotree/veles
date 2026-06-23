@@ -1,6 +1,6 @@
 # 멀티 에이전트 오케스트레이션
 
-> 🌐 **언어:** **English** · [Русский](../../ru/explanation/multi-agent-orchestration.md)
+> 🌐 **언어:** [English](../../en/explanation/multi-agent-orchestration.md) · [简体中文](../../zh-CN/explanation/multi-agent-orchestration.md) · [繁體中文](../../zh-TW/explanation/multi-agent-orchestration.md) · [日本語](../../ja/explanation/multi-agent-orchestration.md) · **한국어** · [Español](../../es/explanation/multi-agent-orchestration.md) · [Français](../../fr/explanation/multi-agent-orchestration.md) · [Italiano](../../it/explanation/multi-agent-orchestration.md) · [Português (BR)](../../pt-BR/explanation/multi-agent-orchestration.md) · [Português (PT)](../../pt-PT/explanation/multi-agent-orchestration.md) · [Русский](../../ru/explanation/multi-agent-orchestration.md) · [العربية](../../ar/explanation/multi-agent-orchestration.md) · [हिन्दी](../../hi/explanation/multi-agent-orchestration.md) · [বাংলা](../../bn/explanation/multi-agent-orchestration.md) · [Tiếng Việt](../../vi/explanation/multi-agent-orchestration.md)
 
 복잡한 작업의 경우, Veles는 모든 것을 하나의 컨텍스트에서 처리하는 대신 **매니저**와
 전문화된 **워커** 서브 에이전트 간에 작업을 분할할 수 있습니다. 이 페이지는 그 모델을

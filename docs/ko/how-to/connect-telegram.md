@@ -1,6 +1,6 @@
 # Telegram 채널 연결 방법
 
-> 🌐 **언어:** **English** · [Русский](../../ru/how-to/connect-telegram.md)
+> 🌐 **언어:** [English](../../en/how-to/connect-telegram.md) · [简体中文](../../zh-CN/how-to/connect-telegram.md) · [繁體中文](../../zh-TW/how-to/connect-telegram.md) · [日本語](../../ja/how-to/connect-telegram.md) · **한국어** · [Español](../../es/how-to/connect-telegram.md) · [Français](../../fr/how-to/connect-telegram.md) · [Italiano](../../it/how-to/connect-telegram.md) · [Português (BR)](../../pt-BR/how-to/connect-telegram.md) · [Português (PT)](../../pt-PT/how-to/connect-telegram.md) · [Русский](../../ru/how-to/connect-telegram.md) · [العربية](../../ar/how-to/connect-telegram.md) · [हिन्दी](../../hi/how-to/connect-telegram.md) · [বাংলা](../../bn/how-to/connect-telegram.md) · [Tiếng Việt](../../vi/how-to/connect-telegram.md)
 
 Telegram에서 Veles 프로젝트와 대화하세요. 채널은 메시지를 [데몬](run-as-daemon.md)에
 전달하고 응답을 스트리밍하는 게이트웨이입니다. 각 채팅은 자체적인 대화 세션을 갖습니다.

@@ -1,6 +1,6 @@
 # किसी project का backup और share कैसे करें
 
-> 🌐 **भाषाएँ:** **English** · [Русский](../../ru/how-to/backup-and-share.md)
+> 🌐 **भाषाएँ:** [English](../../en/how-to/backup-and-share.md) · [简体中文](../../zh-CN/how-to/backup-and-share.md) · [繁體中文](../../zh-TW/how-to/backup-and-share.md) · [日本語](../../ja/how-to/backup-and-share.md) · [한국어](../../ko/how-to/backup-and-share.md) · [Español](../../es/how-to/backup-and-share.md) · [Français](../../fr/how-to/backup-and-share.md) · [Italiano](../../it/how-to/backup-and-share.md) · [Português (BR)](../../pt-BR/how-to/backup-and-share.md) · [Português (PT)](../../pt-PT/how-to/backup-and-share.md) · [Русский](../../ru/how-to/backup-and-share.md) · [العربية](../../ar/how-to/backup-and-share.md) · **हिन्दी** · [বাংলা](../../bn/how-to/backup-and-share.md) · [Tiếng Việt](../../vi/how-to/backup-and-share.md)
 
 Veles projects portable होते हैं। backup या migration के लिए किसी project को एक
 ही `.tar.gz` bundle में export करें, या अपने data को लीक किए बिना share करने के

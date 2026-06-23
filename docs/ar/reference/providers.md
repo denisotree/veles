@@ -1,6 +1,6 @@
 # المزوّدون
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/providers.md)
+> 🌐 **اللغات:** [English](../../en/reference/providers.md) · [简体中文](../../zh-CN/reference/providers.md) · [繁體中文](../../zh-TW/reference/providers.md) · [日本語](../../ja/reference/providers.md) · [한국어](../../ko/reference/providers.md) · [Español](../../es/reference/providers.md) · [Français](../../fr/reference/providers.md) · [Italiano](../../it/reference/providers.md) · [Português (BR)](../../pt-BR/reference/providers.md) · [Português (PT)](../../pt-PT/reference/providers.md) · [Русский](../../ru/reference/providers.md) · **العربية** · [हिन्दी](../../hi/reference/providers.md) · [বাংলা](../../bn/reference/providers.md) · [Tiếng Việt](../../vi/reference/providers.md)
 
 Veles مستقل عن المزوّد. مرّر `--provider <name>` إلى أي أمر وكيل، أو اضبط
 مزوّدًا افتراضيًا في الإعداد. تستخدم معرّفات النماذج تسمية المزوّد نفسه.

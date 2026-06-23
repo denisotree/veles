@@ -1,6 +1,6 @@
 # 設定參考
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/configuration.md)
+> 🌐 **語言：** [English](../../en/reference/configuration.md) · [简体中文](../../zh-CN/reference/configuration.md) · **繁體中文** · [日本語](../../ja/reference/configuration.md) · [한국어](../../ko/reference/configuration.md) · [Español](../../es/reference/configuration.md) · [Français](../../fr/reference/configuration.md) · [Italiano](../../it/reference/configuration.md) · [Português (BR)](../../pt-BR/reference/configuration.md) · [Português (PT)](../../pt-PT/reference/configuration.md) · [Русский](../../ru/reference/configuration.md) · [العربية](../../ar/reference/configuration.md) · [हिन्दी](../../hi/reference/configuration.md) · [বাংলা](../../bn/reference/configuration.md) · [Tiếng Việt](../../vi/reference/configuration.md)
 
 Veles 由兩個 TOML 檔案與一組狀態目錄來設定。機密（API 金鑰、機器人權杖）**絕不會**寫入這些檔案——它們存放在 OS 鑰匙圈或環境變數中（參見[環境變數](environment-variables.md)）。
 

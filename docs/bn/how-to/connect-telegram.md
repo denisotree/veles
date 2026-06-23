@@ -1,6 +1,6 @@
 # একটি Telegram channel কীভাবে যুক্ত করবেন
 
-> 🌐 **Languages:** [English](../../en/how-to/connect-telegram.md) · [Русский](../../ru/how-to/connect-telegram.md) · **বাংলা**
+> 🌐 **ভাষা:** [English](../../en/how-to/connect-telegram.md) · [简体中文](../../zh-CN/how-to/connect-telegram.md) · [繁體中文](../../zh-TW/how-to/connect-telegram.md) · [日本語](../../ja/how-to/connect-telegram.md) · [한국어](../../ko/how-to/connect-telegram.md) · [Español](../../es/how-to/connect-telegram.md) · [Français](../../fr/how-to/connect-telegram.md) · [Italiano](../../it/how-to/connect-telegram.md) · [Português (BR)](../../pt-BR/how-to/connect-telegram.md) · [Português (PT)](../../pt-PT/how-to/connect-telegram.md) · [Русский](../../ru/how-to/connect-telegram.md) · [العربية](../../ar/how-to/connect-telegram.md) · [हिन्दी](../../hi/how-to/connect-telegram.md) · **বাংলা** · [Tiếng Việt](../../vi/how-to/connect-telegram.md)
 
 Telegram থেকে একটি Veles প্রজেক্টের সাথে কথা বলুন। একটি channel হলো একটি gateway যা মেসেজ একটি
 [daemon](run-as-daemon.md)-এ ফরোয়ার্ড করে এবং উত্তর stream করে ফিরিয়ে আনে। প্রতিটি chat তার

@@ -1,6 +1,6 @@
 # Skills e ferramentas como capacidade acumulada
 
-> 🌐 **Idiomas:** **English** · [Русский](../../ru/explanation/skills-and-tools.md)
+> 🌐 **Idiomas:** [English](../../en/explanation/skills-and-tools.md) · [简体中文](../../zh-CN/explanation/skills-and-tools.md) · [繁體中文](../../zh-TW/explanation/skills-and-tools.md) · [日本語](../../ja/explanation/skills-and-tools.md) · [한국어](../../ko/explanation/skills-and-tools.md) · [Español](../../es/explanation/skills-and-tools.md) · [Français](../../fr/explanation/skills-and-tools.md) · [Italiano](../../it/explanation/skills-and-tools.md) · **Português (BR)** · [Português (PT)](../../pt-PT/explanation/skills-and-tools.md) · [Русский](../../ru/explanation/skills-and-tools.md) · [العربية](../../ar/explanation/skills-and-tools.md) · [हिन्दी](../../hi/explanation/skills-and-tools.md) · [বাংলা](../../bn/explanation/skills-and-tools.md) · [Tiếng Việt](../../vi/explanation/skills-and-tools.md)
 
 O Veles começa com um conjunto mínimo de ferramentas e skills e o **expande** à
 medida que trabalha. Esta página explica a diferença entre os dois e como eles se

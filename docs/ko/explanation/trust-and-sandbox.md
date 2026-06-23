@@ -1,6 +1,6 @@
 # 신뢰와 샌드박스
 
-> 🌐 **언어:** **English** · [Русский](../../ru/explanation/trust-and-sandbox.md)
+> 🌐 **언어:** [English](../../en/explanation/trust-and-sandbox.md) · [简体中文](../../zh-CN/explanation/trust-and-sandbox.md) · [繁體中文](../../zh-TW/explanation/trust-and-sandbox.md) · [日本語](../../ja/explanation/trust-and-sandbox.md) · **한국어** · [Español](../../es/explanation/trust-and-sandbox.md) · [Français](../../fr/explanation/trust-and-sandbox.md) · [Italiano](../../it/explanation/trust-and-sandbox.md) · [Português (BR)](../../pt-BR/explanation/trust-and-sandbox.md) · [Português (PT)](../../pt-PT/explanation/trust-and-sandbox.md) · [Русский](../../ru/explanation/trust-and-sandbox.md) · [العربية](../../ar/explanation/trust-and-sandbox.md) · [हिन्दी](../../hi/explanation/trust-and-sandbox.md) · [বাংলা](../../bn/explanation/trust-and-sandbox.md) · [Tiếng Việt](../../vi/explanation/trust-and-sandbox.md)
 
 Veles는 여러분의 머신에서 자율 에이전트를 실행하므로, 에이전트가 할 수 있는 것을
 제한합니다. 두 가지 메커니즘이 함께 작동합니다: 민감한 동작을 위한 **신뢰 사다리**와

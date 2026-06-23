@@ -1,6 +1,6 @@
 # প্রোজেক্ট মেমরি ও লার্নিং লুপ
 
-> 🌐 **ভাষা:** [English](../../en/explanation/project-memory-and-learning-loop.md) · [Русский](../../ru/explanation/project-memory-and-learning-loop.md) · **বাংলা**
+> 🌐 **ভাষা:** [English](../../en/explanation/project-memory-and-learning-loop.md) · [简体中文](../../zh-CN/explanation/project-memory-and-learning-loop.md) · [繁體中文](../../zh-TW/explanation/project-memory-and-learning-loop.md) · [日本語](../../ja/explanation/project-memory-and-learning-loop.md) · [한국어](../../ko/explanation/project-memory-and-learning-loop.md) · [Español](../../es/explanation/project-memory-and-learning-loop.md) · [Français](../../fr/explanation/project-memory-and-learning-loop.md) · [Italiano](../../it/explanation/project-memory-and-learning-loop.md) · [Português (BR)](../../pt-BR/explanation/project-memory-and-learning-loop.md) · [Português (PT)](../../pt-PT/explanation/project-memory-and-learning-loop.md) · [Русский](../../ru/explanation/project-memory-and-learning-loop.md) · [العربية](../../ar/explanation/project-memory-and-learning-loop.md) · [हिन्दी](../../hi/explanation/project-memory-and-learning-loop.md) · **বাংলা** · [Tiếng Việt](../../vi/explanation/project-memory-and-learning-loop.md)
 
 Veles-এর সংজ্ঞায়ক বৈশিষ্ট্য হলো এটি প্রতি প্রোজেক্টে **মনে রাখে** এবং **শেখে**। এই
 পেজে ব্যাখ্যা করা হয়েছে সেই মেমরিটি কী এবং লার্নিং লুপ কীভাবে এটিকে কার্যকর রাখে।

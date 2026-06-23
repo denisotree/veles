@@ -1,6 +1,6 @@
 # 專案結構與狀態
 
-> 🌐 **語言：** **English** · [Русский](../../ru/reference/project-layout.md)
+> 🌐 **語言：** [English](../../en/reference/project-layout.md) · [简体中文](../../zh-CN/reference/project-layout.md) · **繁體中文** · [日本語](../../ja/reference/project-layout.md) · [한국어](../../ko/reference/project-layout.md) · [Español](../../es/reference/project-layout.md) · [Français](../../fr/reference/project-layout.md) · [Italiano](../../it/reference/project-layout.md) · [Português (BR)](../../pt-BR/reference/project-layout.md) · [Português (PT)](../../pt-PT/reference/project-layout.md) · [Русский](../../ru/reference/project-layout.md) · [العربية](../../ar/reference/project-layout.md) · [हिन्दी](../../hi/reference/project-layout.md) · [বাংলা](../../bn/reference/project-layout.md) · [Tiếng Việt](../../vi/reference/project-layout.md)
 
 `veles init` 會建立什麼、Veles 把狀態存放在哪裡，以及專案記憶的 schema。
 

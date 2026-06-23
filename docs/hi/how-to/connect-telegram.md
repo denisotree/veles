@@ -1,6 +1,6 @@
 # Telegram channel कैसे connect करें
 
-> 🌐 **भाषाएँ:** **English** · [Русский](../../ru/how-to/connect-telegram.md)
+> 🌐 **भाषाएँ:** [English](../../en/how-to/connect-telegram.md) · [简体中文](../../zh-CN/how-to/connect-telegram.md) · [繁體中文](../../zh-TW/how-to/connect-telegram.md) · [日本語](../../ja/how-to/connect-telegram.md) · [한국어](../../ko/how-to/connect-telegram.md) · [Español](../../es/how-to/connect-telegram.md) · [Français](../../fr/how-to/connect-telegram.md) · [Italiano](../../it/how-to/connect-telegram.md) · [Português (BR)](../../pt-BR/how-to/connect-telegram.md) · [Português (PT)](../../pt-PT/how-to/connect-telegram.md) · [Русский](../../ru/how-to/connect-telegram.md) · [العربية](../../ar/how-to/connect-telegram.md) · **हिन्दी** · [বাংলা](../../bn/how-to/connect-telegram.md) · [Tiếng Việt](../../vi/how-to/connect-telegram.md)
 
 किसी Veles project से Telegram के ज़रिए बात करें। एक channel ऐसा gateway है जो
 messages को किसी [daemon](run-as-daemon.md) तक forward करता है और replies वापस stream करता है।

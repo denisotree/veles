@@ -1,6 +1,6 @@
 # 运行模式
 
-> 🌐 **Languages:** [English](../../en/explanation/modes.md) · [Русский](../../ru/explanation/modes.md) · **简体中文**
+> 🌐 **语言：** [English](../../en/explanation/modes.md) · **简体中文** · [繁體中文](../../zh-TW/explanation/modes.md) · [日本語](../../ja/explanation/modes.md) · [한국어](../../ko/explanation/modes.md) · [Español](../../es/explanation/modes.md) · [Français](../../fr/explanation/modes.md) · [Italiano](../../it/explanation/modes.md) · [Português (BR)](../../pt-BR/explanation/modes.md) · [Português (PT)](../../pt-PT/explanation/modes.md) · [Русский](../../ru/explanation/modes.md) · [العربية](../../ar/explanation/modes.md) · [हिन्दी](../../hi/explanation/modes.md) · [বাংলা](../../bn/explanation/modes.md) · [Tiếng Việt](../../vi/explanation/modes.md)
 
 在 TUI 中，每条提示都由一个 **运行模式** 处理 —— 一种决定本轮获得多少自主权、使用哪些工具的策略。用 `Shift+Tab` 循环切换模式；顺序为 `auto → planning → writing → goal`。
 

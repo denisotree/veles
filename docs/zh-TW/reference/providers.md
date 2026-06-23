@@ -1,6 +1,6 @@
 # Providers
 
-> 🌐 **Languages:** **English** · [Русский](../../ru/reference/providers.md)
+> 🌐 **語言：** [English](../../en/reference/providers.md) · [简体中文](../../zh-CN/reference/providers.md) · **繁體中文** · [日本語](../../ja/reference/providers.md) · [한국어](../../ko/reference/providers.md) · [Español](../../es/reference/providers.md) · [Français](../../fr/reference/providers.md) · [Italiano](../../it/reference/providers.md) · [Português (BR)](../../pt-BR/reference/providers.md) · [Português (PT)](../../pt-PT/reference/providers.md) · [Русский](../../ru/reference/providers.md) · [العربية](../../ar/reference/providers.md) · [हिन्दी](../../hi/reference/providers.md) · [বাংলা](../../bn/reference/providers.md) · [Tiếng Việt](../../vi/reference/providers.md)
 
 Veles 與供應商無關。對任何代理命令傳入 `--provider <name>`，或在設定中指定一個預設值。模型 ID 採用各供應商自有的命名方式。
 

@@ -1,6 +1,6 @@
 # نظرة عامة على البنية
 
-> 🌐 **اللغات:** **English** · [Русский](../../ru/explanation/architecture.md)
+> 🌐 **اللغات:** [English](../../en/explanation/architecture.md) · [简体中文](../../zh-CN/explanation/architecture.md) · [繁體中文](../../zh-TW/explanation/architecture.md) · [日本語](../../ja/explanation/architecture.md) · [한국어](../../ko/explanation/architecture.md) · [Español](../../es/explanation/architecture.md) · [Français](../../fr/explanation/architecture.md) · [Italiano](../../it/explanation/architecture.md) · [Português (BR)](../../pt-BR/explanation/architecture.md) · [Português (PT)](../../pt-PT/explanation/architecture.md) · [Русский](../../ru/explanation/architecture.md) · **العربية** · [हिन्दी](../../hi/explanation/architecture.md) · [বাংলা](../../bn/explanation/architecture.md) · [Tiếng Việt](../../vi/explanation/architecture.md)
 
 تشرح هذه الصفحة *ماهية* Veles وكيف تتلاءم أجزاؤه معًا، حتى تصبح بقية
 الوثائق مفهومة. للاطلاع على رؤية المنتج المرجعية، راجع `VISION.md` في
