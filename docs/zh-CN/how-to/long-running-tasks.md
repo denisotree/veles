@@ -2,7 +2,7 @@
 
 > 🌐 **语言：** [English](../../en/how-to/long-running-tasks.md) · **简体中文** · [繁體中文](../../zh-TW/how-to/long-running-tasks.md) · [日本語](../../ja/how-to/long-running-tasks.md) · [한국어](../../ko/how-to/long-running-tasks.md) · [Español](../../es/how-to/long-running-tasks.md) · [Français](../../fr/how-to/long-running-tasks.md) · [Italiano](../../it/how-to/long-running-tasks.md) · [Português (BR)](../../pt-BR/how-to/long-running-tasks.md) · [Português (PT)](../../pt-PT/how-to/long-running-tasks.md) · [Русский](../../ru/how-to/long-running-tasks.md) · [العربية](../../ar/how-to/long-running-tasks.md) · [हिन्दी](../../hi/how-to/long-running-tasks.md) · [বাংলা](../../bn/how-to/long-running-tasks.md) · [Tiếng Việt](../../vi/how-to/long-running-tasks.md)
 
-除了单条提示之外，Veles 还能带着预算去推进多步骤的**目标（goals）**、运行**定时作业（scheduled jobs）**、通过**做梦（dream）**来整合内存、并行地在网络上做**研究（research）**，并把工作拆解到一个**管理者（manager）**和子智能体之间。
+除了单条提示之外，Veles 还能带着预算去推进多步骤的**目标（goals）**、运行**定时作业（scheduled jobs）**、通过**做梦（dream）**来整合记忆、并行地在网络上做**研究（research）**，并把工作拆解到一个**管理者（manager）**和子智能体之间。
 
 ## 目标（Goals）——带预算和检查点的目的
 
@@ -47,9 +47,9 @@ veles job tick                  # run due jobs now, no daemon needed
 
 用 `--deliver-to telegram:<chat_id>` 把作业输出投递到某个频道。
 
-## 做梦（Dreaming）——后台内存整合
+## 做梦（Dreaming）——后台记忆整合
 
-`dream` 会提取洞见、对技能去重、给出晋升建议，并对 wiki 做 lint——在你无需等待的情况下保持内存新鲜：
+`dream` 会提取洞见、对技能去重、给出晋升建议，并对 wiki 做 lint——在你无需等待的情况下保持记忆新鲜：
 
 ```bash
 veles dream

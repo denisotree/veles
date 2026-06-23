@@ -17,7 +17,7 @@ d'environnement (voir [variables d'environnement](environment-variables.md)).
 | `<project>/wiki/`, `sources/` | Projet | Contenu utilisateur (la mise en page LLM-Wiki par défaut) |
 
 `VELES_USER_HOME` redirige `~` (l'état utilisateur se retrouve donc dans `<override>/.veles/`).
-Voir [structure du projet](project-layout.md) pour l'arborescence complète.
+Voir [mise en page du projet](project-layout.md) pour l'arborescence complète.
 
 ---
 

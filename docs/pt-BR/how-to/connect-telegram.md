@@ -26,7 +26,7 @@ Ou anexe a uma sessão de daemon nomeada específica:
 veles channel add --channel telegram --session api
 ```
 
-Você também pode fazer isso a partir do [TUI seletor de daemon](run-as-daemon.md#the-daemon-picker-tui):
+Você também pode fazer isso a partir da [TUI de seleção de daemon](run-as-daemon.md#the-daemon-picker-tui):
 pressione `c` em um daemon e siga as instruções.
 
 Isso produz um bloco de configuração:

@@ -71,6 +71,6 @@ veles route refresh --force    # even if AGENTS.md hasn't changed
 5. 사용자 `[routing.tasks][task]` / `.default`
 6. 사용자 `[user] default_provider` + `default_model`
 
-이 중 어느 것도 해석되지 않으면 **하드코딩된 폴백은 없습니다** — 태스크는 설정되지 않은 채로 남고, 그 호출자는 (해당 기능을 건너뛰며) 우아하게 degrade되거나 명확하게 오류를 냅니다. 조용히 클라우드 모델을 끌어다 쓰지 않습니다.
+이 중 어느 것도 해석되지 않으면 **하드코딩된 폴백은 없습니다** — 태스크는 설정되지 않은 채로 남고, 그 호출자는 (해당 기능을 건너뛰며) 우아하게 성능을 낮추거나 명확하게 오류를 냅니다. 조용히 클라우드 모델을 끌어다 쓰지 않습니다.
 
 (`embedding`은 catch-all을 건너뜁니다 — 챗 모델은 임베딩 모델이 아니므로 — 따라서 오직 명시적인 `[routing.tasks].embedding`만이 이를 충족합니다.)

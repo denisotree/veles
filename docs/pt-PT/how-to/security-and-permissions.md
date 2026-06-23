@@ -10,7 +10,7 @@ coloca o acesso a ficheiros numa sandbox e mantém os segredos no porta-chaves
 ## A escada de confiança
 
 As ferramentas sensíveis (`run_shell`, `write_file`, `fetch_url`, …) pedem
-confirmação antes de executar. Você escolhe: permitir **uma vez**, **sempre
+confirmação antes de executar. Escolhe: permitir **uma vez**, **sempre
 para este projeto**, **sempre em todo o lado** ou **recusar**. As autorizações
 persistem, pelo que não voltará a ser questionado.
 

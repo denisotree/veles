@@ -99,7 +99,7 @@ veles sessions search "three sentences"
 
 ## Adónde ir después
 
-- **[Crear una base de conocimiento](building-a-knowledge-base.md)** — ingiere fuentes
+- **[Construir una base de conocimiento](building-a-knowledge-base.md)** — ingiere fuentes
   en la wiki y hazle preguntas sobre ellas.
 - **[Configurar proveedores](../how-to/configure-providers.md)** — cambia a
   Anthropic, OpenAI, Gemini o un modelo totalmente local.

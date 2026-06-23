@@ -80,7 +80,7 @@ per l'avanzamento per turno:
 veles run --stream "What files exist in this project right now?"
 ```
 
-## 5. Aprire la REPL interattiva
+## 5. Aprire il REPL interattivo
 
 Per una conversazione a più turni, apri la TUI:
 

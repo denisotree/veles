@@ -60,7 +60,7 @@ veles init my-notes
 veles run "Read AGENTS.md and describe this project in three sentences."
 ```
 
-Veles 会加载你的项目上下文、调用模型并打印答案。这一回合会被保存到项目的内存中。
+Veles 会加载你的项目上下文、调用模型并打印答案。这一回合会被保存到项目的记忆中。
 
 加上 `--stream` 可以看到逐 token 抵达的内容，或加上 `--verbose` 查看每回合的进度：
 

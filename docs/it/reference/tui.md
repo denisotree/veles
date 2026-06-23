@@ -51,5 +51,5 @@ Digita `/` nel composer; `Tab` completa. I comandi registrati sono:
 ## Temi
 
 Temi integrati: `everforest` (default), `dracula`, `gruvbox`, `tokyo-night`,
-`catppuccin`. Sceglone uno con `Ctrl+T`, `veles tui --theme <name>`, o
+`catppuccin`. Scegline uno con `Ctrl+T`, `veles tui --theme <name>`, o
 `[user] tui_theme` in `~/.veles/config.toml`.

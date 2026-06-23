@@ -64,7 +64,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 ## 运行 agent
 
 ### `veles run "<prompt>"`
-端到端运行单个 prompt，带内存持久化以及 curator/学习触发器。接受所有[共享 agent-loop 参数](#shared-agent-loop-flags)，外加：
+端到端运行单个 prompt，带记忆持久化以及 curator/学习触发器。接受所有[共享 agent-loop 参数](#shared-agent-loop-flags)，外加：
 
 | 参数 | 默认值 | 用途 |
 |---|---|---|
@@ -112,7 +112,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 外加共享 agent-loop 参数。
 
 ### `veles dream`
-运行一轮后台内存巩固循环（insights → skill 去重 → 晋升建议 → wiki lint，可选 LLM 巩固）。
+运行一轮后台记忆巩固循环（insights → skill 去重 → 晋升建议 → wiki lint，可选 LLM 巩固）。
 
 | 参数 | 默认值 | 用途 |
 |---|---|---|
@@ -168,7 +168,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 ---
 
-## Sessions 与内存
+## Sessions 与记忆
 
 ### `veles sessions {list,show,delete,search}`
 

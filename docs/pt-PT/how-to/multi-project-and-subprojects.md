@@ -9,7 +9,7 @@ memórias delimitadas.
 
 ## Projetos
 
-O Veles descobre o projeto ativo subindo a partir da sua cwd até a um diretório
+O Veles descobre o projeto ativo subindo a partir da sua cwd até um diretório
 `.veles/` (tal como o `git`). Gira o registo:
 
 ```bash

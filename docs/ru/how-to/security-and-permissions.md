@@ -3,7 +3,7 @@
 > 🌐 **Языки:** [English](../../en/how-to/security-and-permissions.md) · [简体中文](../../zh-CN/how-to/security-and-permissions.md) · [繁體中文](../../zh-TW/how-to/security-and-permissions.md) · [日本語](../../ja/how-to/security-and-permissions.md) · [한국어](../../ko/how-to/security-and-permissions.md) · [Español](../../es/how-to/security-and-permissions.md) · [Français](../../fr/how-to/security-and-permissions.md) · [Italiano](../../it/how-to/security-and-permissions.md) · [Português (BR)](../../pt-BR/how-to/security-and-permissions.md) · [Português (PT)](../../pt-PT/how-to/security-and-permissions.md) · **Русский** · [العربية](../../ar/how-to/security-and-permissions.md) · [हिन्दी](../../hi/how-to/security-and-permissions.md) · [বাংলা](../../bn/how-to/security-and-permissions.md) · [Tiếng Việt](../../vi/how-to/security-and-permissions.md)
 
 Veles ограничивает опасные действия через **лестницу доверия**, изолирует доступ к
-файлам в песочнице и хранит секреты в ключнице ОС. Обоснование см. в
+файлам в песочнице и хранит секреты в keychain ОС. Обоснование см. в
 [доверие и песочница](../explanation/trust-and-sandbox.md).
 
 ## Лестница доверия
@@ -45,7 +45,7 @@ veles autopilot disable
 
 ## Секреты
 
-API-ключи и токены ботов хранятся в ключнице ОС, никогда в конфигурационных файлах:
+API-ключи и токены ботов хранятся в keychain ОС, никогда в конфигурационных файлах:
 
 ```bash
 veles secret set OPENROUTER_API_KEY       # prompts (or pipe via stdin)

@@ -19,7 +19,7 @@
 
 Вы подаёте источники; Veles перегоняет их в связанные wiki-страницы; вы запрашиваете
 wiki на естественном языке. Зачем это нужно — см.
-[layout-паки и LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).
+[layout-пакеты и LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).
 
 ## 1. Загрузите источник
 

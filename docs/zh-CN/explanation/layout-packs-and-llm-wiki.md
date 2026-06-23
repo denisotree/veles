@@ -29,4 +29,4 @@
 
 ## 它 *不是* 什么
 
-布局只管辖 **你的内容**。Veles 自身的项目内存 —— `memory.db` 加上 `.veles/memory/` 产物树（洞见、会话摘要、提案、系统操作日志）—— 属于系统侧，在任何布局下都以相同方式工作。切换布局绝不会触及学习循环、会话或注册表。参阅 [架构](architecture.md) 和 [项目布局](../reference/project-layout.md)。
+布局只管辖 **你的内容**。Veles 自身的项目记忆 —— `memory.db` 加上 `.veles/memory/` 产物树（洞见、会话摘要、提案、系统操作日志）—— 属于系统侧，在任何布局下都以相同方式工作。切换布局绝不会触及学习循环、会话或注册表。参阅 [架构](architecture.md) 和 [项目布局](../reference/project-layout.md)。

@@ -56,7 +56,7 @@ veles route reset              # all tasks back to default
 ## Pistas en lenguaje natural en AGENTS.md
 
 Puedes expresar el enrutamiento en prosa en `AGENTS.md` (p. ej. "usa un modelo barato para
-la compresión"). Veles las analiza en un `routing.nl.toml` autogenerado:
+la compresión"). Veles analiza estas pistas en un `routing.nl.toml` autogenerado:
 
 ```bash
 veles route refresh            # re-parse AGENTS.md hints

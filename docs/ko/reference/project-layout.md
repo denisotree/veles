@@ -28,9 +28,9 @@ my-project/                  # veles init  (default llm-wiki layout)
     └── skills/              # project-local skills
 ```
 
-`--layout notes`를 사용하면 콘텐츠 부분이 단일 `notes/` 디렉토리가 되고, `--layout bare`를 사용하면 콘텐츠 스캐폴드가 전혀 생성되지 않습니다. `wiki/INDEX.md`(온디맨드 카탈로그)는 위키가 성장함에 따라 생성됩니다. `config.toml`, `tools/`, `plans/`는 무언가를 설정하거나, 에이전트가 도구를 작성하거나, 목표를 실행할 때 `.veles/` 아래에 나타납니다.
+`--layout notes`를 사용하면 콘텐츠 부분이 단일 `notes/` 디렉터리가 되고, `--layout bare`를 사용하면 콘텐츠 스캐폴드가 전혀 생성되지 않습니다. `wiki/INDEX.md`(온디맨드 카탈로그)는 위키가 성장함에 따라 생성됩니다. `config.toml`, `tools/`, `plans/`는 무언가를 설정하거나, 에이전트가 도구를 작성하거나, 목표를 실행할 때 `.veles/` 아래에 나타납니다.
 
-## 상태 디렉토리
+## 상태 디렉터리
 
 | 경로 | 범위 | 커밋 여부 |
 |---|---|---|

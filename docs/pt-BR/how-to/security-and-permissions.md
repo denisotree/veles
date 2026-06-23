@@ -11,7 +11,7 @@ entender o porquê, veja [confiança & sandbox](../explanation/trust-and-sandbox
 Tools sensíveis (`run_shell`, `write_file`, `fetch_url`, …) pedem confirmação antes de
 executar. Você escolhe: permitir **uma vez**, **sempre para este projeto**, **sempre em
 todo lugar** ou **recusar**. As permissões concedidas são persistidas, então você não é
-perguntado de novo.
+questionado de novo.
 
 Gerencie as permissões sem esperar por um prompt:
 

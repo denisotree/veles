@@ -43,7 +43,7 @@ chaque action de l'autopilote est journalisée pour revue.
 Un garde-chemins borne où les outils peuvent lire et écrire :
 
 - **Lecture** — à l'intérieur du projet actif (et de ses sous-projets) plus `~/.veles/`.
-- **Écriture** — uniquement les zones inscriptibles de la disposition (par ex. `wiki/`) ;
+- **Écriture** — uniquement les zones inscriptibles de la mise en page (par ex. `wiki/`) ;
   `.veles/` est toujours inscriptible pour l'état machine.
 
 Les liens symboliques qui s'échappent du bac à sable sont rejetés, et la traversée par `..`
