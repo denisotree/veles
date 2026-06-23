@@ -74,6 +74,10 @@ For each task, the first layer that yields a spec wins:
 4. project `[provider]` base
 5. user `[routing.tasks][task]` / `.default`
 6. user `[user] default_provider` + `default_model`
-7. built-in default for that task
 
-(`embedding` skips the catch-alls — a chat model is not an embedding model.)
+If none of these resolves, there is **no hardcoded fallback** — the task is left
+unset and its caller degrades (skips the feature) or errors clearly, rather than
+silently reaching for a cloud model.
+
+(`embedding` skips the catch-alls — a chat model is not an embedding model — so
+only an explicit `[routing.tasks].embedding` answers it.)

@@ -19,7 +19,8 @@ Put a base in `<project>/.veles/config.toml`:
 
 ```toml
 [provider]
-default = "openrouter:anthropic/claude-sonnet-4.6"
+default = "openrouter"                 # provider name
+model = "anthropic/claude-sonnet-4.6"  # model id
 ```
 
 Or a user-global default in `~/.veles/config.toml`:

@@ -27,7 +27,8 @@ its lifetime** — set them before starting:
 ```toml
 # <project>/.veles/config.toml
 [provider]
-default = "ollama:qwen3:4b-instruct"
+default = "ollama"            # provider name
+model = "qwen3:4b-instruct"   # model id
 ```
 
 ## Authentication tokens
