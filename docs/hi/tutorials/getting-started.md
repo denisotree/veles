@@ -99,9 +99,9 @@ veles sessions search "three sentences"
 
 ## आगे कहाँ जाएँ
 
-- **[एक knowledge base बनाना](building-a-knowledge-base.md)** — sources को wiki में
+- **[Building a knowledge base](building-a-knowledge-base.md)** — sources को wiki में
   ingest करें और उनके बारे में सवाल पूछें।
-- **[Providers configure करें](../how-to/configure-providers.md)** — Anthropic,
+- **[Configure providers](../how-to/configure-providers.md)** — Anthropic,
   OpenAI, Gemini, या एक पूरी तरह local model पर switch करें।
-- **[Architecture अवलोकन](../explanation/architecture.md)** — समझें कि Veles
+- **[Architecture overview](../explanation/architecture.md)** — समझें कि Veles
   परदे के पीछे क्या कर रहा है।

@@ -21,7 +21,7 @@ explica o modelo; para o ativar, consulte
   produz a resposta, `advisor` revê. O conjunto é extensível.
 - No final, o gestor escreve um breve relatório na memória.
 
-## Sem jogo do telefone
+## Sem telefone estragado
 
 Uma regra fundamental: os artefactos intermédios chegam ao sintetizador **verbatim**, e
 não como paráfrase do gestor. Os achados de um explorer são entregues diretamente ao

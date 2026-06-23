@@ -23,7 +23,7 @@ structurées :
 - **Carte de l'arborescence du projet** — une carte de fichiers mise en cache et étiquetée
   sémantiquement, afin que l'agent lise les 3 à 5 fichiers pertinents et non toute
   l'arborescence.
-- **Registres de compétences et d'outils** — avec leur télémétrie (compteurs
+- **Registres de skills et d'outils** — avec leur télémétrie (compteurs
   d'utilisation/succès/erreur) que le classement et la déduplication exploitent.
 
 Voir la liste des tables dans
@@ -47,15 +47,15 @@ Après une exécution, un extracteur cherche ce qui mérite d'être retenu : les
 correctif). Il les distille en insights et en règles afin que la même erreur ne se reproduise
 pas.
 
-### Curator — consolider les sessions
-Le curator distille les sessions plus anciennes en mémoire durable : toujours des insights et
+### Curateur — consolider les sessions
+Le curateur distille les sessions plus anciennes en mémoire durable : toujours des insights et
 des règles SQL ; et en plus une page `wiki/sessions/` lorsque la disposition du projet active
 le moteur wiki. Il s'exécute sur des minuteurs d'inactivité / d'après-tour, ou à la demande
 avec `veles curate`.
 
 ### Dreaming — maintenance en arrière-plan
 `veles dream` (et le daemon lorsqu'il est inactif) extrait des insights, déduplique les
-compétences et les insights, suggère des promotions et (sous une disposition wiki) effectue le
+skills et les insights, suggère des promotions et (sous une disposition wiki) effectue le
 lint du wiki — gardant la mémoire fraîche sans vous bloquer. Ajoutez `--include-consolidation`
 pour une passe LLM plus approfondie.
 

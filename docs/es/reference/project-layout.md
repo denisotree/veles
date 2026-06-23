@@ -37,7 +37,7 @@ escribe una herramienta o ejecutas un objetivo.
 
 ## Directorios de estado
 
-| Ruta | Alcance | ¿Versionar? |
+| Ruta | Ámbito | ¿Versionar? |
 |---|---|---|
 | `<project>/AGENTS.md` + contenido del layout (`wiki/`, `sources/`, `notes/`, …) | Contenido del proyecto | **Sí** — es tu base de conocimiento |
 | `<project>/.veles/` | Estado de máquina del proyecto (memoria, configuración, skills/herramientas locales) | No |
@@ -63,7 +63,7 @@ operaciones del sistema). Tablas clave:
 | `tools`, `tool_uses` | Registro de herramientas + telemetría (contadores de uso/éxito/error) |
 | `project_tree` | Mapa de archivos del proyecto cacheado + etiquetas semánticas para ordenar por relevancia |
 
-Consulta [Project memory & the learning loop](../explanation/project-memory-and-learning-loop.md)
+Consulta [La memoria del proyecto y el bucle de aprendizaje](../explanation/project-memory-and-learning-loop.md)
 para ver cómo se escriben y se recuperan.
 
 ## Packs de layout
@@ -72,4 +72,4 @@ para ver cómo se escriben y se recuperan.
 contenido; el pack es dueño del andamiaje, la plantilla de AGENTS.md, las zonas
 escribibles y de si el motor de wiki (herramientas de wiki, inyección del prompt
 INDEX, recuperación de wiki) está activo. Consulta
-[layout packs & the LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).
+[Packs de layout y la LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).

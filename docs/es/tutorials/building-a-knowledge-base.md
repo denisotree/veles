@@ -7,7 +7,7 @@ ingieres unas cuantas fuentes, dejas que Veles escriba páginas de wiki, haces
 preguntas y consolidas lo que aprendiste. Este es el flujo **LLM-Wiki** por
 defecto. Unos 15 minutos.
 
-Antes deberías haber terminado [Getting started](getting-started.md).
+Antes deberías haber terminado [Primeros pasos](getting-started.md).
 
 ## La idea
 
@@ -19,7 +19,7 @@ Un proyecto de Veles tiene dos zonas de contenido:
   en la que escribe contenido).
 
 Le aportas fuentes; Veles las destila en páginas de wiki enlazadas; tú consultas la
-wiki en lenguaje natural. Consulta [layout packs & the LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)
+wiki en lenguaje natural. Consulta [layout packs y la LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)
 para el porqué.
 
 ## 1. Ingerir una fuente
@@ -71,7 +71,7 @@ veles curate
 
 Esto escribe páginas en `wiki/sessions/` y actualiza los insights y las reglas del
 proyecto. Veles también lo hace automáticamente con el tiempo — consulta
-[project memory & the learning loop](../explanation/project-memory-and-learning-loop.md).
+[memoria del proyecto y el bucle de aprendizaje](../explanation/project-memory-and-learning-loop.md).
 
 ## 5. Mantener la wiki sana
 
@@ -91,9 +91,9 @@ Una base de conocimiento autoorganizada: entran fuentes, salen páginas de wiki
 enlazadas, consultable en lenguaje natural, que se ordena mejor a medida que Veles
 consolida. Desde aquí:
 
-- **[Manage skills, tools, and modules](../how-to/manage-skills-and-tools.md)** —
+- **[Gestionar skills, herramientas y módulos](../how-to/manage-skills-and-tools.md)** —
   enseña a Veles flujos de trabajo reutilizables.
-- **[Run as a daemon](../how-to/run-as-daemon.md)** + **[connect Telegram](../how-to/connect-telegram.md)** —
+- **[Ejecutar como daemon](../how-to/run-as-daemon.md)** + **[conectar Telegram](../how-to/connect-telegram.md)** —
   habla con tu base de conocimiento desde el móvil.
-- **[Multiple projects & subprojects](../how-to/multi-project-and-subprojects.md)** —
+- **[Múltiples proyectos y subproyectos](../how-to/multi-project-and-subprojects.md)** —
   escala a muchas bases de conocimiento.

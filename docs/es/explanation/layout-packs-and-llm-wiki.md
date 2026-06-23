@@ -31,7 +31,7 @@ opcionales de skills y plantillas). El manifiesto declara:
 |---|---|
 | `llm-wiki` *(predeterminado)* | La [LLM-Wiki al estilo de Karpathy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): `sources/` (solo lectura), `wiki/` (escribible por el agente), `INDEX.md` inyectado en el prompt, los skills `ingest`/`query`/`lint`, y el engine de wiki activado. |
 | `notes` | Un único directorio plano `notes/` en el que escribe el agente. Sin maquinaria de wiki. |
-| `bare` | Sin scaffold de contenido alguno — para repositorios de código y trabajo de forma libre. Las escrituras son permisivas dentro de la raíz del proyecto (sujetas igualmente a la escala de confianza). |
+| `bare` | Sin scaffold de contenido alguno — para repositorios de código y trabajo de forma libre. Las escrituras son permisivas dentro de la raíz del proyecto (sujetas igualmente a la escalera de confianza). |
 
 ## Layouts personalizados
 

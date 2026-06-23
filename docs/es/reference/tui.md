@@ -21,7 +21,7 @@ plegable.
 | `Tab` | Rotar las sugerencias de autocompletado de comandos de barra |
 | `Up` / `Down` | Historial (y extrae prompts en cola) |
 
-Los modos de ejecución se explican en [Run modes](../explanation/modes.md).
+Los modos de ejecución se explican en [Modos de ejecución](../explanation/modes.md).
 
 ## Comandos de barra
 

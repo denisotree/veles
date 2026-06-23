@@ -34,7 +34,7 @@ ne devrait pas les couvrir silencieusement.
 
 Dans un daemon, un traitement par lot ou tout autre contexte sans TTY, il n'y a pas d'humain à
 interroger, donc Veles **refuse** les actions sensibles par défaut — une entrée stdin
-parasite ne peut pas faufiler une approbation. Pour fonctionner sans surveillance de manière
+parasite ne peut pas glisser une approbation en douce. Pour fonctionner sans surveillance de manière
 délibérée, ouvrez une fenêtre d'[autopilote](../how-to/security-and-permissions.md#autopilot--a-time-boxed-bypass) ;
 chaque action de l'autopilote est journalisée pour revue.
 
@@ -55,5 +55,5 @@ lever le blocage du réseau privé avec `VELES_FETCH_ALLOW_PRIVATE=1` — les de
 
 Le but est une **autonomie utile sans mauvaises surprises** : l'agent peut accomplir un vrai
 travail sans une invite à chaque lecture, mais tout ce qui pourrait endommager votre machine,
-dépenser de l'argent ou sortir de la boîte est verrouillé — une fois, puis mémorisé selon vos
+dépenser de l'argent ou sortir de son périmètre est verrouillé — une fois, puis mémorisé selon vos
 préférences.

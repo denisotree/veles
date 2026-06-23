@@ -14,47 +14,47 @@ cuadrante que se ajuste a lo que necesitas ahora mismo.
 
 Si nunca has ejecutado Veles, haz los dos tutoriales en orden:
 
-1. **[Getting started](tutorials/getting-started.md)** — instala Veles, configura
+1. **[Primeros pasos](tutorials/getting-started.md)** — instala Veles, configura
    una clave API, crea tu primer proyecto y ejecuta tu primer prompt.
-2. **[Building a knowledge base](tutorials/building-a-knowledge-base.md)** — ingiere
+2. **[Construir una base de conocimiento](tutorials/building-a-knowledge-base.md)** — ingiere
    fuentes en la LLM-Wiki, haz preguntas y consolida sesiones.
 
 ## Tutoriales — aprende haciendo
 
-- [Getting started](tutorials/getting-started.md)
-- [Building a knowledge base](tutorials/building-a-knowledge-base.md)
+- [Primeros pasos](tutorials/getting-started.md)
+- [Construir una base de conocimiento](tutorials/building-a-knowledge-base.md)
 
 ## Guías prácticas — completa una tarea
 
-- [Configure providers (cloud & local)](how-to/configure-providers.md)
-- [Route different tasks to different models](how-to/per-task-routing.md)
-- [Run Veles as a daemon](how-to/run-as-daemon.md)
-- [Connect a Telegram channel](how-to/connect-telegram.md)
-- [Manage skills, tools, and modules](how-to/manage-skills-and-tools.md)
-- [Work with multiple projects and subprojects](how-to/multi-project-and-subprojects.md)
-- [Security: trust, autopilot, secrets](how-to/security-and-permissions.md)
-- [Long-running tasks: goals, jobs, dreaming, research](how-to/long-running-tasks.md)
-- [Connect external MCP servers](how-to/external-mcp-servers.md)
-- [Back up and share a project](how-to/backup-and-share.md)
+- [Configurar proveedores (nube y local)](how-to/configure-providers.md)
+- [Enrutar distintas tareas a distintos modelos](how-to/per-task-routing.md)
+- [Ejecutar Veles como daemon](how-to/run-as-daemon.md)
+- [Conectar un canal de Telegram](how-to/connect-telegram.md)
+- [Gestionar skills, herramientas y módulos](how-to/manage-skills-and-tools.md)
+- [Trabajar con múltiples proyectos y subproyectos](how-to/multi-project-and-subprojects.md)
+- [Seguridad: confianza, autopilot, secretos](how-to/security-and-permissions.md)
+- [Tareas de larga duración: goals, jobs, dreaming, research](how-to/long-running-tasks.md)
+- [Conectar servidores MCP externos](how-to/external-mcp-servers.md)
+- [Respaldar y compartir un proyecto](how-to/backup-and-share.md)
 
 ## Referencia — búscalo
 
-- [CLI command reference](reference/cli.md)
-- [Configuration (`config.toml`)](reference/configuration.md)
-- [Environment variables](reference/environment-variables.md)
-- [Providers](reference/providers.md)
-- [TUI keybindings & slash commands](reference/tui.md)
-- [Project layout & state](reference/project-layout.md)
+- [Referencia de comandos de la CLI](reference/cli.md)
+- [Configuración (`config.toml`)](reference/configuration.md)
+- [Variables de entorno](reference/environment-variables.md)
+- [Proveedores](reference/providers.md)
+- [Atajos de teclado y comandos de barra de la TUI](reference/tui.md)
+- [Layout y estado del proyecto](reference/project-layout.md)
 
 ## Explicación — comprende el diseño
 
-- [Architecture overview](explanation/architecture.md)
-- [Project memory & the learning loop](explanation/project-memory-and-learning-loop.md)
-- [Skills & tools as accumulating capability](explanation/skills-and-tools.md)
-- [Run modes](explanation/modes.md)
-- [Multi-agent orchestration](explanation/multi-agent-orchestration.md)
-- [Layout packs & the LLM-Wiki](explanation/layout-packs-and-llm-wiki.md)
-- [Trust & the sandbox](explanation/trust-and-sandbox.md)
+- [Visión general de la arquitectura](explanation/architecture.md)
+- [Memoria del proyecto y el bucle de aprendizaje](explanation/project-memory-and-learning-loop.md)
+- [Skills y herramientas como capacidad acumulativa](explanation/skills-and-tools.md)
+- [Modos de ejecución](explanation/modes.md)
+- [Orquestación multiagente](explanation/multi-agent-orchestration.md)
+- [Layout packs y la LLM-Wiki](explanation/layout-packs-and-llm-wiki.md)
+- [Confianza y el sandbox](explanation/trust-and-sandbox.md)
 
 ---
 

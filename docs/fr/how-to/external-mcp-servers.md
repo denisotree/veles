@@ -110,7 +110,7 @@ distinct, la présence de la configuration fait office d'interrupteur. Chaque ou
 entre dans le registre normal sous la forme `mcp_<server>_<tool>` et est appelable par
 l'agent comme n'importe quel outil intégré. Les schémas sont assainis (limites de
 nom/longueur, suppression des caractères de contrôle) afin qu'un serveur non fiable ne
-puisse pas s'injecter dans le prompt. Les indices d'outils sont mappés sur l'échelle de
+puisse pas s'injecter dans le prompt. Les indications d'outils sont mappées sur l'échelle de
 confiance : les outils destructeurs demandent toujours confirmation, les outils en
 lecture seule ne sont pas soumis à invite, et tout le reste suit le flux de
 [confiance](security-and-permissions.md) habituel — accordez une approbation permanente

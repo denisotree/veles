@@ -28,7 +28,7 @@ comme des données privées.
 
 ## Modèle partageable
 
-N'empaquette que la structure réutilisable — schéma, skills, modules et pages wiki
+N'empaquette que la structure réutilisable — schéma, compétences, modules et pages wiki
 hors session. Il **supprime** `memory.db`, `sources/`, `sessions/`, les autorisations
 de confiance, et caviarde les données personnelles (PII) dans le texte :
 
@@ -37,7 +37,7 @@ veles export template ./my-template.tar.gz
 ```
 
 Transmettez le modèle à un collègue ; il l'importe avec `veles import` et récupère
-votre structure et vos skills, sans votre historique de conversation ni vos sources
+votre structure et vos compétences, sans votre historique de conversation ni vos sources
 brutes.
 
 ## Lequel utiliser
@@ -45,4 +45,4 @@ brutes.
 | Objectif | Commande |
 |---|---|
 | Sauvegarder / déplacer un projet intact | `veles export full` |
-| Partager structure + skills, pas les données | `veles export template` |
+| Partager structure + compétences, pas les données | `veles export template` |

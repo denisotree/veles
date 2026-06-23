@@ -40,7 +40,7 @@ ls wiki/concepts wiki/entities wiki/sources
 ```
 
 Các trang tham chiếu chéo lẫn nhau. Danh mục `wiki/INDEX.md` theo nhu cầu giữ một
-bản đồ mà agent tải khi cần (không phải một bản đổ ngữ cảnh khổng lồ).
+bản đồ mà agent tải khi cần (không phải một khối ngữ cảnh khổng lồ đổ vào một lần).
 
 ## 3. Đặt câu hỏi
 

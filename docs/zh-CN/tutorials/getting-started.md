@@ -89,6 +89,6 @@ veles sessions search "three sentences"
 
 ## 接下来去哪
 
-- **[构建知识库](building-a-knowledge-base.md)** — 将来源摄取到 wiki 中并对它们提问。
+- **[构建知识库](building-a-knowledge-base.md)** — 将来源摄入到 wiki 中并对它们提问。
 - **[配置提供方](../how-to/configure-providers.md)** — 切换到 Anthropic、OpenAI、Gemini 或完全本地的模型。
 - **[架构概览](../explanation/architecture.md)** — 了解 Veles 在底层都做了些什么。

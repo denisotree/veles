@@ -51,7 +51,7 @@ veles tool promote <name>      # move to ~/.veles/tools/ (cross-project)
 ```
 
 Las herramientas sensibles (`run_shell`, `write_file`, `fetch_url`, …) están
-controladas por la [escala de confianza](security-and-permissions.md).
+controladas por la [escalera de confianza](security-and-permissions.md).
 
 ## Módulos
 

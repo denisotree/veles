@@ -293,7 +293,7 @@ automatiquement.
 |---|---|
 | `enable --until <DUR>` | Ouvre une fenêtre (`+30m`, `+2h`, `+1d`, ou ISO `2026-05-12T18:00:00Z`) |
 | `disable` | Ferme la fenêtre immédiatement |
-| `status` | Indique si l'autopilote est actif |
+| `status` | Indique si le pilote automatique est actif |
 
 ### `veles secret {set,get,list,delete}`
 Secrets adossés au trousseau de l'OS (clés API, jetons de bot).

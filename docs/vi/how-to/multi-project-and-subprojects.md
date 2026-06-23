@@ -6,7 +6,7 @@ Veles chạy nhiều dự án trong một vòng lặp agent. Mỗi dự án có 
 riêng. **Dự án con (subprojects)** là các dự án lồng bên trong một dự án cha — hữu ích để
 phân rã một monorepo hoặc cơ sở tri thức lớn thành các bộ nhớ có phạm vi.
 
-## Projects
+## Dự án
 
 Veles phát hiện dự án đang hoạt động bằng cách đi ngược lên từ thư mục làm việc hiện tại (cwd) của bạn đến một thư mục `.veles/`
 (giống như `git`). Quản lý registry:

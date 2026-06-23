@@ -14,7 +14,7 @@ veles run --provider gemini     --model gemini-2.5-pro    "..."
 
 ## 프로젝트 기본값 설정
 
-`<project>/.veles/config.toml`에 기반을 지정하세요.
+`<project>/.veles/config.toml`에 기본 설정을 지정하세요.
 
 ```toml
 [provider]

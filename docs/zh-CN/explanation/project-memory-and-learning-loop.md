@@ -1,12 +1,12 @@
-# 项目内存与学习循环
+# 项目记忆与学习循环
 
 > 🌐 **语言：** [English](../../en/explanation/project-memory-and-learning-loop.md) · **简体中文** · [繁體中文](../../zh-TW/explanation/project-memory-and-learning-loop.md) · [日本語](../../ja/explanation/project-memory-and-learning-loop.md) · [한국어](../../ko/explanation/project-memory-and-learning-loop.md) · [Español](../../es/explanation/project-memory-and-learning-loop.md) · [Français](../../fr/explanation/project-memory-and-learning-loop.md) · [Italiano](../../it/explanation/project-memory-and-learning-loop.md) · [Português (BR)](../../pt-BR/explanation/project-memory-and-learning-loop.md) · [Português (PT)](../../pt-PT/explanation/project-memory-and-learning-loop.md) · [Русский](../../ru/explanation/project-memory-and-learning-loop.md) · [العربية](../../ar/explanation/project-memory-and-learning-loop.md) · [हिन्दी](../../hi/explanation/project-memory-and-learning-loop.md) · [বাংলা](../../bn/explanation/project-memory-and-learning-loop.md) · [Tiếng Việt](../../vi/explanation/project-memory-and-learning-loop.md)
 
-Veles 的决定性特性在于它能按项目 **记忆** 并 **学习**。本页解释这种内存是什么，以及学习循环如何让它保持有用。
+Veles 的决定性特性在于它能按项目 **记忆** 并 **学习**。本页解释这种记忆是什么，以及学习循环如何让它保持有用。
 
-## 内存是一份结构化产物
+## 记忆是一份结构化产物
 
-项目内存存放于 `<project>/.veles/` —— `memory.db`（SQLite，事实来源）外加一棵人类可读的 `.veles/memory/` 树（渲染后的洞见视图、会话摘要、提案、系统操作日志）。它 **独立于你的内容**，在任何布局（wiki、notes 或 bare）下都以相同方式工作。它不是聊天记录的倾倒，而是一组结构化的层：
+项目记忆存放于 `<project>/.veles/` —— `memory.db`（SQLite，事实来源）外加一棵人类可读的 `.veles/memory/` 树（渲染后的洞见视图、会话摘要、提案、系统操作日志）。它 **独立于你的内容**，在任何布局（wiki、notes 或 bare）下都以相同方式工作。它不是聊天记录的倾倒，而是一组结构化的层：
 
 - **会话日志** —— 每次对话，每轮一行，并建立全文索引。
 - **规则** —— 智能体应当遵循的简短祈使句（`format`、`do`、`don't`、`preference`），注入到稳定的系统提示中。

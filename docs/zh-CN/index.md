@@ -3,7 +3,7 @@
 > 🌐 **语言：** [English](../en/index.md) · **简体中文** · [繁體中文](../zh-TW/index.md) · [日本語](../ja/index.md) · [한국어](../ko/index.md) · [Español](../es/index.md) · [Français](../fr/index.md) · [Italiano](../it/index.md) · [Português (BR)](../pt-BR/index.md) · [Português (PT)](../pt-PT/index.md) · [Русский](../ru/index.md) · [العربية](../ar/index.md) · [हिन्दी](../hi/index.md) · [বাংলা](../bn/index.md) · [Tiếng Việt](../vi/index.md)
 
 Veles 是一个极简、本地优先的 CLI 智能体框架。你将它指向一个项目
-目录；它会维护一份结构化的**项目内存**，从你的会话中**学习**，
+目录；它会维护一份结构化的**项目记忆**，从你的会话中**学习**，
 运行任意 LLM 提供商（云端或本地），并在工作过程中积累可复用的
 **技能**与**工具**。
 
@@ -49,7 +49,7 @@ Veles 是一个极简、本地优先的 CLI 智能体框架。你将它指向一
 ## 说明 — 理解其设计
 
 - [架构概览](explanation/architecture.md)
-- [项目内存与学习循环](explanation/project-memory-and-learning-loop.md)
+- [项目记忆与学习循环](explanation/project-memory-and-learning-loop.md)
 - [作为累积能力的技能与工具](explanation/skills-and-tools.md)
 - [运行模式](explanation/modes.md)
 - [多智能体编排](explanation/multi-agent-orchestration.md)

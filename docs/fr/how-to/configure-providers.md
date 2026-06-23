@@ -72,7 +72,7 @@ Redéfinissez les points d'accès si votre serveur n'écoute pas sur le port par
 ```bash
 export OLLAMA_BASE_URL=http://localhost:11434/v1
 export LLAMACPP_BASE_URL=http://localhost:8080/v1
-export OPENAI_COMPAT_BASE_URL=http://my-host:8000/v1   # required for openai-compat
+export OPENAI_COMPAT_BASE_URL=http://my-host:8000/v1   # requis pour openai-compat
 ```
 
 ## Déléguer à un abonnement CLI Claude / Gemini

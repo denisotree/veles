@@ -41,7 +41,7 @@ veles autopilot disable
 ```
 
 Chaque action en pilote automatique est journalisée pour un examen ultérieur. Les
-contextes non interactifs (démon, traitement par lots) refusent par défaut, sauf
+contextes non interactifs (daemon, traitement par lots) refusent par défaut, sauf
 si le pilote automatique est actif.
 
 ## Secrets
