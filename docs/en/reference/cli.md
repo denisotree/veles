@@ -80,6 +80,7 @@ triggers. Accepts all [shared agent-loop flags](#shared-agent-loop-flags) plus:
 |---|---|---|
 | `--resume <session_id>` | new session | Continue an existing session |
 | `--manager` | off | Decompose via the multi-agent manager (also `VELES_MANAGER_MODE=1`) |
+| `--verify` | off | After the run, the routed advisor judges the answer; on a confident failure, re-run on the stronger model (also `VELES_VERIFY_MODE=1`) |
 | `--plan` | off | Planning mode: read/search/draft allowed, mutations blocked |
 | `--no-agents-md` | off | Don't inject `AGENTS.md` into the system prompt |
 | `--no-index` | off | Don't inject `wiki/INDEX.md` |
@@ -132,8 +133,8 @@ suggestions → wiki lint, optionally LLM consolidation).
 | `--include-consolidation` | off | Run the expensive LLM consolidation (needs an API key) |
 | `--dry-run` | off | Run all steps but skip `wiki/state` writes |
 | `--skip-insights` / `--skip-dedup` / `--skip-promote` / `--skip-lint` | off | Skip individual steps |
-| `--consolidation-model <id>` | `anthropic/claude-haiku-4.5` | Override the consolidation model |
-| `--provider <name>` | `openrouter` | Provider for the consolidation sub-agent |
+| `--consolidation-model <id>` | routed (falls back to `anthropic/claude-haiku-4.5`) | Override the consolidation model |
+| `--provider <name>` | routed | Provider for the consolidation sub-agent (omit to use the project's routed provider) |
 | `--project-root <path>` | discover | Project override |
 
 ---
@@ -359,7 +360,7 @@ start`:
 
 | Flag | Default | Purpose |
 |---|---|---|
-| `--model <id>` | `anthropic/claude-sonnet-4.6` (tui: persisted) | Model ID |
+| `--model <id>` | resolved from project `[provider]` model → user `default_model` (no hardcoded default) | Model ID |
 | `--provider <name>` | `openrouter` | Provider (see below) |
 | `--max-tokens-total <n>` | `100000` | Cumulative token budget; `0` disables |
 | `--max-iterations <n>` | `30` | Max tool-calling iterations per turn |

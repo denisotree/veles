@@ -33,7 +33,7 @@ first_project_name = "myorg"     # recorded by the wizard
 tui_theme = "everforest"         # everforest | dracula | gruvbox | tokyo-night | catppuccin
 
 [permissions]                    # optional per-tool policy
-fetch_url  = "approval_required" # approval_required | always_confirm | always_allow
+fetch_url  = "approval_required" # allow | approval_required | always_confirm
 write_file = "always_confirm"
 
 [routing.tasks]                  # optional user-scope routing (see below)
@@ -59,7 +59,8 @@ args = ["-m", "my_mcp_server"]
 
 ```toml
 [provider]
-default = "openrouter:anthropic/claude-sonnet-4.6"   # base for the main agent + routing
+default = "openrouter"                               # provider name for the main agent + routing base
+model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -101,7 +102,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 | Section | Purpose |
 |---|---|
-| `[provider]` | Base provider/model for the main agent and the routing cascade |
+| `[provider]` | Base provider (`default` = provider name) + model (`model` = model id) for the main agent and the routing cascade |
 | `[routing.tasks]` | Per-task `provider:model` overrides — see [per-task routing](../how-to/per-task-routing.md) |
 | `[permissions]` | Per-tool permission policy (project scope) |
 | `[daemon]` | The unnamed/"default" daemon's bind + autostart |

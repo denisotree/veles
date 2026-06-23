@@ -56,6 +56,7 @@ API-key lookup cascade: OS keychain (project scope) → OS keychain (default sco
 |---|---|---|
 | `VELES_NO_WIZARD` | off | Skip the first-run wizard (also needs a TTY) |
 | `VELES_MANAGER_MODE` | off | Force multi-agent manager for `veles run` (`1` on / `0` kill switch) |
+| `VELES_VERIFY_MODE` | off | Force the verify→escalate pass for `veles run` (`1` on / `0` kill switch) |
 | `VELES_FENCED_TOOLS` | off | Run tools in the fenced/sandboxed execution path |
 | `VELES_TRUST_AUTO_ALLOW` | off | Bypass the trust ladder (CI / autopilot / pre-authorised sub-agents) |
 | `VELES_SANDBOX_ROOTS` | project + `~/.veles` | `:`-separated override of the read/write sandbox roots |

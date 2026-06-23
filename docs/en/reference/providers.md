@@ -17,8 +17,10 @@ a default in config. Model IDs use the provider's own naming.
 | `llamacpp` | Local | none | `LLAMACPP_BASE_URL` (default `http://localhost:8080/v1`) |
 | `openai-compat` | Local/custom | none | `OPENAI_COMPAT_BASE_URL` (required, no default) |
 
-Defaults: provider `openrouter`, model `anthropic/claude-sonnet-4.6`, compressor
-`anthropic/claude-haiku-4.5`.
+Default provider: `openrouter`. There is **no hardcoded default model** — set one
+via the setup wizard, `[provider] model`, or `--model` (otherwise the agent reports
+"no model configured"). Per-task routes inherit `[provider]` as their base unless
+overridden in `[routing.tasks]` — see [per-task routing](../how-to/per-task-routing.md).
 
 ## Local providers
 
