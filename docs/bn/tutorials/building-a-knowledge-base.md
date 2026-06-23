@@ -13,7 +13,7 @@
 - `sources/` — কাঁচা, অপরিবর্তনীয় উপাদান যা আপনি দেন (agent-এর জন্য read-only)।
 - `wiki/` — agent-এর নিজস্ব, LLM-generated জ্ঞান (একমাত্র এই zone-এ-ই এটি content লেখে)।
 
-আপনি source খাওয়ান; Veles সেগুলোকে linked wiki page-এ সংক্ষিপ্ত করে; আপনি স্বাভাবিক ভাষায় wiki-তে query করেন। কেন তা জানতে দেখুন [layout packs & the LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)।
+আপনি source সরবরাহ করেন; Veles সেগুলোকে linked wiki page-এ সংক্ষিপ্ত করে; আপনি স্বাভাবিক ভাষায় wiki-তে query করেন। কেন তা জানতে দেখুন [layout packs & the LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)।
 
 ## ১. একটি source ingest করা
 

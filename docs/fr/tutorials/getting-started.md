@@ -61,7 +61,7 @@ veles init my-notes
 ```
 
 Cela crée `AGENTS.md` (le contexte de votre projet), `sources/` et `wiki/` (le
-[layout LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md) par défaut), ainsi
+[mise en page LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md) par défaut), ainsi
 que `.veles/` (l'état machine). Voir [structure du projet](../reference/project-layout.md).
 
 ## 4. Lancer votre première requête

@@ -19,7 +19,7 @@ Veles একটি [MCP](https://modelcontextprotocol.io/) **client**: এটি
 | `connect_timeout_s` | — | `30` | প্রাথমিক সংযোগের জন্য বাজেট |
 | `enabled` | — | `true` | এন্ট্রি রেখে দিয়ে সংযোগ এড়াতে `false` সেট করুন |
 
-`command`, `args`, `env`, এবং `url`-এর String মানগুলো environment থেকে `${VAR}` interpolate করে (সেট না করা ভেরিয়েবল একটি সতর্কবার্তাসহ খালি স্ট্রিং হয়ে যায়) — সিক্রেটগুলো ফাইলের বাইরে রাখুন।
+`command`, `args`, `env`, এবং `url`-এর স্ট্রিং মানগুলো environment থেকে `${VAR}` interpolate করে (সেট না করা ভেরিয়েবল একটি সতর্কবার্তাসহ খালি স্ট্রিং হয়ে যায়) — সিক্রেটগুলো ফাইলের বাইরে রাখুন।
 
 > **`command` বনাম `args`।** Veles প্রোগ্রামটি সরাসরি চালায় (কোনো shell ছাড়া), তাই executable এবং তার আর্গুমেন্ট **আলাদা** ফিল্ড। লিখুন `command = "npx"`, `args = ["-y", "pkg"]` — **নয়** `command = "npx -y pkg"`।
 

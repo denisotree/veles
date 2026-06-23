@@ -10,7 +10,7 @@ explique ce qu'est cette mémoire et comment la boucle d'apprentissage la mainti
 La mémoire de projet réside dans `<project>/.veles/` — `memory.db` (SQLite, la source de
 vérité) plus une arborescence `.veles/memory/` lisible par l'humain (vues d'insights rendues,
 condensés de session, propositions, un journal des opérations système). Elle est **distincte
-de votre contenu** et fonctionne à l'identique sous n'importe quelle disposition (wiki, notes
+de votre contenu** et fonctionne à l'identique sous n'importe quelle mise en page (wiki, notes
 ou bare). Ce n'est pas une décharge de transcription de chat — c'est un ensemble de couches
 structurées :
 
@@ -27,7 +27,7 @@ structurées :
   d'utilisation/succès/erreur) que le classement et la déduplication exploitent.
 
 Voir la liste des tables dans
-[disposition du projet](../reference/project-layout.md#project-memory-velesmemorydb).
+[mise en page du projet](../reference/project-layout.md#project-memory-velesmemorydb).
 
 ## Rappel : un contexte réduit, tiré à la demande
 
@@ -49,13 +49,13 @@ pas.
 
 ### Curateur — consolider les sessions
 Le curateur distille les sessions plus anciennes en mémoire durable : toujours des insights et
-des règles SQL ; et en plus une page `wiki/sessions/` lorsque la disposition du projet active
+des règles SQL ; et en plus une page `wiki/sessions/` lorsque la mise en page du projet active
 le moteur wiki. Il s'exécute sur des minuteurs d'inactivité / d'après-tour, ou à la demande
 avec `veles curate`.
 
 ### Dreaming — maintenance en arrière-plan
 `veles dream` (et le daemon lorsqu'il est inactif) extrait des insights, déduplique les
-skills et les insights, suggère des promotions et (sous une disposition wiki) effectue le
+skills et les insights, suggère des promotions et (sous une mise en page wiki) effectue le
 lint du wiki — gardant la mémoire fraîche sans vous bloquer. Ajoutez `--include-consolidation`
 pour une passe LLM plus approfondie.
 

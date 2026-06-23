@@ -44,7 +44,7 @@ Si vous n'avez jamais lancé Veles, faites les deux tutoriels dans l'ordre :
 - [Variables d'environnement](reference/environment-variables.md)
 - [Fournisseurs](reference/providers.md)
 - [Raccourcis clavier et commandes slash de la TUI](reference/tui.md)
-- [Disposition et état du projet](reference/project-layout.md)
+- [Mise en page et état du projet](reference/project-layout.md)
 
 ## Explication — comprendre la conception
 
@@ -53,7 +53,7 @@ Si vous n'avez jamais lancé Veles, faites les deux tutoriels dans l'ordre :
 - [Skills et outils, une capacité qui s'accumule](explanation/skills-and-tools.md)
 - [Modes d'exécution](explanation/modes.md)
 - [Orchestration multi-agents](explanation/multi-agent-orchestration.md)
-- [Packs de disposition et le LLM-Wiki](explanation/layout-packs-and-llm-wiki.md)
+- [Packs de mise en page et le LLM-Wiki](explanation/layout-packs-and-llm-wiki.md)
 - [Confiance et bac à sable](explanation/trust-and-sandbox.md)
 
 ---

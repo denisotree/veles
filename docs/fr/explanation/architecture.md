@@ -62,9 +62,9 @@ pertinents) sont rappelées **à la demande** plutôt que déversées d'emblée.
 
 - `<project>/.veles/` — la mémoire, la configuration et les skills/outils locaux de ce projet.
 - `~/.veles/` — la configuration globale utilisateur, les skills/outils inter-projets, les caches, la confiance.
-- `<project>/AGENTS.md`, `wiki/`, `sources/` — votre contenu (la disposition LLM-Wiki).
+- `<project>/AGENTS.md`, `wiki/`, `sources/` — votre contenu (la mise en page LLM-Wiki).
 
-Voir [disposition du projet](../reference/project-layout.md).
+Voir [mise en page du projet](../reference/project-layout.md).
 
 ## Le multi-projet dans une seule boucle
 

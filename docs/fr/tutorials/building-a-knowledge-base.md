@@ -19,7 +19,7 @@ Un projet Veles comporte deux zones de contenu :
   zone dans laquelle il écrit du contenu).
 
 Vous y injectez des sources ; Veles les distille en pages wiki interconnectées ;
-vous interrogez le wiki en langage naturel. Voir [packs de layout & le LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)
+vous interrogez le wiki en langage naturel. Voir [packs de mise en page & le LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)
 pour comprendre pourquoi.
 
 ## 1. Intégrer une source
@@ -81,7 +81,7 @@ les repère :
 veles run "lint"
 ```
 
-(`ingest`, `query` et `lint` sont des skills livrés avec le layout LLM-Wiki ; vous
+(`ingest`, `query` et `lint` sont des skills livrés avec la mise en page LLM-Wiki ; vous
 les invoquez avec `veles run "<operation>"` ou laissez l'agent les appeler.)
 
 ## Ce que vous avez construit

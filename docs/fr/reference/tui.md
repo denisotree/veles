@@ -43,7 +43,7 @@ Tapez `/` dans le composeur ; `Tab` complète. Les commandes enregistrées sont 
 | `/insights` | Afficher les insights appris pour le projet |
 | `/rules` | Afficher le condensé des règles du projet |
 | `/schema` | Valider / corriger `AGENTS.md` |
-| `/wiki` | Opérations wiki pour la disposition active |
+| `/wiki` | Opérations wiki pour la mise en page active |
 | `/daemon` | Ouvrir le panneau de contrôle du daemon (projet → daemons → canaux) |
 
 > L'ensemble des commandes slash est le même que vous lanciez la TUI directement ou

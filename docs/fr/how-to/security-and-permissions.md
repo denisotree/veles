@@ -62,8 +62,8 @@ correspondante, sauf si vous passez `--no-env-fallback`.
 ## Le bac à sable
 
 Les outils peuvent lire à l'intérieur du projet actif et de `~/.veles/`, et
-écrire uniquement dans les zones inscriptibles du layout (`wiki/`, `.veles/` par
-défaut). Remplacez les racines pour les configurations avancées avec
+écrire uniquement dans les zones inscriptibles de la mise en page (`wiki/`, `.veles/`
+par défaut). Remplacez les racines pour les configurations avancées avec
 `VELES_SANDBOX_ROOTS` (séparées par `:`). Les récupérations d'URL conservent une
 liste de blocage SSRF ; `VELES_FETCH_ALLOW_PRIVATE=1` lève le blocage du réseau
 privé.
