@@ -1,35 +1,34 @@
-# Référence de la CLI
+# Référence CLI
 
-> 🌐 **Langues :** [English](../../en/reference/cli.md) · [Русский](../../ru/reference/cli.md)
+> 🌐 **Languages:** **English** · [Русский](../../ru/reference/cli.md)
 
-Toutes les commandes, sous-commandes et options de Veles. Lancez `veles <command> --help`
-pour obtenir la signature faisant autorité et toujours à jour — cette page reflète les
+Toutes les commandes, sous-commandes et options de Veles. Exécutez `veles <command> --help`
+pour obtenir la signature de référence, toujours à jour — cette page reflète les
 analyseurs d'arguments de `src/veles/cli/_parsers/`.
 
 ```
 veles [--no-wizard] <command> [subcommand] [options]
 ```
 
-- `--no-wizard` — ignore l'assistant de configuration au premier lancement, même si
-  `~/.veles/config.toml` est absent (conditionné également par un TTY et par
-  `VELES_NO_WIZARD=1`).
+- `--no-wizard` — ignore l'assistant de configuration initiale même si `~/.veles/config.toml`
+  est absent (conditionné aussi par un TTY et par `VELES_NO_WIZARD=1`).
 - Sans argument, `veles` lance la [TUI](tui.md) interactive.
 
-La plupart des commandes de l'agent acceptent les [options partagées de la boucle d'agent](#shared-agent-loop-flags)
-et les [noms de fournisseurs](#provider-names) listés en bas de page.
+La plupart des commandes d'agent acceptent les [options partagées de la boucle d'agent](#options-partagées-de-la-boucle-dagent)
+ainsi que les [noms de fournisseurs](#noms-de-fournisseurs) listés en bas de page.
 
 ---
 
-## Cycle de vie d'un projet
+## Cycle de vie du projet
 
 ### `veles init [name]`
 Crée un nouveau projet Veles dans le répertoire courant (un répertoire d'état `.veles/`
-+ `AGENTS.md` + l'arborescence de contenu du pack de mise en page choisi).
++ `AGENTS.md` + l'ossature de contenu du pack de mise en page choisi).
 
 | Option | Défaut | Rôle |
 |---|---|---|
 | `name` (positionnel) | nom de base du cwd | Nom du projet |
-| `--layout <name>` | `llm-wiki` | Pack de mise en page pour l'arborescence de contenu (`llm-wiki`, `notes`, `bare`, ou un pack personnalisé issu de `~/.veles/layouts/`) |
+| `--layout <name>` | `llm-wiki` | Pack de mise en page pour l'ossature de contenu (`llm-wiki`, `notes`, `bare`, ou un pack personnalisé issu de `~/.veles/layouts/`) |
 | `--force` | désactivé | Recrée `.veles/` même s'il existe déjà |
 
 ### `veles schema {validate,edit,fix}`
@@ -75,12 +74,13 @@ Restaure une archive créée par `veles export`.
 
 ### `veles run "<prompt>"`
 Exécute un prompt unique de bout en bout, avec persistance de la mémoire et les
-déclencheurs du curateur / d'apprentissage. Accepte toutes les [options partagées de la boucle d'agent](#shared-agent-loop-flags) ainsi que :
+déclencheurs du curateur / d'apprentissage. Accepte toutes les [options partagées de la boucle d'agent](#options-partagées-de-la-boucle-dagent) ainsi que :
 
 | Option | Défaut | Rôle |
 |---|---|---|
 | `--resume <session_id>` | nouvelle session | Poursuit une session existante |
 | `--manager` | désactivé | Décompose via le gestionnaire multi-agent (aussi `VELES_MANAGER_MODE=1`) |
+| `--verify` | désactivé | Après l'exécution, l'advisor routé juge la réponse ; en cas d'échec avéré, relance sur le modèle plus puissant (aussi `VELES_VERIFY_MODE=1`) |
 | `--plan` | désactivé | Mode planification : lecture/recherche/brouillon autorisés, mutations bloquées |
 | `--no-agents-md` | désactivé | N'injecte pas `AGENTS.md` dans le prompt système |
 | `--no-index` | désactivé | N'injecte pas `wiki/INDEX.md` |
@@ -134,8 +134,8 @@ skills → suggestions de promotion → lint du wiki, et éventuellement consoli
 | `--include-consolidation` | désactivé | Lance la consolidation par LLM (coûteuse, nécessite une clé API) |
 | `--dry-run` | désactivé | Exécute toutes les étapes mais saute les écritures dans `wiki/state` |
 | `--skip-insights` / `--skip-dedup` / `--skip-promote` / `--skip-lint` | désactivé | Saute des étapes individuelles |
-| `--consolidation-model <id>` | `anthropic/claude-haiku-4.5` | Surcharge le modèle de consolidation |
-| `--provider <name>` | `openrouter` | Fournisseur pour le sous-agent de consolidation |
+| `--consolidation-model <id>` | routé (repli sur `anthropic/claude-haiku-4.5`) | Surcharge le modèle de consolidation |
+| `--provider <name>` | routé | Fournisseur du sous-agent de consolidation (omettre pour utiliser le fournisseur routé du projet) |
 | `--project-root <path>` | détection | Surcharge du projet |
 
 ---
@@ -239,7 +239,7 @@ sont mis en cache 24 h ; les fournisseurs locaux sont toujours en direct.
 
 | Option | Défaut | Rôle |
 |---|---|---|
-| `provider` (positionnel) | — | L'un des [noms de fournisseurs](#provider-names) |
+| `provider` (positionnel) | — | L'un des [noms de fournisseurs](#noms-de-fournisseurs) |
 | `--refresh` | désactivé | Contourne le cache disque (cloud uniquement) |
 | `--json` | désactivé | Émet `{provider, source, models}` en JSON |
 
@@ -358,12 +358,11 @@ Inspecte les serveurs MCP externes configurés sous `[mcp.servers.*]`. Voir
 
 ## Options partagées de la boucle d'agent
 
-Acceptées par `run`, `add`, `tui`, `curate`, `research`, `job tick`, et `daemon
-start` :
+Acceptées par `run`, `add`, `tui`, `curate`, `research`, `job tick`, et `daemon start` :
 
 | Option | Défaut | Rôle |
 |---|---|---|
-| `--model <id>` | `anthropic/claude-sonnet-4.6` (tui : persisté) | ID du modèle |
+| `--model <id>` | résolu depuis le modèle `[provider]` du projet → `default_model` utilisateur (aucun défaut codé en dur) | ID du modèle |
 | `--provider <name>` | `openrouter` | Fournisseur (voir ci-dessous) |
 | `--max-tokens-total <n>` | `100000` | Budget cumulé de tokens ; `0` le désactive |
 | `--max-iterations <n>` | `30` | Nombre max d'itérations d'appel d'outils par tour |

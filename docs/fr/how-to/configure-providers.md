@@ -1,6 +1,6 @@
 # Configurer les fournisseurs
 
-> 🌐 **Langues :** **English** · [Русский](../../ru/how-to/configure-providers.md)
+> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/configure-providers.md)
 
 Basculez Veles entre OpenRouter, Anthropic, OpenAI, Gemini, des modèles locaux ou un
 abonnement CLI. Liste complète des fournisseurs : [référence des fournisseurs](../reference/providers.md).
@@ -19,7 +19,8 @@ Placez une base dans `<project>/.veles/config.toml` :
 
 ```toml
 [provider]
-default = "openrouter:anthropic/claude-sonnet-4.6"
+default = "openrouter"                 # nom du fournisseur
+model = "anthropic/claude-sonnet-4.6"  # id du modèle
 ```
 
 Ou une valeur par défaut globale (au niveau utilisateur) dans `~/.veles/config.toml` :
@@ -71,7 +72,7 @@ Redéfinissez les points d'accès si votre serveur n'écoute pas sur le port par
 ```bash
 export OLLAMA_BASE_URL=http://localhost:11434/v1
 export LLAMACPP_BASE_URL=http://localhost:8080/v1
-export OPENAI_COMPAT_BASE_URL=http://my-host:8000/v1   # requis pour openai-compat
+export OPENAI_COMPAT_BASE_URL=http://my-host:8000/v1   # required for openai-compat
 ```
 
 ## Déléguer à un abonnement CLI Claude / Gemini
@@ -88,9 +89,9 @@ Aucune clé d'API nécessaire — le CLI gère l'authentification.
 ## Lister les modèles disponibles
 
 ```bash
-veles models openrouter            # cloud : mis en cache 24 h
-veles models openrouter --refresh  # force une nouvelle récupération
-veles models ollama                # local : toujours en direct
+veles models openrouter            # cloud: cached 24h
+veles models openrouter --refresh  # force re-fetch
+veles models ollama                # local: always live
 ```
 
 ## Suite

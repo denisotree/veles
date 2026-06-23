@@ -1,6 +1,6 @@
 # Variables d'environnement
 
-> 🌐 **Langues :** **English** · [Русский](../../ru/reference/environment-variables.md)
+> 🌐 **Languages:** **English** · [Русский](../../ru/reference/environment-variables.md)
 
 Veles lit ces variables à l'exécution. Les clés d'API et les jetons sont à stocker
 de préférence dans le trousseau du système d'exploitation (`veles secret set …`) ;
@@ -57,6 +57,7 @@ trousseau du système (portée par défaut) → variable d'environnement.
 |---|---|---|
 | `VELES_NO_WIZARD` | désactivé | Saute l'assistant de premier lancement (nécessite aussi un TTY) |
 | `VELES_MANAGER_MODE` | désactivé | Force le manager multi-agents pour `veles run` (`1` activé / `0` coupe-circuit) |
+| `VELES_VERIFY_MODE` | désactivé | Force la passe verify→escalade pour `veles run` (`1` activé / `0` coupe-circuit) |
 | `VELES_FENCED_TOOLS` | désactivé | Exécute les outils via le chemin d'exécution cloisonné / en bac à sable |
 | `VELES_TRUST_AUTO_ALLOW` | désactivé | Contourne l'échelle de confiance (CI / autopilot / sous-agents pré-autorisés) |
 | `VELES_SANDBOX_ROOTS` | projet + `~/.veles` | Surcharge (séparée par `:`) des racines lecture/écriture du bac à sable |

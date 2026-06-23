@@ -1,34 +1,34 @@
 # كيفية توجيه المهام إلى نماذج مختلفة
 
-> 🌐 **اللغات:** [English](../../en/how-to/per-task-routing.md) · [Русский](../../ru/how-to/per-task-routing.md) · **العربية**
+> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/per-task-routing.md)
 
-ليست Veles مقيّدة بنموذج واحد. يمكن لكل **مهمة** داخلية أن تستخدم
-`provider:model` مختلفًا — نموذجًا رخيصًا لضغط السياق، ونموذجًا قويًّا
-للوكيل الرئيسي، ونموذجًا بصريًّا للصور. هذا هو نظام *التوجيه المجمّع* (ensemble routing).
+Veles غير مقيَّد بنموذج واحد. يمكن لكل **مهمة** داخلية استخدام
+`provider:model` مختلف — نموذج رخيص لضغط السياق، وآخر قوي للوكيل
+الرئيسي، ونموذج رؤية للصور. هذا هو نظام *توجيه التجميع*.
 
 ## أنواع المهام
 
 | المهمة | تُستخدم لـ |
 |---|---|
 | `default` | حلقة الوكيل الرئيسية |
-| `curator` | دمج الجلسة → الويكي |
+| `curator` | دمج الجلسة ← الويكي |
 | `compressor` | ضغط السياق بنافذة منزلقة |
-| `insights` | استخلاص الرؤى بعد التشغيل |
+| `insights` | استخراج الرؤى بعد التشغيل |
 | `skills` | تنفيذ المهارات |
 | `advisor` | الفحص الذاتي `advisor_review` |
-| `vision` | `image_describe` (عند توصيل محوّل بصري) |
+| `vision` | `image_describe` (عند توصيل محوّل رؤية) |
 | `embedding` | تشابه `veles skill dedup` |
 
-## عرض التوجيه الحالي
+## اطّلع على التوجيه الحالي
 
 ```bash
 veles route show
 ```
 
-يطبع هذا الأمر `provider:model` المحلول لكل مهمة، إضافةً إلى وسم `source`
-يبيّن أي طبقة قرّرته.
+يطبع هذا `provider:model` المُحلَّل لكل مهمة وعلامة `source`
+تبيّن أي طبقة قرّرته.
 
-## تثبيت مهمة على نموذج
+## ثبّت مهمة على نموذج
 
 ```bash
 veles route set compressor openrouter:anthropic/claude-haiku-4.5
@@ -36,7 +36,7 @@ veles route set advisor    openrouter:anthropic/claude-opus-4.8
 veles route set vision     openai:gpt-4o
 ```
 
-تكتب هذه الأوامر `[routing.tasks]` في `<project>/.veles/config.toml`:
+تكتب هذه `[routing.tasks]` في `<project>/.veles/config.toml`:
 
 ```toml
 [routing.tasks]
@@ -45,35 +45,39 @@ advisor    = "openrouter:anthropic/claude-opus-4.8"
 vision     = "openai:gpt-4o"
 ```
 
-## إعادة الضبط
+## إعادة التعيين
 
 ```bash
-veles route reset compressor   # إعادة مهمة واحدة إلى الافتراضي
-veles route reset              # إعادة كل المهام إلى الافتراضي
+veles route reset compressor   # one task back to default
+veles route reset              # all tasks back to default
 ```
 
-## تلميحات بلغة طبيعية في AGENTS.md
+## تلميحات اللغة الطبيعية في AGENTS.md
 
-يمكنك التعبير عن التوجيه بصيغة نثرية في `AGENTS.md` (مثلًا "استخدم نموذجًا رخيصًا
-للضغط"). تحلّل Veles هذه التلميحات إلى ملف `routing.nl.toml` مُولَّد تلقائيًّا:
+يمكنك التعبير عن التوجيه نثرًا في `AGENTS.md` (مثل "استخدم نموذجًا رخيصًا
+للضغط"). يحلّل Veles هذه التلميحات إلى ملف `routing.nl.toml` مُولَّد تلقائيًا:
 
 ```bash
-veles route refresh            # إعادة تحليل تلميحات AGENTS.md
-veles route refresh --force    # حتى لو لم يتغيّر AGENTS.md
+veles route refresh            # re-parse AGENTS.md hints
+veles route refresh --force    # even if AGENTS.md hasn't changed
 ```
 
-تتفوّق مدخلات `[routing.tasks]` الصريحة دائمًا على التلميحات بلغة طبيعية.
+تفوز إدخالات `[routing.tasks]` الصريحة دائمًا على تلميحات اللغة الطبيعية.
 
 ## ترتيب الحلّ
 
 لكل مهمة، تفوز أول طبقة تُنتج مواصفة:
 
-1. مشروع `[routing.tasks][task]`
-2. مشروع `[routing.tasks].default`
-3. تلميح مشروع بلغة طبيعية (`routing.nl.toml`)
-4. أساس المشروع `[provider]`
-5. مستخدم `[routing.tasks][task]` / `.default`
-6. مستخدم `[user] default_provider` + `default_model`
-7. الافتراضي المُدمَج لتلك المهمة
+1. `[routing.tasks][task]` على مستوى المشروع
+2. `[routing.tasks].default` على مستوى المشروع
+3. تلميح اللغة الطبيعية على مستوى المشروع (`routing.nl.toml`)
+4. أساس `[provider]` على مستوى المشروع
+5. `[routing.tasks][task]` / `.default` على مستوى المستخدم
+6. `[user] default_provider` + `default_model` على مستوى المستخدم
 
-(تتخطّى `embedding` المُلتقِطات الشاملة — فنموذج الدردشة ليس نموذج تضمين.)
+إذا لم يَحُلَّ أيٌّ من هذه، فلا يوجد **بديل احتياطي مُضمَّن** — تُترَك المهمة
+غير محدَّدة ويتدهور مستدعيها (يتخطّى الميزة) أو يُخطئ بوضوح، بدل أن
+يلجأ بصمت إلى نموذج سحابي.
+
+(تتخطّى `embedding` خيارات الالتقاط الشامل — فنموذج الدردشة ليس نموذج تضمين — لذا
+لا يجيب عنها إلا `[routing.tasks].embedding` صريح.)

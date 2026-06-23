@@ -1,6 +1,6 @@
 # Fournisseurs
 
-> 🌐 **Langues :** **English** · [Русский](../../ru/reference/providers.md)
+> 🌐 **Languages:** **English** · [Русский](../../ru/reference/providers.md)
 
 Veles est agnostique vis-à-vis des fournisseurs. Passez `--provider <name>` à
 n'importe quelle commande d'agent, ou définissez une valeur par défaut dans la
@@ -18,8 +18,11 @@ config. Les identifiants de modèles suivent la nomenclature propre à chaque fo
 | `llamacpp` | Local | aucune | `LLAMACPP_BASE_URL` (défaut `http://localhost:8080/v1`) |
 | `openai-compat` | Local/personnalisé | aucune | `OPENAI_COMPAT_BASE_URL` (requis, sans valeur par défaut) |
 
-Valeurs par défaut : fournisseur `openrouter`, modèle `anthropic/claude-sonnet-4.6`,
-compresseur `anthropic/claude-haiku-4.5`.
+Fournisseur par défaut : `openrouter`. Il n'existe **aucun modèle par défaut codé en
+dur** — définissez-en un via l'assistant de configuration, `[provider] model`, ou
+`--model` (sinon l'agent signale « no model configured »). Les routes par tâche
+héritent de `[provider]` comme base, sauf surcharge dans `[routing.tasks]` — voir
+[routage par tâche](../how-to/per-task-routing.md).
 
 ## Fournisseurs locaux
 

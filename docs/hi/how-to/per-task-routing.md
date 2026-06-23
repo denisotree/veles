@@ -1,35 +1,34 @@
 # विभिन्न मॉडल्स पर टास्क रूट कैसे करें
 
-> 🌐 **भाषाएँ:** **English** · [Русский](../../ru/how-to/per-task-routing.md)
+> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/per-task-routing.md)
 
-Veles किसी एक मॉडल से बँधा नहीं है। प्रत्येक आंतरिक **task** एक अलग
-`provider:model` इस्तेमाल कर सकता है — context compression के लिए एक सस्ता मॉडल,
-मुख्य agent के लिए एक मज़बूत मॉडल, images के लिए एक vision मॉडल। यही है
-*ensemble routing* सिस्टम।
+Veles किसी एक model से बँधा नहीं है। प्रत्येक internal **task** एक अलग `provider:model`
+का उपयोग कर सकता है — context compression के लिए एक सस्ता model, main agent के लिए एक
+मज़बूत model, images के लिए एक vision model। यह *ensemble routing* system है।
 
 ## Task types
 
 | Task | किसके लिए |
 |---|---|
-| `default` | मुख्य agent loop |
+| `default` | main agent loop |
 | `curator` | Session → wiki consolidation |
 | `compressor` | Sliding-window context compression |
-| `insights` | रन के बाद insight extraction |
+| `insights` | run के बाद insight extraction |
 | `skills` | Skill execution |
 | `advisor` | `advisor_review` self-check |
-| `vision` | `image_describe` (जब vision adapter जुड़ा हो) |
+| `vision` | `image_describe` (जब एक vision adapter wire किया गया हो) |
 | `embedding` | `veles skill dedup` similarity |
 
-## मौजूदा routing देखें
+## वर्तमान routing देखें
 
 ```bash
 veles route show
 ```
 
-यह हर task के लिए resolved `provider:model` और एक `source` label प्रिंट करता है,
-जो बताता है कि किस layer ने उसे तय किया।
+यह प्रत्येक task के लिए resolved `provider:model` और एक `source` label प्रिंट करता है
+जो बताता है कि किस layer ने इसे तय किया।
 
-## किसी task को किसी मॉडल पर पिन करें
+## एक task को एक model पर pin करें
 
 ```bash
 veles route set compressor openrouter:anthropic/claude-haiku-4.5
@@ -49,26 +48,25 @@ vision     = "openai:gpt-4o"
 ## Reset
 
 ```bash
-veles route reset compressor   # एक task को वापस default पर
-veles route reset              # सभी tasks वापस default पर
+veles route reset compressor   # one task back to default
+veles route reset              # all tasks back to default
 ```
 
 ## AGENTS.md में natural-language hints
 
-आप `AGENTS.md` में routing को सादे शब्दों में व्यक्त कर सकते हैं (जैसे "compression
-के लिए सस्ता मॉडल इस्तेमाल करो")। Veles इन्हें पार्स करके एक auto-generated
-`routing.nl.toml` बनाता है:
+आप routing को `AGENTS.md` में गद्य में व्यक्त कर सकते हैं (जैसे "use a cheap model for
+compression")। Veles इन्हें एक auto-generated `routing.nl.toml` में parse करता है:
 
 ```bash
-veles route refresh            # AGENTS.md hints दोबारा पार्स करें
-veles route refresh --force    # भले ही AGENTS.md बदला न हो
+veles route refresh            # re-parse AGENTS.md hints
+veles route refresh --force    # even if AGENTS.md hasn't changed
 ```
 
-स्पष्ट `[routing.tasks]` entries हमेशा NL hints पर भारी पड़ती हैं।
+explicit `[routing.tasks]` entries हमेशा NL hints पर जीतती हैं।
 
-## Resolution order
+## Resolution क्रम
 
-प्रत्येक task के लिए, पहली layer जो कोई spec देती है वही जीतती है:
+प्रत्येक task के लिए, पहली layer जो एक spec देती है वह जीतती है:
 
 1. project `[routing.tasks][task]`
 2. project `[routing.tasks].default`
@@ -76,6 +74,10 @@ veles route refresh --force    # भले ही AGENTS.md बदला न ह
 4. project `[provider]` base
 5. user `[routing.tasks][task]` / `.default`
 6. user `[user] default_provider` + `default_model`
-7. उस task के लिए built-in default
 
-(`embedding` catch-alls को skip करता है — एक chat मॉडल कोई embedding मॉडल नहीं है।)
+यदि इनमें से कोई भी resolve नहीं होता, तो कोई **hardcoded fallback नहीं है** — task
+unset छोड़ दिया जाता है और उसका caller degrade हो जाता है (feature छोड़ देता है) या साफ
+तौर पर error देता है, बजाय चुपचाप किसी cloud model तक पहुँचने के।
+
+(`embedding` catch-alls को छोड़ देता है — एक chat model embedding model नहीं है — इसलिए
+केवल एक explicit `[routing.tasks].embedding` ही इसका उत्तर देता है।)

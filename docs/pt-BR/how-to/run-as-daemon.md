@@ -1,10 +1,10 @@
 # Como rodar o Veles como daemon
 
-> 🌐 **Idiomas:** **English** · [Русский](../../ru/how-to/run-as-daemon.md)
+> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/run-as-daemon.md)
 
-O daemon é um servidor HTTP+WS opcional e de longa duração que expõe o agente como uma
-API — a base para [canais](connect-telegram.md) (Telegram, …), [jobs](long-running-tasks.md)
-agendados e uso remoto/headless.
+O daemon é um servidor HTTP+WS opcional e de longa duração que expõe o agente como
+uma API — a base para [canais](connect-telegram.md) (Telegram, …),
+[jobs](long-running-tasks.md) agendados e uso remoto/headless.
 
 ## Iniciar e parar
 
@@ -14,25 +14,27 @@ veles daemon status             # is it running?
 veles daemon stop               # SIGTERM via the pid file
 ```
 
-O `start` se desanexa e devolve o seu shell. Para um processo em primeiro plano
-(systemd `Type=simple`, Docker, depuração) passe `--foreground`. Sobrescreva o bind:
+`start` desanexa e devolve o seu shell. Para um processo em primeiro plano
+(`Type=simple` do systemd, Docker, depuração), passe `--foreground`. Sobrescreva o
+bind:
 
 ```bash
 veles daemon start --host 0.0.0.0 --port 9000
 ```
 
-O modelo e o provedor do daemon vêm da configuração do projeto e são **fixos durante
+O modelo e o provedor do daemon vêm da config do projeto e ficam **fixos durante
 todo o seu ciclo de vida** — defina-os antes de iniciar:
 
 ```toml
 # <project>/.veles/config.toml
 [provider]
-default = "ollama:qwen3:4b-instruct"
+default = "ollama"            # provider name
+model = "qwen3:4b-instruct"   # model id
 ```
 
 ## Tokens de autenticação
 
-Clientes da API se autenticam com um token bearer:
+Os clientes da API se autenticam com um token bearer:
 
 ```bash
 veles daemon token add tui-client     # mint a token
@@ -40,10 +42,10 @@ veles daemon token list               # list (masked)
 veles daemon token remove tui-client
 ```
 
-## O seletor de daemon (TUI)
+## O seletor de daemons (TUI)
 
-Execute `veles daemon` sem subcomando para abrir o painel de controle — uma árvore com
-os daemons do seu projeto e os canais de cada daemon:
+Rode `veles daemon` sem subcomando para abrir o painel de controle — uma árvore dos
+daemons do seu projeto e dos canais de cada daemon:
 
 ```
 Project: my-project
@@ -54,10 +56,10 @@ Other projects
   other-proj  running
 ```
 
-Teclas: `Enter` abre o log de um daemon; `s`/`t`/`r` iniciam/param/reiniciam; `d`
-exclui; `c`/`x` adicionam/removem um canal; `q` sai.
+Teclas: `Enter` abre o log de um daemon; `s`/`t`/`r` inicia/para/reinicia; `d`
+exclui; `c`/`x` adiciona/remove um canal; `q` sai.
 
-## Múltiplos daemons por projeto (sessões nomeadas)
+## Vários daemons por projeto (sessões nomeadas)
 
 Um projeto pode rodar vários daemons com modelos/portas diferentes ao mesmo tempo.
 Declare uma sessão nomeada e depois inicie-a:
@@ -68,10 +70,10 @@ veles daemon start --name api
 veles daemon session list
 ```
 
-Cada sessão nomeada tem seu próprio bloco de configuração `[daemon.<name>]` e seus
+Cada sessão nomeada tem seu próprio bloco de config `[daemon.<name>]` e seus
 próprios canais (`[daemon.<name>.channels.*]`).
 
-## Listar daemons entre projetos
+## Liste daemons entre projetos
 
 ```bash
 veles daemon list
@@ -79,7 +81,7 @@ veles daemon restart <project-or-slug>
 veles daemon delete  <project-or-slug>
 ```
 
-## A seguir
+## Próximo
 
 - [Conectar um canal do Telegram](connect-telegram.md)
 - [Agendar jobs](long-running-tasks.md)

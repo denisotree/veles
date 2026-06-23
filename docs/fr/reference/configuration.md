@@ -1,6 +1,6 @@
 # Référence de configuration
 
-> 🌐 **Langues :** **English** · [Русский](../../ru/reference/configuration.md)
+> 🌐 **Languages:** **English** · [Русский](../../ru/reference/configuration.md)
 
 Veles se configure via deux fichiers TOML et un ensemble de répertoires d'état. Les
 secrets (clés d'API, jetons de bot) ne sont **jamais** écrits dans ces fichiers — ils
@@ -34,7 +34,7 @@ first_project_name = "myorg"     # enregistré par l'assistant
 tui_theme = "everforest"         # everforest | dracula | gruvbox | tokyo-night | catppuccin
 
 [permissions]                    # politique optionnelle par outil
-fetch_url  = "approval_required" # approval_required | always_confirm | always_allow
+fetch_url  = "approval_required" # allow | approval_required | always_confirm
 write_file = "always_confirm"
 
 [routing.tasks]                  # routage optionnel à la portée utilisateur (voir ci-dessous)
@@ -60,7 +60,8 @@ args = ["-m", "my_mcp_server"]
 
 ```toml
 [provider]
-default = "openrouter:anthropic/claude-sonnet-4.6"   # base pour l'agent principal + le routage
+default = "openrouter"                               # nom du fournisseur pour l'agent principal + base du routage
+model = "anthropic/claude-sonnet-4.6"                # id du modèle (omettre pour exiger --model ou le default_model utilisateur)
 
 [routing.tasks]                  # surcharges par tâche (priorité la plus haute en dessous des flags explicites)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -102,7 +103,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} est interpolé depuis l'en
 
 | Section | Rôle |
 |---|---|
-| `[provider]` | Fournisseur/modèle de base pour l'agent principal et la cascade de routage |
+| `[provider]` | Fournisseur de base (`default` = nom du fournisseur) + modèle (`model` = id du modèle) pour l'agent principal et la cascade de routage |
 | `[routing.tasks]` | Surcharges `provider:model` par tâche — voir [routage par tâche](../how-to/per-task-routing.md) |
 | `[permissions]` | Politique de permission par outil (portée projet) |
 | `[daemon]` | Liaison + démarrage automatique du daemon anonyme / « par défaut » |

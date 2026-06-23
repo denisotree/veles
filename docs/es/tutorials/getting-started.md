@@ -2,16 +2,16 @@
 
 > 🌐 **Languages:** **English** · [Русский](../../ru/tutorials/getting-started.md)
 
-En este tutorial instalas Veles, le das una clave API, creas tu primer proyecto y
-ejecutas tu primer prompt. Unos 10 minutos. Terminarás con un proyecto de Veles
-funcional con el que puedes conversar.
+En este tutorial instalarás Veles, le darás una clave de API, crearás tu primer proyecto
+y ejecutarás tu primer prompt. Unos 10 minutos. Terminarás con un proyecto Veles funcional
+con el que podrás conversar.
 
 ## Requisitos previos
 
 - **Python 3.13+** (Veles requiere `>=3.13`).
-- Una clave API de LLM. Usaremos **OpenRouter** (el proveedor por defecto);
-  cualquiera de los [otros proveedores](../reference/providers.md) también sirve,
-  incluidos los totalmente locales sin clave.
+- Una clave de API de LLM. Usaremos **OpenRouter** (el proveedor por defecto); cualquiera
+  de los [otros proveedores](../reference/providers.md) también funciona, incluidos los
+  totalmente locales sin clave.
 
 ## 1. Instalar
 
@@ -21,37 +21,36 @@ Veles se instala como un comando global `veles` mediante [uv](https://docs.astra
 # install uv if you don't have it
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# from the Veles source directory
-uv tool install .
+# install veles (published as `veles-ai`; the command is `veles`)
+uv tool install veles-ai
+# …or from a source checkout: uv tool install .
 
 # verify
 veles --help
 ```
 
-Para actualizar más tarde: `uv tool install . --reinstall`.
+Para actualizar más adelante: `uv tool upgrade veles-ai`.
 
-## 2. Dar a Veles una clave API
+## 2. Darle a Veles una clave de API
 
-Obtén una clave en [openrouter.ai](https://openrouter.ai) y expórtala:
+Consigue una clave en [openrouter.ai](https://openrouter.ai) y expórtala:
 
 ```bash
 export OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-También puedes guardarla en el llavero del sistema operativo para no reexportarla
-en cada shell:
+También puedes guardarla en el llavero del SO para no reexportarla en cada shell:
 
 ```bash
 veles secret set OPENROUTER_API_KEY
 ```
 
 (¿Prefieres una configuración totalmente local sin clave? Instala [Ollama](https://ollama.com),
-`ollama pull qwen3:4b-instruct`, y usa `--provider ollama` más abajo.)
+`ollama pull qwen3:4b-instruct` y usa `--provider ollama` más abajo.)
 
 ## 3. Crear tu primer proyecto
 
-Un proyecto de Veles no es más que un directorio con una carpeta de estado
-`.veles/`. Crea uno:
+Un proyecto Veles no es más que un directorio con una carpeta de estado `.veles/`. Crea uno:
 
 ```bash
 mkdir my-notes && cd my-notes
@@ -59,8 +58,8 @@ veles init my-notes
 ```
 
 Esto crea `AGENTS.md` (el contexto de tu proyecto), `sources/` y `wiki/` (el
-[layout LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md) por defecto), y
-`.veles/` (el estado de máquina). Consulta [project layout](../reference/project-layout.md).
+[layout LLM-Wiki por defecto](../explanation/layout-packs-and-llm-wiki.md)) y
+`.veles/` (el estado de la máquina). Consulta [layout del proyecto](../reference/project-layout.md).
 
 ## 4. Ejecutar tu primer prompt
 
@@ -71,8 +70,7 @@ veles run "Read AGENTS.md and describe this project in three sentences."
 Veles carga el contexto de tu proyecto, llama al modelo e imprime la respuesta. El
 turno se guarda en la memoria del proyecto.
 
-Añade `--stream` para ver los tokens a medida que llegan, o `--verbose` para el
-progreso por turno:
+Añade `--stream` para ver los tokens según llegan, o `--verbose` para ver el progreso por turno:
 
 ```bash
 veles run --stream "What files exist in this project right now?"
@@ -86,9 +84,9 @@ Para una conversación de varios turnos, abre la TUI:
 veles tui
 ```
 
-Escribe un mensaje y pulsa Enter. Teclas útiles: `Ctrl+D` para salir, `Shift+Tab`
-para rotar los [modos de ejecución](../explanation/modes.md), `/help` para listar
-los comandos de barra. La lista completa en la [referencia de la TUI](../reference/tui.md).
+Escribe un mensaje y pulsa Enter. Teclas útiles: `Ctrl+D` para salir, `Shift+Tab` para
+recorrer los [modos de ejecución](../explanation/modes.md), `/help` para listar los comandos
+de barra. Lista completa en la [referencia de la TUI](../reference/tui.md).
 
 ## 6. Ver qué recuerda Veles
 
@@ -99,11 +97,11 @@ veles sessions list
 veles sessions search "three sentences"
 ```
 
-## A dónde ir después
+## Adónde ir después
 
-- **[Building a knowledge base](building-a-knowledge-base.md)** — ingiere fuentes
-  en la wiki y hazle preguntas.
-- **[Configure providers](../how-to/configure-providers.md)** — cambia a
+- **[Crear una base de conocimiento](building-a-knowledge-base.md)** — ingiere fuentes
+  en la wiki y hazle preguntas sobre ellas.
+- **[Configurar proveedores](../how-to/configure-providers.md)** — cambia a
   Anthropic, OpenAI, Gemini o un modelo totalmente local.
-- **[Architecture overview](../explanation/architecture.md)** — comprende qué está
-  haciendo Veles bajo el capó.
+- **[Visión general de la arquitectura](../explanation/architecture.md)** — entiende qué
+  hace Veles bajo el capó.

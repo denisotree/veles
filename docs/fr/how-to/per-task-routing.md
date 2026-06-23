@@ -1,6 +1,6 @@
 # Comment router les tâches vers différents modèles
 
-> 🌐 **Langues :** [English](../../en/how-to/per-task-routing.md) · [Русский](../../ru/how-to/per-task-routing.md)
+> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/per-task-routing.md)
 
 Veles n'est pas figé sur un seul modèle. Chaque **tâche** interne peut utiliser un
 `provider:model` différent — un modèle économique pour la compression du contexte,
@@ -77,7 +77,10 @@ Pour chaque tâche, la première couche qui produit une spécification l'emporte
 4. base `[provider]` du projet
 5. `[routing.tasks][task]` / `.default` de l'utilisateur
 6. `[user] default_provider` + `default_model` de l'utilisateur
-7. valeur par défaut intégrée pour cette tâche
+
+Si aucune de ces couches ne résout, il n'y a **aucun repli codé en dur** — la tâche
+reste non définie et son appelant se dégrade (saute la fonctionnalité) ou échoue
+clairement, plutôt que de se rabattre silencieusement sur un modèle cloud.
 
 (`embedding` ignore les couches fourre-tout — un modèle de chat n'est pas un modèle
-d'embedding.)
+d'embedding — seul un `[routing.tasks].embedding` explicite y répond donc.)

@@ -1,28 +1,28 @@
-# Configuration reference
+# কনফিগারেশন রেফারেন্স
 
-> 🌐 **Languages:** [English](../../en/reference/configuration.md) · [Русский](../../ru/reference/configuration.md) · **বাংলা**
+> 🌐 **Languages:** **English** · [Русский](../../ru/reference/configuration.md)
 
-Veles দুটি TOML ফাইল ও একগুচ্ছ state ডিরেক্টরি দিয়ে কনফিগার করা হয়। Secrets
-(API key, bot token) **কখনোই** এই ফাইলগুলোতে লেখা হয় না — সেগুলো থাকে OS
-keychain বা environment variable-এ (দেখুন [environment variables](environment-variables.md))।
+Veles দুটি TOML ফাইল এবং কয়েকটি স্টেট ডিরেক্টরি দিয়ে কনফিগার করা হয়। সিক্রেট
+(API কী, বট টোকেন) **কখনোই** এই ফাইলগুলোতে লেখা হয় না — সেগুলো OS
+keychain বা এনভায়রনমেন্ট ভ্যারিয়েবলে থাকে (দেখুন [এনভায়রনমেন্ট ভ্যারিয়েবল](environment-variables.md))।
 
-## State কোথায় থাকে
+## স্টেট কোথায় থাকে
 
-| Path | Scope | Contents |
+| পাথ | স্কোপ | বিষয়বস্তু |
 |---|---|---|
-| `~/.veles/` | User-global | `config.toml`, trust grants, cross-project skills/tools, model cache, locales, registry |
-| `<project>/.veles/` | Project-local | `project.toml`, `config.toml`, `memory.db`, project skills/tools, plans, runtime artefacts |
-| `<project>/AGENTS.md` | Project | agent-এ inject হওয়া context ফাইল (`CLAUDE.md` / `GEMINI.md`-তে symlink করা) |
-| `<project>/wiki/`, `sources/` | Project | ব্যবহারকারীর কন্টেন্ট (ডিফল্ট LLM-Wiki layout) |
+| `~/.veles/` | User-global | `config.toml`, trust গ্রান্ট, ক্রস-প্রজেক্ট skills/tools, মডেল ক্যাশ, locales, registry |
+| `<project>/.veles/` | Project-local | `project.toml`, `config.toml`, `memory.db`, প্রজেক্ট skills/tools, plans, রানটাইম আর্টিফ্যাক্ট |
+| `<project>/AGENTS.md` | Project | এজেন্টে ইনজেক্ট করা কনটেক্সট ফাইল (`CLAUDE.md` / `GEMINI.md`-এ symlink করা) |
+| `<project>/wiki/`, `sources/` | Project | ইউজার কন্টেন্ট (ডিফল্ট LLM-Wiki লেআউট) |
 
-`VELES_USER_HOME` `~`-কে redirect করে (ফলে user state `<override>/.veles/`-এ যায়)।
-সম্পূর্ণ tree-র জন্য দেখুন [project layout](project-layout.md)।
+`VELES_USER_HOME` `~` রিডাইরেক্ট করে (ফলে ইউজার স্টেট `<override>/.veles/`-এ যায়)।
+সম্পূর্ণ ট্রির জন্য দেখুন [প্রজেক্ট লেআউট](project-layout.md)।
 
 ---
 
-## User config — `~/.veles/config.toml`
+## ইউজার কনফিগ — `~/.veles/config.toml`
 
-first-run wizard এটি লেখে; হাতে সম্পাদনা করা নিরাপদ।
+প্রথম-রানের উইজার্ড লেখে; হাতে সম্পাদনা করা নিরাপদ।
 
 ```toml
 [user]
@@ -33,7 +33,7 @@ first_project_name = "myorg"     # recorded by the wizard
 tui_theme = "everforest"         # everforest | dracula | gruvbox | tokyo-night | catppuccin
 
 [permissions]                    # optional per-tool policy
-fetch_url  = "approval_required" # approval_required | always_confirm | always_allow
+fetch_url  = "approval_required" # allow | approval_required | always_confirm
 write_file = "always_confirm"
 
 [routing.tasks]                  # optional user-scope routing (see below)
@@ -45,21 +45,22 @@ command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
 ```
 
-| Key | Type | Purpose |
+| কী | টাইপ | উদ্দেশ্য |
 |---|---|---|
-| `[user] language` | `"en"` \| `"ru"` | UI string-এর locale (`VELES_LOCALE` দিয়ে override করা যায়) |
-| `[user] default_provider` | string | কোনোটি না দিলে যে provider ব্যবহৃত হয় |
-| `[user] default_model` | string | কোনোটি না দিলে যে model ব্যবহৃত হয় |
-| `[user] tui_theme` | string | ডিফল্ট TUI color theme |
-| `[permissions] <tool>` | policy | per-tool permission policy (দেখুন [trust ও sandbox](../explanation/trust-and-sandbox.md)) |
+| `[user] language` | `"en"` \| `"ru"` | UI স্ট্রিং-এর জন্য locale (`VELES_LOCALE` দিয়ে ওভাররাইডযোগ্য) |
+| `[user] default_provider` | string | কোনোটি না দিলে যে প্রোভাইডার ব্যবহৃত হয় |
+| `[user] default_model` | string | কোনোটি না দিলে যে মডেল ব্যবহৃত হয় |
+| `[user] tui_theme` | string | ডিফল্ট TUI কালার থিম |
+| `[permissions] <tool>` | policy | পার-টুল পারমিশন পলিসি (দেখুন [trust ও sandbox](../explanation/trust-and-sandbox.md)) |
 
 ---
 
-## Project config — `<project>/.veles/config.toml`
+## প্রজেক্ট কনফিগ — `<project>/.veles/config.toml`
 
 ```toml
 [provider]
-default = "openrouter:anthropic/claude-sonnet-4.6"   # base for the main agent + routing
+default = "openrouter"                               # provider name for the main agent + routing base
+model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -97,39 +98,39 @@ args = ["-y", "@modelcontextprotocol/server-github"]
 env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the environment
 ```
 
-### Sections
+### সেকশনসমূহ
 
-| Section | Purpose |
+| সেকশন | উদ্দেশ্য |
 |---|---|
-| `[provider]` | main agent ও routing cascade-এর base provider/model |
-| `[routing.tasks]` | per-task `provider:model` override — দেখুন [per-task routing](../how-to/per-task-routing.md) |
-| `[permissions]` | per-tool permission policy (project scope) |
-| `[daemon]` | unnamed/"default" daemon-এর bind + autostart |
-| `[daemon.<name>]` | একটি named daemon session (নিজস্ব model/provider/host/port/mode) |
-| `[channels.<type>]` | unnamed daemon দ্বারা পরিবেশিত একটি channel (যেমন `telegram`) |
-| `[daemon.<name>.channels.<type>]` | একটি named daemon session-এ bound channel |
-| `[mcp.servers.<name>]` | একটি external MCP server (tool source) |
+| `[provider]` | মূল এজেন্ট এবং রাউটিং ক্যাসকেডের জন্য বেস প্রোভাইডার (`default` = provider name) + মডেল (`model` = model id) |
+| `[routing.tasks]` | পার-টাস্ক `provider:model` ওভাররাইড — দেখুন [পার-টাস্ক রাউটিং](../how-to/per-task-routing.md) |
+| `[permissions]` | পার-টুল পারমিশন পলিসি (প্রজেক্ট স্কোপ) |
+| `[daemon]` | unnamed/"default" ডিমনের bind + autostart |
+| `[daemon.<name>]` | একটি নামকৃত ডিমন সেশন (নিজস্ব model/provider/host/port/mode) |
+| `[channels.<type>]` | unnamed ডিমন দ্বারা পরিবেশিত একটি চ্যানেল (যেমন `telegram`) |
+| `[daemon.<name>.channels.<type>]` | একটি নামকৃত ডিমন সেশনে বাইন্ড করা একটি চ্যানেল |
+| `[mcp.servers.<name>]` | একটি এক্সটার্নাল MCP সার্ভার (টুল সোর্স) |
 
-`[routing.tasks]`-এর task type: `default`, `curator`, `compressor`, `insights`,
+`[routing.tasks]`-এর টাস্ক টাইপ: `default`, `curator`, `compressor`, `insights`,
 `skills`, `advisor`, `vision`, `embedding`।
 
-> `AGENTS.md`-এর natural-language routing hint গুলো একটি auto-generated
-> `routing.nl.toml`-এ parse করা হয়; স্পষ্ট `[routing.tasks]` entry সবসময় জেতে।
-> পুনরায় parse করতে `veles route refresh` চালান। দেখুন [per-task routing](../how-to/per-task-routing.md)।
+> `AGENTS.md`-এর ন্যাচারাল-ল্যাঙ্গুয়েজ রাউটিং হিন্ট একটি অটো-জেনারেটেড
+> `routing.nl.toml`-এ পার্স হয়; স্পষ্ট `[routing.tasks]` এন্ট্রি সর্বদা জেতে। পুনরায়
+> পার্স করতে `veles route refresh` চালান। দেখুন [পার-টাস্ক রাউটিং](../how-to/per-task-routing.md)।
 
 ### `project.toml`
 
-`<project>/.veles/project.toml` অপরিবর্তনীয় project metadata ধারণ করে (`name`,
-`created_at`, `schema_version`, `layout`)। সাধারণত আপনি এটি হাতে সম্পাদনা করেন না।
+`<project>/.veles/project.toml` অপরিবর্তনীয় প্রজেক্ট মেটাডেটা ধারণ করে (`name`,
+`created_at`, `schema_version`, `layout`)। সাধারণত আপনি এটি হাতে সম্পাদনা করবেন না।
 
 ---
 
 ## AGENTS.md
 
-project root-এ থাকা project context ফাইল। startup-এ এটি agent-এর
-system prompt-এ inject করা হয় এবং `CLAUDE.md` ও `GEMINI.md`-তে symlink করা হয়, যাতে
-ওই ডিরেক্টরিতে চালু করা একটি `claude` বা `gemini` CLI একই context তুলে নেয়।
+প্রজেক্ট রুটে থাকা প্রজেক্ট কনটেক্সট ফাইল। এটি স্টার্টআপে এজেন্টের সিস্টেম প্রম্পটে
+ইনজেক্ট করা হয় এবং `CLAUDE.md` ও `GEMINI.md`-এ symlink করা হয় যাতে ডিরেক্টরিতে চালু
+করা একটি `claude` বা `gemini` CLI একই কনটেক্সট তুলে নেয়।
 
-এটি ছোট রাখুন — auxiliary `.md` ফাইলগুলো (যেমন `wiki/INDEX.md`) প্রয়োজনমতো load হয়।
-আবশ্যক section-গুলো `veles schema validate` দিয়ে validate করুন। দেখুন
-[layout pack ও LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)।
+এটি ছোট রাখুন — সহায়ক `.md` ফাইল (যেমন `wiki/INDEX.md`) প্রয়োজনে লোড হয়।
+`veles schema validate` দিয়ে প্রয়োজনীয় সেকশনগুলো যাচাই করুন। দেখুন
+[লেআউট প্যাক ও LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)।

@@ -1,30 +1,31 @@
 # はじめに
 
-> 🌐 **言語:** **English** · [Русский](../../ru/tutorials/getting-started.md)
+> 🌐 **Languages:** **English** · [Русский](../../ru/tutorials/getting-started.md)
 
 このチュートリアルでは、Veles をインストールし、API キーを与え、最初のプロジェクトを作成して、最初のプロンプトを実行します。所要時間は約 10 分です。最後には、対話できる動作する Veles プロジェクトが手に入ります。
 
 ## 前提条件
 
 - **Python 3.13+**（Veles は `>=3.13` を必要とします）。
-- LLM API キー。ここでは **OpenRouter**（デフォルトのプロバイダ）を使用します。キー不要の完全ローカルなものを含め、[その他のプロバイダ](../reference/providers.md)のいずれでも動作します。
+- LLM API キー。ここでは **OpenRouter**（デフォルトのプロバイダー）を使用します。キー不要の完全ローカルなものを含め、[その他のプロバイダー](../reference/providers.md)のいずれでも動作します。
 
 ## 1. インストール
 
 Veles は [uv](https://docs.astral.sh/uv/) を使ってグローバルな `veles` コマンドとしてインストールします:
 
 ```bash
-# uv を持っていない場合はインストール
+# install uv if you don't have it
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Veles のソースディレクトリから
-uv tool install .
+# install veles (published as `veles-ai`; the command is `veles`)
+uv tool install veles-ai
+# …or from a source checkout: uv tool install .
 
-# 確認
+# verify
 veles --help
 ```
 
-後で更新するには: `uv tool install . --reinstall`。
+後で更新するには: `uv tool upgrade veles-ai`。
 
 ## 2. Veles に API キーを与える
 
@@ -89,5 +90,5 @@ veles sessions search "three sentences"
 ## 次に進む先
 
 - **[ナレッジベースを構築する](building-a-knowledge-base.md)** — ソースを wiki に取り込み、それらについて質問します。
-- **[プロバイダを設定する](../how-to/configure-providers.md)** — Anthropic、OpenAI、Gemini、または完全ローカルのモデルに切り替えます。
+- **[プロバイダーを設定する](../how-to/configure-providers.md)** — Anthropic、OpenAI、Gemini、または完全ローカルのモデルに切り替えます。
 - **[アーキテクチャ概要](../explanation/architecture.md)** — Veles が内部で何をしているかを理解します。

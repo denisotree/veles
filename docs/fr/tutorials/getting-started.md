@@ -1,6 +1,6 @@
 # Premiers pas
 
-> 🌐 **Langues :** **English** · [Русский](../../ru/tutorials/getting-started.md)
+> 🌐 **Languages:** **English** · [Русский](../../ru/tutorials/getting-started.md)
 
 Dans ce tutoriel, vous installez Veles, lui fournissez une clé API, créez votre
 premier projet et lancez votre première requête. Environ 10 minutes. Vous
@@ -9,8 +9,8 @@ obtiendrez à la fin un projet Veles fonctionnel avec lequel dialoguer.
 ## Prérequis
 
 - **Python 3.13+** (Veles requiert `>=3.13`).
-- Une clé API de LLM. Nous utiliserons **OpenRouter** (le provider par défaut) ;
-  n'importe lequel des [autres providers](../reference/providers.md) convient
+- Une clé API de LLM. Nous utiliserons **OpenRouter** (le fournisseur par défaut) ;
+  n'importe lequel des [autres fournisseurs](../reference/providers.md) convient
   également, y compris ceux entièrement locaux qui ne nécessitent aucune clé.
 
 ## 1. Installer
@@ -21,14 +21,15 @@ Veles s'installe en tant que commande globale `veles` via [uv](https://docs.astr
 # install uv if you don't have it
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# from the Veles source directory
-uv tool install .
+# install veles (published as `veles-ai`; the command is `veles`)
+uv tool install veles-ai
+# …or from a source checkout: uv tool install .
 
 # verify
 veles --help
 ```
 
-Pour mettre à jour plus tard : `uv tool install . --reinstall`.
+Pour mettre à jour plus tard : `uv tool upgrade veles-ai`.
 
 ## 2. Fournir une clé API à Veles
 
@@ -105,7 +106,7 @@ veles sessions search "three sentences"
 
 - **[Construire une base de connaissances](building-a-knowledge-base.md)** —
   intégrez des sources dans le wiki et posez-leur des questions.
-- **[Configurer les providers](../how-to/configure-providers.md)** — basculez vers
+- **[Configurer les fournisseurs](../how-to/configure-providers.md)** — basculez vers
   Anthropic, OpenAI, Gemini ou un modèle entièrement local.
 - **[Vue d'ensemble de l'architecture](../explanation/architecture.md)** —
   comprenez ce que Veles fait sous le capot.

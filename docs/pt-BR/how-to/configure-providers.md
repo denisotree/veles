@@ -1,6 +1,6 @@
 # Como configurar provedores
 
-> 🌐 **Idiomas:** **English** · [Русский](../../ru/how-to/configure-providers.md)
+> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/configure-providers.md)
 
 Alterne o Veles entre OpenRouter, Anthropic, OpenAI, Gemini, modelos locais ou uma
 assinatura de CLI. Lista completa de provedores: [referência de provedores](../reference/providers.md).
@@ -19,7 +19,8 @@ Coloque uma base em `<project>/.veles/config.toml`:
 
 ```toml
 [provider]
-default = "openrouter:anthropic/claude-sonnet-4.6"
+default = "openrouter"                 # provider name
+model = "anthropic/claude-sonnet-4.6"  # model id
 ```
 
 Ou um padrão global do usuário em `~/.veles/config.toml`:
@@ -32,7 +33,7 @@ default_model = "anthropic/claude-sonnet-4.6"
 
 ## Forneça a chave de API
 
-Provedores na nuvem precisam de uma chave. Armazene-a uma vez no keychain do SO:
+Provedores de nuvem precisam de uma chave. Guarde-a uma vez no chaveiro do SO:
 
 ```bash
 veles secret set OPENROUTER_API_KEY
@@ -45,8 +46,8 @@ veles secret set ANTHROPIC_API_KEY
 export OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-Ordem de busca: keychain (escopo do projeto) → keychain (padrão) → variável de ambiente. As chaves
-**nunca** são gravadas em arquivos de configuração.
+Ordem de busca: chaveiro (escopo do projeto) → chaveiro (default) → variável de
+ambiente. As chaves **nunca** são gravadas em arquivos de config.
 
 ## Use um modelo totalmente local (sem chave)
 
@@ -58,8 +59,8 @@ veles models ollama                     # confirm it's listed
 veles run --provider ollama --model qwen3:4b-instruct "Hello"
 ```
 
-A chamada de ferramentas (tool calling) fica **desativada por padrão** em provedores locais. Ative-a quando você tiver
-escolhido um modelo capaz de usar ferramentas:
+A chamada de tools vem **desligada por padrão** em provedores locais. Habilite-a
+depois de escolher um modelo capaz de usar tools:
 
 ```bash
 export VELES_LOCAL_TOOLS=1
@@ -73,16 +74,16 @@ export LLAMACPP_BASE_URL=http://localhost:8080/v1
 export OPENAI_COMPAT_BASE_URL=http://my-host:8000/v1   # required for openai-compat
 ```
 
-## Delegue a uma assinatura da CLI Claude / Gemini
+## Delegue para uma assinatura de CLI do Claude / Gemini
 
-Se você tem a CLI `claude` ou `gemini` autenticada, o Veles pode controlá-la:
+Se você tiver a CLI `claude` ou `gemini` autenticada, o Veles pode pilotá-la:
 
 ```bash
 veles run --provider claude-cli "..."
 veles run --provider gemini-cli "..."
 ```
 
-Nenhuma chave de API é necessária — a CLI cuida da autenticação.
+Nenhuma chave de API necessária — a CLI cuida da autenticação.
 
 ## Liste os modelos disponíveis
 
@@ -92,7 +93,7 @@ veles models openrouter --refresh  # force re-fetch
 veles models ollama                # local: always live
 ```
 
-## A seguir
+## Próximo
 
-- [Roteie tarefas diferentes para modelos diferentes](per-task-routing.md) — modelo barato
-  para compressão, modelo forte para planejamento.
+- [Rotear diferentes tarefas para diferentes modelos](per-task-routing.md) — modelo
+  barato para compressão, modelo forte para planejamento.

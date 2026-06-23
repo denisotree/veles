@@ -1,8 +1,8 @@
-# Comment exécuter Veles en démon
+# Comment exécuter Veles en daemon
 
-> 🌐 **Langues :** [English](../../en/how-to/run-as-daemon.md) · [Русский](../../ru/how-to/run-as-daemon.md)
+> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/run-as-daemon.md)
 
-Le démon est un serveur HTTP+WS optionnel et persistant qui expose l'agent sous
+Le daemon est un serveur HTTP+WS optionnel et persistant qui expose l'agent sous
 forme d'API — c'est la fondation des [canaux](connect-telegram.md) (Telegram, …),
 des [tâches](long-running-tasks.md) planifiées et de l'usage distant/sans interface.
 
@@ -22,13 +22,14 @@ Remplacez l'adresse d'écoute :
 veles daemon start --host 0.0.0.0 --port 9000
 ```
 
-Le modèle et le fournisseur du démon proviennent de la configuration du projet et
+Le modèle et le fournisseur du daemon proviennent de la configuration du projet et
 sont **fixés pour toute sa durée de vie** — définissez-les avant de démarrer :
 
 ```toml
 # <project>/.veles/config.toml
 [provider]
-default = "ollama:qwen3:4b-instruct"
+default = "ollama"            # nom du fournisseur
+model = "qwen3:4b-instruct"   # id du modèle
 ```
 
 ## Jetons d'authentification
@@ -41,10 +42,10 @@ veles daemon token list               # list (masked)
 veles daemon token remove tui-client
 ```
 
-## Le sélecteur de démons (TUI)
+## Le sélecteur de daemons (TUI)
 
 Lancez `veles daemon` sans sous-commande pour ouvrir le panneau de contrôle — un
-arbre des démons de votre projet et des canaux de chaque démon :
+arbre des daemons de votre projet et des canaux de chaque daemon :
 
 ```
 Project: my-project
@@ -55,12 +56,12 @@ Other projects
   other-proj  running
 ```
 
-Touches : `Enter` ouvre le journal d'un démon ; `s`/`t`/`r` démarrer/arrêter/
+Touches : `Enter` ouvre le journal d'un daemon ; `s`/`t`/`r` démarrer/arrêter/
 redémarrer ; `d` supprimer ; `c`/`x` ajouter/retirer un canal ; `q` quitter.
 
-## Plusieurs démons par projet (sessions nommées)
+## Plusieurs daemons par projet (sessions nommées)
 
-Un projet peut faire tourner plusieurs démons avec des modèles/ports différents
+Un projet peut faire tourner plusieurs daemons avec des modèles/ports différents
 en même temps. Déclarez une session nommée, puis démarrez-la :
 
 ```bash
@@ -72,7 +73,7 @@ veles daemon session list
 Chaque session nommée a son propre bloc de configuration `[daemon.<name>]` et ses
 propres canaux (`[daemon.<name>.channels.*]`).
 
-## Lister les démons à travers les projets
+## Lister les daemons à travers les projets
 
 ```bash
 veles daemon list

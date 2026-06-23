@@ -1,11 +1,11 @@
 # كيفية تهيئة المزوّدين
 
-> 🌐 **اللغات:** [English](../../en/how-to/configure-providers.md) · [Русский](../../ru/how-to/configure-providers.md) · **العربية**
+> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/configure-providers.md)
 
-بدّل Veles بين OpenRouter، وAnthropic، وOpenAI، وGemini، والنماذج المحلية، أو اشتراك في
-أداة CLI. قائمة المزوّدين الكاملة: [مرجع المزوّدين](../reference/providers.md).
+بدّل Veles بين OpenRouter و Anthropic و OpenAI و Gemini والنماذج المحلية أو اشتراك
+CLI. قائمة المزوّدين الكاملة: [مرجع المزوّدين](../reference/providers.md).
 
-## اختيار مزوّد لكل أمر
+## اختر مزوّدًا لكل أمر
 
 ```bash
 veles run --provider anthropic --model claude-sonnet-4.6 "..."
@@ -13,16 +13,17 @@ veles run --provider openai     --model gpt-4o            "..."
 veles run --provider gemini     --model gemini-2.5-pro    "..."
 ```
 
-## تعيين مزوّد افتراضي للمشروع
+## اضبط افتراضيًا للمشروع
 
-ضع قاعدة في `<project>/.veles/config.toml`:
+ضع أساسًا في `<project>/.veles/config.toml`:
 
 ```toml
 [provider]
-default = "openrouter:anthropic/claude-sonnet-4.6"
+default = "openrouter"                 # provider name
+model = "anthropic/claude-sonnet-4.6"  # model id
 ```
 
-أو افتراضيًا عامًا على مستوى المستخدم في `~/.veles/config.toml`:
+أو افتراضيًا عامًا للمستخدم في `~/.veles/config.toml`:
 
 ```toml
 [user]
@@ -30,9 +31,9 @@ default_provider = "openrouter"
 default_model = "anthropic/claude-sonnet-4.6"
 ```
 
-## توفير مفتاح الـ API
+## وفّر مفتاح API
 
-المزوّدون السحابيون يحتاجون مفتاحًا. خزّنه مرة واحدة في سلسلة مفاتيح نظام التشغيل:
+يحتاج المزوّدون السحابيون إلى مفتاح. خزّنه مرة واحدة في سلسلة مفاتيح نظام التشغيل:
 
 ```bash
 veles secret set OPENROUTER_API_KEY
@@ -45,10 +46,10 @@ veles secret set ANTHROPIC_API_KEY
 export OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-ترتيب البحث: سلسلة المفاتيح (نطاق المشروع) ← سلسلة المفاتيح (الافتراضية) ← متغيّر البيئة. المفاتيح
-**لا** تُكتب أبدًا في ملفات التهيئة.
+ترتيب البحث: سلسلة المفاتيح (نطاق المشروع) → سلسلة المفاتيح (الافتراضي) → متغيّر البيئة. لا تُكتَب المفاتيح
+**أبدًا** في ملفات الإعداد.
 
-## استخدام نموذج محلي بالكامل (بدون مفتاح)
+## استخدم نموذجًا محليًا بالكامل (دون مفتاح)
 
 ثبّت [Ollama](https://ollama.com)، واسحب نموذجًا، ووجّه Veles إليه:
 
@@ -58,8 +59,8 @@ veles models ollama                     # confirm it's listed
 veles run --provider ollama --model qwen3:4b-instruct "Hello"
 ```
 
-استدعاء الأدوات **معطّل افتراضيًا** على المزوّدين المحليين. فعّله بعد أن
-تختار نموذجًا قادرًا على استخدام الأدوات:
+استدعاء الأدوات **معطّل افتراضيًا** على المزوّدين المحليين. فعّله بعد
+اختيار نموذج قادر على استخدام الأدوات:
 
 ```bash
 export VELES_LOCAL_TOOLS=1
@@ -73,18 +74,18 @@ export LLAMACPP_BASE_URL=http://localhost:8080/v1
 export OPENAI_COMPAT_BASE_URL=http://my-host:8000/v1   # required for openai-compat
 ```
 
-## التفويض إلى اشتراك CLI الخاص بـ Claude / Gemini
+## التفويض إلى اشتراك Claude / Gemini CLI
 
-إذا كانت أداة `claude` أو `gemini` لديك مصادَقًا عليها، يمكن لـ Veles تشغيلها:
+إذا كان لديك `claude` أو `gemini` CLI مُصادَقًا عليه، فيمكن لـ Veles تشغيله:
 
 ```bash
 veles run --provider claude-cli "..."
 veles run --provider gemini-cli "..."
 ```
 
-لا حاجة لمفتاح API — تتولّى أداة CLI المصادقة.
+لا حاجة إلى مفتاح API — تتولّى الـ CLI المصادقة.
 
-## سرد النماذج المتاحة
+## اسرد النماذج المتاحة
 
 ```bash
 veles models openrouter            # cloud: cached 24h
@@ -94,5 +95,5 @@ veles models ollama                # local: always live
 
 ## التالي
 
-- [توجيه مهام مختلفة إلى نماذج مختلفة](per-task-routing.md) — نموذج رخيص
+- [وجّه مهامًا مختلفة إلى نماذج مختلفة](per-task-routing.md) — نموذج رخيص
   للضغط، ونموذج قوي للتخطيط.

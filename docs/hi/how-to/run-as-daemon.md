@@ -1,50 +1,50 @@
 # Veles को daemon के रूप में कैसे चलाएँ
 
-> 🌐 **भाषाएँ:** **English** · [Русский](../../ru/how-to/run-as-daemon.md)
+> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/run-as-daemon.md)
 
-Daemon एक वैकल्पिक, लंबे समय तक चलने वाला HTTP+WS server है जो agent को एक API के
-रूप में expose करता है — यह [channels](connect-telegram.md) (Telegram, …),
-scheduled [jobs](long-running-tasks.md), और remote/headless उपयोग की नींव है।
+daemon एक वैकल्पिक, दीर्घजीवी HTTP+WS server है जो agent को एक API के रूप में उजागर
+करता है — यह [channels](connect-telegram.md) (Telegram, …), scheduled
+[jobs](long-running-tasks.md), और remote/headless उपयोग की नींव है।
 
-## Start और stop
+## शुरू और बंद करना
 
 ```bash
-veles daemon start              # डिफ़ॉल्ट रूप से detach होता है; 127.0.0.1:8765 पर bind करता है
-veles daemon status             # क्या यह चल रहा है?
-veles daemon stop               # pid file के ज़रिए SIGTERM
+veles daemon start              # detaches by default; binds 127.0.0.1:8765
+veles daemon status             # is it running?
+veles daemon stop               # SIGTERM via the pid file
 ```
 
-`start` detach हो जाता है और आपका shell वापस कर देता है। एक foreground process के
-लिए (systemd `Type=simple`, Docker, debugging) `--foreground` पास करें। Bind को
-override करें:
+`start` detach होकर आपका shell लौटा देता है। एक foreground process के लिए (systemd
+`Type=simple`, Docker, debugging) `--foreground` दें। bind override करें:
 
 ```bash
 veles daemon start --host 0.0.0.0 --port 9000
 ```
 
-Daemon का मॉडल और provider project config से आते हैं और उसके **पूरे जीवनकाल के लिए
-fixed** रहते हैं — start करने से पहले उन्हें सेट करें:
+daemon का model और provider प्रोजेक्ट config से आते हैं और **उसके जीवनकाल भर fixed
+रहते हैं** — उन्हें शुरू करने से पहले set करें:
 
 ```toml
 # <project>/.veles/config.toml
 [provider]
-default = "ollama:qwen3:4b-instruct"
+default = "ollama"            # provider name
+model = "qwen3:4b-instruct"   # model id
 ```
 
 ## Authentication tokens
 
-API clients एक bearer token से authenticate करते हैं:
+API clients एक bearer token से authenticate होते हैं:
 
 ```bash
-veles daemon token add tui-client     # एक token बनाएँ
-veles daemon token list               # सूची (masked)
+veles daemon token add tui-client     # mint a token
+veles daemon token list               # list (masked)
 veles daemon token remove tui-client
 ```
 
-## Daemon picker (TUI)
+## daemon picker (TUI)
 
-बिना किसी subcommand के `veles daemon` चलाएँ ताकि control panel खुले — आपके
-project के daemons और हर daemon के channels का एक tree:
+control panel खोलने के लिए बिना किसी subcommand के `veles daemon` चलाएँ — यह आपके
+प्रोजेक्ट के daemons और प्रत्येक daemon के channels का एक tree है:
 
 ```
 Project: my-project
@@ -55,13 +55,13 @@ Other projects
   other-proj  running
 ```
 
-Keys: `Enter` किसी daemon का log खोलता है; `s`/`t`/`r` start/stop/restart; `d`
-delete; `c`/`x` एक channel जोड़ें/हटाएँ; `q` quit।
+Keys: `Enter` किसी daemon का log खोलता है; `s`/`t`/`r` start/stop/restart; `d` delete;
+`c`/`x` एक channel add/remove; `q` quit।
 
-## प्रति project कई daemons (named sessions)
+## प्रति प्रोजेक्ट कई daemons (नामित sessions)
 
-एक project एक साथ अलग-अलग models/ports के साथ कई daemons चला सकता है। एक named
-session घोषित करें, फिर उसे start करें:
+एक प्रोजेक्ट एक साथ अलग-अलग models/ports वाले कई daemons चला सकता है। एक नामित session
+घोषित करें, फिर उसे शुरू करें:
 
 ```bash
 veles daemon session create api --port 8801 --provider anthropic --model claude-opus-4.8
@@ -69,10 +69,10 @@ veles daemon start --name api
 veles daemon session list
 ```
 
-प्रत्येक named session का अपना `[daemon.<name>]` config block और अपने channels
+प्रत्येक नामित session का अपना `[daemon.<name>]` config block और अपने channels
 (`[daemon.<name>.channels.*]`) होते हैं।
 
-## Projects के बीच daemons की सूची
+## प्रोजेक्ट्स के पार daemons सूचीबद्ध करें
 
 ```bash
 veles daemon list
@@ -82,5 +82,5 @@ veles daemon delete  <project-or-slug>
 
 ## आगे
 
-- [Telegram channel जोड़ें](connect-telegram.md)
+- [एक Telegram channel जोड़ें](connect-telegram.md)
 - [Jobs schedule करें](long-running-tasks.md)

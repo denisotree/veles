@@ -2,68 +2,67 @@
 
 > 🌐 **Languages:** **English** · [Русский](../../ru/reference/configuration.md)
 
-O Veles é configurado por dois ficheiros TOML e um conjunto de diretórios de
-estado. Os segredos (chaves de API, tokens de bots) **nunca** são escritos nestes
-ficheiros — ficam no porta-chaves (keychain) do sistema operativo ou em variáveis
-de ambiente (consulte [variáveis de ambiente](environment-variables.md)).
+O Veles é configurado por dois ficheiros TOML e um conjunto de directórios de estado.
+Os segredos (chaves de API, tokens de bot) **nunca** são escritos nestes ficheiros —
+residem no chaveiro do SO ou em variáveis de ambiente (ver [variáveis de ambiente](environment-variables.md)).
 
-## Onde fica o estado
+## Onde reside o estado
 
 | Caminho | Âmbito | Conteúdo |
 |---|---|---|
-| `~/.veles/` | Global do utilizador | `config.toml`, autorizações de confiança, skills/ferramentas entre projetos, cache de modelos, locales, registo |
-| `<project>/.veles/` | Local do projeto | `project.toml`, `config.toml`, `memory.db`, skills/ferramentas do projeto, planos, artefactos de execução |
-| `<project>/AGENTS.md` | Projeto | O ficheiro de contexto injetado no agente (com symlink para `CLAUDE.md` / `GEMINI.md`) |
-| `<project>/wiki/`, `sources/` | Projeto | Conteúdo do utilizador (o layout LLM-Wiki por omissão) |
+| `~/.veles/` | Global do utilizador | `config.toml`, concessões de confiança, skills/ferramentas transversais a projectos, cache de modelos, locales, registo |
+| `<project>/.veles/` | Local do projecto | `project.toml`, `config.toml`, `memory.db`, skills/ferramentas do projecto, planos, artefactos de runtime |
+| `<project>/AGENTS.md` | Projecto | O ficheiro de contexto injectado no agente (com symlink para `CLAUDE.md` / `GEMINI.md`) |
+| `<project>/wiki/`, `sources/` | Projecto | Conteúdo do utilizador (o layout LLM-Wiki predefinido) |
 
-`VELES_USER_HOME` redireciona `~` (de modo que o estado do utilizador fica em
-`<override>/.veles/`). Consulte [layout do projeto](project-layout.md) para a
-árvore completa.
+`VELES_USER_HOME` redirecciona o `~` (para que o estado do utilizador fique em
+`<override>/.veles/`). Ver [estrutura do projecto](project-layout.md) para a árvore completa.
 
 ---
 
 ## Configuração do utilizador — `~/.veles/config.toml`
 
-Escrita pelo assistente da primeira execução; segura para editar à mão.
+Escrita pelo assistente do primeiro arranque; segura para editar à mão.
 
 ```toml
 [user]
-language = "en"                  # "en" | "ru" — locale das strings da UI
-default_provider = "openrouter"  # fornecedor predefinido para novos projetos
+language = "en"                  # "en" | "ru" — UI string locale
+default_provider = "openrouter"  # default provider for new projects
 default_model = "anthropic/claude-sonnet-4.6"
-first_project_name = "myorg"     # registado pelo assistente
+first_project_name = "myorg"     # recorded by the wizard
 tui_theme = "everforest"         # everforest | dracula | gruvbox | tokyo-night | catppuccin
 
-[permissions]                    # política opcional por ferramenta
-fetch_url  = "approval_required" # approval_required | always_confirm | always_allow
+[permissions]                    # optional per-tool policy
+fetch_url  = "approval_required" # allow | approval_required | always_confirm
 write_file = "always_confirm"
 
-[routing.tasks]                  # encaminhamento opcional de âmbito de utilizador (ver abaixo)
+[routing.tasks]                  # optional user-scope routing (see below)
 compressor = "openrouter:anthropic/claude-haiku-4.5"
 
-[mcp.servers.my-server]          # servidores MCP opcionais de âmbito de utilizador
+[mcp.servers.my-server]          # optional user-scope MCP servers
 transport = "stdio"
-command = "python"               # apenas o executável — os argumentos vão em `args`
+command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
 ```
 
 | Chave | Tipo | Finalidade |
 |---|---|---|
-| `[user] language` | `"en"` \| `"ru"` | Locale para as strings da UI (substituível via `VELES_LOCALE`) |
+| `[user] language` | `"en"` \| `"ru"` | Locale para as strings da UI (sobreponível via `VELES_LOCALE`) |
 | `[user] default_provider` | string | Fornecedor usado quando nenhum é indicado |
 | `[user] default_model` | string | Modelo usado quando nenhum é indicado |
 | `[user] tui_theme` | string | Tema de cores predefinido da TUI |
-| `[permissions] <tool>` | política | Política de permissões por ferramenta (consulte [confiança e sandbox](../explanation/trust-and-sandbox.md)) |
+| `[permissions] <tool>` | política | Política de permissões por ferramenta (ver [confiança e sandbox](../explanation/trust-and-sandbox.md)) |
 
 ---
 
-## Configuração do projeto — `<project>/.veles/config.toml`
+## Configuração do projecto — `<project>/.veles/config.toml`
 
 ```toml
 [provider]
-default = "openrouter:anthropic/claude-sonnet-4.6"   # base para o agente principal + encaminhamento
+default = "openrouter"                               # provider name for the main agent + routing base
+model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
 
-[routing.tasks]                  # substituições por tarefa (prioridade mais alta abaixo das opções explícitas)
+[routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
 compressor = "openrouter:anthropic/claude-haiku-4.5"
 insights   = "openrouter:anthropic/claude-haiku-4.5"
@@ -71,68 +70,68 @@ advisor    = "openrouter:anthropic/claude-opus-4.8"
 vision     = "openai:gpt-4o"
 embedding  = "openai:text-embedding-3-small"
 
-[daemon]                         # o daemon sem nome / "default"
+[daemon]                         # the unnamed/"default" daemon
 enabled = true
 host = "127.0.0.1"
 port = 8765
 autostart = false
 
-[daemon.api]                     # uma sessão de daemon nomeada ("api")
+[daemon.api]                     # a named daemon session ("api")
 provider = "anthropic"
 model = "claude-opus-4.8"
 host = "127.0.0.1"
 port = 8801
 mode = "auto"
 
-[channels.telegram]              # canais globais (servidos pelo daemon sem nome)
+[channels.telegram]              # global channels (served by the unnamed daemon)
 enabled = true
 whitelist = ["@alice", "123456789"]
 
-[daemon.api.channels.telegram]   # canais ligados a uma sessão de daemon nomeada
+[daemon.api.channels.telegram]   # channels bound to a named daemon session
 enabled = true
 whitelist = ["@bob"]
 
-[mcp.servers.github]             # servidores MCP externos (âmbito de projeto)
+[mcp.servers.github]             # external MCP servers (project scope)
 transport = "stdio"             # stdio | http | sse
-command = "npx"                  # apenas o executável — os argumentos vão em `args`
+command = "npx"                  # executable only — arguments go in `args`
 args = ["-y", "@modelcontextprotocol/server-github"]
-env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpola a partir do ambiente
+env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the environment
 ```
 
 ### Secções
 
 | Secção | Finalidade |
 |---|---|
-| `[provider]` | Fornecedor/modelo base para o agente principal e a cascata de encaminhamento |
-| `[routing.tasks]` | Substituições de `provider:model` por tarefa — consulte [encaminhamento por tarefa](../how-to/per-task-routing.md) |
-| `[permissions]` | Política de permissões por ferramenta (âmbito de projeto) |
-| `[daemon]` | Endereço de ligação + autostart do daemon sem nome / "default" |
+| `[provider]` | Fornecedor base (`default` = nome do fornecedor) + modelo (`model` = id do modelo) para o agente principal e a cascata de encaminhamento |
+| `[routing.tasks]` | Sobreposições `provider:model` por tarefa — ver [encaminhamento por tarefa](../how-to/per-task-routing.md) |
+| `[permissions]` | Política de permissões por ferramenta (âmbito do projecto) |
+| `[daemon]` | Vínculo (bind) + autostart do daemon sem nome/"default" |
 | `[daemon.<name>]` | Uma sessão de daemon nomeada (modelo/fornecedor/host/porta/modo próprios) |
-| `[channels.<type>]` | Um canal servido pelo daemon sem nome (por exemplo, `telegram`) |
+| `[channels.<type>]` | Um canal servido pelo daemon sem nome (p. ex. `telegram`) |
 | `[daemon.<name>.channels.<type>]` | Um canal ligado a uma sessão de daemon nomeada |
 | `[mcp.servers.<name>]` | Um servidor MCP externo (fonte de ferramentas) |
 
-Tipos de tarefa para `[routing.tasks]`: `default`, `curator`, `compressor`,
-`insights`, `skills`, `advisor`, `vision`, `embedding`.
+Tipos de tarefa para `[routing.tasks]`: `default`, `curator`, `compressor`, `insights`,
+`skills`, `advisor`, `vision`, `embedding`.
 
-> As sugestões de encaminhamento em linguagem natural no `AGENTS.md` são
-> interpretadas e geram automaticamente um `routing.nl.toml`; as entradas
-> explícitas em `[routing.tasks]` prevalecem sempre. Execute
-> `veles route refresh` para reinterpretar. Consulte [encaminhamento por tarefa](../how-to/per-task-routing.md).
+> As pistas de encaminhamento em linguagem natural no `AGENTS.md` são analisadas para um
+> `routing.nl.toml` gerado automaticamente; as entradas explícitas em `[routing.tasks]`
+> ganham sempre. Execute `veles route refresh` para reanalisar. Ver
+> [encaminhamento por tarefa](../how-to/per-task-routing.md).
 
 ### `project.toml`
 
-`<project>/.veles/project.toml` contém os metadados imutáveis do projeto (`name`,
+O `<project>/.veles/project.toml` contém metadados imutáveis do projecto (`name`,
 `created_at`, `schema_version`, `layout`). Normalmente não o edita à mão.
 
 ---
 
 ## AGENTS.md
 
-O ficheiro de contexto do projeto na raiz do projeto. É injetado no system prompt
-do agente no arranque e tem symlinks para `CLAUDE.md` e `GEMINI.md`, de modo que
-uma CLI `claude` ou `gemini` iniciada no diretório capta o mesmo contexto.
+O ficheiro de contexto do projecto, na raiz do projecto. É injectado no prompt de sistema
+do agente no arranque e ligado por symlink a `CLAUDE.md` e `GEMINI.md` para que uma CLI
+`claude` ou `gemini` lançada no directório apanhe o mesmo contexto.
 
-Mantenha-o pequeno — os ficheiros `.md` auxiliares (por exemplo, `wiki/INDEX.md`)
-carregam a pedido. Valide as secções obrigatórias com `veles schema validate`.
-Consulte [pacotes de layout e a LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).
+Mantenha-o pequeno — os ficheiros `.md` auxiliares (p. ex. `wiki/INDEX.md`) carregam a
+pedido. Valide as secções obrigatórias com `veles schema validate`. Ver
+[packs de layout e o LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).

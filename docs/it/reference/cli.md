@@ -1,63 +1,66 @@
 # Riferimento CLI
 
-> 🌐 **Lingue:** [English](../../en/reference/cli.md) · [Русский](../../ru/reference/cli.md) · **Italiano**
+> 🌐 **Languages:** **English** · [Русский](../../ru/reference/cli.md)
 
-Ogni comando, sottocomando e flag di Veles. Esegui `veles <command> --help` per la
-firma autorevole e sempre aggiornata — questa pagina rispecchia i parser degli
-argomenti in `src/veles/cli/_parsers/`.
+Ogni comando, sottocomando e flag di Veles. Esegui `veles <command> --help` per
+ottenere la firma autorevole e sempre aggiornata — questa pagina rispecchia i
+parser degli argomenti in `src/veles/cli/_parsers/`.
 
 ```
 veles [--no-wizard] <command> [subcommand] [options]
 ```
 
-- `--no-wizard` — salta la procedura guidata di configurazione al primo avvio anche se
-  `~/.veles/config.toml` è assente (condizionato anche dalla presenza di un TTY e da `VELES_NO_WIZARD=1`).
+- `--no-wizard` — salta la procedura guidata di configurazione iniziale anche se
+  `~/.veles/config.toml` è assente (subordinato anche alla presenza di un TTY e a
+  `VELES_NO_WIZARD=1`).
 - Senza argomenti, `veles` avvia la [TUI](tui.md) interattiva.
 
-La maggior parte dei comandi dell'agente accetta i [flag condivisi del ciclo dell'agente](#shared-agent-loop-flags)
-e i [nomi dei provider](#provider-names) elencati in fondo.
+La maggior parte dei comandi dell'agente accetta i [flag condivisi del ciclo
+dell'agente](#shared-agent-loop-flags) e i [nomi dei provider](#provider-names)
+elencati in fondo.
 
 ---
 
 ## Ciclo di vita del progetto
 
 ### `veles init [name]`
-Crea un nuovo progetto Veles nella directory corrente (una directory di stato `.veles/`
-+ `AGENTS.md` + lo scaffold di contenuto del layout pack scelto).
+Crea un nuovo progetto Veles nella directory corrente (una directory di stato
+`.veles/` + `AGENTS.md` + lo scaffold dei contenuti del layout pack scelto).
 
 | Flag | Default | Scopo |
 |---|---|---|
 | `name` (posizionale) | basename della cwd | Nome del progetto |
-| `--layout <name>` | `llm-wiki` | Layout pack per lo scaffold di contenuto (`llm-wiki`, `notes`, `bare` o un pack personalizzato da `~/.veles/layouts/`) |
+| `--layout <name>` | `llm-wiki` | Layout pack per lo scaffold dei contenuti (`llm-wiki`, `notes`, `bare` o un pack personalizzato da `~/.veles/layouts/`) |
 | `--force` | off | Ricrea `.veles/` anche se esiste già |
 
 ### `veles schema {validate,edit,fix}`
-Valida o modifica `AGENTS.md` (il file di contesto del progetto).
+Convalida o modifica `AGENTS.md` (il file di contesto del progetto).
 
 - `validate` — verifica la presenza delle sezioni H2 richieste.
-- `edit` — apre `AGENTS.md` in `$EDITOR` (default `vi`), valida all'uscita.
-- `fix` — aggiunge interattivamente le sezioni mancanti tramite una procedura guidata LLM.
+- `edit` — apre `AGENTS.md` in `$EDITOR` (default `vi`), convalida all'uscita.
+- `fix` — aggiunge interattivamente le sezioni mancanti tramite una procedura
+  guidata LLM.
 
 ### `veles self-doc [refresh|show]`
-Genera e mostra l'auto-documentazione del progetto (`wiki/self-doc/overview.md`).
+Genera e visualizza l'auto-documentazione del progetto (`wiki/self-doc/overview.md`).
 `veles self-doc` da solo mostra la pagina corrente; `refresh` la rigenera.
 
 ### `veles doctor`
-Esegue controlli di integrità sullo stato user-global e sul progetto attivo. Funziona con o
-senza un progetto attivo.
+Esegue controlli di integrità sullo stato globale dell'utente e sul progetto
+attivo. Funziona con o senza un progetto attivo.
 
 | Flag | Default | Scopo |
 |---|---|---|
 | `--json` | off | Emette un report JSON |
-| `--strict` | off | Esce con codice diverso da zero su qualsiasi avviso (gating CI) |
+| `--strict` | off | Esce con codice diverso da zero in presenza di qualsiasi warning (gating CI) |
 
 ### `veles export {full,template} <path>`
 Impacchetta il progetto in un bundle `.tar.gz`. Vedi [Backup e condivisione](../how-to/backup-and-share.md).
 
-- `full <path>` — intero progetto (`.veles/` + `AGENTS.md`), meno gli effimeri di runtime.
-- `template <path>` — sottoinsieme sanificato (schema + skill + moduli + pagine wiki
-  non di sessione); rimuove `memory.db`, `sources/`, `sessions/`, le concessioni `trust` e
-  redige le PII dal testo.
+- `full <path>` — l'intero progetto (`.veles/` + `AGENTS.md`), esclusi gli effimeri di runtime.
+- `template <path>` — sottoinsieme sanificato (schema + skill + moduli + pagine
+  wiki non di sessione); rimuove `memory.db`, `sources/`, `sessions/`, le
+  concessioni di `trust`, e redige le informazioni personali (PII) dal testo.
 
 ### `veles import <path>`
 Ripristina un bundle creato da `veles export`.
@@ -66,46 +69,50 @@ Ripristina un bundle creato da `veles export`.
 |---|---|---|
 | `path` (posizionale) | — | Percorso del bundle (`.tar.gz`) |
 | `--into <dir>` | cwd | Directory di destinazione |
-| `--force` | off | Sovrascrive una `.veles/` esistente nella destinazione |
+| `--force` | off | Sovrascrive un `.veles/` esistente nella destinazione |
 
 ---
 
 ## Esecuzione dell'agente
 
 ### `veles run "<prompt>"`
-Esegue un singolo prompt end-to-end con persistenza della memoria e i trigger di
-curator/apprendimento. Accetta tutti i [flag condivisi del ciclo dell'agente](#shared-agent-loop-flags) più:
+Esegue un singolo prompt end-to-end con persistenza della memoria e i trigger del
+curator/apprendimento. Accetta tutti i [flag condivisi del ciclo
+dell'agente](#shared-agent-loop-flags) più:
 
 | Flag | Default | Scopo |
 |---|---|---|
 | `--resume <session_id>` | nuova sessione | Continua una sessione esistente |
-| `--manager` | off | Scompone tramite il manager multi-agente (anche `VELES_MANAGER_MODE=1`) |
+| `--manager` | off | Decompone tramite il manager multi-agente (anche `VELES_MANAGER_MODE=1`) |
+| `--verify` | off | Al termine, l'advisor instradato giudica la risposta; in caso di fallimento netto, riesegue sul modello più potente (anche `VELES_VERIFY_MODE=1`) |
 | `--plan` | off | Modalità pianificazione: lettura/ricerca/bozza consentite, mutazioni bloccate |
-| `--no-agents-md` | off | Non inietta `AGENTS.md` nel prompt di sistema |
+| `--no-agents-md` | off | Non inietta `AGENTS.md` nel system prompt |
 | `--no-index` | off | Non inietta `wiki/INDEX.md` |
 | `--no-compress` | off | Disabilita la compressione del contesto a finestra scorrevole |
 | `--no-curator` | off | Disabilita i trigger del curator per questa esecuzione |
-| `--no-insights` | off | Disabilita l'estrazione di insight post-esecuzione |
+| `--no-insights` | off | Disabilita l'estrazione degli insight a fine esecuzione |
 | `--no-proposer` | off | Disabilita l'auto-trigger del proposer dei sottoprogetti |
 | `--no-route-refresh` | off | Disabilita l'aggiornamento del routing NL da `AGENTS.md` |
 | `--no-suggest-promote` | off | Disabilita il suggeritore di auto-promozione |
-| `--compressor-model <id>` | da routing | Sovrascrive il modello di compressione |
-| `--compress-threshold-tokens <n>` | `50000` | Dimensione della cronologia che innesca la compressione |
+| `--compressor-model <id>` | instradato | Sovrascrive il modello di compressione |
+| `--compress-threshold-tokens <n>` | `50000` | Dimensione della cronologia che attiva la compressione |
 
 ### `veles tui`
-Apre il REPL interattivo. Vedi [riferimento TUI](tui.md). Accetta i flag condivisi del
-ciclo dell'agente, `--resume`, i flag `--no-*` di iniezione/compressione sopra, e:
+Apre la REPL interattiva. Vedi [Riferimento TUI](tui.md). Accetta i flag condivisi
+del ciclo dell'agente, `--resume`, i flag `--no-*` di iniezione/compressione qui
+sopra e:
 
 | Flag | Default | Scopo |
 |---|---|---|
-| `--theme <name>` | config o `everforest` | Tema colore (everforest, dracula, gruvbox, tokyo-night, catppuccin) |
+| `--theme <name>` | config o `everforest` | Tema di colori (everforest, dracula, gruvbox, tokyo-night, catppuccin) |
 
 ### `veles add <source>`
-Legge una fonte (un file locale o un URL `http(s)://`) e la sintetizza in una pagina
-wiki. Accetta i flag condivisi del ciclo dell'agente.
+Legge una sorgente (un file locale o un URL `http(s)://`) e la sintetizza in una
+pagina wiki. Accetta i flag condivisi del ciclo dell'agente.
 
 ### `veles curate`
-Esegue una passata del curator: compatta le sessioni non elaborate in pagine `wiki/sessions/`.
+Esegue un passaggio del curator: compatta le sessioni non elaborate in pagine
+`wiki/sessions/`.
 
 | Flag | Default | Scopo |
 |---|---|---|
@@ -114,8 +121,8 @@ Esegue una passata del curator: compatta le sessioni non elaborate in pagine `wi
 Più i flag condivisi del ciclo dell'agente.
 
 ### `veles research "<question>"`
-Ricerca approfondita: scompone in sottodomande → esplora il web in parallelo →
-sintetizza un report citato.
+Ricerca approfondita: decompone in sotto-domande → esplora il web in parallelo →
+sintetizza un report con citazioni.
 
 | Flag | Default | Scopo |
 |---|---|---|
@@ -124,17 +131,18 @@ sintetizza un report citato.
 Più i flag condivisi del ciclo dell'agente.
 
 ### `veles dream`
-Esegue un ciclo di consolidamento della memoria in background (insight → dedup delle skill → suggerimenti
-di promozione → lint della wiki, opzionalmente consolidamento LLM).
+Esegue un ciclo di consolidamento della memoria in background (insight → dedup
+delle skill → suggerimenti di promozione → lint della wiki, opzionalmente
+consolidamento LLM).
 
 | Flag | Default | Scopo |
 |---|---|---|
 | `--include-consolidation` | off | Esegue il costoso consolidamento LLM (richiede una chiave API) |
 | `--dry-run` | off | Esegue tutti i passaggi ma salta le scritture in `wiki/state` |
 | `--skip-insights` / `--skip-dedup` / `--skip-promote` / `--skip-lint` | off | Salta singoli passaggi |
-| `--consolidation-model <id>` | `anthropic/claude-haiku-4.5` | Sovrascrive il modello di consolidamento |
-| `--provider <name>` | `openrouter` | Provider per il sub-agente di consolidamento |
-| `--project-root <path>` | rilevamento | Override del progetto |
+| `--consolidation-model <id>` | instradato (ripiega su `anthropic/claude-haiku-4.5`) | Sovrascrive il modello di consolidamento |
+| `--provider <name>` | instradato | Provider per il sub-agente di consolidamento (ometti per usare il provider instradato del progetto) |
+| `--project-root <path>` | scoperto | Override del progetto |
 
 ---
 
@@ -144,22 +152,22 @@ di promozione → lint della wiki, opzionalmente consolidamento LLM).
 
 | Sottocomando | Scopo |
 |---|---|
-| `list` | Elenca le skill nel progetto attivo (con telemetria) |
-| `show <name>` | Stampa lo `SKILL.md` di una skill |
-| `add <source> [--name N] [--scope project\|user] [-y]` | Installa da un URL git o un percorso locale |
+| `list` | Elenca le skill del progetto attivo (con telemetria) |
+| `show <name>` | Stampa il `SKILL.md` di una skill |
+| `add <source> [--name N] [--scope project\|user] [-y]` | Installa da un URL git o da un percorso locale |
 | `remove <name> [--scope project\|user] [-y]` | Elimina una skill installata |
 | `promote <name> [--keep-telemetry]` | Copia una skill di progetto nello scope utente (`~/.veles/skills/`) |
 | `demote <name> [-y]` | Copia una skill utente nel progetto attivo |
 | `dedup [--mode auto\|embedding\|tfidf] [--embedding-threshold f] [--tfidf-threshold f]` | Trova skill quasi duplicate |
-| `suggest-promote [--save] [--min-uses n] [--min-success-rate f]` | Elenca le skill che superano la soglia di auto-promozione |
+| `suggest-promote [--save] [--min-uses n] [--min-success-rate f]` | Elenca le skill che soddisfano la soglia di auto-promozione |
 
 ### `veles tool {list,show,promote}`
 
 | Sottocomando | Scopo |
 |---|---|
 | `list` | Elenca i tool catalogati nel `memory.db` di questo progetto |
-| `show <name>` | Stampa il manifest + telemetria di un tool |
-| `promote <name> [-y]` | Sposta un tool di progetto in `~/.veles/tools/` (cross-project) |
+| `show <name>` | Stampa il manifest + la telemetria di un tool |
+| `promote <name> [-y]` | Sposta un tool di progetto in `~/.veles/tools/` (cross-progetto) |
 
 ### `veles module {list,show,add,remove}`
 
@@ -167,7 +175,7 @@ di promozione → lint della wiki, opzionalmente consolidamento LLM).
 |---|---|
 | `list` | Elenca i moduli installati |
 | `show <name>` | Stampa il manifest di un modulo |
-| `add <source> [--name N] [-y]` | Installa un modulo da un URL git o un percorso locale |
+| `add <source> [--name N] [-y]` | Installa un modulo da un URL git o da un percorso locale |
 | `remove <name> [-y]` | Elimina un modulo installato |
 
 ### `veles browse {modules,skills} [query]`
@@ -176,7 +184,7 @@ Sfoglia i registri curati.
 | Flag | Default | Scopo |
 |---|---|---|
 | `query` (posizionale) | `""` | Filtro per sottostringa |
-| `--source <url>` | canonico | Sovrascrive la fonte del registro |
+| `--source <url>` | canonico | Sovrascrive la sorgente del registro |
 | `--json` | off | Emette JSON |
 
 ---
@@ -202,7 +210,7 @@ Sfoglia i registri curati.
 |---|---|
 | `list` | Elenca i progetti registrati, dal più recente |
 | `add <path> [--slug S]` | Registra una directory di progetto esistente |
-| `remove <slug>` | Annulla la registrazione di un progetto (file intatti) |
+| `remove <slug>` | Annulla la registrazione di un progetto (i file restano intatti) |
 | `switch <slug>` | Stampa il percorso assoluto del progetto (usa `cd $(veles project switch <slug>)`) |
 
 ### `veles subproject {init,list,switch,remove,suggest}`
@@ -220,30 +228,30 @@ Sfoglia i registri curati.
 ## Routing e modelli
 
 ### `veles route {show,set,reset,refresh}`
-Routing ensemble per-task — quale `provider:model` gestisce ciascun tipo di task
+Routing d'ensemble per task — quale `provider:model` gestisce ciascun tipo di task
 (`default`, `curator`, `compressor`, `insights`, `skills`, `advisor`, `vision`,
-`embedding`). Vedi [routing per-task](../how-to/per-task-routing.md).
+`embedding`). Vedi [routing per task](../how-to/per-task-routing.md).
 
 | Sottocomando | Scopo |
 |---|---|
 | `show` | Stampa la tabella di routing risolta per il progetto attivo |
-| `set <task> <provider:model>` | Fissa un task a una spec |
-| `reset [task]` | Reimposta un task (o tutti) ai default |
-| `refresh [--force]` | Ri-analizza gli hint di routing in linguaggio naturale da `AGENTS.md` |
+| `set <task> <provider:model>` | Fissa un task a una specifica |
+| `reset [task]` | Ripristina un task (o tutti) ai default |
+| `refresh [--force]` | Rianalizza i suggerimenti di routing in linguaggio naturale da `AGENTS.md` |
 
 ### `veles models <provider>`
-Elenca i modelli di un provider. I provider cloud (openrouter/openai/gemini) sono in cache
-24h; i provider locali sono sempre live.
+Elenca i modelli di un provider. I provider cloud (openrouter/openai/gemini)
+vengono messi in cache per 24h; i provider locali sono sempre live.
 
 | Flag | Default | Scopo |
 |---|---|---|
 | `provider` (posizionale) | — | Uno dei [nomi dei provider](#provider-names) |
-| `--refresh` | off | Aggira la cache su disco (solo cloud) |
+| `--refresh` | off | Bypassa la cache su disco (solo cloud) |
 | `--json` | off | Emette `{provider, source, models}` come JSON |
 
 ---
 
-## Task a lunga durata
+## Task di lunga durata
 
 ### `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}`
 Obiettivi a lungo orizzonte con budget e checkpoint.
@@ -253,8 +261,8 @@ Obiettivi a lungo orizzonte con budget e checkpoint.
 | `list [--status active\|paused\|completed\|blocked\|cancelled]` | Elenca gli obiettivi |
 | `show <id> [--json]` | Mostra un obiettivo |
 | `start "<objective>" [--scope S] [--done-when D] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n] [--forbid A]… [--approve A]…` | Crea un obiettivo |
-| `checkpoint <id> "<note>" [--evidence U] [--cost-usd f] [--no-advance]` | Aggiunge progresso |
-| `pause <id>` / `resume <id>` | Mette in pausa / riprende |
+| `checkpoint <id> "<note>" [--evidence U] [--cost-usd f] [--no-advance]` | Aggiunge un avanzamento |
+| `pause <id>` / `resume <id>` | Metti in pausa / riprendi |
 | `done <id> [--evidence E]` / `cancel <id> [--reason R]` | Completa / annulla |
 
 ### `veles job {add,list,show,pause,resume,trigger,remove,history,tick}`
@@ -262,19 +270,19 @@ Job dell'agente pianificati.
 
 | Sottocomando | Scopo |
 |---|---|
-| `add --name N --schedule S --prompt P [--repeat n] [--context-from JOB_ID] [--deliver-to TARGET]` | Crea un job (schedule = cron, `<N><s\|m\|h\|d>`, o timestamp ISO) |
+| `add --name N --schedule S --prompt P [--repeat n] [--context-from JOB_ID] [--deliver-to TARGET]` | Crea un job (schedule = cron, `<N><s\|m\|h\|d>` o timestamp ISO) |
 | `list [--json]` / `show <id>` | Ispeziona i job |
 | `pause <id>` / `resume <id>` / `trigger <id>` / `remove <id>` | Ciclo di vita |
 | `history <id> [--limit n]` | Esecuzioni recenti |
-| `tick` | Esegue sincronamente una volta tutti i job dovuti (nessun daemon necessario; accetta i flag del ciclo dell'agente) |
+| `tick` | Esegue in modo sincrono tutti i job scaduti una volta (nessun daemon necessario; accetta i flag del ciclo dell'agente) |
 
 ---
 
 ## Sicurezza e controllo degli accessi
 
 ### `veles trust {list,set,revoke,clear}`
-Concessioni persistenti per tool sensibili (`run_shell`, `write_file`, `fetch_url`, …).
-Vedi [sicurezza](../how-to/security-and-permissions.md).
+Concessioni persistenti per i tool sensibili (`run_shell`, `write_file`,
+`fetch_url`, …). Vedi [sicurezza](../how-to/security-and-permissions.md).
 
 | Sottocomando | Scopo |
 |---|---|
@@ -284,21 +292,22 @@ Vedi [sicurezza](../how-to/security-and-permissions.md).
 | `clear [--scope project\|user\|all]` | Cancella le concessioni in uno scope |
 
 ### `veles autopilot {enable,disable,status}`
-Una finestra temporizzata in cui i prompt della trust ladder si auto-consentono.
+Una finestra temporizzata in cui i prompt della scala di fiducia vengono
+auto-consentiti.
 
 | Sottocomando | Scopo |
 |---|---|
-| `enable --until <DUR>` | Apre una finestra (`+30m`, `+2h`, `+1d`, o ISO `2026-05-12T18:00:00Z`) |
-| `disable` | Chiude la finestra subito |
+| `enable --until <DUR>` | Apre una finestra (`+30m`, `+2h`, `+1d` o ISO `2026-05-12T18:00:00Z`) |
+| `disable` | Chiude subito la finestra |
 | `status` | Riporta se l'autopilot è attivo |
 
 ### `veles secret {set,get,list,delete}`
-Segreti supportati dal portachiavi del SO (chiavi API, token dei bot).
+Segreti basati sul keychain del sistema operativo (chiavi API, token dei bot).
 
 | Sottocomando | Scopo |
 |---|---|
 | `set <name> [value]` | Memorizza (ometti il valore per input interattivo / stdin) |
-| `get <name> [--reveal] [--no-env-fallback]` | Cerca (fallback su env per default) |
+| `get <name> [--reveal] [--no-env-fallback]` | Recupera (fallback su env per default) |
 | `list` | Mostra quali segreti canonici sono configurati |
 | `delete <name>` | Rimuove un segreto |
 
@@ -307,22 +316,24 @@ Segreti supportati dal portachiavi del SO (chiavi API, token dei bot).
 ## Daemon e canali
 
 ### `veles daemon [start|stop|status|list|restart|delete|session|token]`
-Esegue/controlla il daemon HTTP+WS. `veles daemon` da solo apre la **TUI di selezione daemon**
-(progetto → daemon → canali). Vedi [eseguire come daemon](../how-to/run-as-daemon.md).
+Avvia/controlla il daemon HTTP+WS. `veles daemon` da solo apre la TUI del
+**selettore di daemon** (progetto → daemon → canali). Vedi
+[esecuzione come daemon](../how-to/run-as-daemon.md).
 
 | Sottocomando | Scopo |
 |---|---|
-| `start [--host H] [--port P] [--foreground] [--name N]` | Avvia un daemon (si distacca per default) |
-| `stop [--name N]` / `status [--name N]` | Ferma / ispeziona |
+| `start [--host H] [--port P] [--foreground] [--name N]` | Avvia un daemon (si stacca per default) |
+| `stop [--name N]` / `status [--name N]` | Arresta / ispeziona |
 | `list` | Elenca i daemon di tutti i progetti |
-| `restart [target] [--name N]` | Ferma + rilancia sullo stesso host/porta |
-| `delete <target> [-y]` | Ferma + rimuove dal registro |
+| `restart [target] [--name N]` | Arresta + riavvia sullo stesso host/porta |
+| `delete <target> [-y]` | Arresta + rimuove dal registro |
 | `session create <name> [--host H] --port P [--model M] [--provider P] [--mode M]` | Dichiara una sessione daemon con nome |
 | `session list [--all]` / `session delete <name>` | Gestisce le sessioni con nome |
 | `token add <name>` / `token list` / `token remove <name>` | CRUD dei bearer token |
 
-`start` accetta anche i flag condivisi del ciclo dell'agente; per il daemon, `--model` /
-`--provider` per default usano la config del progetto e sono fissi per tutta la vita del daemon.
+`start` accetta anche i flag condivisi del ciclo dell'agente; per il daemon,
+`--model` / `--provider` assumono come default la config del progetto e sono fissi
+per tutta la durata del daemon.
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
 Gateway di chat esterni (Telegram, …) che dialogano con un daemon. Vedi
@@ -330,11 +341,11 @@ Gateway di chat esterni (Telegram, …) che dialogano con un daemon. Vedi
 
 | Sottocomando | Scopo |
 |---|---|
-| `list` | Elenca le piattaforme di canale registrate + conteggio sessioni |
+| `list` | Elenca le piattaforme di canale registrate + il conteggio delle sessioni |
 | `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | Avvia un gateway in primo piano |
 | `list-sessions [--channel C]` | Mostra le mappature `chat_id → session_id` |
 | `reset-session <chat_id> [--channel C]` | Dimentica una mappatura (il prossimo messaggio parte da zero) |
-| `add [--channel C] [--session S]` | Collega un canale a un daemon (procedura guidata; credenziali → portachiavi) |
+| `add [--channel C] [--session S]` | Collega un canale a un daemon (procedura guidata; credenziali → keychain) |
 | `remove <channel> [--session S]` | Rimuove un binding di canale |
 
 ---
@@ -359,18 +370,19 @@ start`:
 
 | Flag | Default | Scopo |
 |---|---|---|
-| `--model <id>` | `anthropic/claude-sonnet-4.6` (tui: persistito) | ID del modello |
+| `--model <id>` | risolto dal modello `[provider]` del progetto → `default_model` utente (nessun default hardcoded) | ID del modello |
 | `--provider <name>` | `openrouter` | Provider (vedi sotto) |
-| `--max-tokens-total <n>` | `100000` | Budget cumulativo di token; `0` disabilita |
-| `--max-iterations <n>` | `30` | Numero massimo di iterazioni di chiamata tool per turno |
+| `--max-tokens-total <n>` | `100000` | Budget cumulativo di token; `0` lo disabilita |
+| `--max-iterations <n>` | `30` | Numero massimo di iterazioni di chiamata-tool per turno |
 | `--stream` | off | Trasmette la risposta token per token |
-| `--verbose` / `-v` | off | Progresso per-turno su stderr |
-| `--project-root <path>` | rilevamento dalla cwd | Opera su un progetto altrove |
+| `--verbose` / `-v` | off | Avanzamento per turno su stderr |
+| `--project-root <path>` | scoperto dalla cwd | Opera su un progetto altrove |
 
 ## Nomi dei provider
 
 `openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
 `gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
 
-I provider locali (`ollama`, `llamacpp`, `openai-compat`) non necessitano di chiave API. Vedi il
-[riferimento dei provider](providers.md) e [configurare i provider](../how-to/configure-providers.md).
+I provider locali (`ollama`, `llamacpp`, `openai-compat`) non richiedono chiave
+API. Vedi il [riferimento dei provider](providers.md) e
+[configurare i provider](../how-to/configure-providers.md).

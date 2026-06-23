@@ -1,10 +1,10 @@
 # Come eseguire Veles come daemon
 
-> 🌐 **Lingue:** [English](../../en/how-to/run-as-daemon.md) · [Русский](../../ru/how-to/run-as-daemon.md) · **Italiano**
+> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/run-as-daemon.md)
 
-Il daemon è un server HTTP+WS opzionale e a lunga durata che espone l'agente come
-API — la base per i [canali](connect-telegram.md) (Telegram, …), i [job](long-running-tasks.md)
-pianificati e l'uso remoto/headless.
+Il daemon è un server HTTP+WS opzionale e di lunga durata che espone l'agente come
+API — la base per i [canali](connect-telegram.md) (Telegram, …), i
+[job](long-running-tasks.md) pianificati e l'uso remoto/headless.
 
 ## Avvio e arresto
 
@@ -14,26 +14,26 @@ veles daemon status             # is it running?
 veles daemon stop               # SIGTERM via the pid file
 ```
 
-`start` si distacca e restituisce il controllo alla shell. Per un processo in
-primo piano (`Type=simple` di systemd, Docker, debug) passa `--foreground`.
-Sovrascrivi il bind:
+`start` si stacca e restituisce la shell. Per un processo in primo piano (systemd
+`Type=simple`, Docker, debug) passa `--foreground`. Sovrascrivi il bind:
 
 ```bash
 veles daemon start --host 0.0.0.0 --port 9000
 ```
 
-Il modello e il provider del daemon provengono dalla configurazione del progetto e
-sono **fissi per tutta la sua durata** — impostali prima di avviarlo:
+Il modello e il provider del daemon provengono dalla config del progetto e sono
+**fissi per tutta la sua durata** — impostali prima di avviarlo:
 
 ```toml
 # <project>/.veles/config.toml
 [provider]
-default = "ollama:qwen3:4b-instruct"
+default = "ollama"            # provider name
+model = "qwen3:4b-instruct"   # model id
 ```
 
 ## Token di autenticazione
 
-I client API si autenticano con un token bearer:
+I client API si autenticano con un bearer token:
 
 ```bash
 veles daemon token add tui-client     # mint a token
@@ -55,12 +55,12 @@ Other projects
   other-proj  running
 ```
 
-Tasti: `Enter` apre il log di un daemon; `s`/`t`/`r` avvia/ferma/riavvia; `d`
+Tasti: `Enter` apre il log di un daemon; `s`/`t`/`r` avvia/arresta/riavvia; `d`
 elimina; `c`/`x` aggiunge/rimuove un canale; `q` esce.
 
 ## Più daemon per progetto (sessioni con nome)
 
-Un progetto può eseguire contemporaneamente più daemon con modelli/porte diversi.
+Un progetto può eseguire più daemon con modelli/porte diversi contemporaneamente.
 Dichiara una sessione con nome, poi avviala:
 
 ```bash
@@ -69,10 +69,10 @@ veles daemon start --name api
 veles daemon session list
 ```
 
-Ogni sessione con nome ha il proprio blocco di configurazione `[daemon.<name>]` e i
-propri canali (`[daemon.<name>.channels.*]`).
+Ogni sessione con nome ha il proprio blocco di config `[daemon.<name>]` e i propri
+canali (`[daemon.<name>.channels.*]`).
 
-## Elencare i daemon tra i progetti
+## Elencare i daemon di tutti i progetti
 
 ```bash
 veles daemon list
@@ -80,7 +80,7 @@ veles daemon restart <project-or-slug>
 veles daemon delete  <project-or-slug>
 ```
 
-## Prossimi passi
+## Passo successivo
 
-- [Collega un canale Telegram](connect-telegram.md)
-- [Pianifica i job](long-running-tasks.md)
+- [Connettere un canale Telegram](connect-telegram.md)
+- [Pianificare job](long-running-tasks.md)

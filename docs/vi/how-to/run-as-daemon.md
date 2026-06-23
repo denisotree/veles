@@ -1,10 +1,10 @@
 # Cách chạy Veles dưới dạng daemon
 
-> 🌐 **Ngôn ngữ:** [English](../../en/how-to/run-as-daemon.md) · **Tiếng Việt**
+> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/run-as-daemon.md)
 
-Daemon là một máy chủ HTTP+WS tùy chọn, chạy lâu dài, đưa agent ra ngoài dưới dạng
-API — nền tảng cho các [kênh](connect-telegram.md) (Telegram, …), các
-[tác vụ](long-running-tasks.md) được lên lịch, cũng như việc sử dụng từ xa/headless.
+Daemon là một máy chủ HTTP+WS tùy chọn chạy lâu dài, phơi bày agent dưới dạng một
+API — nền tảng cho [channels](connect-telegram.md) (Telegram, …), các
+[job](long-running-tasks.md) được lên lịch, và việc dùng từ xa/headless.
 
 ## Khởi động và dừng
 
@@ -14,25 +14,26 @@ veles daemon status             # is it running?
 veles daemon stop               # SIGTERM via the pid file
 ```
 
-`start` tách tiến trình ra nền và trả lại shell cho bạn. Để chạy ở tiền cảnh
-(systemd `Type=simple`, Docker, gỡ lỗi) hãy truyền `--foreground`. Ghi đè địa chỉ bind:
+`start` tách tiến trình và trả lại shell cho bạn. Để có một tiến trình foreground
+(systemd `Type=simple`, Docker, gỡ lỗi) hãy truyền `--foreground`. Ghi đè bind:
 
 ```bash
 veles daemon start --host 0.0.0.0 --port 9000
 ```
 
-Model và provider của daemon được lấy từ cấu hình dự án và **cố định trong suốt
-vòng đời** của nó — hãy thiết lập chúng trước khi khởi động:
+Model và nhà cung cấp của daemon lấy từ config dự án và **cố định trong suốt vòng
+đời của nó** — hãy đặt chúng trước khi khởi động:
 
 ```toml
 # <project>/.veles/config.toml
 [provider]
-default = "ollama:qwen3:4b-instruct"
+default = "ollama"            # provider name
+model = "qwen3:4b-instruct"   # model id
 ```
 
 ## Token xác thực
 
-Các client API xác thực bằng bearer token:
+Client API xác thực bằng một bearer token:
 
 ```bash
 veles daemon token add tui-client     # mint a token
@@ -40,10 +41,10 @@ veles daemon token list               # list (masked)
 veles daemon token remove tui-client
 ```
 
-## Bộ chọn daemon (TUI)
+## Trình chọn daemon (TUI)
 
-Chạy `veles daemon` không kèm subcommand để mở bảng điều khiển — một cây liệt kê
-các daemon của dự án và các kênh của từng daemon:
+Chạy `veles daemon` không kèm lệnh con để mở bảng điều khiển — một cây gồm các
+daemon của dự án và các channel của từng daemon:
 
 ```
 Project: my-project
@@ -54,13 +55,13 @@ Other projects
   other-proj  running
 ```
 
-Phím: `Enter` mở log của daemon; `s`/`t`/`r` start/stop/restart; `d` xóa;
-`c`/`x` thêm/gỡ một kênh; `q` thoát.
+Các phím: `Enter` mở log của một daemon; `s`/`t`/`r` start/stop/restart; `d`
+xóa; `c`/`x` thêm/gỡ một channel; `q` thoát.
 
-## Nhiều daemon cho mỗi dự án (named session)
+## Nhiều daemon cho mỗi dự án (session có tên)
 
-Một dự án có thể chạy đồng thời nhiều daemon với các model/cổng khác nhau. Khai báo
-một named session, rồi khởi động nó:
+Một dự án có thể chạy đồng thời nhiều daemon với các model/cổng khác nhau. Khai
+báo một session có tên, rồi khởi động nó:
 
 ```bash
 veles daemon session create api --port 8801 --provider anthropic --model claude-opus-4.8
@@ -68,10 +69,10 @@ veles daemon start --name api
 veles daemon session list
 ```
 
-Mỗi named session có khối cấu hình `[daemon.<name>]` riêng và các kênh riêng
+Mỗi session có tên có khối config `[daemon.<name>]` riêng và các channel riêng
 (`[daemon.<name>.channels.*]`).
 
-## Liệt kê daemon trên nhiều dự án
+## Liệt kê các daemon trên các dự án
 
 ```bash
 veles daemon list
@@ -81,5 +82,5 @@ veles daemon delete  <project-or-slug>
 
 ## Tiếp theo
 
-- [Kết nối kênh Telegram](connect-telegram.md)
-- [Lên lịch tác vụ](long-running-tasks.md)
+- [Kết nối một channel Telegram](connect-telegram.md)
+- [Lên lịch các job](long-running-tasks.md)

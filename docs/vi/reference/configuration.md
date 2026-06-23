@@ -1,29 +1,28 @@
-# Tài liệu tham khảo cấu hình
+# Tham khảo cấu hình
 
-> 🌐 **Ngôn ngữ:** [English](../../en/reference/configuration.md) · **Tiếng Việt**
+> 🌐 **Languages:** **English** · [Русский](../../ru/reference/configuration.md)
 
-Veles được cấu hình bằng hai tệp TOML và một tập hợp các thư mục lưu trạng thái.
-Secret (API key, bot token) **không bao giờ** được ghi vào các tệp này — chúng nằm
-trong keychain của hệ điều hành hoặc trong biến môi trường (xem
-[biến môi trường](environment-variables.md)).
+Veles được cấu hình bởi hai file TOML và một tập các thư mục trạng thái. Các
+secret (API key, bot token) **không bao giờ** được ghi vào những file này — chúng
+nằm trong keychain của hệ điều hành hoặc trong biến môi trường (xem [biến môi trường](environment-variables.md)).
 
 ## Trạng thái được lưu ở đâu
 
 | Đường dẫn | Phạm vi | Nội dung |
 |---|---|---|
-| `~/.veles/` | Toàn cục cấp người dùng | `config.toml`, các quyền trust, skill/tool dùng chung giữa các dự án, model cache, locale, registry |
-| `<project>/.veles/` | Cục bộ trong dự án | `project.toml`, `config.toml`, `memory.db`, skill/tool của dự án, plan, các artefact thời gian chạy |
-| `<project>/AGENTS.md` | Dự án | Tệp ngữ cảnh được tiêm vào agent (symlink tới `CLAUDE.md` / `GEMINI.md`) |
+| `~/.veles/` | User-global | `config.toml`, các cấp quyền trust, skills/tools dùng chung nhiều dự án, cache model, locale, registry |
+| `<project>/.veles/` | Cục bộ theo dự án | `project.toml`, `config.toml`, `memory.db`, skills/tools của dự án, plan, các file tạm lúc chạy |
+| `<project>/AGENTS.md` | Dự án | File ngữ cảnh được chèn vào agent (symlink tới `CLAUDE.md` / `GEMINI.md`) |
 | `<project>/wiki/`, `sources/` | Dự án | Nội dung của người dùng (layout LLM-Wiki mặc định) |
 
-`VELES_USER_HOME` chuyển hướng `~` (để trạng thái cấp người dùng nằm tại
-`<override>/.veles/`). Xem [bố cục dự án](project-layout.md) để biết toàn bộ cây thư mục.
+`VELES_USER_HOME` chuyển hướng `~` (nên trạng thái user nằm tại `<override>/.veles/`).
+Xem [layout dự án](project-layout.md) để biết cây thư mục đầy đủ.
 
 ---
 
-## Cấu hình người dùng — `~/.veles/config.toml`
+## Config của user — `~/.veles/config.toml`
 
-Được tạo bởi wizard chạy lần đầu; có thể chỉnh sửa bằng tay an toàn.
+Được trình thiết lập lần đầu ghi ra; có thể chỉnh tay an toàn.
 
 ```toml
 [user]
@@ -34,7 +33,7 @@ first_project_name = "myorg"     # recorded by the wizard
 tui_theme = "everforest"         # everforest | dracula | gruvbox | tokyo-night | catppuccin
 
 [permissions]                    # optional per-tool policy
-fetch_url  = "approval_required" # approval_required | always_confirm | always_allow
+fetch_url  = "approval_required" # allow | approval_required | always_confirm
 write_file = "always_confirm"
 
 [routing.tasks]                  # optional user-scope routing (see below)
@@ -48,19 +47,20 @@ args = ["-m", "my_mcp_server"]
 
 | Khóa | Kiểu | Mục đích |
 |---|---|---|
-| `[user] language` | `"en"` \| `"ru"` | Locale cho các chuỗi giao diện (có thể ghi đè qua `VELES_LOCALE`) |
-| `[user] default_provider` | string | Provider được dùng khi không chỉ định |
-| `[user] default_model` | string | Model được dùng khi không chỉ định |
-| `[user] tui_theme` | string | Theme màu mặc định cho TUI |
-| `[permissions] <tool>` | policy | Chính sách quyền theo từng công cụ (xem [trust & sandbox](../explanation/trust-and-sandbox.md)) |
+| `[user] language` | `"en"` \| `"ru"` | Locale cho chuỗi UI (có thể ghi đè qua `VELES_LOCALE`) |
+| `[user] default_provider` | string | Nhà cung cấp dùng khi không chỉ định |
+| `[user] default_model` | string | Model dùng khi không chỉ định |
+| `[user] tui_theme` | string | Chủ đề màu TUI mặc định |
+| `[permissions] <tool>` | policy | Chính sách quyền theo từng tool (xem [trust & sandbox](../explanation/trust-and-sandbox.md)) |
 
 ---
 
-## Cấu hình dự án — `<project>/.veles/config.toml`
+## Config của dự án — `<project>/.veles/config.toml`
 
 ```toml
 [provider]
-default = "openrouter:anthropic/claude-sonnet-4.6"   # base for the main agent + routing
+default = "openrouter"                               # provider name for the main agent + routing base
+model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -98,40 +98,40 @@ args = ["-y", "@modelcontextprotocol/server-github"]
 env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the environment
 ```
 
-### Các phần (section)
+### Các mục
 
-| Phần | Mục đích |
+| Mục | Mục đích |
 |---|---|
-| `[provider]` | Provider/model nền cho agent chính và cascade routing |
-| `[routing.tasks]` | Ghi đè `provider:model` theo từng tác vụ — xem [routing theo tác vụ](../how-to/per-task-routing.md) |
-| `[permissions]` | Chính sách quyền theo từng công cụ (phạm vi dự án) |
-| `[daemon]` | Địa chỉ bind + autostart của daemon không tên/"default" |
-| `[daemon.<name>]` | Một named daemon session (có model/provider/host/port/mode riêng) |
-| `[channels.<type>]` | Một kênh được phục vụ bởi daemon không tên (ví dụ `telegram`) |
-| `[daemon.<name>.channels.<type>]` | Một kênh gắn với một named daemon session |
-| `[mcp.servers.<name>]` | Một máy chủ MCP bên ngoài (nguồn công cụ) |
+| `[provider]` | Nhà cung cấp cơ sở (`default` = tên nhà cung cấp) + model (`model` = id model) cho agent chính và chuỗi cascade định tuyến |
+| `[routing.tasks]` | Ghi đè `provider:model` theo từng tác vụ — xem [định tuyến theo tác vụ](../how-to/per-task-routing.md) |
+| `[permissions]` | Chính sách quyền theo từng tool (phạm vi dự án) |
+| `[daemon]` | Bind + autostart của daemon không tên/"default" |
+| `[daemon.<name>]` | Một session daemon có tên (model/provider/host/port/mode riêng) |
+| `[channels.<type>]` | Một channel do daemon không tên phục vụ (ví dụ `telegram`) |
+| `[daemon.<name>.channels.<type>]` | Một channel gắn với một session daemon có tên |
+| `[mcp.servers.<name>]` | Một máy chủ MCP bên ngoài (nguồn tool) |
 
-Các kiểu tác vụ cho `[routing.tasks]`: `default`, `curator`, `compressor`, `insights`,
-`skills`, `advisor`, `vision`, `embedding`.
+Các loại tác vụ cho `[routing.tasks]`: `default`, `curator`, `compressor`,
+`insights`, `skills`, `advisor`, `vision`, `embedding`.
 
-> Các gợi ý routing bằng ngôn ngữ tự nhiên trong `AGENTS.md` được phân tích thành
-> một tệp `routing.nl.toml` tự sinh; các mục `[routing.tasks]` khai báo tường minh
-> luôn thắng. Chạy `veles route refresh` để phân tích lại. Xem
-> [routing theo tác vụ](../how-to/per-task-routing.md).
+> Các gợi ý định tuyến bằng ngôn ngữ tự nhiên trong `AGENTS.md` được phân tích
+> thành một `routing.nl.toml` tự sinh; các mục `[routing.tasks]` tường minh luôn
+> thắng. Chạy `veles route refresh` để phân tích lại. Xem
+> [định tuyến theo tác vụ](../how-to/per-task-routing.md).
 
 ### `project.toml`
 
-`<project>/.veles/project.toml` giữ metadata bất biến của dự án (`name`,
-`created_at`, `schema_version`, `layout`). Thông thường bạn không chỉnh sửa nó bằng tay.
+`<project>/.veles/project.toml` chứa siêu dữ liệu bất biến của dự án (`name`,
+`created_at`, `schema_version`, `layout`). Thông thường bạn không chỉnh tay file này.
 
 ---
 
 ## AGENTS.md
 
-Tệp ngữ cảnh dự án nằm ở thư mục gốc của dự án. Nó được tiêm vào system prompt của
-agent khi khởi động và được symlink tới `CLAUDE.md` và `GEMINI.md` để một CLI
+File ngữ cảnh của dự án nằm ở thư mục gốc dự án. Nó được chèn vào system prompt
+của agent khi khởi động và được symlink tới `CLAUDE.md` và `GEMINI.md` để một CLI
 `claude` hoặc `gemini` khởi chạy trong thư mục đó nhận được cùng ngữ cảnh.
 
-Giữ nó nhỏ gọn — các tệp `.md` phụ trợ (ví dụ `wiki/INDEX.md`) được nạp theo nhu cầu.
-Kiểm tra các phần bắt buộc bằng `veles schema validate`. Xem
-[layout pack & LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).
+Giữ nó nhỏ gọn — các file `.md` phụ trợ (ví dụ `wiki/INDEX.md`) được nạp theo
+nhu cầu. Kiểm tra các mục bắt buộc bằng `veles schema validate`. Xem
+[gói layout & LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).

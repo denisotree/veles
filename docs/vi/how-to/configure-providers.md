@@ -1,11 +1,11 @@
-# Cách cấu hình provider
+# Cách cấu hình nhà cung cấp
 
-> 🌐 **Ngôn ngữ:** [English](../../en/how-to/configure-providers.md) · **Tiếng Việt**
+> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/configure-providers.md)
 
-Chuyển Veles giữa OpenRouter, Anthropic, OpenAI, Gemini, các model cục bộ, hay một
-subscription CLI. Danh sách provider đầy đủ: [tham chiếu provider](../reference/providers.md).
+Chuyển Veles giữa OpenRouter, Anthropic, OpenAI, Gemini, các model cục bộ, hoặc
+một gói đăng ký CLI. Danh sách nhà cung cấp đầy đủ: [tham khảo nhà cung cấp](../reference/providers.md).
 
-## Chọn provider theo từng lệnh
+## Chọn một nhà cung cấp theo từng lệnh
 
 ```bash
 veles run --provider anthropic --model claude-sonnet-4.6 "..."
@@ -19,10 +19,11 @@ veles run --provider gemini     --model gemini-2.5-pro    "..."
 
 ```toml
 [provider]
-default = "openrouter:anthropic/claude-sonnet-4.6"
+default = "openrouter"                 # provider name
+model = "anthropic/claude-sonnet-4.6"  # model id
 ```
 
-Hoặc một mặc định toàn cục theo người dùng trong `~/.veles/config.toml`:
+Hoặc một giá trị mặc định user-global trong `~/.veles/config.toml`:
 
 ```toml
 [user]
@@ -32,7 +33,7 @@ default_model = "anthropic/claude-sonnet-4.6"
 
 ## Cung cấp API key
 
-Các provider trên cloud cần một key. Lưu nó một lần vào keychain của hệ điều hành:
+Các nhà cung cấp đám mây cần một key. Lưu nó một lần trong keychain của hệ điều hành:
 
 ```bash
 veles secret set OPENROUTER_API_KEY
@@ -45,8 +46,8 @@ veles secret set ANTHROPIC_API_KEY
 export OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-Thứ tự tra cứu: keychain (phạm vi dự án) → keychain (mặc định) → biến môi trường.
-Key **không bao giờ** được ghi vào các tệp config.
+Thứ tự tra cứu: keychain (phạm vi dự án) → keychain (default) → biến môi trường.
+Các key **không bao giờ** được ghi vào file config.
 
 ## Dùng một model hoàn toàn cục bộ (không cần key)
 
@@ -54,26 +55,26 @@ Cài [Ollama](https://ollama.com), pull một model, và trỏ Veles tới nó:
 
 ```bash
 ollama pull qwen3:4b-instruct
-veles models ollama                     # xác nhận nó đã được liệt kê
+veles models ollama                     # confirm it's listed
 veles run --provider ollama --model qwen3:4b-instruct "Hello"
 ```
 
-Việc gọi công cụ (tool calling) **mặc định tắt** trên các provider cục bộ. Bật nó
-khi bạn đã chọn một model có khả năng dùng công cụ:
+Gọi tool **mặc định bị tắt** trên các nhà cung cấp cục bộ. Bật nó khi bạn đã chọn
+một model hỗ trợ tool:
 
 ```bash
 export VELES_LOCAL_TOOLS=1
 ```
 
-Ghi đè các endpoint nếu server của bạn không ở cổng mặc định:
+Ghi đè endpoint nếu máy chủ của bạn không ở cổng mặc định:
 
 ```bash
 export OLLAMA_BASE_URL=http://localhost:11434/v1
 export LLAMACPP_BASE_URL=http://localhost:8080/v1
-export OPENAI_COMPAT_BASE_URL=http://my-host:8000/v1   # bắt buộc cho openai-compat
+export OPENAI_COMPAT_BASE_URL=http://my-host:8000/v1   # required for openai-compat
 ```
 
-## Ủy quyền cho subscription CLI Claude / Gemini
+## Ủy thác cho một gói đăng ký CLI Claude / Gemini
 
 Nếu bạn đã xác thực CLI `claude` hoặc `gemini`, Veles có thể điều khiển nó:
 
@@ -82,14 +83,14 @@ veles run --provider claude-cli "..."
 veles run --provider gemini-cli "..."
 ```
 
-Không cần API key — CLI tự xử lý việc xác thực.
+Không cần API key — CLI tự lo việc xác thực.
 
-## Liệt kê các model khả dụng
+## Liệt kê các model có sẵn
 
 ```bash
-veles models openrouter            # cloud: cache 24h
-veles models openrouter --refresh  # buộc lấy lại
-veles models ollama                # cục bộ: luôn lấy trực tiếp
+veles models openrouter            # cloud: cached 24h
+veles models openrouter --refresh  # force re-fetch
+veles models ollama                # local: always live
 ```
 
 ## Tiếp theo

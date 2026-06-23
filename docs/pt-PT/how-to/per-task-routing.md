@@ -2,32 +2,32 @@
 
 > 🌐 **Languages:** **English** · [Русский](../../ru/how-to/per-task-routing.md)
 
-O Veles não está vinculado a um único modelo. Cada **tarefa** interna pode usar
-um `provider:model` diferente — um modelo barato para a compressão de contexto,
-um modelo forte para o agente principal, um modelo de visão para imagens. É o
-sistema de *encaminhamento por ensemble* (ensemble routing).
+O Veles não está fixado a um único modelo. Cada **tarefa** interna pode usar um
+`provider:model` diferente — um modelo barato para a compressão de contexto, um forte para
+o agente principal, um modelo de visão para imagens. É o sistema de *encaminhamento de
+ensemble*.
 
 ## Tipos de tarefa
 
-| Tarefa | Utilizada para |
+| Tarefa | Usada para |
 |---|---|
-| `default` | O ciclo principal do agente |
-| `curator` | Consolidação de sessão → wiki |
+| `default` | O ciclo do agente principal |
+| `curator` | Consolidação sessão → wiki |
 | `compressor` | Compressão de contexto por janela deslizante |
-| `insights` | Extração de insights após a execução |
+| `insights` | Extracção de insights pós-execução |
 | `skills` | Execução de skills |
 | `advisor` | A auto-verificação `advisor_review` |
-| `vision` | `image_describe` (quando há um adaptador de visão ligado) |
-| `embedding` | Similaridade de `veles skill dedup` |
+| `vision` | `image_describe` (quando um adaptador de visão está ligado) |
+| `embedding` | Similaridade do `veles skill dedup` |
 
-## Ver o encaminhamento atual
+## Ver o encaminhamento actual
 
 ```bash
 veles route show
 ```
 
-Isto imprime o `provider:model` resolvido para cada tarefa e uma etiqueta
-`source` que indica qual a camada que o decidiu.
+Isto imprime o `provider:model` resolvido para cada tarefa e uma etiqueta `source` a
+indicar que camada o decidiu.
 
 ## Fixar uma tarefa a um modelo
 
@@ -37,7 +37,7 @@ veles route set advisor    openrouter:anthropic/claude-opus-4.8
 veles route set vision     openai:gpt-4o
 ```
 
-Estes comandos escrevem `[routing.tasks]` em `<project>/.veles/config.toml`:
+Isto escreve `[routing.tasks]` em `<project>/.veles/config.toml`:
 
 ```toml
 [routing.tasks]
@@ -49,35 +49,36 @@ vision     = "openai:gpt-4o"
 ## Repor
 
 ```bash
-veles route reset compressor   # uma tarefa de volta à predefinição
-veles route reset              # todas as tarefas de volta à predefinição
+veles route reset compressor   # one task back to default
+veles route reset              # all tasks back to default
 ```
 
-## Sugestões em linguagem natural no AGENTS.md
+## Pistas em linguagem natural no AGENTS.md
 
-Pode exprimir o encaminhamento em prosa no `AGENTS.md` (por exemplo, "usar um
-modelo barato para a compressão"). O Veles interpreta-as e gera automaticamente
-um `routing.nl.toml`:
+Pode exprimir o encaminhamento em prosa no `AGENTS.md` (p. ex. "usar um modelo barato para
+a compressão"). O Veles analisa-as para um `routing.nl.toml` gerado automaticamente:
 
 ```bash
-veles route refresh            # reinterpretar as sugestões do AGENTS.md
-veles route refresh --force    # mesmo que o AGENTS.md não tenha mudado
+veles route refresh            # re-parse AGENTS.md hints
+veles route refresh --force    # even if AGENTS.md hasn't changed
 ```
 
-As entradas explícitas em `[routing.tasks]` prevalecem sempre sobre as sugestões
-em linguagem natural.
+As entradas explícitas em `[routing.tasks]` ganham sempre sobre as pistas em LN.
 
 ## Ordem de resolução
 
-Para cada tarefa, vence a primeira camada que produza uma especificação:
+Para cada tarefa, ganha a primeira camada que produz uma especificação:
 
-1. projeto `[routing.tasks][task]`
-2. projeto `[routing.tasks].default`
-3. sugestão em linguagem natural do projeto (`routing.nl.toml`)
-4. base `[provider]` do projeto
-5. utilizador `[routing.tasks][task]` / `.default`
-6. utilizador `[user] default_provider` + `default_model`
-7. predefinição interna para essa tarefa
+1. `[routing.tasks][task]` do projecto
+2. `[routing.tasks].default` do projecto
+3. pista em LN do projecto (`routing.nl.toml`)
+4. base `[provider]` do projecto
+5. `[routing.tasks][task]` / `.default` do utilizador
+6. `[user] default_provider` + `default_model` do utilizador
 
-(`embedding` ignora as camadas genéricas — um modelo de chat não é um modelo de
-embedding.)
+Se nenhuma destas resolver, **não existe um recurso de reserva rígido** — a tarefa fica por
+definir e quem a invoca degrada (ignora a funcionalidade) ou falha com clareza, em vez de
+recorrer silenciosamente a um modelo na nuvem.
+
+(`embedding` ignora os apanha-tudo — um modelo de chat não é um modelo de embeddings — pelo
+que só um `[routing.tasks].embedding` explícito a resolve.)

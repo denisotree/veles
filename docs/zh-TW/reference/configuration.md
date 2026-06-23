@@ -1,26 +1,23 @@
 # 設定參考
 
-> 🌐 **語言：** **English** · [Русский](../../ru/reference/configuration.md)
+> 🌐 **Languages:** **English** · [Русский](../../ru/reference/configuration.md)
 
-Veles 由兩個 TOML 檔案與一組狀態目錄進行設定。Secrets
-（API 金鑰、bot token）**絕不會**寫進這些檔案——它們存放於作業系統的
-keychain 或環境變數中（參閱[環境變數](environment-variables.md)）。
+Veles 由兩個 TOML 檔案與一組狀態目錄來設定。機密（API 金鑰、機器人權杖）**絕不會**寫入這些檔案——它們存放在 OS 鑰匙圈或環境變數中（參見[環境變數](environment-variables.md)）。
 
-## 狀態存放於何處
+## 狀態存放位置
 
-| Path | Scope | Contents |
+| 路徑 | 範圍 | 內容 |
 |---|---|---|
-| `~/.veles/` | User-global | `config.toml`、trust 授權、跨專案 skills/tools、模型快取、locales、registry |
-| `<project>/.veles/` | Project-local | `project.toml`、`config.toml`、`memory.db`、專案 skills/tools、plans、執行期暫存物 |
-| `<project>/AGENTS.md` | Project | 注入 agent 的 context 檔案（symlink 到 `CLAUDE.md` / `GEMINI.md`） |
-| `<project>/wiki/`, `sources/` | Project | 使用者內容（預設的 LLM-Wiki layout） |
+| `~/.veles/` | 使用者全域 | `config.toml`、信任授權、跨專案技能／工具、模型快取、語系、登錄庫 |
+| `<project>/.veles/` | 專案本地 | `project.toml`、`config.toml`、`memory.db`、專案技能／工具、計畫、執行期暫態檔 |
+| `<project>/AGENTS.md` | 專案 | 注入代理的脈絡檔（以符號連結指向 `CLAUDE.md` / `GEMINI.md`） |
+| `<project>/wiki/`、`sources/` | 專案 | 使用者內容（預設的 LLM-Wiki 版面） |
 
-`VELES_USER_HOME` 會重新導向 `~`（使得 user 狀態落在 `<override>/.veles/`）。
-完整的目錄樹請參閱[專案 layout](project-layout.md)。
+`VELES_USER_HOME` 會重新導向 `~`（因此使用者狀態會落在 `<override>/.veles/`）。完整的目錄樹參見[專案版面](project-layout.md)。
 
 ---
 
-## User 設定——`~/.veles/config.toml`
+## 使用者設定——`~/.veles/config.toml`
 
 由首次執行的精靈寫入；可安全地手動編輯。
 
@@ -33,7 +30,7 @@ first_project_name = "myorg"     # recorded by the wizard
 tui_theme = "everforest"         # everforest | dracula | gruvbox | tokyo-night | catppuccin
 
 [permissions]                    # optional per-tool policy
-fetch_url  = "approval_required" # approval_required | always_confirm | always_allow
+fetch_url  = "approval_required" # allow | approval_required | always_confirm
 write_file = "always_confirm"
 
 [routing.tasks]                  # optional user-scope routing (see below)
@@ -45,13 +42,13 @@ command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
 ```
 
-| Key | Type | Purpose |
+| 鍵 | 型別 | 用途 |
 |---|---|---|
-| `[user] language` | `"en"` \| `"ru"` | UI 字串的 locale（可用 `VELES_LOCALE` 覆寫） |
-| `[user] default_provider` | string | 未指定時使用的 provider |
-| `[user] default_model` | string | 未指定時使用的模型 |
-| `[user] tui_theme` | string | 預設 TUI 配色主題 |
-| `[permissions] <tool>` | policy | 各工具的權限政策（參閱 [trust 與沙箱](../explanation/trust-and-sandbox.md)） |
+| `[user] language` | `"en"` \| `"ru"` | UI 字串的語系（可透過 `VELES_LOCALE` 覆寫） |
+| `[user] default_provider` | string | 未指定時所用的供應商 |
+| `[user] default_model` | string | 未指定時所用的模型 |
+| `[user] tui_theme` | string | 預設的 TUI 色彩主題 |
+| `[permissions] <tool>` | policy | 逐工具的權限策略（參見[信任與沙箱](../explanation/trust-and-sandbox.md)） |
 
 ---
 
@@ -59,7 +56,8 @@ args = ["-m", "my_mcp_server"]
 
 ```toml
 [provider]
-default = "openrouter:anthropic/claude-sonnet-4.6"   # base for the main agent + routing
+default = "openrouter"                               # provider name for the main agent + routing base
+model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -97,39 +95,31 @@ args = ["-y", "@modelcontextprotocol/server-github"]
 env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the environment
 ```
 
-### 區段
+### 各區段
 
-| Section | Purpose |
+| 區段 | 用途 |
 |---|---|
-| `[provider]` | 主 agent 與 routing 串接所用的基礎 provider／模型 |
-| `[routing.tasks]` | 各任務的 `provider:model` 覆寫——參閱[各任務 routing](../how-to/per-task-routing.md) |
-| `[permissions]` | 各工具的權限政策（專案範圍） |
-| `[daemon]` | 未具名／「default」daemon 的綁定位址 ＋ autostart |
-| `[daemon.<name>]` | 一個具名 daemon session（擁有自己的 model/provider/host/port/mode） |
+| `[provider]` | 基礎供應商（`default` = 供應商名稱）＋模型（`model` = 模型 ID），供主代理與路由串接使用 |
+| `[routing.tasks]` | 逐任務的 `provider:model` 覆寫——參見[逐任務路由](../how-to/per-task-routing.md) |
+| `[permissions]` | 逐工具的權限策略（專案範圍） |
+| `[daemon]` | 未具名／「預設」daemon 的綁定＋自動啟動 |
+| `[daemon.<name>]` | 一個具名 daemon 工作階段（自己的 model/provider/host/port/mode） |
 | `[channels.<type>]` | 由未具名 daemon 服務的 channel（例如 `telegram`） |
-| `[daemon.<name>.channels.<type>]` | 綁定到某個具名 daemon session 的 channel |
-| `[mcp.servers.<name>]` | 一個外部 MCP 伺服器（tool 來源） |
+| `[daemon.<name>.channels.<type>]` | 綁定至某具名 daemon 工作階段的 channel |
+| `[mcp.servers.<name>]` | 一個外部 MCP 伺服器（工具來源） |
 
-`[routing.tasks]` 的任務類型：`default`、`curator`、`compressor`、`insights`、
-`skills`、`advisor`、`vision`、`embedding`。
+`[routing.tasks]` 的任務類型：`default`、`curator`、`compressor`、`insights`、`skills`、`advisor`、`vision`、`embedding`。
 
-> `AGENTS.md` 中的自然語言 routing 提示會被解析成自動產生的
-> `routing.nl.toml`；明確的 `[routing.tasks]` 條目永遠優先。執行
-> `veles route refresh` 可重新解析。參閱[各任務 routing](../how-to/per-task-routing.md)。
+> `AGENTS.md` 中的自然語言路由提示會被解析進一個自動產生的 `routing.nl.toml`；明確的 `[routing.tasks]` 條目永遠優先。執行 `veles route refresh` 可重新解析。參見[逐任務路由](../how-to/per-task-routing.md)。
 
 ### `project.toml`
 
-`<project>/.veles/project.toml` 保存不可變的專案中繼資料（`name`、
-`created_at`、`schema_version`、`layout`）。一般不需要手動編輯它。
+`<project>/.veles/project.toml` 保存不可變的專案中繼資料（`name`、`created_at`、`schema_version`、`layout`）。一般情況下不需手動編輯。
 
 ---
 
 ## AGENTS.md
 
-位於專案根目錄的專案 context 檔案。它會在啟動時注入 agent 的
-系統 prompt，並 symlink 到 `CLAUDE.md` 與 `GEMINI.md`，使得在該目錄啟動的
-`claude` 或 `gemini` CLI 也能接收到相同的 context。
+位於專案根目錄的專案脈絡檔。它會在啟動時注入代理的系統提示，並以符號連結指向 `CLAUDE.md` 與 `GEMINI.md`，因此在該目錄中啟動的 `claude` 或 `gemini` CLI 會取得相同的脈絡。
 
-請保持它精簡——輔助的 `.md` 檔案（例如 `wiki/INDEX.md`）會按需載入。
-以 `veles schema validate` 驗證必要的區段。參閱
-[layout packs 與 LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)。
+請保持精簡——輔助的 `.md` 檔（例如 `wiki/INDEX.md`）會按需載入。以 `veles schema validate` 驗證必要章節。參見[版面套件與 LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)。
