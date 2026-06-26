@@ -86,6 +86,11 @@ class TuiApp(App[int]):
         # otherwise consume PageUp/PageDown). End re-arms follow-mode so
         # streaming resumes auto-scrolling; Ctrl+Home/Ctrl+End jump to the
         # ends without colliding with the composer's plain Home/End.
+        # M179: Ctrl+O toggles focus between the input and the output pane —
+        # the primary, Mac-friendly entry to read mode (Mac laptops have no
+        # PageUp/Home keys, and Ctrl+↑/↓ are taken by macOS Mission Control).
+        # `priority=True` so it works while the Composer (a TextArea) is focused.
+        Binding("ctrl+o", "toggle_chat_focus", "read output", priority=True),
         Binding("pageup", "scroll_chat('page_up')", "read ↑", priority=True),
         Binding("pagedown", "scroll_chat('page_down')", "scroll down", priority=True),
         Binding("ctrl+home", "scroll_chat('home')", "scroll top", priority=True, show=False),
@@ -592,6 +597,20 @@ class TuiApp(App[int]):
         elif where == "end":
             self._chat.scroll_to_bottom()
             self.action_focus_composer()
+
+    def action_toggle_chat_focus(self) -> None:
+        """Ctrl+O: flip focus between the input and the output pane.
+
+        The Mac-friendly entry point to read mode (no PageUp/Home needed).
+        Into the chat → pause follow so streaming doesn't drag the view;
+        back to the input → leave the scroll position as-is (the next prompt
+        re-arms follow via `append_user`)."""
+        if self._chat is None:
+            return
+        if self._chat.has_focus:
+            self.action_focus_composer()
+        else:
+            self.action_focus_chat()
 
     def action_focus_chat(self) -> None:
         """Enter read mode: focus the chat pane and stop auto-following so

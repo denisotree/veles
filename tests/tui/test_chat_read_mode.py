@@ -20,6 +20,25 @@ def _new_app(tmp_project, agent_factory_for, text_response):
     )
 
 
+async def test_ctrl_o_toggles_focus_between_panes(
+    tmp_project, agent_factory_for, text_response
+) -> None:
+    app = _new_app(tmp_project, agent_factory_for, text_response)
+    async with app.run_test() as pilot:
+        # Boot: input focused.
+        assert pilot.app._composer.has_focus
+        await pilot.press("ctrl+o")
+        await pilot.pause()
+        # Into read mode: output pane focused, follow paused.
+        assert pilot.app._chat.has_focus
+        assert not pilot.app._chat.following
+        await pilot.press("ctrl+o")
+        await pilot.pause()
+        # Back to the input.
+        assert pilot.app._composer.has_focus
+        assert not pilot.app._chat.has_focus
+
+
 async def test_pageup_focuses_chat_and_pauses_follow(
     tmp_project, agent_factory_for, text_response
 ) -> None:

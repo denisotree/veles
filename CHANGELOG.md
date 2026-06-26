@@ -12,10 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **TUI read mode (M179).** Switch keyboard focus from the input field into the output pane
-  and navigate it with the arrow keys. **PageUp** (or **Ctrl+Home**) enters read mode — the
-  chat pane takes focus (its left edge turns accent), auto-follow pauses, and **↑/↓**,
-  **PageUp/PageDown**, **Home/End** move through the output. **Esc** returns to the input;
-  **Ctrl+End** jumps to the bottom, resumes auto-scroll, and hands focus back.
+  and navigate it with the arrow keys. **Ctrl+O** toggles focus between the input and the
+  output (the primary, Mac-friendly entry — Mac laptops have no PageUp/Home keys); the focused
+  pane shows an accent left edge and auto-follow pauses. Once in the output, **↑/↓** move
+  through it; **Esc** returns to the input. PageUp / Ctrl+End still work where those keys
+  exist (Ctrl+End also jumps to the bottom and resumes auto-scroll).
 
 ## [0.7.0] — 2026-06-26
 

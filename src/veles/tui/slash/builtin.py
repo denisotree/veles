@@ -75,10 +75,10 @@ def _help(line: str, ctx: SlashContext) -> SlashResult:
         "  Ctrl+R                       open session picker",
         "  Ctrl+T                       open theme picker",
         "  Shift+Tab                    cycle mode",
-        "  PageUp                       enter read mode (focus output) + scroll up",
-        "  ↑/↓ PageUp/PageDown Home/End  navigate the output once in read mode",
+        "  Ctrl+O                       toggle focus: input <-> output (read mode)",
+        "  ↑/↓                          navigate the output once in read mode",
         "  Esc                          leave read mode, back to the input",
-        "  Ctrl+End                     jump to bottom + resume auto-scroll + back to input",
+        "  PageUp / Ctrl+End            (if available) read up / jump to bottom",
         "  (set VELES_TUI_MOUSE=1 to scroll with the mouse wheel; trades native select)",
     ]
     return SlashResult.ok("\n".join(rows))
