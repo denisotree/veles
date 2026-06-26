@@ -127,9 +127,10 @@ def test_apply_marks_last_user_message_tail() -> None:
     assert tail[0]["cache_control"] == {"type": "ephemeral"}
 
 
-def test_apply_tail_skips_assistant_with_tool_calls() -> None:
-    """The last message is an assistant tool-call (null content) — the tail
-    breakpoint lands on the preceding tool-result message instead."""
+def test_apply_tail_marks_user_only_not_tool_or_assistant() -> None:
+    """The tail breakpoint is scoped to `user` messages (documented-safe
+    OpenRouter shape). Trailing tool / assistant-tool-call messages are left
+    as-is; the last user message is the one marked."""
     msgs = [
         _sys_msg("system"),
         {"role": "user", "content": "do it"},
@@ -138,13 +139,11 @@ def test_apply_tail_skips_assistant_with_tool_calls() -> None:
     ]
     out = apply_cache_hints(msgs, "anthropic/claude-sonnet-4.6")
     assert out[3] == msgs[3]  # assistant tool-call untouched
-    tail = out[2]["content"]
+    assert out[2] == msgs[2]  # tool message stays a plain string (not marked)
+    tail = out[1]["content"]
     assert isinstance(tail, list)
-    assert tail[0]["text"] == "tool output"
+    assert tail[0]["text"] == "do it"
     assert tail[0]["cache_control"] == {"type": "ephemeral"}
-    # User message before the tool result stays a plain string (only the
-    # nearest eligible tail is marked).
-    assert out[1]["content"] == "do it"
 
 
 def test_apply_at_most_two_breakpoints() -> None:

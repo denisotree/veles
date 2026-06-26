@@ -6,9 +6,12 @@ the runtime hard-ceiling guard (to cap the request below the provider limit).
 
 The lookup is substring-based on the model id (provider prefixes like
 `openrouter/` are tolerated) — adapter metadata isn't uniformly available
-across providers, so this is a best-effort table biased *conservative*: when
-unsure we return a smaller window, which makes the hard ceiling stricter (the
-safe direction) rather than letting a request blow the real limit.
+across providers, so this is a best-effort table. Known large windows
+(Sonnet/Opus 4.6+, Fable, Gemini 1.5/2.x) are returned accurately; *unknown*
+models fall back to a small 200k default, which keeps the hard ceiling
+stricter (the safe direction) rather than letting a request blow the real
+limit. Note a real OpenRouter route may serve less than the model's nominal
+window — if that bites, lower the entry here.
 """
 
 from __future__ import annotations

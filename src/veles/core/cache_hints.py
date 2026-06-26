@@ -128,23 +128,27 @@ def strip_cache_sentinel(openai_messages: list[dict[str, Any]]) -> list[dict[str
 
 
 def _mark_message_tail(openai_messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Add an ephemeral `cache_control` breakpoint to the most-recent turn.
+    """Add an ephemeral `cache_control` breakpoint to the most-recent user turn.
 
     M178: caching the stable system prefix alone leaves the growing
-    conversation history uncached — in an agentic loop that history (tool
-    calls/results) dominates token cost and is re-sent in full every turn.
-    Marking the last `user`/`tool` message's content makes each turn read
-    the entire prior conversation from cache (a "rolling" breakpoint that
-    leapfrogs forward). Combined with the system breakpoint that's ≤2 of
-    Anthropic's 4 allowed breakpoints.
+    conversation history uncached — in an agentic loop that history dominates
+    token cost and is re-sent in full every turn. Marking the last `user`
+    message's content makes each turn read the prior conversation from cache
+    (a "rolling" breakpoint that leapfrogs forward — turn N's prefix reads the
+    entry turn N-1 wrote at *its* last user message, even without re-marking
+    it). Combined with the system breakpoint that's ≤2 of Anthropic's 4.
 
-    Only `user`/`tool` messages with non-empty string content are eligible —
-    assistant turns carrying `tool_calls` have null/array content and are
-    skipped (we mark the nearest preceding eligible message instead).
+    Scoped to `user` messages on purpose: a content-block array with
+    `cache_control` on a user message is the documented OpenRouter/Anthropic
+    shape (and matches the system-message arrays Veles already ships). Marking
+    `tool`-role tails would cache the per-iteration tool results too, but its
+    wire-acceptance via OpenRouter is unverified — left as a follow-up so a
+    rejection can't 400 every agentic turn. Assistant turns carrying
+    `tool_calls` have null/array content and are never eligible.
     """
     for i in range(len(openai_messages) - 1, -1, -1):
         msg = openai_messages[i]
-        if msg.get("role") not in ("user", "tool"):
+        if msg.get("role") != "user":
             continue
         content = msg.get("content")
         if not isinstance(content, str) or not content:
