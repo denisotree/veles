@@ -7,9 +7,11 @@ from __future__ import annotations
 
 import argparse
 
-from veles.cli.commands.ingest import _run_ingest_cli
+from veles.cli.commands.ingest import _run_batch_ingest_cli, _run_ingest_cli
 from veles.core.project import Project
 
 
 def cmd_add(args: argparse.Namespace, project: Project) -> int:
+    if getattr(args, "recursive", False):
+        return _run_batch_ingest_cli(args, project, source=args.source)
     return _run_ingest_cli(args, project, source=args.source)

@@ -33,3 +33,8 @@ description = "Answer a question using the wiki via wiki_search + wiki_read_page
 name = "lint"
 skill = "lint"
 description = "Find orphan / stale / duplicate wiki pages"
+
+[[layout.operations]]
+name = "organize"
+skill = "organize"
+description = "Reorganize wiki pages into canonical categories, repair links, dedup"

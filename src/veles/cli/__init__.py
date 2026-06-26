@@ -95,6 +95,7 @@ from veles.cli.commands.job import cmd_job as _cmd_job
 from veles.cli.commands.mcp import cmd_mcp as _cmd_mcp
 from veles.cli.commands.models import cmd_models as _cmd_models
 from veles.cli.commands.modules import cmd_module as _cmd_module
+from veles.cli.commands.organize import cmd_organize as _cmd_organize
 from veles.cli.commands.portability import cmd_export as _cmd_export
 from veles.cli.commands.portability import cmd_import as _cmd_import
 from veles.cli.commands.projects import cmd_project as _cmd_project
@@ -187,6 +188,7 @@ __all__ = [
     "_cmd_mcp",
     "_cmd_models",
     "_cmd_module",
+    "_cmd_organize",
     "_cmd_project",
     "_cmd_research",
     "_cmd_route",
@@ -316,6 +318,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_research(args, project)
         if args.command == "add":
             return _cmd_add(args, project)
+        if args.command == "organize":
+            return _cmd_organize(args, project)
         if args.command == "curate":
             return _cmd_curate(args, project)
         if args.command == "skill":

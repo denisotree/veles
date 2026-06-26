@@ -13,6 +13,8 @@ exposed during `veles ingest` via Registry.subset filtering — the agent in
 
 from __future__ import annotations
 
+import contextlib
+
 from veles.core.context import current_project
 from veles.core.risk import RiskClass
 from veles.core.tools.registry import tool
@@ -78,6 +80,60 @@ def wiki_write_page(category: str, slug: str, title: str, content: str) -> str:
     except ValueError as exc:
         return f"<error: {exc}>"
     return f"wrote {rel}"
+
+
+@tool(risk_class=RiskClass.WRITE_LOCAL_PROJECT, sensitive=True, side_effects=["filesystem"])
+def wiki_rename_page(rel_path: str, new_category: str, new_slug: str) -> str:
+    """Move/rename a wiki page and repair references to it (M175).
+
+    Re-files `rel_path` (e.g. 'wiki/sources/foo.md') to
+    `wiki/<new_category>/<new_slug>.md`, rewrites every `[[old-slug]]`
+    wikilink across the wiki to `[[new-slug]]`, deletes the old file, and
+    refreshes INDEX.md. `new_category` must be a valid wiki category
+    (concepts / entities / sources). Use this instead of `move_file` for
+    wiki pages so inbound links and the index don't go stale.
+
+    Returns the new relative path, or a `<error: ...>` marker.
+    """
+    wiki = _default_wiki()
+    old_slug = rel_path.rsplit("/", 1)[-1].removesuffix(".md")
+    try:
+        title = next(
+            (p.title for p in wiki.list_pages() if p.rel_path == rel_path),
+            old_slug,
+        )
+        content = wiki.read_page(rel_path)
+    except (FileNotFoundError, ValueError) as exc:
+        return f"<error: {exc}>"
+    try:
+        new_rel = wiki.write_page(
+            category=new_category, slug=new_slug, title=title, content=content
+        )
+    except ValueError as exc:
+        return f"<error: {exc}>"
+    if new_rel == rel_path:
+        return f"<error: target {new_rel} is the same page (no-op)>"
+    # Remove the old file now that the new one is written.
+    old_path = wiki.root / rel_path
+    with contextlib.suppress(OSError):
+        old_path.unlink()
+    # Repair inbound [[old-slug]] links across every page, then reindex.
+    clean_new_slug = new_rel.rsplit("/", 1)[-1].removesuffix(".md")
+    repaired = 0
+    if clean_new_slug != old_slug:
+        for page in wiki.list_pages():
+            ppath = wiki.root / page.rel_path
+            try:
+                text = ppath.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            updated = text.replace(f"[[{old_slug}]]", f"[[{clean_new_slug}]]")
+            if updated != text:
+                ppath.write_text(updated, encoding="utf-8")
+                repaired += 1
+    wiki.update_index()
+    wiki.append_log(op="rename", summary=f"{rel_path} -> {new_rel} ({repaired} links repaired)")
+    return f"renamed {rel_path} -> {new_rel} ({repaired} link(s) repaired)"
 
 
 @tool(risk_class=RiskClass.WRITE_LOCAL_PROJECT, side_effects=["filesystem"])
