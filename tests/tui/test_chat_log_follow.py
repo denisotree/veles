@@ -1,7 +1,10 @@
-"""M176 — ChatLog follow-mode: auto-scroll only when at the bottom.
+"""M176 — ChatLog follow-mode: auto-scroll only while following is armed.
 
-Streaming deltas must not yank the viewport down while the user is scrolled
-up reading earlier output; a new user turn (and End) re-arm following.
+Follow-mode is a boolean flag (deterministic), not a geometry check: the
+user turns it off by scrolling up and back on via End / a new turn. Tests
+assert the flag transitions and whether `scroll_end` is invoked, rather than
+exact scroll offsets (which lag content growth by a few lines mid-stream and
+flake across machines).
 """
 
 from __future__ import annotations
@@ -20,68 +23,71 @@ class _ChatHost(App):
         yield self._log
 
 
-async def _fill(log: ChatLog, n: int) -> None:
-    """Mount enough messages to overflow a short viewport so it can scroll."""
-    for i in range(n):
-        log.append_system(f"line {i} — some filler text to take vertical space")
+def _spy_scroll_end(log: ChatLog) -> list[int]:
+    calls: list[int] = []
+    orig = log.scroll_end
+
+    def wrapper(*args, **kwargs):
+        calls.append(1)
+        return orig(*args, **kwargs)
+
+    log.scroll_end = wrapper  # type: ignore[method-assign]
+    return calls
 
 
-async def test_follow_when_at_bottom():
+async def test_delta_follows_when_armed():
     app = _ChatHost()
     async with app.run_test(size=(40, 6)) as pilot:
         log = pilot.app.query_one(ChatLog)
-        await _fill(log, 30)
-        log.scroll_end(animate=False)
-        await pilot.pause()
-        assert log.max_scroll_y > 0  # content overflows → scrollable
-        # A new streamed delta while pinned to the bottom keeps us at bottom.
+        assert log.following  # armed by default
+        calls = _spy_scroll_end(log)
         log.start_assistant()
-        log.append_assistant_delta("fresh assistant output line")
+        log.append_assistant_delta("fresh output")
         await pilot.pause()
-        assert log.scroll_offset.y >= log.max_scroll_y - 1
+        assert calls  # followed → scroll_end invoked
 
 
-async def test_no_follow_when_scrolled_up():
+async def test_delta_does_not_follow_when_paused():
     app = _ChatHost()
     async with app.run_test(size=(40, 6)) as pilot:
         log = pilot.app.query_one(ChatLog)
-        await _fill(log, 30)
-        log.scroll_home(animate=False)  # user scrolls up to the very top
-        await pilot.pause()
-        assert log.scroll_offset.y == 0
-        # New output must NOT drag the viewport down — stays at the top.
-        log.append_system("a late system message")
+        log.pause_follow()
+        assert not log.following
+        calls = _spy_scroll_end(log)
         log.start_assistant()
-        log.append_assistant_delta("late assistant delta")
+        log.append_assistant_delta("late output")
+        log.append_system("a system line")
         await pilot.pause()
-        assert log.scroll_offset.y == 0
+        assert not calls  # paused → no auto-scroll
 
 
 async def test_new_user_turn_rearms_follow():
     app = _ChatHost()
     async with app.run_test(size=(40, 6)) as pilot:
         log = pilot.app.query_one(ChatLog)
-        await _fill(log, 30)
-        log.scroll_home(animate=False)
-        await pilot.pause()
-        assert log.scroll_offset.y == 0
-        # Sending a new prompt jumps back to the bottom to watch the reply.
+        log.pause_follow()
+        assert not log.following
         log.append_user("what's next?")
         await pilot.pause()
-        assert log.scroll_offset.y >= log.max_scroll_y - 1
+        assert log.following  # a new turn re-arms following
 
 
 async def test_scroll_to_bottom_rearms_follow():
     app = _ChatHost()
     async with app.run_test(size=(40, 6)) as pilot:
         log = pilot.app.query_one(ChatLog)
-        await _fill(log, 30)
-        log.scroll_home(animate=False)
-        await pilot.pause()
-        assert log.scroll_offset.y == 0
+        log.pause_follow()
+        assert not log.following
         log.scroll_to_bottom()
         await pilot.pause()
-        # Re-armed: viewport is pinned to the bottom and `_at_bottom()` (the
-        # follow predicate) reports True, so subsequent deltas will follow.
-        assert log.scroll_offset.y >= log.max_scroll_y - 1
-        assert log._at_bottom()
+        assert log.following
+
+
+async def test_mouse_wheel_up_pauses_follow():
+    """Wheel-up (only delivered when VELES_TUI_MOUSE=1) stops auto-following."""
+    app = _ChatHost()
+    async with app.run_test(size=(40, 6)) as pilot:
+        log = pilot.app.query_one(ChatLog)
+        assert log.following
+        log.on_mouse_scroll_up(object())  # handler ignores the event payload
+        assert not log.following

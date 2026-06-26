@@ -66,26 +66,36 @@ class ChatLog(VerticalScroll):
         # mounted. Tests inspect this directly; the production code only
         # reads it during dev debugging. Each entry is `(role, text)`.
         self.transcript: list[tuple[str, str]] = []
+        # M176 follow-mode flag (see below).
+        self._follow = True
 
     # ---- follow-mode (M176) ----
     #
-    # Auto-scroll only when the viewport is already at the bottom. Once the
-    # user scrolls up to re-read earlier output, streaming deltas leave the
-    # viewport put instead of yanking it back down — the cause of the
-    # "I can't scroll the chat" complaint. A new user turn (append_user) and
-    # an explicit End (scroll_to_bottom) re-arm following.
+    # Auto-scroll new output to the bottom only while `_follow` is on. The
+    # user turns it OFF by scrolling up (the app's PageUp/Home/Ctrl+Home
+    # actions and the mouse-wheel handlers call `pause_follow()`), and back
+    # ON via End / a new user turn (`scroll_to_bottom()`). A boolean flag is
+    # deterministic — unlike inferring "am I at the bottom?" from
+    # `scroll_offset` vs `max_scroll_y`, which lags behind content growth by
+    # a few lines mid-stream and would both flake tests and intermittently
+    # drop auto-scroll in production.
 
-    def _at_bottom(self) -> bool:
-        """True when the viewport sits at (or within a line of) the bottom.
+    @property
+    def following(self) -> bool:
+        return self._follow
 
-        When there's nothing to scroll yet (`max_scroll_y == 0`) the chat is
-        trivially at the bottom, so the first messages still auto-scroll.
-        """
-        return self.scroll_offset.y >= self.max_scroll_y - 1
+    def pause_follow(self) -> None:
+        """Stop auto-scrolling (the user scrolled up to read earlier output)."""
+        self._follow = False
 
     def scroll_to_bottom(self) -> None:
         """Jump to the newest output and re-arm following (End / new turn)."""
+        self._follow = True
         self.scroll_end(animate=False)
+
+    def _follow_if_armed(self) -> None:
+        if self._follow:
+            self.scroll_end(animate=False)
 
     # ---- public API ----
 
@@ -103,27 +113,23 @@ class ChatLog(VerticalScroll):
         defend against)."""
         if self._current_assistant is not None:
             return
-        follow = self._at_bottom()
         self._buffer = ""
         self._current_assistant = SelectableStatic("assistant>", classes="veles-assistant")
         self.transcript.append(("assistant", ""))
         self.mount(self._current_assistant)
-        if follow:
-            self.scroll_end(animate=False)
+        self._follow_if_armed()
 
     def append_assistant_delta(self, chunk: str) -> None:
         if self._current_assistant is None:
             self.start_assistant()
         assert self._current_assistant is not None
-        follow = self._at_bottom()
         self._buffer += chunk
         self._current_assistant.update(self._render_assistant(self._buffer))
         # Keep transcript tail in sync with the growing buffer so tests
         # can read the assistant's full reply by the time TurnDone fires.
         if self.transcript and self.transcript[-1][0] == "assistant":
             self.transcript[-1] = ("assistant", self._buffer)
-        if follow:
-            self.scroll_end(animate=False)
+        self._follow_if_armed()
 
     def seal_assistant(self) -> None:
         """End-of-turn marker. Re-renders the streaming Static through
@@ -135,24 +141,20 @@ class ChatLog(VerticalScroll):
         self._seal_assistant()
 
     def append_error(self, text: str) -> None:
-        follow = self._at_bottom()
         self._seal_assistant()
         self.transcript.append(("error", text))
         self.mount(SelectableStatic(f"error> {text}", classes="veles-error"))
-        if follow:
-            self.scroll_end(animate=False)
+        self._follow_if_armed()
 
     def append_system(self, text: str) -> None:
         """Render slash-command output and other meta info. Multi-line
         text is mounted as one Static so blank-line separators inside
         the output stay intact."""
-        follow = self._at_bottom()
         self._seal_assistant()
         self.transcript.append(("system", text))
         safe = text.replace("[", r"\[")
         self.mount(SelectableStatic(safe, classes="veles-system"))
-        if follow:
-            self.scroll_end(animate=False)
+        self._follow_if_armed()
 
     def clear_messages(self) -> None:
         """Drop every mounted message Static. Used by `/clear`."""
@@ -160,6 +162,14 @@ class ChatLog(VerticalScroll):
         self.transcript.clear()
         for child in list(self.children):
             child.remove()
+
+    # ---- mouse wheel (only active when VELES_TUI_MOUSE=1) ----
+
+    def on_mouse_scroll_up(self, event) -> None:
+        """Wheel-up means the user wants to read earlier output — stop
+        auto-following. The container still performs the scroll (we don't
+        stop the event)."""
+        self.pause_follow()
 
     # ---- internals ----
 

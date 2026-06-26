@@ -577,10 +577,12 @@ class TuiApp(App[int]):
         if self._chat is None:
             return
         if where == "page_up":
+            self._chat.pause_follow()
             self._chat.scroll_page_up()
         elif where == "page_down":
             self._chat.scroll_page_down()
         elif where == "home":
+            self._chat.pause_follow()
             self._chat.scroll_home(animate=False)
         elif where == "end":
             self._chat.scroll_to_bottom()
