@@ -26,7 +26,7 @@
 **A minimal CLI agent framework that gets smarter with every session.**
 
 <p align="center">
-  <img src="docs/assets/tui-hero.gif" alt="Veles TUI — ask a question, get an answer grounded in the project's own memory" width="800">
+  <img src="https://raw.githubusercontent.com/denisotree/veles/main/docs/assets/tui-hero.gif" alt="Veles TUI — ask a question, get an answer grounded in the project's own memory" width="800">
 </p>
 
 Unlike chat tools that start fresh every time, Veles maintains **structured project memory** — insights, rules, and curated knowledge that accumulate across sessions and make the agent more useful the longer you use it. How your *content* is organised is pluggable: a Karpathy-style LLM wiki by default, flat notes, or no structure at all for code repos. Built clean: no god-files, no vendor lock-in, no cloud sync.
@@ -141,7 +141,7 @@ veles curate                          # explicit session → memory consolidatio
 ```
 
 <p align="center">
-  <img src="docs/assets/kb-ingest.gif" alt="Veles knowledge base — ingest a source into a wiki page, then ask a question and get an answer that cites it" width="800">
+  <img src="https://raw.githubusercontent.com/denisotree/veles/main/docs/assets/kb-ingest.gif" alt="Veles knowledge base — ingest a source into a wiki page, then ask a question and get an answer that cites it" width="800">
 </p>
 
 The Curator runs automatically after sessions. Insight extraction catches phrases like "always prefer X" or "never do Y" and writes them as persistent project insights.
@@ -225,7 +225,7 @@ veles tui --resume <id>      # continue a session
 ```
 
 <p align="center">
-  <img src="docs/assets/tui-tour.gif" alt="Veles TUI — slash inspectors (/status, /context), mode switching, and the command palette" width="800">
+  <img src="https://raw.githubusercontent.com/denisotree/veles/main/docs/assets/tui-tour.gif" alt="Veles TUI — slash inspectors (/status, /context), mode switching, and the command palette" width="800">
 </p>
 
 Slash commands surface everything live — `/status`, `/tokens`, `/context`, `/mode`, `/help` — and `Shift+Tab` cycles modes (auto / planning / writing / goal).
@@ -249,7 +249,7 @@ Slash commands: `/help` · `/model` · `/mode` · `/status` · `/tokens` · `/co
 Run Veles as a persistent daemon with an HTTP/WebSocket API. In a fresh project directory, `veles daemon start` walks you through the setup — initialize the project, enable the daemon, and **connect a channel**: first pick a channel *type* (Telegram is the only platform today, but the picker is the seam new channels register on), then fill that channel's fields (bot token, whitelist). No need to open the TUI first.
 
 <p align="center">
-  <img src="docs/assets/daemon-setup.gif" alt="veles daemon start — wizard that brings up the daemon and connects a Telegram channel (channel type first, then its token and whitelist)" width="800">
+  <img src="https://raw.githubusercontent.com/denisotree/veles/main/docs/assets/daemon-setup.gif" alt="veles daemon start — wizard that brings up the daemon and connects a Telegram channel (channel type first, then its token and whitelist)" width="800">
 </p>
 
 ```bash
@@ -261,7 +261,7 @@ veles daemon list                         # daemons across all projects
 Bare `veles daemon` opens a live control panel — a tree of project → daemons → channels. Start, stop, restart, or delete daemons, and add/remove channels (the same channel-type-first flow, key `c`) across every project, all from the keyboard:
 
 <p align="center">
-  <img src="docs/assets/daemon-panel.gif" alt="veles daemon — control-panel TUI: a project → daemons → channels tree with start/stop/restart/delete and inline channel management" width="800">
+  <img src="https://raw.githubusercontent.com/denisotree/veles/main/docs/assets/daemon-panel.gif" alt="veles daemon — control-panel TUI: a project → daemons → channels tree with start/stop/restart/delete and inline channel management" width="800">
 </p>
 
 The same channel wizard is also available standalone (`veles channel add`) on an already-running project.
