@@ -306,6 +306,14 @@ def _maybe_run_subproject_proposer(args: argparse.Namespace, project: Project) -
         return
     if getattr(args, "no_proposer", False):
         return
+    from veles.core.layout.engines import wiki_enabled
+
+    # The subproject proposer clusters wiki pages — a no-op on layouts whose
+    # wiki engine is off (bare/notes). Gating here keeps `detect_clusters`
+    # (which constructs a Wiki) from ever running on a non-wiki layout.
+    if not wiki_enabled(project):
+        return
+
     state_path = project.state_dir / _PROPOSER_STATE_FILE
     last_ran = _read_proposer_state(state_path)
     now = time.time()

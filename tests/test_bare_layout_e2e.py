@@ -182,3 +182,55 @@ def test_bare_system_prompt_has_no_wiki_blocks(bare_project: Project) -> None:
     assert prompt is not None
     assert "Wiki habits" not in prompt
     assert "Knowledge base index" not in prompt
+
+
+# ---- M174: wiki-as-one-layout consistency (gated leak sites) ----
+
+
+def test_bare_doctor_wiki_check_is_info_not_warn(bare_project: Project) -> None:
+    """`veles doctor` must not nag about missing INDEX.md/LOG.md on a
+    layout whose wiki engine is off."""
+    from veles.core.doctor import _check_wiki_files
+
+    result = _check_wiki_files(bare_project)
+    assert result.status == "info"
+    assert "no wiki engine" in result.message
+
+
+def test_bare_subproject_proposer_is_noop(bare_project: Project) -> None:
+    """The continuous-curator subproject proposer clusters wiki pages; on a
+    non-wiki layout it must return cleanly without constructing a Wiki."""
+    import argparse
+
+    from veles.cli._curator import _maybe_run_subproject_proposer
+
+    args = argparse.Namespace(
+        continuous_curator=True,
+        no_proposer=False,
+        no_curator=False,
+        provider="openrouter",
+    )
+    # Must not raise (detect_clusters would build a Wiki the bare layout lacks).
+    _maybe_run_subproject_proposer(args, bare_project)
+    assert not (bare_project.root / "wiki").exists()
+
+
+def test_bare_save_slash_falls_back_to_insight(bare_project: Project) -> None:
+    """`/save <slug>` on a non-wiki layout keeps the reply as a memory
+    insight instead of crashing on the absent wiki/queries/ tree."""
+    from veles.core.memory import SessionStore
+    from veles.tui.slash.builtin import _save
+    from veles.tui.slash.registry import SlashContext
+    from veles.tui.state import AppState
+
+    state = AppState(session_id="ses-x", provider_name="openrouter", model="m")
+    state.last_assistant_text = "Terraform applies after migrations run."
+    store = SessionStore(bare_project.memory_db_path)
+    try:
+        ctx = SlashContext(state=state, project=bare_project, store=store)
+        result = _save("deploy-notes", ctx)
+    finally:
+        store.close()
+    assert not result.is_error
+    assert "insight" in result.text
+    assert not (bare_project.root / "wiki").exists()

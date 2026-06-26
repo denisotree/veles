@@ -21,6 +21,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Literal
 
 from veles.core.approval import list_approvals
+from veles.core.layout.engines import wiki_enabled
 from veles.core.project import Project
 from veles.core.trace import cache_fragmentation_alert, read_records, trace_path_for_project
 
@@ -263,6 +264,15 @@ def _check_symlinks(project: Project | None) -> CheckResult:
 def _check_wiki_files(project: Project | None) -> CheckResult:
     if project is None:
         return CheckResult(name="wiki_files", status="info", message="no active project")
+    if not wiki_enabled(project):
+        return CheckResult(
+            name="wiki_files",
+            status="info",
+            message=(
+                f"layout '{project.layout_name}' has no wiki engine — "
+                "INDEX.md/LOG.md not required"
+            ),
+        )
     missing: list[str] = []
     for name in ("INDEX.md", "LOG.md"):
         if not (project.root / name).exists():
