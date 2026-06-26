@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] — 2026-06-27
+
+### Added
+
+- **`veles doctor` catches stale/cloned project state (M181).** Two new checks for the "agent
+  answered about the wrong (deleted) project" class of confusion: `agents_md_identity` warns
+  when AGENTS.md is still the unmodified scaffold default but its `# ` title names a *different*
+  project (a directory copied/renamed from another project, so its title leaks into the system
+  prompt); `registry_paths` warns about project-registry entries whose directory no longer
+  exists, with a `veles project remove <slug>` fix hint.
+
 ## [0.7.1] — 2026-06-27
 
 ### Added

@@ -12,10 +12,12 @@ from veles.core.doctor import (
     CheckResult,
     DoctorReport,
     _check_agents_md,
+    _check_agents_md_identity,
     _check_approval_audit,
     _check_events_health,
     _check_provider_keys,
     _check_python_version,
+    _check_registry_paths,
     _check_symlinks,
     _check_trace_health,
     _check_user_config,
@@ -307,3 +309,85 @@ def test_text_output_includes_glyphs(tmp_path: Path) -> None:
     assert "1 ok" in text
     assert "1 warn" in text
     assert "1 error" in text
+
+
+# ---------- M181: stale-clone / dead-registry checks ----------
+
+_DEFAULT_AGENTS = "# {name}\n\nAdd your project context here.\n\n## Layout\n\n- x\n"
+
+
+def test_agents_md_identity_flags_cloned_default(tmp_path: Path) -> None:
+    """Unmodified default whose H1 names a *different* project → warn."""
+    project = _make_project(tmp_path)  # name="test"
+    (tmp_path / "AGENTS.md").write_text(
+        _DEFAULT_AGENTS.format(name="mind-palace"), encoding="utf-8"
+    )
+    result = _check_agents_md_identity(project)
+    assert result.status == "warn"
+    assert "mind-palace" in result.message and "test" in result.message
+
+
+def test_agents_md_identity_ok_when_title_matches(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    (tmp_path / "AGENTS.md").write_text(_DEFAULT_AGENTS.format(name="test"), encoding="utf-8")
+    assert _check_agents_md_identity(project).status == "ok"
+
+
+def test_agents_md_identity_never_flags_customised(tmp_path: Path) -> None:
+    """A customised AGENTS.md (default marker gone) is user content — never
+    flagged, even if its title differs from the project name."""
+    project = _make_project(tmp_path)
+    (tmp_path / "AGENTS.md").write_text("# Something Else\n\nReal project context.\n", "utf-8")
+    assert _check_agents_md_identity(project).status == "ok"
+
+
+def test_registry_paths_flags_missing_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    reg = tmp_path / "registry.json"
+    reg.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "projects": {
+                    "gone": {
+                        "slug": "gone",
+                        "name": "gone",
+                        "path": "/no/such/dir",
+                        "last_active_at": 0.0,
+                    },
+                    "here": {
+                        "slug": "here",
+                        "name": "here",
+                        "path": str(tmp_path),
+                        "last_active_at": 0.0,
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("VELES_REGISTRY_PATH", str(reg))
+    result = _check_registry_paths(None)
+    assert result.status == "warn"
+    assert result.details["dead_slugs"] == ["gone"]
+
+
+def test_registry_paths_ok_when_all_exist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    reg = tmp_path / "registry.json"
+    reg.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "projects": {
+                    "here": {
+                        "slug": "here",
+                        "name": "here",
+                        "path": str(tmp_path),
+                        "last_active_at": 0.0,
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("VELES_REGISTRY_PATH", str(reg))
+    assert _check_registry_paths(None).status == "ok"
