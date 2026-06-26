@@ -269,8 +269,7 @@ def _check_wiki_files(project: Project | None) -> CheckResult:
             name="wiki_files",
             status="info",
             message=(
-                f"layout '{project.layout_name}' has no wiki engine — "
-                "INDEX.md/LOG.md not required"
+                f"layout '{project.layout_name}' has no wiki engine — INDEX.md/LOG.md not required"
             ),
         )
     missing: list[str] = []
