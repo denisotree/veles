@@ -25,8 +25,16 @@ from veles.core.layout.discovery import LayoutDirectory
 def apply_scaffold(pack: LayoutDirectory | None, root: Path, name: str) -> None:
     """Create the user-content skeleton the pack declares.
 
-    Idempotent: existing dirs are kept, an existing AGENTS.md is never
-    overwritten."""
+    Idempotent and content-preserving: existing dirs are kept and a
+    *customised* AGENTS.md is never overwritten. The one exception (M181):
+    if AGENTS.md is still the unmodified scaffold default but its `# ` title
+    names a different project, the directory was copied/renamed from another
+    project (e.g. `cp -R old new && cd new && veles init`) and the stale
+    title would otherwise leak the wrong identity into the system prompt — so
+    it's regenerated for the new name. A default whose title already matches,
+    or any file the user has edited, is left untouched."""
+    from veles.core.agents_md_schema import is_default_template, title_of
+
     if pack is not None:
         for rel in pack.manifest.scaffold_dirs:
             (root / rel).mkdir(parents=True, exist_ok=True)
@@ -38,6 +46,16 @@ def apply_scaffold(pack: LayoutDirectory | None, root: Path, name: str) -> None:
     agents_md = root / "AGENTS.md"
     if not agents_md.exists():
         agents_md.write_text(_render_agents_md(pack, name), encoding="utf-8")
+        return
+    existing = agents_md.read_text(encoding="utf-8", errors="replace")
+    if is_default_template(existing) and title_of(existing) not in (None, name):
+        agents_md.write_text(_render_agents_md(pack, name), encoding="utf-8")
+        print(
+            f"note: regenerated a stale default AGENTS.md (was titled "
+            f"'# {title_of(existing)}', now '# {name}') — looked copied from "
+            "another project",
+            file=sys.stderr,
+        )
 
 
 def _render_agents_md(pack: LayoutDirectory | None, name: str) -> str:

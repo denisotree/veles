@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] — 2026-06-27
+
+### Fixed
+
+- **`veles init` heals a directory copied from another project (M181).** Root cause of the
+  "agent answered about the wrong (deleted) project" report: `cp -R old new && cd new && veles
+  init` carried `old`'s `.veles/` — its stale default AGENTS.md titled `# old` and its
+  `memory.db` — and init silently kept both, so the system prompt named the wrong project and
+  recall surfaced the wrong history. Now init **regenerates** an AGENTS.md that is still the
+  unmodified scaffold default whose title ≠ the new project name (a customised AGENTS.md is
+  always preserved), and **warns** when it completes a `.veles/` that carries a prior project's
+  `memory.db` (pointing at `veles curate` / removing the file for a clean slate).
+
+### Added
+
+- **`veles doctor` catches stale/cloned project state (M181).** Two new checks for the same
+  class of confusion (catch files that pre-date the init fix or were copied in after init):
+  `agents_md_identity` warns when AGENTS.md is still the unmodified scaffold default but its
+  `# ` title names a *different* project; `registry_paths` warns about project-registry entries
+  whose directory no longer exists, with a `veles project remove <slug>` fix hint.
+
 ## [0.7.1] — 2026-06-27
 
 ### Added

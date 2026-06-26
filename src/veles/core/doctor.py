@@ -18,6 +18,7 @@ import sys
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Literal
 
 from veles.core.approval import list_approvals
@@ -232,6 +233,70 @@ def _check_agents_md(project: Project | None) -> CheckResult:
     )
 
 
+def _check_agents_md_identity(project: Project | None) -> CheckResult:
+    """Catch a stale/cloned AGENTS.md whose H1 names a different project.
+
+    When the AGENTS.md is still the unmodified scaffold default *and* its `# `
+    title doesn't match the project name, the directory was almost certainly
+    copied or renamed from another project (the default carries the old name).
+    That title goes into the system prompt and makes the agent describe the
+    wrong project — so flag it. A customised AGENTS.md (default marker gone)
+    is the user's own content and is never flagged, whatever its title.
+
+    M181 `veles init` now auto-regenerates this case, so this check mainly
+    catches AGENTS.md files that pre-date the fix or were copied in after init."""
+    from veles.core.agents_md_schema import is_default_template, title_of
+
+    if project is None:
+        return CheckResult(name="agents_md_identity", status="info", message="no active project")
+    p = project.root / "AGENTS.md"
+    if not p.exists():
+        return CheckResult(name="agents_md_identity", status="info", message="no AGENTS.md")
+    text = p.read_text(encoding="utf-8", errors="replace")
+    if not is_default_template(text):
+        return CheckResult(
+            name="agents_md_identity", status="ok", message="AGENTS.md is customised"
+        )
+    h1 = title_of(text)
+    if h1 is not None and h1 != project.name:
+        return CheckResult(
+            name="agents_md_identity",
+            status="warn",
+            message=(
+                f"AGENTS.md is the unmodified default but its title (# {h1}) "
+                f"doesn't match the project name ({project.name}) — likely copied "
+                "from another project, so the agent may describe the wrong one"
+            ),
+            fix_hint="re-run `veles init` here (it regenerates a stale default), "
+            "or replace the title/body with this project's real context",
+        )
+    return CheckResult(
+        name="agents_md_identity", status="ok", message="AGENTS.md title matches the project"
+    )
+
+
+def _check_registry_paths(project: Project | None) -> CheckResult:
+    """Warn about project-registry entries whose directory no longer exists —
+    a deleted project leaves a dangling slug that pollutes `veles project list`
+    and `/project <slug>` switching."""
+    del project  # user-global check, independent of the active project
+    from veles.core.project_registry import Registry
+
+    reg = Registry.load()
+    dead = [e.slug for e in reg.list_entries() if not Path(e.path).is_dir()]
+    if dead:
+        return CheckResult(
+            name="registry_paths",
+            status="warn",
+            message=f"registry has {len(dead)} entry(ies) with a missing path: {', '.join(dead)}",
+            fix_hint="prune with `veles project remove <slug>`",
+            details={"dead_slugs": dead},
+        )
+    return CheckResult(
+        name="registry_paths", status="ok", message="all registered project paths exist"
+    )
+
+
 def _check_symlinks(project: Project | None) -> CheckResult:
     if project is None:
         return CheckResult(name="symlinks", status="info", message="no active project")
@@ -396,6 +461,8 @@ def run_all(project: Project | None) -> DoctorReport:
     project_aware: list[Callable[[Project | None], CheckResult]] = [
         _check_active_project,
         _check_agents_md,
+        _check_agents_md_identity,
+        _check_registry_paths,
         _check_symlinks,
         _check_wiki_files,
         _check_trace_health,

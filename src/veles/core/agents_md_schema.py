@@ -20,7 +20,26 @@ from dataclasses import dataclass
 
 RECOMMENDED_SECTIONS: tuple[str, ...] = ("Layout", "Conventions", "Workflows")
 
+# Telltale phrase every scaffold-generated AGENTS.md (default + the builtin
+# pack templates) carries. Its presence means the file is the unmodified
+# scaffold default — used by `apply_scaffold` and `doctor` to tell a stale
+# copied-from-another-project default from real user content.
+DEFAULT_TEMPLATE_MARKER = "Add your project context here"
+
 _H2_RE = re.compile(r"^\s*##\s+(.+?)\s*$", re.MULTILINE)
+
+
+def is_default_template(text: str) -> bool:
+    """True when `text` is still the unmodified scaffold default AGENTS.md."""
+    return DEFAULT_TEMPLATE_MARKER in text
+
+
+def title_of(text: str) -> str | None:
+    """The first `# ` H1 title in `text`, or None."""
+    for line in text.splitlines():
+        if line.startswith("# "):
+            return line[2:].strip()
+    return None
 
 
 @dataclass(frozen=True, slots=True)
