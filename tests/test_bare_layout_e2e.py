@@ -215,6 +215,37 @@ def test_bare_subproject_proposer_is_noop(bare_project: Project) -> None:
     assert not (bare_project.root / "wiki").exists()
 
 
+def test_wiki_slash_not_registered_on_bare(bare_project: Project, tmp_path: Path) -> None:
+    """`/wiki` is registered only when the active layout enables the wiki
+    engine — so it never shows in completion / `/help` on bare/notes."""
+    from veles.tui.slash.builtin import build_default_registry
+
+    bare_reg = build_default_registry(project=bare_project)
+    assert "/wiki" not in bare_reg.names()
+    assert "/save" in bare_reg.names()  # still present (memory fallback)
+
+    wiki_project = init_project(tmp_path / "w", name="w", layout="llm-wiki")
+    wiki_reg = build_default_registry(project=wiki_project)
+    assert "/wiki" in wiki_reg.names()
+
+
+def test_bare_help_omits_wiki(bare_project: Project) -> None:
+    from veles.core.memory import SessionStore
+    from veles.tui.slash.builtin import _help
+    from veles.tui.slash.registry import SlashContext
+    from veles.tui.state import AppState
+
+    state = AppState(session_id=None, provider_name="openrouter", model="m")
+    store = SessionStore(bare_project.memory_db_path)
+    try:
+        ctx = SlashContext(state=state, project=bare_project, store=store)
+        out = _help("", ctx)
+    finally:
+        store.close()
+    assert "/wiki" not in out.text
+    assert "project memory" in out.text  # /save wording reflects no-wiki
+
+
 def test_bare_save_slash_falls_back_to_insight(bare_project: Project) -> None:
     """`/save <slug>` on a non-wiki layout keeps the reply as a memory
     insight instead of crashing on the absent wiki/queries/ tree."""
