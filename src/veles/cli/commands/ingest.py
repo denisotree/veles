@@ -7,11 +7,61 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from veles.core.layout.engines import wiki_enabled
 from veles.core.project import Project
 from veles.modules.wiki.ingest import INGEST_SYSTEM_PROMPT, ingest_user_message
 from veles.modules.wiki.wiki import Wiki
+
+
+def _batch_ingest_files(root: Path, pattern: str) -> list[Path]:
+    """Files under `root` matching `pattern`, skipping dot-dirs (.git/.veles/…).
+
+    Sorted for deterministic ordering. A dotfile or any path with a
+    dot-prefixed component is skipped so we never ingest VCS internals or
+    Veles' own state tree.
+    """
+    out: list[Path] = []
+    for p in sorted(root.rglob(pattern)):
+        if not p.is_file():
+            continue
+        if any(part.startswith(".") for part in p.relative_to(root).parts):
+            continue
+        out.append(p)
+    return out
+
+
+def _run_batch_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) -> int:
+    """Recursive `veles add <dir> --recursive [--glob PATTERN]`.
+
+    Iterates each matching file through the single-source runner. Keeps every
+    ingest a separate agent task (no cross-file context); this is just the
+    fan-out loop the single-source command never had.
+    """
+    root = Path(source)
+    if not root.is_dir():
+        print(
+            f"error: --recursive needs a directory, but {source!r} is not one.",
+            file=sys.stderr,
+        )
+        return 2
+    pattern = getattr(args, "glob", "*") or "*"
+    files = _batch_ingest_files(root, pattern)
+    if not files:
+        print(f"no files under {source!r} match {pattern!r}; nothing to add.", file=sys.stderr)
+        return 0
+    print(f"batch add: {len(files)} file(s) under {source!r} matching {pattern!r}", file=sys.stderr)
+    failures = 0
+    for i, path in enumerate(files, 1):
+        print(f"[{i}/{len(files)}] {path}", file=sys.stderr)
+        if _run_ingest_cli(args, project, source=str(path)) != 0:
+            failures += 1
+    if failures:
+        print(f"batch add finished with {failures}/{len(files)} failure(s).", file=sys.stderr)
+        return 1
+    print(f"batch add finished: {len(files)} file(s) ingested.", file=sys.stderr)
+    return 0
 
 
 def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) -> int:

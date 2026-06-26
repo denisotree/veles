@@ -24,6 +24,7 @@ tools = [
     "wiki_write_page",
     "wiki_append_log",
     "wiki_ingest",
+    "wiki_rename_page",
 ]
 
 [builtin]
@@ -87,6 +88,26 @@ tools = [
     "wiki_write_page",
     "wiki_append_log",
     "wiki_ingest",
+]
+
+[organize]
+# `veles organize --apply` — reorganize project content. Read-only baseline +
+# generic file mutation + the organize module's `move_file` primitive +
+# memory writes. Wiki reorg tools (wiki_write_page/append_log/rename_page) come
+# in via engine-wiki and are auto-subtracted on non-wiki layouts by
+# `_load_skills`. The default (propose) run uses the read-only `builtin` set
+# instead — mutation tools appear only with --apply.
+includes = ["builtin"]
+tools = [
+    "write_file",
+    "edit_file",
+    "move_file",
+    "run_shell",
+    "memory_save_insight",
+    "memory_query",
+    "wiki_write_page",
+    "wiki_append_log",
+    "wiki_rename_page",
 ]
 
 [planning]

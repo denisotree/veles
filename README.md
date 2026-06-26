@@ -323,9 +323,9 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | Create a new project |
 | `veles run "<prompt>"` | Single-turn agent run |
 | `veles tui` | Interactive TUI REPL |
-| `veles add <file\|url>` | Ingest a source → wiki page |
+| `veles add <file\|url>` | Ingest a source → wiki page (llm-wiki layout) |
 | `veles research "<question>"` | Deep multi-angle research |
-| `veles curate` | Consolidate sessions into the wiki |
+| `veles curate` | Distil sessions into project memory (`.veles/`, any layout) |
 | `veles sessions {list,show,delete,search}` | Session management |
 | `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | Skill management |
 | `veles tool {list,show,promote}` | Tool management |

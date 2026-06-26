@@ -14,6 +14,7 @@ from veles.core.cache_hints import (
     inject_breakpoint,
     is_anthropic_model,
     split_at_breakpoint,
+    strip_cache_sentinel,
 )
 
 # ---- is_anthropic_model ----
@@ -109,15 +110,68 @@ def test_apply_non_anthropic_strips_sentinel_from_string() -> None:
     assert out[0]["content"] == "stabledynamic"
 
 
-def test_apply_skips_user_and_assistant_messages() -> None:
+def test_apply_marks_last_user_message_tail() -> None:
+    """M178: the most-recent user/tool message gets a rolling cache breakpoint
+    so the growing conversation prefix is cached. The assistant turn (not
+    user/tool) is left untouched; the user message before it is marked."""
     msgs = [
         _sys_msg("system"),
         {"role": "user", "content": "hi"},
         {"role": "assistant", "content": "hello"},
     ]
     out = apply_cache_hints(msgs, "anthropic/claude-sonnet-4.6")
-    assert out[1] == msgs[1]
-    assert out[2] == msgs[2]
+    assert out[2] == msgs[2]  # assistant untouched
+    tail = out[1]["content"]
+    assert isinstance(tail, list)
+    assert tail[0]["text"] == "hi"
+    assert tail[0]["cache_control"] == {"type": "ephemeral"}
+
+
+def test_apply_tail_marks_user_only_not_tool_or_assistant() -> None:
+    """The tail breakpoint is scoped to `user` messages (documented-safe
+    OpenRouter shape). Trailing tool / assistant-tool-call messages are left
+    as-is; the last user message is the one marked."""
+    msgs = [
+        _sys_msg("system"),
+        {"role": "user", "content": "do it"},
+        {"role": "tool", "content": "tool output", "tool_call_id": "t1"},
+        {"role": "assistant", "content": None, "tool_calls": [{"id": "t2"}]},
+    ]
+    out = apply_cache_hints(msgs, "anthropic/claude-sonnet-4.6")
+    assert out[3] == msgs[3]  # assistant tool-call untouched
+    assert out[2] == msgs[2]  # tool message stays a plain string (not marked)
+    tail = out[1]["content"]
+    assert isinstance(tail, list)
+    assert tail[0]["text"] == "do it"
+    assert tail[0]["cache_control"] == {"type": "ephemeral"}
+
+
+def test_apply_at_most_two_breakpoints() -> None:
+    """System split (1) + rolling tail (1) ≤ Anthropic's 4-breakpoint limit."""
+    msgs = [
+        _sys_msg(inject_breakpoint("stable", "dynamic")),
+        {"role": "user", "content": "first"},
+        {"role": "assistant", "content": "reply"},
+        {"role": "user", "content": "second"},
+    ]
+    out = apply_cache_hints(msgs, "anthropic/claude-sonnet-4.6")
+    n = 0
+    for m in out:
+        content = m.get("content")
+        if isinstance(content, list):
+            n += sum(1 for b in content if isinstance(b, dict) and "cache_control" in b)
+    assert n == 2
+
+
+def test_apply_non_anthropic_strips_sentinel_and_no_tail() -> None:
+    msgs = [
+        _sys_msg(inject_breakpoint("stable", "dynamic")),
+        {"role": "user", "content": "hi"},
+    ]
+    out = apply_cache_hints(msgs, "openai/gpt-4o")
+    assert isinstance(out[0]["content"], str)
+    assert CACHE_BREAKPOINT_SENTINEL not in out[0]["content"]
+    assert out[1] == msgs[1]  # no cache_control for non-anthropic
 
 
 def test_apply_drops_empty_dynamic_suffix() -> None:
@@ -138,6 +192,32 @@ def test_apply_preserves_other_message_keys() -> None:
 
 def test_apply_handles_empty_message_list() -> None:
     assert apply_cache_hints([], "anthropic/claude-sonnet-4.6") == []
+
+
+# ---- strip_cache_sentinel (local / base path) ----
+
+
+def test_strip_cache_sentinel_removes_marker() -> None:
+    msgs = [
+        _sys_msg(inject_breakpoint("stable", "dynamic")),
+        {"role": "user", "content": "no sentinel here"},
+    ]
+    out = strip_cache_sentinel(msgs)
+    assert out[0]["content"] == "stabledynamic"
+    assert CACHE_BREAKPOINT_SENTINEL not in out[0]["content"]
+    assert out[1] == msgs[1]
+
+
+def test_local_prepare_messages_strips_sentinel() -> None:
+    """The base (local) `_prepare_messages` must strip the sentinel so it
+    never leaks into a local model's prompt."""
+    from veles.core.openai_wire import OpenAICompatibleProvider
+    from veles.core.provider import Message
+
+    prov = OpenAICompatibleProvider.__new__(OpenAICompatibleProvider)
+    msgs = [Message(role="system", content=inject_breakpoint("stable", "dynamic"))]
+    out = prov._prepare_messages(msgs, "ollama/llama3")
+    assert CACHE_BREAKPOINT_SENTINEL not in out[0]["content"]
 
 
 # ---------- M42b — build_anthropic_system_blocks ----------

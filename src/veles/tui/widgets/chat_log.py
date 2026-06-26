@@ -66,6 +66,36 @@ class ChatLog(VerticalScroll):
         # mounted. Tests inspect this directly; the production code only
         # reads it during dev debugging. Each entry is `(role, text)`.
         self.transcript: list[tuple[str, str]] = []
+        # M176 follow-mode flag (see below).
+        self._follow = True
+
+    # ---- follow-mode (M176) ----
+    #
+    # Auto-scroll new output to the bottom only while `_follow` is on. The
+    # user turns it OFF by scrolling up (the app's PageUp/Home/Ctrl+Home
+    # actions and the mouse-wheel handlers call `pause_follow()`), and back
+    # ON via End / a new user turn (`scroll_to_bottom()`). A boolean flag is
+    # deterministic — unlike inferring "am I at the bottom?" from
+    # `scroll_offset` vs `max_scroll_y`, which lags behind content growth by
+    # a few lines mid-stream and would both flake tests and intermittently
+    # drop auto-scroll in production.
+
+    @property
+    def following(self) -> bool:
+        return self._follow
+
+    def pause_follow(self) -> None:
+        """Stop auto-scrolling (the user scrolled up to read earlier output)."""
+        self._follow = False
+
+    def scroll_to_bottom(self) -> None:
+        """Jump to the newest output and re-arm following (End / new turn)."""
+        self._follow = True
+        self.scroll_end(animate=False)
+
+    def _follow_if_armed(self) -> None:
+        if self._follow:
+            self.scroll_end(animate=False)
 
     # ---- public API ----
 
@@ -73,7 +103,9 @@ class ChatLog(VerticalScroll):
         self._seal_assistant()
         self.transcript.append(("user", text))
         self.mount(SelectableStatic(self._render_user(text), classes="veles-user"))
-        self.scroll_end(animate=False)
+        # A new turn always re-arms following — the user just sent input and
+        # wants to watch the reply.
+        self.scroll_to_bottom()
 
     def start_assistant(self) -> None:
         """Begin a new streaming assistant message. Idempotent: a no-op
@@ -85,7 +117,7 @@ class ChatLog(VerticalScroll):
         self._current_assistant = SelectableStatic("assistant>", classes="veles-assistant")
         self.transcript.append(("assistant", ""))
         self.mount(self._current_assistant)
-        self.scroll_end(animate=False)
+        self._follow_if_armed()
 
     def append_assistant_delta(self, chunk: str) -> None:
         if self._current_assistant is None:
@@ -97,7 +129,7 @@ class ChatLog(VerticalScroll):
         # can read the assistant's full reply by the time TurnDone fires.
         if self.transcript and self.transcript[-1][0] == "assistant":
             self.transcript[-1] = ("assistant", self._buffer)
-        self.scroll_end(animate=False)
+        self._follow_if_armed()
 
     def seal_assistant(self) -> None:
         """End-of-turn marker. Re-renders the streaming Static through
@@ -112,7 +144,7 @@ class ChatLog(VerticalScroll):
         self._seal_assistant()
         self.transcript.append(("error", text))
         self.mount(SelectableStatic(f"error> {text}", classes="veles-error"))
-        self.scroll_end(animate=False)
+        self._follow_if_armed()
 
     def append_system(self, text: str) -> None:
         """Render slash-command output and other meta info. Multi-line
@@ -122,7 +154,7 @@ class ChatLog(VerticalScroll):
         self.transcript.append(("system", text))
         safe = text.replace("[", r"\[")
         self.mount(SelectableStatic(safe, classes="veles-system"))
-        self.scroll_end(animate=False)
+        self._follow_if_armed()
 
     def clear_messages(self) -> None:
         """Drop every mounted message Static. Used by `/clear`."""
@@ -130,6 +162,14 @@ class ChatLog(VerticalScroll):
         self.transcript.clear()
         for child in list(self.children):
             child.remove()
+
+    # ---- mouse wheel (only active when VELES_TUI_MOUSE=1) ----
+
+    def on_mouse_scroll_up(self, event) -> None:
+        """Wheel-up means the user wants to read earlier output — stop
+        auto-following. The container still performs the scroll (we don't
+        stop the event)."""
+        self.pause_follow()
 
     # ---- internals ----
 

@@ -113,9 +113,16 @@ class OpenAICompatibleProvider:
         return max_tokens_kwarg_for(model)
 
     def _prepare_messages(self, messages: list[Message], model: str) -> list[dict[str, Any]]:
-        """Default: plain wire-form. Cloud adapters override to call
-        `apply_cache_hints` on top."""
-        return [to_openai_message(m) for m in messages]
+        """Default: plain wire-form with the cache sentinel stripped.
+
+        Cloud adapters override to call `apply_cache_hints` (which converts
+        the sentinel into `cache_control` blocks for Anthropic). The default
+        — used by local backends — must still strip the sentinel so it never
+        leaks into the prompt; local servers do their own automatic prefix
+        KV-caching off the (now clean, stable) prefix (M178)."""
+        from veles.core.cache_hints import strip_cache_sentinel
+
+        return strip_cache_sentinel([to_openai_message(m) for m in messages])
 
     def _extract_usage(self, usage_obj: Any) -> TokenUsage:
         """Default: prompt/completion/total only. Cloud adapters override

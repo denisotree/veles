@@ -52,21 +52,22 @@ def test_tokens_includes_in_out_labels(slash_ctx):
 
 def test_context_with_zero_tokens_still_responds(slash_ctx):
     """No turn done yet — command still returns sensible info, not error."""
-    slash_ctx.state.model = "anthropic/claude-sonnet-4.6"
+    slash_ctx.state.model = "anthropic/claude-haiku-4.5"  # 200k window
     res = _reg().dispatch("/context", slash_ctx)
     assert res is not None and not res.is_error
-    assert "200" in res.text  # Claude limit visible somewhere
+    assert "200" in res.text  # Haiku 200k limit visible somewhere
 
 
 def test_context_shows_size_limit_and_percentage(slash_ctx):
-    slash_ctx.state.model = "anthropic/claude-sonnet-4.6"
-    slash_ctx.state.last_turn_total_tokens = 20_000
+    # M177: /context reports live occupancy (last_prompt_tokens) vs window.
+    slash_ctx.state.model = "anthropic/claude-haiku-4.5"  # 200k window
+    slash_ctx.state.last_prompt_tokens = 20_000
     res = _reg().dispatch("/context", slash_ctx)
     assert res is not None and not res.is_error
     text = res.text
     # 20k / 200k = 10%
     assert "10" in text  # percentage
-    assert "200" in text  # limit (200k for Claude)
+    assert "200" in text  # limit (200k for Haiku)
 
 
 def test_context_model_specific_limit_for_gpt(slash_ctx):

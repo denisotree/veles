@@ -6,10 +6,8 @@ from __future__ import annotations
 from textual.widgets import Static
 
 from veles.core.model_naming import strip_provider_prefix
+from veles.core.model_windows import context_window_for
 from veles.tui.state import AppState
-
-# Conservative defaults; refined per-model via `_context_limit_for`.
-_DEFAULT_CTX_LIMIT = 200_000
 
 
 def _fmt_tokens(n: int) -> str:
@@ -18,24 +16,6 @@ def _fmt_tokens(n: int) -> str:
     if n < 1_000_000:
         return f"{n / 1_000:.1f}k".rstrip("0").rstrip(".") + "k" if False else f"{n // 1_000}k"
     return f"{n // 1_000_000}M"
-
-
-def _context_limit_for(model: str | None) -> int:
-    """Best-effort context-window lookup. Real per-model limits live in
-    the adapter; here we approximate by model-id substring so the status
-    bar shows a sensible % when adapter metadata is unavailable."""
-    if not model:
-        return _DEFAULT_CTX_LIMIT
-    m = model.lower()
-    if "claude" in m or "sonnet" in m or "opus" in m or "haiku" in m:
-        return 200_000
-    if "gpt-4o" in m or "gpt-4.1" in m:
-        return 128_000
-    if "gemini" in m and "1.5" in m:
-        return 1_000_000
-    if "gemini" in m:
-        return 200_000
-    return _DEFAULT_CTX_LIMIT
 
 
 # ---- per-chip renderers ----
@@ -68,16 +48,28 @@ def _chip_tokens(state: AppState) -> str | None:
 
 
 def _chip_context(state: AppState) -> str | None:
-    if not state.last_turn_total_tokens:
+    """Live context occupancy: the last request's prompt size vs the model
+    window. M177 — this used to render cumulative run usage
+    (`last_turn_total_tokens`) over a hardcoded 200k, which conflated billed
+    tokens with window size and could show >100%. The prompt-size proxy is
+    what's actually resident for the next turn, so the % stays sane."""
+    occupied = state.last_prompt_tokens or state.last_turn_total_tokens
+    if not occupied:
         return None
-    limit = _context_limit_for(state.model)
-    pct = (state.last_turn_total_tokens * 100) // max(limit, 1)
+    limit = context_window_for(state.model)
+    pct = (occupied * 100) // max(limit, 1)
     marker = "[bold red]" if pct >= 80 else ("[yellow]" if pct >= 60 else "")
     close = "[/]" if marker else ""
-    return (
-        f"ctx {marker}{_fmt_tokens(state.last_turn_total_tokens)}/"
-        f"{_fmt_tokens(limit)} ({pct}%){close}"
-    )
+    return f"ctx {marker}{_fmt_tokens(occupied)}/{_fmt_tokens(limit)} ({pct}%){close}"
+
+
+def _chip_cache(state: AppState) -> str | None:
+    """M178: cache-read tokens for the last turn — visible proof that prompt
+    caching is working. Hidden until the first cached read (so a cold first
+    turn doesn't show a misleading `cache 0`)."""
+    if not state.last_turn_cache_read:
+        return None
+    return f"[green]cache {_fmt_tokens(state.last_turn_cache_read)}[/]"
 
 
 def _chip_insights(state: AppState) -> str | None:
@@ -102,6 +94,7 @@ def _collect_chips(state: AppState) -> list[str]:
         _chip_provider_model(state),
         _chip_tokens(state),
         _chip_context(state),
+        _chip_cache(state),
         _chip_insights(state),
         _chip_busy(state),
         _chip_queue(state),

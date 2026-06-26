@@ -57,6 +57,13 @@ class AppState:
     tokens_in: int = 0
     tokens_out: int = 0
     last_turn_total_tokens: int = 0
+    # M177: prompt-token count of the most recent request — the live context
+    # occupancy the `ctx` chip renders against the model window (so it stays
+    # <= ~100% instead of conflating cumulative run usage with window size).
+    last_prompt_tokens: int = 0
+    # M178: cache-read tokens for the last turn — surfaced as a `cache` chip so
+    # the user can see prompt caching is working (or regressing).
+    last_turn_cache_read: int = 0
     # M87: batch insight extractor candidates awaiting `/save` confirmation.
     # Each entry is a tuple (slug, title, body). Populated by the periodic
     # extractor; consumed (and cleared per slug) by `/save <slug>`.

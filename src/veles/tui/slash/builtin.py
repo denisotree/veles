@@ -75,6 +75,9 @@ def _help(line: str, ctx: SlashContext) -> SlashResult:
         "  Ctrl+R                       open session picker",
         "  Ctrl+T                       open theme picker",
         "  Shift+Tab                    cycle mode",
+        "  PageUp / PageDown            scroll chat history",
+        "  Ctrl+Home / Ctrl+End         jump to top / bottom (End resumes auto-scroll)",
+        "  (set VELES_TUI_MOUSE=1 to scroll with the mouse wheel; trades native select)",
     ]
     return SlashResult.ok("\n".join(rows))
 
@@ -109,6 +112,7 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
       the legacy behaviour: save the last assistant reply to
       `wiki/queries/<slug>.md` (user content).
     """
+    from veles.core.layout.engines import wiki_enabled
     from veles.modules.wiki.wiki import Wiki
 
     candidates = list(ctx.state.insight_candidates)
@@ -134,11 +138,27 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
                 append_memory_log(ctx.project, op="tui-save-insight", summary=f"-> insight #{rid}")
             ctx.state.insight_candidates = [c for c in candidates if c[0] != slug]
             return SlashResult.ok(f"saved insight #{rid}")
-    # Legacy path: save the last assistant reply under wiki/queries/.
+    # Fall back to saving the last assistant reply.
     last = ctx.state.last_assistant_text
     if not last or not last.strip():
         return SlashResult.err("/save: nothing to save yet (no assistant response in this run)")
     title = _title_from_text(last) or slug.replace("-", " ").title()
+
+    # On layouts without the wiki engine (bare/notes), there is no
+    # `wiki/queries/` to write to — keep the reply as a memory insight
+    # instead of crashing on a Wiki the layout never created.
+    if not wiki_enabled(ctx.project):
+        from veles.core.memory.artefacts import append_memory_log
+        from veles.core.tools.builtin.memory_save import save_insight_row
+
+        rid = save_insight_row(title=title, body=last, category="tui-save", project=ctx.project)
+        if rid == 0:
+            return SlashResult.err("/save failed: could not write insight to memory.db")
+        with contextlib.suppress(Exception):
+            append_memory_log(ctx.project, op="tui-save-insight", summary=f"-> insight #{rid}")
+        return SlashResult.ok(f"saved insight #{rid}")
+
+    # Legacy path: save the last assistant reply under wiki/queries/.
     wiki = Wiki(ctx.project.wiki_root)
     try:
         rel = wiki.write_page(category="queries", slug=slug, title=title, content=last)
@@ -341,15 +361,16 @@ def _tokens(line: str, ctx: SlashContext) -> SlashResult:
 
 
 def _context(line: str, ctx: SlashContext) -> SlashResult:
-    """Current context size against the model's window. Looks up the
-    limit via the same helper the StatusBar chip uses, so the two
-    surfaces never disagree on the model's nominal window."""
+    """Live context occupancy against the model's window. Uses the same
+    per-model registry (M177) the StatusBar chip uses, so the two surfaces
+    never disagree on the window — and reports the last request's prompt
+    size (resident context) rather than cumulative run usage."""
     del line
-    from veles.tui.widgets.status_bar import _context_limit_for
+    from veles.core.model_windows import context_window_for
 
     st = ctx.state
-    limit = _context_limit_for(st.model)
-    used = st.last_turn_total_tokens
+    limit = context_window_for(st.model)
+    used = st.last_prompt_tokens or st.last_turn_total_tokens
     pct = (used * 100) // max(limit, 1) if used else 0
     rows = [
         "context window:",

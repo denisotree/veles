@@ -17,3 +17,8 @@ agents_md_template = "templates/AGENTS.md"
 [[layout.writable_zones]]
 path = "notes/"
 description = "Free-form markdown notes — the only zone the agent writes content into"
+
+[[layout.operations]]
+name = "organize"
+skill = "organize"
+description = "Tidy the notes/ tree — group into subfolders, rename consistently, cross-link"
