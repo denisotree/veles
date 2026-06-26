@@ -86,10 +86,19 @@ class TuiApp(App[int]):
         # otherwise consume PageUp/PageDown). End re-arms follow-mode so
         # streaming resumes auto-scrolling; Ctrl+Home/Ctrl+End jump to the
         # ends without colliding with the composer's plain Home/End.
-        Binding("pageup", "scroll_chat('page_up')", "scroll up", priority=True),
+        # M179: Ctrl+O toggles focus between the input and the output pane —
+        # the primary, Mac-friendly entry to read mode (Mac laptops have no
+        # PageUp/Home keys, and Ctrl+↑/↓ are taken by macOS Mission Control).
+        # `priority=True` so it works while the Composer (a TextArea) is focused.
+        Binding("ctrl+o", "toggle_chat_focus", "read output", priority=True),
+        Binding("pageup", "scroll_chat('page_up')", "read ↑", priority=True),
         Binding("pagedown", "scroll_chat('page_down')", "scroll down", priority=True),
         Binding("ctrl+home", "scroll_chat('home')", "scroll top", priority=True, show=False),
         Binding("ctrl+end", "scroll_chat('end')", "scroll bottom", priority=True, show=False),
+        # M179: leave chat read-mode and return to the input. Non-priority so
+        # the Composer keeps Escape (cancel-history) while it holds focus; this
+        # only fires when the ChatLog has focus and lets Escape bubble up.
+        Binding("escape", "focus_composer", "to input", show=False),
         # M115.3: native terminal text-selection is always on (see
         # `on_mount` where mouse capture is permanently released). No
         # toggle binding — VISION §7.2 explicitly forbids mode-switching
@@ -572,24 +581,53 @@ class TuiApp(App[int]):
         return f"{ts}-{sha}.png"
 
     def action_scroll_chat(self, where: str) -> None:
-        """Scroll the chat log (M176). `where` ∈ page_up/page_down/home/end.
+        """Scroll the chat log (M176/M179). `where` ∈ page_up/page_down/home/end.
 
-        `end` re-arms follow-mode (subsequent streaming auto-scrolls again);
-        the others leave the user parked where they scrolled to, so reading
-        earlier output isn't interrupted by new deltas.
+        `page_up`/`home` also move keyboard focus INTO the chat pane (read
+        mode): once focused, the ChatLog's own ↑/↓/PageUp/PageDown/Home/End
+        bindings let the user navigate with the arrow keys. `end` returns to
+        the bottom, re-arms follow-mode, and hands focus back to the Composer.
         """
         if self._chat is None:
             return
         if where == "page_up":
-            self._chat.pause_follow()
+            self.action_focus_chat()
             self._chat.scroll_page_up()
         elif where == "page_down":
             self._chat.scroll_page_down()
         elif where == "home":
-            self._chat.pause_follow()
+            self.action_focus_chat()
             self._chat.scroll_home(animate=False)
         elif where == "end":
             self._chat.scroll_to_bottom()
+            self.action_focus_composer()
+
+    def action_toggle_chat_focus(self) -> None:
+        """Ctrl+O: flip focus between the input and the output pane.
+
+        The Mac-friendly entry point to read mode (no PageUp/Home needed).
+        Into the chat → pause follow so streaming doesn't drag the view;
+        back to the input → leave the scroll position as-is (the next prompt
+        re-arms follow via `append_user`)."""
+        if self._chat is None:
+            return
+        if self._chat.has_focus:
+            self.action_focus_composer()
+        else:
+            self.action_focus_chat()
+
+    def action_focus_chat(self) -> None:
+        """Enter read mode: focus the chat pane and stop auto-following so
+        streaming deltas don't drag the view while the user navigates."""
+        if self._chat is None:
+            return
+        self._chat.pause_follow()
+        self._chat.focus()
+
+    def action_focus_composer(self) -> None:
+        """Leave read mode: hand focus back to the input field."""
+        if self._composer is not None:
+            self._composer.focus()
 
     def action_toggle_inspector(self) -> None:
         if self._inspector is None:
