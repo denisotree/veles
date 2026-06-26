@@ -81,6 +81,15 @@ class TuiApp(App[int]):
         Binding("ctrl+i", "toggle_inspector", "toggle inspector"),
         Binding("ctrl+r", "pick_session", "sessions"),
         Binding("ctrl+t", "pick_theme", "themes"),
+        # M176: scroll the chat log to re-read earlier output. `priority=True`
+        # so these win over the focused Composer (a TextArea that would
+        # otherwise consume PageUp/PageDown). End re-arms follow-mode so
+        # streaming resumes auto-scrolling; Ctrl+Home/Ctrl+End jump to the
+        # ends without colliding with the composer's plain Home/End.
+        Binding("pageup", "scroll_chat('page_up')", "scroll up", priority=True),
+        Binding("pagedown", "scroll_chat('page_down')", "scroll down", priority=True),
+        Binding("ctrl+home", "scroll_chat('home')", "scroll top", priority=True, show=False),
+        Binding("ctrl+end", "scroll_chat('end')", "scroll bottom", priority=True, show=False),
         # M115.3: native terminal text-selection is always on (see
         # `on_mount` where mouse capture is permanently released). No
         # toggle binding — VISION §7.2 explicitly forbids mode-switching
@@ -549,6 +558,24 @@ class TuiApp(App[int]):
         ts = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         sha = hashlib.sha1(str(time.time_ns()).encode()).hexdigest()[:8]
         return f"{ts}-{sha}.png"
+
+    def action_scroll_chat(self, where: str) -> None:
+        """Scroll the chat log (M176). `where` ∈ page_up/page_down/home/end.
+
+        `end` re-arms follow-mode (subsequent streaming auto-scrolls again);
+        the others leave the user parked where they scrolled to, so reading
+        earlier output isn't interrupted by new deltas.
+        """
+        if self._chat is None:
+            return
+        if where == "page_up":
+            self._chat.scroll_page_up()
+        elif where == "page_down":
+            self._chat.scroll_page_down()
+        elif where == "home":
+            self._chat.scroll_home(animate=False)
+        elif where == "end":
+            self._chat.scroll_to_bottom()
 
     def action_toggle_inspector(self) -> None:
         if self._inspector is None:

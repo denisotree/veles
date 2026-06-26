@@ -159,13 +159,18 @@ def run_tui(args: argparse.Namespace, project: Project) -> int:
     # M138: record this run as a kind=tui runtime session for the duration of
     # the REPL; mark it stopped on exit (best-effort, never blocks).
     tui_session = _register_tui_session(project)
-    # `mouse=False`: don't emit SGR mouse-mode escape sequences at boot.
-    # Terminal stays out of mouse-reporting → native drag-select + system
-    # ⌘C (macOS) / Shift+drag (Linux) work via the terminal itself.
-    # Trade-off (continuation of M115.3): scroll wheel and click-to-focus
-    # are gone — PageUp/PageDown/arrows/Tab are the canonical navigation.
+    # `mouse=False` by default: don't emit SGR mouse-mode escape sequences at
+    # boot. Terminal stays out of mouse-reporting → native drag-select + system
+    # ⌘C (macOS) / Shift+drag (Linux) work via the terminal itself. Canonical
+    # scrollback is the keyboard (PageUp/PageDown, Ctrl+Home/Ctrl+End — M176).
+    #
+    # M176 opt-in: set `VELES_TUI_MOUSE=1` to enable mouse reporting so the
+    # scroll wheel scrolls the chat. Copy then goes through Textual's in-app
+    # selection (Shift+drag) → OSC52 clipboard instead of native drag-select —
+    # the M115.5 trade-off, surfaced as a per-user choice rather than forced.
+    mouse = os.environ.get("VELES_TUI_MOUSE", "").strip().lower() in {"1", "true", "yes", "on"}
     try:
-        return app.run(mouse=False) or 0
+        return app.run(mouse=mouse) or 0
     finally:
         if tui_session is not None:
             rt_store, rid = tui_session

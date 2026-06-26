@@ -75,6 +75,9 @@ def _help(line: str, ctx: SlashContext) -> SlashResult:
         "  Ctrl+R                       open session picker",
         "  Ctrl+T                       open theme picker",
         "  Shift+Tab                    cycle mode",
+        "  PageUp / PageDown            scroll chat history",
+        "  Ctrl+Home / Ctrl+End         jump to top / bottom (End resumes auto-scroll)",
+        "  (set VELES_TUI_MOUSE=1 to scroll with the mouse wheel; trades native select)",
     ]
     return SlashResult.ok("\n".join(rows))
 
