@@ -189,25 +189,25 @@ def _append_section(path: Path, content: str) -> None:
 
 
 def _default_section_content(section: str) -> str:
+    # Layout-neutral placeholders. These are the fallback used only when the
+    # LLM sub-agent produces nothing; the real content is layout-specific and
+    # belongs to the active layout pack's AGENTS.md template
+    # ([layout.scaffold].agents_md_template), so core must not bake in a
+    # particular layout (e.g. the wiki's sources/ + wiki/ + INDEX) here.
     defaults: dict[str, str] = {
         "Layout": (
             "## Layout\n\n"
-            "- `sources/` — immutable raw inputs.\n"
-            "- `wiki/` — agent-curated knowledge.\n"
-            "- `INDEX.md` — auto-generated catalogue.\n"
-            "- `LOG.md` — append-only operation journal.\n"
+            "- Describe the project's top-level directories and what each holds.\n"
+            "- `.veles/` is Veles' own state (memory, sessions) — leave it alone.\n"
         ),
         "Conventions": (
             "## Conventions\n\n"
-            "- Wiki pages use kebab-case slugs.\n"
-            "- Tool calls are logged to `LOG.md` via `wiki_append_log`.\n"
-            "- LLM-only writes go under `wiki/`; `sources/` is read-only.\n"
+            "- TODO: naming, formatting, and file-organisation rules for this project.\n"
         ),
         "Workflows": (
             "## Workflows\n\n"
-            "- `veles ingest <url|file>` — read source, write a wiki page.\n"
-            "- `veles query <question>` — search wiki and synthesise an answer.\n"
-            "- `veles lint` — audit for orphans, stale claims, duplicates.\n"
+            '- `veles run "<prompt>"` / `veles tui` — drive the agent.\n'
+            "- `veles curate` — distil sessions into project memory.\n"
         ),
     }
     return defaults.get(section, f"## {section}\n\n- TODO: describe {section}.\n")

@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.1] — 2026-06-26
+## [0.7.1] — 2026-06-27
 
 ### Added
 
@@ -17,6 +17,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pane shows an accent left edge and auto-follow pauses. Once in the output, **↑/↓** move
   through it; **Esc** returns to the input. PageUp / Ctrl+End still work where those keys
   exist (Ctrl+End also jumps to the bottom and resumes auto-scroll).
+
+### Changed
+
+- **`/wiki` is hidden on non-wiki layouts (M180).** The slash command is now registered only
+  when the active layout enables the wiki engine, so it no longer appears in `/help` or
+  completion on `bare`/`notes` projects; `/help` and the `/save` hint adapt to the layout.
+
+### Fixed
+
+- **Removed wiki artifacts from core (M180).** `veles schema fix`'s fallback AGENTS.md template
+  no longer references the removed `veles ingest`/`query`/`lint` commands or assume the wiki
+  directory layout; `subproject_proposer.detect_clusters` is gated on the wiki engine (so
+  `veles subproject suggest` no longer tries to build a Wiki on a non-wiki project); the
+  TUI `/save` wiki import moved inside its engine-gated branch.
 
 ## [0.7.0] — 2026-06-26
 

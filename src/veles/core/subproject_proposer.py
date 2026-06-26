@@ -119,7 +119,16 @@ def detect_clusters(
     Two pages are connected when their title-token Jaccard similarity
     is ≥ `min_similarity`. Connected components of size ≥ `min_pages`
     become clusters. Returns clusters sorted by score descending.
+
+    Clustering operates on wiki pages, so it is a no-op (empty list) on any
+    layout whose wiki engine is off — gated here, not only in the callers, so
+    `veles subproject suggest` can't construct a Wiki on a bare/notes project.
     """
+    from veles.core.layout.engines import wiki_enabled
+
+    if not wiki_enabled(project):
+        return []
+
     from veles.modules.wiki.wiki import Wiki
 
     wiki = Wiki(project.wiki_root)

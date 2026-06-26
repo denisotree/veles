@@ -130,7 +130,11 @@ class TuiApp(App[int]):
         self._factory = agent_factory
         self._project = project
         self._store = store
-        self._slash = slash_registry if slash_registry is not None else build_default_registry()
+        self._slash = (
+            slash_registry
+            if slash_registry is not None
+            else build_default_registry(project=project)
+        )
         # Per-app history + completer. Default history persists at
         # `~/.veles/tui_history.jsonl`; tests inject a redirected one.
         self._history = history if history is not None else InputHistory.load()

@@ -13,8 +13,12 @@ from __future__ import annotations
 
 import contextlib
 import datetime as dt
+from typing import TYPE_CHECKING
 
 from veles.tui.slash.registry import SlashContext, SlashRegistry, SlashResult
+
+if TYPE_CHECKING:
+    from veles.core.project import Project
 
 # ---------------- helpers ----------------
 
@@ -49,17 +53,30 @@ def _fmt_ts(ts: float) -> str:
 
 
 def _help(line: str, ctx: SlashContext) -> SlashResult:
-    del line, ctx
+    del line
+    from veles.core.layout.engines import wiki_enabled
+
+    wiki_on = ctx.project is not None and wiki_enabled(ctx.project)
+    save_help = (
+        "  /save <slug>                 save last answer as wiki/queries/<slug>.md"
+        if wiki_on
+        else "  /save <slug>                 save last answer to project memory"
+    )
     rows = [
         "Slash commands:",
         "  /help                        show this help",
         "  /quit, /q, /exit             exit the TUI",
         "  /clear                       start a fresh session (clears chat)",
         "  /session                     print current session id",
-        "  /save <slug>                 save last answer as wiki/queries/<slug>.md",
+        save_help,
         "  /history [N]                 list recent sessions (default 20)",
-        "  /wiki add <path|url>         agent ingests a source into the wiki",
-        "  /wiki query <question>       agent answers from the wiki",
+    ]
+    if wiki_on:
+        rows += [
+            "  /wiki add <path|url>         agent ingests a source into the wiki",
+            "  /wiki query <question>       agent answers from the wiki",
+        ]
+    rows += [
         "  /model [<id>]                show or set the active model",
         "  /mode [<name>]               show or set the active mode (Shift+Tab cycles)",
         "                               modes: auto, planning, writing, goal",
@@ -115,7 +132,6 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
       `wiki/queries/<slug>.md` (user content).
     """
     from veles.core.layout.engines import wiki_enabled
-    from veles.modules.wiki.wiki import Wiki
 
     candidates = list(ctx.state.insight_candidates)
     if not line:
@@ -160,7 +176,11 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
             append_memory_log(ctx.project, op="tui-save-insight", summary=f"-> insight #{rid}")
         return SlashResult.ok(f"saved insight #{rid}")
 
-    # Legacy path: save the last assistant reply under wiki/queries/.
+    # Legacy path: save the last assistant reply under wiki/queries/. Import
+    # the wiki module only here, after the engine gate above — a non-wiki
+    # project never reaches this branch and never imports it.
+    from veles.modules.wiki.wiki import Wiki
+
     wiki = Wiki(ctx.project.wiki_root)
     try:
         rel = wiki.write_page(category="queries", slug=slug, title=title, content=last)
@@ -575,9 +595,18 @@ def _self_doc(line: str, ctx: SlashContext) -> SlashResult:
 # ---------------- registry assembly ----------------
 
 
-def build_default_registry() -> SlashRegistry:
+def build_default_registry(project: Project | None = None) -> SlashRegistry:
     """Wires every shipped command. New phases extend the registry by
-    importing this and calling `register` on the returned instance."""
+    importing this and calling `register` on the returned instance.
+
+    `/wiki` is registered only when the active layout enables the wiki engine
+    (so it never shows in `/help` or completion on bare/notes layouts). When
+    `project` is None (e.g. unit tests), the wiki command is kept — the
+    omission is opt-out, scoped to a project that explicitly has no wiki."""
+    from veles.core.layout.engines import wiki_enabled
+
+    wiki_on = project is None or wiki_enabled(project)
+
     reg = SlashRegistry()
 
     reg.register("/help", _help, summary="show this help")
@@ -590,10 +619,14 @@ def build_default_registry() -> SlashRegistry:
     reg.register("/clear", _clear, summary="start a fresh session")
     reg.register("/session", _session, summary="print current session id")
 
-    reg.register("/save", _save, summary="save last answer as wiki/queries/<slug>.md")
+    save_summary = (
+        "save last answer as wiki/queries/<slug>.md" if wiki_on else "save last answer to memory"
+    )
+    reg.register("/save", _save, summary=save_summary)
     reg.register("/history", _history, summary="list recent sessions")
 
-    reg.register("/wiki", _wiki, summary="wiki: add <path|url> | query <question>")
+    if wiki_on:
+        reg.register("/wiki", _wiki, summary="wiki: add <path|url> | query <question>")
 
     reg.register("/model", _model, summary="show or set the active model")
     reg.register("/mode", _mode, summary="show or set the active mode (auto|planning|writing|goal)")
