@@ -361,15 +361,16 @@ def _tokens(line: str, ctx: SlashContext) -> SlashResult:
 
 
 def _context(line: str, ctx: SlashContext) -> SlashResult:
-    """Current context size against the model's window. Looks up the
-    limit via the same helper the StatusBar chip uses, so the two
-    surfaces never disagree on the model's nominal window."""
+    """Live context occupancy against the model's window. Uses the same
+    per-model registry (M177) the StatusBar chip uses, so the two surfaces
+    never disagree on the window — and reports the last request's prompt
+    size (resident context) rather than cumulative run usage."""
     del line
-    from veles.tui.widgets.status_bar import _context_limit_for
+    from veles.core.model_windows import context_window_for
 
     st = ctx.state
-    limit = _context_limit_for(st.model)
-    used = st.last_turn_total_tokens
+    limit = context_window_for(st.model)
+    used = st.last_prompt_tokens or st.last_turn_total_tokens
     pct = (used * 100) // max(limit, 1) if used else 0
     rows = [
         "context window:",

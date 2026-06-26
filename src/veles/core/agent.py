@@ -97,13 +97,22 @@ class UsageSnapshot:
     total_tokens: int = 0
     cache_read_tokens: int = 0
     cache_creation_tokens: int = 0
+    # M177: the *last* request's prompt-token count (overwritten, not summed).
+    # Approximates the live context occupancy — what's resident in the window
+    # for the next turn — so the status chip can show a sane % instead of
+    # cumulative run usage.
+    last_prompt_tokens: int = 0
 
     def add(self, usage) -> None:
-        self.prompt_tokens += getattr(usage, "prompt_tokens", 0)
+        prompt = getattr(usage, "prompt_tokens", 0)
+        self.prompt_tokens += prompt
         self.completion_tokens += getattr(usage, "completion_tokens", 0)
         self.total_tokens += getattr(usage, "total_tokens", 0)
         self.cache_read_tokens += getattr(usage, "cache_read_tokens", 0)
         self.cache_creation_tokens += getattr(usage, "cache_creation_tokens", 0)
+        # Latest request's prompt size = current resident-context estimate.
+        if prompt:
+            self.last_prompt_tokens = prompt
 
 
 @dataclass(slots=True)

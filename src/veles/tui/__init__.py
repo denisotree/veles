@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import os
 
+from veles.core.model_windows import default_hard_ceiling_for
 from veles.core.project import Project
 from veles.core.project_config import get_section, load_project_config
 
@@ -145,6 +146,11 @@ def run_tui(args: argparse.Namespace, project: Project) -> int:
             store=store,
             session_id=state.session_id,
             compressor=compressor,
+            # M177: parity with the daemon/CLI path — without a hard ceiling
+            # the emergency-truncation guard never runs, so a long TUI session
+            # could send an over-window request. Derive it from the model's
+            # real context window (~90%).
+            hard_ceiling_tokens=default_hard_ceiling_for(state.model),
             plan_mode=is_planning,
         )
 

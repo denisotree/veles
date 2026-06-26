@@ -480,6 +480,12 @@ class TuiApp(App[int]):
             self._state.tokens_in += usage.prompt_tokens
             self._state.tokens_out += usage.completion_tokens
             self._state.last_turn_total_tokens = usage.total_tokens
+            # M177: live context occupancy for the `ctx` chip = the last
+            # request's prompt size (falls back to total when a provider
+            # doesn't split prompt tokens).
+            self._state.last_prompt_tokens = (
+                usage.last_prompt_tokens or usage.prompt_tokens or usage.total_tokens
+            )
         # FIFO drain of any queued prompts (Phase 6 adds the editing UI).
         self._bridge.drain_one()
         self._refresh_status()
