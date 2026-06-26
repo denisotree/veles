@@ -108,20 +108,70 @@ def build_anthropic_system_blocks(system_text: str | None) -> str | list[dict[st
     return blocks
 
 
+def strip_cache_sentinel(openai_messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove the breakpoint sentinel from every string-content message.
+
+    The base (and local) adapters don't emit `cache_control` blocks, but the
+    system prompt still carries the ZWSP sentinel — without this it would
+    leak verbatim into the model's prompt (and, being a constant, slightly
+    perturb the prefix). Local backends do their own automatic prefix
+    KV-caching, so a clean, stable prefix is all they need (M178).
+    """
+    out: list[dict[str, Any]] = []
+    for msg in openai_messages:
+        content = msg.get("content")
+        if isinstance(content, str) and CACHE_BREAKPOINT_SENTINEL in content:
+            out.append({**msg, "content": content.replace(CACHE_BREAKPOINT_SENTINEL, "")})
+        else:
+            out.append(msg)
+    return out
+
+
+def _mark_message_tail(openai_messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Add an ephemeral `cache_control` breakpoint to the most-recent turn.
+
+    M178: caching the stable system prefix alone leaves the growing
+    conversation history uncached — in an agentic loop that history (tool
+    calls/results) dominates token cost and is re-sent in full every turn.
+    Marking the last `user`/`tool` message's content makes each turn read
+    the entire prior conversation from cache (a "rolling" breakpoint that
+    leapfrogs forward). Combined with the system breakpoint that's ≤2 of
+    Anthropic's 4 allowed breakpoints.
+
+    Only `user`/`tool` messages with non-empty string content are eligible —
+    assistant turns carrying `tool_calls` have null/array content and are
+    skipped (we mark the nearest preceding eligible message instead).
+    """
+    for i in range(len(openai_messages) - 1, -1, -1):
+        msg = openai_messages[i]
+        if msg.get("role") not in ("user", "tool"):
+            continue
+        content = msg.get("content")
+        if not isinstance(content, str) or not content:
+            continue
+        block = {"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}
+        out = list(openai_messages)
+        out[i] = {**msg, "content": [block]}
+        return out
+    return openai_messages
+
+
 def apply_cache_hints(openai_messages: list[dict[str, Any]], model: str) -> list[dict[str, Any]]:
-    """Post-process converted messages so a cache breakpoint reaches the wire.
+    """Post-process converted messages so cache breakpoints reach the wire.
 
-    For Anthropic targets: splits each system message containing the
-    sentinel into a two-block content array with `cache_control` on
-    the first block (the stable prefix). For everything else: strips
-    the sentinel from system content so non-Anthropic providers never
-    see it.
+    For Anthropic targets: (1) splits each system message containing the
+    sentinel into a two-block content array with `cache_control` on the
+    first block (the stable prefix), and (2) adds a rolling `cache_control`
+    breakpoint on the most-recent `user`/`tool` message so the growing
+    conversation prefix is cached too (M178). For everything else: strips
+    the sentinel so non-Anthropic providers never see it.
 
-    Operates on the OpenAI Chat Completions wire form (list of dicts
-    with `role` / `content`); does not touch tool / assistant / user
-    messages.
+    Operates on the OpenAI Chat Completions wire form (list of dicts with
+    `role` / `content`).
     """
     is_anthropic = is_anthropic_model(model)
+    if not is_anthropic:
+        return strip_cache_sentinel(openai_messages)
     out: list[dict[str, Any]] = []
     for msg in openai_messages:
         if msg.get("role") != "system":
@@ -130,10 +180,6 @@ def apply_cache_hints(openai_messages: list[dict[str, Any]], model: str) -> list
         content = msg.get("content")
         if not isinstance(content, str) or CACHE_BREAKPOINT_SENTINEL not in content:
             out.append(msg)
-            continue
-        if not is_anthropic:
-            stripped = content.replace(CACHE_BREAKPOINT_SENTINEL, "")
-            out.append({**msg, "content": stripped})
             continue
         prefix, suffix = split_at_breakpoint(content)
         blocks: list[dict[str, Any]] = [
@@ -146,4 +192,4 @@ def apply_cache_hints(openai_messages: list[dict[str, Any]], model: str) -> list
         if suffix and suffix.strip():
             blocks.append({"type": "text", "text": suffix})
         out.append({**msg, "content": blocks})
-    return out
+    return _mark_message_tail(out)

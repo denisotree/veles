@@ -63,6 +63,15 @@ def _chip_context(state: AppState) -> str | None:
     return f"ctx {marker}{_fmt_tokens(occupied)}/{_fmt_tokens(limit)} ({pct}%){close}"
 
 
+def _chip_cache(state: AppState) -> str | None:
+    """M178: cache-read tokens for the last turn — visible proof that prompt
+    caching is working. Hidden until the first cached read (so a cold first
+    turn doesn't show a misleading `cache 0`)."""
+    if not state.last_turn_cache_read:
+        return None
+    return f"[green]cache {_fmt_tokens(state.last_turn_cache_read)}[/]"
+
+
 def _chip_insights(state: AppState) -> str | None:
     if not state.insight_candidates:
         return None
@@ -85,6 +94,7 @@ def _collect_chips(state: AppState) -> list[str]:
         _chip_provider_model(state),
         _chip_tokens(state),
         _chip_context(state),
+        _chip_cache(state),
         _chip_insights(state),
         _chip_busy(state),
         _chip_queue(state),

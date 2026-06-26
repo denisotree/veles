@@ -486,6 +486,8 @@ class TuiApp(App[int]):
             self._state.last_prompt_tokens = (
                 usage.last_prompt_tokens or usage.prompt_tokens or usage.total_tokens
             )
+            # M178: cache-read tokens for the last turn (prompt caching).
+            self._state.last_turn_cache_read = getattr(usage, "cache_read_tokens", 0)
         # FIFO drain of any queued prompts (Phase 6 adds the editing UI).
         self._bridge.drain_one()
         self._refresh_status()
