@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-06-26
+
+### Added
+
+- **`veles organize` — layout-driven project tidy-up (M175).** Reorganizes a project's
+  content the way its active layout dictates (cluster wiki pages into
+  `concepts`/`entities`/`sources`, repair `[[wikilinks]]` and INDEX, dedup; sort a `notes/`
+  tree; a `bare` project has no organize step). **Propose-then-apply:** the default run writes
+  a reorganization plan to `.veles/memory/proposals/organize-<ts>.md` and changes nothing;
+  `--apply` executes it. Ships as a built-in module (`modules/organize/`), not core. Reorg
+  primitives are path-guarded: `move_file` and `wiki_rename_page` (move + back-reference
+  repair). Batch onboarding: `veles add <dir> --recursive [--glob PATTERN]` ingests a whole
+  directory.
+- **TUI chat scrollback (M176).** Scroll the chat to re-read earlier output with
+  `PageUp`/`PageDown` and `Ctrl+Home`/`Ctrl+End`. Streaming no longer yanks the view to the
+  bottom while you're scrolled up (follow-mode resumes on `End` or a new turn). Opt into
+  mouse-wheel scrolling with `VELES_TUI_MOUSE=1` (trades native drag-select for in-app
+  selection + OSC52 copy).
+- **Cache-hit indicator (M178).** The TUI status bar shows a green `cache <N>` chip with the
+  last turn's cache-read tokens, so prompt caching is visible.
+
+### Changed
+
+- **Prompt caching now caches the conversation, not just the system prompt (M178).** A rolling
+  `cache_control` breakpoint is placed on the most-recent user message, so each turn reads the
+  prior conversation from cache instead of re-sending it at full price (the dominant cost in
+  agentic loops). Local backends (ollama/llama.cpp/openai-compat) no longer leak the cache
+  sentinel into their prompts and cache off the clean prefix automatically.
+- **Context-window meter shows live occupancy (M177).** The `ctx` status chip (and `/context`)
+  now render the current request's prompt size against the model's real context window
+  (per-model registry: Haiku 200k, Sonnet/Opus 4.6+ and Fable 1M) — it no longer conflated
+  cumulative run usage with a hardcoded 200k and could show >100%.
+
+### Fixed
+
+- **Context overflow without compression (M177).** The TUI agent now carries a model-derived
+  `hard_ceiling_tokens`, so the emergency-truncation guard runs (parity with the daemon path);
+  a long session can't send an over-window request.
+- **Non-wiki layouts no longer get wiki machinery (M174).** `veles doctor` stops warning about
+  missing `INDEX.md`/`LOG.md`, the subproject proposer no-ops, and TUI `/save` falls back to a
+  memory insight — on `bare`/`notes` layouts where the wiki engine is off.
+
 ## [0.6.5] — 2026-06-22
 
 ### Changed
