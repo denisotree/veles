@@ -233,12 +233,6 @@ def _check_agents_md(project: Project | None) -> CheckResult:
     )
 
 
-# Telltale of the auto-generated AGENTS.md (scaffold template). Used to detect
-# an unmodified default that was copied from another project under a different
-# name — the "stale clone" that made an agent answer about the wrong project.
-_AGENTS_MD_DEFAULT_MARKER = "Add your project context here"
-
-
 def _check_agents_md_identity(project: Project | None) -> CheckResult:
     """Catch a stale/cloned AGENTS.md whose H1 names a different project.
 
@@ -247,23 +241,24 @@ def _check_agents_md_identity(project: Project | None) -> CheckResult:
     copied or renamed from another project (the default carries the old name).
     That title goes into the system prompt and makes the agent describe the
     wrong project — so flag it. A customised AGENTS.md (default marker gone)
-    is the user's own content and is never flagged, whatever its title."""
+    is the user's own content and is never flagged, whatever its title.
+
+    M181 `veles init` now auto-regenerates this case, so this check mainly
+    catches AGENTS.md files that pre-date the fix or were copied in after init."""
+    from veles.core.agents_md_schema import is_default_template, title_of
+
     if project is None:
         return CheckResult(name="agents_md_identity", status="info", message="no active project")
     p = project.root / "AGENTS.md"
     if not p.exists():
         return CheckResult(name="agents_md_identity", status="info", message="no AGENTS.md")
     text = p.read_text(encoding="utf-8", errors="replace")
-    if _AGENTS_MD_DEFAULT_MARKER not in text:
+    if not is_default_template(text):
         return CheckResult(
             name="agents_md_identity", status="ok", message="AGENTS.md is customised"
         )
-    h1 = ""
-    for line in text.splitlines():
-        if line.startswith("# "):
-            h1 = line[2:].strip()
-            break
-    if h1 and h1 != project.name:
+    h1 = title_of(text)
+    if h1 is not None and h1 != project.name:
         return CheckResult(
             name="agents_md_identity",
             status="warn",
@@ -272,7 +267,7 @@ def _check_agents_md_identity(project: Project | None) -> CheckResult:
                 f"doesn't match the project name ({project.name}) — likely copied "
                 "from another project, so the agent may describe the wrong one"
             ),
-            fix_hint="regenerate it (`veles init --force` preserves a customised one) "
+            fix_hint="re-run `veles init` here (it regenerates a stale default), "
             "or replace the title/body with this project's real context",
         )
     return CheckResult(

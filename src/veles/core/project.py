@@ -198,6 +198,16 @@ def init_project(
     root = root.resolve()
     state_dir = root / _STATE_DIR
     project_toml = state_dir / _PROJECT_TOML
+    # M181: detect a "heal in place" — a `.veles/` left without a project.toml
+    # that still carries a prior project's memory (e.g. `cp -R old new` brought
+    # along `.veles/memory.db` but not project.toml). We complete the project
+    # but warn so the foreign history doesn't silently feed recall.
+    healing_foreign_memory = (
+        not project_toml.is_file()
+        and not force
+        and state_dir.exists()
+        and (state_dir / "memory.db").is_file()
+    )
     if project_toml.is_file():
         # A real (complete) project already lives here.
         if not force:
@@ -234,6 +244,14 @@ def init_project(
             file=sys.stderr,
         )
     apply_scaffold(pack, root, resolved_name)
+
+    if healing_foreign_memory:
+        print(
+            f"note: this directory already had .veles/memory.db from a prior project — "
+            f"it now feeds recall for '{resolved_name}'. For a clean slate, remove "
+            f"{state_dir / 'memory.db'} (back it up first) or run `veles curate`.",
+            file=sys.stderr,
+        )
 
     _ensure_symlinks(root)
 
