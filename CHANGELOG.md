@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-06-26
+
+### Added
+
+- **TUI read mode (M179).** Switch keyboard focus from the input field into the output pane
+  and navigate it with the arrow keys. **PageUp** (or **Ctrl+Home**) enters read mode — the
+  chat pane takes focus (its left edge turns accent), auto-follow pauses, and **↑/↓**,
+  **PageUp/PageDown**, **Home/End** move through the output. **Esc** returns to the input;
+  **Ctrl+End** jumps to the bottom, resumes auto-scroll, and hands focus back.
+
 ## [0.7.0] — 2026-06-26
 
 ### Added

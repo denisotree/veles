@@ -39,6 +39,13 @@ class ChatLog(VerticalScroll):
     ChatLog {
         background: $surface;
         padding: 0 1;
+        /* Reserve a left edge so highlighting it on focus doesn't shift
+           layout. M179: it turns accent when the chat pane has keyboard
+           focus (read mode), so the user can see which pane is active. */
+        border-left: thick $surface;
+    }
+    ChatLog:focus {
+        border-left: thick $accent;
     }
     ChatLog > Static.veles-user {
         color: $accent;
