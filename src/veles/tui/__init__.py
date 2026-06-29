@@ -165,16 +165,20 @@ def run_tui(args: argparse.Namespace, project: Project) -> int:
     # M138: record this run as a kind=tui runtime session for the duration of
     # the REPL; mark it stopped on exit (best-effort, never blocks).
     tui_session = _register_tui_session(project)
-    # `mouse=False` by default: don't emit SGR mouse-mode escape sequences at
-    # boot. Terminal stays out of mouse-reporting → native drag-select + system
-    # ⌘C (macOS) / Shift+drag (Linux) work via the terminal itself. Canonical
-    # scrollback is the keyboard (PageUp/PageDown, Ctrl+Home/Ctrl+End — M176).
+    # M182: `mouse=True` by default — the scroll wheel / trackpad scrolls the
+    # chat, the canonical scrollback gesture (all keyboard scroll bindings were
+    # dropped). Native drag-select is NOT lost: with mouse-reporting on, every
+    # terminal still bypasses it under a modifier — Shift+drag on most
+    # (kitty/WezTerm/GNOME Terminal/Windows Terminal), Option(⌥)+drag on
+    # iTerm2/macOS — and ⌘C / Ctrl+Shift+C copies that selection. ⌘V / Ctrl+V
+    # paste is unaffected (not a mouse event). Textual's in-app Shift+drag →
+    # OSC52 (super+c / ctrl+shift+c) remains the fallback where a terminal's
+    # modifier-bypass is weak (e.g. macOS Terminal.app).
     #
-    # M176 opt-in: set `VELES_TUI_MOUSE=1` to enable mouse reporting so the
-    # scroll wheel scrolls the chat. Copy then goes through Textual's in-app
-    # selection (Shift+drag) → OSC52 clipboard instead of native drag-select —
-    # the M115.5 trade-off, surfaced as a per-user choice rather than forced.
-    mouse = os.environ.get("VELES_TUI_MOUSE", "").strip().lower() in {"1", "true", "yes", "on"}
+    # Opt-out: `VELES_TUI_MOUSE=0` keeps mouse-reporting off for users who want
+    # pure unmodified terminal drag-select and don't need wheel scrolling.
+    _mouse_env = os.environ.get("VELES_TUI_MOUSE", "").strip().lower()
+    mouse = _mouse_env not in {"0", "false", "no", "off"}
     try:
         return app.run(mouse=mouse) or 0
     finally:

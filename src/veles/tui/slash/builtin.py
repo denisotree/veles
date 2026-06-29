@@ -92,11 +92,10 @@ def _help(line: str, ctx: SlashContext) -> SlashResult:
         "  Ctrl+R                       open session picker",
         "  Ctrl+T                       open theme picker",
         "  Shift+Tab                    cycle mode",
-        "  Ctrl+O                       toggle focus: input <-> output (read mode)",
-        "  ↑/↓                          navigate the output once in read mode",
-        "  Esc                          leave read mode, back to the input",
-        "  PageUp / Ctrl+End            (if available) read up / jump to bottom",
-        "  (set VELES_TUI_MOUSE=1 to scroll with the mouse wheel; trades native select)",
+        "  Mouse wheel / trackpad       scroll the chat (back to bottom re-arms follow)",
+        "  Esc                          return focus to the input (after a chat click)",
+        "  Select text                  Shift+drag (Option+drag on iTerm2/macOS), then ⌘C",
+        "  (set VELES_TUI_MOUSE=0 to disable the wheel and keep pure terminal select)",
     ]
     return SlashResult.ok("\n".join(rows))
 
