@@ -189,6 +189,33 @@ def _persist_approval_if_grant(
         logger.warning("approval audit write failed (best-effort, dispatch continues): %s", exc)
 
 
+def _unknown_tool_refusal_text(name: str, active: Registry) -> str:
+    """Build a recovery-oriented message for a tool the model called but that
+    isn't in the active registry.
+
+    Distinguishes two cases via the global registry (which holds every
+    `@tool`-registered builtin): a tool that *exists* but is gated to another
+    mode/toolset (e.g. `create_plan` when running in writing mode), versus a
+    name that doesn't exist at all. Either way it lists the tools that *are*
+    available so the model can recover instead of retrying or fabricating an
+    explanation of the failure.
+    """
+    from veles.core.tools.registry import registry as global_registry
+
+    available = ", ".join(sorted(active.list_names())) or "(none)"
+    if name in global_registry.list_names():
+        return (
+            f"<error: tool {name!r} exists but is not enabled in the current mode. "
+            f"Do not retry it here. Either continue using the tools available now "
+            f"({available}), or tell the user it needs a different mode (e.g. switch to "
+            f"planning mode to use create_plan) and let them switch.>"
+        )
+    return (
+        f"<error: no such tool {name!r}. Available tools: {available}. "
+        f"Use one of these, or accomplish the task without it.>"
+    )
+
+
 def _dispatch(
     registry: Registry,
     call: ToolCall,
@@ -250,6 +277,37 @@ def _dispatch(
         entry = registry.get(call.name)
     except KeyError:
         entry = None
+
+    if entry is None:
+        # The model called a tool that isn't in the active registry. Without
+        # this guard, `_invoke_tool_safely` → `registry.dispatch` would raise
+        # `KeyError("unknown tool 'X'")` and feed the model a cryptic
+        # `<error: KeyError: ...>` it can't act on — which in practice makes it
+        # invent an authoritative-but-false explanation. Return a helpful
+        # refusal instead, distinguishing "exists in another mode" from
+        # "no such tool" and listing what *is* available here.
+        refusal_text = _unknown_tool_refusal_text(call.name, registry)
+        log(f"   refused: unknown tool {call.name!r} (not in active toolset)")
+        _emit(
+            event_writer,
+            PermissionDecision(
+                ts=now_iso(),
+                session_id=session_id,
+                tool_name=call.name,
+                decision="deny",
+                rule="unknown_tool",
+                reason=f"{call.name!r} not in active toolset",
+            ),
+            event_listener,
+        )
+        return _emit_tool_refusal(
+            call,
+            refusal_text=refusal_text,
+            error_msg=f"unknown tool {call.name!r}",
+            event_writer=event_writer,
+            event_listener=event_listener,
+            session_id=session_id,
+        )
 
     via_autopilot = False
     if entry is not None:
