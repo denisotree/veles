@@ -170,13 +170,28 @@ class ChatLog(VerticalScroll):
         for child in list(self.children):
             child.remove()
 
-    # ---- mouse wheel (only active when VELES_TUI_MOUSE=1) ----
+    # ---- mouse wheel (on by default since M182) ----
 
     def on_mouse_scroll_up(self, event) -> None:
         """Wheel-up means the user wants to read earlier output — stop
         auto-following. The container still performs the scroll (we don't
         stop the event)."""
         self.pause_follow()
+
+    def on_mouse_scroll_down(self, event) -> None:
+        """Wheel-down: re-arm following once the user scrolls back to the
+        bottom. With keyboard scrolling gone (M182), this is the only way —
+        besides a new turn — to resume auto-scroll. The geometry check runs
+        AFTER the scroll is applied (`call_after_refresh`) and only on this
+        discrete wheel event — never in the per-delta path, which is exactly
+        what the `_follow` flag exists to avoid."""
+        self.call_after_refresh(self._rearm_if_at_bottom)
+
+    def _rearm_if_at_bottom(self) -> None:
+        # A 1-row tolerance absorbs the off-by-one between scroll_offset and
+        # max_scroll_y while content is still settling.
+        if self.scroll_offset.y >= self.max_scroll_y - 1:
+            self._follow = True
 
     # ---- internals ----
 

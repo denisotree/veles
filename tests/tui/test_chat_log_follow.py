@@ -84,10 +84,25 @@ async def test_scroll_to_bottom_rearms_follow():
 
 
 async def test_mouse_wheel_up_pauses_follow():
-    """Wheel-up (only delivered when VELES_TUI_MOUSE=1) stops auto-following."""
+    """Wheel-up (mouse-reporting is on by default since M182) stops
+    auto-following so streaming doesn't drag the view while reading."""
     app = _ChatHost()
     async with app.run_test(size=(40, 6)) as pilot:
         log = pilot.app.query_one(ChatLog)
         assert log.following
         log.on_mouse_scroll_up(object())  # handler ignores the event payload
         assert not log.following
+
+
+async def test_mouse_wheel_down_at_bottom_rearms_follow():
+    """M182: with keyboard scrolling gone, wheel-down back to the bottom is
+    how the user resumes auto-follow. `_rearm_if_at_bottom` re-arms once the
+    view is at (within one row of) the bottom."""
+    app = _ChatHost()
+    async with app.run_test(size=(40, 6)) as pilot:
+        log = pilot.app.query_one(ChatLog)
+        log.pause_follow()
+        assert not log.following
+        # No scrollback content → already at the bottom → re-arm fires.
+        log._rearm_if_at_bottom()
+        assert log.following

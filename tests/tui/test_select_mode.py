@@ -46,14 +46,12 @@ def test_chat_log_user_static_is_selectable() -> None:
 # ---- mouse capture is off from boot, no toggle action ----
 
 
-async def test_mouse_capture_disabled_on_mount(agent_factory_for, text_response) -> None:
-    """Native terminal drag-select works from boot without any user
-    action. M115.5: mouse reporting is now disabled driver-level via
-    `app.run(mouse=False)` in `veles.tui.run_tui`; under Pilot the
-    driver flag isn't applied, so `mouse_capture` may read as default-
-    truthy. The load-bearing contract is that the `[select]` chip is
-    gone (no mode toggle exists) — see `test_run_tui_passes_mouse_false`
-    for the runtime path."""
+async def test_no_select_mode_chip_on_mount(agent_factory_for, text_response) -> None:
+    """No select mode-toggle exists (VISION §7.2). M182: mouse-reporting
+    is on by default (wheel scroll) with native drag-select preserved via
+    terminal modifier-bypass; the runtime call shape is asserted in
+    `test_run_tui_defaults_mouse_on_with_opt_out`. The load-bearing
+    contract here is that the `[select]` chip is gone (no off-state)."""
     from veles.tui.app import TuiApp
 
     app = TuiApp(
@@ -150,22 +148,23 @@ def test_ctrl_c_still_routes_to_copy_or_exit() -> None:
     assert matches and matches[0].action == "copy_or_exit"
 
 
-def test_run_tui_passes_mouse_false() -> None:
-    """The runtime `app.run()` must be invoked with `mouse=False` — this
-    is the load-bearing piece that gives native terminal drag-select +
-    system ⌘C in macOS Terminal.app (where OSC52 doesn't work).
-    Source-level guard: stubbing the full `run_tui` boot path (provider
-    factory, session store, skill registries) is too brittle, so we
-    assert the literal call shape in the module source instead."""
+def test_run_tui_defaults_mouse_on_with_opt_out() -> None:
+    """M182: the runtime `app.run()` defaults mouse-reporting ON so the
+    wheel / trackpad scrolls the chat, with `VELES_TUI_MOUSE=0` as the
+    opt-out. Native drag-select survives via terminal modifier-bypass
+    (Shift / Option). Source-level guard (stubbing the full boot path is
+    too brittle): assert the env-driven default-on shape, not a hardcoded
+    `mouse=False`."""
     import inspect
 
     import veles.tui as tui_pkg
 
     source = inspect.getsource(tui_pkg.run_tui)
-    assert "mouse=False" in source, (
-        "run_tui must invoke app.run(..., mouse=False) to disable mouse "
-        "reporting at the driver level"
+    assert "VELES_TUI_MOUSE" in source
+    assert 'not in {"0", "false", "no", "off"}' in source, (
+        "run_tui must default mouse-reporting ON (opt-out via VELES_TUI_MOUSE=0)"
     )
+    assert "mouse=False" not in source, "mouse must no longer be hardcoded off"
 
 
 async def test_no_toggle_action_exists(agent_factory_for, text_response) -> None:

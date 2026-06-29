@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **TUI scrolls with the mouse wheel / trackpad (M182).** Mouse-reporting is now on by default,
+  so the wheel / trackpad scrolls the chat directly (scrolling back to the bottom re-arms
+  auto-follow). Native drag-select is preserved via the terminal's standard modifier-bypass —
+  **Shift+drag** on most terminals, **Option(⌥)+drag** on iTerm2/macOS — then **⌘C** copies;
+  **⌘V / Ctrl+V** paste is unchanged. Where a terminal's modifier-bypass is weak (e.g. macOS
+  Terminal.app), the in-app Textual selection → OSC52 fallback (`super+c` / `ctrl+shift+c`)
+  remains. Set `VELES_TUI_MOUSE=0` to keep mouse-reporting off for pure unmodified terminal
+  select (no wheel scrolling).
+
+### Removed
+
+- **TUI read mode and keyboard scrolling (M182, supersedes M176/M179).** Removed the **Ctrl+O**
+  focus toggle and the **PageUp / PageDown / Ctrl+Home / Ctrl+End** scroll bindings; chat
+  scrollback is now the mouse wheel / trackpad. **Esc** still returns focus to the input after a
+  mouse click lands on the chat pane.
+
 ## [0.7.2] — 2026-06-27
 
 ### Fixed
