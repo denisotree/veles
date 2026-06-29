@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Calling a tool that isn't in the active mode no longer dead-ends in a cryptic
+  error (M183).** When the model called a tool absent from the current mode's
+  toolset (e.g. `create_plan`, which is planning-only, while in writing/direct
+  mode), dispatch let `registry.dispatch` raise `KeyError` and fed the model a
+  bare `<error: KeyError: unknown tool 'X'>` — which it couldn't recover from and
+  tended to "explain" with a fabricated rationale. `_dispatch` now short-circuits
+  on an unknown tool with a recovery-oriented refusal: it distinguishes a tool
+  that exists but is gated to another mode from one that doesn't exist at all,
+  lists the tools available now, and tells the model to switch modes or proceed
+  without it. A `decision="deny", rule="unknown_tool"` event is recorded for
+  audit. The tool's handler is never invoked.
+
 ## [0.7.2] — 2026-06-27
 
 ### Fixed
