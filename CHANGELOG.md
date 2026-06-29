@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-06-29
+
 ### Internal
 
 - **Release workflow is now idempotent on a re-run / re-pushed tag.** The
@@ -393,7 +395,8 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/denisotree/veles/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/denisotree/veles/compare/v0.7.2...v0.8.0
 [0.3.2]: https://github.com/denisotree/veles/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/denisotree/veles/compare/v0.3.0...v0.3.1
