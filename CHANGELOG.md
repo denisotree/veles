@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-06-29
+
 ### Changed
 
 - **TUI scrolls with the mouse wheel / trackpad (M182).** Mouse-reporting is now on by default,
@@ -17,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Terminal.app), the in-app Textual selection → OSC52 fallback (`super+c` / `ctrl+shift+c`)
   remains. Set `VELES_TUI_MOUSE=0` to keep mouse-reporting off for pure unmodified terminal
   select (no wheel scrolling).
+
+### Fixed
+
+- **Calling a tool that isn't in the active mode no longer dead-ends in a cryptic
+  error (M183).** When the model called a tool absent from the current mode's
+  toolset (e.g. `create_plan`, which is planning-only, while in writing/direct
+  mode), dispatch let `registry.dispatch` raise `KeyError` and fed the model a
+  bare `<error: KeyError: unknown tool 'X'>` — which it couldn't recover from and
+  tended to "explain" with a fabricated rationale. `_dispatch` now short-circuits
+  on an unknown tool with a recovery-oriented refusal: it distinguishes a tool
+  that exists but is gated to another mode from one that doesn't exist at all,
+  lists the tools available now, and tells the model to switch modes or proceed
+  without it. A `decision="deny", rule="unknown_tool"` event is recorded for
+  audit. The tool's handler is never invoked.
 
 ### Removed
 
@@ -367,7 +383,8 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/denisotree/veles/compare/v0.7.2...v0.8.0
 [0.3.2]: https://github.com/denisotree/veles/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/denisotree/veles/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/denisotree/veles/compare/v0.2.0...v0.3.0
