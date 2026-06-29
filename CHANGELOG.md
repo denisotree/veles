@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Internal
+
+- **Release workflow is now idempotent on a re-run / re-pushed tag.** The
+  `github-release` job ran `gh release create` unconditionally, so re-pushing a
+  tag (or re-running the job) failed with "a release with the same tag name
+  already exists"; it now updates the existing release in place (`gh release
+  edit` + `gh release upload --clobber`). The PyPI publish step gained
+  `skip-existing: true` so an already-published version no longer fails the
+  re-run.
+
 ## [0.8.0] — 2026-06-29
 
 ### Changed

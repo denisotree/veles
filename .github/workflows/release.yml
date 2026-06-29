@@ -37,6 +37,11 @@ jobs:
           path: dist/
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Idempotent re-runs: a re-pushed tag or a manual job re-run must not
+          # fail just because this version is already on PyPI (uploads are
+          # immutable — the same version can never be re-published anyway).
+          skip-existing: true
 
   # Create the GitHub Release page only after PyPI publish succeeds, so a failed
   # upload never leaves a Release pointing at a version that isn't on PyPI. Notes
@@ -53,7 +58,7 @@ jobs:
         with:
           name: dist
           path: dist/
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -63,7 +68,16 @@ jobs:
             grab && /^## \[/ { exit }
             grab { print }
           ' CHANGELOG.md > notes.md
-          if [ -s notes.md ]; then
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            # The release already exists (re-pushed tag or a manual job re-run).
+            # Update it in place instead of failing on `gh release create`.
+            echo "Release $GITHUB_REF_NAME exists — updating notes and assets."
+            if [ -s notes.md ]; then
+              gh release edit "$GITHUB_REF_NAME" \
+                --title "$GITHUB_REF_NAME" --notes-file notes.md
+            fi
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          elif [ -s notes.md ]; then
             gh release create "$GITHUB_REF_NAME" --verify-tag \
               --title "$GITHUB_REF_NAME" --notes-file notes.md dist/*
           else
