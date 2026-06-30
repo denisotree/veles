@@ -64,12 +64,11 @@ class TuiApp(App[int]):
         # within `_CTRL_C_EXIT_WINDOW_S` exits with a confirmation warning.
         Binding("ctrl+c", "copy_or_exit", "copy / 2x exit", priority=True, show=False),
         Binding("ctrl+v", "paste_clipboard", "paste", priority=True, show=False),
-        # OSC52 fallback for in-app (Textual) selection: terminals that
-        # forward ⌘C as `super+c` (some iTerm2/WezTerm/kitty profiles) or
-        # use the Linux/Windows-canonical Ctrl+Shift+C get a copy via
-        # Textual's built-in `screen.copy_text` action, which emits OSC52.
-        # macOS Terminal.app users instead get native drag-select + ⌘C
-        # via the terminal itself (mouse reporting is off, see `run_tui`).
+        # Extra copy-selection paths via Textual's built-in `screen.copy_text`
+        # (OSC52): terminals that forward ⌘C as `super+c` (some iTerm2/WezTerm/
+        # kitty profiles) or use the Linux/Windows-canonical Ctrl+Shift+C. The
+        # primary path is `ctrl+c` → `copy_or_exit`, which copies the active
+        # mouse selection via the native clipboard (M183b).
         Binding("super+c", "screen.copy_text", "copy selection", priority=True, show=False),
         Binding(
             "ctrl+shift+c",
@@ -84,14 +83,12 @@ class TuiApp(App[int]):
         # M182: chat scrollback is the mouse wheel / trackpad (mouse-reporting
         # is on by default — see `run_tui`). All keyboard scroll bindings
         # (Ctrl+O read-mode toggle, PageUp/PageDown, Ctrl+Home/Ctrl+End) were
-        # removed. `escape` stays as an escape-hatch: a mouse click can focus
-        # the chat pane (click-to-focus), and Escape hands focus back to the
-        # input. Non-priority so the Composer keeps its own Escape while focused.
-        Binding("escape", "focus_composer", "to input", show=False),
-        # M115.3: native terminal text-selection is always on (see
-        # `on_mount` where mouse capture is permanently released). No
-        # toggle binding — VISION §7.2 explicitly forbids mode-switching
-        # for selection.
+        # removed. M183b: the chat pane is non-focusable (`ChatLog.can_focus =
+        # False`), so keyboard focus never leaves the input — no Escape-to-input
+        # escape hatch is needed.
+        # No toggle binding for text-selection — VISION §7.2 forbids
+        # mode-switching for select (M183b: drag-select + Ctrl+C, or
+        # Option+drag + ⌘C on iTerm2).
         # `priority=True` is essential: Textual's default `Shift+Tab` is
         # reverse-focus, which would otherwise consume the keystroke
         # before our handler runs.
@@ -506,12 +503,35 @@ class TuiApp(App[int]):
     # ---- bindings ----
 
     def action_copy_or_exit(self) -> None:
-        """M77: single Ctrl+C copies the last assistant reply; a second
-        press inside the exit window confirms the quit. Status bar shows
-        a transient warning between the two presses."""
+        """Ctrl+C semantics, in priority order:
+
+        1. M183b — if there's a live mouse text-selection in the output, copy
+           exactly that (via the native clipboard helper — pbcopy/xclip, no
+           OSC52 needed, so it's reliable on iTerm2/Terminal.app). This is the
+           "drag-select then Ctrl+C" path that coexists with wheel scrolling.
+        2. M77 — otherwise copy the last assistant reply; a second press inside
+           the exit window confirms the quit (transient warning between presses).
+        """
         import time
 
         from veles.tui.clipboard import copy_text
+
+        # 1) A live in-app selection wins — copy verbatim, no exit intent.
+        try:
+            selected = self.screen.get_selected_text() or ""
+        except Exception:
+            selected = ""
+        if selected.strip():
+            assert self._chat is not None
+            if copy_text(selected):
+                self._chat.append_system("copied selection")
+            else:
+                self._chat.append_system("copy failed (no clipboard tool found)")
+            # Clear the highlight so a following Ctrl+C,Ctrl+C can still exit
+            # (otherwise the lingering selection re-enters this branch forever).
+            with contextlib.suppress(Exception):
+                self.screen.clear_selection()
+            return
 
         now = time.monotonic()
         if now - self._last_ctrl_c_at <= self._CTRL_C_EXIT_WINDOW_S:
@@ -568,13 +588,6 @@ class TuiApp(App[int]):
         ts = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         sha = hashlib.sha1(str(time.time_ns()).encode()).hexdigest()[:8]
         return f"{ts}-{sha}.png"
-
-    def action_focus_composer(self) -> None:
-        """Hand focus back to the input field (Escape escape-hatch when a mouse
-        click has focused the chat pane). M182: read-mode was removed; this is
-        the only remaining focus action."""
-        if self._composer is not None:
-            self._composer.focus()
 
     def action_toggle_inspector(self) -> None:
         if self._inspector is None:
