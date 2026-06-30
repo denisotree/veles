@@ -251,7 +251,10 @@ def main(argv: list[str] | None = None) -> int:
 
     _argv = list(sys.argv[1:]) if argv is None else list(argv)
     if not _argv:
-        _argv = ["tui"]
+        # M186: bare `veles` opens the inline streaming REPL (native terminal
+        # scroll/selection/copy). The full-screen Textual `veles tui` stays
+        # available explicitly.
+        _argv = ["repl"]
     args = _build_parser().parse_args(_argv)
     # Resolve the active i18n locale before any user-facing string fires.
     # `set_active_locale` honours `VELES_LOCALE` env over the config so a
