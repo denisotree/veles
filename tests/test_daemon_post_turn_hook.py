@@ -82,6 +82,38 @@ def test_post_turn_hook_keeps_going_when_one_step_fails(
     assert "boom" in err
 
 
+def test_post_turn_hook_resolves_provider_from_project_config(tmp_path: Path) -> None:
+    """M184: the daemon/channel start Namespace has `provider=None` when no
+    `--provider` is passed (provider flows from project config). The post-turn
+    hook must resolve the effective provider into `args.provider`, otherwise
+    the continuous-curator eligibility gate sees None and silently disables
+    the curator — the bug that left a wiki-llm diary bot with 0 curated pages.
+    """
+    project = init_project(tmp_path, name="provres")
+    (project.state_dir / "config.toml").write_text(
+        '[provider]\ndefault = "ollama"\n', encoding="utf-8"
+    )
+    args = argparse.Namespace(provider=None, model=None)
+
+    _make_post_turn_hook(args, project)
+
+    assert args.provider == "ollama"
+
+
+def test_post_turn_hook_keeps_explicit_provider(tmp_path: Path) -> None:
+    """An explicit `--provider` on the daemon Namespace must win over the
+    project-config default (mirrors the run.py resolution cascade)."""
+    project = init_project(tmp_path, name="provexplicit")
+    (project.state_dir / "config.toml").write_text(
+        '[provider]\ndefault = "ollama"\n', encoding="utf-8"
+    )
+    args = argparse.Namespace(provider="anthropic", model=None)
+
+    _make_post_turn_hook(args, project)
+
+    assert args.provider == "anthropic"
+
+
 async def test_run_agent_in_background_invokes_post_turn_hook(monkeypatch) -> None:
     """End-to-end: `run_agent_in_background` should call the hook after
     the worker completes, via `to_thread`."""

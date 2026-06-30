@@ -139,21 +139,33 @@ def _run_curator_pass(
 
 
 def _continuous_curator_eligible(args: argparse.Namespace) -> bool:
-    """Gate `_maybe_run_*` helpers. M43: continuous curation runs whenever
-    the active provider is a direct-API one (`openrouter`/`anthropic`/
-    `openai`/`gemini`) with the right env key; cli-delegate providers
-    (`claude-cli`/`gemini-cli`) can't drive arbitrary models for the
-    sub-agents, and `--resume` runs are user-driven refinement where
-    extra LLM noise is unwelcome.
+    """Gate `_maybe_run_*` helpers. Continuous curation runs whenever the
+    active provider can drive the curator sub-agents:
+
+    - direct-API providers (`openrouter`/`anthropic`/`openai`/`gemini`) with
+      the right API key configured;
+    - local providers (`ollama`/`llamacpp`/`openai-compat`), which authenticate
+      via their own runtime — `has_api_key` returns True for them.
+
+    cli-delegate providers (`claude-cli`/`gemini-cli`) can't drive arbitrary
+    models for the sub-agents (`has_api_key` returns False), and `--resume`
+    runs are user-driven refinement where extra LLM noise is unwelcome.
+
+    M184: this keys off `has_api_key(provider)` rather than membership in
+    `PROVIDER_API_KEY_ENVS`. The old membership check silently excluded local
+    providers, so a daemon/channel diary bot on ollama never curated. `provider`
+    must be the *resolved* effective provider — daemon/channel callers resolve
+    it into `args.provider` before the post-turn loop runs (a bare None — the
+    daemon-start default — stays ineligible).
     """
-    from veles.core.provider_factory import PROVIDER_API_KEY_ENVS, has_api_key
+    from veles.core.provider_factory import has_api_key
 
     if getattr(args, "no_curator", False):
         return False
     if getattr(args, "resume", None) is not None:
         return False
     provider = getattr(args, "provider", None)
-    if provider not in PROVIDER_API_KEY_ENVS:
+    if not provider:
         return False
     return has_api_key(provider)
 

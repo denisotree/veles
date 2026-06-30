@@ -343,6 +343,23 @@ def test_not_eligible_without_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _continuous_curator_eligible(_run_args()) is False
 
 
+def test_eligible_on_local_provider_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    # M184: local providers (ollama/llamacpp/openai-compat) authenticate via
+    # their own runtime, not an API key, so the continuous curator must treat
+    # them as eligible. The old `provider in PROVIDER_API_KEY_ENVS` membership
+    # gate silently excluded them, disabling curation for local-model setups.
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    assert _continuous_curator_eligible(_run_args(provider="ollama")) is True
+
+
+def test_not_eligible_when_provider_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    # M184: a bare `args.provider` of None (the daemon/channel start Namespace
+    # when no `--provider` was passed) must not be eligible — the effective
+    # provider has to be resolved upstream first.
+    monkeypatch.setenv("OPENROUTER_API_KEY", "fake")
+    assert _continuous_curator_eligible(_run_args(provider=None)) is False
+
+
 def test_idle_curator_skips_when_cursor_is_fresh(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

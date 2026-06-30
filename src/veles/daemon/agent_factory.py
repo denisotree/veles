@@ -498,7 +498,21 @@ def _make_post_turn_hook(args: argparse.Namespace, project):
     helpers consult (e.g. `--no-curator`); they read those via
     `getattr` with safe defaults so absence is interpreted as "default
     behaviour" (mirrors `veles run`).
+
+    M184: the daemon/channel start Namespace carries `provider=None` when no
+    `--provider` was passed — provider flows from project/user config. The
+    continuous-curator eligibility gate keys off `args.provider`, so without
+    this resolution it sees None and silently disables the curator (a wiki-llm
+    diary bot accumulated 5 sessions but 0 curated wiki pages). Resolve the
+    effective provider into `args` here — the same step `cmd_run` performs
+    before its own post-turn block — so the daemon and every channel that
+    reuses `state.post_turn_hook` curate correctly.
     """
+    from veles.core.model_resolver import resolve_effective_provider
+
+    if not getattr(args, "provider", None):
+        args.provider = resolve_effective_provider(args, project)
+
     from veles.cli import (
         _maybe_refresh_nl_routing,
         _maybe_refresh_self_doc,
