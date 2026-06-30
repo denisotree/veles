@@ -43,6 +43,40 @@ def test_chat_log_user_static_is_selectable() -> None:
     assert widget.allow_select is True
 
 
+def test_chat_log_is_not_focusable() -> None:
+    """M183b: the output pane never takes keyboard focus (so a mouse click on it
+    can't steal focus from the input). `allow_select` is unaffected — selection
+    is pointer-driven, not focus-driven."""
+    from veles.tui.widgets.chat_log import ChatLog
+
+    assert ChatLog.can_focus is False
+
+
+async def test_keyboard_focus_stays_on_composer(
+    tmp_project, agent_factory_for, text_response
+) -> None:
+    """Even after explicitly trying to focus the chat pane, keyboard focus
+    stays on the Composer — `ChatLog.can_focus = False` makes `.focus()` a
+    no-op, so there is no input<->output focus switching."""
+    from veles.tui.app import TuiApp
+    from veles.tui.widgets.chat_log import ChatLog
+
+    project, store = tmp_project
+    app = TuiApp(
+        state=AppState(session_id=None, provider_name="openrouter", model="m"),
+        agent_factory=agent_factory_for(text_response("ok")),
+        project=project,
+        store=store,
+    )
+    async with app.run_test() as pilot:
+        assert pilot.app._composer.has_focus
+        chat = pilot.app.query_one(ChatLog)
+        chat.focus()  # no-op on a non-focusable widget
+        await pilot.pause()
+        assert not chat.has_focus
+        assert pilot.app._composer.has_focus
+
+
 # ---- mouse capture is off from boot, no toggle action ----
 
 

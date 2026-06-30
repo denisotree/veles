@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **TUI: text selection / copy in the output, and keyboard focus stays on the
+  input (M183b).** Two follow-ups to the M182 mouse-on default:
+  - The final (sealed) assistant reply could not be selected or copied. It was
+    a `Static` carrying a `rich.markdown.Markdown` renderable — which renders
+    nicely but whose text Textual's selection cannot extract. Sealed replies are
+    now rendered with a Textual `Markdown` *widget*, which composes selectable
+    child widgets, so drag-select works on the formatted output. `Ctrl+C` now
+    copies the active mouse selection (via the native clipboard — pbcopy/xclip,
+    no OSC52 needed) when there is one, falling back to the last-reply copy /
+    double-tap-exit otherwise.
+  - Keyboard focus no longer switches to the output pane. `ChatLog` is now
+    non-focusable (`can_focus = False`), so a mouse click on the output can't
+    steal focus from the input line; the Composer is the only focusable widget.
+    On iTerm2/macOS, `Option+drag` then `⌘C` also works (native terminal
+    select+copy); plain drag uses `Ctrl+C`.
+
 ## [0.8.1] — 2026-06-29
 
 ### Internal

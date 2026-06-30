@@ -40,6 +40,69 @@ async def test_first_ctrl_c_copies_and_warns(
     assert captured.get("text") == "hello world"
 
 
+async def test_ctrl_c_copies_active_selection_over_last_reply(
+    tmp_project, agent_factory_for, text_response, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """M183b: a live mouse text-selection takes priority over the last-reply
+    copy, and the press is not treated as an exit intent."""
+    captured: dict[str, str] = {}
+    monkeypatch.setattr(
+        "veles.tui.clipboard.copy_text",
+        lambda text: captured.__setitem__("text", text) or True,
+    )
+
+    app = _app(tmp_project, agent_factory_for, text_response)
+    async with app.run_test() as pilot:
+        pilot.app.state.last_assistant_text = "the whole reply"
+        # Simulate an in-app text selection on the active screen.
+        pilot.app.screen.get_selected_text = lambda: "just this bit"  # type: ignore[method-assign]
+        await pilot.press("ctrl+c")
+        await pilot.pause()
+        # Copied the selection, not the last reply; app still running.
+        assert captured.get("text") == "just this bit"
+        assert pilot.app.return_code is None
+
+
+async def test_ctrl_c_without_selection_copies_last_reply(
+    tmp_project, agent_factory_for, text_response, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No selection → fall back to the M77 last-reply copy."""
+    captured: dict[str, str] = {}
+    monkeypatch.setattr(
+        "veles.tui.clipboard.copy_text",
+        lambda text: captured.__setitem__("text", text) or True,
+    )
+    app = _app(tmp_project, agent_factory_for, text_response)
+    async with app.run_test() as pilot:
+        pilot.app.state.last_assistant_text = "the whole reply"
+        pilot.app.screen.get_selected_text = lambda: ""  # type: ignore[method-assign]
+        await pilot.press("ctrl+c")
+        await pilot.pause()
+        assert captured.get("text") == "the whole reply"
+
+
+async def test_screen_selection_extracts_chat_text(
+    tmp_project, agent_factory_for, text_response
+) -> None:
+    """The selection machinery actually extracts text from a Markdown-sealed
+    chat message (the real path a mouse drag drives). Proven via the Screen's
+    own `text_select_all` so it doesn't depend on a synthetic drag — if this
+    holds, a real drag's `get_selected_text()` returns the dragged substring
+    and Ctrl+C copies it."""
+    from veles.tui.widgets.chat_log import ChatLog
+
+    app = _app(tmp_project, agent_factory_for, text_response)
+    async with app.run_test() as pilot:
+        chat = pilot.app.query_one(ChatLog)
+        chat.append_assistant_delta("hello selectable world")
+        chat.seal_assistant()  # re-renders through rich Markdown
+        await pilot.pause()
+        pilot.app.screen.text_select_all()
+        await pilot.pause()
+        selected = pilot.app.screen.get_selected_text() or ""
+        assert "hello selectable world" in selected
+
+
 async def test_double_ctrl_c_exits(
     tmp_project, agent_factory_for, text_response, monkeypatch: pytest.MonkeyPatch
 ) -> None:

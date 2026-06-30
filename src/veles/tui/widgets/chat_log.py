@@ -4,48 +4,60 @@ Textual gives us `RichLog`, but it's line-oriented: each `write()` lays
 down a finished line. Streaming a partial assistant reply token-by-token
 needs a different shape — we want the *last* line to keep growing.
 
-Approach: a `VerticalScroll` of one `Static` per logical message.
+Approach: a `VerticalScroll` of one widget per logical message.
 - A user turn appends one user-Static.
 - The assistant's reply starts as an empty Static held on the widget;
-  every `ChatDelta` rewrites its content with the accumulated buffer.
-- On `TurnDone`, the streaming Static is sealed: its final content is
-  re-rendered through `rich.markdown.Markdown` so tables, code blocks,
-  GFM-style lists, and ` ```diff` chunks (Pygments diff-lexer →
-  red/green) appear properly formatted. Streaming stays plain to keep
-  per-delta layout cheap and avoid mid-stream markdown breakage.
+  every `ChatDelta` rewrites its content with the accumulated buffer
+  (plain text — cheap per-delta, no mid-stream markdown breakage).
+- On `TurnDone`, the streaming Static is sealed: it is *replaced* by a
+  Textual `Markdown` widget rendering the accumulated buffer, so tables,
+  code blocks, GFM-style lists, and ` ```diff` chunks land formatted —
+  AND the text stays mouse-selectable. (M183b: a Static carrying a
+  `rich.markdown.Markdown` renderable renders nicely but Textual's text
+  selection cannot extract its text, so the final reply could not be
+  copied. A Markdown *widget* composes selectable child widgets.)
 """
 
 from __future__ import annotations
 
-from rich.markdown import Markdown
 from textual.containers import VerticalScroll
-from textual.widgets import Static
+from textual.widgets import Markdown, Static
 
 
 class SelectableStatic(Static):
     """Static that opts into Textual's selection API.
 
     M109 made every ChatLog message individually selectable so the user
-    can Shift+arrow through text and copy via the in-app selection (a
-    fallback when terminal-native drag-select is unavailable). Marking
+    can drag-select and copy via the in-app selection. Marking
     `allow_select` on the subclass is cleaner than poking the attribute
     on each instance from `ChatLog._make_static` (the previous shape)."""
 
     allow_select = True
 
 
+class AssistantMarkdown(Markdown):
+    """Sealed assistant reply, rendered as a Textual Markdown *widget*.
+
+    M183b: replaces the old `Static(rich.markdown.Markdown(...))`, whose
+    rendered text Textual's selection could not extract — so the final
+    (markdown) reply was un-copyable. A Markdown widget composes
+    selectable child widgets and is itself non-focusable (no descendant
+    grabs keyboard focus), so it keeps the input line focused."""
+
+
 class ChatLog(VerticalScroll):
+    # M183b: never take keyboard focus. A `VerticalScroll` is focusable by
+    # default, so a mouse click on the output pane used to steal focus from the
+    # Composer (the "focus keeps switching" report). Keyboard focus must always
+    # stay on the input line — the Composer is then the only focusable widget.
+    # This does NOT disable mouse-wheel scrolling or in-app text selection:
+    # both are pointer-driven and focus-independent.
+    can_focus = False
+
     DEFAULT_CSS = """
     ChatLog {
         background: $surface;
         padding: 0 1;
-        /* Reserve a left edge so highlighting it on focus doesn't shift
-           layout. M179: it turns accent when the chat pane has keyboard
-           focus (read mode), so the user can see which pane is active. */
-        border-left: thick $surface;
-    }
-    ChatLog:focus {
-        border-left: thick $accent;
     }
     ChatLog > Static.veles-user {
         color: $accent;
@@ -139,12 +151,17 @@ class ChatLog(VerticalScroll):
         self._follow_if_armed()
 
     def seal_assistant(self) -> None:
-        """End-of-turn marker. Re-renders the streaming Static through
-        Rich Markdown for the final view (tables, code blocks, diff
-        coloring), then drops the streaming handle so the next delta
-        opens a fresh Static instead of growing the previous one."""
+        """End-of-turn marker. Replaces the streaming Static with a Textual
+        `Markdown` widget for the final view (tables, code blocks, diff
+        coloring) that stays mouse-selectable, then drops the streaming
+        handle so the next delta opens a fresh Static. An empty reply
+        (nothing streamed) leaves the placeholder Static untouched."""
         if self._current_assistant is not None and self._buffer.strip():
-            self._current_assistant.update(Markdown(self._buffer, code_theme="monokai"))
+            sealed = AssistantMarkdown(self._buffer)
+            # Mount in place (right after the streaming Static), then drop the
+            # Static — preserves append order even if other mounts interleave.
+            self.mount(sealed, after=self._current_assistant)
+            self._current_assistant.remove()
         self._seal_assistant()
 
     def append_error(self, text: str) -> None:

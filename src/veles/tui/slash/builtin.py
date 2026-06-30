@@ -93,9 +93,9 @@ def _help(line: str, ctx: SlashContext) -> SlashResult:
         "  Ctrl+T                       open theme picker",
         "  Shift+Tab                    cycle mode",
         "  Mouse wheel / trackpad       scroll the chat (back to bottom re-arms follow)",
-        "  Esc                          return focus to the input (after a chat click)",
-        "  Select text                  Shift+drag (Option+drag on iTerm2/macOS), then ⌘C",
-        "  (set VELES_TUI_MOUSE=0 to disable the wheel and keep pure terminal select)",
+        "  Drag + Ctrl+C                select text in the output and copy it",
+        "  Option+drag then ⌘C          native terminal select+copy (iTerm2/macOS)",
+        "  (keyboard focus stays on the input; set VELES_TUI_MOUSE=0 to disable the wheel)",
     ]
     return SlashResult.ok("\n".join(rows))
 
