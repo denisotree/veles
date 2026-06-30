@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] — 2026-06-30
+
+### Fixed
+
+- **Goal mode no longer gets stuck before it can act (M185).** At the CONFIRM
+  step the agent only accepted `yes/да/ok/ага` as confirmation, so a natural
+  "Продолжи" / "Вперёд" / "continue" reply was read as *edits* and bounced back
+  to the interview — the goal could never reach its execute phase. The
+  confirmation parser now understands common bilingual "proceed" replies, and
+  the "how to confirm" hint is shown the moment the agent asks for confirmation
+  (previously it was only emitted on a turn that never happens in the TUI).
+- **Planning mode now tells you how to leave it (M185).** When a change was
+  blocked in planning mode, the agent invented a non-existent `veles mode
+  standard` command. The planning prompt and the block message now point to the
+  real action — `/mode writing` (or Shift+Tab) — and the model is told not to
+  invent commands.
+- **Copy behaviour in the TUI (M185).** A plain drag-select no longer copies on
+  its own. Copying the selection is bound to **⌘C** (macOS) and **Ctrl+Shift+C**
+  (Linux/Windows) and confirms with "copied to clipboard". Whether ⌘C reaches
+  the app depends on the terminal (default iTerm2/Terminal.app keep ⌘C for their
+  own Copy); Ctrl+Shift+C works almost everywhere, and `VELES_TUI_MOUSE=0`
+  restores native terminal selection + native ⌘C.
+
 ## [0.8.2] — 2026-06-30
 
 ### Fixed
