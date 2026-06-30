@@ -1,8 +1,9 @@
-"""M186 prototype: `veles repl` — inline streaming REPL.
+"""`veles repl` — inline streaming REPL (Phase 1: slash + modes + status).
 
-These cover the testable seams (slash dispatch, the streaming turn, parser
-wiring). The interactive prompt_toolkit loop itself isn't unit-driven; the
-turn path is exercised through `_run_turn` with a fake agent.
+Covers the testable seams: message-routing callbacks, post-turn state
+carry, slash dispatch through the *real* registry, and parser wiring. The
+interactive prompt_toolkit loop and the live mode FSM are exercised by a
+manual smoke run, not unit-driven here.
 """
 
 from __future__ import annotations
@@ -11,65 +12,100 @@ import argparse
 
 import pytest
 
-from veles.cli.commands.repl import _dispatch_slash, _run_turn
-from veles.core.agent import RunResult
-
-
-@pytest.mark.parametrize(
-    "line,expected",
-    [
-        ("hello there", "run"),
-        ("  not a slash", "run"),  # already stripped by caller, but be safe
-        ("/help", "help"),
-        ("/quit", "quit"),
-        ("/exit", "quit"),
-        ("/QUIT", "quit"),
-        ("/clear", "clear"),
-        ("/quit now", "quit"),
-        ("/bogus", "unknown"),
-    ],
+from veles.cli.commands.repl import (
+    _handle_slash,
+    _make_turn_callbacks,
+    _update_state_after_turn,
 )
-def test_dispatch_slash(line: str, expected: str) -> None:
-    assert _dispatch_slash(line) == expected
+from veles.core.agent import RunResult, UsageSnapshot
+from veles.tui.slash import build_default_registry
+from veles.tui.state import AppState
 
 
-class _FakeAgent:
-    """Minimal stand-in: streams two deltas then returns a completed result."""
-
-    _session_id = "s1"
-
-    def run(self, prompt, *, on_text_delta=None, event_listener=None):
-        if on_text_delta is not None:
-            on_text_delta("hello ")
-            on_text_delta("world")
-        return RunResult(
-            text="hello world", iterations=1, stopped_reason="completed", session_id="s1"
-        )
+def _state() -> AppState:
+    return AppState(session_id=None, provider_name="openrouter", model="m")
 
 
-def _args() -> argparse.Namespace:
-    return argparse.Namespace(stream=True, max_tokens_total=0, provider="openrouter")
+def _project_and_store(tmp_path):
+    from veles.core.memory import SessionStore
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path, name="repltest")
+    return project, SessionStore(project.memory_db_path)
 
 
-def test_run_turn_streams_answer_to_stdout(capsys: pytest.CaptureFixture[str]) -> None:
-    _run_turn(_FakeAgent(), "hi", _args())
+def test_turn_callbacks_route_messages(capsys: pytest.CaptureFixture[str]) -> None:
+    from veles.tui.messages import ChatDelta, SystemLine, TurnDone
+
+    post, on_text, _on_event, holder = _make_turn_callbacks(_state())
+    post(SystemLine(text="[auto -> writing]"))  # dim system line
+    on_text("hello")  # streamed answer
+    post(ChatDelta(text=" world"))
+    rr = RunResult(text="hello world", iterations=1, stopped_reason="completed", session_id="s1")
+    post(TurnDone(result=rr))
+
     out = capsys.readouterr().out
-    assert "assistant>" in out
-    assert "hello world" in out
+    assert "[auto -> writing]" in out
+    assert "hello world" in out  # "hello" + " world"
+    assert holder["result"] is rr
 
 
-def test_run_turn_survives_provider_error(capsys: pytest.CaptureFixture[str]) -> None:
-    from veles.core.provider import ProviderError
+def test_update_state_after_turn_carries_session_and_tokens() -> None:
+    state = _state()
+    rr = RunResult(
+        text="answer",
+        iterations=1,
+        stopped_reason="completed",
+        session_id="s9",
+        usage=UsageSnapshot(prompt_tokens=10, completion_tokens=5, total_tokens=15),
+    )
+    _update_state_after_turn(state, rr)
+    assert state.session_id == "s9"
+    assert state.last_assistant_text == "answer"
+    assert state.tokens_in == 10
+    assert state.tokens_out == 5
+    assert state.last_turn_total_tokens == 15
 
-    class _Boom:
-        _session_id = "s1"
 
-        def run(self, *_a, **_kw):
-            raise ProviderError("upstream 503")
+def test_update_state_after_turn_ignores_none() -> None:
+    state = _state()
+    _update_state_after_turn(state, None)
+    assert state.session_id is None  # no crash, no change
 
-    _run_turn(_Boom(), "hi", _args())
-    err = capsys.readouterr().err
-    assert "upstream 503" in err  # printed, not raised — REPL stays alive
+
+def test_handle_slash_help_quit_unknown(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
+    project, store = _project_and_store(tmp_path)
+    try:
+        registry = build_default_registry(project=project)
+        state = _state()
+
+        quit_, submit = _handle_slash("/help", registry, state, project, store)
+        assert quit_ is False and submit is None
+        assert capsys.readouterr().out  # help text was printed
+
+        quit_, submit = _handle_slash("/quit", registry, state, project, store)
+        assert quit_ is True
+
+        quit_, submit = _handle_slash("/zzznope", registry, state, project, store)
+        assert quit_ is False
+        assert "unknown" in capsys.readouterr().err.lower()
+    finally:
+        store.close()
+
+
+def test_handle_slash_clear_resets_session(tmp_path) -> None:
+    project, store = _project_and_store(tmp_path)
+    try:
+        registry = build_default_registry(project=project)
+        state = _state()
+        state.session_id = "s-old"
+        state.last_assistant_text = "prev"
+
+        _handle_slash("/clear", registry, state, project, store)
+        assert state.session_id is None
+        assert state.last_assistant_text is None
+    finally:
+        store.close()
 
 
 def test_repl_command_registered() -> None:
