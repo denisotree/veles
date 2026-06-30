@@ -168,14 +168,58 @@ def parse_check_verdict(raw: str) -> tuple[Verdict, str]:
 # ---- yes/no parsing ----
 
 
+# M185: affirmative/"proceed" prefixes parsed bilingually (EN + RU). The
+# original set was tiny (yes/ok + two RU tokens), so the very natural RU
+# "proceed" replies and English "continue" fell through to `no` (= edits)
+# and bounced the user back to INTERVIEW — the goal FSM could never reach
+# EXECUTE.
+_CONFIRM_YES_PREFIXES: tuple[str, ...] = (
+    "yes",
+    "y ",
+    "y\n",
+    "yeah",
+    "yep",
+    "yup",
+    "sure",
+    "ok",
+    "okay",
+    "okey",
+    "approve",
+    "lgtm",
+    "proceed",
+    "continue",
+    "confirm",
+    "go ahead",
+    "go on",
+    "go for",
+    "да",
+    "ага",  # noqa: RUF001
+    "ок",
+    "окей",
+    "продолж",  # продолжи / продолжай / продолжить
+    "вперёд",
+    "вперед",
+    "давай",
+    "поехали",
+    "погнали",
+    "подтвержда",  # подтверждаю
+    "подтверди",
+    "согласен",
+)
+_CONFIRM_YES_EXACT: frozenset[str] = frozenset({"y", "yes!", "go", "go!", "+"})
+
+
 def _classify_confirm_reply(prompt: str) -> Literal["yes", "no", "cancel"]:
-    """Permissive: any prompt starting with 'yes'/'да'/'ok' → yes;
-    starting with 'cancel'/'отмен' → cancel; anything else → no
+    """Permissive bilingual ack parser. A reply starting with any common
+    affirmative / "proceed" word (yes/ok/continue/да/продолжи/вперёд/…) →
+    yes; starting with 'cancel'/'отмен' → cancel; anything else → no
     (treated as edits, returns to INTERVIEW). Case-insensitive."""
     p = (prompt or "").strip().lower()
+    if not p:
+        return "no"
     if p.startswith(("cancel", "отмен")):
         return "cancel"
-    if p.startswith(("yes", "y ", "y\n", "да", "ok", "ага")) or p in {"y", "yes!"}:  # noqa: RUF001 — Russian replies are parsed bilingually
+    if p in _CONFIRM_YES_EXACT or p.startswith(_CONFIRM_YES_PREFIXES):
         return "yes"
     return "no"
 
@@ -299,6 +343,14 @@ class GoalMode:
                 interview_summary=summary,
             )
             ctx.post(SystemLine(text="[goal: interview complete → confirm next]"))
+            # M185: surface the ack instruction in the SAME turn. The
+            # dedicated `_emit_confirmation` only fires on an empty-prompt
+            # turn, which never happens in normal TUI flow — so the user
+            # otherwise transitions to CONFIRM without ever being told how to
+            # acknowledge, and a natural "Продолжи" used to bounce them back.
+            from veles.core.i18n import t
+
+            ctx.post(SystemLine(text=t("goal.confirm_actions")))
         ctx.post(TurnDone(result))
 
     def _run_confirm(self, prompt: str, ctx: ModeContext, goal) -> None:
