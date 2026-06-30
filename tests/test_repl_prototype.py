@@ -26,6 +26,12 @@ def _state() -> AppState:
     return AppState(session_id=None, provider_name="openrouter", model="m")
 
 
+def _console():
+    from rich.console import Console
+
+    return Console()
+
+
 def _project_and_store(tmp_path):
     from veles.core.memory import SessionStore
     from veles.core.project import init_project
@@ -37,7 +43,8 @@ def _project_and_store(tmp_path):
 def test_turn_callbacks_route_messages(capsys: pytest.CaptureFixture[str]) -> None:
     from veles.tui.messages import ChatDelta, SystemLine, TurnDone
 
-    post, on_text, _on_event, holder = _make_turn_callbacks(_state())
+    errors: list[str] = []
+    post, on_text, _on_event, holder = _make_turn_callbacks(_state(), _console(), errors)
     post(SystemLine(text="[auto -> writing]"))  # dim system line
     on_text("hello")  # streamed answer
     post(ChatDelta(text=" world"))
@@ -75,33 +82,37 @@ def test_update_state_after_turn_ignores_none() -> None:
 
 def test_handle_slash_help_quit_unknown(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
     project, store = _project_and_store(tmp_path)
+    console = _console()
+    errors: list[str] = []
     try:
         registry = build_default_registry(project=project)
         state = _state()
 
-        quit_, submit = _handle_slash("/help", registry, state, project, store)
+        quit_, submit = _handle_slash("/help", registry, state, project, store, console, errors)
         assert quit_ is False and submit is None
-        assert capsys.readouterr().out  # help text was printed
+        assert capsys.readouterr().out  # repl help was printed
 
-        quit_, submit = _handle_slash("/quit", registry, state, project, store)
+        quit_, submit = _handle_slash("/quit", registry, state, project, store, console, errors)
         assert quit_ is True
 
-        quit_, submit = _handle_slash("/zzznope", registry, state, project, store)
+        quit_, submit = _handle_slash("/zzznope", registry, state, project, store, console, errors)
         assert quit_ is False
-        assert "unknown" in capsys.readouterr().err.lower()
+        assert "unknown" in capsys.readouterr().out.lower()
     finally:
         store.close()
 
 
 def test_handle_slash_clear_resets_session(tmp_path) -> None:
     project, store = _project_and_store(tmp_path)
+    console = _console()
+    errors: list[str] = []
     try:
         registry = build_default_registry(project=project)
         state = _state()
         state.session_id = "s-old"
         state.last_assistant_text = "prev"
 
-        _handle_slash("/clear", registry, state, project, store)
+        _handle_slash("/clear", registry, state, project, store, console, errors)
         assert state.session_id is None
         assert state.last_assistant_text is None
     finally:
