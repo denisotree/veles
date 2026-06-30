@@ -203,6 +203,11 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     provider_name = resolve_effective_provider(args, project, daemon_session=name)
     if not _ensure_api_key(provider_name, project=project.name):
         return 2
+    # M184: reflect the resolved provider (incl. any `[daemon.<name>]` override)
+    # back into `args`, mirroring `cmd_run`. The post-turn learning loop — built
+    # below and reused by every channel via `state.post_turn_hook` — gates the
+    # continuous curator on `args.provider`; a bare None silently disables it.
+    args.provider = provider_name
 
     # M173: in an already-initialised project with no channel configured, offer
     # to connect one before we detach. The fresh-project path already offers a
