@@ -15,6 +15,7 @@ import pytest
 from veles.cli.commands.repl import (
     _handle_slash,
     _make_turn_callbacks,
+    _render_answer,
     _update_state_after_turn,
 )
 from veles.core.agent import RunResult, UsageSnapshot
@@ -40,21 +41,29 @@ def _project_and_store(tmp_path):
     return project, SessionStore(project.memory_db_path)
 
 
-def test_turn_callbacks_route_messages(capsys: pytest.CaptureFixture[str]) -> None:
+def test_turn_callbacks_accumulate_messages() -> None:
     from veles.tui.messages import ChatDelta, SystemLine, TurnDone
 
     errors: list[str] = []
-    post, on_text, _on_event, holder = _make_turn_callbacks(_state(), _console(), errors)
-    post(SystemLine(text="[auto -> writing]"))  # dim system line
-    on_text("hello")  # streamed answer
+    post, on_text, _on_event, holder, sys_lines, answer = _make_turn_callbacks(_state(), errors)
+    post(SystemLine(text="[auto -> writing]"))  # accumulated as a dim mode line
+    on_text("hello")  # accumulated answer text
     post(ChatDelta(text=" world"))
     rr = RunResult(text="hello world", iterations=1, stopped_reason="completed", session_id="s1")
     post(TurnDone(result=rr))
 
-    out = capsys.readouterr().out
-    assert "[auto -> writing]" in out
-    assert "hello world" in out  # "hello" + " world"
+    assert sys_lines == ["[auto -> writing]"]
+    assert "".join(answer) == "hello world"
     assert holder["result"] is rr
+
+
+def test_render_answer_formats_markdown(capsys: pytest.CaptureFixture[str]) -> None:
+    _render_answer(_console(), "# Heading\n\n- alpha\n- beta\n\n**bold** and `code`")
+    out = capsys.readouterr().out
+    # Markdown structure renders (text survives; rich may restyle/underline).
+    assert "Heading" in out
+    assert "alpha" in out and "beta" in out
+    assert "bold" in out
 
 
 def test_update_state_after_turn_carries_session_and_tokens() -> None:

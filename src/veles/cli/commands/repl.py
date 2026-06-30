@@ -23,8 +23,12 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import sys
+import time
 
 from veles.core.project import Project
+
+# Window inside which a second Ctrl+C at the prompt is treated as exit.
+_CTRL_C_EXIT_WINDOW_S = 1.5
 
 
 def _console():
@@ -139,13 +143,18 @@ def _build_runtime(args: argparse.Namespace, project: Project):
         mode = get_mode(active)
         is_planning = active == "planning"
         registry_key = "planning" if is_planning else "writing"
+        # M186: rebuild the system prompt EVERY turn (not only when the session
+        # is fresh), so the *current* mode's block reaches the model. Agent's
+        # `_bootstrap_history` refreshes history[0] with a passed system prompt
+        # on resume. Without this, the strict PLANNING block baked on a first
+        # planning turn stays frozen for the whole session and the model keeps
+        # insisting it can't execute even after the turn routed to writing.
         sys_chunks: list[str] = []
-        if state.session_id is None:
-            base = _build_run_system_prompt(args, project)
-            if base:
-                sys_chunks.append(base)
-            if mode.system_block.strip():
-                sys_chunks.append(mode.system_block.strip())
+        base = _build_run_system_prompt(args, project)
+        if base:
+            sys_chunks.append(base)
+        if mode.system_block.strip():
+            sys_chunks.append(mode.system_block.strip())
         if extra_system and extra_system.strip():
             sys_chunks.append(extra_system.strip())
         system_prompt = "\n\n".join(sys_chunks) if sys_chunks else None
@@ -171,36 +180,54 @@ def _build_runtime(args: argparse.Namespace, project: Project):
     return state, factory, store
 
 
-def _make_turn_callbacks(state, console, errors: list[str]):
-    """Build (post, on_text, on_event) for a `ModeContext`, plus a holder the
-    caller reads the final `RunResult` from. Modes never import Textual — they
-    only call these — so the same FSM drives the REPL, printing not posting."""
+def _make_turn_callbacks(state, errors: list[str]):
+    """Build (post, on_text, on_event) for a `ModeContext`, plus a holder for
+    the final `RunResult` and the accumulators for the dim system lines and the
+    answer text.
+
+    The turn is rendered *after* it completes (so the answer can be pretty-
+    printed as Markdown), so these callbacks accumulate instead of printing.
+    Modes never import Textual — they only call these — so the same FSM drives
+    the REPL.
+
+    Returns ``(post, on_text, on_event, holder, sys_lines, answer)``.
+    """
     from veles.tui.messages import AgentError, ChatDelta, SystemLine, TurnDone
 
     holder: dict[str, object] = {}
+    sys_lines: list[str] = []
+    answer: list[str] = []
 
     def post(msg) -> None:
         if isinstance(msg, TurnDone):
             holder["result"] = msg.result
         elif isinstance(msg, SystemLine):
-            # markup=False: mode lines like "[auto → plan]" must not be parsed
-            # as rich markup.
-            console.print(f"  ⋅ {msg.text}", style="dim", markup=False)
+            sys_lines.append(msg.text)
         elif isinstance(msg, ChatDelta):
-            sys.stdout.write(msg.text)
-            sys.stdout.flush()
+            answer.append(msg.text)
         elif isinstance(msg, AgentError):
             errors.append(str(msg.exc))
-            console.print(f"\nerror: {msg.exc}", style="red", markup=False)
+            answer.append(f"\n\n**error:** {msg.exc}\n")
 
     def on_text(text: str) -> None:
-        sys.stdout.write(text)
-        sys.stdout.flush()
+        answer.append(text)
 
     def on_event(_event) -> None:
         return None
 
-    return post, on_text, on_event, holder
+    return post, on_text, on_event, holder, sys_lines, answer
+
+
+def _render_answer(console, text: str) -> None:
+    """Pretty-print the assistant answer as Markdown — headings, lists, tables,
+    links, bold/italic, and syntax-highlighted code blocks. Falls back to plain
+    text if rendering ever raises so a glitch never eats the answer."""
+    from rich.markdown import Markdown
+
+    try:
+        console.print(Markdown(text))
+    except Exception:
+        console.print(text, markup=False)
 
 
 def _update_state_after_turn(state, result) -> None:
@@ -219,10 +246,12 @@ def _update_state_after_turn(state, result) -> None:
 
 
 def _run_mode_turn(state, project, factory, line: str, console, errors: list[str]):
-    """Drive one user turn through the active mode's FSM; return the RunResult."""
+    """Drive one user turn through the active mode's FSM, then render the
+    answer as Markdown. Shows a spinner while the model works; dim mode lines
+    and the formatted answer print once the turn completes."""
     from veles.core.modes import ModeContext, get_mode
 
-    post, on_text, on_event, holder = _make_turn_callbacks(state, console, errors)
+    post, on_text, on_event, holder, sys_lines, answer = _make_turn_callbacks(state, errors)
     ctx = ModeContext(
         state=state,
         project=project,
@@ -231,8 +260,24 @@ def _run_mode_turn(state, project, factory, line: str, console, errors: list[str
         on_text=on_text,
         on_event=on_event,
     )
-    get_mode(state.mode).run_turn(line, ctx)
-    return holder.get("result")
+    interrupted = False
+    try:
+        with console.status("[cyan]working…[/cyan]", spinner="dots"):
+            get_mode(state.mode).run_turn(line, ctx)
+    except KeyboardInterrupt:
+        interrupted = True
+
+    for sl in sys_lines:
+        console.print(f"  ⋅ {sl}", style="dim", markup=False)
+    text = "".join(answer).strip()
+    result = holder.get("result")
+    if not text and result is not None:
+        text = (getattr(result, "text", "") or "").strip()
+    if text:
+        _render_answer(console, text)
+    if interrupted:
+        console.print("  [dim]⋅ interrupted[/dim]")
+    return result
 
 
 def _pick_session(store, state, console) -> None:
@@ -370,6 +415,7 @@ def cmd_repl(args: argparse.Namespace, project: Project) -> int:
     console = _console()
     errors: list[str] = []
 
+    last_ctrl_c = 0.0
     try:
         _banner(console, args.provider, args.model, state.mode)
         prompt_session = _make_prompt_session(project, registry, state)
@@ -378,13 +424,20 @@ def cmd_repl(args: argparse.Namespace, project: Project) -> int:
             try:
                 line = prompt_session.prompt(HTML("<b><ansicyan>❯</ansicyan></b> "))
             except KeyboardInterrupt:
-                continue  # Ctrl+C cancels the current line.
+                # Double Ctrl+C (within the window) exits, like Ctrl+D; a single
+                # one just cancels the current line.
+                now = time.monotonic()
+                if now - last_ctrl_c <= _CTRL_C_EXIT_WINDOW_S:
+                    break
+                last_ctrl_c = now
+                console.print("[dim](press Ctrl+C again or Ctrl+D to exit)[/dim]")
+                continue
             except EOFError:
                 break  # Ctrl+D exits.
 
             line = line.strip()
             if not line:
-                continue
+                continue  # ignore empty input
 
             if line.startswith("/"):
                 should_quit, submit = _handle_slash(
@@ -396,19 +449,14 @@ def cmd_repl(args: argparse.Namespace, project: Project) -> int:
                     continue
                 line = submit  # fall through and run the command's prompt
 
-            print()
+            console.print()
             try:
                 result = _run_mode_turn(state, project, factory, line, console, errors)
-            except KeyboardInterrupt:
-                console.print("\n  [dim]⋅ interrupted[/dim]")
-                continue
             except Exception as exc:
                 errors.append(str(exc))
-                console.print(f"\n[red]error:[/red] {exc}")
+                console.print(f"error: {exc}", style="red", markup=False)
                 continue
             _update_state_after_turn(state, result)
-            sys.stdout.write("\n")
-            sys.stdout.flush()
     finally:
         store.close()
     console.print("[dim]bye[/dim]")
