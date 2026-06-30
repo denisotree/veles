@@ -64,15 +64,17 @@ class TuiApp(App[int]):
         # within `_CTRL_C_EXIT_WINDOW_S` exits with a confirmation warning.
         Binding("ctrl+c", "copy_or_exit", "copy / 2x exit", priority=True, show=False),
         Binding("ctrl+v", "paste_clipboard", "paste", priority=True, show=False),
-        # Extra copy-selection paths via Textual's built-in `screen.copy_text`
-        # (OSC52): terminals that forward ⌘C as `super+c` (some iTerm2/WezTerm/
-        # kitty profiles) or use the Linux/Windows-canonical Ctrl+Shift+C. The
-        # primary path is `ctrl+c` → `copy_or_exit`, which copies the active
-        # mouse selection via the native clipboard (M183b).
-        Binding("super+c", "screen.copy_text", "copy selection", priority=True, show=False),
+        # M185: copying the output selection is bound exclusively to ⌘C
+        # (`super+c`, macOS) and Ctrl+Shift+C (Linux/Windows). A bare
+        # drag-select never copies on its own. Both go through
+        # `action_copy_selection`, which uses the native clipboard
+        # (pbcopy/xclip) and confirms with "copied to clipboard". ⌘C reaches
+        # the app only where the terminal forwards it (Textual requests the
+        # kitty keyboard protocol); Ctrl+Shift+C is forwarded near-universally.
+        Binding("super+c", "copy_selection", "copy selection", priority=True, show=False),
         Binding(
             "ctrl+shift+c",
-            "screen.copy_text",
+            "copy_selection",
             "copy selection",
             priority=True,
             show=False,
@@ -185,12 +187,13 @@ class TuiApp(App[int]):
         self._seed_inspector_errors()
         self._queue_panel.render_queue(self._state.queue)
         self._status.render_state(self._state)
-        # M115.3 / M115.5: native terminal text-selection is always on.
-        # Mouse reporting is disabled driver-level via `app.run(mouse=False)`
-        # in `veles.tui.run_tui` — no per-mount calls needed. Trade-off:
-        # scroll wheel and click-to-focus are gone — keyboard navigation
-        # (Tab, arrows, PageUp/PageDown, Ctrl+R, Ctrl+T) is the canonical
-        # way through the TUI (VISION §7.2).
+        # M182: mouse reporting is ON by default (`app.run(mouse=True)` in
+        # `veles.tui.run_tui`, opt-out via `VELES_TUI_MOUSE=0`). The wheel
+        # scrolls the chat and drag makes an app-level Textual selection that
+        # does NOT copy on its own — copying is bound to ⌘C / Ctrl+Shift+C
+        # (M185, `action_copy_selection`). A modifier-drag (⌥ on iTerm2/macOS,
+        # Shift elsewhere) bypasses capture for native terminal select+copy.
+        # (Supersedes the old M115.3/M115.5 `mouse=False` model.)
         # Best-effort theme application — failure is silent so a missing
         # custom .toml doesn't abort the mount.
         apply_theme(self, self._state.theme_name)
@@ -503,35 +506,15 @@ class TuiApp(App[int]):
     # ---- bindings ----
 
     def action_copy_or_exit(self) -> None:
-        """Ctrl+C semantics, in priority order:
+        """Ctrl+C: M77 — copy the last assistant reply; a second press inside
+        the exit window confirms the quit (transient warning between presses).
 
-        1. M183b — if there's a live mouse text-selection in the output, copy
-           exactly that (via the native clipboard helper — pbcopy/xclip, no
-           OSC52 needed, so it's reliable on iTerm2/Terminal.app). This is the
-           "drag-select then Ctrl+C" path that coexists with wheel scrolling.
-        2. M77 — otherwise copy the last assistant reply; a second press inside
-           the exit window confirms the quit (transient warning between presses).
+        M185: Ctrl+C no longer copies the mouse selection. Per the chosen UX,
+        a bare selection never copies on its own, and copying the selection is
+        bound exclusively to ⌘C (`super+c`) / Ctrl+Shift+C
+        (`action_copy_selection`). Ctrl+C stays the copy-last-reply / exit key.
         """
         import time
-
-        from veles.tui.clipboard import copy_text
-
-        # 1) A live in-app selection wins — copy verbatim, no exit intent.
-        try:
-            selected = self.screen.get_selected_text() or ""
-        except Exception:
-            selected = ""
-        if selected.strip():
-            assert self._chat is not None
-            if copy_text(selected):
-                self._chat.append_system("copied selection")
-            else:
-                self._chat.append_system("copy failed (no clipboard tool found)")
-            # Clear the highlight so a following Ctrl+C,Ctrl+C can still exit
-            # (otherwise the lingering selection re-enters this branch forever).
-            with contextlib.suppress(Exception):
-                self.screen.clear_selection()
-            return
 
         now = time.monotonic()
         if now - self._last_ctrl_c_at <= self._CTRL_C_EXIT_WINDOW_S:
@@ -544,6 +527,8 @@ class TuiApp(App[int]):
             self.exit(0)
             return
         self._last_ctrl_c_at = now
+        from veles.tui.clipboard import copy_text
+
         target = self._state.last_assistant_text or ""
         ok = copy_text(target) if target.strip() else False
         assert self._chat is not None
@@ -551,6 +536,35 @@ class TuiApp(App[int]):
             self._chat.append_system("copied last reply · press Ctrl+C again to exit")
         else:
             self._chat.append_system("press Ctrl+C again to exit (nothing to copy)")
+
+    def action_copy_selection(self) -> None:
+        """M185: explicit copy of the current output selection — bound to ⌘C
+        (`super+c`, macOS) and Ctrl+Shift+C (Linux/Windows). A bare drag-select
+        never copies on its own; only these keys do. Copies via the native
+        clipboard (pbcopy/xclip) so it's reliable regardless of terminal, and
+        surfaces a "copied to clipboard" confirmation.
+
+        Note: whether ⌘C reaches the app is terminal-dependent — Textual
+        requests the kitty keyboard protocol, but a terminal that binds ⌘C to
+        its own Copy (e.g. default iTerm2/Terminal.app) intercepts it first.
+        Ctrl+Shift+C is forwarded by virtually every terminal; `VELES_TUI_MOUSE=0`
+        falls back to native terminal selection + native ⌘C."""
+        from veles.tui.clipboard import copy_text
+
+        try:
+            selected = self.screen.get_selected_text() or ""
+        except Exception:
+            selected = ""
+        assert self._chat is not None
+        if not selected.strip():
+            self._chat.append_system("nothing selected to copy")
+            return
+        if copy_text(selected):
+            self._chat.append_system("copied to clipboard")
+        else:
+            self._chat.append_system("copy failed (no clipboard tool found)")
+        with contextlib.suppress(Exception):
+            self.screen.clear_selection()
 
     def action_quit(self) -> None:  # type: ignore[override]
         """Ctrl+D / explicit quit. Stop the in-flight turn first so the

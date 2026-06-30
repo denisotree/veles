@@ -40,11 +40,12 @@ async def test_first_ctrl_c_copies_and_warns(
     assert captured.get("text") == "hello world"
 
 
-async def test_ctrl_c_copies_active_selection_over_last_reply(
+async def test_ctrl_c_ignores_selection_and_copies_last_reply(
     tmp_project, agent_factory_for, text_response, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """M183b: a live mouse text-selection takes priority over the last-reply
-    copy, and the press is not treated as an exit intent."""
+    """M185: Ctrl+C no longer copies the mouse selection — copying the
+    selection is bound exclusively to ⌘C / Ctrl+Shift+C. Even with a live
+    selection, Ctrl+C copies the last reply (M77) and arms the exit window."""
     captured: dict[str, str] = {}
     monkeypatch.setattr(
         "veles.tui.clipboard.copy_text",
@@ -54,12 +55,11 @@ async def test_ctrl_c_copies_active_selection_over_last_reply(
     app = _app(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:
         pilot.app.state.last_assistant_text = "the whole reply"
-        # Simulate an in-app text selection on the active screen.
         pilot.app.screen.get_selected_text = lambda: "just this bit"  # type: ignore[method-assign]
         await pilot.press("ctrl+c")
         await pilot.pause()
-        # Copied the selection, not the last reply; app still running.
-        assert captured.get("text") == "just this bit"
+        # Selection is ignored; the last reply is what landed on the clipboard.
+        assert captured.get("text") == "the whole reply"
         assert pilot.app.return_code is None
 
 
@@ -101,6 +101,80 @@ async def test_screen_selection_extracts_chat_text(
         await pilot.pause()
         selected = pilot.app.screen.get_selected_text() or ""
         assert "hello selectable world" in selected
+
+
+async def test_selection_alone_does_not_copy(
+    tmp_project, agent_factory_for, text_response, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """M185: a bare drag-select must NOT copy. Drive the real `TextSelected`
+    message the screen emits on mouse-release (with a real selection) and
+    assert the clipboard was never touched — only ⌘C / Ctrl+Shift+C copy."""
+    from textual import events
+
+    from veles.tui.widgets.chat_log import ChatLog
+
+    calls: list[str] = []
+    monkeypatch.setattr("veles.tui.clipboard.copy_text", lambda text: calls.append(text) or True)
+    app = _app(tmp_project, agent_factory_for, text_response)
+    async with app.run_test() as pilot:
+        chat = pilot.app.query_one(ChatLog)
+        chat.append_assistant_delta("hello selectable world")
+        chat.seal_assistant()
+        await pilot.pause()
+        pilot.app.screen.text_select_all()  # real selection
+        await pilot.pause()
+        pilot.app.screen.post_message(events.TextSelected())  # what MouseUp emits
+        await pilot.pause()
+    assert calls == [], "selection alone must not copy"
+
+
+async def test_copy_selection_action_copies_via_native_clipboard(
+    tmp_project, agent_factory_for, text_response, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """M185: ⌘C / Ctrl+Shift+C → `action_copy_selection` copies the active
+    selection through the native clipboard and confirms."""
+    captured: dict[str, str] = {}
+    monkeypatch.setattr(
+        "veles.tui.clipboard.copy_text",
+        lambda text: captured.__setitem__("text", text) or True,
+    )
+    app = _app(tmp_project, agent_factory_for, text_response)
+    async with app.run_test() as pilot:
+        pilot.app.screen.get_selected_text = lambda: "selected chunk"  # type: ignore[method-assign]
+        pilot.app.action_copy_selection()
+        await pilot.pause()
+        assert captured.get("text") == "selected chunk"
+
+
+async def test_copy_selection_action_noop_without_selection(
+    tmp_project, agent_factory_for, text_response, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr("veles.tui.clipboard.copy_text", lambda text: calls.append(text) or True)
+    app = _app(tmp_project, agent_factory_for, text_response)
+    async with app.run_test() as pilot:
+        pilot.app.screen.get_selected_text = lambda: ""  # type: ignore[method-assign]
+        pilot.app.action_copy_selection()
+        await pilot.pause()
+        assert calls == []
+
+
+async def test_ctrl_shift_c_copies_selection(
+    tmp_project, agent_factory_for, text_response, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The Linux/Windows-canonical Ctrl+Shift+C is bound to copy the selection
+    (drives the real key→binding→action path, not a direct call)."""
+    captured: dict[str, str] = {}
+    monkeypatch.setattr(
+        "veles.tui.clipboard.copy_text",
+        lambda text: captured.__setitem__("text", text) or True,
+    )
+    app = _app(tmp_project, agent_factory_for, text_response)
+    async with app.run_test() as pilot:
+        pilot.app.screen.get_selected_text = lambda: "linux selection"  # type: ignore[method-assign]
+        await pilot.press("ctrl+shift+c")
+        await pilot.pause()
+        assert captured.get("text") == "linux selection"
 
 
 async def test_double_ctrl_c_exits(

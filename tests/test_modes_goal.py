@@ -91,6 +91,23 @@ def test_parse_check_verdict_defaults_off_track_on_unknown_verdict() -> None:
         ("no, actually ...", "no"),
         ("change scope to Z", "no"),
         ("", "no"),
+        # M185: natural "proceed" replies (RU + EN) must count as
+        # confirmation. The old parser knew only a handful of tokens, so the
+        # common affirmatives below bounced the user back to INTERVIEW and the
+        # goal FSM never reached EXECUTE.
+        ("Продолжи", "yes"),
+        ("продолжай", "yes"),
+        ("Вперёд", "yes"),
+        ("вперед", "yes"),
+        ("continue", "yes"),
+        ("proceed", "yes"),
+        ("go ahead", "yes"),
+        ("поехали", "yes"),
+        ("погнали", "yes"),
+        ("подтверждаю", "yes"),
+        # edits must still NOT be read as confirmation
+        ("поменяй охват на Z", "no"),
+        ("verlauf, but rename only bash/", "no"),
     ],
 )
 def test_classify_confirm_reply(prompt: str, expected: str) -> None:
@@ -205,6 +222,38 @@ def test_goal_interview_to_confirm_on_ready_marker(project, state) -> None:
     goal = read_goal(project.state_dir, state.active_goal_id)
     assert goal.current_phase == "confirm"
     assert "dark theme" in goal.interview_summary
+
+
+def test_goal_interview_to_confirm_surfaces_confirm_instruction(project, state) -> None:
+    """M185: on INTERVIEW→CONFIRM the ack instruction must be shown in the
+    same turn. The dedicated `_emit_confirmation` only fires on an
+    empty-prompt turn, which never happens in normal TUI flow — so without
+    this the user transitions to CONFIRM with no idea how to acknowledge."""
+    from veles.core.i18n import t
+
+    token = set_active_project(project)
+    try:
+        goal = create_goal(project.state_dir, objective="placeholder", done_condition="")
+        state.active_goal_id = goal.id
+        update_fsm(project.state_dir, goal.id, phase="interview")
+
+        rec = _Recorder(
+            state=state,
+            project=project,
+            next_result=RunResult(
+                text="<ready>Tidy the vault into a flat kebab-case layout.</ready>",
+                iterations=1,
+                session_id="s1",
+            ),
+        )
+        GoalMode().run_turn("ok", rec.make_ctx())
+    finally:
+        reset_active_project(token)
+
+    sys_texts = [m.text for m in rec.posted if isinstance(m, SystemLine)]
+    assert any(t("goal.confirm_actions") in tx for tx in sys_texts), (
+        "INTERVIEW→CONFIRM must surface the ack instruction"
+    )
 
 
 def test_goal_interview_uses_writing_registry_and_interview_prompt(project, state) -> None:

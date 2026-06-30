@@ -93,7 +93,8 @@ def _help(line: str, ctx: SlashContext) -> SlashResult:
         "  Ctrl+T                       open theme picker",
         "  Shift+Tab                    cycle mode",
         "  Mouse wheel / trackpad       scroll the chat (back to bottom re-arms follow)",
-        "  Drag + Ctrl+C                select text in the output and copy it",
+        "  Drag-select output           selects text (does NOT copy on its own)",
+        "  ⌘C (macOS) / Ctrl+Shift+C    copy the current selection to the clipboard",
         "  Option+drag then ⌘C          native terminal select+copy (iTerm2/macOS)",
         "  (keyboard focus stays on the input; set VELES_TUI_MOUSE=0 to disable the wheel)",
     ]

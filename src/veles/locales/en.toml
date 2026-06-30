@@ -27,7 +27,7 @@ group_format = "Output format:"
 
 [goal]
 confirm_line = "Let me check I got this right: {summary}"
-confirm_actions = "Confirm (yes), edit (describe what's wrong), or cancel (cancel)."
+confirm_actions = "Confirm (yes / continue / go ahead), describe edits, or cancel (cancel)."
 
 [telegram]
 start_greeting = "Hi! I'm Veles. Just send a message and I'll reply. Tip: /help lists the commands."

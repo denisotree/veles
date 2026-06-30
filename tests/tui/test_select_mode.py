@@ -147,27 +147,28 @@ async def test_inspector_body_rows_are_selectable(agent_factory_for, text_respon
             assert row.allow_select is True
 
 
-def test_super_c_binding_routes_to_screen_copy_text() -> None:
-    """⌘C forwarded as `super+c` (some iTerm2/WezTerm/kitty profiles)
-    triggers OSC52 copy via Textual's built-in screen action."""
+def test_super_c_binding_routes_to_copy_selection() -> None:
+    """M185: ⌘C (forwarded as `super+c`) copies the selection via the native
+    clipboard action, not OSC52 — and a bare selection never copies on its own."""
     from textual.binding import Binding
 
     from veles.tui.app import TuiApp
 
     matches = [b for b in TuiApp.BINDINGS if isinstance(b, Binding) and b.key == "super+c"]
     assert matches, "super+c binding missing"
-    assert matches[0].action == "screen.copy_text"
+    assert matches[0].action == "copy_selection"
 
 
-def test_ctrl_shift_c_binding_routes_to_screen_copy_text() -> None:
-    """Ctrl+Shift+C is the Linux/Windows canonical for in-app copy."""
+def test_ctrl_shift_c_binding_routes_to_copy_selection() -> None:
+    """M185: Ctrl+Shift+C (Linux/Windows canonical) copies the selection via
+    the native clipboard action."""
     from textual.binding import Binding
 
     from veles.tui.app import TuiApp
 
     matches = [b for b in TuiApp.BINDINGS if isinstance(b, Binding) and b.key == "ctrl+shift+c"]
     assert matches, "ctrl+shift+c binding missing"
-    assert matches[0].action == "screen.copy_text"
+    assert matches[0].action == "copy_selection"
 
 
 def test_ctrl_c_still_routes_to_copy_or_exit() -> None:

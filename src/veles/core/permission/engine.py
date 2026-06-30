@@ -105,7 +105,8 @@ def _planning_mode_rule(entry: ToolEntry) -> Decision | None:
         rule="planning_mode",
         reason=(
             f"tool {entry.name!r} ({rc.value}) is blocked while in planning mode; "
-            "exit planning to commit changes"
+            "exit planning to commit changes (switch with `/mode writing` or Shift+Tab — "
+            "there is no `veles mode` command)"
         ),
     )
 
