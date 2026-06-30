@@ -128,6 +128,33 @@ def test_handle_slash_clear_resets_session(tmp_path) -> None:
         store.close()
 
 
+def test_replapp_constructs(tmp_path) -> None:
+    """The inline prompt_toolkit Application builds its layout/widgets/style
+    without error (run() itself needs a real TTY and is tested live)."""
+    from veles.cli.commands.repl import _console, _ReplApp, _resolve_theme
+
+    project, store = _project_and_store(tmp_path)
+    try:
+        state = _state()
+        registry = build_default_registry(project=project)
+        app = _ReplApp(
+            argparse.Namespace(),
+            project,
+            state,
+            lambda *_a, **_k: None,  # factory stub — not called at construction
+            store,
+            registry,
+            _console(),
+            _resolve_theme(state),
+            [],
+        )
+        assert app.app is not None
+        assert app._status_fragments()  # status bar renders
+        assert app.busy is False
+    finally:
+        store.close()
+
+
 def test_repl_command_registered() -> None:
     from veles.cli._parsers.agent_loop import register
 

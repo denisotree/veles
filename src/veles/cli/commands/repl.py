@@ -21,9 +21,12 @@ Textual app + bridge + widgets become print-based callbacks.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import datetime as _dt
+import os
 import sys
 import time
+from collections import deque
 
 from veles.core.project import Project
 
@@ -347,6 +350,20 @@ def _handle_slash(
     if cmd == "/sessions":
         _pick_session(store, state, console)
         return False, None
+    if cmd == "/resume":
+        parts = line.split(maxsplit=1)
+        arg = parts[1].strip() if len(parts) > 1 else ""
+        match = (
+            next((s for s in store.list_sessions(limit=50) if s.id.startswith(arg)), None)
+            if arg
+            else None
+        )
+        if match is not None:
+            state.session_id = match.id
+            console.print(f"  resumed {match.id}", style="green")
+        else:
+            console.print("  /resume <id-prefix> — see /sessions for ids", style="yellow")
+        return False, None
 
     ctx = SlashContext(state=state, project=project, store=store)
     result = registry.dispatch(line, ctx)
@@ -414,9 +431,316 @@ def _make_prompt_session(project: Project, registry, state):
     )
 
 
-def cmd_repl(args: argparse.Namespace, project: Project) -> int:
+def _run_simple_repl(
+    args, project, state, factory, store, registry, console, theme, errors
+) -> None:
+    """Fallback loop on the blocking `PromptSession.prompt()` (set
+    `VELES_REPL_SIMPLE=1`). No live-during-generation input; kept as a safety
+    net for terminals where the inline Application misbehaves."""
     from prompt_toolkit.formatted_text import HTML
 
+    prompt_html = HTML(f'<style fg="{theme.accent}"><b>❯</b></style> ')
+    prompt_session = _make_prompt_session(project, registry, state)
+    console.rule(style=theme.border, characters="─")
+    last_ctrl_c = 0.0
+    while True:
+        try:
+            line = prompt_session.prompt(prompt_html)
+        except KeyboardInterrupt:
+            now = time.monotonic()
+            if now - last_ctrl_c <= _CTRL_C_EXIT_WINDOW_S:
+                break
+            last_ctrl_c = now
+            console.print("(press Ctrl+C again or Ctrl+D to exit)", style=theme.muted)
+            continue
+        except EOFError:
+            break
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("/"):
+            should_quit, submit = _handle_slash(
+                line, registry, state, project, store, console, errors
+            )
+            if should_quit:
+                break
+            if not submit:
+                continue
+            line = submit
+        console.print()
+        try:
+            result = _run_mode_turn(state, project, factory, line, console, errors, theme)
+        except Exception as exc:
+            errors.append(str(exc))
+            console.print(f"error: {exc}", style=theme.error, markup=False)
+            console.rule(style=theme.border, characters="─")
+            continue
+        _update_state_after_turn(state, result)
+        console.rule(style=theme.border, characters="─")
+
+
+class _ReplApp:
+    """Inline prompt_toolkit Application (no alt-screen). A bordered input box
+    stays live while a turn runs in a background executor; input typed during
+    generation is queued and drained on completion. Output renders ABOVE the
+    box via `run_in_terminal`, landing in the terminal's own scrollback — so
+    native scroll / selection / copy are preserved.
+    """
+
+    def __init__(self, args, project, state, factory, store, registry, console, theme, errors):
+        from prompt_toolkit.application import Application
+        from prompt_toolkit.completion import Completer, Completion
+        from prompt_toolkit.formatted_text import FormattedText
+        from prompt_toolkit.layout import HSplit, Layout, Window
+        from prompt_toolkit.layout.controls import FormattedTextControl
+        from prompt_toolkit.layout.dimension import Dimension
+        from prompt_toolkit.styles import Style
+        from prompt_toolkit.widgets import Frame, TextArea
+
+        from veles.core.modes import next_mode
+
+        self.args = args
+        self.project = project
+        self.state = state
+        self.factory = factory
+        self.store = store
+        self.registry = registry
+        self.console = console
+        self.theme = theme
+        self.errors = errors
+        self.busy = False
+        self.queue: deque[str] = deque()
+        self.cancel_token = None
+        self._last_ctrl_c = 0.0
+        self._next_mode = next_mode
+        self._tasks: set = set()  # keep strong refs so tasks aren't GC'd mid-flight
+
+        extra = ("/sessions", "/errors", "/resume")
+
+        class _SlashCompleter(Completer):
+            def get_completions(self, document, complete_event):
+                text = document.text_before_cursor
+                if not text.startswith("/") or " " in text:
+                    return
+                for name in [*registry.names(), *extra]:
+                    if name.startswith(text):
+                        yield Completion(name, start_position=-len(text))
+
+        self.input = TextArea(
+            prompt=FormattedText([("class:prompt", "❯ ")]),
+            multiline=True,
+            wrap_lines=True,
+            height=Dimension(min=1, max=10),
+            completer=_SlashCompleter(),
+            complete_while_typing=True,
+            style="class:input",
+        )
+        frame = Frame(self.input)
+        status = Window(
+            FormattedTextControl(self._status_fragments), height=1, style="class:status"
+        )
+        root = HSplit([frame, status])
+        style = Style.from_dict(
+            {
+                "frame.border": theme.border,
+                "prompt": f"bold {theme.accent}",
+                "status": theme.muted,
+            }
+        )
+        self.app = Application(
+            layout=Layout(root, focused_element=self.input),
+            key_bindings=self._make_keys(),
+            style=style,
+            full_screen=False,
+            mouse_support=False,
+            erase_when_done=True,
+        )
+
+    def run(self) -> None:
+        self.app.run()
+
+    def _spawn(self, coro) -> None:
+        task = asyncio.ensure_future(coro)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+
+    def _status_fragments(self):
+        s = self.state
+        sid = (s.session_id or "new")[:8]
+        flag = "working… · " if self.busy else ""
+        tok = f" · {s.last_turn_total_tokens} tok" if s.last_turn_total_tokens else ""
+        return [
+            (
+                "class:status",
+                f" {flag}mode:{s.mode} · {s.provider_name}:{s.model} · session:{sid}{tok}"
+                " · Shift+Tab mode · /help · Ctrl+D exit ",
+            )
+        ]
+
+    def _make_keys(self):
+        from prompt_toolkit.key_binding import KeyBindings
+
+        kb = KeyBindings()
+
+        @kb.add("enter")
+        def _(event) -> None:
+            self._on_enter()
+
+        @kb.add("escape", "enter")  # Alt/Option+Enter inserts a newline
+        def _(event) -> None:
+            self.input.buffer.insert_text("\n")
+
+        @kb.add("s-tab")
+        def _(event) -> None:
+            self.state.mode = self._next_mode(self.state.mode)
+            self.app.invalidate()
+
+        @kb.add("c-d")
+        def _(event) -> None:
+            event.app.exit()
+
+        @kb.add("c-c")
+        def _(event) -> None:
+            self._on_ctrl_c(event)
+
+        return kb
+
+    def _on_enter(self) -> None:
+        text = self.input.text.strip()
+        self.input.text = ""
+        if not text:
+            return  # ignore empty input
+        self._spawn(self._dispatch(text))
+
+    def _on_ctrl_c(self, event) -> None:
+        if self.busy and self.cancel_token is not None:
+            self.cancel_token.cancel()  # cooperative cancel of the running turn
+            return
+        if self.input.text:
+            self.input.text = ""  # clear the current line
+            return
+        now = time.monotonic()
+        if now - self._last_ctrl_c <= _CTRL_C_EXIT_WINDOW_S:
+            event.app.exit()
+            return
+        self._last_ctrl_c = now
+        self._spawn(
+            self._in_terminal(
+                lambda: self.console.print(
+                    "(Ctrl+C again or Ctrl+D to exit)", style=self.theme.muted
+                )
+            )
+        )
+
+    async def _in_terminal(self, func) -> None:
+        from prompt_toolkit.application import run_in_terminal
+
+        await run_in_terminal(func)
+
+    async def _dispatch(self, text: str) -> None:
+        if text.startswith("/"):
+            await self._slash(text)
+            return
+        if self.busy:
+            self.queue.append(text)
+            await self._in_terminal(
+                lambda t=text: self.console.print(
+                    f"  ⋅ queued: {t}", style=self.theme.muted, markup=False
+                )
+            )
+            return
+        await self._run_chain(text)
+
+    async def _slash(self, text: str) -> None:
+        box: dict = {}
+
+        def _do() -> None:
+            box["res"] = _handle_slash(
+                text, self.registry, self.state, self.project, self.store, self.console, self.errors
+            )
+
+        await self._in_terminal(_do)
+        should_quit, submit = box.get("res", (False, None))
+        if should_quit:
+            self.app.exit()
+        elif submit:
+            await self._dispatch(submit)
+
+    async def _run_chain(self, text: str) -> None:
+        from veles.core.cancel import CancelToken
+
+        self.busy = True
+        self.app.invalidate()
+        loop = asyncio.get_event_loop()
+        try:
+            while True:
+                self.cancel_token = CancelToken()
+                try:
+                    sys_lines, answer, result = await loop.run_in_executor(
+                        None, self._blocking_turn, text
+                    )
+                except Exception as exc:
+                    self.errors.append(str(exc))
+                    await self._in_terminal(
+                        lambda e=exc: self.console.print(
+                            f"error: {e}", style=self.theme.error, markup=False
+                        )
+                    )
+                    sys_lines, answer, result = [], "", None
+                await self._render_turn(sys_lines, answer, result)
+                _update_state_after_turn(self.state, result)
+                if self.queue:
+                    text = self.queue.popleft()
+                else:
+                    break
+        finally:
+            self.cancel_token = None
+            self.busy = False
+            self.app.invalidate()
+
+    def _blocking_turn(self, text: str):
+        """Runs in the executor thread. Activates the cancel token in *this*
+        thread (contextvar) so the agent's cooperative cancel checks see it."""
+        from veles.core.cancel import reset_cancel_token, set_cancel_token
+        from veles.core.modes import ModeContext, get_mode
+
+        tok = set_cancel_token(self.cancel_token)
+        try:
+            post, on_text, on_event, holder, sys_lines, answer = _make_turn_callbacks(
+                self.state, self.errors
+            )
+            ctx = ModeContext(
+                state=self.state,
+                project=self.project,
+                factory=self.factory,
+                post=post,
+                on_text=on_text,
+                on_event=on_event,
+            )
+            get_mode(self.state.mode).run_turn(text, ctx)
+        finally:
+            reset_cancel_token(tok)
+        result = holder.get("result")
+        text_out = "".join(answer).strip() or (getattr(result, "text", "") or "").strip()
+        return sys_lines, text_out, result
+
+    async def _render_turn(self, sys_lines, answer, result) -> None:
+        cancelled = getattr(result, "stopped_reason", "") == "cancelled"
+
+        def _do() -> None:
+            self.console.print()
+            for sl in sys_lines:
+                self.console.print(f"  ⋅ {sl}", style=self.theme.muted, markup=False)
+            if answer:
+                _render_answer(self.console, answer)
+            if cancelled:
+                self.console.print("  ⋅ cancelled", style=self.theme.muted, markup=False)
+            self.console.print()
+
+        await self._in_terminal(_do)
+
+
+def cmd_repl(args: argparse.Namespace, project: Project) -> int:
     from veles.tui.slash import build_default_registry
 
     runtime = _build_runtime(args, project)
@@ -427,56 +751,13 @@ def cmd_repl(args: argparse.Namespace, project: Project) -> int:
     console = _console()
     theme = _resolve_theme(state)
     errors: list[str] = []
-    # Themed prompt: the accent-coloured "❯", with a thin rule above it framing
-    # the input and separating it from the generated output above.
-    prompt_html = HTML(f'<style fg="{theme.accent}"><b>❯</b></style> ')
 
-    last_ctrl_c = 0.0
     try:
         _banner(console, args.provider, args.model, state.mode, theme)
-        prompt_session = _make_prompt_session(project, registry, state)
-        console.rule(style=theme.border, characters="─")
-
-        while True:
-            try:
-                line = prompt_session.prompt(prompt_html)
-            except KeyboardInterrupt:
-                # Double Ctrl+C (within the window) exits, like Ctrl+D; a single
-                # one just cancels the current line.
-                now = time.monotonic()
-                if now - last_ctrl_c <= _CTRL_C_EXIT_WINDOW_S:
-                    break
-                last_ctrl_c = now
-                console.print("(press Ctrl+C again or Ctrl+D to exit)", style=theme.muted)
-                continue
-            except EOFError:
-                break  # Ctrl+D exits.
-
-            line = line.strip()
-            if not line:
-                continue  # ignore empty input
-
-            if line.startswith("/"):
-                should_quit, submit = _handle_slash(
-                    line, registry, state, project, store, console, errors
-                )
-                if should_quit:
-                    break
-                if not submit:
-                    continue
-                line = submit  # fall through and run the command's prompt
-
-            console.print()
-            try:
-                result = _run_mode_turn(state, project, factory, line, console, errors, theme)
-            except Exception as exc:
-                errors.append(str(exc))
-                console.print(f"error: {exc}", style=theme.error, markup=False)
-                console.rule(style=theme.border, characters="─")
-                continue
-            _update_state_after_turn(state, result)
-            # Separate this turn's output from the next input.
-            console.rule(style=theme.border, characters="─")
+        if os.environ.get("VELES_REPL_SIMPLE"):
+            _run_simple_repl(args, project, state, factory, store, registry, console, theme, errors)
+        else:
+            _ReplApp(args, project, state, factory, store, registry, console, theme, errors).run()
     finally:
         store.close()
     return 0
