@@ -7,8 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] — 2026-06-30
+
 ### Fixed
 
+- **Daemon/channel runs never curated — wiki pages stayed empty (M184).** A
+  wiki-llm Telegram diary bot accumulated sessions in `memory.db` but produced
+  zero curated wiki pages. The continuous-curator eligibility gate keyed off the
+  raw `args.provider`, but `daemon start` defaults `provider=None` (the provider
+  flows from project/user config), so the gate returned `False` on every
+  post-turn hook and the curator body never ran. `daemon start` now writes the
+  resolved provider back into `args.provider` before building the post-turn hook
+  (which every channel reuses), and the gate now keys off `has_api_key(provider)`
+  instead of `PROVIDER_API_KEY_ENVS` membership — which also makes the curator
+  eligible on local providers (`ollama`/`llamacpp`/`openai-compat`) while
+  cli-delegate providers stay ineligible. (On a local provider, emitting pages
+  also needs `VELES_LOCAL_TOOLS=1` with a tool-capable model, since the curator
+  persists via tool calls.)
 - **TUI: text selection / copy in the output, and keyboard focus stays on the
   input (M183b).** Two follow-ups to the M182 mouse-on default:
   - The final (sealed) assistant reply could not be selected or copied. It was
