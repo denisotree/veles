@@ -435,9 +435,9 @@ def cmd_repl(args: argparse.Namespace, project: Project) -> int:
     try:
         _banner(console, args.provider, args.model, state.mode, theme)
         prompt_session = _make_prompt_session(project, registry, state)
+        console.rule(style=theme.border, characters="─")
 
         while True:
-            console.rule(style=theme.border, characters="─")
             try:
                 line = prompt_session.prompt(prompt_html)
             except KeyboardInterrupt:
@@ -472,8 +472,11 @@ def cmd_repl(args: argparse.Namespace, project: Project) -> int:
             except Exception as exc:
                 errors.append(str(exc))
                 console.print(f"error: {exc}", style=theme.error, markup=False)
+                console.rule(style=theme.border, characters="─")
                 continue
             _update_state_after_turn(state, result)
+            # Separate this turn's output from the next input.
+            console.rule(style=theme.border, characters="─")
     finally:
         store.close()
     return 0
