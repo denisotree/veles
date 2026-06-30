@@ -42,19 +42,27 @@ def _fmt_ts(ts: float) -> str:
     return _dt.datetime.fromtimestamp(ts, tz=_dt.UTC).astimezone().strftime("%Y-%m-%d %H:%M")
 
 
-def _banner(console, provider: str, model: str, mode: str) -> None:
+def _resolve_theme(state):
+    """The active TUI theme (user config → fallback), reused for the REPL's
+    colours so `veles repl` matches the user's installed theme."""
+    from veles.cli.tui_theme import THEMES, load_theme
+
+    return load_theme(getattr(state, "theme_name", "") or "everforest") or THEMES["everforest"]
+
+
+def _banner(console, provider: str, model: str, mode: str, theme) -> None:
     from rich.panel import Panel
     from rich.text import Text
 
     body = Text()
-    body.append("veles", style="bold cyan")
+    body.append("veles", style=f"bold {theme.accent}")
     body.append("  ·  ")
-    body.append(f"{provider}:{model}", style="green")
+    body.append(f"{provider}:{model}", style=theme.success)
     body.append("  ·  ")
-    body.append(f"mode {mode}", style="magenta")
+    body.append(f"mode {mode}", style=theme.accent)
     body.append("\n")
-    body.append("/help for commands · Shift+Tab cycles mode · Ctrl+D to exit", style="dim")
-    console.print(Panel(body, expand=False, border_style="cyan", padding=(0, 2)))
+    body.append("/help for commands · Shift+Tab cycles mode · Ctrl+D to exit", style=theme.muted)
+    console.print(Panel(body, expand=False, border_style=theme.border, padding=(0, 2)))
 
 
 def _print_repl_help(console) -> None:
@@ -172,10 +180,14 @@ def _build_runtime(args: argparse.Namespace, project: Project):
             plan_mode=is_planning,
         )
 
+    from veles.core.user_config import load_user_config
+
+    user_cfg = load_user_config()
     state = AppState(
         session_id=getattr(args, "resume", None),
         provider_name=args.provider,
         model=args.model,
+        theme_name=(user_cfg.tui_theme if user_cfg and user_cfg.tui_theme else "everforest"),
     )
     return state, factory, store
 
@@ -245,7 +257,7 @@ def _update_state_after_turn(state, result) -> None:
         state.last_turn_total_tokens = getattr(usage, "total_tokens", 0) or 0
 
 
-def _run_mode_turn(state, project, factory, line: str, console, errors: list[str]):
+def _run_mode_turn(state, project, factory, line: str, console, errors: list[str], theme):
     """Drive one user turn through the active mode's FSM, then render the
     answer as Markdown. Shows a spinner while the model works; dim mode lines
     and the formatted answer print once the turn completes."""
@@ -262,13 +274,13 @@ def _run_mode_turn(state, project, factory, line: str, console, errors: list[str
     )
     interrupted = False
     try:
-        with console.status("[cyan]working…[/cyan]", spinner="dots"):
+        with console.status(f"[{theme.accent}]working…[/]", spinner="dots"):
             get_mode(state.mode).run_turn(line, ctx)
     except KeyboardInterrupt:
         interrupted = True
 
     for sl in sys_lines:
-        console.print(f"  ⋅ {sl}", style="dim", markup=False)
+        console.print(f"  ⋅ {sl}", style=theme.muted, markup=False)
     text = "".join(answer).strip()
     result = holder.get("result")
     if not text and result is not None:
@@ -276,7 +288,7 @@ def _run_mode_turn(state, project, factory, line: str, console, errors: list[str
     if text:
         _render_answer(console, text)
     if interrupted:
-        console.print("  [dim]⋅ interrupted[/dim]")
+        console.print("  ⋅ interrupted", style=theme.muted, markup=False)
     return result
 
 
@@ -413,16 +425,21 @@ def cmd_repl(args: argparse.Namespace, project: Project) -> int:
     state, factory, store = runtime
     registry = build_default_registry(project=project)
     console = _console()
+    theme = _resolve_theme(state)
     errors: list[str] = []
+    # Themed prompt: the accent-coloured "❯", with a thin rule above it framing
+    # the input and separating it from the generated output above.
+    prompt_html = HTML(f'<style fg="{theme.accent}"><b>❯</b></style> ')
 
     last_ctrl_c = 0.0
     try:
-        _banner(console, args.provider, args.model, state.mode)
+        _banner(console, args.provider, args.model, state.mode, theme)
         prompt_session = _make_prompt_session(project, registry, state)
 
         while True:
+            console.rule(style=theme.border, characters="─")
             try:
-                line = prompt_session.prompt(HTML("<b><ansicyan>❯</ansicyan></b> "))
+                line = prompt_session.prompt(prompt_html)
             except KeyboardInterrupt:
                 # Double Ctrl+C (within the window) exits, like Ctrl+D; a single
                 # one just cancels the current line.
@@ -430,7 +447,7 @@ def cmd_repl(args: argparse.Namespace, project: Project) -> int:
                 if now - last_ctrl_c <= _CTRL_C_EXIT_WINDOW_S:
                     break
                 last_ctrl_c = now
-                console.print("[dim](press Ctrl+C again or Ctrl+D to exit)[/dim]")
+                console.print("(press Ctrl+C again or Ctrl+D to exit)", style=theme.muted)
                 continue
             except EOFError:
                 break  # Ctrl+D exits.
@@ -451,13 +468,12 @@ def cmd_repl(args: argparse.Namespace, project: Project) -> int:
 
             console.print()
             try:
-                result = _run_mode_turn(state, project, factory, line, console, errors)
+                result = _run_mode_turn(state, project, factory, line, console, errors, theme)
             except Exception as exc:
                 errors.append(str(exc))
-                console.print(f"error: {exc}", style="red", markup=False)
+                console.print(f"error: {exc}", style=theme.error, markup=False)
                 continue
             _update_state_after_turn(state, result)
     finally:
         store.close()
-    console.print("[dim]bye[/dim]")
     return 0
