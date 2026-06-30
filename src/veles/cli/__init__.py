@@ -99,6 +99,7 @@ from veles.cli.commands.organize import cmd_organize as _cmd_organize
 from veles.cli.commands.portability import cmd_export as _cmd_export
 from veles.cli.commands.portability import cmd_import as _cmd_import
 from veles.cli.commands.projects import cmd_project as _cmd_project
+from veles.cli.commands.repl import cmd_repl as _cmd_repl
 from veles.cli.commands.research import cmd_research as _cmd_research
 from veles.cli.commands.route import cmd_route as _cmd_route
 from veles.cli.commands.run import cmd_run as _cmd_run
@@ -190,6 +191,7 @@ __all__ = [
     "_cmd_module",
     "_cmd_organize",
     "_cmd_project",
+    "_cmd_repl",
     "_cmd_research",
     "_cmd_route",
     "_cmd_run",
@@ -342,6 +344,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_dream(args, project)
         if args.command == "tui":
             return _cmd_tui(args, project)
+        if args.command == "repl":
+            return _cmd_repl(args, project)
         if args.command == "route":
             return _cmd_route(args, project)
         if args.command == "export":
