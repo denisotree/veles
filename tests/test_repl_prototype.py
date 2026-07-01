@@ -63,6 +63,22 @@ def test_turn_callbacks_stream_and_capture_result(
     assert holder["result"] is rr
 
 
+def test_status_line_matches_tui_fields() -> None:
+    from veles.cli.commands.repl import _status_line
+
+    state = _state()
+    state.session_id = "sess1234"
+    state.tokens_in = 1500
+    state.tokens_out = 800
+    state.last_prompt_tokens = 60000
+    line = _status_line(state)
+    assert "[auto]" in line  # mode chip
+    assert "session sess1234" in line
+    assert "openrouter/m" in line  # provider/model
+    assert "tok 1k/800" in line
+    assert "ctx 60k/" in line and "%" in line  # context meter
+
+
 def test_render_edit_diff(capsys: pytest.CaptureFixture[str]) -> None:
     from veles.cli.commands.repl import _render_edit_diff, _resolve_theme
 

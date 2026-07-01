@@ -57,6 +57,42 @@ def _resolve_theme(state):
     return load_theme(getattr(state, "theme_name", "") or "everforest") or THEMES["everforest"]
 
 
+def _fmt_tok(n: int) -> str:
+    if n < 1_000:
+        return str(n)
+    if n < 1_000_000:
+        return f"{n // 1_000}k"
+    return f"{n // 1_000_000}M"
+
+
+def _status_line(state) -> str:
+    """The same footer info the Textual `veles tui` shows — mode, session,
+    provider/model, tokens, context %, cache, insights, queue — as plain text
+    (mirrors `tui.widgets.status_bar` chip-for-chip)."""
+    from veles.core.model_naming import strip_provider_prefix
+    from veles.core.model_windows import context_window_for
+
+    parts = [
+        f"[{state.mode}]",
+        f"session {state.session_id or 'new'}",
+        f"{state.provider_name}/{strip_provider_prefix(state.model)}",
+    ]
+    if state.tokens_in or state.tokens_out:
+        parts.append(f"tok {_fmt_tok(state.tokens_in)}/{_fmt_tok(state.tokens_out)}")
+    occupied = state.last_prompt_tokens or state.last_turn_total_tokens
+    if occupied:
+        limit = context_window_for(state.model)
+        pct = round(occupied / limit * 100) if limit else 0
+        parts.append(f"ctx {_fmt_tok(occupied)}/{_fmt_tok(limit)} ({pct}%)")
+    if state.last_turn_cache_read:
+        parts.append(f"cache {_fmt_tok(state.last_turn_cache_read)}")
+    if state.insight_candidates:
+        parts.append(f"{len(state.insight_candidates)} insight(s)")
+    if state.queue:
+        parts.append(f"queue {len(state.queue)}")
+    return " · ".join(parts)
+
+
 def _banner(console, provider: str, model: str, mode: str, theme) -> None:
     from rich.panel import Panel
     from rich.text import Text
@@ -488,11 +524,7 @@ def _make_prompt_session(project: Project, registry, state):
                     yield Completion(name, start_position=-len(text))
 
     def _toolbar():
-        sid = (state.session_id or "new")[:8]
-        bits = f" mode:{state.mode} · {state.provider_name}:{state.model} · session:{sid}"
-        if state.last_turn_total_tokens:
-            bits += f" · {state.last_turn_total_tokens} tok"
-        return bits + " · Shift+Tab mode · /help · Ctrl+D exit "
+        return f" {_status_line(state)} · Shift+Tab mode · /help · Ctrl+D exit "
 
     kb = KeyBindings()
 
@@ -660,15 +692,11 @@ class _ReplApp:
         task.add_done_callback(self._tasks.discard)
 
     def _status_fragments(self):
-        s = self.state
-        sid = (s.session_id or "new")[:8]
         flag = "working… · " if self.busy else ""
-        tok = f" · {s.last_turn_total_tokens} tok" if s.last_turn_total_tokens else ""
         return [
             (
                 "class:status",
-                f" {flag}mode:{s.mode} · {s.provider_name}:{s.model} · session:{sid}{tok}"
-                " · Shift+Tab mode · /help · Ctrl+D exit ",
+                f" {flag}{_status_line(self.state)} · Shift+Tab mode · /help · Ctrl+D exit ",
             )
         ]
 
