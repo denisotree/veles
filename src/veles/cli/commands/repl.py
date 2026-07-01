@@ -595,11 +595,13 @@ class _ReplApp:
         @kb.add("up")
         def _(event) -> None:
             # Smart: history-backward when on the first line, else cursor up.
-            self.input.buffer.auto_up(count=1, go_to_start_of_line_if_history_changes=True)
+            # `go_to_start_of_line_if_history_changes=False` leaves the cursor at
+            # the END of the recalled command (not the start).
+            self.input.buffer.auto_up(count=1, go_to_start_of_line_if_history_changes=False)
 
         @kb.add("down")
         def _(event) -> None:
-            self.input.buffer.auto_down(count=1, go_to_start_of_line_if_history_changes=True)
+            self.input.buffer.auto_down(count=1, go_to_start_of_line_if_history_changes=False)
 
         @kb.add("s-tab")
         def _(event) -> None:
