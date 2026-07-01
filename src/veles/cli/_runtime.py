@@ -195,6 +195,13 @@ def build_run_system_prompt(
                 "Use wiki_read_page/wiki_search to explore:\n\n" + index
             )
     if wiki_on:
+        # A compact map of the project root + current wiki tree, so the model
+        # works with the REAL folder/page names instead of guessing. Prompt-
+        # independent → stable (cached when the tree is unchanged; the whole
+        # prompt is rebuilt each turn, so a mid-session move is still reflected).
+        workspace = _workspace_block(project)
+        if workspace:
+            stable_parts.append(workspace)
         stable_parts.append(_RUN_WIKI_RAG_BLOCK)
     volatile_parts: list[str] = []
     recall = _recall_block(project, prompt or "")
@@ -301,6 +308,84 @@ def _relevant_paths_block(project: Project, query: str) -> str | None:
         lines.append(f"- `{e.rel_path}`{tag}")
     lines.append("</relevant-files>")
     return "\n".join(lines)
+
+
+# Bounds for the wiki-layout workspace map — kept tight because the block is
+# volatile (re-sent every turn) so it reflects the agent's own moves/creates.
+_WS_ROOT_LIMIT = 50
+_WS_TREE_MAX_LINES = 120
+_WS_TREE_DIR_CAP = 30
+_WS_TREE_MAX_DEPTH = 3
+
+
+def _ws_should_skip(name: str) -> bool:
+    return name == ".veles" or name.startswith(".")
+
+
+def _ws_list_root(root: Path) -> list[str]:
+    """Flat, dirs-first listing of the project root (real top-level names)."""
+    try:
+        entries = sorted(root.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
+    except OSError:
+        return []
+    names = [f"{p.name}/" if p.is_dir() else p.name for p in entries if not _ws_should_skip(p.name)]
+    if len(names) > _WS_ROOT_LIMIT:
+        names = [*names[:_WS_ROOT_LIMIT], f"… (+{len(names) - _WS_ROOT_LIMIT} more)"]
+    return names
+
+
+def _ws_render_tree(root: Path) -> list[str]:
+    """Indented, depth- and size-capped tree of `root` (dirs first)."""
+    lines: list[str] = []
+
+    def walk(d: Path, prefix: str, depth: int) -> None:
+        if depth > _WS_TREE_MAX_DEPTH or len(lines) >= _WS_TREE_MAX_LINES:
+            return
+        try:
+            entries = sorted(d.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
+        except OSError:
+            return
+        entries = [p for p in entries if not _ws_should_skip(p.name)]
+        shown = entries[:_WS_TREE_DIR_CAP]
+        for p in shown:
+            if len(lines) >= _WS_TREE_MAX_LINES:
+                lines.append(f"{prefix}…")
+                return
+            lines.append(f"{prefix}{p.name}/" if p.is_dir() else f"{prefix}{p.name}")
+            if p.is_dir():
+                walk(p, prefix + "  ", depth + 1)
+        if len(entries) > len(shown):
+            lines.append(f"{prefix}… (+{len(entries) - len(shown)} more)")
+
+    walk(root, "", 1)
+    return lines
+
+
+def _workspace_block(project: Project) -> str | None:
+    """Wiki-layout only: a compact map of the project ROOT (real top-level
+    names) plus the current `wiki/` tree, so the model SEES what exists —
+    e.g. `-- Daily --/` — instead of guessing at folder names or wrongly
+    concluding "nothing found". Volatile (per-turn) so it reflects the agent's
+    own moves. Best-effort: any FS error yields no block."""
+    root = project.root
+    root_names = _ws_list_root(root)
+    wiki_dir = root / "wiki"
+    wiki_tree = _ws_render_tree(wiki_dir) if wiki_dir.is_dir() else []
+    if not root_names and not wiki_tree:
+        return None
+    out = [
+        "<workspace>",
+        "Your real workspace (wiki layout). Work with THESE paths — never invent "
+        "folder names, and list/read before concluding something is missing or "
+        "asking the user where things are.",
+        "",
+        "Project root:",
+        *(f"- {n}" for n in root_names),
+    ]
+    if wiki_tree:
+        out += ["", "Current wiki structure (`wiki/`):", *wiki_tree]
+    out.append("</workspace>")
+    return "\n".join(out)
 
 
 def _proposals_block(project: Project) -> str | None:
