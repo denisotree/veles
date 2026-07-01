@@ -86,6 +86,19 @@ def test_settled_status_shows_mode_tokens_cache_only() -> None:
     assert "openrouter" not in line
 
 
+def test_behaviour_block_forbids_deferred_work() -> None:
+    """The REPL persistence block must kill the "announce a plan, promise to
+    report back, then stop with no tool calls" failure mode — the turn ends the
+    instant the model returns no tool calls, so there is no "later". Keep the
+    ask_user carve-out intact (pausing to ask is still allowed)."""
+    from veles.cli.commands.repl import _REPL_BEHAVIOUR_BLOCK
+
+    low = _REPL_BEHAVIOUR_BLOCK.lower()
+    assert "there is no 'later'" in low  # names the failure mode
+    assert "tool calls" in low and "in this same reply" in low  # act now, here
+    assert "ask_user" in _REPL_BEHAVIOUR_BLOCK  # carve-out preserved
+
+
 def test_turn_callbacks_route_meta_to_sink() -> None:
     """With an on_meta sink, stream chunks / mode switches / tool calls flow to
     the live HUD instead of printing inline."""

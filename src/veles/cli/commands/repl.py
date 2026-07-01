@@ -61,10 +61,11 @@ def _suspend_live():
 
 
 # Injected into the REPL's system prompt for normal auto/writing turns (NOT
-# goal mode, which drives its own one-step-per-turn phase prompts). Two levers:
-# persistence — the biggest reason a small model "gives up" after one or two
-# edits is that nothing tells it to finish the whole job — and routing genuine
-# decisions through the interactive `ask_user` picker instead of prose.
+# goal mode, which drives its own one-step-per-turn phase prompts). Three levers:
+# persistence (finish the whole job), acting-now (the failure mode where a model
+# announces a plan / "I'll report back" and stops without doing the work — the
+# turn ends the instant it returns no tool calls, so there IS no "later"), and
+# routing genuine decisions through the `ask_user` picker instead of prose.
 _REPL_BEHAVIOUR_BLOCK = (
     "## Working through a task\n"
     "When the user asks you to carry out work — especially across MANY items "
@@ -74,6 +75,17 @@ _REPL_BEHAVIOUR_BLOCK = (
     "— use them. Do NOT stop after one or two items to summarise and ask whether "
     "to continue; that needlessly interrupts the work. Stop only when the task "
     "is genuinely complete or you hit a real blocker.\n\n"
+    "## Act now — there is no 'later'\n"
+    "This reply is the ONLY place work happens. There is no background, no async, "
+    "no next turn you control — the moment you stop making tool calls, the turn "
+    'ends. So anything you announce — "I\'ll create these files", "приступаю", '
+    '"working on it", "I\'ll report back in a few minutes" — you must actually '
+    "carry out with tool calls in THIS same reply, before you stop. Prose, plans "
+    'and parenthetical asides like "(creating the pages)" are NOT actions; only '
+    "tool calls (`write_file`, `edit_file`, …) change anything. Never end a reply "
+    "having only described work you did not perform. If you named files to create "
+    "or edit, create or edit them now, in this reply. If you are not going to do "
+    "something, do not claim you are.\n\n"
     "## Asking the user\n"
     "Pause to ask ONLY for a real decision the user must make — a choice between "
     "concrete alternatives, or confirmation of a risky / irreversible action. "
