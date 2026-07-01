@@ -885,15 +885,21 @@ class _ReplApp:
             style="class:input",
         )
         frame = Frame(self.input)
-        # Live "working…" HUD — visible only while a turn runs and no question is
-        # pending. dont_extend_height so it's one line collapsed, a few expanded.
+        # Live generation HUD — shown while a turn runs AND afterwards for the
+        # last turn (until the next prompt resets it), so Ctrl+O expand/collapse
+        # works both during generation and while idle. Hidden only when a
+        # question picker is up. dont_extend_height → one line collapsed.
         meta = ConditionalContainer(
             Window(
                 FormattedTextControl(self._meta_fragments),
                 dont_extend_height=True,
                 style="class:meta",
             ),
-            filter=Condition(lambda: self.busy and not self.q_active),
+            filter=Condition(
+                lambda: (
+                    bool(self.busy or self.stream_chars or self.meta_events) and not self.q_active
+                )
+            ),
         )
         # Mid-turn question picker — replaces the HUD while the agent asks.
         picker = ConditionalContainer(
@@ -981,18 +987,20 @@ class _ReplApp:
         ]
 
     def _meta_fragments(self):
-        """The live "working…" HUD shown in the app region during a turn:
-        elapsed, an approximate output-token count (chars/4 — providers only
-        report exact usage in the final chunk), and tool/mode-switch activity.
-        Collapsed by default; Ctrl+O expands the event list."""
+        """The generation HUD in the app region: elapsed, an approximate
+        output-token count (chars/4 — providers only report exact usage in the
+        final chunk), and tool/mode-switch activity. Reads "working…" while the
+        turn runs and "done" once it finishes (the block stays until the next
+        prompt). Collapsed by default; Ctrl+O expands the event list, and the
+        toggle works in both states because the block is visible in both."""
         from prompt_toolkit.formatted_text import FormattedText
 
         elapsed = int(time.monotonic() - self.turn_start) if self.turn_start else 0
         approx = self.stream_chars // 4
-        dots = "." * (1 + (self._tick % 3))
         tools = [t for k, t in self.meta_events if k == "tool"]
         modes = [t for k, t in self.meta_events if k == "mode"]
-        head = f" ⏳ working{dots} · ≈{approx} tok · {len(tools)} tool(s) · {elapsed}s"
+        label = f" ⏳ working{'.' * (1 + (self._tick % 3))}" if self.busy else " ✓ done"
+        head = f"{label} · ≈{approx} tok · {len(tools)} tool(s) · {elapsed}s"
         hint = "  (Ctrl+O свернуть)" if self.meta_expanded else "  (Ctrl+O раскрыть)"
         frags: list[tuple[str, str]] = [("class:meta", head + hint + "\n")]
         if self.meta_expanded:
@@ -1032,27 +1040,6 @@ class _ReplApp:
             self._tick += 1
             self.app.invalidate()
             await asyncio.sleep(0.3)
-
-    def _freeze_meta(self) -> None:
-        """Freeze the turn's meta into scrollback in its current (collapsed /
-        expanded) form — the live HUD region is transient, so this is what
-        survives in the terminal's history."""
-        tools = [t for k, t in self.meta_events if k == "tool"]
-        modes = [t for k, t in self.meta_events if k == "mode"]
-        if not tools and not modes and not self.stream_chars:
-            return
-        approx = self.stream_chars // 4
-        elapsed = int(time.monotonic() - self.turn_start) if self.turn_start else 0
-        self.console.print(
-            f"  ⋅ ≈{approx} tok · {len(tools)} tool(s) · {elapsed}s",
-            style=self.theme.muted,
-            markup=False,
-        )
-        if self.meta_expanded:
-            for t in modes:
-                self.console.print(f"     ↳ {t}", style=self.theme.muted, markup=False)
-            for t in tools:
-                self.console.print(f"     ⚒ {t}", style=self.theme.muted, markup=False)
 
     # --- mid-turn ask_user picker (answered inside this running app) ---
 
@@ -1285,7 +1272,6 @@ class _ReplApp:
                 if getattr(result, "stopped_reason", "") == "cancelled":
                     self.console.print("  ⋅ cancelled", style=self.theme.muted, markup=False)
                 self.console.print()  # trailing blank after the streamed answer
-                self._freeze_meta()  # freeze the HUD into scrollback
                 _update_state_after_turn(self.state, result)
                 if self.queue:
                     text = self.queue.popleft()

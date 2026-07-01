@@ -131,19 +131,31 @@ def _build_app(tmp_path):
     return app, store
 
 
-def test_meta_fragments_show_working_and_expand(tmp_path) -> None:
+def test_meta_fragments_working_idle_and_expand_in_both(tmp_path) -> None:
     app, store = _build_app(tmp_path)
     try:
         app.turn_start = 0.0  # falsy → elapsed renders as 0s
         app._push_meta("stream", "x" * 40)  # ≈10 tok
         app._push_meta("tool", "edit_file foo.py")
         app._push_meta("mode", "[auto -> writing]")
+
+        # During generation: "working…" label, collapsed by default.
+        app.busy = True
         text = "".join(f[1] for f in app._meta_fragments())
         assert "working" in text and "1 tool(s)" in text and "≈10 tok" in text
         assert "foo.py" not in text  # collapsed → no event list
         app.meta_expanded = True
         text2 = "".join(f[1] for f in app._meta_fragments())
         assert "foo.py" in text2 and "auto -> writing" in text2
+
+        # Idle (turn finished): "done" label, and the SAME toggle still expands —
+        # the unified behaviour the block stays visible for.
+        app.busy = False
+        idle = "".join(f[1] for f in app._meta_fragments())
+        assert "done" in idle and "foo.py" in idle  # still expanded while idle
+        app.meta_expanded = False
+        idle2 = "".join(f[1] for f in app._meta_fragments())
+        assert "foo.py" not in idle2  # collapse works while idle too
     finally:
         store.close()
 
