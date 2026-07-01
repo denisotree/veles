@@ -491,6 +491,7 @@ class _ReplApp:
         from prompt_toolkit.application import Application
         from prompt_toolkit.completion import Completer, Completion
         from prompt_toolkit.formatted_text import FormattedText
+        from prompt_toolkit.history import FileHistory
         from prompt_toolkit.layout import HSplit, Layout, Window
         from prompt_toolkit.layout.controls import FormattedTextControl
         from prompt_toolkit.layout.dimension import Dimension
@@ -533,6 +534,7 @@ class _ReplApp:
             height=Dimension(min=1, max=10),
             completer=_SlashCompleter(),
             complete_while_typing=True,
+            history=FileHistory(str(project.state_dir / "repl_history")),
             style="class:input",
         )
         frame = Frame(self.input)
@@ -589,6 +591,15 @@ class _ReplApp:
         @kb.add("escape", "enter")  # Alt/Option+Enter inserts a newline
         def _(event) -> None:
             self.input.buffer.insert_text("\n")
+
+        @kb.add("up")
+        def _(event) -> None:
+            # Smart: history-backward when on the first line, else cursor up.
+            self.input.buffer.auto_up(count=1, go_to_start_of_line_if_history_changes=True)
+
+        @kb.add("down")
+        def _(event) -> None:
+            self.input.buffer.auto_down(count=1, go_to_start_of_line_if_history_changes=True)
 
         @kb.add("s-tab")
         def _(event) -> None:
