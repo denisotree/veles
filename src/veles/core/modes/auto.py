@@ -30,11 +30,18 @@ from veles.core.provider import Message
 Verdict = Literal["direct", "plan"]
 
 _CLASSIFIER_SYSTEM = (
-    "Classify the user request. Answer with exactly one word, lowercase:\n"
-    "  - `direct`: chat reply, quick read, or a small edit that can be\n"
-    "    answered in at most two tool calls.\n"
-    "  - `plan`: research, design decisions, or multi-step changes\n"
-    "    worth a written plan first.\n"
+    "Route the user request to one execution mode. Answer with exactly one\n"
+    "lowercase word.\n"
+    "  - `direct`: DO the work now — answer, read, edit, run commands, or\n"
+    "    carry out a task, EVEN IF it takes several steps or tool calls.\n"
+    "    This is the default; prefer it.\n"
+    "  - `plan`: ONLY when the user explicitly asks you to plan / design /\n"
+    "    research an approach FIRST, or the task is genuinely large and\n"
+    "    ambiguous enough that writing a plan before touching anything is\n"
+    "    clearly warranted. A request to carry out or EXECUTE work (e.g.\n"
+    "    'do it', 'implement the plan', 'выполни', 'реализуй') is `direct`,\n"
+    "    never `plan`.\n"
+    "When unsure, answer `direct`.\n"
     "Respond with the single word, no punctuation, no prose."
 )
 
