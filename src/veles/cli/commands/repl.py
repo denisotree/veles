@@ -203,16 +203,31 @@ def _make_turn_callbacks(console, theme, errors: list[str]):
     """Build (post, on_text, on_event) for a `ModeContext`, plus a holder for
     the final `RunResult`.
 
-    These **stream live**: the answer is written token-by-token as the model
-    generates it, and dim mode lines print as they arrive. Under the
-    Application's `patch_stdout`, writes from the executor thread appear above
-    the live input box. Modes never import Textual — they only call these.
+    These **stream by block**: answer tokens accumulate in a buffer, and each
+    completed Markdown block (paragraph, list, table, fenced code) is rendered
+    formatted as soon as its terminating blank line arrives — progressive AND
+    formatted. `flush()` renders the trailing block at end of turn. Dim mode
+    lines print as they arrive. Under the Application's `patch_stdout`, writes
+    from the executor thread appear above the live input box.
 
-    Returns ``(post, on_text, on_event, holder)``.
+    Returns ``(post, on_text, on_event, holder, flush)``.
     """
     from veles.tui.messages import AgentError, ChatDelta, SystemLine, TurnDone
 
     holder: dict[str, object] = {}
+    buf = [""]  # mutable string cell shared across chunks
+
+    def _emit(chunk: str) -> None:
+        buf[0] += chunk
+        blocks, buf[0] = _split_blocks(buf[0])
+        for block in blocks:
+            if block.strip():
+                _render_answer(console, block)
+
+    def flush() -> None:
+        if buf[0].strip():
+            _render_answer(console, buf[0])
+        buf[0] = ""
 
     def post(msg) -> None:
         if isinstance(msg, TurnDone):
@@ -220,32 +235,60 @@ def _make_turn_callbacks(console, theme, errors: list[str]):
         elif isinstance(msg, SystemLine):
             console.print(f"  ⋅ {msg.text}", style=theme.muted, markup=False)
         elif isinstance(msg, ChatDelta):
-            sys.stdout.write(msg.text)
-            sys.stdout.flush()
+            _emit(msg.text)
         elif isinstance(msg, AgentError):
             errors.append(str(msg.exc))
             console.print(f"\nerror: {msg.exc}", style=theme.error, markup=False)
 
     def on_text(text: str) -> None:
-        sys.stdout.write(text)
-        sys.stdout.flush()
+        _emit(text)
 
     def on_event(_event) -> None:
         return None
 
-    return post, on_text, on_event, holder
+    return post, on_text, on_event, holder, flush
 
 
 def _render_answer(console, text: str) -> None:
-    """Pretty-print the assistant answer as Markdown — headings, lists, tables,
-    links, bold/italic, and syntax-highlighted code blocks. Falls back to plain
-    text if rendering ever raises so a glitch never eats the answer."""
+    """Pretty-print a Markdown block — headings, lists, tables, links,
+    bold/italic, and syntax-highlighted code blocks. Falls back to plain text
+    if rendering ever raises so a glitch never eats the answer."""
     from rich.markdown import Markdown
 
     try:
         console.print(Markdown(text))
     except Exception:
         console.print(text, markup=False)
+
+
+def _split_blocks(buf: str) -> tuple[list[str], str]:
+    """Split a growing Markdown buffer into (complete_blocks, remainder).
+
+    Blocks are separated by blank lines OUTSIDE fenced code (``` / ~~~). The
+    trailing incomplete block — everything after the last blank-line boundary,
+    an unterminated code fence, or a partial final line — is the remainder,
+    kept buffered until more tokens arrive. This lets the REPL render each
+    finished block (paragraph, list, table, code fence) as it completes,
+    streaming *and* formatted."""
+    lines = buf.split("\n")
+    tail = lines.pop()  # text after the final "\n" — a partial line (or "")
+    blocks: list[str] = []
+    cur: list[str] = []
+    in_fence = False
+    for line in lines:
+        s = line.lstrip()
+        if s.startswith("```") or s.startswith("~~~"):
+            in_fence = not in_fence
+            cur.append(line)
+        elif line.strip() == "" and not in_fence:
+            if cur:
+                blocks.append("\n".join(cur))
+                cur = []
+            # else: swallow extra blank separators
+        else:
+            cur.append(line)
+    remainder = "\n".join([*cur, tail]) if cur else tail
+    return blocks, remainder
 
 
 def _update_state_after_turn(state, result) -> None:
@@ -268,7 +311,7 @@ def _run_mode_turn(state, project, factory, line: str, console, errors: list[str
     live via the callbacks; dim mode lines print as they arrive."""
     from veles.core.modes import ModeContext, get_mode
 
-    post, on_text, on_event, holder = _make_turn_callbacks(console, theme, errors)
+    post, on_text, on_event, holder, flush = _make_turn_callbacks(console, theme, errors)
     ctx = ModeContext(
         state=state,
         project=project,
@@ -281,7 +324,8 @@ def _run_mode_turn(state, project, factory, line: str, console, errors: list[str
         get_mode(state.mode).run_turn(line, ctx)
     except KeyboardInterrupt:
         console.print("\n  ⋅ interrupted", style=theme.muted, markup=False)
-    console.print()  # trailing newline after the streamed answer
+    flush()  # render the trailing block
+    console.print()  # spacing after the answer
     return holder.get("result")
 
 
@@ -729,10 +773,10 @@ class _ReplApp:
         from veles.core.modes import ModeContext, get_mode
 
         tok = set_cancel_token(self.cancel_token)
+        post, on_text, on_event, holder, flush = _make_turn_callbacks(
+            self.console, self.theme, self.errors
+        )
         try:
-            post, on_text, on_event, holder = _make_turn_callbacks(
-                self.console, self.theme, self.errors
-            )
             ctx = ModeContext(
                 state=self.state,
                 project=self.project,
@@ -744,6 +788,7 @@ class _ReplApp:
             get_mode(self.state.mode).run_turn(text, ctx)
         finally:
             reset_cancel_token(tok)
+            flush()  # render the trailing block even if the turn raised
         return holder.get("result")
 
 

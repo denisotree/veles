@@ -49,17 +49,42 @@ def test_turn_callbacks_stream_and_capture_result(
 
     errors: list[str] = []
     theme = _resolve_theme(_state())
-    post, on_text, _on_event, holder = _make_turn_callbacks(_console(), theme, errors)
-    post(SystemLine(text="[auto -> writing]"))  # dim mode line, streamed live
-    on_text("hello ")  # streamed answer token
+    post, on_text, _on_event, holder, flush = _make_turn_callbacks(_console(), theme, errors)
+    post(SystemLine(text="[auto -> writing]"))  # dim mode line
+    on_text("hello ")  # buffered (no block boundary yet)
     post(ChatDelta(text="world"))
     rr = RunResult(text="hello world", iterations=1, stopped_reason="completed", session_id="s1")
     post(TurnDone(result=rr))
+    flush()  # renders the trailing block
 
     out = capsys.readouterr().out
     assert "[auto -> writing]" in out  # mode line printed
-    assert "hello world" in out  # answer streamed
+    assert "hello world" in out  # answer rendered
     assert holder["result"] is rr
+
+
+def test_split_blocks() -> None:
+    from veles.cli.commands.repl import _split_blocks
+
+    # a completed paragraph flushes; the next (unterminated) one stays buffered
+    blocks, rem = _split_blocks("para one\n\npara two")
+    assert blocks == ["para one"]
+    assert rem == "para two"
+
+    # a fenced code block is atomic — blank lines inside it don't split it
+    blocks, rem = _split_blocks("```py\ncode\n\nmore\n```\n\nafter")
+    assert blocks == ["```py\ncode\n\nmore\n```"]
+    assert rem == "after"
+
+    # an unterminated fence stays entirely in the remainder
+    blocks, rem = _split_blocks("text\n\n```py\nhalf")
+    assert blocks == ["text"]
+    assert rem == "```py\nhalf"
+
+    # a lone newline is not a boundary — wait for a blank line
+    blocks, rem = _split_blocks("line one\nline two")
+    assert blocks == []
+    assert rem == "line one\nline two"
 
 
 def test_render_answer_formats_markdown(capsys: pytest.CaptureFixture[str]) -> None:
