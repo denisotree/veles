@@ -155,6 +155,45 @@ def test_replapp_constructs(tmp_path) -> None:
         store.close()
 
 
+def test_replapp_propagates_active_project_to_worker(tmp_path) -> None:
+    """The captured parent context carries the active project into a worker
+    thread — the fix for tools resolving ~/.veles/skills when run_in_executor
+    dropped the context."""
+    import contextvars
+    from concurrent.futures import ThreadPoolExecutor
+
+    from veles.cli.commands.repl import _console, _ReplApp, _resolve_theme
+    from veles.core.context import current_project, reset_active_project, set_active_project
+
+    project, store = _project_and_store(tmp_path)
+    token = set_active_project(project)
+    try:
+        state = _state()
+        app = _ReplApp(
+            argparse.Namespace(),
+            project,
+            state,
+            lambda *_a, **_k: None,
+            store,
+            build_default_registry(project=project),
+            _console(),
+            _resolve_theme(state),
+            [],
+        )
+        turn_ctx = app._parent_ctx.run(contextvars.copy_context)
+        seen: dict = {}
+
+        def _work() -> None:
+            seen["project"] = turn_ctx.run(current_project)
+
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            ex.submit(_work).result()
+        assert seen["project"] is project
+    finally:
+        reset_active_project(token)
+        store.close()
+
+
 def test_repl_command_registered() -> None:
     from veles.cli._parsers.agent_loop import register
 

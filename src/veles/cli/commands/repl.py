@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextvars
 import datetime as _dt
 import os
 import sys
@@ -515,6 +516,11 @@ class _ReplApp:
         self._last_ctrl_c = 0.0
         self._next_mode = next_mode
         self._tasks: set = set()  # keep strong refs so tasks aren't GC'd mid-flight
+        # Capture the caller's ContextVars NOW (constructed inside the CLI's
+        # `set_active_project` scope) so background turns can re-enter them —
+        # `run_in_executor` does not copy context, and without the active
+        # project the tools resolve wrong paths (run_shell cwd → ~/.veles/skills).
+        self._parent_ctx = contextvars.copy_context()
 
         extra = ("/sessions", "/errors", "/resume")
 
@@ -701,9 +707,13 @@ class _ReplApp:
             while True:
                 await self._echo_user(text)
                 self.cancel_token = CancelToken()
+                # A fresh copy of the captured parent context per turn (a Context
+                # can't be run concurrently); the executor runs the turn inside it
+                # so the active project / module registry / i18n reach the tools.
+                turn_ctx = self._parent_ctx.run(contextvars.copy_context)
                 try:
                     sys_lines, answer, result = await loop.run_in_executor(
-                        None, self._blocking_turn, text
+                        None, lambda c=turn_ctx, t=text: c.run(self._blocking_turn, t)
                     )
                 except Exception as exc:
                     self.errors.append(str(exc))
