@@ -34,22 +34,29 @@ from veles.core.project import Project
 # Window inside which a second Ctrl+C at the prompt is treated as exit.
 _CTRL_C_EXIT_WINDOW_S = 1.5
 
-# Injected into the REPL's system prompt so the agent surfaces choices through
-# the interactive picker instead of prose. The REPL is interactive; `ask_user`
-# with options renders an arrow-key menu (see `_choice_picker`).
-_INTERACTIVE_CHOICE_NUDGE = (
-    "## Interactive choices\n"
-    "You are running in an interactive REPL where the `ask_user` tool renders an "
-    "arrow-key picker. When you would END your reply by asking the user to CHOOSE "
-    "between alternatives, or to CONFIRM an action (a yes/no), you MUST NOT write "
-    "that question as prose. Instead call `ask_user` with `options` as your final "
-    "step, e.g. `ask_user(\"Run veles curate now?\", options=[\"Yes, run it\", "
-    "\"No, not yet\"])` or `ask_user(\"Where to start?\", options=[\"Refactor the "
-    "hierarchy\", \"Fix stub pages\", \"Rewrite INDEX.md\"])`. List each real "
-    "alternative as an option; the user can still type a free-text answer. Only "
-    "for a truly open question with no discernible alternatives may you ask "
-    "`ask_user(question)` without options. Never end a turn with a plain-text "
-    "choice or yes/no question."
+# Injected into the REPL's system prompt for normal auto/writing turns (NOT
+# goal mode, which drives its own one-step-per-turn phase prompts). Two levers:
+# persistence — the biggest reason a small model "gives up" after one or two
+# edits is that nothing tells it to finish the whole job — and routing genuine
+# decisions through the interactive `ask_user` picker instead of prose.
+_REPL_BEHAVIOUR_BLOCK = (
+    "## Working through a task\n"
+    "When the user asks you to carry out work — especially across MANY items "
+    '("loop through all pages", "fix everything", "review each file") — do the '
+    "WHOLE task in this turn. Work item by item: read it, make the change, move "
+    "to the next, until every item is handled. You have many tool calls per turn "
+    "— use them. Do NOT stop after one or two items to summarise and ask whether "
+    "to continue; that needlessly interrupts the work. Stop only when the task "
+    "is genuinely complete or you hit a real blocker.\n\n"
+    "## Asking the user\n"
+    "Pause to ask ONLY for a real decision the user must make — a choice between "
+    "concrete alternatives, or confirmation of a risky / irreversible action. "
+    "When you do, call the `ask_user` tool with `options=[...]` (it renders an "
+    "arrow-key picker) instead of writing the question as prose, e.g. "
+    '`ask_user("Apply the plan or exclude sources/?", options=["Apply fully", '
+    '"Exclude sources/", "Cancel"])`. Never end a turn with a plain-text choice '
+    "or yes/no question, and never ask permission for routine steps of a task "
+    "you were already told to do — just do them."
 )
 
 
@@ -224,10 +231,13 @@ def _build_runtime(args: argparse.Namespace, project: Project):
             sys_chunks.append(base)
         if mode.system_block.strip():
             sys_chunks.append(mode.system_block.strip())
-        # REPL is interactive: route end-of-turn choices through the picker.
-        sys_chunks.append(_INTERACTIVE_CHOICE_NUDGE)
         if extra_system and extra_system.strip():
+            # A phase prompt is driving this turn (goal mode's own FSM, which is
+            # deliberately one-step-per-turn) — don't inject the persistence
+            # block, it would contradict "run the step, then STOP".
             sys_chunks.append(extra_system.strip())
+        else:
+            sys_chunks.append(_REPL_BEHAVIOUR_BLOCK)
         system_prompt = "\n\n".join(sys_chunks) if sys_chunks else None
         return Agent(
             provider=provider,
