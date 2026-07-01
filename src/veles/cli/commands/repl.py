@@ -34,6 +34,24 @@ from veles.core.project import Project
 # Window inside which a second Ctrl+C at the prompt is treated as exit.
 _CTRL_C_EXIT_WINDOW_S = 1.5
 
+# Injected into the REPL's system prompt so the agent surfaces choices through
+# the interactive picker instead of prose. The REPL is interactive; `ask_user`
+# with options renders an arrow-key menu (see `_choice_picker`).
+_INTERACTIVE_CHOICE_NUDGE = (
+    "## Interactive choices\n"
+    "You are running in an interactive REPL where the `ask_user` tool renders an "
+    "arrow-key picker. When you would END your reply by asking the user to CHOOSE "
+    "between alternatives, or to CONFIRM an action (a yes/no), you MUST NOT write "
+    "that question as prose. Instead call `ask_user` with `options` as your final "
+    "step, e.g. `ask_user(\"Run veles curate now?\", options=[\"Yes, run it\", "
+    "\"No, not yet\"])` or `ask_user(\"Where to start?\", options=[\"Refactor the "
+    "hierarchy\", \"Fix stub pages\", \"Rewrite INDEX.md\"])`. List each real "
+    "alternative as an option; the user can still type a free-text answer. Only "
+    "for a truly open question with no discernible alternatives may you ask "
+    "`ask_user(question)` without options. Never end a turn with a plain-text "
+    "choice or yes/no question."
+)
+
 
 def _console():
     from rich.console import Console
@@ -206,6 +224,8 @@ def _build_runtime(args: argparse.Namespace, project: Project):
             sys_chunks.append(base)
         if mode.system_block.strip():
             sys_chunks.append(mode.system_block.strip())
+        # REPL is interactive: route end-of-turn choices through the picker.
+        sys_chunks.append(_INTERACTIVE_CHOICE_NUDGE)
         if extra_system and extra_system.strip():
             sys_chunks.append(extra_system.strip())
         system_prompt = "\n\n".join(sys_chunks) if sys_chunks else None
