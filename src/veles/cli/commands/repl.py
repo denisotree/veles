@@ -543,6 +543,100 @@ def _make_prompt_session(project: Project, registry, state):
     )
 
 
+def _choice_picker(theme, question: str, options: list[str]):
+    """Inline arrow-key picker (normal screen buffer, no mouse) for a choice
+    question. Lists the options plus a final free-text entry; returns the chosen
+    option string, a typed free-text answer, or None on Esc/no-TTY. Mirrors the
+    trust-ladder menu pattern."""
+    from prompt_toolkit import Application
+    from prompt_toolkit.formatted_text import FormattedText
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.layout import Layout, Window
+    from prompt_toolkit.layout.controls import FormattedTextControl
+
+    free_label = "✎ свой вариант…"
+    items = [*options, free_label]
+    sel = [0]
+    picked: list[int | None] = [None]
+    kb = KeyBindings()
+
+    @kb.add("up")
+    def _u(e) -> None:
+        sel[0] = (sel[0] - 1) % len(items)
+
+    @kb.add("down")
+    def _d(e) -> None:
+        sel[0] = (sel[0] + 1) % len(items)
+
+    for _i in range(min(9, len(items))):
+
+        @kb.add(str(_i + 1))
+        def _n(e, idx=_i) -> None:
+            sel[0] = idx
+
+    @kb.add("enter")
+    def _en(e) -> None:
+        picked[0] = sel[0]
+        e.app.exit()
+
+    @kb.add("escape")
+    @kb.add("c-c")
+    def _es(e) -> None:
+        picked[0] = None
+        e.app.exit()
+
+    def _text():
+        lines: list[tuple[str, str]] = [("bold", f"{question}\n\n")]
+        for i, label in enumerate(items):
+            style = f"bold {theme.accent}" if i == sel[0] else ""
+            marker = "❯" if i == sel[0] else " "
+            lines.append((style, f"  {marker} {label}\n"))
+        lines.append(("ansibrightblack", "\n  ↑↓ выбор · Enter · Esc отмена\n"))
+        return FormattedText(lines)
+
+    Application(
+        layout=Layout(Window(FormattedTextControl(_text, focusable=True))),
+        key_bindings=kb,
+        full_screen=False,
+        mouse_support=False,
+    ).run()
+
+    idx = picked[0]
+    if idx is None:
+        return None
+    if idx == len(items) - 1:  # free-text entry
+        return _free_text(theme)
+    return options[idx]
+
+
+def _free_text(theme):
+    from prompt_toolkit import prompt
+
+    try:
+        answer = prompt(_pt_html(theme, "  ваш вариант ❯ ")).strip()
+    except (EOFError, KeyboardInterrupt):
+        return None
+    return answer or None
+
+
+def _pt_html(theme, text: str):
+    from prompt_toolkit.formatted_text import HTML
+
+    return HTML(f'<style fg="{theme.accent}">{text}</style>')
+
+
+def _ask_repl(console, theme, question: str, options: list[str] | None):
+    """Question prompter for the REPL: an interactive picker when the agent
+    offers options, a free-text line otherwise. Returns None when there's no
+    interactive TTY so the agent proceeds on its best assumption."""
+    if not sys.stdin.isatty():
+        return None
+    if options:
+        return _choice_picker(theme, question, options)
+    console.print(f"\n[agent] {question}", style=theme.accent, markup=False)
+    return _free_text(theme)
+
+
 def _run_simple_repl(
     args, project, state, factory, store, registry, console, theme, errors
 ) -> None:
@@ -551,9 +645,44 @@ def _run_simple_repl(
     net for terminals where the inline Application misbehaves."""
     from prompt_toolkit.formatted_text import HTML
 
+    from veles.core.user_prompt import reset_question_prompter, set_question_prompter
+
     prompt_html = HTML(f'<style fg="{theme.accent}"><b>❯</b></style> ')
     prompt_session = _make_prompt_session(project, registry, state)
+    # Route agent `ask_user` questions to an inline picker / free-text prompt.
+    qtoken = set_question_prompter(lambda q, opts=None: _ask_repl(console, theme, q, opts))
     console.rule(style=theme.border, characters="─")
+    try:
+        _simple_repl_loop(
+            args,
+            project,
+            state,
+            factory,
+            store,
+            registry,
+            console,
+            theme,
+            errors,
+            prompt_session,
+            prompt_html,
+        )
+    finally:
+        reset_question_prompter(qtoken)
+
+
+def _simple_repl_loop(
+    args,
+    project,
+    state,
+    factory,
+    store,
+    registry,
+    console,
+    theme,
+    errors,
+    prompt_session,
+    prompt_html,
+) -> None:
     last_ctrl_c = 0.0
     while True:
         try:

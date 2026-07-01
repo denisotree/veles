@@ -187,7 +187,7 @@ class AgentBridge:
         # Textual (input() would fight the TUI for the terminal). Install a
         # non-blocking skip prompter so ask_user degrades to "proceed on your
         # best assumption" in the TUI. A real modal is M148b.
-        question_token = set_question_prompter(lambda _q: None)
+        question_token = set_question_prompter(lambda _q, _opts=None: None)
         turn_token = begin_trust_turn()
         try:
             mode = get_mode(self._state.mode)

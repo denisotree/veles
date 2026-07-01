@@ -79,6 +79,15 @@ def test_status_line_matches_tui_fields() -> None:
     assert "ctx 60k/" in line and "%" in line  # context meter
 
 
+def test_ask_repl_skips_without_tty(monkeypatch) -> None:
+    from veles.cli.commands import repl as repl_mod
+
+    monkeypatch.setattr(repl_mod.sys.stdin, "isatty", lambda: False)
+    theme = repl_mod._resolve_theme(_state())
+    # No interactive TTY → None so the agent proceeds on its best assumption.
+    assert repl_mod._ask_repl(_console(), theme, "pick?", ["a", "b"]) is None
+
+
 def test_render_edit_diff(capsys: pytest.CaptureFixture[str]) -> None:
     from veles.cli.commands.repl import _render_edit_diff, _resolve_theme
 
