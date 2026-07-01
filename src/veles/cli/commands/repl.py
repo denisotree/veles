@@ -650,6 +650,17 @@ class _ReplApp:
 
         await run_in_terminal(func)
 
+    async def _echo_user(self, text: str) -> None:
+        """Echo the user's request into the output/scrollback, visually marked
+        (accent `❯`) so it reads as the user's input, distinct from the agent's
+        answer below it."""
+
+        def _do() -> None:
+            self.console.print()
+            self.console.print(f"❯ {text}", style=f"bold {self.theme.accent}", markup=False)
+
+        await self._in_terminal(_do)
+
     async def _dispatch(self, text: str) -> None:
         if text.startswith("/"):
             await self._slash(text)
@@ -665,6 +676,7 @@ class _ReplApp:
         await self._run_chain(text)
 
     async def _slash(self, text: str) -> None:
+        await self._echo_user(text)
         box: dict = {}
 
         def _do() -> None:
@@ -687,6 +699,7 @@ class _ReplApp:
         loop = asyncio.get_event_loop()
         try:
             while True:
+                await self._echo_user(text)
                 self.cancel_token = CancelToken()
                 try:
                     sys_lines, answer, result = await loop.run_in_executor(
@@ -741,7 +754,7 @@ class _ReplApp:
         cancelled = getattr(result, "stopped_reason", "") == "cancelled"
 
         def _do() -> None:
-            self.console.print()
+            # No leading blank — `_echo_user` already spaced this turn.
             for sl in sys_lines:
                 self.console.print(f"  ⋅ {sl}", style=self.theme.muted, markup=False)
             if answer:
