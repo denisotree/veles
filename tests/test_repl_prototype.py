@@ -232,6 +232,98 @@ def test_picker_enter_on_sentinel_switches_to_free_text(tmp_path) -> None:
         store.close()
 
 
+def test_filter_models_substring_case_insensitive() -> None:
+    from veles.cli.commands.repl import _filter_models
+
+    models = ["openrouter/anthropic/claude", "openai/gpt-4o", "google/gemini"]
+    assert _filter_models(models, "") == models  # empty → all
+    assert _filter_models(models, "CLAUDE") == ["openrouter/anthropic/claude"]
+    assert _filter_models(models, "gpt") == ["openai/gpt-4o"]
+    assert _filter_models(models, "zzz") == []
+
+
+def test_fetch_models_wraps_fetcher(tmp_path, monkeypatch) -> None:
+    from veles.tui.screens import _model_fetcher
+
+    class _ML:
+        models: typing.ClassVar = ["a/x", "a/y"]
+        source = "cache"
+
+    monkeypatch.setattr(_model_fetcher, "fetch_models", lambda *_a, **_k: _ML())
+    app, store = _build_app(tmp_path)
+    try:
+        assert app._fetch_models(False) == (["a/x", "a/y"], "cache")
+    finally:
+        store.close()
+
+
+def test_fetch_models_swallows_errors(tmp_path, monkeypatch) -> None:
+    from veles.tui.screens import _model_fetcher
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("no key")
+
+    monkeypatch.setattr(_model_fetcher, "fetch_models", _boom)
+    app, store = _build_app(tmp_path)
+    try:
+        assert app._fetch_models(True) == ([], "error")  # never propagates
+    finally:
+        store.close()
+
+
+def test_model_picker_filter_and_pick_persists(tmp_path, monkeypatch) -> None:
+    from veles.core import tui_state
+
+    persisted: dict = {}
+    monkeypatch.setattr(
+        tui_state, "persist_model_choice", lambda project, model: persisted.update(m=model)
+    )
+    app, store = _build_app(tmp_path)
+    try:
+        app.mp_active = True
+        app.mp_models = ["openai/gpt-4o", "anthropic/claude", "anthropic/claude-haiku"]
+        app.input.text = "haiku"  # filters to one; on_text_changed resets sel→0
+        assert app._mp_filtered() == ["anthropic/claude-haiku"]
+        app._mp_pick()
+        assert app.state.model == "anthropic/claude-haiku"
+        assert persisted["m"] == "anthropic/claude-haiku"  # persisted the choice
+        assert app.mp_active is False  # picker closed
+        assert app.input.text == ""  # filter cleared
+    finally:
+        store.close()
+
+
+def test_model_picker_move_wraps_and_cancel_closes(tmp_path) -> None:
+    app, store = _build_app(tmp_path)
+    try:
+        app.mp_active = True
+        app.mp_models = ["a", "b", "c"]
+        app.mp_sel = 0
+        app._mp_move(-1)  # wrap to the last
+        assert app.mp_sel == 2
+        app._mp_move(1)  # wrap back to the first
+        assert app.mp_sel == 0
+        app._mp_cancel()
+        assert app.mp_active is False and app.mp_models == []
+    finally:
+        store.close()
+
+
+def test_print_model_list_fallback(monkeypatch, capsys: pytest.CaptureFixture[str]) -> None:
+    from veles.cli.commands.repl import _print_model_list
+    from veles.tui.screens import _model_fetcher
+
+    class _ML:
+        models: typing.ClassVar = ["openai/gpt-4o", "anthropic/claude"]
+        source = "cache"
+
+    monkeypatch.setattr(_model_fetcher, "fetch_models", lambda *_a, **_k: _ML())
+    _print_model_list(_console(), "openrouter", "anthropic/claude", refresh=False)
+    out = capsys.readouterr().out
+    assert "openrouter" in out and "2 models" in out
+    assert "anthropic/claude" in out and "← current" in out  # current marked
+
+
 def test_suspend_live_pauses_and_resumes_active_live() -> None:
     from veles.cli.commands import repl as repl_mod
 

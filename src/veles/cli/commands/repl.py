@@ -502,6 +502,46 @@ def _run_mode_turn(state, project, factory, line: str, console, errors: list[str
     return holder.get("result")
 
 
+def _filter_models(models, text: str) -> list[str]:
+    """Case-insensitive substring filter for the model picker — the same
+    helper backs the inline app picker and could back the fallback list."""
+    f = text.strip().lower()
+    if not f:
+        return list(models)
+    return [m for m in models if f in m.lower()]
+
+
+def _print_model_list(console, provider: str, current: str, *, refresh: bool = False) -> None:
+    """Fallback (simple-loop) model lister: fetch the provider's catalogue and
+    print it, marking the current model. No interactive picker here — the
+    default REPL (inline Application) has the filterable picker; the fallback
+    just shows the list and relies on `/model <id>` to set one."""
+    from veles.tui.screens._model_fetcher import fetch_models
+
+    try:
+        result = fetch_models(provider, refresh=refresh)
+    except Exception as exc:
+        console.print(f"  could not fetch models: {exc}", style="red", markup=False)
+        return
+    if not result.models:
+        console.print(
+            "  no models (no API key / provider offline) — set with /model <id>",
+            style="yellow",
+            markup=False,
+        )
+        return
+    console.print(
+        f"  {provider} · {len(result.models)} models · {result.source}",
+        style="cyan",
+        markup=False,
+    )
+    for m in result.models[:40]:
+        console.print(f"    {m}{'  ← current' if m == current else ''}", style="dim", markup=False)
+    if len(result.models) > 40:
+        console.print(f"    … +{len(result.models) - 40} more", style="dim", markup=False)
+    console.print("  set with /model <id>", style="dim", markup=False)
+
+
 def _pick_session(store, state, console) -> None:
     """Inline session picker: a rich table of recent sessions + a numbered
     prompt to resume one. Stays in the normal buffer (no alt screen)."""
@@ -587,6 +627,13 @@ def _handle_slash(
         state.last_assistant_text = None
     if result.open_picker == "sessions":
         _pick_session(store, state, console)
+    elif result.open_picker in ("models", "models:refresh"):
+        _print_model_list(
+            console,
+            state.provider_name,
+            state.model,
+            refresh=result.open_picker.endswith("refresh"),
+        )
     elif result.open_picker:
         console.print(f"  [dim]{result.open_picker}: set directly, e.g. /model <id>[/dim]")
     return result.quit, result.submit_prompt
@@ -869,6 +916,14 @@ class _ReplApp:
         self.q_sel = 0
         self.q_answer: str | None = None
         self.q_event = None
+        # --- /model picker state (loop-thread driven; the input box is its live
+        # filter). Mutually exclusive with q_active by construction — you can't
+        # submit a slash while a question is pending. ---
+        self.mp_active = False
+        self.mp_loading = False
+        self.mp_models: list[str] = []
+        self.mp_source = ""
+        self.mp_sel = 0
         # Capture the caller's ContextVars NOW (constructed inside the CLI's
         # `set_active_project` scope) so background turns can re-enter them —
         # `run_in_executor` does not copy context, and without the active
@@ -876,9 +931,13 @@ class _ReplApp:
         self._parent_ctx = contextvars.copy_context()
 
         extra = ("/sessions", "/errors", "/resume")
+        outer = self
 
         class _SlashCompleter(Completer):
             def get_completions(self, document, complete_event):
+                # No slash completion while the model filter owns the input box.
+                if outer.mp_active:
+                    return
                 text = document.text_before_cursor
                 if not text.startswith("/") or " " in text:
                     return
@@ -896,6 +955,9 @@ class _ReplApp:
             history=FileHistory(str(project.state_dir / "repl_history")),
             style="class:input",
         )
+        # While the /model picker is open, typing in the input box filters the
+        # list — reset the selection to the top on every keystroke.
+        self.input.buffer.on_text_changed += self._on_input_changed
         frame = Frame(self.input)
         # Live generation HUD — shown while a turn runs AND afterwards for the
         # last turn (until the next prompt resets it), so Ctrl+O expand/collapse
@@ -909,7 +971,9 @@ class _ReplApp:
             ),
             filter=Condition(
                 lambda: (
-                    bool(self.busy or self.stream_chars or self.meta_events) and not self.q_active
+                    bool(self.busy or self.stream_chars or self.meta_events)
+                    and not self.q_active
+                    and not self.mp_active
                 )
             ),
         )
@@ -922,10 +986,19 @@ class _ReplApp:
             ),
             filter=Condition(lambda: self.q_active),
         )
+        # /model filterable picker — shown when the user opens it.
+        model_picker = ConditionalContainer(
+            Window(
+                FormattedTextControl(self._mp_fragments),
+                dont_extend_height=True,
+                style="class:picker",
+            ),
+            filter=Condition(lambda: self.mp_active),
+        )
         status = Window(
             FormattedTextControl(self._status_fragments), height=1, style="class:status"
         )
-        root = HSplit([meta, picker, frame, status])
+        root = HSplit([meta, picker, model_picker, frame, status])
         style = Style.from_dict(
             {
                 "frame.border": theme.border,
@@ -1096,6 +1169,126 @@ class _ReplApp:
             return
         self._answer(self.q_options[self.q_sel])
 
+    # --- /model picker (filterable, driven inside this Application) ---
+
+    def _on_input_changed(self, _buffer) -> None:
+        # While the model picker is open the input box is the filter; reset the
+        # highlighted row to the top on each keystroke so the selection tracks
+        # the freshly-filtered list.
+        if self.mp_active:
+            self.mp_sel = 0
+            self.app.invalidate()
+
+    def _open_model_picker(self, refresh: bool = False) -> None:
+        self.mp_active = True
+        self.mp_loading = True
+        self.mp_models = []
+        self.mp_source = ""
+        self.mp_sel = 0
+        self.input.text = ""
+        self.app.invalidate()
+
+        async def _load() -> None:
+            loop = asyncio.get_event_loop()
+            models, source = await loop.run_in_executor(None, self._fetch_models, refresh)
+            if self.mp_active:  # not cancelled while the fetch was in flight
+                self.mp_models = models
+                self.mp_source = source
+                self.mp_loading = False
+                self.mp_sel = 0
+                self.app.invalidate()
+
+        self._spawn(_load())
+
+    def _fetch_models(self, refresh: bool):
+        """Runs in the executor (a refresh / cold cache does network I/O, which
+        must not block the event loop). Returns (models, source)."""
+        from veles.tui.screens._model_fetcher import fetch_models
+
+        try:
+            result = fetch_models(self.state.provider_name, refresh=refresh)
+            return result.models, result.source
+        except Exception:
+            return [], "error"
+
+    def _mp_filtered(self) -> list[str]:
+        return _filter_models(self.mp_models, self.input.text)
+
+    def _mp_fragments(self):
+        from prompt_toolkit.formatted_text import FormattedText
+
+        if self.mp_loading:
+            return FormattedText(
+                [("class:picker", f" загружаю модели ({self.state.provider_name})…\n")]
+            )
+        if not self.mp_models:
+            return FormattedText(
+                [
+                    (
+                        "class:picker.dim",
+                        " нет моделей (нет API-ключа / провайдер недоступен) — "
+                        "задай через /model <id>\n",
+                    )
+                ]
+            )
+        filtered = self._mp_filtered()
+        head = (
+            f" модель · {self.state.provider_name} · {len(self.mp_models)} · "
+            f"{self.mp_source} — печатай для фильтра · ↑↓ · Enter · Esc\n"
+        )
+        frags: list[tuple[str, str]] = [("class:picker", head)]
+        if not filtered:
+            frags.append(("class:picker.dim", "  нет совпадений\n"))
+            return FormattedText(frags)
+        sel = max(0, min(self.mp_sel, len(filtered) - 1))
+        window = 10
+        start = (
+            max(0, min(sel - window // 2, len(filtered) - window)) if len(filtered) > window else 0
+        )
+        for i in range(start, min(start + window, len(filtered))):
+            m = filtered[i]
+            is_sel = i == sel
+            marker = "❯" if is_sel else " "
+            cur = "  ← current" if m == self.state.model else ""
+            frags.append(
+                ("class:picker.sel" if is_sel else "class:picker", f"  {marker} {m}{cur}\n")
+            )
+        if len(filtered) > window:
+            frags.append(("class:picker.dim", f"  … {len(filtered)} совпадений, уточни фильтр\n"))
+        return FormattedText(frags)
+
+    def _mp_move(self, delta: int) -> None:
+        n = len(self._mp_filtered())
+        if n:
+            self.mp_sel = (max(0, min(self.mp_sel, n - 1)) + delta) % n
+        self.app.invalidate()
+
+    def _mp_pick(self) -> None:
+        filtered = self._mp_filtered()
+        if not filtered:
+            return
+        model = filtered[max(0, min(self.mp_sel, len(filtered) - 1))]
+        self.state.model = model  # the factory reads state.model fresh next turn
+        import contextlib
+
+        from veles.core.tui_state import persist_model_choice
+
+        with contextlib.suppress(Exception):
+            persist_model_choice(self.project, model)
+        self._mp_close()
+        self.console.print(f"  ⋅ model set to {model}", style=self.theme.muted, markup=False)
+
+    def _mp_cancel(self) -> None:
+        self._mp_close()
+        self.console.print("  ⋅ выбор модели отменён", style=self.theme.muted, markup=False)
+
+    def _mp_close(self) -> None:
+        self.mp_active = False
+        self.mp_loading = False
+        self.mp_models = []
+        self.input.text = ""
+        self.app.invalidate()
+
     def _free_submit(self) -> None:
         txt = self.input.text.strip()
         self.input.text = ""
@@ -1106,13 +1299,15 @@ class _ReplApp:
         from prompt_toolkit.key_binding import KeyBindings
 
         kb = KeyBindings()
-        # Three input regimes, gated by filters so one key means different things:
-        #   normal   — typing a prompt (no question pending)
+        # Input regimes, gated by filters so one key means different things:
+        #   normal   — typing a prompt (no picker up)
         #   choosing — arrow-selecting an ask_user option
         #   freeing  — typing a free-text answer to an ask_user question
-        normal = Condition(lambda: not self.q_active)
+        #   modeling — filtering/selecting in the /model picker
+        normal = Condition(lambda: not self.q_active and not self.mp_active)
         choosing = Condition(lambda: self.q_active and not self.q_free)
         freeing = Condition(lambda: self.q_active and self.q_free)
+        modeling = Condition(lambda: self.mp_active)
 
         @kb.add("enter", filter=normal)
         def _(event) -> None:
@@ -1163,6 +1358,22 @@ class _ReplApp:
         def _(event) -> None:
             self._answer(None)
 
+        @kb.add("enter", filter=modeling)
+        def _(event) -> None:
+            self._mp_pick()
+
+        @kb.add("up", filter=modeling)
+        def _(event) -> None:
+            self._mp_move(-1)
+
+        @kb.add("down", filter=modeling)
+        def _(event) -> None:
+            self._mp_move(1)
+
+        @kb.add("escape", filter=modeling)
+        def _(event) -> None:
+            self._mp_cancel()
+
         @kb.add("s-tab", filter=normal)
         def _(event) -> None:
             self.state.mode = self._next_mode(self.state.mode)
@@ -1191,6 +1402,9 @@ class _ReplApp:
         self._spawn(self._dispatch(text))
 
     def _on_ctrl_c(self, event) -> None:
+        if self.mp_active:
+            self._mp_cancel()  # cancel the /model picker
+            return
         if self.q_active:
             self._answer(None)  # cancel the pending question
             return
@@ -1227,6 +1441,18 @@ class _ReplApp:
 
     async def _dispatch(self, text: str) -> None:
         if text.startswith("/"):
+            parts = text.split()
+            # /model with no id (or `refresh`) → the inline filterable picker,
+            # driven inside this Application. /model <id> still sets directly
+            # via the shared slash handler below.
+            if (
+                parts
+                and parts[0].lower() == "/model"
+                and (len(parts) == 1 or parts[1].lower() == "refresh")
+            ):
+                self._echo_user(text)
+                self._open_model_picker(refresh=len(parts) > 1)
+                return
             await self._slash(text)
             return
         if self.busy:
