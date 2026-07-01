@@ -906,6 +906,7 @@ class _ReplApp:
         self.meta_expanded = False
         self.stream_chars = 0
         self.turn_start = 0.0
+        self.turn_elapsed = 0.0  # frozen duration once the turn finishes
         self._tick = 0
         # --- mid-turn ask_user picker state (answered inside THIS app; a nested
         # prompt_toolkit Application can't run under the live loop) ---
@@ -945,6 +946,16 @@ class _ReplApp:
                     if name.startswith(text):
                         yield Completion(name, start_position=-len(text))
 
+        # Input history is managed explicitly (see _history_up/_down): the
+        # Buffer's own FileHistory reloads its working-lines asynchronously and
+        # didn't resync a just-submitted command in this embedded Application, so
+        # Up recalled stale entries. We keep a plain oldest→newest list, persist
+        # to the same `repl_history` file for cross-run recall, and drive Up/Down
+        # ourselves. The TextArea therefore takes NO history.
+        self._hist_store = FileHistory(str(project.state_dir / "repl_history"))
+        self._hist: list[str] = list(reversed(list(self._hist_store.load_history_strings())))
+        self._hist_pos: int | None = None  # None → editing a fresh line
+        self._hist_draft = ""  # the in-progress line stashed when recall starts
         self.input = TextArea(
             prompt=FormattedText([("class:prompt", "❯ ")]),
             multiline=True,
@@ -952,7 +963,6 @@ class _ReplApp:
             height=Dimension(min=1, max=10),
             completer=_SlashCompleter(),
             complete_while_typing=True,
-            history=FileHistory(str(project.state_dir / "repl_history")),
             style="class:input",
         )
         # While the /model picker is open, typing in the input box filters the
@@ -1080,10 +1090,15 @@ class _ReplApp:
         toggle works in both states because the block is visible in both."""
         from prompt_toolkit.formatted_text import FormattedText
 
-        elapsed = int(time.monotonic() - self.turn_start) if self.turn_start else 0
         approx = self.stream_chars // 4
         tools = [t for k, t in self.meta_events if k == "tool"]
         modes = [t for k, t in self.meta_events if k == "mode"]
+        # Live while the turn runs; FROZEN once done (else every idle re-render
+        # recomputes now - turn_start and the "done" line keeps ticking up).
+        if self.busy:
+            elapsed = int(time.monotonic() - self.turn_start) if self.turn_start else 0
+        else:
+            elapsed = int(self.turn_elapsed)
         label = f" ⏳ working{'.' * (1 + (self._tick % 3))}" if self.busy else " ✓ done"
         head = f"{label} · ≈{approx} tok · {len(tools)} tool(s) · {elapsed}s"
         hint = "  (Ctrl+O свернуть)" if self.meta_expanded else "  (Ctrl+O раскрыть)"
@@ -1327,14 +1342,11 @@ class _ReplApp:
 
         @kb.add("up", filter=normal)
         def _(event) -> None:
-            # Smart: history-backward when on the first line, else cursor up.
-            # `go_to_start_of_line_if_history_changes=False` leaves the cursor at
-            # the END of the recalled command (not the start).
-            self.input.buffer.auto_up(count=1, go_to_start_of_line_if_history_changes=False)
+            self._history_up()
 
         @kb.add("down", filter=normal)
         def _(event) -> None:
-            self.input.buffer.auto_down(count=1, go_to_start_of_line_if_history_changes=False)
+            self._history_down()
 
         @kb.add("up", filter=choosing)
         def _(event) -> None:
@@ -1395,11 +1407,64 @@ class _ReplApp:
         return kb
 
     def _on_enter(self) -> None:
-        text = self.input.text.strip()
+        raw = self.input.text
+        text = raw.strip()
         self.input.text = ""
         if not text:
+            self._hist_pos = None
             return  # ignore empty input
+        self._record_history(raw)
         self._spawn(self._dispatch(text))
+
+    # --- input history (explicit; the Buffer's async FileHistory didn't resync
+    # a just-submitted command in this embedded Application) ---
+
+    def _record_history(self, text: str) -> None:
+        """Append a submitted command to the in-memory history and persist it to
+        the shared `repl_history` file. Skips a consecutive duplicate. Resets the
+        recall cursor so the next Up starts from the newest entry."""
+        text = text.rstrip("\n")
+        if text and (not self._hist or self._hist[-1] != text):
+            self._hist.append(text)
+            import contextlib
+
+            with contextlib.suppress(Exception):
+                self._hist_store.store_string(text)  # cross-run persistence
+        self._hist_pos = None
+
+    def _set_input(self, text: str) -> None:
+        self.input.text = text
+        self.input.buffer.cursor_position = len(text)  # cursor at end of recall
+
+    def _history_up(self) -> None:
+        # Multiline: move the cursor up within the text unless already on the
+        # first row — only then recall an older command.
+        doc = self.input.buffer.document
+        if doc.cursor_position_row > 0:
+            self.input.buffer.cursor_up()
+            return
+        if not self._hist:
+            return
+        if self._hist_pos is None:  # starting recall — stash the draft line
+            self._hist_draft = self.input.text
+            self._hist_pos = len(self._hist)
+        if self._hist_pos > 0:
+            self._hist_pos -= 1
+            self._set_input(self._hist[self._hist_pos])
+
+    def _history_down(self) -> None:
+        doc = self.input.buffer.document
+        if doc.cursor_position_row < doc.line_count - 1:
+            self.input.buffer.cursor_down()
+            return
+        if self._hist_pos is None:
+            return
+        self._hist_pos += 1
+        if self._hist_pos >= len(self._hist):  # past the newest → restore draft
+            self._hist_pos = None
+            self._set_input(self._hist_draft)
+        else:
+            self._set_input(self._hist[self._hist_pos])
 
     def _on_ctrl_c(self, event) -> None:
         if self.mp_active:
@@ -1510,6 +1575,7 @@ class _ReplApp:
                 if getattr(result, "stopped_reason", "") == "cancelled":
                     self.console.print("  ⋅ cancelled", style=self.theme.muted, markup=False)
                 self.console.print()  # trailing blank after the streamed answer
+                self.turn_elapsed = time.monotonic() - self.turn_start  # freeze the timer
                 _update_state_after_turn(self.state, result)
                 if self.queue:
                     text = self.queue.popleft()

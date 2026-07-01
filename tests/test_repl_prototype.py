@@ -173,6 +173,21 @@ def test_meta_fragments_working_idle_and_expand_in_both(tmp_path) -> None:
         store.close()
 
 
+def test_meta_timer_frozen_when_idle(tmp_path) -> None:
+    """Once a turn is done the elapsed seconds must be FROZEN, not recomputed
+    from turn_start on every idle re-render (the bug: "done · … · 294s")."""
+    app, store = _build_app(tmp_path)
+    try:
+        app._push_meta("stream", "x" * 20)
+        app.turn_elapsed = 42.0
+        app.turn_start = 100.0  # a live compute would yield a huge, growing number
+        app.busy = False
+        text = "".join(f[1] for f in app._meta_fragments())
+        assert "done" in text and "42s" in text  # frozen duration, not now - turn_start
+    finally:
+        store.close()
+
+
 def test_picker_fragments_list_options_and_free_entry(tmp_path) -> None:
     app, store = _build_app(tmp_path)
     try:
@@ -228,6 +243,69 @@ def test_picker_enter_on_sentinel_switches_to_free_text(tmp_path) -> None:
         app._picker_enter()
         assert app.q_free is True  # now capturing a typed answer
         assert app.q_active is True  # still waiting
+    finally:
+        store.close()
+
+
+def test_on_enter_records_input_history(tmp_path) -> None:
+    """Submitting a command must append it to the input history so Up recalls
+    the just-typed command — not a stale entry from an earlier run."""
+    app, store = _build_app(tmp_path)
+    try:
+        app._spawn = lambda coro: coro.close()  # no event loop needed here
+        app.input.text = "реализуй планы один за другим"
+        app._on_enter()
+        assert app.input.text == ""  # box cleared after submit
+        assert app._hist[-1] == "реализуй планы один за другим"
+
+        app.input.text = "второй запрос"
+        app._on_enter()
+        assert app._hist[-1] == "второй запрос"  # newest is last → first Up recalls it
+        # Persisted for cross-run recall (a fresh store reads the same file).
+        from prompt_toolkit.history import FileHistory
+
+        reread = list(
+            FileHistory(str(app.project.state_dir / "repl_history")).load_history_strings()
+        )
+        assert "второй запрос" in reread
+    finally:
+        store.close()
+
+
+def test_history_up_down_recall_newest_first(tmp_path) -> None:
+    app, store = _build_app(tmp_path)
+    try:
+        app._hist = ["alpha one", "bravo two"]
+        app._hist_pos = None
+        app.input.text = "draft"  # in-progress line
+        app._history_up()
+        assert app.input.text == "bravo two"  # newest first
+        app._history_up()
+        assert app.input.text == "alpha one"
+        app._history_up()
+        assert app.input.text == "alpha one"  # clamps at the oldest
+        app._history_down()
+        assert app.input.text == "bravo two"
+        app._history_down()
+        assert app.input.text == "draft"  # past the newest → restore the draft
+    finally:
+        store.close()
+
+
+def test_on_enter_empty_input_is_ignored(tmp_path) -> None:
+    app, store = _build_app(tmp_path)
+    try:
+        spawned: list = []
+
+        def _fake_spawn(coro):
+            spawned.append(1)
+            coro.close()
+
+        app._spawn = _fake_spawn
+        app.input.text = "   "
+        app._on_enter()
+        assert spawned == []  # blank input dispatches nothing
+        assert app.input.text == ""
     finally:
         store.close()
 
