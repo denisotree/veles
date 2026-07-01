@@ -938,6 +938,12 @@ class _ReplApp:
         # running Application — a nested prompt_toolkit app can't run under the
         # live event loop).
         qtoken = set_question_prompter(lambda q, opts=None: self._ask(q, opts))
+        # Re-snapshot the context AFTER installing the prompter: the prompter is
+        # a ContextVar, and the executor runs each turn in a copy of _parent_ctx.
+        # The __init__ snapshot predates this set(), so without re-capturing here
+        # the turn thread would see the DEFAULT prompter and the in-app picker
+        # would never fire. (This scope still holds the active project.)
+        self._parent_ctx = contextvars.copy_context()
         # patch_stdout routes all writes (rich prints + streamed tokens, from
         # this thread or the executor) ABOVE the live input box, into the
         # terminal's own scrollback. raw=True is required so rich's ANSI colour
