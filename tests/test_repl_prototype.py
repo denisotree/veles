@@ -375,6 +375,26 @@ def test_on_enter_empty_input_is_ignored(tmp_path) -> None:
         store.close()
 
 
+def test_shift_enter_newline_remap_and_binding(tmp_path) -> None:
+    """Shift+Enter (CSI-u terminals) maps to the F24 carrier key, and the app
+    binds F24 to insert a newline — so Enter still submits, Shift+Enter breaks
+    a line where the terminal sends a distinct sequence."""
+    from prompt_toolkit.input import ansi_escape_sequences as aes
+    from prompt_toolkit.keys import Keys
+
+    from veles.cli.commands.repl import _enable_shift_enter_newline
+
+    _enable_shift_enter_newline()
+    assert aes.ANSI_SEQUENCES["\x1b[27;2;13~"] == Keys.F24  # xterm modifyOtherKeys
+    assert aes.ANSI_SEQUENCES["\x1b[13;2u"] == Keys.F24  # kitty CSI-u
+
+    app, store = _build_app(tmp_path)
+    try:
+        assert any(Keys.F24 in b.keys for b in app.app.key_bindings.bindings)
+    finally:
+        store.close()
+
+
 def test_filter_models_substring_case_insensitive() -> None:
     from veles.cli.commands.repl import _filter_models
 

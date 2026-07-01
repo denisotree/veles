@@ -98,6 +98,25 @@ _REPL_BEHAVIOUR_BLOCK = (
 )
 
 
+def _enable_shift_enter_newline() -> None:
+    """Best-effort Shift+Enter → newline in the inline input box.
+
+    Most terminals send plain CR for both Enter and Shift+Enter, and stock
+    prompt_toolkit even collapses the *distinct* modified sequences to `ControlM`
+    — so Shift+Enter is normally indistinguishable from Enter. Terminals in
+    CSI-u / modifyOtherKeys mode (kitty, WezTerm, Ghostty, iTerm2 with CSI-u)
+    DO send a distinct sequence; remap those to the spare `F24` key, which
+    `_ReplApp` binds to "insert newline". Plain CR still yields `ControlM`
+    (submit). Terminals that don't emit a distinct sequence are unaffected —
+    Alt/Option+Enter remains the portable newline there. Idempotent; the parser
+    builds its lookup per-instance so this must run before the app starts."""
+    from prompt_toolkit.input import ansi_escape_sequences as _aes
+    from prompt_toolkit.keys import Keys
+
+    for seq in ("\x1b[27;2;13~", "\x1b[13;2u"):  # xterm modifyOtherKeys, kitty CSI-u
+        _aes.ANSI_SEQUENCES[seq] = Keys.F24
+
+
 def _console():
     from rich.console import Console
 
@@ -886,6 +905,8 @@ class _ReplApp:
 
         from veles.core.modes import next_mode
 
+        _enable_shift_enter_newline()  # Shift+Enter → newline where the terminal allows
+
         self.args = args
         self.project = project
         self.state = state
@@ -1395,6 +1416,10 @@ class _ReplApp:
             self._free_submit()
 
         @kb.add("escape", "enter", filter=normal)  # Alt/Option+Enter → newline
+        def _(event) -> None:
+            self.input.buffer.insert_text("\n")
+
+        @kb.add("f24", filter=normal)  # Shift+Enter (CSI-u terminals) → newline
         def _(event) -> None:
             self.input.buffer.insert_text("\n")
 
