@@ -561,9 +561,6 @@ def _make_prompt_session(project: Project, registry, state):
                 if name.startswith(text):
                     yield Completion(name, start_position=-len(text))
 
-    def _toolbar():
-        return f" {_status_line(state)} · Shift+Tab mode · /help · Ctrl+D exit "
-
     kb = KeyBindings()
 
     @kb.add("s-tab")
@@ -571,13 +568,15 @@ def _make_prompt_session(project: Project, registry, state):
         state.mode = next_mode(state.mode)  # type: ignore[assignment]
         event.app.invalidate()
 
+    # No bottom_toolbar: it only renders while the prompt waits (vanishes on
+    # Enter) and would double the status we print into the scrollback after
+    # each turn. The status line above the prompt is the single source.
     hist_path = project.state_dir / "repl_history"
     return PromptSession(
         history=FileHistory(str(hist_path)),
         completer=_SlashCompleter(),
         complete_while_typing=True,
         key_bindings=kb,
-        bottom_toolbar=_toolbar,
     )
 
 
