@@ -116,18 +116,16 @@ def _fmt_tok(n: int) -> str:
     return f"{n // 1_000_000}M"
 
 
-def _status_line(state) -> str:
-    """The same footer info the Textual `veles tui` shows — mode, session,
-    provider/model, tokens, context %, cache, insights, queue — as plain text
-    (mirrors `tui.widgets.status_bar` chip-for-chip)."""
-    from veles.core.model_naming import strip_provider_prefix
+def _settled_status(state) -> str:
+    """The quiet bottom bar of the inline app: current mode + settled token /
+    cache stats ONLY. It changes after a turn completes (never mid-generation),
+    so it stays still while the answer streams; the live "working…" HUD with the
+    per-request counters lives in the generation body instead. Provider/model,
+    session id and insights are deliberately dropped here (they're in the
+    startup banner and `/status`) — the bar is meant to be quiet."""
     from veles.core.model_windows import context_window_for
 
-    parts = [
-        f"[{state.mode}]",
-        f"session {state.session_id or 'new'}",
-        f"{state.provider_name}/{strip_provider_prefix(state.model)}",
-    ]
+    parts = [f"[{state.mode}]"]
     if state.tokens_in or state.tokens_out:
         parts.append(f"tok {_fmt_tok(state.tokens_in)}/{_fmt_tok(state.tokens_out)}")
     occupied = state.last_prompt_tokens or state.last_turn_total_tokens
@@ -137,10 +135,6 @@ def _status_line(state) -> str:
         parts.append(f"ctx {_fmt_tok(occupied)}/{_fmt_tok(limit)} ({pct}%)")
     if state.last_turn_cache_read:
         parts.append(f"cache {_fmt_tok(state.last_turn_cache_read)}")
-    if state.insight_candidates:
-        parts.append(f"{len(state.insight_candidates)} insight(s)")
-    if state.queue:
-        parts.append(f"queue {len(state.queue)}")
     return " · ".join(parts)
 
 
@@ -291,16 +285,22 @@ def _build_runtime(args: argparse.Namespace, project: Project):
     return state, factory, store
 
 
-def _make_turn_callbacks(console, theme, errors: list[str]):
+def _make_turn_callbacks(console, theme, errors: list[str], on_meta=None):
     """Build (post, on_text, on_event) for a `ModeContext`, plus a holder for
     the final `RunResult`.
 
     These **stream by block**: answer tokens accumulate in a buffer, and each
     completed Markdown block (paragraph, list, table, fenced code) is rendered
     formatted as soon as its terminating blank line arrives — progressive AND
-    formatted. `flush()` renders the trailing block at end of turn. Dim mode
-    lines print as they arrive. Under the Application's `patch_stdout`, writes
-    from the executor thread appear above the live input box.
+    formatted. `flush()` renders the trailing block at end of turn. Under the
+    Application's `patch_stdout`, writes from the executor thread appear above
+    the live input box.
+
+    `on_meta(kind, text)` (optional) is the live-generation HUD sink: it
+    receives ``("stream", chunk)`` for every answer chunk (so the app can show a
+    running token estimate), ``("mode", text)`` on a mode switch, and
+    ``("tool", text)`` on each tool call. When it's None (the fallback simple
+    loop) mode switches print inline instead.
 
     Returns ``(post, on_text, on_event, holder, flush)``.
     """
@@ -310,6 +310,8 @@ def _make_turn_callbacks(console, theme, errors: list[str]):
     buf = [""]  # mutable string cell shared across chunks
 
     def _emit(chunk: str) -> None:
+        if on_meta is not None:
+            on_meta("stream", chunk)
         buf[0] += chunk
         blocks, buf[0] = _split_blocks(buf[0])
         for block in blocks:
@@ -325,7 +327,12 @@ def _make_turn_callbacks(console, theme, errors: list[str]):
         if isinstance(msg, TurnDone):
             holder["result"] = msg.result
         elif isinstance(msg, SystemLine):
-            console.print(f"  ⋅ {msg.text}", style=theme.muted, markup=False)
+            # A mode switch etc. — into the live meta HUD, or inline as a dim
+            # line when there's no HUD (fallback loop).
+            if on_meta is not None:
+                on_meta("mode", msg.text)
+            else:
+                console.print(f"  ⋅ {msg.text}", style=theme.muted, markup=False)
         elif isinstance(msg, ChatDelta):
             _emit(msg.text)
         elif isinstance(msg, AgentError):
@@ -336,13 +343,17 @@ def _make_turn_callbacks(console, theme, errors: list[str]):
         _emit(text)
 
     def on_event(event) -> None:
+        if getattr(event, "type", "") != "tool_call":
+            return
+        name = getattr(event, "name", "")
+        args = getattr(event, "arguments", {}) or {}
+        if on_meta is not None:
+            label = f"{name} {args.get('path', '')}".strip()
+            on_meta("tool", label)
         # Preview file edits as a coloured diff, in order with the answer text.
-        if getattr(event, "type", "") == "tool_call" and getattr(event, "name", "") in (
-            "edit_file",
-            "write_file",
-        ):
+        if name in ("edit_file", "write_file"):
             flush()  # render any pending answer text first, so ordering holds
-            _render_edit_diff(console, theme, event.name, getattr(event, "arguments", {}) or {})
+            _render_edit_diff(console, theme, name, args)
 
     return post, on_text, on_event, holder, flush
 
@@ -453,14 +464,11 @@ def _update_state_after_turn(state, result) -> None:
 
 
 def _run_mode_turn(state, project, factory, line: str, console, errors: list[str], theme):
-    """Drive one user turn through the active mode's FSM. The answer streams
-    block-by-block; a status bar stays pinned at the bottom for the whole turn
-    (rich.Live) — output blocks render above it, so the status is visible during
-    generation, not just while the prompt waits."""
-    from rich.live import Live
-    from rich.spinner import Spinner
-    from rich.text import Text
-
+    """Drive one user turn through the active mode's FSM (fallback simple loop).
+    The answer streams block-by-block straight to stdout; the settled status bar
+    is the prompt's bottom-toolbar between turns. No pinned-during-generation bar
+    here — rich.Live can't pin over output taller than the screen without
+    stranding content, so that job belongs to the inline Application (default)."""
     from veles.core.modes import ModeContext, get_mode
 
     post, on_text, on_event, holder, flush = _make_turn_callbacks(console, theme, errors)
@@ -472,25 +480,12 @@ def _run_mode_turn(state, project, factory, line: str, console, errors: list[str
         on_text=on_text,
         on_event=on_event,
     )
-    # Pinned bottom status for the duration of the turn. rich prints the streamed
-    # blocks ABOVE the live region, so the bar never scrolls away; transient so
-    # it's removed on completion and the between-turns bottom-toolbar takes over.
-    bar = Spinner(
-        "dots",
-        text=Text(f" {_status_line(state)} · Esc/Ctrl+C to stop", style=theme.muted),
-        style=theme.accent,
-    )
-    global _ACTIVE_LIVE
     try:
-        with Live(bar, console=console, transient=True, refresh_per_second=10) as live:
-            _ACTIVE_LIVE = live
-            try:
-                get_mode(state.mode).run_turn(line, ctx)
-            finally:
-                _ACTIVE_LIVE = None
-                flush()  # render the trailing block above the bar
+        get_mode(state.mode).run_turn(line, ctx)
     except KeyboardInterrupt:
         console.print("\n  ⋅ interrupted", style=theme.muted, markup=False)
+    finally:
+        flush()  # render the trailing block
     console.print()  # spacing after the answer
     return holder.get("result")
 
@@ -608,7 +603,7 @@ def _make_prompt_session(project: Project, registry, state):
                     yield Completion(name, start_position=-len(text))
 
     def _toolbar():
-        return f" {_status_line(state)} · Shift+Tab mode · /help · Ctrl+D exit "
+        return f" {_settled_status(state)} · Shift+Tab mode · /help · Ctrl+D exit "
 
     kb = KeyBindings()
 
@@ -815,12 +810,16 @@ class _ReplApp:
     native scroll / selection / copy are preserved.
     """
 
+    # The final picker item — selecting it switches to free-text entry.
+    _FREE_LABEL = "✎ свой вариант…"
+
     def __init__(self, args, project, state, factory, store, registry, console, theme, errors):
         from prompt_toolkit.application import Application
         from prompt_toolkit.completion import Completer, Completion
+        from prompt_toolkit.filters import Condition
         from prompt_toolkit.formatted_text import FormattedText
         from prompt_toolkit.history import FileHistory
-        from prompt_toolkit.layout import HSplit, Layout, Window
+        from prompt_toolkit.layout import ConditionalContainer, HSplit, Layout, Window
         from prompt_toolkit.layout.controls import FormattedTextControl
         from prompt_toolkit.layout.dimension import Dimension
         from prompt_toolkit.styles import Style
@@ -843,6 +842,21 @@ class _ReplApp:
         self._last_ctrl_c = 0.0
         self._next_mode = next_mode
         self._tasks: set = set()  # keep strong refs so tasks aren't GC'd mid-flight
+        # --- live-generation meta HUD state (reset per turn) ---
+        self.meta_events: list[tuple[str, str]] = []  # ("mode"|"tool", text)
+        self.meta_expanded = False
+        self.stream_chars = 0
+        self.turn_start = 0.0
+        self._tick = 0
+        # --- mid-turn ask_user picker state (answered inside THIS app; a nested
+        # prompt_toolkit Application can't run under the live loop) ---
+        self.q_active = False
+        self.q_free = False
+        self.q_question = ""
+        self.q_options: list[str] = []
+        self.q_sel = 0
+        self.q_answer: str | None = None
+        self.q_event = None
         # Capture the caller's ContextVars NOW (constructed inside the CLI's
         # `set_active_project` scope) so background turns can re-enter them —
         # `run_in_executor` does not copy context, and without the active
@@ -871,15 +885,39 @@ class _ReplApp:
             style="class:input",
         )
         frame = Frame(self.input)
+        # Live "working…" HUD — visible only while a turn runs and no question is
+        # pending. dont_extend_height so it's one line collapsed, a few expanded.
+        meta = ConditionalContainer(
+            Window(
+                FormattedTextControl(self._meta_fragments),
+                dont_extend_height=True,
+                style="class:meta",
+            ),
+            filter=Condition(lambda: self.busy and not self.q_active),
+        )
+        # Mid-turn question picker — replaces the HUD while the agent asks.
+        picker = ConditionalContainer(
+            Window(
+                FormattedTextControl(self._picker_fragments),
+                dont_extend_height=True,
+                style="class:picker",
+            ),
+            filter=Condition(lambda: self.q_active),
+        )
         status = Window(
             FormattedTextControl(self._status_fragments), height=1, style="class:status"
         )
-        root = HSplit([frame, status])
+        root = HSplit([meta, picker, frame, status])
         style = Style.from_dict(
             {
                 "frame.border": theme.border,
                 "prompt": f"bold {theme.accent}",
                 "status": theme.muted,
+                "meta": theme.accent,
+                "meta.dim": theme.muted,
+                "picker": "",  # normal item — inherit the terminal foreground
+                "picker.sel": theme.pt_selected,
+                "picker.dim": theme.pt_hint,
             }
         )
         self.app = Application(
@@ -894,55 +932,240 @@ class _ReplApp:
     def run(self) -> None:
         from prompt_toolkit.patch_stdout import patch_stdout
 
+        from veles.core.user_prompt import reset_question_prompter, set_question_prompter
+
+        # Route the agent's `ask_user` to the in-app picker (answered inside this
+        # running Application — a nested prompt_toolkit app can't run under the
+        # live event loop).
+        qtoken = set_question_prompter(lambda q, opts=None: self._ask(q, opts))
         # patch_stdout routes all writes (rich prints + streamed tokens, from
         # this thread or the executor) ABOVE the live input box, into the
         # terminal's own scrollback. raw=True is required so rich's ANSI colour
         # sequences pass through instead of being escaped (shown as literal
         # `\x1b[...m`).
-        with patch_stdout(raw=True):
-            self.app.run()
+        try:
+            with patch_stdout(raw=True):
+                self.app.run()
+        finally:
+            reset_question_prompter(qtoken)
 
     def _spawn(self, coro) -> None:
         task = asyncio.ensure_future(coro)
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
+    def _invalidate_threadsafe(self) -> None:
+        """Ask the app to redraw. `Application.invalidate` schedules the redraw
+        on the loop, so it's safe to call from the executor thread (streaming
+        callbacks) as well as the loop thread."""
+        import contextlib
+
+        with contextlib.suppress(Exception):
+            self.app.invalidate()
+
     def _status_fragments(self):
-        flag = "working… · " if self.busy else ""
+        # The quiet bottom bar: settled mode + tokens + cache ONLY (no live
+        # churn — the working HUD carries the per-request counters).
         return [
             (
                 "class:status",
-                f" {flag}{_status_line(self.state)} · Shift+Tab mode · /help · Ctrl+D exit ",
+                f" {_settled_status(self.state)} · Shift+Tab mode · /help · "
+                "Ctrl+O meta · Ctrl+D exit ",
             )
         ]
 
+    def _meta_fragments(self):
+        """The live "working…" HUD shown in the app region during a turn:
+        elapsed, an approximate output-token count (chars/4 — providers only
+        report exact usage in the final chunk), and tool/mode-switch activity.
+        Collapsed by default; Ctrl+O expands the event list."""
+        from prompt_toolkit.formatted_text import FormattedText
+
+        elapsed = int(time.monotonic() - self.turn_start) if self.turn_start else 0
+        approx = self.stream_chars // 4
+        dots = "." * (1 + (self._tick % 3))
+        tools = [t for k, t in self.meta_events if k == "tool"]
+        modes = [t for k, t in self.meta_events if k == "mode"]
+        head = f" ⏳ working{dots} · ≈{approx} tok · {len(tools)} tool(s) · {elapsed}s"
+        hint = "  (Ctrl+O свернуть)" if self.meta_expanded else "  (Ctrl+O раскрыть)"
+        frags: list[tuple[str, str]] = [("class:meta", head + hint + "\n")]
+        if self.meta_expanded:
+            for t in modes:
+                frags.append(("class:meta.dim", f"     ↳ {t}\n"))
+            for t in tools[-10:]:
+                frags.append(("class:meta.dim", f"     ⚒ {t}\n"))
+        return FormattedText(frags)
+
+    def _picker_fragments(self):
+        """The mid-turn ask_user picker rendered in the app region."""
+        from prompt_toolkit.formatted_text import FormattedText
+
+        frags: list[tuple[str, str]] = [("class:picker", f" {self.q_question}\n")]
+        if self.q_free:
+            frags.append(("class:picker.dim", "  введите свой вариант ниже — Enter отправит\n"))
+            return FormattedText(frags)
+        items = [*self.q_options, self._FREE_LABEL]
+        for i, label in enumerate(items):
+            sel = i == self.q_sel
+            marker = "❯" if sel else " "
+            frags.append(("class:picker.sel" if sel else "class:picker", f"  {marker} {label}\n"))
+        frags.append(("class:picker.dim", "  ↑↓ выбор · Enter · Esc отмена\n"))
+        return FormattedText(frags)
+
+    def _push_meta(self, kind: str, text: str) -> None:
+        """Meta sink for the turn callbacks (called from the executor thread)."""
+        if kind == "stream":
+            self.stream_chars += len(text)
+        else:
+            self.meta_events.append((kind, text))
+        self._invalidate_threadsafe()
+
+    async def _tick_meta(self) -> None:
+        """Animate the HUD's spinner/elapsed while a turn runs."""
+        while self.busy:
+            self._tick += 1
+            self.app.invalidate()
+            await asyncio.sleep(0.3)
+
+    def _freeze_meta(self) -> None:
+        """Freeze the turn's meta into scrollback in its current (collapsed /
+        expanded) form — the live HUD region is transient, so this is what
+        survives in the terminal's history."""
+        tools = [t for k, t in self.meta_events if k == "tool"]
+        modes = [t for k, t in self.meta_events if k == "mode"]
+        if not tools and not modes and not self.stream_chars:
+            return
+        approx = self.stream_chars // 4
+        elapsed = int(time.monotonic() - self.turn_start) if self.turn_start else 0
+        self.console.print(
+            f"  ⋅ ≈{approx} tok · {len(tools)} tool(s) · {elapsed}s",
+            style=self.theme.muted,
+            markup=False,
+        )
+        if self.meta_expanded:
+            for t in modes:
+                self.console.print(f"     ↳ {t}", style=self.theme.muted, markup=False)
+            for t in tools:
+                self.console.print(f"     ⚒ {t}", style=self.theme.muted, markup=False)
+
+    # --- mid-turn ask_user picker (answered inside this running app) ---
+
+    def _ask(self, question: str, options):
+        """Question prompter installed for the agent's `ask_user`. Runs in the
+        executor thread: it publishes the question, wakes the UI, then blocks on
+        an Event until a key handler (loop thread) supplies the answer. Returns
+        None with no TTY so headless runs never block."""
+        import threading
+
+        if not sys.stdin.isatty():
+            return None
+        self.q_question = question
+        self.q_options = list(options) if options else []
+        self.q_sel = 0
+        self.q_free = not self.q_options  # no options → straight to free text
+        self.q_answer = None
+        self.q_event = threading.Event()
+        self.q_active = True
+        self._invalidate_threadsafe()
+        self.q_event.wait()  # blocks the executor thread, not the loop
+        return self.q_answer
+
+    def _answer(self, ans) -> None:
+        ev = self.q_event
+        question = self.q_question
+        self.q_answer = ans
+        self.q_active = False
+        self.q_free = False
+        self.q_event = None
+        if ans is not None:
+            self.console.print(f"  ⋅ {question} → {ans}", style=self.theme.muted, markup=False)
+        self.app.invalidate()
+        if ev is not None:
+            ev.set()
+
+    def _picker_enter(self) -> None:
+        if self.q_sel >= len(self.q_options):  # the free-text sentinel row
+            self.q_free = True
+            self.input.text = ""
+            self.app.invalidate()
+            return
+        self._answer(self.q_options[self.q_sel])
+
+    def _free_submit(self) -> None:
+        txt = self.input.text.strip()
+        self.input.text = ""
+        self._answer(txt or None)
+
     def _make_keys(self):
+        from prompt_toolkit.filters import Condition
         from prompt_toolkit.key_binding import KeyBindings
 
         kb = KeyBindings()
+        # Three input regimes, gated by filters so one key means different things:
+        #   normal   — typing a prompt (no question pending)
+        #   choosing — arrow-selecting an ask_user option
+        #   freeing  — typing a free-text answer to an ask_user question
+        normal = Condition(lambda: not self.q_active)
+        choosing = Condition(lambda: self.q_active and not self.q_free)
+        freeing = Condition(lambda: self.q_active and self.q_free)
 
-        @kb.add("enter")
+        @kb.add("enter", filter=normal)
         def _(event) -> None:
             self._on_enter()
 
-        @kb.add("escape", "enter")  # Alt/Option+Enter inserts a newline
+        @kb.add("enter", filter=choosing)
+        def _(event) -> None:
+            self._picker_enter()
+
+        @kb.add("enter", filter=freeing)
+        def _(event) -> None:
+            self._free_submit()
+
+        @kb.add("escape", "enter", filter=normal)  # Alt/Option+Enter → newline
         def _(event) -> None:
             self.input.buffer.insert_text("\n")
 
-        @kb.add("up")
+        @kb.add("up", filter=normal)
         def _(event) -> None:
             # Smart: history-backward when on the first line, else cursor up.
             # `go_to_start_of_line_if_history_changes=False` leaves the cursor at
             # the END of the recalled command (not the start).
             self.input.buffer.auto_up(count=1, go_to_start_of_line_if_history_changes=False)
 
-        @kb.add("down")
+        @kb.add("down", filter=normal)
         def _(event) -> None:
             self.input.buffer.auto_down(count=1, go_to_start_of_line_if_history_changes=False)
 
-        @kb.add("s-tab")
+        @kb.add("up", filter=choosing)
+        def _(event) -> None:
+            self.q_sel = (self.q_sel - 1) % (len(self.q_options) + 1)
+            self.app.invalidate()
+
+        @kb.add("down", filter=choosing)
+        def _(event) -> None:
+            self.q_sel = (self.q_sel + 1) % (len(self.q_options) + 1)
+            self.app.invalidate()
+
+        for _i in range(9):
+
+            @kb.add(str(_i + 1), filter=choosing)
+            def _(event, idx=_i) -> None:
+                if idx <= len(self.q_options):
+                    self.q_sel = idx
+                    self.app.invalidate()
+
+        @kb.add("escape", filter=Condition(lambda: self.q_active))
+        def _(event) -> None:
+            self._answer(None)
+
+        @kb.add("s-tab", filter=normal)
         def _(event) -> None:
             self.state.mode = self._next_mode(self.state.mode)
+            self.app.invalidate()
+
+        @kb.add("c-o")
+        def _(event) -> None:
+            self.meta_expanded = not self.meta_expanded
             self.app.invalidate()
 
         @kb.add("c-d")
@@ -963,6 +1186,9 @@ class _ReplApp:
         self._spawn(self._dispatch(text))
 
     def _on_ctrl_c(self, event) -> None:
+        if self.q_active:
+            self._answer(None)  # cancel the pending question
+            return
         if self.busy and self.cancel_token is not None:
             self.cancel_token.cancel()  # cooperative cancel of the running turn
             return
@@ -1026,10 +1252,16 @@ class _ReplApp:
         from veles.core.cancel import CancelToken
 
         self.busy = True
+        self._tick = 0
+        self._spawn(self._tick_meta())  # animate the working HUD while busy
         self.app.invalidate()
         loop = asyncio.get_event_loop()
         try:
             while True:
+                # Reset the live meta HUD for this turn.
+                self.meta_events = []
+                self.stream_chars = 0
+                self.turn_start = time.monotonic()
                 self._echo_user(text)
                 self.cancel_token = CancelToken()
                 # A fresh copy of the captured parent context per turn (a Context
@@ -1047,6 +1279,7 @@ class _ReplApp:
                 if getattr(result, "stopped_reason", "") == "cancelled":
                     self.console.print("  ⋅ cancelled", style=self.theme.muted, markup=False)
                 self.console.print()  # trailing blank after the streamed answer
+                self._freeze_meta()  # freeze the HUD into scrollback
                 _update_state_after_turn(self.state, result)
                 if self.queue:
                     text = self.queue.popleft()
@@ -1066,7 +1299,7 @@ class _ReplApp:
 
         tok = set_cancel_token(self.cancel_token)
         post, on_text, on_event, holder, flush = _make_turn_callbacks(
-            self.console, self.theme, self.errors
+            self.console, self.theme, self.errors, on_meta=self._push_meta
         )
         try:
             ctx = ModeContext(
@@ -1098,15 +1331,16 @@ def cmd_repl(args: argparse.Namespace, project: Project) -> int:
 
     try:
         _banner(console, args.provider, args.model, state.mode, theme)
-        # Default: the reliable blocking-prompt loop — rich formatting, block
-        # streaming and native scroll/select/copy all work, no persistent-box
-        # rendering quirks. The inline Application (bordered box + live input +
-        # queue-during-generation) is opt-in via VELES_REPL_APP=1 while its
-        # prompt_toolkit layout edges are ironed out.
-        if os.environ.get("VELES_REPL_APP"):
-            _ReplApp(args, project, state, factory, store, registry, console, theme, errors).run()
-        else:
+        # Default: the inline Application — a settled bottom status bar (mode +
+        # token/cache stats), a live "working…" HUD during generation (Ctrl+O
+        # expands tool/mode activity), and the in-app ask_user picker. It pins
+        # the status bar correctly over long scrolling output (rich.Live can't).
+        # The blocking-prompt loop is a fallback via VELES_REPL_SIMPLE=1 for
+        # terminals where the Application misbehaves.
+        if os.environ.get("VELES_REPL_SIMPLE"):
             _run_simple_repl(args, project, state, factory, store, registry, console, theme, errors)
+        else:
+            _ReplApp(args, project, state, factory, store, registry, console, theme, errors).run()
     finally:
         store.close()
     return 0

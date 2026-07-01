@@ -9,6 +9,7 @@ manual smoke run, not unit-driven here.
 from __future__ import annotations
 
 import argparse
+import typing
 
 import pytest
 
@@ -63,8 +64,11 @@ def test_turn_callbacks_stream_and_capture_result(
     assert holder["result"] is rr
 
 
-def test_status_line_matches_tui_fields() -> None:
-    from veles.cli.commands.repl import _status_line
+def test_settled_status_shows_mode_tokens_cache_only() -> None:
+    """The quiet bottom bar: mode + settled token/cache stats ONLY. Session id
+    and provider/model are deliberately dropped (banner + /status carry those),
+    per the user's "bottom bar = mode + tokens + cache" split."""
+    from veles.cli.commands.repl import _settled_status
 
     state = _state()
     state.session_id = "sess1234"
@@ -72,13 +76,135 @@ def test_status_line_matches_tui_fields() -> None:
     state.tokens_out = 800
     state.last_prompt_tokens = 60000
     state.last_turn_cache_read = 42000
-    line = _status_line(state)
+    line = _settled_status(state)
     assert "[auto]" in line  # mode chip
-    assert "session sess1234" in line
-    assert "openrouter/m" in line  # provider/model
-    assert "tok 1k/800" in line
+    assert "tok 1k/800" in line  # settled token totals
     assert "ctx 60k/" in line and "%" in line  # context meter
     assert "cache 42k" in line  # cache-read chip
+    # Quiet bar — no session id, no provider/model churn.
+    assert "sess1234" not in line
+    assert "openrouter" not in line
+
+
+def test_turn_callbacks_route_meta_to_sink() -> None:
+    """With an on_meta sink, stream chunks / mode switches / tool calls flow to
+    the live HUD instead of printing inline."""
+    from veles.cli.commands.repl import _make_turn_callbacks, _resolve_theme
+    from veles.tui.messages import SystemLine
+
+    meta: list[tuple[str, str]] = []
+    theme = _resolve_theme(_state())
+    _post, on_text, on_event, _holder, _flush = _make_turn_callbacks(
+        _console(), theme, [], on_meta=lambda k, t: meta.append((k, t))
+    )
+    on_text("hello")  # → ("stream", "hello")
+    _post(SystemLine(text="[auto -> writing]"))  # → ("mode", ...)
+
+    class _Evt:
+        type = "tool_call"
+        name = "edit_file"
+        arguments: typing.ClassVar = {"path": "foo.py", "old_string": "a", "new_string": "b"}
+
+    on_event(_Evt())  # → ("tool", "edit_file foo.py")
+    kinds = {k for k, _ in meta}
+    assert {"stream", "mode", "tool"} <= kinds
+    assert ("mode", "[auto -> writing]") in meta
+    assert any(k == "tool" and "edit_file" in t and "foo.py" in t for k, t in meta)
+
+
+def _build_app(tmp_path):
+    from veles.cli.commands.repl import _console, _ReplApp, _resolve_theme
+
+    project, store = _project_and_store(tmp_path)
+    state = _state()
+    app = _ReplApp(
+        argparse.Namespace(),
+        project,
+        state,
+        lambda *_a, **_k: None,
+        store,
+        build_default_registry(project=project),
+        _console(),
+        _resolve_theme(state),
+        [],
+    )
+    return app, store
+
+
+def test_meta_fragments_show_working_and_expand(tmp_path) -> None:
+    app, store = _build_app(tmp_path)
+    try:
+        app.turn_start = 0.0  # falsy → elapsed renders as 0s
+        app._push_meta("stream", "x" * 40)  # ≈10 tok
+        app._push_meta("tool", "edit_file foo.py")
+        app._push_meta("mode", "[auto -> writing]")
+        text = "".join(f[1] for f in app._meta_fragments())
+        assert "working" in text and "1 tool(s)" in text and "≈10 tok" in text
+        assert "foo.py" not in text  # collapsed → no event list
+        app.meta_expanded = True
+        text2 = "".join(f[1] for f in app._meta_fragments())
+        assert "foo.py" in text2 and "auto -> writing" in text2
+    finally:
+        store.close()
+
+
+def test_picker_fragments_list_options_and_free_entry(tmp_path) -> None:
+    app, store = _build_app(tmp_path)
+    try:
+        app.q_active = True
+        app.q_question = "Apply the plan?"
+        app.q_options = ["Apply fully", "Exclude sources/"]
+        app.q_sel = 0
+        text = "".join(f[1] for f in app._picker_fragments())
+        assert "Apply the plan?" in text
+        assert "Apply fully" in text and "Exclude sources/" in text
+        assert app._FREE_LABEL in text  # free-text sentinel row present
+        app.q_free = True
+        assert "свой вариант" in "".join(f[1] for f in app._picker_fragments())
+    finally:
+        store.close()
+
+
+def test_ask_returns_none_without_tty(tmp_path, monkeypatch) -> None:
+    from veles.cli.commands import repl as repl_mod
+
+    app, store = _build_app(tmp_path)
+    try:
+        monkeypatch.setattr(repl_mod.sys.stdin, "isatty", lambda: False)
+        assert app._ask("pick?", ["a", "b"]) is None  # headless → never blocks
+    finally:
+        store.close()
+
+
+def test_picker_enter_selects_option_and_wakes_waiter(tmp_path) -> None:
+    import threading
+
+    app, store = _build_app(tmp_path)
+    try:
+        app.q_active = True
+        app.q_question = "q?"
+        app.q_options = ["a", "b"]
+        app.q_sel = 1
+        app.q_event = threading.Event()
+        app._picker_enter()  # picks "b"
+        assert app.q_answer == "b"
+        assert app.q_active is False
+        assert app.q_event is None  # cleared after answering
+    finally:
+        store.close()
+
+
+def test_picker_enter_on_sentinel_switches_to_free_text(tmp_path) -> None:
+    app, store = _build_app(tmp_path)
+    try:
+        app.q_active = True
+        app.q_options = ["a", "b"]
+        app.q_sel = 2  # the free-text sentinel (index == len(options))
+        app._picker_enter()
+        assert app.q_free is True  # now capturing a typed answer
+        assert app.q_active is True  # still waiting
+    finally:
+        store.close()
 
 
 def test_suspend_live_pauses_and_resumes_active_live() -> None:
