@@ -47,6 +47,7 @@ from veles.core.fenced_tools import (
     parse_tool_calls,
     render_tools_prompt,
 )
+from veles.core.history_repair import repair_tool_pairing
 from veles.core.memory import SessionStore
 from veles.core.modules import fire_hook
 from veles.core.provider import (
@@ -391,6 +392,13 @@ class Agent:
             # forcing there.)
             round_tools = None if force_answer else tools_for_provider
             force_answer = False
+
+            # Last-line consistency guard before the wire: compression /
+            # truncation / a resumed session / a provider translation quirk can
+            # split a tool_call from its result, which providers reject with
+            # "No tool output found for function call ...". Synthesize a
+            # placeholder for any unanswered call and drop any orphaned result.
+            history = repair_tool_pairing(history)
 
             response = self._request_completion(
                 history=history,

@@ -123,6 +123,7 @@ files = [
     "src/veles/core/provider_routing.py",
     "src/veles/core/secrets.py",
     "src/veles/core/goal.py",
+    "src/veles/core/history_repair.py",
     "src/veles/core/plan_artifact.py",
     "src/veles/core/approval_prompter.py",
 ]
