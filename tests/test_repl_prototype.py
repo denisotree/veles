@@ -81,6 +81,29 @@ def test_status_line_matches_tui_fields() -> None:
     assert "cache 42k" in line  # cache-read chip
 
 
+def test_suspend_live_pauses_and_resumes_active_live() -> None:
+    from veles.cli.commands import repl as repl_mod
+
+    class _FakeLive:
+        def __init__(self) -> None:
+            self.events: list[str] = []
+
+        def stop(self) -> None:
+            self.events.append("stop")
+
+        def start(self, refresh: bool = False) -> None:
+            self.events.append("start")
+
+    fake = _FakeLive()
+    repl_mod._ACTIVE_LIVE = fake
+    try:
+        with repl_mod._suspend_live():
+            assert fake.events == ["stop"]  # paused for the nested prompt
+        assert fake.events == ["stop", "start"]  # resumed after
+    finally:
+        repl_mod._ACTIVE_LIVE = None
+
+
 def test_ask_repl_skips_without_tty(monkeypatch) -> None:
     from veles.cli.commands import repl as repl_mod
 

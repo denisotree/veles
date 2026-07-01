@@ -34,6 +34,32 @@ from veles.core.project import Project
 # Window inside which a second Ctrl+C at the prompt is treated as exit.
 _CTRL_C_EXIT_WINDOW_S = 1.5
 
+# The rich.Live pinning the status bar during the active turn (or None). The
+# ask_user picker runs a prompt_toolkit Application mid-turn, which needs the
+# terminal — `_suspend_live` pauses this Live around it. Single-threaded loop,
+# so a module global is safe.
+_ACTIVE_LIVE = None
+
+
+def _suspend_live():
+    """Context manager that pauses the active status-bar Live so a nested
+    interactive prompt (the ask_user picker) can own the terminal, then resumes."""
+    import contextlib
+
+    @contextlib.contextmanager
+    def _cm():
+        live = _ACTIVE_LIVE
+        if live is not None:
+            live.stop()
+        try:
+            yield
+        finally:
+            if live is not None:
+                live.start(refresh=True)
+
+    return _cm()
+
+
 # Injected into the REPL's system prompt for normal auto/writing turns (NOT
 # goal mode, which drives its own one-step-per-turn phase prompts). Two levers:
 # persistence — the biggest reason a small model "gives up" after one or two
@@ -428,7 +454,13 @@ def _update_state_after_turn(state, result) -> None:
 
 def _run_mode_turn(state, project, factory, line: str, console, errors: list[str], theme):
     """Drive one user turn through the active mode's FSM. The answer streams
-    live via the callbacks; dim mode lines print as they arrive."""
+    block-by-block; a status bar stays pinned at the bottom for the whole turn
+    (rich.Live) — output blocks render above it, so the status is visible during
+    generation, not just while the prompt waits."""
+    from rich.live import Live
+    from rich.spinner import Spinner
+    from rich.text import Text
+
     from veles.core.modes import ModeContext, get_mode
 
     post, on_text, on_event, holder, flush = _make_turn_callbacks(console, theme, errors)
@@ -440,11 +472,25 @@ def _run_mode_turn(state, project, factory, line: str, console, errors: list[str
         on_text=on_text,
         on_event=on_event,
     )
+    # Pinned bottom status for the duration of the turn. rich prints the streamed
+    # blocks ABOVE the live region, so the bar never scrolls away; transient so
+    # it's removed on completion and the between-turns bottom-toolbar takes over.
+    bar = Spinner(
+        "dots",
+        text=Text(f" {_status_line(state)} · Esc/Ctrl+C to stop", style=theme.muted),
+        style=theme.accent,
+    )
+    global _ACTIVE_LIVE
     try:
-        get_mode(state.mode).run_turn(line, ctx)
+        with Live(bar, console=console, transient=True, refresh_per_second=10) as live:
+            _ACTIVE_LIVE = live
+            try:
+                get_mode(state.mode).run_turn(line, ctx)
+            finally:
+                _ACTIVE_LIVE = None
+                flush()  # render the trailing block above the bar
     except KeyboardInterrupt:
         console.print("\n  ⋅ interrupted", style=theme.muted, markup=False)
-    flush()  # render the trailing block
     console.print()  # spacing after the answer
     return holder.get("result")
 
@@ -669,10 +715,13 @@ def _ask_repl(console, theme, question: str, options: list[str] | None):
     interactive TTY so the agent proceeds on its best assumption."""
     if not sys.stdin.isatty():
         return None
-    if options:
-        return _choice_picker(theme, question, options)
-    console.print(f"\n[agent] {question}", style=theme.accent, markup=False)
-    return _free_text(theme)
+    # A turn's status-bar Live (if any) owns the terminal — pause it so the
+    # picker's prompt_toolkit Application can take over, then resume.
+    with _suspend_live():
+        if options:
+            return _choice_picker(theme, question, options)
+        console.print(f"\n[agent] {question}", style=theme.accent, markup=False)
+        return _free_text(theme)
 
 
 def _run_simple_repl(
