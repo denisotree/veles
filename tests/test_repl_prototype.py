@@ -71,12 +71,14 @@ def test_status_line_matches_tui_fields() -> None:
     state.tokens_in = 1500
     state.tokens_out = 800
     state.last_prompt_tokens = 60000
+    state.last_turn_cache_read = 42000
     line = _status_line(state)
     assert "[auto]" in line  # mode chip
     assert "session sess1234" in line
     assert "openrouter/m" in line  # provider/model
     assert "tok 1k/800" in line
     assert "ctx 60k/" in line and "%" in line  # context meter
+    assert "cache 42k" in line  # cache-read chip
 
 
 def test_ask_repl_skips_without_tty(monkeypatch) -> None:
@@ -143,7 +145,13 @@ def test_update_state_after_turn_carries_session_and_tokens() -> None:
         iterations=1,
         stopped_reason="completed",
         session_id="s9",
-        usage=UsageSnapshot(prompt_tokens=10, completion_tokens=5, total_tokens=15),
+        usage=UsageSnapshot(
+            prompt_tokens=10,
+            completion_tokens=5,
+            total_tokens=15,
+            cache_read_tokens=7,
+            last_prompt_tokens=12,
+        ),
     )
     _update_state_after_turn(state, rr)
     assert state.session_id == "s9"
@@ -151,6 +159,8 @@ def test_update_state_after_turn_carries_session_and_tokens() -> None:
     assert state.tokens_in == 10
     assert state.tokens_out == 5
     assert state.last_turn_total_tokens == 15
+    assert state.last_prompt_tokens == 12  # feeds the ctx chip
+    assert state.last_turn_cache_read == 7  # feeds the cache chip
 
 
 def test_update_state_after_turn_ignores_none() -> None:

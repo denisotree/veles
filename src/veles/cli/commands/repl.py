@@ -406,6 +406,14 @@ def _update_state_after_turn(state, result) -> None:
         state.tokens_in += getattr(usage, "prompt_tokens", 0) or 0
         state.tokens_out += getattr(usage, "completion_tokens", 0) or 0
         state.last_turn_total_tokens = getattr(usage, "total_tokens", 0) or 0
+        # Mirror the TUI (app.py): context occupancy = last request's prompt
+        # size; cache-read tokens drive the `cache` chip (M177/M178).
+        state.last_prompt_tokens = (
+            getattr(usage, "last_prompt_tokens", 0)
+            or getattr(usage, "prompt_tokens", 0)
+            or getattr(usage, "total_tokens", 0)
+        )
+        state.last_turn_cache_read = getattr(usage, "cache_read_tokens", 0)
 
 
 def _run_mode_turn(state, project, factory, line: str, console, errors: list[str], theme):
@@ -737,6 +745,10 @@ def _simple_repl_loop(
             console.rule(style=theme.border, characters="─")
             continue
         _update_state_after_turn(state, result)
+        # Print the status into the scrollback after each turn — the live
+        # bottom-toolbar only exists while the prompt is waiting for input, so
+        # without this the status would vanish the moment you press Enter.
+        console.print(f" {_status_line(state)}", style=theme.muted, markup=False)
         console.rule(style=theme.border, characters="─")
 
 
