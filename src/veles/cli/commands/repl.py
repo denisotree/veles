@@ -243,8 +243,14 @@ def _make_turn_callbacks(console, theme, errors: list[str]):
     def on_text(text: str) -> None:
         _emit(text)
 
-    def on_event(_event) -> None:
-        return None
+    def on_event(event) -> None:
+        # Preview file edits as a coloured diff, in order with the answer text.
+        if getattr(event, "type", "") == "tool_call" and getattr(event, "name", "") in (
+            "edit_file",
+            "write_file",
+        ):
+            flush()  # render any pending answer text first, so ordering holds
+            _render_edit_diff(console, theme, event.name, getattr(event, "arguments", {}) or {})
 
     return post, on_text, on_event, holder, flush
 
@@ -259,6 +265,46 @@ def _render_answer(console, text: str) -> None:
         console.print(Markdown(text))
     except Exception:
         console.print(text, markup=False)
+
+
+def _render_edit_diff(console, theme, name: str, arguments: dict) -> None:
+    """Show a coloured unified diff (red = removed, green = added) for a file
+    edit, in a code block. `edit_file` diffs its old_string → new_string;
+    `write_file` diffs the file's current content → the new content (read before
+    the write lands, since the tool-call event fires ahead of execution)."""
+    import difflib
+
+    from rich.syntax import Syntax
+
+    path = str(arguments.get("path", "?"))
+    if name == "edit_file":
+        old = str(arguments.get("old_string", ""))
+        new = str(arguments.get("new_string", ""))
+    else:  # write_file
+        new = str(arguments.get("content", ""))
+        old = ""
+        try:
+            from veles.core.path_guard import resolve_safe
+
+            p = resolve_safe(path)
+            if p.is_file():
+                old = p.read_text(encoding="utf-8")
+        except Exception:
+            old = ""
+
+    diff = "\n".join(
+        difflib.unified_diff(
+            old.splitlines(),
+            new.splitlines(),
+            fromfile=f"a/{path}",
+            tofile=f"b/{path}",
+            lineterm="",
+        )
+    )
+    if not diff.strip():
+        return
+    console.print(f"  ✎ {path}", style=theme.accent, markup=False)
+    console.print(Syntax(diff, "diff", background_color="default", word_wrap=True))
 
 
 def _split_blocks(buf: str) -> tuple[list[str], str]:

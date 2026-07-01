@@ -63,6 +63,21 @@ def test_turn_callbacks_stream_and_capture_result(
     assert holder["result"] is rr
 
 
+def test_render_edit_diff(capsys: pytest.CaptureFixture[str]) -> None:
+    from veles.cli.commands.repl import _render_edit_diff, _resolve_theme
+
+    _render_edit_diff(
+        _console(),
+        _resolve_theme(_state()),
+        "edit_file",
+        {"path": "foo.py", "old_string": "return x + 1", "new_string": "return x * 2"},
+    )
+    out = capsys.readouterr().out
+    assert "foo.py" in out
+    assert "return x + 1" in out  # removed line present
+    assert "return x * 2" in out  # added line present
+
+
 def test_split_blocks() -> None:
     from veles.cli.commands.repl import _split_blocks
 
