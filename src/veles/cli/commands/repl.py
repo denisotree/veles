@@ -38,8 +38,11 @@ _CTRL_C_EXIT_WINDOW_S = 1.5
 def _console():
     from rich.console import Console
 
-    # force_terminal so colours survive when piped; the REPL is interactive.
-    return Console()
+    # force_terminal so theme colours survive through prompt_toolkit's
+    # patch_stdout proxy (which doesn't report as a tty). Console has no cached
+    # file, so it writes to the *current* sys.stdout — i.e. the proxy while the
+    # Application runs, so background/streamed output lands above the input box.
+    return Console(force_terminal=True)
 
 
 def _fmt_ts(ts: float) -> str:
@@ -196,42 +199,41 @@ def _build_runtime(args: argparse.Namespace, project: Project):
     return state, factory, store
 
 
-def _make_turn_callbacks(state, errors: list[str]):
+def _make_turn_callbacks(console, theme, errors: list[str]):
     """Build (post, on_text, on_event) for a `ModeContext`, plus a holder for
-    the final `RunResult` and the accumulators for the dim system lines and the
-    answer text.
+    the final `RunResult`.
 
-    The turn is rendered *after* it completes (so the answer can be pretty-
-    printed as Markdown), so these callbacks accumulate instead of printing.
-    Modes never import Textual — they only call these — so the same FSM drives
-    the REPL.
+    These **stream live**: the answer is written token-by-token as the model
+    generates it, and dim mode lines print as they arrive. Under the
+    Application's `patch_stdout`, writes from the executor thread appear above
+    the live input box. Modes never import Textual — they only call these.
 
-    Returns ``(post, on_text, on_event, holder, sys_lines, answer)``.
+    Returns ``(post, on_text, on_event, holder)``.
     """
     from veles.tui.messages import AgentError, ChatDelta, SystemLine, TurnDone
 
     holder: dict[str, object] = {}
-    sys_lines: list[str] = []
-    answer: list[str] = []
 
     def post(msg) -> None:
         if isinstance(msg, TurnDone):
             holder["result"] = msg.result
         elif isinstance(msg, SystemLine):
-            sys_lines.append(msg.text)
+            console.print(f"  ⋅ {msg.text}", style=theme.muted, markup=False)
         elif isinstance(msg, ChatDelta):
-            answer.append(msg.text)
+            sys.stdout.write(msg.text)
+            sys.stdout.flush()
         elif isinstance(msg, AgentError):
             errors.append(str(msg.exc))
-            answer.append(f"\n\n**error:** {msg.exc}\n")
+            console.print(f"\nerror: {msg.exc}", style=theme.error, markup=False)
 
     def on_text(text: str) -> None:
-        answer.append(text)
+        sys.stdout.write(text)
+        sys.stdout.flush()
 
     def on_event(_event) -> None:
         return None
 
-    return post, on_text, on_event, holder, sys_lines, answer
+    return post, on_text, on_event, holder
 
 
 def _render_answer(console, text: str) -> None:
@@ -262,12 +264,11 @@ def _update_state_after_turn(state, result) -> None:
 
 
 def _run_mode_turn(state, project, factory, line: str, console, errors: list[str], theme):
-    """Drive one user turn through the active mode's FSM, then render the
-    answer as Markdown. Shows a spinner while the model works; dim mode lines
-    and the formatted answer print once the turn completes."""
+    """Drive one user turn through the active mode's FSM. The answer streams
+    live via the callbacks; dim mode lines print as they arrive."""
     from veles.core.modes import ModeContext, get_mode
 
-    post, on_text, on_event, holder, sys_lines, answer = _make_turn_callbacks(state, errors)
+    post, on_text, on_event, holder = _make_turn_callbacks(console, theme, errors)
     ctx = ModeContext(
         state=state,
         project=project,
@@ -276,24 +277,12 @@ def _run_mode_turn(state, project, factory, line: str, console, errors: list[str
         on_text=on_text,
         on_event=on_event,
     )
-    interrupted = False
     try:
-        with console.status(f"[{theme.accent}]working…[/]", spinner="dots"):
-            get_mode(state.mode).run_turn(line, ctx)
+        get_mode(state.mode).run_turn(line, ctx)
     except KeyboardInterrupt:
-        interrupted = True
-
-    for sl in sys_lines:
-        console.print(f"  ⋅ {sl}", style=theme.muted, markup=False)
-    text = "".join(answer).strip()
-    result = holder.get("result")
-    if not text and result is not None:
-        text = (getattr(result, "text", "") or "").strip()
-    if text:
-        _render_answer(console, text)
-    if interrupted:
-        console.print("  ⋅ interrupted", style=theme.muted, markup=False)
-    return result
+        console.print("\n  ⋅ interrupted", style=theme.muted, markup=False)
+    console.print()  # trailing newline after the streamed answer
+    return holder.get("result")
 
 
 def _pick_session(store, state, console) -> None:
@@ -565,7 +554,13 @@ class _ReplApp:
         )
 
     def run(self) -> None:
-        self.app.run()
+        from prompt_toolkit.patch_stdout import patch_stdout
+
+        # patch_stdout routes all writes (rich prints + streamed tokens, from
+        # this thread or the executor) ABOVE the live input box, into the
+        # terminal's own scrollback.
+        with patch_stdout():
+            self.app.run()
 
     def _spawn(self, coro) -> None:
         task = asyncio.ensure_future(coro)
@@ -656,16 +651,12 @@ class _ReplApp:
 
         await run_in_terminal(func)
 
-    async def _echo_user(self, text: str) -> None:
-        """Echo the user's request into the output/scrollback, visually marked
-        (accent `❯`) so it reads as the user's input, distinct from the agent's
-        answer below it."""
-
-        def _do() -> None:
-            self.console.print()
-            self.console.print(f"❯ {text}", style=f"bold {self.theme.accent}", markup=False)
-
-        await self._in_terminal(_do)
+    def _echo_user(self, text: str) -> None:
+        """Echo the request into the scrollback, accent-marked as user input
+        (distinct from the agent's streamed answer below it). Under
+        `patch_stdout` this lands above the live input box."""
+        self.console.print()
+        self.console.print(f"❯ {text}", style=f"bold {self.theme.accent}", markup=False)
 
     async def _dispatch(self, text: str) -> None:
         if text.startswith("/"):
@@ -673,16 +664,12 @@ class _ReplApp:
             return
         if self.busy:
             self.queue.append(text)
-            await self._in_terminal(
-                lambda t=text: self.console.print(
-                    f"  ⋅ queued: {t}", style=self.theme.muted, markup=False
-                )
-            )
+            self.console.print(f"  ⋅ queued: {text}", style=self.theme.muted, markup=False)
             return
         await self._run_chain(text)
 
     async def _slash(self, text: str) -> None:
-        await self._echo_user(text)
+        self._echo_user(text)
         box: dict = {}
 
         def _do() -> None:
@@ -690,6 +677,8 @@ class _ReplApp:
                 text, self.registry, self.state, self.project, self.store, self.console, self.errors
             )
 
+        # run_in_terminal: /sessions may read input (rich.Prompt.ask), which
+        # needs the terminal handed back from the app.
         await self._in_terminal(_do)
         should_quit, submit = box.get("res", (False, None))
         if should_quit:
@@ -705,25 +694,23 @@ class _ReplApp:
         loop = asyncio.get_event_loop()
         try:
             while True:
-                await self._echo_user(text)
+                self._echo_user(text)
                 self.cancel_token = CancelToken()
                 # A fresh copy of the captured parent context per turn (a Context
                 # can't be run concurrently); the executor runs the turn inside it
                 # so the active project / module registry / i18n reach the tools.
                 turn_ctx = self._parent_ctx.run(contextvars.copy_context)
                 try:
-                    sys_lines, answer, result = await loop.run_in_executor(
+                    result = await loop.run_in_executor(
                         None, lambda c=turn_ctx, t=text: c.run(self._blocking_turn, t)
                     )
                 except Exception as exc:
                     self.errors.append(str(exc))
-                    await self._in_terminal(
-                        lambda e=exc: self.console.print(
-                            f"error: {e}", style=self.theme.error, markup=False
-                        )
-                    )
-                    sys_lines, answer, result = [], "", None
-                await self._render_turn(sys_lines, answer, result)
+                    self.console.print(f"\nerror: {exc}", style=self.theme.error, markup=False)
+                    result = None
+                if getattr(result, "stopped_reason", "") == "cancelled":
+                    self.console.print("  ⋅ cancelled", style=self.theme.muted, markup=False)
+                self.console.print()  # trailing blank after the streamed answer
                 _update_state_after_turn(self.state, result)
                 if self.queue:
                     text = self.queue.popleft()
@@ -735,15 +722,16 @@ class _ReplApp:
             self.app.invalidate()
 
     def _blocking_turn(self, text: str):
-        """Runs in the executor thread. Activates the cancel token in *this*
-        thread (contextvar) so the agent's cooperative cancel checks see it."""
+        """Runs in the executor thread and streams the answer live via the
+        callbacks. Activates the cancel token in *this* thread so the agent's
+        cooperative cancel checks see it. Returns the RunResult."""
         from veles.core.cancel import reset_cancel_token, set_cancel_token
         from veles.core.modes import ModeContext, get_mode
 
         tok = set_cancel_token(self.cancel_token)
         try:
-            post, on_text, on_event, holder, sys_lines, answer = _make_turn_callbacks(
-                self.state, self.errors
+            post, on_text, on_event, holder = _make_turn_callbacks(
+                self.console, self.theme, self.errors
             )
             ctx = ModeContext(
                 state=self.state,
@@ -756,24 +744,7 @@ class _ReplApp:
             get_mode(self.state.mode).run_turn(text, ctx)
         finally:
             reset_cancel_token(tok)
-        result = holder.get("result")
-        text_out = "".join(answer).strip() or (getattr(result, "text", "") or "").strip()
-        return sys_lines, text_out, result
-
-    async def _render_turn(self, sys_lines, answer, result) -> None:
-        cancelled = getattr(result, "stopped_reason", "") == "cancelled"
-
-        def _do() -> None:
-            # No leading blank — `_echo_user` already spaced this turn.
-            for sl in sys_lines:
-                self.console.print(f"  ⋅ {sl}", style=self.theme.muted, markup=False)
-            if answer:
-                _render_answer(self.console, answer)
-            if cancelled:
-                self.console.print("  ⋅ cancelled", style=self.theme.muted, markup=False)
-            self.console.print()
-
-        await self._in_terminal(_do)
+        return holder.get("result")
 
 
 def cmd_repl(args: argparse.Namespace, project: Project) -> int:

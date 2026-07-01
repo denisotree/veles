@@ -41,19 +41,24 @@ def _project_and_store(tmp_path):
     return project, SessionStore(project.memory_db_path)
 
 
-def test_turn_callbacks_accumulate_messages() -> None:
+def test_turn_callbacks_stream_and_capture_result(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from veles.cli.commands.repl import _resolve_theme
     from veles.tui.messages import ChatDelta, SystemLine, TurnDone
 
     errors: list[str] = []
-    post, on_text, _on_event, holder, sys_lines, answer = _make_turn_callbacks(_state(), errors)
-    post(SystemLine(text="[auto -> writing]"))  # accumulated as a dim mode line
-    on_text("hello")  # accumulated answer text
-    post(ChatDelta(text=" world"))
+    theme = _resolve_theme(_state())
+    post, on_text, _on_event, holder = _make_turn_callbacks(_console(), theme, errors)
+    post(SystemLine(text="[auto -> writing]"))  # dim mode line, streamed live
+    on_text("hello ")  # streamed answer token
+    post(ChatDelta(text="world"))
     rr = RunResult(text="hello world", iterations=1, stopped_reason="completed", session_id="s1")
     post(TurnDone(result=rr))
 
-    assert sys_lines == ["[auto -> writing]"]
-    assert "".join(answer) == "hello world"
+    out = capsys.readouterr().out
+    assert "[auto -> writing]" in out  # mode line printed
+    assert "hello world" in out  # answer streamed
     assert holder["result"] is rr
 
 
