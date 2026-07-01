@@ -648,8 +648,10 @@ class _ReplApp:
 
         # patch_stdout routes all writes (rich prints + streamed tokens, from
         # this thread or the executor) ABOVE the live input box, into the
-        # terminal's own scrollback.
-        with patch_stdout():
+        # terminal's own scrollback. raw=True is required so rich's ANSI colour
+        # sequences pass through instead of being escaped (shown as literal
+        # `\x1b[...m`).
+        with patch_stdout(raw=True):
             self.app.run()
 
     def _spawn(self, coro) -> None:
@@ -852,10 +854,15 @@ def cmd_repl(args: argparse.Namespace, project: Project) -> int:
 
     try:
         _banner(console, args.provider, args.model, state.mode, theme)
-        if os.environ.get("VELES_REPL_SIMPLE"):
-            _run_simple_repl(args, project, state, factory, store, registry, console, theme, errors)
-        else:
+        # Default: the reliable blocking-prompt loop — rich formatting, block
+        # streaming and native scroll/select/copy all work, no persistent-box
+        # rendering quirks. The inline Application (bordered box + live input +
+        # queue-during-generation) is opt-in via VELES_REPL_APP=1 while its
+        # prompt_toolkit layout edges are ironed out.
+        if os.environ.get("VELES_REPL_APP"):
             _ReplApp(args, project, state, factory, store, registry, console, theme, errors).run()
+        else:
+            _run_simple_repl(args, project, state, factory, store, registry, console, theme, errors)
     finally:
         store.close()
     return 0
