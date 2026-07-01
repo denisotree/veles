@@ -912,8 +912,10 @@ class _ReplApp:
         # prompt_toolkit Application can't run under the live loop) ---
         self.q_active = False
         self.q_free = False
+        self.q_allow_free = False  # show the "✎ свой вариант" row (ask_user only)
         self.q_question = ""
         self.q_options: list[str] = []
+        self.q_values: list[str] | None = None  # decision values (permission prompt)
         self.q_sel = 0
         self.q_answer: str | None = None
         self.q_event = None
@@ -1033,17 +1035,23 @@ class _ReplApp:
     def run(self) -> None:
         from prompt_toolkit.patch_stdout import patch_stdout
 
+        from veles.core.permission.prompt import reset_prompter, set_prompter
         from veles.core.user_prompt import reset_question_prompter, set_question_prompter
 
-        # Route the agent's `ask_user` to the in-app picker (answered inside this
-        # running Application — a nested prompt_toolkit app can't run under the
-        # live event loop).
+        # Route BOTH mid-turn prompts through the in-app picker (answered inside
+        # this running Application — a nested prompt_toolkit app can't run under
+        # the live event loop, and rendering one corrupts the terminal):
+        #   - ask_user (the agent's clarifying questions)
+        #   - the unified permission prompt (trust ladder + approval) that fires
+        #     when a sensitive tool like write_file needs a decision.
         qtoken = set_question_prompter(lambda q, opts=None: self._ask(q, opts))
-        # Re-snapshot the context AFTER installing the prompter: the prompter is
-        # a ContextVar, and the executor runs each turn in a copy of _parent_ctx.
-        # The __init__ snapshot predates this set(), so without re-capturing here
-        # the turn thread would see the DEFAULT prompter and the in-app picker
-        # would never fire. (This scope still holds the active project.)
+        ptoken = set_prompter(self._permission_prompt)
+        # Re-snapshot the context AFTER installing the prompters: they're
+        # ContextVars, and the executor runs each turn in a copy of _parent_ctx.
+        # The __init__ snapshot predates these set()s, so without re-capturing
+        # here the turn thread would see the DEFAULT prompters (which render
+        # nested Applications) and corrupt the terminal. (This scope still holds
+        # the active project.)
         self._parent_ctx = contextvars.copy_context()
         # patch_stdout routes all writes (rich prints + streamed tokens, from
         # this thread or the executor) ABOVE the live input box, into the
@@ -1055,6 +1063,7 @@ class _ReplApp:
                 self.app.run()
         finally:
             reset_question_prompter(qtoken)
+            reset_prompter(ptoken)
 
     def _spawn(self, coro) -> None:
         task = asyncio.ensure_future(coro)
@@ -1111,14 +1120,15 @@ class _ReplApp:
         return FormattedText(frags)
 
     def _picker_fragments(self):
-        """The mid-turn ask_user picker rendered in the app region."""
+        """The mid-turn picker (ask_user or permission) rendered in the app
+        region. The free-text row shows only when q_allow_free (ask_user)."""
         from prompt_toolkit.formatted_text import FormattedText
 
         frags: list[tuple[str, str]] = [("class:picker", f" {self.q_question}\n")]
         if self.q_free:
             frags.append(("class:picker.dim", "  введите свой вариант ниже — Enter отправит\n"))
             return FormattedText(frags)
-        items = [*self.q_options, self._FREE_LABEL]
+        items = [*self.q_options] + ([self._FREE_LABEL] if self.q_allow_free else [])
         for i, label in enumerate(items):
             sel = i == self.q_sel
             marker = "❯" if sel else " "
@@ -1141,7 +1151,7 @@ class _ReplApp:
             self.app.invalidate()
             await asyncio.sleep(0.3)
 
-    # --- mid-turn ask_user picker (answered inside this running app) ---
+    # --- mid-turn pickers (ask_user + permission), answered inside this app ---
 
     def _ask(self, question: str, options):
         """Question prompter installed for the agent's `ask_user`. Runs in the
@@ -1154,6 +1164,8 @@ class _ReplApp:
             return None
         self.q_question = question
         self.q_options = list(options) if options else []
+        self.q_values = None  # answer IS the chosen option string
+        self.q_allow_free = bool(options)  # options → offer a free-text row too
         self.q_sel = 0
         self.q_free = not self.q_options  # no options → straight to free text
         self.q_answer = None
@@ -1162,6 +1174,50 @@ class _ReplApp:
         self._invalidate_threadsafe()
         self.q_event.wait()  # blocks the executor thread, not the loop
         return self.q_answer
+
+    def _permission_prompt(self, req):
+        """Unified permission prompter (trust ladder + approval), installed so a
+        sensitive tool's decision is answered inside THIS app instead of the
+        default nested-Application menu (which corrupts the terminal). Runs in
+        the executor thread and blocks on the same picker Event as `_ask`. Denies
+        with no TTY so headless runs never block."""
+        import threading
+
+        from veles.core.permission.prompt import PromptAnswer, format_prompt_body
+
+        if not sys.stdin.isatty():
+            return PromptAnswer(decision="deny")
+        # The tool / reason / arguments go to scrollback; the picker shows only
+        # the ladder options (mirrors the default menu's layout).
+        self.console.print()
+        self.console.print(format_prompt_body(req), style=self.theme.muted, markup=False)
+        if req.kind == "trust":
+            labels = [
+                "Once (this call only)",
+                "Always for this project",
+                "Always everywhere",
+                "Refuse",
+            ]
+            values = ["allow_once", "allow_project", "allow_global", "deny"]
+        else:  # approval — turn-scoped: only allow-once / deny
+            labels = ["Allow once", "Refuse"]
+            values = ["allow_once", "deny"]
+        self.q_question = f"Разрешить выполнение {req.tool_name}?"
+        self.q_options = labels
+        self.q_values = values
+        self.q_allow_free = False
+        self.q_free = False
+        self.q_sel = 0
+        self.q_answer = None
+        self.q_event = threading.Event()
+        self.q_active = True
+        self._invalidate_threadsafe()
+        self.q_event.wait()
+        return PromptAnswer(decision=self.q_answer or "deny")  # Esc/None → deny
+
+    def _picker_rows(self) -> int:
+        """Total selectable rows: options plus the free-text sentinel if shown."""
+        return len(self.q_options) + (1 if self.q_allow_free else 0)
 
     def _answer(self, ans) -> None:
         ev = self.q_event
@@ -1177,12 +1233,14 @@ class _ReplApp:
             ev.set()
 
     def _picker_enter(self) -> None:
-        if self.q_sel >= len(self.q_options):  # the free-text sentinel row
+        if self.q_allow_free and self.q_sel >= len(self.q_options):  # free-text row
             self.q_free = True
             self.input.text = ""
             self.app.invalidate()
             return
-        self._answer(self.q_options[self.q_sel])
+        idx = min(self.q_sel, len(self.q_options) - 1) if self.q_options else 0
+        # Answer the mapped decision value (permission) or the option (ask_user).
+        self._answer(self.q_values[idx] if self.q_values is not None else self.q_options[idx])
 
     # --- /model picker (filterable, driven inside this Application) ---
 
@@ -1350,19 +1408,19 @@ class _ReplApp:
 
         @kb.add("up", filter=choosing)
         def _(event) -> None:
-            self.q_sel = (self.q_sel - 1) % (len(self.q_options) + 1)
+            self.q_sel = (self.q_sel - 1) % self._picker_rows()
             self.app.invalidate()
 
         @kb.add("down", filter=choosing)
         def _(event) -> None:
-            self.q_sel = (self.q_sel + 1) % (len(self.q_options) + 1)
+            self.q_sel = (self.q_sel + 1) % self._picker_rows()
             self.app.invalidate()
 
         for _i in range(9):
 
             @kb.add(str(_i + 1), filter=choosing)
             def _(event, idx=_i) -> None:
-                if idx <= len(self.q_options):
+                if idx < self._picker_rows():
                     self.q_sel = idx
                     self.app.invalidate()
 

@@ -194,6 +194,7 @@ def test_picker_fragments_list_options_and_free_entry(tmp_path) -> None:
         app.q_active = True
         app.q_question = "Apply the plan?"
         app.q_options = ["Apply fully", "Exclude sources/"]
+        app.q_allow_free = True  # ask_user offers a free-text row
         app.q_sel = 0
         text = "".join(f[1] for f in app._picker_fragments())
         assert "Apply the plan?" in text
@@ -201,6 +202,69 @@ def test_picker_fragments_list_options_and_free_entry(tmp_path) -> None:
         assert app._FREE_LABEL in text  # free-text sentinel row present
         app.q_free = True
         assert "свой вариант" in "".join(f[1] for f in app._picker_fragments())
+    finally:
+        store.close()
+
+
+def test_permission_prompt_trust_maps_decision(tmp_path, monkeypatch) -> None:
+    """The trust-ladder permission prompt is answered inside the app picker (no
+    nested Application), and the chosen row maps to the right PromptDecision."""
+    import threading
+    import time as _t
+
+    from veles.cli.commands import repl as repl_mod
+    from veles.core.permission.prompt import PromptRequest
+
+    app, store = _build_app(tmp_path)
+    try:
+        monkeypatch.setattr(repl_mod.sys.stdin, "isatty", lambda: True)
+        req = PromptRequest(
+            tool_name="write_file", arguments={"path": "x"}, reason="trust", kind="trust"
+        )
+        result: dict = {}
+
+        def _run():
+            result["ans"] = app._permission_prompt(req)
+
+        th = threading.Thread(target=_run)
+        th.start()
+        for _ in range(400):  # wait until the picker publishes (executor thread)
+            if app.q_active:
+                break
+            _t.sleep(0.005)
+        assert app.q_active
+        assert app.q_values == ["allow_once", "allow_project", "allow_global", "deny"]
+        assert app.q_allow_free is False  # no free-text row for a permission prompt
+        app.q_sel = 1  # "Always for this project"
+        app._picker_enter()
+        th.join(timeout=2)
+        assert result["ans"].decision == "allow_project"
+    finally:
+        store.close()
+
+
+def test_permission_prompt_denies_without_tty(tmp_path) -> None:
+    from veles.core.permission.prompt import PromptRequest
+
+    app, store = _build_app(tmp_path)
+    try:
+        # pytest stdin is non-interactive → deny, never block.
+        req = PromptRequest(tool_name="run_shell", arguments={}, reason="", kind="trust")
+        assert app._permission_prompt(req).decision == "deny"
+    finally:
+        store.close()
+
+
+def test_picker_fragments_permission_has_no_free_row(tmp_path) -> None:
+    app, store = _build_app(tmp_path)
+    try:
+        app.q_active = True
+        app.q_question = "Разрешить write_file?"
+        app.q_options = ["Once (this call only)", "Refuse"]
+        app.q_allow_free = False
+        text = "".join(f[1] for f in app._picker_fragments())
+        assert "Once (this call only)" in text and "Refuse" in text
+        assert app._FREE_LABEL not in text  # permission prompt → no free-text row
     finally:
         store.close()
 
@@ -239,6 +303,7 @@ def test_picker_enter_on_sentinel_switches_to_free_text(tmp_path) -> None:
     try:
         app.q_active = True
         app.q_options = ["a", "b"]
+        app.q_allow_free = True
         app.q_sel = 2  # the free-text sentinel (index == len(options))
         app._picker_enter()
         assert app.q_free is True  # now capturing a typed answer
