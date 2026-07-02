@@ -92,6 +92,7 @@ from veles.cli.commands.dream import cmd_dream as _cmd_dream
 from veles.cli.commands.goal import cmd_goal as _cmd_goal
 from veles.cli.commands.init import cmd_init as _cmd_init
 from veles.cli.commands.job import cmd_job as _cmd_job
+from veles.cli.commands.layout import cmd_layout as _cmd_layout
 from veles.cli.commands.mcp import cmd_mcp as _cmd_mcp
 from veles.cli.commands.models import cmd_models as _cmd_models
 from veles.cli.commands.modules import cmd_module as _cmd_module
@@ -186,6 +187,7 @@ __all__ = [
     "_cmd_import",
     "_cmd_init",
     "_cmd_job",
+    "_cmd_layout",
     "_cmd_mcp",
     "_cmd_models",
     "_cmd_module",
@@ -325,6 +327,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_add(args, project)
         if args.command == "organize":
             return _cmd_organize(args, project)
+        if args.command == "layout":
+            return _cmd_layout(args, project)
         if args.command == "curate":
             return _cmd_curate(args, project)
         if args.command == "skill":
