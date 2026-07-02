@@ -122,6 +122,43 @@ def test_writing_mode_records_itself_in_last_mode_in_session() -> None:
     assert state.last_mode_in_session == "writing"
 
 
+def test_writing_mode_wraps_prompt_on_switch_from_planning() -> None:
+    """Switching planning → writing must inject a mode-switch observation so
+    the model knows the planning restriction is lifted — otherwise it keeps
+    parroting its own earlier 'switch to writing first' refusals from history."""
+    state = _state()
+    state.last_mode_in_session = "planning"  # type: ignore[assignment]
+    agent = _FakeAgent(result=RunResult(text="ok", iterations=1, session_id="s1"))
+
+    WritingMode().run_turn("Реализуй план", _Recorder(state=state).make_ctx(agent))
+
+    body = agent.seen_prompt or ""
+    assert "<mode-switch-observation>" in body
+    assert "writing" in body
+    assert "lifted" in body.lower()  # the restriction-lifted note
+    assert "Реализуй план" in body  # the user's actual request still present
+
+
+def test_writing_mode_no_wrap_when_already_writing() -> None:
+    state = _state()
+    state.last_mode_in_session = "writing"  # type: ignore[assignment]
+    agent = _FakeAgent(result=RunResult(text="ok", iterations=1, session_id="s1"))
+
+    WritingMode().run_turn("hi", _Recorder(state=state).make_ctx(agent))
+
+    assert "<mode-switch-observation>" not in (agent.seen_prompt or "")
+
+
+def test_writing_mode_no_wrap_on_first_turn() -> None:
+    state = _state()
+    state.last_mode_in_session = None
+    agent = _FakeAgent(result=RunResult(text="ok", iterations=1, session_id="s1"))
+
+    WritingMode().run_turn("hi", _Recorder(state=state).make_ctx(agent))
+
+    assert "<mode-switch-observation>" not in (agent.seen_prompt or "")
+
+
 def test_writing_mode_propagates_none_session_id_safely() -> None:
     """If the agent never assigns a session_id (e.g. SessionStore
     disabled), AppState stays at None — no crash, no mutation."""
