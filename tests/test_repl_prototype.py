@@ -255,6 +255,75 @@ def test_permission_prompt_denies_without_tty(tmp_path) -> None:
         store.close()
 
 
+def test_confirm_critical_picker_yes(tmp_path, monkeypatch) -> None:
+    """DESTRUCTIVE hard-confirm (delete_file) is answered in-app as a yes/no
+    picker — the default confirmer reads input() and hangs the running app."""
+    import threading
+    import time as _t
+
+    from veles.cli.commands import repl as repl_mod
+
+    app, store = _build_app(tmp_path)
+    try:
+        monkeypatch.setattr(repl_mod.sys.stdin, "isatty", lambda: True)
+        result: dict = {}
+
+        def _run():
+            result["ok"] = app._confirm_critical("dispatch delete_file", "destructive action")
+
+        th = threading.Thread(target=_run)
+        th.start()
+        for _ in range(400):
+            if app.q_active:
+                break
+            _t.sleep(0.005)
+        assert app.q_active
+        assert app.q_values == ["yes", "no"]
+        assert app.q_sel == 1  # highlight defaults to Cancel (safe)
+        app.q_sel = 0  # choose "Да, выполнить"
+        app._picker_enter()
+        th.join(timeout=2)
+        assert result["ok"] is True
+    finally:
+        store.close()
+
+
+def test_confirm_critical_cancel_denies(tmp_path, monkeypatch) -> None:
+    import threading
+    import time as _t
+
+    from veles.cli.commands import repl as repl_mod
+
+    app, store = _build_app(tmp_path)
+    try:
+        monkeypatch.setattr(repl_mod.sys.stdin, "isatty", lambda: True)
+        result: dict = {}
+
+        def _run():
+            result["ok"] = app._confirm_critical("dispatch delete_file", "")
+
+        th = threading.Thread(target=_run)
+        th.start()
+        for _ in range(400):
+            if app.q_active:
+                break
+            _t.sleep(0.005)
+        app._answer(None)  # Esc / cancel
+        th.join(timeout=2)
+        assert result["ok"] is False
+    finally:
+        store.close()
+
+
+def test_confirm_critical_no_tty_refuses(tmp_path) -> None:
+    app, store = _build_app(tmp_path)
+    try:
+        # pytest stdin is non-interactive → refuse without blocking.
+        assert app._confirm_critical("dispatch delete_file", "x") is False
+    finally:
+        store.close()
+
+
 def test_picker_fragments_permission_has_no_free_row(tmp_path) -> None:
     app, store = _build_app(tmp_path)
     try:

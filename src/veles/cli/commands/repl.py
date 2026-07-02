@@ -1060,17 +1060,21 @@ class _ReplApp:
     def run(self) -> None:
         from prompt_toolkit.patch_stdout import patch_stdout
 
+        from veles.core.critical_ops import reset_critical_confirmer, set_critical_confirmer
         from veles.core.permission.prompt import reset_prompter, set_prompter
         from veles.core.user_prompt import reset_question_prompter, set_question_prompter
 
-        # Route BOTH mid-turn prompts through the in-app picker (answered inside
+        # Route EVERY mid-turn prompt through the in-app picker (answered inside
         # this running Application — a nested prompt_toolkit app can't run under
-        # the live event loop, and rendering one corrupts the terminal):
+        # the live event loop, and any stdin input() hangs it):
         #   - ask_user (the agent's clarifying questions)
-        #   - the unified permission prompt (trust ladder + approval) that fires
-        #     when a sensitive tool like write_file needs a decision.
+        #   - the unified permission prompt (trust ladder + approval)
+        #   - confirm_critical (M39 hard-confirm for DESTRUCTIVE ops like
+        #     delete_file / user-global writes) — else its input("Confirm: ")
+        #     blocks the executor thread and the whole REPL hangs.
         qtoken = set_question_prompter(lambda q, opts=None: self._ask(q, opts))
         ptoken = set_prompter(self._permission_prompt)
+        ctoken = set_critical_confirmer(self._confirm_critical)
         # Re-snapshot the context AFTER installing the prompters: they're
         # ContextVars, and the executor runs each turn in a copy of _parent_ctx.
         # The __init__ snapshot predates these set()s, so without re-capturing
@@ -1089,6 +1093,7 @@ class _ReplApp:
         finally:
             reset_question_prompter(qtoken)
             reset_prompter(ptoken)
+            reset_critical_confirmer(ctoken)
 
     def _spawn(self, coro) -> None:
         task = asyncio.ensure_future(coro)
@@ -1199,6 +1204,34 @@ class _ReplApp:
         self._invalidate_threadsafe()
         self.q_event.wait()  # blocks the executor thread, not the loop
         return self.q_answer
+
+    def _confirm_critical(self, op: str, summary: str) -> bool:
+        """M39 hard-confirm for DESTRUCTIVE ops (delete_file, user-global
+        writes), answered inside THIS app as a yes/no picker — the default
+        confirmer reads `input()` from stdin, which hangs the executor thread
+        under the running Application. Runs in the executor thread; blocks on the
+        picker Event. Refuses (False) with no TTY, and defaults the highlight to
+        Cancel so a stray Enter never deletes."""
+        import threading
+
+        if not sys.stdin.isatty():
+            return False
+        self.console.print()
+        self.console.print(f"⚠ {op}", style=self.theme.error, markup=False)
+        if summary:
+            self.console.print(f"  {summary}", style=self.theme.muted, markup=False)
+        self.q_question = f"Подтвердить необратимое действие: {op}?"
+        self.q_options = ["Да, выполнить", "Отмена"]
+        self.q_values = ["yes", "no"]
+        self.q_allow_free = False
+        self.q_free = False
+        self.q_sel = 1  # default highlight = Cancel (safe)
+        self.q_answer = None
+        self.q_event = threading.Event()
+        self.q_active = True
+        self._invalidate_threadsafe()
+        self.q_event.wait()
+        return self.q_answer == "yes"  # Esc/cancel → None → False (deny)
 
     def _permission_prompt(self, req):
         """Unified permission prompter (trust ladder + approval), installed so a

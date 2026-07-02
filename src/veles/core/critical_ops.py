@@ -16,10 +16,13 @@ Current call sites:
   project root (i.e. into user-global `~/.veles/`) — the agent could
   install code there otherwise.
 
+In M39 scope now:
+- `tools/builtin/file_ops.py::delete_file` (DESTRUCTIVE) — routes here per
+  call. Interactive surfaces MUST install their own confirmer via
+  `set_critical_confirmer` (the REPL/TUI render an in-app yes/no picker); the
+  default `input()` confirmer would hang a running prompt_toolkit app.
+
 Out of M39 scope:
-- File deletion at the tool layer — no builtin tool deletes files yet.
-  The shell tool can `rm`, but it's gated by the M38 trust ladder; a
-  per-call hard confirm would be unusable without command-shape parsing.
 - Network beyond the LLM endpoint (`fetch_url`) — gated by M38 trust
   ladder. Re-prompting on every fetch would defeat any agent loop that
   uses public docs.
