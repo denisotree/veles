@@ -401,7 +401,10 @@ def test_shift_enter_newline_remap_and_binding(tmp_path) -> None:
 
     app, store = _build_app(tmp_path)
     try:
-        assert any(Keys.F24 in b.keys for b in app.app.key_bindings.bindings)
+        bound = {k for b in app.app.key_bindings.bindings for k in b.keys}
+        assert Keys.F24 in bound  # Shift+Enter carrier (CSI-u terminals)
+        # Ctrl+J (LF) is a newline key distinct from Enter in EVERY terminal.
+        assert Keys.ControlJ in bound
     finally:
         store.close()
 

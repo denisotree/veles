@@ -1423,6 +1423,10 @@ class _ReplApp:
         def _(event) -> None:
             self.input.buffer.insert_text("\n")
 
+        @kb.add("c-j", filter=normal)  # Ctrl+J = LF (0x0a) — a newline key that
+        def _(event) -> None:  # is distinct from Enter (0x0d) in EVERY terminal,
+            self.input.buffer.insert_text("\n")  # unlike Shift+Enter.
+
         @kb.add("f24", filter=normal)  # Shift+Enter (CSI-u terminals) → newline
         def _(event) -> None:
             self.input.buffer.insert_text("\n")
