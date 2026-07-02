@@ -61,6 +61,7 @@ tools = [
     "web_search",
     "ask_user",
     "advisor_review",
+    "delegate",
     "pdf_read",
     "image_ocr",
     "image_describe",

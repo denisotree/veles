@@ -9,6 +9,7 @@ cli/_runtime.py). A non-wiki project never imports the wiki module.
 from veles.core.tools.builtin import (  # noqa: F401
     advisor,
     ask_user,
+    delegate,
     edit_file,
     fetch_url,
     file_ops,
