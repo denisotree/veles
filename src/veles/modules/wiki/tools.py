@@ -71,15 +71,43 @@ def wiki_search(query: str, limit: int = 10) -> str:
 def wiki_write_page(category: str, slug: str, title: str, content: str) -> str:
     """Create or overwrite wiki/<category>/<slug>.md.
 
-    `category` must be one of: concepts, entities, sources.
-    `content` is the markdown body. The H1 line is added automatically if
-    missing. INDEX.md is rewritten atomically after the write.
+    `category` must be an allowed category for this project — the core defaults
+    (concepts, entities, sources, queries, sessions, self-doc) plus any declared
+    for the project (in `.veles/wiki.toml`, e.g. diary/tasks/projects). Nested
+    paths like `projects/work` are allowed. To use a NEW category first declare
+    it with `wiki_add_category`. `content` is the markdown body (H1 added if
+    missing). INDEX.md is rewritten after the write.
     """
     try:
         rel = _default_wiki().write_page(category=category, slug=slug, title=title, content=content)
     except ValueError as exc:
         return f"<error: {exc}>"
     return f"wrote {rel}"
+
+
+@tool(risk_class=RiskClass.WRITE_LOCAL_PROJECT, sensitive=True, side_effects=["filesystem"])
+def wiki_add_category(name: str) -> str:
+    """Declare a NEW wiki category for THIS project and create its directory.
+
+    The framework ships no project-specific categories — this is how you extend
+    the wiki structure for a kind of data the user describes (diary, tasks,
+    projects, meetings, …). The declaration is persisted to `.veles/wiki.toml`
+    (so it survives and is picked up by every wiki write), and the directory is
+    created. Nested paths like `projects/work` are allowed. After this,
+    `wiki_write_page(category="<name>", …)` works. Idempotent.
+    """
+    from veles.modules.wiki.wiki import add_project_category
+
+    proj = current_project()
+    if proj is None:
+        return "<error: no active Veles project>"
+    added, result = add_project_category(proj.wiki_root, name)
+    if result.startswith("<error"):
+        return result
+    _default_wiki().ensure_layout()  # materialize the new dir(s)
+    if not added:
+        return f"category {result!r} already available (wiki/{result}/)"
+    return f"declared category {result!r} and created wiki/{result}/"
 
 
 @tool(risk_class=RiskClass.WRITE_LOCAL_PROJECT, sensitive=True, side_effects=["filesystem"])

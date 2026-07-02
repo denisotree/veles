@@ -10,12 +10,13 @@ wiki = true
 [layout.scaffold]
 agents_md_template = "templates/AGENTS.md"
 
-[layout.wiki]
-# Extra wiki categories beyond the core defaults (concepts, entities, sources,
-# queries, sessions, self-doc). Nested paths like "projects/work" are allowed;
-# the agent can create deeper substructure under any declared category. This is
-# what makes the wiki layout extensible for iterative data (diary/tasks/projects).
-categories = ["projects", "diary", "tasks"]
+# NOTE: no project-specific categories are declared here. The builtin pack ships
+# only the generic wiki categories (concepts/entities/sources/queries/sessions/
+# self-doc — see wiki._DEFAULT_CATEGORIES). Project-specific structure (diary,
+# tasks, projects, …) is declared PER PROJECT in `.veles/wiki.toml` (writable, so
+# the agent can extend it at runtime via `wiki_add_category`). Packs MAY still
+# add categories via `[layout.wiki].categories = [...]`, but the framework itself
+# hardcodes no project schema.
 
 [[layout.writable_zones]]
 path = "wiki/"

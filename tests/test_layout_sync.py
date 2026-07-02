@@ -35,15 +35,18 @@ def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     reset_active_project(token)
 
 
-def test_sync_recreates_missing_category_dir(project, capsys) -> None:
-    # Simulate a project inited before the pack gained the diary category.
-    shutil.rmtree(project.root / "wiki" / "diary")
+def test_sync_creates_newly_declared_category(project, capsys) -> None:
+    # A project declares a new category (as the agent would) but the dir isn't
+    # materialised yet — sync creates it.
+    from veles.modules.wiki.wiki import add_project_category
+
+    add_project_category(project.wiki_root, "diary")
+    shutil.rmtree(project.root / "wiki" / "diary", ignore_errors=True)
     assert not (project.root / "wiki" / "diary").is_dir()
 
     rc = cmd_layout(argparse.Namespace(layout_command="sync"), project)
     assert rc == 0
     assert (project.root / "wiki" / "diary").is_dir()
-    assert (project.root / "wiki" / "projects").is_dir()
     assert "created" in capsys.readouterr().out
 
 

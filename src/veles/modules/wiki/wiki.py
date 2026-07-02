@@ -60,14 +60,93 @@ _DEFAULT_CATEGORIES = (
 _SUMMARY_CHAR_CAP = 200
 
 
-def _resolve_wiki_categories(root: Path) -> tuple[str, ...]:
-    """Core defaults plus the active layout pack's `[layout.wiki].categories`.
+def project_categories_path(root: Path) -> Path:
+    """Where a project declares its OWN wiki categories. Lives in the always-
+    writable `.veles/`, so the agent can extend the structure at runtime — the
+    framework ships no project-specific schema."""
+    return root / ".veles" / "wiki.toml"
 
-    Best-effort and cheap: reads the layout name from `<root>/.veles/project.toml`
-    and looks the pack up via `find_layout(name, project=None)` (builtin + user
-    packs; project-local packs need the Project and fall back to defaults). Any
-    failure → defaults, so wiki writes never break on a malformed/absent pack."""
-    extra: tuple[str, ...] = ()
+
+def normalize_category(name: str) -> str | None:
+    """Normalize a (possibly nested) category like `Projects/Work` → `projects/work`.
+    Returns None if empty or a segment is unsafe (`..`, non-slug)."""
+    parts = [p for p in name.strip().strip("/").split("/") if p]
+    if not parts or any(p == ".." for p in parts):
+        return None
+    norm = [_normalize_slug(p) for p in parts]
+    if any(not p for p in norm):
+        return None
+    return "/".join(norm)
+
+
+def read_project_categories(root: Path) -> list[str]:
+    """The project-local category declarations (`.veles/wiki.toml`). Best-effort."""
+    path = project_categories_path(root)
+    if not path.is_file():
+        return []
+    try:
+        import tomllib
+
+        with path.open("rb") as fh:
+            data = tomllib.load(fh)
+    except Exception:
+        return []
+    cats = data.get("categories")
+    if not isinstance(cats, list):
+        return []
+    out: list[str] = []
+    for c in cats:
+        if isinstance(c, str):
+            norm = normalize_category(c)
+            if norm:
+                out.append(norm)
+    return out
+
+
+def add_project_category(root: Path, name: str) -> tuple[bool, str]:
+    """Declare a new project-local wiki category, persisting to `.veles/wiki.toml`.
+    Returns (added, category-or-error). Idempotent; refuses core defaults and
+    already-declared categories (added=False, not an error)."""
+    norm = normalize_category(name)
+    if norm is None:
+        return False, f"<error: invalid category name {name!r}>"
+    if norm in _DEFAULT_CATEGORIES:
+        return False, norm  # a core category — already available
+    existing = read_project_categories(root)
+    if norm in existing:
+        return False, norm
+    existing.append(norm)
+    path = project_categories_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# Project-local wiki categories — declared by you / the agent.",
+        "# The framework ships no project-specific schema; yours lives here.",
+        "categories = [",
+        *[f'    "{c}",' for c in existing],
+        "]",
+    ]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return True, norm
+
+
+def _resolve_wiki_categories(root: Path) -> tuple[str, ...]:
+    """Allowed category roots = core defaults + the active layout pack's
+    `[layout.wiki].categories` + the PROJECT's own `.veles/wiki.toml` categories.
+
+    The project-local source is what keeps schema out of the framework: the
+    builtin `llm-wiki` pack ships only the generic categories; diary/tasks/
+    projects and any other project-specific structure are declared per-project.
+    Best-effort — any failure degrades to whatever resolved, never breaks a
+    write."""
+    resolved: list[str] = list(_DEFAULT_CATEGORIES)
+
+    def _add(cats: object) -> None:
+        if not isinstance(cats, (list, tuple)):
+            return
+        for c in cats:
+            if isinstance(c, str) and c and c not in resolved:
+                resolved.append(c)
+
     try:
         import tomllib
 
@@ -83,10 +162,11 @@ def _resolve_wiki_categories(root: Path) -> tuple[str, ...]:
 
         pack = find_layout(name, project=None)
         if pack is not None:
-            extra = tuple(pack.manifest.wiki_categories)
+            _add(pack.manifest.wiki_categories)
     except Exception:
-        extra = ()
-    return _DEFAULT_CATEGORIES + tuple(c for c in extra if c not in _DEFAULT_CATEGORIES)
+        pass
+    _add(read_project_categories(root))
+    return tuple(resolved)
 
 
 @dataclass(slots=True)
