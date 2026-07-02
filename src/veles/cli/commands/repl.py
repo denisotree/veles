@@ -75,6 +75,16 @@ _REPL_BEHAVIOUR_BLOCK = (
     "— use them. Do NOT stop after one or two items to summarise and ask whether "
     "to continue; that needlessly interrupts the work. Stop only when the task "
     "is genuinely complete or you hit a real blocker.\n\n"
+    "## Break big work into delegated subtasks\n"
+    "For a non-trivial, multi-part task, prefer to DECOMPOSE it and hand each "
+    "small, self-contained piece to a focused worker with the `delegate` tool "
+    "instead of doing everything yourself in one long context. Give each worker "
+    'ONLY the tools it needs (e.g. `delegate("rewrite file X as a wiki page and '
+    'link it", tools=["read_file", "wiki_write_page", "wiki_search", '
+    '"move_file"], context="target structure: …")`), read its report, and '
+    "either accept the result and move on or delegate a correction. Do the small "
+    "trivial steps yourself; delegate the repeated or heavy ones. You remain the "
+    "coordinator — you decide the decomposition and integrate the results.\n\n"
     "## Act now — there is no 'later'\n"
     "This reply is the ONLY place work happens. There is no background, no async, "
     "no next turn you control — the moment you stop making tool calls, the turn "
@@ -304,6 +314,24 @@ def _build_runtime(args: argparse.Namespace, project: Project):
             plan_mode=is_planning,
         )
 
+    def subagent_factory(*, system_prompt, tools):
+        """Build an ephemeral, context-isolated worker for the `delegate` tool.
+        Same provider/model as the root; a NARROW registry (scoped from the FULL
+        global registry so wiki_* etc. are reachable); no SessionStore (workers
+        are disposable)."""
+        from veles.core.tools.registry import registry as _global_registry
+
+        return Agent(
+            provider=provider,
+            registry=_global_registry.subset(tools),
+            model=args.model,
+            max_iterations=min(args.max_iterations, 20),
+            system_prompt=system_prompt,
+            store=None,
+            compressor=compressor,
+            hard_ceiling_tokens=default_hard_ceiling_for(args.model),
+        )
+
     from veles.core.user_config import load_user_config
 
     user_cfg = load_user_config()
@@ -313,7 +341,7 @@ def _build_runtime(args: argparse.Namespace, project: Project):
         model=args.model,
         theme_name=(user_cfg.tui_theme if user_cfg and user_cfg.tui_theme else "everforest"),
     )
-    return state, factory, store
+    return state, factory, store, subagent_factory
 
 
 def _make_turn_callbacks(console, theme, errors: list[str], on_meta=None):
@@ -798,19 +826,24 @@ def _ask_repl(console, theme, question: str, options: list[str] | None):
 
 
 def _run_simple_repl(
-    args, project, state, factory, store, registry, console, theme, errors
+    args, project, state, factory, store, registry, console, theme, errors, subagent_factory=None
 ) -> None:
     """Fallback loop on the blocking `PromptSession.prompt()` (set
     `VELES_REPL_SIMPLE=1`). No live-during-generation input; kept as a safety
     net for terminals where the inline Application misbehaves."""
     from prompt_toolkit.formatted_text import HTML
 
+    from veles.core.orchestration.delegation import (
+        reset_subagent_factory,
+        set_subagent_factory,
+    )
     from veles.core.user_prompt import reset_question_prompter, set_question_prompter
 
     prompt_html = HTML(f'<style fg="{theme.accent}"><b>❯</b></style> ')
     prompt_session = _make_prompt_session(project, registry, state)
     # Route agent `ask_user` questions to an inline picker / free-text prompt.
     qtoken = set_question_prompter(lambda q, opts=None: _ask_repl(console, theme, q, opts))
+    dtoken = set_subagent_factory(subagent_factory) if subagent_factory is not None else None
     console.rule(style=theme.border, characters="─")
     try:
         _simple_repl_loop(
@@ -828,6 +861,8 @@ def _run_simple_repl(
         )
     finally:
         reset_question_prompter(qtoken)
+        if dtoken is not None:
+            reset_subagent_factory(dtoken)
 
 
 def _simple_repl_loop(
@@ -891,7 +926,19 @@ class _ReplApp:
     # The final picker item — selecting it switches to free-text entry.
     _FREE_LABEL = "✎ свой вариант…"
 
-    def __init__(self, args, project, state, factory, store, registry, console, theme, errors):
+    def __init__(
+        self,
+        args,
+        project,
+        state,
+        factory,
+        store,
+        registry,
+        console,
+        theme,
+        errors,
+        subagent_factory=None,
+    ):
         from prompt_toolkit.application import Application
         from prompt_toolkit.completion import Completer, Completion
         from prompt_toolkit.filters import Condition
@@ -916,6 +963,7 @@ class _ReplApp:
         self.console = console
         self.theme = theme
         self.errors = errors
+        self._subagent_factory = subagent_factory  # for the `delegate` tool
         self.busy = False
         self.queue: deque[str] = deque()
         self.cancel_token = None
@@ -1061,6 +1109,10 @@ class _ReplApp:
         from prompt_toolkit.patch_stdout import patch_stdout
 
         from veles.core.critical_ops import reset_critical_confirmer, set_critical_confirmer
+        from veles.core.orchestration.delegation import (
+            reset_subagent_factory,
+            set_subagent_factory,
+        )
         from veles.core.permission.prompt import reset_prompter, set_prompter
         from veles.core.user_prompt import reset_question_prompter, set_question_prompter
 
@@ -1075,6 +1127,12 @@ class _ReplApp:
         qtoken = set_question_prompter(lambda q, opts=None: self._ask(q, opts))
         ptoken = set_prompter(self._permission_prompt)
         ctoken = set_critical_confirmer(self._confirm_critical)
+        # The `delegate` tool builds workers via this factory (holds provider/model).
+        dtoken = (
+            set_subagent_factory(self._subagent_factory)
+            if self._subagent_factory is not None
+            else None
+        )
         # Re-snapshot the context AFTER installing the prompters: they're
         # ContextVars, and the executor runs each turn in a copy of _parent_ctx.
         # The __init__ snapshot predates these set()s, so without re-capturing
@@ -1094,6 +1152,8 @@ class _ReplApp:
             reset_question_prompter(qtoken)
             reset_prompter(ptoken)
             reset_critical_confirmer(ctoken)
+            if dtoken is not None:
+                reset_subagent_factory(dtoken)
 
     def _spawn(self, coro) -> None:
         task = asyncio.ensure_future(coro)
@@ -1743,7 +1803,7 @@ def cmd_repl(args: argparse.Namespace, project: Project) -> int:
     runtime = _build_runtime(args, project)
     if runtime is None:
         return 2
-    state, factory, store = runtime
+    state, factory, store, subagent_factory = runtime
     registry = build_default_registry(project=project)
     console = _console()
     theme = _resolve_theme(state)
@@ -1758,9 +1818,31 @@ def cmd_repl(args: argparse.Namespace, project: Project) -> int:
         # The blocking-prompt loop is a fallback via VELES_REPL_SIMPLE=1 for
         # terminals where the Application misbehaves.
         if os.environ.get("VELES_REPL_SIMPLE"):
-            _run_simple_repl(args, project, state, factory, store, registry, console, theme, errors)
+            _run_simple_repl(
+                args,
+                project,
+                state,
+                factory,
+                store,
+                registry,
+                console,
+                theme,
+                errors,
+                subagent_factory=subagent_factory,
+            )
         else:
-            _ReplApp(args, project, state, factory, store, registry, console, theme, errors).run()
+            _ReplApp(
+                args,
+                project,
+                state,
+                factory,
+                store,
+                registry,
+                console,
+                theme,
+                errors,
+                subagent_factory=subagent_factory,
+            ).run()
     finally:
         store.close()
     return 0

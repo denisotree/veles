@@ -136,3 +136,44 @@ def test_delegate_registered_and_in_run_toolset() -> None:
 
     assert registry.get("delegate") is not None
     assert "delegate" in TOOLSETS["run"]
+
+
+def test_repl_runtime_subagent_factory_scopes_tools(tmp_path, monkeypatch) -> None:
+    """The repl run loop's subagent factory builds a worker scoped to exactly
+    the requested tools, drawn from the full registry (wiki_* on wiki layout)."""
+    import argparse
+
+    from veles.cli.commands.repl import _build_runtime
+    from veles.core.context import reset_active_project, set_active_project
+    from veles.core.layout import clear_engine_cache
+    from veles.core.project import init_project
+
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    clear_engine_cache()
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
+    token = set_active_project(project)
+    try:
+        args = argparse.Namespace(
+            provider="ollama",  # local, keyless — no network at construction
+            model="m",
+            resume=None,
+            max_iterations=30,
+            verbose=False,
+            no_agents_md=False,
+            no_index=False,
+        )
+        runtime = _build_runtime(args, project)
+        assert runtime is not None
+        _state, _factory, store, subagent_factory = runtime
+        try:
+            worker = subagent_factory(
+                system_prompt="worker", tools=["read_file", "wiki_write_page"]
+            )
+            names = set(worker._registry.list_names())
+            assert {"read_file", "wiki_write_page"} <= names  # scoped, wiki tool present
+            assert "run_shell" not in names  # not requested → absent
+        finally:
+            store.close()
+    finally:
+        reset_active_project(token)
+        clear_engine_cache()
