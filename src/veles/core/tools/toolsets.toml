@@ -53,6 +53,9 @@ includes = ["builtin"]
 tools = [
     "write_file",
     "edit_file",
+    "move_file",
+    "delete_file",
+    "make_dir",
     "run_shell",
     "fetch_url",
     "web_search",

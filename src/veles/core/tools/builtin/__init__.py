@@ -11,6 +11,7 @@ from veles.core.tools.builtin import (  # noqa: F401
     ask_user,
     edit_file,
     fetch_url,
+    file_ops,
     image,
     job_tools,
     list_files,
