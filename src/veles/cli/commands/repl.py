@@ -984,6 +984,10 @@ class _ReplApp:
             multiline=True,
             wrap_lines=True,
             height=Dimension(min=1, max=10),
+            # Size to content: 1 line when empty, growing per line up to max=10.
+            # Without this the Window extends to fill toward max even when empty
+            # (its default dont_extend_height is False).
+            dont_extend_height=True,
             completer=_SlashCompleter(),
             complete_while_typing=True,
             style="class:input",

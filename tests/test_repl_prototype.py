@@ -375,6 +375,17 @@ def test_on_enter_empty_input_is_ignored(tmp_path) -> None:
         store.close()
 
 
+def test_input_box_sizes_to_content(tmp_path) -> None:
+    """The input Window must size to its content (1 line when empty), not extend
+    toward its max height — the box-bloat fix."""
+    app, store = _build_app(tmp_path)
+    try:
+        # dont_extend_height is a Filter; truthy → the window sizes to content.
+        assert app.input.window.dont_extend_height()
+    finally:
+        store.close()
+
+
 def test_shift_enter_newline_remap_and_binding(tmp_path) -> None:
     """Shift+Enter (CSI-u terminals) maps to the F24 carrier key, and the app
     binds F24 to insert a newline — so Enter still submits, Shift+Enter breaks
