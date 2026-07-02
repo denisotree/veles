@@ -10,6 +10,13 @@ wiki = true
 [layout.scaffold]
 agents_md_template = "templates/AGENTS.md"
 
+[layout.wiki]
+# Extra wiki categories beyond the core defaults (concepts, entities, sources,
+# queries, sessions, self-doc). Nested paths like "projects/work" are allowed;
+# the agent can create deeper substructure under any declared category. This is
+# what makes the wiki layout extensible for iterative data (diary/tasks/projects).
+categories = ["projects", "diary", "tasks"]
+
 [[layout.writable_zones]]
 path = "wiki/"
 description = "LLM-generated knowledge — the only zone the agent writes content into"

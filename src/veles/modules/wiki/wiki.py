@@ -12,9 +12,10 @@ Layout under that root:
         sources/
     sources/<category>/ raw immutable sources
 
-Categories are whitelisted to keep the schema predictable. M2 shipped three:
-`concepts`, `entities`, `sources`. Future milestones may add `comparisons`
-and `overviews` once real ingest patterns warrant them.
+Allowed category roots = the core defaults (`concepts`, `entities`, `sources`,
+`queries`, `sessions`, `self-doc`) plus the active layout pack's
+`[layout.wiki].categories`. A category may be a nested path (`projects/work`),
+so the wiki layout is extensible for iterative data (diary/tasks/projects).
 
 Path semantics:
 - `rel_path` always means a path under the wiki root, starting with `wiki/`.
@@ -46,7 +47,9 @@ _FTS_DB = "wiki_index.db"
 # M160/M161: `proposals` and `insights` removed — both are system memory
 # and live in `.veles/memory/` (core/memory/artefacts.py + the `insights`
 # SQL table), not user content.
-_ALLOWED_CATEGORIES = (
+# Core categories always present regardless of layout pack (curator writes
+# `sessions`, self-doc writes `self-doc`, ingest writes concepts/entities/sources).
+_DEFAULT_CATEGORIES = (
     "concepts",
     "entities",
     "sources",
@@ -55,6 +58,35 @@ _ALLOWED_CATEGORIES = (
     "self-doc",
 )
 _SUMMARY_CHAR_CAP = 200
+
+
+def _resolve_wiki_categories(root: Path) -> tuple[str, ...]:
+    """Core defaults plus the active layout pack's `[layout.wiki].categories`.
+
+    Best-effort and cheap: reads the layout name from `<root>/.veles/project.toml`
+    and looks the pack up via `find_layout(name, project=None)` (builtin + user
+    packs; project-local packs need the Project and fall back to defaults). Any
+    failure → defaults, so wiki writes never break on a malformed/absent pack."""
+    extra: tuple[str, ...] = ()
+    try:
+        import tomllib
+
+        name = "llm-wiki"
+        proj_toml = root / ".veles" / "project.toml"
+        if proj_toml.is_file():
+            with proj_toml.open("rb") as fh:
+                data = tomllib.load(fh)
+            n = (data.get("project") or {}).get("layout")
+            if isinstance(n, str) and n.strip():
+                name = n.strip()
+        from veles.core.layout.discovery import find_layout
+
+        pack = find_layout(name, project=None)
+        if pack is not None:
+            extra = tuple(pack.manifest.wiki_categories)
+    except Exception:
+        extra = ()
+    return _DEFAULT_CATEGORIES + tuple(c for c in extra if c not in _DEFAULT_CATEGORIES)
 
 
 @dataclass(slots=True)
@@ -96,18 +128,45 @@ def _extract_title_and_summary(content: str, fallback: str) -> tuple[str, str]:
 
 
 class Wiki:
-    def __init__(self, root: Path | str) -> None:
+    def __init__(self, root: Path | str, *, categories: tuple[str, ...] | None = None) -> None:
         self._root = Path(root)
         self._fts: sqlite3.Connection | None = None
         self._fts_disabled = False
+        # Allowed category roots: explicit override (tests) or resolved from the
+        # active layout pack (defaults plus pack extras). Resolved lazily, once.
+        self._categories_override = categories
+        self._categories_resolved: tuple[str, ...] | None = None
 
     @property
     def root(self) -> Path:
         return self._root
 
+    def categories(self) -> tuple[str, ...]:
+        """The allowed wiki category roots for this project's layout pack."""
+        if self._categories_override is not None:
+            return self._categories_override
+        if self._categories_resolved is None:
+            self._categories_resolved = _resolve_wiki_categories(self._root)
+        return self._categories_resolved
+
+    def _validate_category(self, category: str) -> str:
+        """Normalize + validate a (possibly nested) category like `projects/work`.
+        Its first segment must be a declared category root; every segment is
+        slug-normalized. Raises ValueError otherwise."""
+        parts = [p for p in category.strip().strip("/").split("/") if p]
+        if not parts:
+            raise ValueError("category must be non-empty")
+        allowed = self.categories()
+        if parts[0] not in allowed:
+            raise ValueError(f"category root must be one of {allowed}, got {category!r}")
+        norm = [_normalize_slug(p) for p in parts]
+        if any(not p for p in norm):
+            raise ValueError(f"category has an invalid segment: {category!r}")
+        return "/".join(norm)
+
     def ensure_layout(self) -> None:
         self._root.mkdir(parents=True, exist_ok=True)
-        for cat in _ALLOWED_CATEGORIES:
+        for cat in self.categories():
             (self._root / _WIKI_DIR / cat).mkdir(parents=True, exist_ok=True)
         (self._root / _SOURCES_DIR).mkdir(parents=True, exist_ok=True)
 
@@ -130,8 +189,7 @@ class Wiki:
         / `fetched:` so curator and lint can apply the right priority during
         contradiction resolution (M66, §8.6).
         """
-        if category not in _ALLOWED_CATEGORIES:
-            raise ValueError(f"category must be one of {_ALLOWED_CATEGORIES}, got {category!r}")
+        category = self._validate_category(category)
         clean_slug = _normalize_slug(slug)
         self.ensure_layout()
         body = content if content.lstrip().startswith("#") else f"# {title}\n\n{content}"
@@ -144,6 +202,7 @@ class Wiki:
                 frontmatter = f"---\ntrust: {trust}\n---\n\n"
             body = frontmatter + body
         page_path = self._root / _WIKI_DIR / category / f"{clean_slug}.md"
+        page_path.parent.mkdir(parents=True, exist_ok=True)  # nested category (projects/work)
         page_path.write_text(body, encoding="utf-8")
         self.update_index()
         rel_path = f"{_WIKI_DIR}/{category}/{clean_slug}.md"
@@ -159,15 +218,19 @@ class Wiki:
     def list_pages(self) -> list[WikiPageInfo]:
         self.ensure_layout()
         pages: list[WikiPageInfo] = []
-        for cat in _ALLOWED_CATEGORIES:
-            for md in sorted((self._root / _WIKI_DIR / cat).glob("*.md")):
+        wiki_base = self._root / _WIKI_DIR
+        for cat in self.categories():
+            # Recurse so nested substructure (e.g. projects/work/*.md) is listed;
+            # the page's `category` is its parent dir relative to wiki/.
+            for md in sorted((wiki_base / cat).rglob("*.md")):
+                nested_cat = md.parent.relative_to(wiki_base).as_posix()
                 slug = md.stem
                 content = md.read_text(encoding="utf-8", errors="replace")
                 title, summary = _extract_title_and_summary(content, fallback=slug)
                 pages.append(
                     WikiPageInfo(
-                        rel_path=f"{_WIKI_DIR}/{cat}/{md.name}",
-                        category=cat,
+                        rel_path=f"{_WIKI_DIR}/{nested_cat}/{md.name}",
+                        category=nested_cat,
                         slug=slug,
                         title=title,
                         summary=summary,
@@ -201,19 +264,20 @@ class Wiki:
         if not pages:
             lines.append("_(no pages yet)_")
         else:
-            by_cat: dict[str, list[WikiPageInfo]] = {c: [] for c in _ALLOWED_CATEGORIES}
+            by_cat: dict[str, list[WikiPageInfo]] = {}
             for p in pages:
                 by_cat.setdefault(p.category, []).append(p)
-            for cat in _ALLOWED_CATEGORIES:
-                cat_pages = by_cat.get(cat) or []
-                if not cat_pages:
-                    continue
-                lines.append(f"## {cat}")
-                lines.append("")
-                for p in cat_pages:
-                    summary = p.summary or "—"
-                    lines.append(f"- [{p.title}]({p.rel_path}) — {summary}")
-                lines.append("")
+            # Emit declared roots in pack order; within each, its nested
+            # sub-categories sorted so the index is deterministic.
+            for root_cat in self.categories():
+                subcats = sorted(c for c in by_cat if c == root_cat or c.startswith(f"{root_cat}/"))
+                for cat in subcats:
+                    lines.append(f"## {cat}")
+                    lines.append("")
+                    for p in sorted(by_cat[cat], key=lambda x: x.slug):
+                        summary = p.summary or "—"
+                        lines.append(f"- [{p.title}]({p.rel_path}) — {summary}")
+                    lines.append("")
         (self._root / _INDEX_FILE).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def index_text(self) -> str:
