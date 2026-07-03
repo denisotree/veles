@@ -7,9 +7,9 @@ paths, subtly different error handling. This module replaces them.
 
 Schema (the wizard writes it, the daemon and TUI read it):
 
-    [provider]
-    default = "openrouter"
-    model   = "anthropic/claude-sonnet-4.6"  # optional
+    [engine]
+    provider = "openrouter"
+    model    = "anthropic/claude-sonnet-4.6"  # optional
 
     [daemon]
     enabled  = true
@@ -53,7 +53,7 @@ def _load_config_from_path(path: Path) -> dict[str, Any]:
     """Read a project config from an explicit file path. Internal —
     callers prefer `load_project_config(project)`. Exposed so the
     daemon picker (which has a `project_path` string, not a `Project`)
-    can read `[provider] model` without paying to construct a Project."""
+    can read `[engine] model` without paying to construct a Project."""
     if not path.is_file():
         return {}
     try:
@@ -65,14 +65,14 @@ def _load_config_from_path(path: Path) -> dict[str, Any]:
 
 
 def read_provider_model_at(project_root: Path) -> str | None:
-    """Read `[provider] model` from `<project_root>/.veles/config.toml`.
+    """Read `[engine] model` from `<project_root>/.veles/config.toml`.
 
     Returns `None` when the file is missing, malformed, or has no model
-    key. Path-based variant of `load_project_config(...).provider.model`
+    key. Path-based variant of `load_project_config(...).engine.model`
     so the daemon TUI picker can show the active model per registered
     daemon without constructing a `Project` for each row."""
     cfg = _load_config_from_path(project_root / ".veles" / _CONFIG_FILENAME)
-    section = cfg.get("provider")
+    section = cfg.get("engine")
     if not isinstance(section, dict):
         return None
     model = section.get("model")

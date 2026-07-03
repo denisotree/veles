@@ -1,9 +1,9 @@
-"""M125 — user-level routing layer + `[provider]` base inheritance.
+"""M125 — user-level routing layer + `[engine]` base inheritance.
 
 `effective_route` layers project → user → hardcoded, mirroring M124's
 `effective_policy`. These tests pin the new layers:
 
-  * project `[provider]` base feeds every ensemble task (footgun fix),
+  * project `[engine]` base feeds every ensemble task (footgun fix),
   * user `~/.veles/config.toml` `[routing.tasks]` and `[user]` base,
   * project scope wins over user scope,
   * `embedding` never inherits a chat base.
@@ -30,15 +30,15 @@ def _write_user_config(home: Path, body: str) -> None:
     (veles_dir / "config.toml").write_text(body, encoding="utf-8")
 
 
-# ---------- project [provider] base ----------
+# ---------- project [engine] base ----------
 
 
 def test_provider_base_feeds_ensemble_tasks(tmp_path: Path) -> None:
-    """The footgun fix: `[provider] default=ollama, model=qwen3` with no
+    """The footgun fix: `[engine] provider=ollama, model=qwen3` with no
     explicit routes resolves compressor/insights/advisor to ollama, not
     the hardcoded openrouter haiku default."""
     project = init_project(tmp_path / "p", name="p")
-    save_project_config(project, {"provider": {"default": "ollama", "model": "qwen3:4b-instruct"}})
+    save_project_config(project, {"engine": {"provider": "ollama", "model": "qwen3:4b-instruct"}})
     for task in ("compressor", "insights", "advisor", "vision"):
         provider, model, source = effective_route(task, project)
         assert (provider, model) == ("ollama", "qwen3:4b-instruct")
@@ -46,13 +46,13 @@ def test_provider_base_feeds_ensemble_tasks(tmp_path: Path) -> None:
 
 
 def test_incomplete_provider_base_is_skipped(tmp_path: Path) -> None:
-    """`[provider] default` without `model` must NOT synthesize
+    """`[engine] provider` without `model` must NOT synthesize
     `ollama:<openrouter-slug>` — it falls through, and with no other layer
     configured, routing raises (M165c: no cloud fallback)."""
     from veles.core.model_resolver import ConfigurationError
 
     project = init_project(tmp_path / "p", name="p")
-    save_project_config(project, {"provider": {"default": "ollama"}})
+    save_project_config(project, {"engine": {"provider": "ollama"}})
     with pytest.raises(ConfigurationError):
         effective_route("compressor", project)
 
@@ -62,7 +62,7 @@ def test_explicit_route_beats_provider_base(tmp_path: Path) -> None:
     save_project_config(
         project,
         {
-            "provider": {"default": "ollama", "model": "qwen3"},
+            "engine": {"provider": "ollama", "model": "qwen3"},
             "routing": {"tasks": {"compressor": "openai:gpt-4o-mini"}},
         },
     )
@@ -103,7 +103,7 @@ def test_user_provider_base_layer(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 
 def test_project_scope_beats_user_scope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     project = init_project(tmp_path / "p", name="p")
-    save_project_config(project, {"provider": {"default": "ollama", "model": "qwen3"}})
+    save_project_config(project, {"engine": {"provider": "ollama", "model": "qwen3"}})
     home = tmp_path / "home"
     monkeypatch.setenv("VELES_USER_HOME", str(home))
     _write_user_config(
@@ -111,7 +111,7 @@ def test_project_scope_beats_user_scope(tmp_path: Path, monkeypatch: pytest.Monk
         '[user]\nlanguage = "en"\ndefault_provider = "openrouter"\n\n'
         '[routing.tasks]\ncompressor = "openai:gpt-4o-mini"\n',
     )
-    # project [provider] base (project scope) beats user [routing.tasks].
+    # project [engine] base (project scope) beats user [routing.tasks].
     provider, model, source = effective_route("compressor", project)
     assert (provider, model) == ("ollama", "qwen3")
     assert source == "project-provider"
@@ -131,7 +131,7 @@ def test_embedding_never_inherits_any_base(tmp_path: Path, monkeypatch: pytest.M
     save_project_config(
         project,
         {
-            "provider": {"default": "ollama", "model": "qwen3"},
+            "engine": {"provider": "ollama", "model": "qwen3"},
             "routing": {"tasks": {"default": "ollama:qwen3"}},
         },
     )
@@ -155,7 +155,7 @@ def test_embedding_explicit_route_honored(tmp_path: Path) -> None:
 
 
 def test_compressor_builds_on_local_provider_base(tmp_path: Path) -> None:
-    """M125 headline-fix seam: with `[provider] default=ollama` the
+    """M125 headline-fix seam: with `[engine] provider=ollama` the
     compressor route resolves to ollama AND `build_compressor` must
     actually construct a compressor — `has_api_key` is True for local
     providers, so the route is NOT disabled. Without this, M125 would
@@ -164,7 +164,7 @@ def test_compressor_builds_on_local_provider_base(tmp_path: Path) -> None:
     from veles.cli._runtime import build_compressor
 
     project = init_project(tmp_path / "p", name="p")
-    save_project_config(project, {"provider": {"default": "ollama", "model": "qwen3:4b-instruct"}})
+    save_project_config(project, {"engine": {"provider": "ollama", "model": "qwen3:4b-instruct"}})
     # `provider` positional is unused inside (routed independently); pass None.
     compressor = build_compressor(project, None)  # type: ignore[arg-type]
     assert compressor is not None

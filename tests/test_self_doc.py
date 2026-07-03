@@ -84,7 +84,7 @@ def test_generate_self_doc_routing_has_default(tmp_path: Path) -> None:
     project = _make_project(tmp_path)
     # M165c: routing only resolves with a configured base — give it one so the
     # self-doc routing block has entries.
-    save_project_config(project, {"provider": {"default": "ollama", "model": "qwen3:4b"}})
+    save_project_config(project, {"engine": {"provider": "ollama", "model": "qwen3:4b"}})
     report = generate_self_doc(project)
     assert "default" in report.routing
 

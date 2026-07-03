@@ -80,8 +80,8 @@ def test_factory_settings_uses_named_session_provider_and_model(tmp_path):
 
     project = init_project(tmp_path / "p", name="p")
     cfg = load_project_config(project)
-    cfg.setdefault("provider", {})["default"] = "openrouter"
-    cfg["provider"]["model"] = "openrouter/base-model"
+    cfg.setdefault("engine", {})["provider"] = "openrouter"
+    cfg["engine"]["model"] = "openrouter/base-model"
     cfg.setdefault("daemon", {})["api"] = {
         "provider": "ollama",
         "model": "ollama/qwen3:4b-instruct",
@@ -94,7 +94,7 @@ def test_factory_settings_uses_named_session_provider_and_model(tmp_path):
     assert pinned.provider_name == "ollama"
     assert pinned.model == "ollama/qwen3:4b-instruct"
 
-    # Without the session arg it falls back to the project [provider] base.
+    # Without the session arg it falls back to the project [engine] base.
     base = _factory_settings_from_args(args, project)
     assert base.provider_name == "openrouter"
     assert base.model == "openrouter/base-model"

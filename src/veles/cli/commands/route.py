@@ -1,7 +1,7 @@
 """`veles route` — inspect / edit ensemble routing (M43, unified in M125).
 
 M125 moved per-task routes from a standalone `routing.toml` into
-`config.toml [routing.tasks]` and made `[provider]` the routing base, so
+`config.toml [routing.tasks]` and made `[engine]` the routing base, so
 `set`/`reset` now read-modify-write `config.toml` and `show` resolves
 through `effective_route` (same precedence the agent uses). M149 removed
 the legacy auto-import and the `migrate` verb — `config.toml` is the
@@ -64,13 +64,13 @@ def _show(project: Project) -> int:
         except ConfigurationError:
             print(f"{task:<14}  {'(unconfigured)':<40}  -")
 
-    # Surface an incomplete `[provider]` base — a common footgun where
-    # `default` is set but `model` is not, so the base layer is skipped.
-    prov = get_section(load_project_config(project), "provider")
-    if prov.get("default") and not prov.get("model"):
+    # Surface an incomplete `[engine]` base — a common footgun where
+    # `provider` is set but `model` is not, so the base layer is skipped.
+    prov = get_section(load_project_config(project), "engine")
+    if prov.get("provider") and not prov.get("model"):
         print(
-            f"\nnote: [provider] default={prov['default']!r} has no model — "
-            "the project-provider base layer is skipped (set [provider].model "
+            f"\nnote: [engine] provider={prov['provider']!r} has no model — "
+            "the project-provider base layer is skipped (set [engine].model "
             "or an explicit route).",
             file=sys.stderr,
         )

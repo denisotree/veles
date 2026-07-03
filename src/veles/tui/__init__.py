@@ -33,14 +33,14 @@ def _register_tui_session(project: Project):
 
 
 def _load_project_default_provider(project: Project) -> str | None:
-    """Return `[provider] default` from `<project>/.veles/config.toml`,
-    or None if the file is absent / malformed / has no provider section.
+    """Return `[engine] provider` from `<project>/.veles/config.toml`,
+    or None if the file is absent / malformed / has no engine section.
 
     Thin wrapper kept for backward-compat — `core/model_resolver.py`
     consumes the same data through the cascade helper. Tests still
     import this name."""
-    provider_section = get_section(load_project_config(project), "provider")
-    raw = provider_section.get("default")
+    engine_section = get_section(load_project_config(project), "engine")
+    raw = engine_section.get("provider")
     return raw if isinstance(raw, str) and raw else None
 
 

@@ -22,7 +22,7 @@ def test_load_project_provider_missing_config(tmp_path: Path) -> None:
 def test_load_project_provider_present(tmp_path: Path) -> None:
     project = init_project(tmp_path, name=None, force=False)
     (project.state_dir / "config.toml").write_text(
-        '[provider]\ndefault = "openai"\n',
+        '[engine]\nprovider = "openai"\n',
         encoding="utf-8",
     )
     assert _load_project_default_provider(project) == "openai"

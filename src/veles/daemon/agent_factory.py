@@ -42,7 +42,7 @@ def _attach_background_runners(state, project, agent_factory, provider_name: str
     # the post-turn insight extractor uses (`route("insights")`). Reusing
     # the daemon's main `provider_name` while letting the model default to
     # dreaming's hardcoded `anthropic/claude-haiku-4.5` decoupled the two:
-    # a daemon on a local `[provider]` (e.g. ollama) asked that backend for
+    # a daemon on a local `[engine]` (e.g. ollama) asked that backend for
     # an OpenRouter slug and got HTTP 404 on every deep-dream cycle. Routing
     # both keeps them consistent (ollama → an ollama model, etc.).
     del provider_name
@@ -173,11 +173,11 @@ def _factory_settings_from_args(
     from veles.core.project_config import get_section, load_project_config
 
     # M130: resolve the daemon's main provider/model through the unified
-    # cascade — explicit `--provider`/`--model`, then project `[provider]`,
+    # cascade — explicit `--provider`/`--model`, then project `[engine]`,
     # then user `[user] default_*`, then the argparse DEFAULT — the SAME
     # cascade the TUI uses (`resolve_effective_*`). The old hand-rolled
     # `cli_model or cfg_model or DEFAULT_MODEL` skipped the user layer, so
-    # a daemon in a project that has no own `[provider]` booted on
+    # a daemon in a project that has no own `[engine]` booted on
     # `DEFAULT_MODEL` (anthropic/claude-sonnet-4.6) even when the user had
     # picked ollama at user scope — a provider/model mismatch. The daemon
     # parser sets `--provider`/`--model` defaults to None, so an absent
@@ -221,11 +221,11 @@ def _factory_settings_from_args(
             getattr(args, "compress_threshold_tokens", DEFAULT_COMPRESS_THRESHOLD_TOKENS)
         ),
         # None → let `build_compressor` use the M125-routed compressor model
-        # (`route("compressor")`, which inherits `[provider]`). The daemon
+        # (`route("compressor")`, which inherits `[engine]`). The daemon
         # parser doesn't register `--compressor-model`, so the old getattr
         # fallback to `DEFAULT_COMPRESSOR_MODEL` hard-pinned every daemon's
         # compressor to `anthropic/claude-haiku-4.5`, overriding routing —
-        # a fully-local `[provider]=ollama` project still summarised on
+        # a fully-local `[engine]=ollama` project still summarised on
         # paid haiku. Defaulting to None defers to the route.
         compressor_model=getattr(args, "compressor_model", None),
         max_summariser_input_tokens=max_summariser_input,
@@ -386,7 +386,7 @@ def _make_agent_factory(
     query-aware.
 
     M127: model and provider are fixed at daemon launch from config
-    (`[provider]` / `[routing.tasks]`); there is no per-session model or
+    (`[engine]` / `[routing.tasks]`); there is no per-session model or
     provider override anymore (the Telegram `/model` picker was removed).
     Every turn builds with the same config-derived `settings`. The `state`
     param is retained for signature stability (mode overrides, future use).

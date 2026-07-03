@@ -156,7 +156,7 @@ async def test_picker_typing_filters_without_tab(
 # ---- project-config mirror (resolver-cascade fix) ----
 #
 # `core.model_resolver.resolve_effective_model` puts
-# `<project>/.veles/config.toml [provider] model` ABOVE tui_state.json. If
+# `<project>/.veles/config.toml [engine] model` ABOVE tui_state.json. If
 # the wizard wrote a model there, writing only tui_state.json on `/model X`
 # would silently lose the user's pick on next boot. `persist_model_choice`
 # mirrors the value into project config so the cascade picks the latest
@@ -170,12 +170,12 @@ def test_persist_model_choice_writes_project_config(tmp_project) -> None:
     project, _ = tmp_project
     persist_model_choice(project, "openai/gpt-4o")
     cfg = load_project_config(project)
-    assert cfg.get("provider", {}).get("model") == "openai/gpt-4o"
+    assert cfg.get("engine", {}).get("model") == "openai/gpt-4o"
 
 
 def test_persist_model_choice_preserves_other_keys(tmp_project) -> None:
     """Pre-seed config with unrelated sections + a provider default; the
-    helper must keep them intact while overwriting only `[provider] model`."""
+    helper must keep them intact while overwriting only `[engine] model`."""
     from veles.core.project_config import load_project_config, save_project_config
     from veles.core.tui_state import persist_model_choice
 
@@ -183,14 +183,14 @@ def test_persist_model_choice_preserves_other_keys(tmp_project) -> None:
     save_project_config(
         project,
         {
-            "provider": {"default": "openrouter", "model": "old-model"},
+            "engine": {"provider": "openrouter", "model": "old-model"},
             "daemon": {"enabled": True, "port": 8765},
         },
     )
     persist_model_choice(project, "anthropic/claude-3.7-sonnet")
     cfg = load_project_config(project)
-    assert cfg["provider"]["model"] == "anthropic/claude-3.7-sonnet"
-    assert cfg["provider"]["default"] == "openrouter"
+    assert cfg["engine"]["model"] == "anthropic/claude-3.7-sonnet"
+    assert cfg["engine"]["provider"] == "openrouter"
     assert cfg["daemon"] == {"enabled": True, "port": 8765}
 
 
@@ -223,7 +223,7 @@ async def test_slash_model_set_persists_to_project_config(
     project, store = tmp_project
     save_project_config(
         project,
-        {"provider": {"default": "openrouter", "model": "anthropic/old"}},
+        {"engine": {"provider": "openrouter", "model": "anthropic/old"}},
     )
     app = TuiApp(
         state=AppState(session_id=None, provider_name="openrouter", model="m"),
@@ -238,8 +238,8 @@ async def test_slash_model_set_persists_to_project_config(
         await pilot.press("enter")
         await pilot.pause()
     cfg = load_project_config(project)
-    assert cfg["provider"]["model"] == "openai/gpt-4o"
-    assert cfg["provider"]["default"] == "openrouter"
+    assert cfg["engine"]["model"] == "openai/gpt-4o"
+    assert cfg["engine"]["provider"] == "openrouter"
 
 
 async def test_picker_pick_persists_to_project_config(
@@ -267,4 +267,4 @@ async def test_picker_pick_persists_to_project_config(
         await pilot.pause()
     expected = known_models("openrouter")[0]
     cfg = load_project_config(project)
-    assert cfg.get("provider", {}).get("model") == expected
+    assert cfg.get("engine", {}).get("model") == expected

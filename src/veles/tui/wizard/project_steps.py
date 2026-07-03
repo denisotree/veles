@@ -166,10 +166,10 @@ class ProviderOverrideStep:
         )
 
         cfg = _load_project_toml(project)
-        cfg.setdefault("provider", {})
-        cfg["provider"]["default"] = picked
+        cfg.setdefault("engine", {})
+        cfg["engine"]["provider"] = picked
         if picked_model:
-            cfg["provider"]["model"] = picked_model
+            cfg["engine"]["model"] = picked_model
         _save_project_toml(project, cfg)
         ctx.answers["provider_override"] = {
             "provider": picked,

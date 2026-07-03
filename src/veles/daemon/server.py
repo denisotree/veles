@@ -480,7 +480,7 @@ async def _handle_patch_session(request: web.Request) -> web.Response:
     Body: `{"mode": str}` where mode is one of auto/planning/writing/goal.
 
     M127: `model` and `provider` are **fixed at daemon launch** from
-    `config.toml` (`[provider]` / `[routing.tasks]`) and can no longer be
+    `config.toml` (`[engine]` / `[routing.tasks]`) and can no longer be
     changed per-session — supplying either is a 400. The Telegram `/model`
     picker was removed; `/mode` is the only remaining per-session override.
     """
@@ -500,7 +500,7 @@ async def _handle_patch_session(request: web.Request) -> web.Response:
         return web.json_response(
             {
                 "error": "model and provider are fixed at daemon launch; "
-                "set them in config.toml ([provider] / [routing.tasks]) "
+                "set them in config.toml ([engine] / [routing.tasks]) "
                 "before starting the daemon"
             },
             status=400,

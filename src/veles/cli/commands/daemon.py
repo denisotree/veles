@@ -193,7 +193,7 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     # silently ignored them and always bound the argparse default).
     _resolve_daemon_bind(args, project, name)
 
-    # M130: resolve via the unified cascade (project [provider] → user
+    # M130: resolve via the unified cascade (project [engine] → user
     # [user] → DEFAULT) so the API-key check targets the provider the
     # daemon will actually boot on — not a bare `args.provider` that is
     # `None` when no `--provider` was passed. M135: named sessions add a

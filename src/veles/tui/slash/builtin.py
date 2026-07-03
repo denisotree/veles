@@ -277,7 +277,7 @@ def _model(line: str, ctx: SlashContext) -> SlashResult:
         return SlashResult(open_picker="models:refresh")
     ctx.state.model = new
     # M81 + resolver-cascade fix: persist into tui_state.json **and**
-    # `<project>/.veles/config.toml [provider] model`. The model resolver
+    # `<project>/.veles/config.toml [engine] model`. The model resolver
     # consults project config above tui_state, so writing only the latter
     # would lose the user's pick on next boot whenever the wizard had
     # seeded a model into config.toml.

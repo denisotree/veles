@@ -62,14 +62,14 @@ def test_factory_settings_compressor_model_defers_to_route(tmp_path: Path) -> No
     `--compressor-model`, so `_factory_settings_from_args` must default it
     to None (defer to `route("compressor")`), NOT to the haiku constant.
 
-    Before the fix, a fully-local `[provider]=ollama` project still got
+    Before the fix, a fully-local `[engine]=ollama` project still got
     `compressor_model = "anthropic/claude-haiku-4.5"`, which `build_compressor`
     let win over the M125-routed ollama model — the daemon summarised on
     paid haiku despite a local provider."""
     from veles.core.project_config import save_project_config
 
     project = init_project(tmp_path, name=None, force=False)
-    save_project_config(project, {"provider": {"default": "ollama", "model": "qwen3:4b-instruct"}})
+    save_project_config(project, {"engine": {"provider": "ollama", "model": "qwen3:4b-instruct"}})
     # The daemon-start parser sets model/provider=None and omits
     # --compressor-model entirely.
     args = argparse.Namespace(model=None, provider=None)
@@ -102,13 +102,13 @@ def test_factory_settings_honors_explicit_args(tmp_path: Path) -> None:
 
 def test_factory_settings_reads_project_config_when_cli_absent(tmp_path: Path) -> None:
     """Cascade rung 2: when --model/--provider are absent (None sentinel
-    from daemon parser), `[provider]` in <project>/.veles/config.toml wins
+    from daemon parser), `[engine]` in <project>/.veles/config.toml wins
     over DEFAULT_MODEL/DEFAULT_PROVIDER. Mirrors the Mind Palace bug
     where the daemon ignored `model = "google/gemini-3.1-pro-preview"`."""
     project = init_project(tmp_path, name=None, force=False)
     cfg_path = project.state_dir / "config.toml"
     cfg_path.write_text(
-        '[provider]\ndefault = "openai"\nmodel = "google/gemini-3.1-pro-preview"\n',
+        '[engine]\nprovider = "openai"\nmodel = "google/gemini-3.1-pro-preview"\n',
         encoding="utf-8",
     )
     args = argparse.Namespace(model=None, provider=None)
@@ -119,11 +119,11 @@ def test_factory_settings_reads_project_config_when_cli_absent(tmp_path: Path) -
 
 def test_factory_settings_inherits_user_level_model(tmp_path: Path) -> None:
     """M130 (cascade rung 3): a daemon in a project WITHOUT its own
-    `[provider]` must inherit the user-level `[user] default_provider/
+    `[engine]` must inherit the user-level `[user] default_provider/
     default_model` — the same cascade the TUI uses (`resolve_effective_*`).
 
     Before the fix `_factory_settings_from_args` read only the project
-    `[provider]` (`cfg_model or DEFAULT_MODEL`), so a user who picked
+    `[engine]` (`cfg_model or DEFAULT_MODEL`), so a user who picked
     ollama in the user-level wizard still booted the daemon on
     `anthropic/claude-sonnet-4.6` — a provider/model mismatch (the
     Mind Palace `daemon start` report)."""
@@ -137,14 +137,14 @@ def test_factory_settings_inherits_user_level_model(tmp_path: Path) -> None:
         'default_model = "qwen3:4b-instruct"\n',
         encoding="utf-8",
     )
-    project = init_project(tmp_path, name=None, force=False)  # no [provider]
+    project = init_project(tmp_path, name=None, force=False)  # no [engine]
     s = _factory_settings_from_args(argparse.Namespace(model=None, provider=None), project)
     assert s.provider_name == "ollama"
     assert s.model == "qwen3:4b-instruct"
 
 
 def test_factory_settings_project_provider_beats_user_level(tmp_path: Path) -> None:
-    """M130: project `[provider]` still wins over the user-level config."""
+    """M130: project `[engine]` still wins over the user-level config."""
     from veles.core.user_config import user_config_path
 
     cfg_path = user_config_path()
@@ -157,7 +157,7 @@ def test_factory_settings_project_provider_beats_user_level(tmp_path: Path) -> N
     )
     project = init_project(tmp_path, name=None, force=False)
     (project.state_dir / "config.toml").write_text(
-        '[provider]\ndefault = "openai"\nmodel = "gpt-4o"\n', encoding="utf-8"
+        '[engine]\nprovider = "openai"\nmodel = "gpt-4o"\n', encoding="utf-8"
     )
     s = _factory_settings_from_args(argparse.Namespace(model=None, provider=None), project)
     assert s.provider_name == "openai"
@@ -168,7 +168,7 @@ def test_factory_settings_cli_overrides_project_config(tmp_path: Path) -> None:
     """Cascade rung 1: explicit --model on the CLI beats project config."""
     project = init_project(tmp_path, name=None, force=False)
     (project.state_dir / "config.toml").write_text(
-        '[provider]\nmodel = "google/gemini-3.1-pro-preview"\n',
+        '[engine]\nmodel = "google/gemini-3.1-pro-preview"\n',
         encoding="utf-8",
     )
     args = argparse.Namespace(model="anthropic/claude-haiku-4.5", provider="anthropic")

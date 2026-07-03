@@ -33,7 +33,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         ),
     )
     add_common_run_flags(daemon_start)
-    # Cascade: explicit CLI flag > `[provider]` in <project>/.veles/config.toml
+    # Cascade: explicit CLI flag > `[engine]` in <project>/.veles/config.toml
     # > DEFAULT_MODEL/DEFAULT_PROVIDER. None sentinel lets the runtime tell
     # "not given" apart from a string that happens to equal the hardcoded
     # default. See `cli/commands/daemon.py::_factory_settings_from_args`.

@@ -9,7 +9,7 @@ Steps (each gated by its own y/N, default `n` = skip):
   1. Bootstrap — confirm + run `init_project(cwd)`. This step is the
      wizard's gate; declining returns None and the caller exits with
      the standard "no project found" error.
-  2. Provider override — optional `.veles/config.toml` `[provider]` block.
+  2. Provider override — optional `.veles/config.toml` `[engine]` block.
      Default = inherit from user-level config.
   3. Wiki seed from existing docs — copy `README.md`, `*.md` in `docs/`,
      and top-level `*.md` files into `wiki/sources/`. Pure file copy;
@@ -143,10 +143,10 @@ def _step_provider_override(project: Project, prompter: Prompter) -> None:
     )
     model = prompter(t("project_wizard.ask_model_label"), None).strip() or None
     cfg = _load_project_toml(project)
-    cfg.setdefault("provider", {})
-    cfg["provider"]["default"] = provider
+    cfg.setdefault("engine", {})
+    cfg["engine"]["provider"] = provider
     if model:
-        cfg["provider"]["model"] = model
+        cfg["engine"]["model"] = model
     _save_project_toml(project, cfg)
     print(
         t("project_wizard.provider_written", path=_project_config_path(project)),

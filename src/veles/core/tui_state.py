@@ -98,7 +98,7 @@ def persist_model_choice(project: Project, model: str) -> None:
 
     `tui_state.json` already records the choice (per M81) but
     `core.model_resolver.resolve_effective_model` puts the project's
-    `[provider] model` in `config.toml` **above** the tui_state value:
+    `[engine] model` in `config.toml` **above** the tui_state value:
     if the first-run wizard wrote a model there, the user's later
     `/model X` would never win on restart. We update `config.toml` too
     so the cascade picks the latest interactive choice.
@@ -114,11 +114,11 @@ def persist_model_choice(project: Project, model: str) -> None:
     from veles.core.project_config import load_project_config, save_project_config
 
     cfg = load_project_config(project)
-    provider_section = cfg.get("provider")
-    if not isinstance(provider_section, dict):
-        cfg["provider"] = {"model": model}
+    engine_section = cfg.get("engine")
+    if not isinstance(engine_section, dict):
+        cfg["engine"] = {"model": model}
     else:
-        provider_section["model"] = model
+        engine_section["model"] = model
     with contextlib.suppress(OSError):
         save_project_config(project, cfg)
 

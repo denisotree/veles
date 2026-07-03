@@ -178,7 +178,7 @@ def test_nl_default_used_for_unknown_task(project: Project) -> None:
     """nl-default is a *user-stated* preference for tasks the user hasn't pinned.
 
     Resolution order in route(): manual-task → manual-default → nl-task →
-    nl-default → [provider] base → user layers (M165d: no hardcoded fallback
+    nl-default → [engine] base → user layers (M165d: no hardcoded fallback
     below that — an unconfigured task raises). So an nl-default *does* answer
     tasks not explicitly pinned anywhere, which is the intended behaviour.
     """
