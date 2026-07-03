@@ -144,6 +144,40 @@ def _build_app(tmp_path):
     return app, store
 
 
+def test_repl_ui_strings_localized_not_hardcoded_russian(tmp_path) -> None:
+    """Regression: the REPL used to hardcode Russian UI strings, so an English
+    user saw e.g. '(Ctrl+O раскрыть)'. All picker/HUD strings must route through
+    i18n and render English by default — no Cyrillic leaks."""
+    import re
+
+    from veles.core.i18n import set_active_locale
+
+    set_active_locale("en")
+    cyrillic = re.compile("[Ѐ-ӿ]")  # Cyrillic block
+    try:
+        app, store = _build_app(tmp_path)
+        try:
+            app.busy = True
+            hud = "".join(f[1] for f in app._meta_fragments())
+            assert "(Ctrl+O expand)" in hud and not cyrillic.search(hud)
+
+            app.q_active = True
+            app.q_question = "Pick one"
+            app.q_options = ["A", "B"]
+            app.q_allow_free = True
+            picker = "".join(f[1] for f in app._picker_fragments())
+            assert not cyrillic.search(picker)  # no Russian in the English picker
+
+            app.mp_loading = False
+            app.mp_models = ["m1", "m2"]
+            mp = "".join(f[1] for f in app._mp_fragments())
+            assert not cyrillic.search(mp)
+        finally:
+            store.close()
+    finally:
+        set_active_locale("en")
+
+
 def test_meta_fragments_working_idle_and_expand_in_both(tmp_path) -> None:
     app, store = _build_app(tmp_path)
     try:
@@ -199,9 +233,9 @@ def test_picker_fragments_list_options_and_free_entry(tmp_path) -> None:
         text = "".join(f[1] for f in app._picker_fragments())
         assert "Apply the plan?" in text
         assert "Apply fully" in text and "Exclude sources/" in text
-        assert app._FREE_LABEL in text  # free-text sentinel row present
+        assert "✎" in text  # free-text sentinel row present (locale-independent marker)
         app.q_free = True
-        assert "свой вариант" in "".join(f[1] for f in app._picker_fragments())
+        assert "Enter" in "".join(f[1] for f in app._picker_fragments())  # free-input hint
     finally:
         store.close()
 
@@ -328,12 +362,12 @@ def test_picker_fragments_permission_has_no_free_row(tmp_path) -> None:
     app, store = _build_app(tmp_path)
     try:
         app.q_active = True
-        app.q_question = "Разрешить write_file?"
+        app.q_question = "Allow write_file?"
         app.q_options = ["Once (this call only)", "Refuse"]
         app.q_allow_free = False
         text = "".join(f[1] for f in app._picker_fragments())
         assert "Once (this call only)" in text and "Refuse" in text
-        assert app._FREE_LABEL not in text  # permission prompt → no free-text row
+        assert "✎" not in text  # permission prompt → no free-text row
     finally:
         store.close()
 

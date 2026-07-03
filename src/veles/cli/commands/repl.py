@@ -30,6 +30,7 @@ import sys
 import time
 from collections import deque
 
+from veles.core.i18n import t
 from veles.core.project import Project
 
 # Window inside which a second Ctrl+C at the prompt is treated as exit.
@@ -814,7 +815,7 @@ def _choice_picker(theme, question: str, options: list[str]):
     from prompt_toolkit.layout import Layout, Window
     from prompt_toolkit.layout.controls import FormattedTextControl
 
-    free_label = "✎ свой вариант…"
+    free_label = t("repl.free_choice")
     items = [*options, free_label]
     sel = [0]
     picked: list[int | None] = [None]
@@ -851,7 +852,7 @@ def _choice_picker(theme, question: str, options: list[str]):
             style = f"bold {theme.accent}" if i == sel[0] else ""
             marker = "❯" if i == sel[0] else " "
             lines.append((style, f"  {marker} {label}\n"))
-        lines.append(("ansibrightblack", "\n  ↑↓ выбор · Enter · Esc отмена\n"))
+        lines.append(("ansibrightblack", f"\n  {t('repl.picker_hint')}\n"))
         return FormattedText(lines)
 
     Application(
@@ -873,7 +874,7 @@ def _free_text(theme):
     from prompt_toolkit import prompt
 
     try:
-        answer = prompt(_pt_html(theme, "  ваш вариант ❯ ")).strip()
+        answer = prompt(_pt_html(theme, f"  {t('repl.your_answer')} ❯ ")).strip()
     except (EOFError, KeyboardInterrupt):
         return None
     return answer or None
@@ -999,7 +1000,6 @@ class _ReplApp:
     """
 
     # The final picker item — selecting it switches to free-text entry.
-    _FREE_LABEL = "✎ свой вариант…"
 
     def __init__(
         self,
@@ -1057,7 +1057,7 @@ class _ReplApp:
         # prompt_toolkit Application can't run under the live loop) ---
         self.q_active = False
         self.q_free = False
-        self.q_allow_free = False  # show the "✎ свой вариант" row (ask_user only)
+        self.q_allow_free = False  # show the free-choice row (ask_user only)
         self.q_question = ""
         self.q_options: list[str] = []
         self.q_values: list[str] | None = None  # decision values (permission prompt)
@@ -1290,13 +1290,13 @@ class _ReplApp:
             elapsed = int(self.turn_elapsed)
         label = f" ⏳ working{'.' * (1 + (self._tick % 3))}" if self.busy else " ✓ done"
         head = f"{label} · ≈{approx} tok · {len(tools)} tool(s) · {elapsed}s"
-        hint = "  (Ctrl+O свернуть)" if self.meta_expanded else "  (Ctrl+O раскрыть)"
+        hint = t("repl.meta_collapse") if self.meta_expanded else t("repl.meta_expand")
         frags: list[tuple[str, str]] = [("class:meta", head + hint + "\n")]
         if self.meta_expanded:
-            for t in modes:
-                frags.append(("class:meta.dim", f"     ↳ {t}\n"))
-            for t in tools[-10:]:
-                frags.append(("class:meta.dim", f"     ⚒ {t}\n"))
+            for mode in modes:
+                frags.append(("class:meta.dim", f"     ↳ {mode}\n"))
+            for tl in tools[-10:]:
+                frags.append(("class:meta.dim", f"     ⚒ {tl}\n"))
         return FormattedText(frags)
 
     def _picker_fragments(self):
@@ -1306,14 +1306,14 @@ class _ReplApp:
 
         frags: list[tuple[str, str]] = [("class:picker", f" {self.q_question}\n")]
         if self.q_free:
-            frags.append(("class:picker.dim", "  введите свой вариант ниже — Enter отправит\n"))
+            frags.append(("class:picker.dim", f"  {t('repl.free_input_hint')}\n"))
             return FormattedText(frags)
-        items = [*self.q_options] + ([self._FREE_LABEL] if self.q_allow_free else [])
+        items = [*self.q_options] + ([t("repl.free_choice")] if self.q_allow_free else [])
         for i, label in enumerate(items):
             sel = i == self.q_sel
             marker = "❯" if sel else " "
             frags.append(("class:picker.sel" if sel else "class:picker", f"  {marker} {label}\n"))
-        frags.append(("class:picker.dim", "  ↑↓ выбор · Enter · Esc отмена\n"))
+        frags.append(("class:picker.dim", f"  {t('repl.picker_hint')}\n"))
         return FormattedText(frags)
 
     def _push_meta(self, kind: str, text: str) -> None:
@@ -1370,8 +1370,8 @@ class _ReplApp:
         self.console.print(f"⚠ {op}", style=self.theme.error, markup=False)
         if summary:
             self.console.print(f"  {summary}", style=self.theme.muted, markup=False)
-        self.q_question = f"Подтвердить необратимое действие: {op}?"
-        self.q_options = ["Да, выполнить", "Отмена"]
+        self.q_question = t("repl.confirm_critical", op=op)
+        self.q_options = [t("repl.confirm_yes"), t("repl.confirm_cancel")]
         self.q_values = ["yes", "no"]
         self.q_allow_free = False
         self.q_free = False
@@ -1410,7 +1410,7 @@ class _ReplApp:
         else:  # approval — turn-scoped: only allow-once / deny
             labels = ["Allow once", "Refuse"]
             values = ["allow_once", "deny"]
-        self.q_question = f"Разрешить выполнение {req.tool_name}?"
+        self.q_question = t("repl.permission_allow", tool=req.tool_name)
         self.q_options = labels
         self.q_values = values
         self.q_allow_free = False
@@ -1500,26 +1500,26 @@ class _ReplApp:
 
         if self.mp_loading:
             return FormattedText(
-                [("class:picker", f" загружаю модели ({self.state.provider_name})…\n")]
-            )
-        if not self.mp_models:
-            return FormattedText(
                 [
                     (
-                        "class:picker.dim",
-                        " нет моделей (нет API-ключа / провайдер недоступен) — "
-                        "задай через /model <id>\n",
+                        "class:picker",
+                        f" {t('repl.loading_models', provider=self.state.provider_name)}\n",
                     )
                 ]
             )
+        if not self.mp_models:
+            return FormattedText([("class:picker.dim", f" {t('repl.no_models')}\n")])
         filtered = self._mp_filtered()
-        head = (
-            f" модель · {self.state.provider_name} · {len(self.mp_models)} · "
-            f"{self.mp_source} — печатай для фильтра · ↑↓ · Enter · Esc\n"
+        header = t(
+            "repl.model_header",
+            provider=self.state.provider_name,
+            count=len(self.mp_models),
+            source=self.mp_source,
         )
+        head = f" {header}\n"
         frags: list[tuple[str, str]] = [("class:picker", head)]
         if not filtered:
-            frags.append(("class:picker.dim", "  нет совпадений\n"))
+            frags.append(("class:picker.dim", f"  {t('repl.no_matches')}\n"))
             return FormattedText(frags)
         sel = max(0, min(self.mp_sel, len(filtered) - 1))
         window = 10
@@ -1535,7 +1535,7 @@ class _ReplApp:
                 ("class:picker.sel" if is_sel else "class:picker", f"  {marker} {m}{cur}\n")
             )
         if len(filtered) > window:
-            frags.append(("class:picker.dim", f"  … {len(filtered)} совпадений, уточни фильтр\n"))
+            frags.append(("class:picker.dim", f"  {t('repl.more_matches', count=len(filtered))}\n"))
         return FormattedText(frags)
 
     def _mp_move(self, delta: int) -> None:
@@ -1561,7 +1561,7 @@ class _ReplApp:
 
     def _mp_cancel(self) -> None:
         self._mp_close()
-        self.console.print("  ⋅ выбор модели отменён", style=self.theme.muted, markup=False)
+        self.console.print(f"  ⋅ {t('repl.model_cancelled')}", style=self.theme.muted, markup=False)
 
     def _mp_close(self) -> None:
         self.mp_active = False
