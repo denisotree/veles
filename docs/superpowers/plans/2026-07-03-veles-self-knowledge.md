@@ -804,7 +804,7 @@ def test_veles_help_returns_full_note_body():
 
 def test_veles_help_handles_no_match():
     out = registry.get("veles_help").handler("zzzz nonexistent qqqq topic")
-    assert "no" in out.lower() or out.strip() != ""
+    assert "no matching veles documentation" in out.lower()
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
