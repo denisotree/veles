@@ -848,13 +848,15 @@ def test_replapp_propagates_active_project_to_worker(tmp_path) -> None:
         store.close()
 
 
-def test_repl_command_registered() -> None:
-    from veles.cli._parsers.agent_loop import register
+def test_repl_is_the_default_no_subcommand() -> None:
+    """The REPL has no subcommand — its flags live on the top-level parser and
+    bare `veles` (command is None) dispatches to it. `repl`/`tui` are gone."""
+    from veles.cli._parsers import build_parser
 
-    parser = argparse.ArgumentParser()
-    sub = parser.add_subparsers(dest="command")
-    register(sub)
-    assert "repl" in sub.choices
-    ns = parser.parse_args(["repl", "--resume", "abc"])
-    assert ns.command == "repl"
+    parser = build_parser()
+    ns = parser.parse_args(["--resume", "abc"])
+    assert ns.command is None
     assert ns.resume == "abc"
+    for gone in ("repl", "tui"):
+        with pytest.raises(SystemExit):
+            parser.parse_args([gone])

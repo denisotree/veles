@@ -112,7 +112,6 @@ from veles.cli.commands.skills import cmd_skill as _cmd_skill
 from veles.cli.commands.subprojects import cmd_subproject as _cmd_subproject
 from veles.cli.commands.tool import cmd_tool as _cmd_tool
 from veles.cli.commands.trust import cmd_trust as _cmd_trust
-from veles.cli.commands.tui import cmd_tui as _cmd_tui
 from veles.core.context import (
     reset_active_project,
     set_active_project,
@@ -204,7 +203,6 @@ __all__ = [
     "_cmd_skill",
     "_cmd_subproject",
     "_cmd_trust",
-    "_cmd_tui",
     "_confirm",
     "_continuous_curator_eligible",
     "_curate_one_session",
@@ -246,32 +244,14 @@ __all__ = [
 # ---------- entry ----------
 
 
-_TOP_LEVEL_GLOBALS = ("--version", "-h", "--help", "--no-wizard")
-
-
-def _normalize_argv(argv: list[str]) -> list[str]:
-    """Route to the default surface (repl) when there's no subcommand.
-
-    - Bare `veles` → `veles repl` (M186: the inline REPL is the default; the
-      full-screen `veles tui` stays explicit).
-    - `veles -c` / `veles --provider …` (a flag first, not a top-level global) →
-      `veles repl …`, so run flags work without typing `repl`.
-    A leading top-level global (`--version`/`-h`/`--no-wizard`) is left alone.
-    """
-    if not argv:
-        return ["repl"]
-    if argv[0].startswith("-") and argv[0] not in _TOP_LEVEL_GLOBALS:
-        return ["repl", *argv]
-    return argv
-
-
 def main(argv: list[str] | None = None) -> int:
     from veles.cli.wizard import maybe_run_first_run_wizard
     from veles.core.i18n import set_active_locale
     from veles.core.user_config import load_user_config
 
-    _argv = _normalize_argv(list(sys.argv[1:]) if argv is None else list(argv))
-    args = _build_parser().parse_args(_argv)
+    # Bare `veles` (and `veles -c`, `veles --provider …`) parse with no
+    # subcommand → dispatched to the inline interactive REPL below.
+    args = _build_parser().parse_args(list(sys.argv[1:]) if argv is None else list(argv))
     # Resolve the active i18n locale before any user-facing string fires.
     # `set_active_locale` honours `VELES_LOCALE` env over the config so a
     # one-shot invocation can force a language without rewriting toml.
@@ -363,9 +343,7 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_job(args, project)
         if args.command == "dream":
             return _cmd_dream(args, project)
-        if args.command == "tui":
-            return _cmd_tui(args, project)
-        if args.command == "repl":
+        if args.command is None:  # bare `veles` → the inline interactive REPL
             return _cmd_repl(args, project)
         if args.command == "route":
             return _cmd_route(args, project)

@@ -69,32 +69,34 @@ def _seed_two_sessions(project) -> tuple[str, str]:
 def test_parser_accepts_c_flag() -> None:
     from veles.cli._parsers import build_parser
 
-    parser = build_parser()
-    assert parser.parse_args(["repl", "-c"]).continue_last is True
-    assert parser.parse_args(["repl", "--continue"]).continue_last is True
-    assert parser.parse_args(["repl"]).continue_last is False
+    parser = build_parser()  # -c / --continue are top-level (bare `veles`)
+    assert parser.parse_args(["-c"]).continue_last is True
+    assert parser.parse_args(["--continue"]).continue_last is True
+    assert parser.parse_args([]).continue_last is False
 
 
-def test_bare_veles_and_flag_first_route_to_repl() -> None:
-    """`veles`, `veles -c`, `veles --provider X` all resolve to the repl surface;
-    top-level globals are left alone."""
-    from veles.cli import _normalize_argv
-
-    assert _normalize_argv([]) == ["repl"]
-    assert _normalize_argv(["-c"]) == ["repl", "-c"]
-    assert _normalize_argv(["--provider", "openrouter"]) == ["repl", "--provider", "openrouter"]
-    assert _normalize_argv(["repl", "-c"]) == ["repl", "-c"]  # explicit subcommand kept
-    assert _normalize_argv(["init"]) == ["init"]  # other subcommand kept
-    assert _normalize_argv(["--version"]) == ["--version"]  # global left alone
-    assert _normalize_argv(["-h"]) == ["-h"]
-
-
-def test_veles_dash_c_parses_as_repl_continue() -> None:
-    from veles.cli import _normalize_argv
+def test_bare_veles_and_flags_dispatch_to_repl() -> None:
+    """No subcommand → the interactive REPL (command is None). Its flags live on
+    the top-level parser so `veles`, `veles -c`, `veles --provider X` all work
+    without a subcommand; real subcommands still parse."""
     from veles.cli._parsers import build_parser
 
-    ns = build_parser().parse_args(_normalize_argv(["-c"]))
-    assert ns.command == "repl" and ns.continue_last is True
+    p = build_parser()
+    assert p.parse_args([]).command is None
+    assert p.parse_args(["-c"]).command is None
+    assert p.parse_args(["-c"]).continue_last is True
+    assert p.parse_args(["--provider", "ollama"]).command is None
+    assert p.parse_args(["run", "q"]).command == "run"
+
+
+def test_tui_and_repl_subcommands_removed() -> None:
+    """`veles tui` and `veles repl` no longer exist — the REPL is bare `veles`."""
+    from veles.cli._parsers import build_parser
+
+    p = build_parser()
+    for gone in ("tui", "repl"):
+        with pytest.raises(SystemExit):
+            p.parse_args([gone])
 
 
 def test_continue_resolves_most_recent_session(project) -> None:

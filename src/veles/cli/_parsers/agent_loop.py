@@ -183,87 +183,37 @@ def _register_organize(sub: argparse._SubParsersAction) -> None:
     add_common_run_flags(org)
 
 
-def _register_tui(sub: argparse._SubParsersAction) -> None:
-    tui = sub.add_parser("tui", help="Open an interactive REPL over the agent loop.")
-    add_common_run_flags(tui)
-    # M81: TUI prefers persisted model over DEFAULT_MODEL when --model is
-    # not explicitly given; the runtime resolves None → persisted → default.
-    tui.set_defaults(model=None)
-    tui.add_argument("--resume", metavar="ID", default=None, help="Resume an existing session.")
-    tui.add_argument(
-        "--no-agents-md",
-        action="store_true",
-        help="Skip auto-injection of AGENTS.md into the system prompt.",
-    )
-    tui.add_argument(
-        "--no-index", action="store_true", help="Skip auto-injection of the wiki INDEX.md."
-    )
-    tui.add_argument(
-        "--no-compress",
-        action="store_true",
-        help="Disable sliding-window context compression for this run.",
-    )
-    tui.add_argument(
-        "--compressor-model",
-        default=None,
-        help=(
-            "Override the routed compressor model (default: routed via "
-            f"`veles route show`, fallback {DEFAULT_COMPRESSOR_MODEL})."
-        ),
-    )
-    tui.add_argument(
-        "--compress-threshold-tokens",
-        type=int,
-        default=DEFAULT_COMPRESS_THRESHOLD_TOKENS,
-        metavar="N",
-        help=(
-            f"Estimated history token count that triggers compression "
-            f"(default: {DEFAULT_COMPRESS_THRESHOLD_TOKENS})."
-        ),
-    )
-    tui.add_argument(
-        "--theme",
-        default=None,
-        metavar="NAME",
-        help=(
-            "Colour theme name to use (default: from ~/.veles/config.toml or 'everforest'). "
-            "Built-in themes: everforest, dracula, gruvbox, tokyo-night, catppuccin."
-        ),
-    )
+def add_interactive_flags(parser: argparse.ArgumentParser) -> None:
+    """Flags for the default interactive REPL, added to the TOP-LEVEL parser.
 
-
-def _register_repl(sub: argparse._SubParsersAction) -> None:
-    # M186 prototype: inline streaming REPL (normal screen buffer, no mouse
-    # capture) so native terminal scroll/selection/copy work — unlike the
-    # full-screen `tui`. Shares the run flags so the agent build matches.
-    repl = sub.add_parser(
-        "repl",
-        help="Inline streaming REPL (native terminal scroll/select/copy) — experimental.",
-    )
-    add_common_run_flags(repl)
-    repl.set_defaults(model=None)
-    repl.add_argument("--resume", metavar="ID", default=None, help="Resume an existing session.")
-    repl.add_argument(
+    The inline streaming REPL (normal screen buffer, native terminal scroll/
+    selection/copy) is what bare `veles` launches — there is no separate `repl`
+    or `tui` subcommand. Putting the flags at the top level lets `veles`,
+    `veles -c`, `veles --provider X` all start it without a subcommand."""
+    add_common_run_flags(parser)
+    parser.set_defaults(model=None)  # None → persisted/default resolved at runtime
+    parser.add_argument("--resume", metavar="ID", default=None, help="Resume an existing session.")
+    parser.add_argument(
         "-c",
         "--continue",
         dest="continue_last",
         action="store_true",
         help="Resume the most recent session in this project (its last activity).",
     )
-    repl.add_argument(
+    parser.add_argument(
         "--no-agents-md",
         action="store_true",
         help="Skip auto-injection of AGENTS.md into the system prompt.",
     )
-    repl.add_argument(
+    parser.add_argument(
         "--no-index", action="store_true", help="Skip auto-injection of the wiki INDEX.md."
     )
-    repl.add_argument(
+    parser.add_argument(
         "--no-compress",
         action="store_true",
         help="Disable sliding-window context compression for this run.",
     )
-    repl.add_argument(
+    parser.add_argument(
         "--compressor-model",
         default=None,
         help=(
@@ -271,7 +221,7 @@ def _register_repl(sub: argparse._SubParsersAction) -> None:
             f"`veles route show`, fallback {DEFAULT_COMPRESSOR_MODEL})."
         ),
     )
-    repl.add_argument(
+    parser.add_argument(
         "--compress-threshold-tokens",
         type=int,
         default=DEFAULT_COMPRESS_THRESHOLD_TOKENS,
@@ -324,7 +274,5 @@ def register(sub: argparse._SubParsersAction) -> None:
     _register_run(sub)
     _register_add(sub)
     _register_organize(sub)
-    _register_tui(sub)
-    _register_repl(sub)
     _register_curate(sub)
     _register_research(sub)
