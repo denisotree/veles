@@ -1,9 +1,12 @@
 """KnowledgeStore: token-overlap search over curated notes + live skeleton.
 
 Right-sized for a curated set of tens of entries — no FTS index, no embeddings,
-deterministic and offline. The `SCORE_THRESHOLD` gate is what makes the recall
-surface self-gating: a generic coding query scores below it and yields nothing,
-so normal turns are never polluted with Veles docs.
+deterministic and offline. The `MIN_DISTINCT_MATCHES` gate is what makes the
+recall surface self-gating: a query must share at least two distinct tokens
+with an entry's title/body to clear the gate, so a single common-word title
+hit (e.g. "run", "add" — both note titles and common English verbs) does not
+let a generic coding query through. The weighted `score` (title-vs-body) is
+used only to order the hits that do clear the gate.
 """
 
 from __future__ import annotations
@@ -52,7 +55,7 @@ _STOPWORDS = frozenset(
     }
 )
 
-SCORE_THRESHOLD = 3
+MIN_DISTINCT_MATCHES = 2  # gate: a lone common-word title hit must not clear the gate
 _TITLE_WEIGHT = 3
 _BODY_WEIGHT = 1
 
@@ -130,9 +133,11 @@ class KnowledgeStore:
             return []
         scored: list[tuple[int, _Indexed]] = []
         for e in self._entries:
+            distinct = len(q & (e.title_tokens | e.body_tokens))
+            if distinct < MIN_DISTINCT_MATCHES:
+                continue
             s = self._score(q, e)
-            if s >= SCORE_THRESHOLD:
-                scored.append((s, e))
+            scored.append((s, e))
         # Highest score first; ties keep insertion order (notes before skeleton).
         scored.sort(key=lambda pair: pair[0], reverse=True)
         return [

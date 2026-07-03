@@ -47,6 +47,20 @@ def test_search_orders_by_score():
     assert hits[0].ref == "add-source"
 
 
+def test_search_gates_single_common_verb_run():
+    # "run" is a note title AND a common English verb — a lone match must not pass.
+    assert _store().search("run the tests") == []
+
+
+def test_search_gates_single_common_verb_add():
+    assert _store().search("add error handling to this function") == []
+
+
+def test_search_requires_two_distinct_tokens():
+    # One distinct Veles token ("session") alone should not clear the gate.
+    assert _store().search("session") == []
+
+
 def test_get_by_slug_and_ref():
     st = _store()
     assert st.get("run-session").title == "Run an interactive agent session"
