@@ -570,6 +570,28 @@ def test_print_model_list_fallback(monkeypatch, capsys: pytest.CaptureFixture[st
     assert "anthropic/claude" in out and "← current" in out  # current marked
 
 
+def test_cancel_generation_stops_and_restores_request(tmp_path) -> None:
+    """Esc during generation cancels the turn, clears the queue, and drops the
+    running request back into the input box for editing."""
+    from veles.core.cancel import CancelToken
+
+    app, store = _build_app(tmp_path)
+    try:
+        app.busy = True
+        app._last_submitted = "реализуй план"
+        app.cancel_token = CancelToken()
+        app.queue.append("queued follow-up")
+        app.input.text = "half-typed something"
+
+        app._cancel_generation()
+
+        assert app.cancel_token.cancelled  # running turn told to stop
+        assert list(app.queue) == []  # a full stop — queue cleared
+        assert app.input.text == "реализуй план"  # last request restored for editing
+    finally:
+        store.close()
+
+
 def test_suspend_live_pauses_and_resumes_active_live() -> None:
     from veles.cli.commands import repl as repl_mod
 

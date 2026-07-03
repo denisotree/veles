@@ -966,6 +966,7 @@ class _ReplApp:
         self._subagent_factory = subagent_factory  # for the `delegate` tool
         self.busy = False
         self.queue: deque[str] = deque()
+        self._last_submitted = ""  # the running turn's prompt, for Esc-to-restore
         self.cancel_token = None
         self._last_ctrl_c = 0.0
         self._next_mode = next_mode
@@ -1512,7 +1513,14 @@ class _ReplApp:
         def _(event) -> None:
             self._free_submit()
 
-        @kb.add("escape", "enter", filter=normal)  # Alt/Option+Enter → newline
+        # Alt/Option+Enter → newline. NOT while busy: an active escape-prefix
+        # binding makes a lone Esc a pending prefix, so Esc-to-stop-generation
+        # would never resolve. During a turn you're queuing, not composing.
+        @kb.add(
+            "escape",
+            "enter",
+            filter=Condition(lambda: not self.q_active and not self.mp_active and not self.busy),
+        )
         def _(event) -> None:
             self.input.buffer.insert_text("\n")
 
@@ -1553,6 +1561,13 @@ class _ReplApp:
         @kb.add("escape", filter=Condition(lambda: self.q_active))
         def _(event) -> None:
             self._answer(None)
+
+        @kb.add(
+            "escape",
+            filter=Condition(lambda: self.busy and not self.q_active and not self.mp_active),
+        )
+        def _(event) -> None:  # Esc during generation → stop + restore the request
+            self._cancel_generation()
 
         @kb.add("enter", filter=modeling)
         def _(event) -> None:
@@ -1676,6 +1691,17 @@ class _ReplApp:
             )
         )
 
+    def _cancel_generation(self) -> None:
+        """Esc while a turn runs: stop generation and drop the input box back to
+        the request that was running, so the user can edit and resubmit it. Also
+        clears the queue so Esc fully stops (not just the current turn)."""
+        if self.cancel_token is not None:
+            self.cancel_token.cancel()  # cooperative cancel of the running turn
+        self.queue.clear()  # a full stop — don't run queued follow-ups
+        if self._last_submitted:
+            self._set_input(self._last_submitted)  # restore for editing
+        self.app.invalidate()
+
     async def _in_terminal(self, func) -> None:
         from prompt_toolkit.application import run_in_terminal
 
@@ -1742,6 +1768,7 @@ class _ReplApp:
                 self.meta_events = []
                 self.stream_chars = 0
                 self.turn_start = time.monotonic()
+                self._last_submitted = text  # remember it so Esc can restore it
                 self._echo_user(text)
                 self.cancel_token = CancelToken()
                 # A fresh copy of the captured parent context per turn (a Context
