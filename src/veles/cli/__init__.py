@@ -246,17 +246,31 @@ __all__ = [
 # ---------- entry ----------
 
 
+_TOP_LEVEL_GLOBALS = ("--version", "-h", "--help", "--no-wizard")
+
+
+def _normalize_argv(argv: list[str]) -> list[str]:
+    """Route to the default surface (repl) when there's no subcommand.
+
+    - Bare `veles` → `veles repl` (M186: the inline REPL is the default; the
+      full-screen `veles tui` stays explicit).
+    - `veles -c` / `veles --provider …` (a flag first, not a top-level global) →
+      `veles repl …`, so run flags work without typing `repl`.
+    A leading top-level global (`--version`/`-h`/`--no-wizard`) is left alone.
+    """
+    if not argv:
+        return ["repl"]
+    if argv[0].startswith("-") and argv[0] not in _TOP_LEVEL_GLOBALS:
+        return ["repl", *argv]
+    return argv
+
+
 def main(argv: list[str] | None = None) -> int:
     from veles.cli.wizard import maybe_run_first_run_wizard
     from veles.core.i18n import set_active_locale
     from veles.core.user_config import load_user_config
 
-    _argv = list(sys.argv[1:]) if argv is None else list(argv)
-    if not _argv:
-        # M186: bare `veles` opens the inline streaming REPL (native terminal
-        # scroll/selection/copy). The full-screen Textual `veles tui` stays
-        # available explicitly.
-        _argv = ["repl"]
+    _argv = _normalize_argv(list(sys.argv[1:]) if argv is None else list(argv))
     args = _build_parser().parse_args(_argv)
     # Resolve the active i18n locale before any user-facing string fires.
     # `set_active_locale` honours `VELES_LOCALE` env over the config so a

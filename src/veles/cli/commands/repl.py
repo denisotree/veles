@@ -334,16 +334,18 @@ def _build_runtime(args: argparse.Namespace, project: Project):
 
     from veles.core.user_config import load_user_config
 
-    # -c / --continue: resume this project's most recent session (by last
-    # activity). An explicit --resume ID wins. No sessions yet → start fresh.
+    # -c / --continue: resume this project's most recent NON-EMPTY session (one
+    # with at least one turn — skip empty sessions from an aborted launch). An
+    # explicit --resume ID wins. Nothing to resume → start fresh.
     resume_id = getattr(args, "resume", None)
     if resume_id is None and getattr(args, "continue_last", False):
-        recent = store.list_sessions(limit=1)
+        recent = [s for s in store.list_sessions(limit=50) if s.turn_count > 0]
         if recent:
-            resume_id = recent[0].id
-            print(f"continuing session {resume_id[:8]} ({recent[0].title or 'untitled'})")
+            latest = recent[0]  # list_sessions is ordered by last_activity DESC
+            resume_id = latest.id
+            print(f"continuing session {resume_id[:8]} ({latest.title or 'untitled'})")
         else:
-            print("no previous session in this project — starting fresh")
+            print("no previous session with content in this project — starting fresh")
 
     user_cfg = load_user_config()
     state = AppState(
