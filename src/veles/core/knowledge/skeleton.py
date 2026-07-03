@@ -27,14 +27,20 @@ def _walk_commands(entries: list[SkeletonEntry]) -> None:
     for action in parser._actions:
         if not isinstance(action, argparse._SubParsersAction):
             continue
+        # argparse stores each subcommand's `help=` text on the parent
+        # `_SubParsersAction`'s pseudo-actions, not on the subparser itself
+        # (`subparser.description` is only set when the subparser is built
+        # with an explicit `description=`, which none of ours are).
+        help_by_cmd = {
+            pa.dest: (pa.help or "").strip() for pa in getattr(action, "_choices_actions", [])
+        }
         for cmd_name, subparser in action.choices.items():
-            help_text = (subparser.description or "").strip()
+            help_text = help_by_cmd.get(cmd_name) or (subparser.description or "").strip()
             sub_names: list[str] = []
-            entries.append(SkeletonEntry(kind="cmd", name=cmd_name, summary=help_text))
             for sub_action in subparser._actions:
                 # Flags on this command.
                 for opt in sub_action.option_strings:
-                    if opt.startswith("--"):
+                    if opt.startswith("--") and opt not in ("--help", "-h"):
                         entries.append(
                             SkeletonEntry(
                                 kind="flag",
@@ -45,15 +51,14 @@ def _walk_commands(entries: list[SkeletonEntry]) -> None:
                 # Nested subcommands (e.g. `skill list`) recorded as aliases.
                 if isinstance(sub_action, argparse._SubParsersAction):
                     sub_names.extend(sub_action.choices.keys())
-            if sub_names:
-                entries.append(
-                    SkeletonEntry(
-                        kind="cmd",
-                        name=cmd_name,
-                        summary=help_text,
-                        aliases=sorted(set(sub_names)),
-                    )
+            entries.append(
+                SkeletonEntry(
+                    kind="cmd",
+                    name=cmd_name,
+                    summary=help_text,
+                    aliases=sorted(set(sub_names)),
                 )
+            )
 
 
 def _walk_skills(entries: list[SkeletonEntry]) -> None:

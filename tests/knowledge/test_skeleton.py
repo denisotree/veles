@@ -31,3 +31,22 @@ def test_ref_index_shape():
     assert "flag:run:--manager" in idx
     assert "skill:tool_authoring" in idx
     assert "tool:read_file" in idx
+
+
+def test_skeleton_cmd_summary_is_populated():
+    entries = build_skeleton()
+    run_cmds = [e for e in entries if e.kind == "cmd" and e.name == "run"]
+    assert run_cmds, "run command missing"
+    assert all(e.summary for e in run_cmds), "run cmd summary should be non-empty"
+
+
+def test_skeleton_has_no_duplicate_cmd_names():
+    entries = build_skeleton()
+    cmd_names = [e.name for e in entries if e.kind == "cmd"]
+    assert len(cmd_names) == len(set(cmd_names)), "duplicate cmd entries"
+
+
+def test_skeleton_excludes_help_flag():
+    entries = build_skeleton()
+    flags = {e.name for e in entries if e.kind == "flag"}
+    assert "run:--help" not in flags
