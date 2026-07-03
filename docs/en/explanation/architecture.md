@@ -73,7 +73,7 @@ external CLI launched there sees the same context. See
 ## The surfaces
 
 - **CLI** (`veles run`, `veles add`, …) — one-shot and scripted use.
-- **TUI** (`veles tui`) — interactive REPL with [run modes](modes.md).
+- **TUI** (bare `veles`) — interactive REPL with [run modes](modes.md).
 - **Daemon + channels** — headless API, Telegram, scheduled jobs.
 
 All three drive the same core agent loop.

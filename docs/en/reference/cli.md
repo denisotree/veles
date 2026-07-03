@@ -93,13 +93,21 @@ triggers. Accepts all [shared agent-loop flags](#shared-agent-loop-flags) plus:
 | `--compressor-model <id>` | routed | Override the compression model |
 | `--compress-threshold-tokens <n>` | `50000` | History size that triggers compression |
 
-### `veles tui`
-Open the interactive REPL. See [TUI reference](tui.md). Accepts the shared
-agent-loop flags, `--resume`, the `--no-*` injection/compression flags above, and:
+### `veles` (no subcommand)
+Bare `veles` (no subcommand) opens the interactive inline REPL — the default
+surface. See [TUI reference](tui.md). Its flags live on the top-level parser, so
+they work directly on `veles`: the shared agent-loop flags, plus:
 
 | Flag | Default | Purpose |
 |---|---|---|
-| `--theme <name>` | config or `everforest` | Color theme (everforest, dracula, gruvbox, tokyo-night, catppuccin) |
+| `-c`, `--continue` | off | Resume this project's most recent session |
+| `--resume <id>` | — | Resume a specific session |
+| `--no-agents-md` / `--no-index` | off | Skip auto-injecting AGENTS.md / the wiki INDEX.md |
+| `--no-compress` | off | Disable sliding-window context compression |
+| `--compressor-model <id>` / `--compress-threshold-tokens <n>` | routed / `50000` | Compression overrides |
+
+There is no `veles tui` or `veles repl` subcommand — the inline REPL is invoked
+as bare `veles`.
 
 ### `veles add <source>`
 Read a source (a local file or `http(s)://` URL) and synthesise it into a wiki

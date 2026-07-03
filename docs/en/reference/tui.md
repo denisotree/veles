@@ -2,7 +2,7 @@
 
 > 🌐 **Languages:** **English** · [简体中文](../../zh-CN/reference/tui.md) · [繁體中文](../../zh-TW/reference/tui.md) · [日本語](../../ja/reference/tui.md) · [한국어](../../ko/reference/tui.md) · [Español](../../es/reference/tui.md) · [Français](../../fr/reference/tui.md) · [Italiano](../../it/reference/tui.md) · [Português (BR)](../../pt-BR/reference/tui.md) · [Português (PT)](../../pt-PT/reference/tui.md) · [Русский](../../ru/reference/tui.md) · [العربية](../../ar/reference/tui.md) · [हिन्दी](../../hi/reference/tui.md) · [বাংলা](../../bn/reference/tui.md) · [Tiếng Việt](../../vi/reference/tui.md)
 
-`veles tui` (or bare `veles`) opens the interactive REPL. It is a scrollback chat
+Bare `veles` (no subcommand) opens the interactive REPL. It is a scrollback chat
 with a multi-line composer, a status bar, and a collapsible inspector.
 
 ## Keybindings
@@ -51,5 +51,5 @@ Type `/` in the composer; `Tab` completes. The registered commands are:
 ## Themes
 
 Built-in themes: `everforest` (default), `dracula`, `gruvbox`, `tokyo-night`,
-`catppuccin`. Pick one with `Ctrl+T`, `veles tui --theme <name>`, or
-`[user] tui_theme` in `~/.veles/config.toml`.
+`catppuccin`. Pick one with `Ctrl+T` in the REPL, or set `[user] tui_theme` in
+`~/.veles/config.toml`.

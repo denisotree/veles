@@ -41,7 +41,7 @@ Two invariants make this work:
 
 ## Walkthrough: migrate a vault into the wiki
 
-Run `veles repl` inside a project (`veles init` first; `veles layout sync` if you
+Run `veles` inside a project (`veles init` first; `veles layout sync` if you
 added categories to an existing project and want the dirs materialised). Then, in
 plain language:
 

@@ -54,7 +54,7 @@ and cite the pages you used."
 Veles searches the wiki, reads the relevant pages, and answers — grounded in what
 you ingested rather than its training data alone.
 
-For interactive back-and-forth, do the same in the TUI (`veles tui`).
+For interactive back-and-forth, do the same in the TUI (just run `veles`).
 
 ## 4. Consolidate sessions
 

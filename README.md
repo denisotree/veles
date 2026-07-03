@@ -34,7 +34,7 @@ Unlike chat tools that start fresh every time, Veles maintains **structured proj
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles        # interactive REPL (bare `veles` == `veles tui`)
+veles        # interactive REPL (the TUI; just run `veles` with no subcommand)
 ```
 
 ---
@@ -221,7 +221,8 @@ veles module list
 
 ```bash
 veles                        # new session (bare `veles` launches the TUI)
-veles tui --resume <id>      # continue a session
+veles -c                     # continue the most recent session in this project
+veles --resume <id>          # resume a specific session
 ```
 
 <p align="center">
@@ -322,7 +323,7 @@ veles import ./backup.tar.gz --into ./new-dir
 |---|---|
 | `veles init [name]` | Create a new project |
 | `veles run "<prompt>"` | Single-turn agent run |
-| `veles tui` | Interactive TUI REPL |
+| `veles` | Interactive TUI REPL (no subcommand) |
 | `veles add <file\|url>` | Ingest a source → wiki page (llm-wiki layout) |
 | `veles research "<question>"` | Deep multi-angle research |
 | `veles curate` | Distil sessions into project memory (`.veles/`, any layout) |
