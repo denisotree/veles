@@ -455,24 +455,30 @@ def test_input_box_sizes_to_content(tmp_path) -> None:
         store.close()
 
 
-def test_shift_enter_newline_remap_and_binding(tmp_path) -> None:
-    """Shift+Enter (CSI-u terminals) maps to the F24 carrier key, and the app
-    binds F24 to insert a newline — so Enter still submits, Shift+Enter breaks
-    a line where the terminal sends a distinct sequence."""
+def test_kitty_sequences_remap_and_binding(tmp_path) -> None:
+    """With the kitty protocol enabled, Shift+Enter arrives as a distinct CSI-u
+    sequence → the F24 carrier (bound to insert newline); Enter still submits.
+    The control-key CSI-u forms map to the SAME Keys.* as legacy, so pt's line
+    editing and our Ctrl+C/D/J/O keep working under the protocol."""
     from prompt_toolkit.input import ansi_escape_sequences as aes
     from prompt_toolkit.keys import Keys
 
-    from veles.cli.commands.repl import _enable_shift_enter_newline
+    from veles.cli.commands.repl import _register_kitty_sequences
 
-    _enable_shift_enter_newline()
+    _register_kitty_sequences()
     assert aes.ANSI_SEQUENCES["\x1b[27;2;13~"] == Keys.F24  # xterm modifyOtherKeys
-    assert aes.ANSI_SEQUENCES["\x1b[13;2u"] == Keys.F24  # kitty CSI-u
+    assert aes.ANSI_SEQUENCES["\x1b[13;2u"] == Keys.F24  # kitty Shift+Enter
+    assert aes.ANSI_SEQUENCES["\x1b[13;3u"] == Keys.F24  # kitty Alt+Enter
+    assert aes.ANSI_SEQUENCES["\x1b[27u"] == Keys.Escape  # Esc (disambiguated)
+    assert aes.ANSI_SEQUENCES["\x1b[9;2u"] == Keys.BackTab  # Shift+Tab → mode cycle
+    assert aes.ANSI_SEQUENCES["\x1b[99;5u"] == Keys.ControlC  # Ctrl+C (== legacy)
+    assert aes.ANSI_SEQUENCES["\x1b[97;5u"] == Keys.ControlA  # Ctrl+A → line-home
+    assert aes.ANSI_SEQUENCES["\x1b[106;5u"] == Keys.ControlJ  # Ctrl+J → newline
 
     app, store = _build_app(tmp_path)
     try:
         bound = {k for b in app.app.key_bindings.bindings for k in b.keys}
-        assert Keys.F24 in bound  # Shift+Enter carrier (CSI-u terminals)
-        # Ctrl+J (LF) is a newline key distinct from Enter in EVERY terminal.
+        assert Keys.F24 in bound  # Shift+Enter carrier
         assert Keys.ControlJ in bound
     finally:
         store.close()

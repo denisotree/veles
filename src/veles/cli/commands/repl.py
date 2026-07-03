@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import atexit
 import contextvars
 import datetime as _dt
 import os
@@ -108,23 +109,59 @@ _REPL_BEHAVIOUR_BLOCK = (
 )
 
 
-def _enable_shift_enter_newline() -> None:
-    """Best-effort Shift+Enter → newline in the inline input box.
+# Kitty keyboard protocol (https://sw.kovidgoyal.net/kitty/keyboard-protocol/).
+# We push the "disambiguate escape codes" flag on REPL start and pop it on exit;
+# capable terminals (kitty, WezTerm, Ghostty, foot, iTerm2 ≥3.5, Alacritty) then
+# report Shift+Enter as a DISTINCT sequence — the only reliable way to tell it
+# from plain Enter without per-terminal config. Terminals without support ignore
+# the enable sequence, so there's no regression.
+_KITTY_ENABLE = "\x1b[>1u"  # push flags: disambiguate escape codes
+_KITTY_DISABLE = "\x1b[<u"  # pop flags
 
-    Most terminals send plain CR for both Enter and Shift+Enter, and stock
-    prompt_toolkit even collapses the *distinct* modified sequences to `ControlM`
-    — so Shift+Enter is normally indistinguishable from Enter. Terminals in
-    CSI-u / modifyOtherKeys mode (kitty, WezTerm, Ghostty, iTerm2 with CSI-u)
-    DO send a distinct sequence; remap those to the spare `F24` key, which
-    `_ReplApp` binds to "insert newline". Plain CR still yields `ControlM`
-    (submit). Terminals that don't emit a distinct sequence are unaffected —
-    Alt/Option+Enter remains the portable newline there. Idempotent; the parser
-    builds its lookup per-instance so this must run before the app starts."""
+
+def _kitty_disable_keyboard() -> None:
+    """Pop the kitty keyboard flags. Idempotent and safe on any terminal (the
+    sequence is ignored where unsupported). Runs on every REPL exit path plus an
+    `atexit` backstop, so a crash never leaves the shell stuck in kitty mode."""
+    try:
+        if sys.stdout.isatty():
+            sys.stdout.write(_KITTY_DISABLE)
+            sys.stdout.flush()
+    except Exception:
+        pass
+
+
+def _register_kitty_sequences() -> None:
+    """Teach prompt_toolkit the kitty-protocol CSI-u sequences so keys keep
+    working once we enable the protocol.
+
+    Under "disambiguate escape codes" a capable terminal sends:
+      - Shift+Enter → `\\x1b[13;2u`, Alt+Enter → `\\x1b[13;3u` → the spare `F24`
+        key, which `_ReplApp` binds to "insert newline" (Enter stays submit).
+      - Esc → `\\x1b[27u`, Shift+Tab → `\\x1b[9;2u`, Backspace → `\\x1b[127u`.
+      - `Ctrl+<letter>` → `\\x1b[<codepoint>;5u`. These MUST be remapped or the
+        protocol would break pt's emacs line-editing (Ctrl+A/E/K/W…) and our
+        own Ctrl+C/D/J/O bindings.
+    Each maps to the SAME `Keys.*` member as the legacy byte, so mapping both is
+    purely additive: whichever form the terminal emits resolves identically, and
+    plain text / unmodified Enter/Tab/arrows are untouched. Idempotent."""
     from prompt_toolkit.input import ansi_escape_sequences as _aes
     from prompt_toolkit.keys import Keys
 
-    for seq in ("\x1b[27;2;13~", "\x1b[13;2u"):  # xterm modifyOtherKeys, kitty CSI-u
-        _aes.ANSI_SEQUENCES[seq] = Keys.F24
+    seqs = _aes.ANSI_SEQUENCES
+    # Shift+Enter / Alt+Enter / xterm modifyOtherKeys → newline.
+    for seq in ("\x1b[27;2;13~", "\x1b[13;2u", "\x1b[13;3u"):
+        seqs[seq] = Keys.F24
+    # Unmodified specials, in case a terminal reports them as CSI-u as well.
+    seqs["\x1b[13u"] = Keys.ControlM  # Enter → submit
+    seqs["\x1b[9u"] = Keys.ControlI  # Tab
+    seqs["\x1b[27u"] = Keys.Escape
+    seqs["\x1b[127u"] = Keys.Backspace
+    seqs["\x1b[9;2u"] = Keys.BackTab  # Shift+Tab → cycle mode
+    seqs["\x1b[127;5u"] = Keys.Backspace  # Ctrl+Backspace
+    # Ctrl+a..z → Keys.ControlA..ControlZ (same enum as legacy \x01..\x1a).
+    for i in range(26):
+        seqs[f"\x1b[{ord('a') + i};5u"] = getattr(Keys, f"Control{chr(ord('A') + i)}")
 
 
 def _console():
@@ -990,7 +1027,7 @@ class _ReplApp:
 
         from veles.core.modes import next_mode
 
-        _enable_shift_enter_newline()  # Shift+Enter → newline where the terminal allows
+        _register_kitty_sequences()  # parse CSI-u once the protocol is enabled in run()
 
         self.args = args
         self.project = project
@@ -1179,6 +1216,19 @@ class _ReplApp:
         # nested Applications) and corrupt the terminal. (This scope still holds
         # the active project.)
         self._parent_ctx = contextvars.copy_context()
+
+        # Enable the kitty keyboard protocol once pt has taken over the terminal
+        # (in `pre_run`, after raw mode is set), so Shift+Enter arrives as a
+        # distinct CSI-u sequence. Pop it on every exit path + an atexit backstop.
+        def _enable_kitty() -> None:
+            try:
+                if sys.stdout.isatty():
+                    self.app.output.write_raw(_KITTY_ENABLE)
+                    self.app.output.flush()
+            except Exception:
+                pass
+
+        atexit.register(_kitty_disable_keyboard)
         # patch_stdout routes all writes (rich prints + streamed tokens, from
         # this thread or the executor) ABOVE the live input box, into the
         # terminal's own scrollback. raw=True is required so rich's ANSI colour
@@ -1186,8 +1236,9 @@ class _ReplApp:
         # `\x1b[...m`).
         try:
             with patch_stdout(raw=True):
-                self.app.run()
+                self.app.run(pre_run=_enable_kitty)
         finally:
+            _kitty_disable_keyboard()
             reset_question_prompter(qtoken)
             reset_prompter(ptoken)
             reset_critical_confirmer(ctoken)
