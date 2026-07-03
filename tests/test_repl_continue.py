@@ -150,6 +150,31 @@ def test_continue_skips_empty_sessions(project) -> None:
         store.close()
 
 
+def test_resume_recap_replays_recent_conversation(project, capsys) -> None:
+    """Resuming must SHOW the tail of the conversation so it's visibly continued
+    (not a blank screen that looks fresh)."""
+    from rich.console import Console
+
+    from veles.cli.commands.repl import _print_resume_recap, _resolve_theme
+    from veles.core.provider import Message
+    from veles.tui.state import AppState
+
+    store = SessionStore(project.memory_db_path)
+    try:
+        sid = store.create_session(title="t")
+        store.append_turn(sid, Message(role="user", content="what is thompson sampling?"))
+        store.append_turn(sid, Message(role="assistant", content="It is a bandit algorithm."))
+        theme = _resolve_theme(AppState(session_id=None, provider_name="ollama", model="m"))
+        _print_resume_recap(Console(force_terminal=True), theme, store, sid)
+    finally:
+        store.close()
+
+    out = capsys.readouterr().out
+    assert "continuing this conversation" in out
+    assert "what is thompson sampling?" in out  # user turn shown
+    assert "bandit algorithm" in out  # assistant turn shown
+
+
 def test_no_continue_starts_fresh(project) -> None:
     _seed_two_sessions(project)  # sessions exist but -c not passed
     state, _factory, store, _subf = _build_runtime(_args(continue_last=False), project)

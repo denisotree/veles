@@ -194,6 +194,31 @@ def _banner(console, provider: str, model: str, mode: str, theme) -> None:
     console.print(Panel(body, expand=False, border_style=theme.border, padding=(0, 2)))
 
 
+def _print_resume_recap(console, theme, store, session_id: str, *, max_msgs: int = 4) -> None:
+    """On `-c`/`--resume`, replay the tail of the resumed conversation so the
+    user SEES they're continuing it (the agent already has the full history via
+    session_id; this is just the visible recap). Best-effort."""
+    try:
+        msgs = store.load_messages(session_id)
+    except Exception:
+        return
+    convo = [m for m in msgs if m.role in ("user", "assistant") and (m.content or "").strip()]
+    if not convo:
+        return
+    console.print(
+        f"  [dim]— continuing this conversation ({len(convo)} messages); recent context: —[/dim]\n"
+    )
+    for m in convo[-max_msgs:]:
+        body = (m.content or "").strip()
+        if len(body) > 600:
+            body = body[:600].rstrip() + " […]"
+        if m.role == "user":
+            console.print(f"❯ {body}", style=f"bold {theme.accent}", markup=False)
+        else:
+            _render_answer(console, body)
+    console.print()
+
+
 def _print_repl_help(console) -> None:
     from rich.table import Table
 
@@ -1851,6 +1876,8 @@ def cmd_repl(args: argparse.Namespace, project: Project) -> int:
 
     try:
         _banner(console, args.provider, args.model, state.mode, theme)
+        if state.session_id:  # -c / --resume → show the conversation we continue
+            _print_resume_recap(console, theme, store, state.session_id)
         # Default: the inline Application — a settled bottom status bar (mode +
         # token/cache stats), a live "working…" HUD during generation (Ctrl+O
         # expands tool/mode activity), and the in-app ask_user picker. It pins
