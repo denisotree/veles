@@ -244,6 +244,13 @@ def _register_repl(sub: argparse._SubParsersAction) -> None:
     repl.set_defaults(model=None)
     repl.add_argument("--resume", metavar="ID", default=None, help="Resume an existing session.")
     repl.add_argument(
+        "-c",
+        "--continue",
+        dest="continue_last",
+        action="store_true",
+        help="Resume the most recent session in this project (its last activity).",
+    )
+    repl.add_argument(
         "--no-agents-md",
         action="store_true",
         help="Skip auto-injection of AGENTS.md into the system prompt.",

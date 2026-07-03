@@ -334,9 +334,20 @@ def _build_runtime(args: argparse.Namespace, project: Project):
 
     from veles.core.user_config import load_user_config
 
+    # -c / --continue: resume this project's most recent session (by last
+    # activity). An explicit --resume ID wins. No sessions yet → start fresh.
+    resume_id = getattr(args, "resume", None)
+    if resume_id is None and getattr(args, "continue_last", False):
+        recent = store.list_sessions(limit=1)
+        if recent:
+            resume_id = recent[0].id
+            print(f"continuing session {resume_id[:8]} ({recent[0].title or 'untitled'})")
+        else:
+            print("no previous session in this project — starting fresh")
+
     user_cfg = load_user_config()
     state = AppState(
-        session_id=getattr(args, "resume", None),
+        session_id=resume_id,
         provider_name=args.provider,
         model=args.model,
         theme_name=(user_cfg.tui_theme if user_cfg and user_cfg.tui_theme else "everforest"),
