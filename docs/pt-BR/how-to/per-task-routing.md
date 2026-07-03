@@ -73,7 +73,7 @@ Para cada tarefa, vence a primeira camada que produzir uma especificação:
 1. `[routing.tasks][task]` do projeto
 2. `[routing.tasks].default` do projeto
 3. dica em NL do projeto (`routing.nl.toml`)
-4. base `[provider]` do projeto
+4. base `[engine]` do projeto
 5. `[routing.tasks][task]` / `.default` do usuário
 6. `[user] default_provider` + `default_model` do usuário
 

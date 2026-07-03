@@ -16,7 +16,7 @@ Veles 與供應商無關。對任何代理命令傳入 `--provider <name>`，或
 | `llamacpp` | 本機 | 無 | `LLAMACPP_BASE_URL`（預設 `http://localhost:8080/v1`） |
 | `openai-compat` | 本機／自訂 | 無 | `OPENAI_COMPAT_BASE_URL`（必填，無預設） |
 
-預設供應商：`openrouter`。**沒有硬寫死的預設模型**——請透過設定精靈、`[provider] model` 或 `--model` 指定一個（否則代理會回報「no model configured」）。逐任務的路由會繼承 `[provider]` 作為其基礎，除非在 `[routing.tasks]` 中覆寫——參見[逐任務路由](../how-to/per-task-routing.md)。
+預設供應商：`openrouter`。**沒有硬寫死的預設模型**——請透過設定精靈、`[engine] model` 或 `--model` 指定一個（否則代理會回報「no model configured」）。逐任務的路由會繼承 `[engine]` 作為其基礎，除非在 `[routing.tasks]` 中覆寫——參見[逐任務路由](../how-to/per-task-routing.md)。
 
 ## 本機供應商
 

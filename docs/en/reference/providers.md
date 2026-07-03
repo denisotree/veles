@@ -18,8 +18,8 @@ a default in config. Model IDs use the provider's own naming.
 | `openai-compat` | Local/custom | none | `OPENAI_COMPAT_BASE_URL` (required, no default) |
 
 Default provider: `openrouter`. There is **no hardcoded default model** — set one
-via the setup wizard, `[provider] model`, or `--model` (otherwise the agent reports
-"no model configured"). Per-task routes inherit `[provider]` as their base unless
+via the setup wizard, `[engine] model`, or `--model` (otherwise the agent reports
+"no model configured"). Per-task routes inherit `[engine]` as their base unless
 overridden in `[routing.tasks]` — see [per-task routing](../how-to/per-task-routing.md).
 
 ## Local providers

@@ -18,8 +18,8 @@ veles run --provider gemini     --model gemini-2.5-pro    "..."
 Đặt một giá trị cơ sở trong `<project>/.veles/config.toml`:
 
 ```toml
-[provider]
-default = "openrouter"                 # provider name
+[engine]
+provider = "openrouter"                 # provider name
 model = "anthropic/claude-sonnet-4.6"  # model id
 ```
 

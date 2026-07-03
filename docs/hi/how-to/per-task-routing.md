@@ -71,7 +71,7 @@ explicit `[routing.tasks]` entries हमेशा NL hints पर जीतत�
 1. project `[routing.tasks][task]`
 2. project `[routing.tasks].default`
 3. project NL hint (`routing.nl.toml`)
-4. project `[provider]` base
+4. project `[engine]` base
 5. user `[routing.tasks][task]` / `.default`
 6. user `[user] default_provider` + `default_model`
 

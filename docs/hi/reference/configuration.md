@@ -58,8 +58,8 @@ args = ["-m", "my_mcp_server"]
 ## Project config — `<project>/.veles/config.toml`
 
 ```toml
-[provider]
-default = "openrouter"                               # provider name for the main agent + routing base
+[engine]
+provider = "openrouter"                               # provider name for the main agent + routing base
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
@@ -102,7 +102,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 | Section | उद्देश्य |
 |---|---|
-| `[provider]` | main agent और routing cascade के लिए base provider (`default` = provider name) + model (`model` = model id) |
+| `[engine]` | main agent और routing cascade के लिए base provider (`provider` = provider name) + model (`model` = model id) |
 | `[routing.tasks]` | प्रति-task `provider:model` overrides — देखें [per-task routing](../how-to/per-task-routing.md) |
 | `[permissions]` | प्रति-tool permission policy (project scope) |
 | `[daemon]` | unnamed/"default" daemon का bind + autostart |

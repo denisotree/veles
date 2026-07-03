@@ -67,7 +67,7 @@ veles route refresh --force    # even if AGENTS.md hasn't changed
 1. 프로젝트 `[routing.tasks][task]`
 2. 프로젝트 `[routing.tasks].default`
 3. 프로젝트 NL 힌트(`routing.nl.toml`)
-4. 프로젝트 `[provider]` 기반
+4. 프로젝트 `[engine]` 기반
 5. 사용자 `[routing.tasks][task]` / `.default`
 6. 사용자 `[user] default_provider` + `default_model`
 

@@ -19,9 +19,9 @@ usano la convenzione di denominazione del provider stesso.
 | `openai-compat` | Locale/personalizzato | nessuna | `OPENAI_COMPAT_BASE_URL` (obbligatorio, nessun default) |
 
 Provider di default: `openrouter`. **Non esiste un modello di default hardcoded** —
-impostane uno tramite la procedura guidata di configurazione, `[provider] model` o
+impostane uno tramite la procedura guidata di configurazione, `[engine] model` o
 `--model` (altrimenti l'agente segnala "no model configured"). Le rotte per task
-ereditano `[provider]` come base, salvo override in `[routing.tasks]` — vedi
+ereditano `[engine]` come base, salvo override in `[routing.tasks]` — vedi
 [routing per task](../how-to/per-task-routing.md).
 
 ## Provider locali

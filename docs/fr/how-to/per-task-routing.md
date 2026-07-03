@@ -74,7 +74,7 @@ Pour chaque tâche, la première couche qui produit une spécification l'emporte
 1. `[routing.tasks][task]` du projet
 2. `[routing.tasks].default` du projet
 3. indication NL du projet (`routing.nl.toml`)
-4. base `[provider]` du projet
+4. base `[engine]` du projet
 5. `[routing.tasks][task]` / `.default` de l'utilisateur
 6. `[user] default_provider` + `default_model` de l'utilisateur
 

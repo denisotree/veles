@@ -26,8 +26,8 @@ daemon का model और provider प्रोजेक्ट config से �
 
 ```toml
 # <project>/.veles/config.toml
-[provider]
-default = "ollama"            # provider name
+[engine]
+provider = "ollama"            # provider name
 model = "qwen3:4b-instruct"   # model id
 ```
 

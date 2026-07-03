@@ -19,9 +19,9 @@ lệnh agent nào, hoặc đặt một giá trị mặc định trong config. ID
 | `openai-compat` | Cục bộ/tùy chỉnh | không | `OPENAI_COMPAT_BASE_URL` (bắt buộc, không có mặc định) |
 
 Nhà cung cấp mặc định: `openrouter`. **Không có model mặc định cứng** — hãy đặt
-một model qua trình thiết lập, qua `[provider] model`, hoặc qua `--model` (nếu
+một model qua trình thiết lập, qua `[engine] model`, hoặc qua `--model` (nếu
 không agent sẽ báo "no model configured"). Các route theo tác vụ kế thừa
-`[provider]` làm cơ sở trừ khi được ghi đè trong `[routing.tasks]` — xem
+`[engine]` làm cơ sở trừ khi được ghi đè trong `[routing.tasks]` — xem
 [định tuyến theo tác vụ](../how-to/per-task-routing.md).
 
 ## Nhà cung cấp cục bộ

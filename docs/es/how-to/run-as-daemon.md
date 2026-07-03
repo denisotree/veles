@@ -26,8 +26,8 @@ El modelo y el proveedor del daemon provienen de la configuración del proyecto 
 
 ```toml
 # <project>/.veles/config.toml
-[provider]
-default = "ollama"            # provider name
+[engine]
+provider = "ollama"            # provider name
 model = "qwen3:4b-instruct"   # model id
 ```
 

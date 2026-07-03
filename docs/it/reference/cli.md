@@ -370,7 +370,7 @@ start`:
 
 | Flag | Default | Scopo |
 |---|---|---|
-| `--model <id>` | risolto dal modello `[provider]` del progetto → `default_model` utente (nessun default hardcoded) | ID del modello |
+| `--model <id>` | risolto dal modello `[engine]` del progetto → `default_model` utente (nessun default hardcoded) | ID del modello |
 | `--provider <name>` | `openrouter` | Provider (vedi sotto) |
 | `--max-tokens-total <n>` | `100000` | Budget cumulativo di token; `0` lo disabilita |
 | `--max-iterations <n>` | `30` | Numero massimo di iterazioni di chiamata-tool per turno |

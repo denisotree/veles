@@ -365,7 +365,7 @@ Aceitas por `run`, `add`, `tui`, `curate`, `research`, `job tick` e `daemon star
 
 | Flag | Padrão | Finalidade |
 |---|---|---|
-| `--model <id>` | resolvido a partir do modelo de `[provider]` do projeto → `default_model` do usuário (sem padrão fixo) | ID do modelo |
+| `--model <id>` | resolvido a partir do modelo de `[engine]` do projeto → `default_model` do usuário (sem padrão fixo) | ID do modelo |
 | `--provider <name>` | `openrouter` | Provedor (veja abaixo) |
 | `--max-tokens-total <n>` | `100000` | Orçamento cumulativo de tokens; `0` desativa |
 | `--max-iterations <n>` | `30` | Máximo de iterações de chamada de tools por turno |

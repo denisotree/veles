@@ -18,8 +18,8 @@ Veles provider-agnostic है। किसी भी agent command को `--pr
 | `openai-compat` | Local/custom | none | `OPENAI_COMPAT_BASE_URL` (आवश्यक, कोई default नहीं) |
 
 Default provider: `openrouter`। कोई **hardcoded default model नहीं है** — इसे setup
-wizard, `[provider] model`, या `--model` के ज़रिए set करें (अन्यथा agent "no model
-configured" बताता है)। प्रति-task routes अपने base के रूप में `[provider]` को inherit
+wizard, `[engine] model`, या `--model` के ज़रिए set करें (अन्यथा agent "no model
+configured" बताता है)। प्रति-task routes अपने base के रूप में `[engine]` को inherit
 करते हैं जब तक कि `[routing.tasks]` में override न किया जाए — देखें
 [per-task routing](../how-to/per-task-routing.md)।
 

@@ -58,8 +58,8 @@ args = ["-m", "my_mcp_server"]
 ## Config của dự án — `<project>/.veles/config.toml`
 
 ```toml
-[provider]
-default = "openrouter"                               # provider name for the main agent + routing base
+[engine]
+provider = "openrouter"                               # provider name for the main agent + routing base
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
@@ -102,7 +102,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 | Mục | Mục đích |
 |---|---|
-| `[provider]` | Nhà cung cấp cơ sở (`default` = tên nhà cung cấp) + model (`model` = id model) cho agent chính và chuỗi cascade định tuyến |
+| `[engine]` | Nhà cung cấp cơ sở (`provider` = tên nhà cung cấp) + model (`model` = id model) cho agent chính và chuỗi cascade định tuyến |
 | `[routing.tasks]` | Ghi đè `provider:model` theo từng tác vụ — xem [định tuyến theo tác vụ](../how-to/per-task-routing.md) |
 | `[permissions]` | Chính sách quyền theo từng tool (phạm vi dự án) |
 | `[daemon]` | Bind + autostart của daemon không tên/"default" |

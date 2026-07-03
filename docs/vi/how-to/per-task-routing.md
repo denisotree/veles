@@ -72,7 +72,7 @@ Với mỗi tác vụ, lớp đầu tiên cho ra một spec sẽ thắng:
 1. `[routing.tasks][task]` của dự án
 2. `[routing.tasks].default` của dự án
 3. gợi ý NL của dự án (`routing.nl.toml`)
-4. `[provider]` cơ sở của dự án
+4. `[engine]` cơ sở của dự án
 5. `[routing.tasks][task]` / `.default` của user
 6. `[user] default_provider` + `default_model` của user
 

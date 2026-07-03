@@ -368,7 +368,7 @@ start`:
 
 | Flag | Default | Purpose |
 |---|---|---|
-| `--model <id>` | resolved from project `[provider]` model → user `default_model` (no hardcoded default) | Model ID |
+| `--model <id>` | resolved from project `[engine]` model → user `default_model` (no hardcoded default) | Model ID |
 | `--provider <name>` | `openrouter` | Provider (see below) |
 | `--max-tokens-total <n>` | `100000` | Cumulative token budget; `0` disables |
 | `--max-iterations <n>` | `30` | Max tool-calling iterations per turn |

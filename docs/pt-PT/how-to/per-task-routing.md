@@ -72,7 +72,7 @@ Para cada tarefa, ganha a primeira camada que produz uma especificação:
 1. `[routing.tasks][task]` do projecto
 2. `[routing.tasks].default` do projecto
 3. pista em LN do projecto (`routing.nl.toml`)
-4. base `[provider]` do projecto
+4. base `[engine]` do projecto
 5. `[routing.tasks][task]` / `.default` do utilizador
 6. `[user] default_provider` + `default_model` do utilizador
 
