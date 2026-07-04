@@ -60,8 +60,8 @@ def _state(*, session_id: str | None = None, last_mode: str | None = None) -> Ap
 
 
 def test_planning_mode_passes_mode_override_to_factory() -> None:
-    """The factory call signals `planning` so `run_tui`'s factory picks
-    the planning toolset registry and enables `plan_mode=True`."""
+    """The factory call signals `planning` so the REPL's per-turn Agent
+    factory picks the planning toolset registry and enables `plan_mode=True`."""
     state = _state()
     agent = _FakeAgent(result=RunResult(text="ok", iterations=1, session_id="s1"))
     rec = _Recorder(state=state)

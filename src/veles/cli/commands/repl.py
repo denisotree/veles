@@ -288,12 +288,9 @@ def _print_repl_help(console) -> None:
 
 def _build_runtime(args: argparse.Namespace, project: Project):
     """Resolve provider/model, gate the API key, and build the per-turn Agent
-    factory + AppState + store — a faithful mirror of `tui.run_tui`'s setup.
+    factory + AppState + store for the interactive REPL.
 
     Returns ``(state, factory, store)`` or ``None`` when the key gate fails.
-
-    NOTE (dedup): intentionally duplicates `run_tui`'s factory for now. Once
-    the REPL is canonical, both should share one builder.
     """
     from veles.cli import (
         _PLANNING_TOOLS,

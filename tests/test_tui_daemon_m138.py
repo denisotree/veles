@@ -1,18 +1,19 @@
-"""M138: TUI `/daemon` slash command + TUI registered as a runtime session.
+"""M138: `/daemon` slash command opens the daemon control panel.
 
 `/daemon` opens the daemon control panel (push `DaemonPickerScreen(standalone=
-False)` so quit pops back to chat); the interactive run registers a kind=tui
-`runtime_sessions` row visible alongside daemon sessions.
+False)` so quit pops back to chat).
 
-This file covers the dispatch contract, the runtime-session lifecycle, and the
-focus-behaviour regressions. Picker-internal behaviour (init flags, runtime
-rows/actions, pilot flows) lives in `tests/tui/test_daemon_picker.py`
-(M150 consolidation).
+This file covers the dispatch contract and the focus-behaviour regressions.
+Picker-internal behaviour (init flags, runtime rows/actions, pilot flows)
+lives in `tests/tui/test_daemon_picker.py` (M150 consolidation).
+
+(The `/daemon`-adjacent `kind=tui` runtime-session registration this file
+used to also cover was removed with the chat TUI in M187 — the interactive
+run's session-tracking helper had no production caller once the chat TUI's
+boot entry point was deleted.)
 """
 
 from __future__ import annotations
-
-from pathlib import Path
 
 from veles.cli.repl.slash.builtin import build_default_registry
 from veles.core.project import init_project
@@ -37,52 +38,6 @@ class _DummyCtx:
     state = None
     project = None
     store = None
-
-
-# ---- TUI as a runtime session ----
-
-
-def test_register_tui_session_creates_running_row(tmp_path: Path):
-    from veles.tui import _register_tui_session
-
-    project = init_project(tmp_path / "p", name="p")
-    result = _register_tui_session(project)
-    assert result is not None
-    store, _rid = result
-    try:
-        rec = store.get_by_name("tui", kind="tui")
-        assert rec is not None and rec.status == "running" and rec.pid is not None
-    finally:
-        store.close()
-
-
-def test_register_tui_session_reuses_row(tmp_path: Path):
-    from veles.tui import _register_tui_session
-
-    project = init_project(tmp_path / "p", name="p")
-    s1, rid1 = _register_tui_session(project)
-    s1.close()
-    s2, rid2 = _register_tui_session(project)
-    s2.close()
-    assert rid1 == rid2  # same logical TUI row reused across launches
-
-    # Exactly one live tui session.
-    store = RuntimeSessionStore(project.memory_db_path)
-    try:
-        assert len(store.list(kind="tui")) == 1
-    finally:
-        store.close()
-
-
-def test_tui_session_marked_stopped(tmp_path: Path):
-    from veles.tui import _register_tui_session
-
-    project = init_project(tmp_path / "p", name="p")
-    store, rid = _register_tui_session(project)
-    store.mark_stopped(rid)
-    rec = store.get_by_name("tui", kind="tui")
-    assert rec is not None and rec.status == "stopped" and rec.pid is None
-    store.close()
 
 
 # ---- focus behaviour (M138-followup bugfixes B + E) ----
