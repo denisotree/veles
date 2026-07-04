@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-07-04
+
+### Added
+
+- **Veles now answers "how do I do X in Veles" from its own documentation
+  (M186).** A framework-global knowledge source lets the agent answer usage
+  questions accurately — even on weak or local models — instead of guessing
+  from priors. It pairs a live capability skeleton derived straight from the
+  CLI (commands, flags, builtin skills and tools, so it can never go stale)
+  with curated how-to notes shipped in the package. Relevant docs surface
+  automatically in recall when you ask a how-to question, and stay out of
+  ordinary coding turns (the retrieval gate keys on curated topics, not
+  incidental prose). A new `veles_help` tool provides on-demand deep lookups,
+  and a freshness test keeps the notes honest — a note can never reference a
+  command, flag, skill, or tool that no longer exists. This is layout-
+  independent: it works in every project layout, separate from and
+  complementary to the per-project `self-doc` state snapshot.
+
 ## [0.8.3] — 2026-06-30
 
 ### Fixed
