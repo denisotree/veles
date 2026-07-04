@@ -296,6 +296,10 @@ def _print_repl_help(console) -> None:
         t.add_row(cmd, desc)
     console.print(t)
     console.print(
+        "  [dim]@ file picker · Ctrl+I/Ctrl+O inspector · Ctrl+X Ctrl+E $EDITOR · "
+        "Ctrl+V paste image · Shift+Tab cycle mode[/dim]"
+    )
+    console.print(
         "  [dim]copy: select with the mouse and press ⌘C (macOS) / Ctrl+Shift+C (Linux) — "
         "native terminal copy.[/dim]\n"
     )

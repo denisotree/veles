@@ -363,7 +363,7 @@ Inspect external MCP servers configured under `[mcp.servers.*]`. See
 
 ## Shared agent-loop flags
 
-Accepted by `run`, `add`, `tui`, `curate`, `research`, `job tick`, and `daemon
+Accepted by `run`, `add`, `curate`, `research`, `job tick`, and `daemon
 start`:
 
 | Flag | Default | Purpose |
