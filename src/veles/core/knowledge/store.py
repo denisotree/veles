@@ -52,6 +52,22 @@ _STOPWORDS = frozenset(
         "use",
         "using",
         "get",
+        # Ambient CLI/coding verbs — generic across any codebase, not Veles-specific.
+        # ("add" and "run" are deliberately NOT stopworded: each is the primary topic
+        # of exactly one note (add-a-source, run-a-session) and only ever contributes
+        # one distinct match per entry, so they don't cause self-gate leaks.)
+        "list",
+        "show",
+        "remove",
+        "delete",
+        "switch",
+        "create",
+        "update",
+        "start",
+        "stop",
+        "build",
+        "install",
+        "set",
     }
 )
 
@@ -98,12 +114,16 @@ class KnowledgeStore:
                 body_text=n.body,
             )
         for e in skeleton:
+            # NOTE: aliases (subcommand names like "list"/"show"/"add"/"remove") are
+            # deliberately excluded from title_text — they are everyday coding verbs,
+            # not Veles-specific, and would pollute ranking tokens (see M186 self-gate
+            # leak fix). Aliases remain on SkeletonEntry for display/other uses.
             self._add(
                 ref=f"{e.kind}:{e.name}",
                 source="skeleton",
                 title=e.name,
                 body=e.summary,
-                title_text=e.name + " " + " ".join(e.aliases),
+                title_text=e.name,
                 body_text=e.summary,
             )
 
@@ -133,7 +153,12 @@ class KnowledgeStore:
             return []
         scored: list[tuple[int, _Indexed]] = []
         for e in self._entries:
-            distinct = len(q & (e.title_tokens | e.body_tokens))
+            # Gate on the curated surface only (title + topics for notes; the
+            # command/skill/tool name for skeleton entries). Body prose is used
+            # for ranking (`_score`) but must not clear the gate — otherwise an
+            # incidental generic verb in a note body ("add", "run") lets an
+            # ordinary coding query leak Veles docs into recall (M186 review).
+            distinct = len(q & e.title_tokens)
             if distinct < MIN_DISTINCT_MATCHES:
                 continue
             s = self._score(q, e)

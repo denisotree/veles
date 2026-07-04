@@ -72,3 +72,56 @@ def test_default_store_builds_from_package():
     st = get_default_store()
     # Skeleton always yields entries even before notes are seeded.
     assert st.search("run") != [] or st.get("cmd:run") is not None
+
+
+def test_default_store_gates_generic_coding_queries():
+    # M186 review: ordinary coding turns must not leak Veles docs into recall.
+    # These clear the ≥2-token count only via ambient CLI/coding verbs or via
+    # incidental verbs in note *bodies* — both must be gated out.
+    st = get_default_store()
+    for q in [
+        "list the files and show the diff",
+        "add a new module and remove the old one",
+        "init the database and add a migration",
+        "add error handling and run tests",
+        "remove the unused import and run linter",
+        "switch to the feature branch and run build",
+        "null pointer dereference in the parser loop",
+        "refactor this failing unit test suite",
+    ]:
+        assert st.search(q) == [], f"leaked on {q!r} -> {[h.ref for h in st.search(q)]}"
+
+
+def test_default_store_still_surfaces_real_howto():
+    st = get_default_store()
+    cases = [
+        ("how do I run an interactive session in veles", "run-a-session"),
+        ("how do I add a source to the wiki", "add-a-source"),
+        ("how do I curate memory", "curate-memory"),
+        ("how do I connect an mcp server", "mcp-servers"),
+        ("how do I use manager mode for orchestration", "manager-mode"),
+        ("how do I initialise a new project", "init-a-project"),
+    ]
+    for q, expected in cases:
+        assert any(h.ref == expected for h in st.search(q)[:3]), (
+            f"{q!r} did not surface {expected}: {[h.ref for h in st.search(q)[:3]]}"
+        )
+
+
+def test_gate_uses_title_topics_not_body():
+    # The gate counts distinct matches against title+topics only; a query that
+    # matches solely on body prose must not clear it (else incidental verbs leak).
+    notes = [
+        Note(
+            slug="demo",
+            title="Curate memory",
+            body="Run and add and list and remove things in the project.",
+            topics=["curate", "memory", "compaction"],
+            related=[],
+        )
+    ]
+    st = KnowledgeStore(notes, [])
+    # "run"+"add" appear only in the body → gated (0 title/topic matches).
+    assert st.search("run and add") == []
+    # Two topic tokens → clears the gate.
+    assert st.search("curate the memory") != []
