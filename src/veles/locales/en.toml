@@ -46,6 +46,8 @@ model_header = "model · {provider} · {count} · {source} — type to filter ·
 no_matches = "no matches"
 more_matches = "… {count} matches, narrow the filter"
 model_cancelled = "model selection cancelled"
+file_header = "@ file · {count} — type to filter · ↑↓ · Enter · Esc"
+no_files = "no project files found"
 
 [telegram]
 start_greeting = "Hi! I'm Veles. Just send a message and I'll reply. Tip: /help lists the commands."

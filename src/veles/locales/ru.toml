@@ -39,6 +39,8 @@ model_header = "модель · {provider} · {count} · {source} — печат
 no_matches = "нет совпадений"
 more_matches = "… {count} совпадений, уточни фильтр"
 model_cancelled = "выбор модели отменён"
+file_header = "@ файл · {count} — печатай для фильтра · ↑↓ · Enter · Esc"
+no_files = "в проекте не найдено файлов"
 
 [telegram]
 start_greeting = "Привет! Я Veles. Просто пиши сообщение — я отвечу. Подсказка: /help — список команд."

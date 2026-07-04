@@ -29,6 +29,7 @@ import os
 import sys
 import time
 from collections import deque
+from pathlib import Path
 
 from veles.core.i18n import t
 from veles.core.project import Project
@@ -631,6 +632,20 @@ def _filter_models(models, text: str) -> list[str]:
     return [m for m in models if f in m.lower()]
 
 
+def _filter_files(paths: list[str], text: str) -> list[str]:
+    """Case-insensitive substring filter for the `@` file picker — same shape
+    as `_filter_models`, kept as a separate name for clarity/searchability."""
+    return _filter_models(paths, text)
+
+
+def _at_trigger_boundary(text_before_cursor: str) -> bool:
+    """True when a freshly-typed `@` at this cursor position should open the
+    file picker: start of input, or right after whitespace/newline. Mirrors
+    the old Textual `Composer` rule — `foo@bar.com` must NOT trigger it since
+    the `@` lands mid-word."""
+    return not text_before_cursor or text_before_cursor[-1].isspace()
+
+
 def _print_model_list(console, provider: str, current: str, *, refresh: bool = False) -> None:
     """Fallback (simple-loop) model lister: fetch the provider's catalogue and
     print it, marking the current model. No interactive picker here — the
@@ -1069,6 +1084,13 @@ class _ReplApp:
         self.mp_models: list[str] = []
         self.mp_source = ""
         self.mp_sel = 0
+        # --- @ file picker state (mirrors the /model picker, but is triggered
+        # inline by typing `@` at a word boundary — not via a slash command —
+        # and, unlike the model picker, keeps the `@`+filter text IN the input
+        # box rather than clearing it, since Enter re-inserts a path after it).
+        self.fp_active = False
+        self.fp_files: list[str] = []
+        self.fp_sel = 0
         # Capture the caller's ContextVars NOW (constructed inside the CLI's
         # `set_active_project` scope) so background turns can re-enter them —
         # `run_in_executor` does not copy context, and without the active
@@ -1080,8 +1102,8 @@ class _ReplApp:
 
         class _SlashCompleter(Completer):
             def get_completions(self, document, complete_event):
-                # No slash completion while the model filter owns the input box.
-                if outer.mp_active:
+                # No slash completion while the model/file filter owns the input box.
+                if outer.mp_active or outer.fp_active:
                     return
                 text = document.text_before_cursor
                 if not text.startswith("/") or " " in text:
@@ -1132,6 +1154,7 @@ class _ReplApp:
                     bool(self.busy or self.stream_chars or self.meta_events)
                     and not self.q_active
                     and not self.mp_active
+                    and not self.fp_active
                 )
             ),
         )
@@ -1153,10 +1176,19 @@ class _ReplApp:
             ),
             filter=Condition(lambda: self.mp_active),
         )
+        # @ file picker — shown while typing an `@` file reference.
+        file_picker = ConditionalContainer(
+            Window(
+                FormattedTextControl(self._fp_fragments),
+                dont_extend_height=True,
+                style="class:picker",
+            ),
+            filter=Condition(lambda: self.fp_active),
+        )
         status = Window(
             FormattedTextControl(self._status_fragments), height=1, style="class:status"
         )
-        root = HSplit([meta, picker, model_picker, frame, status])
+        root = HSplit([meta, picker, model_picker, file_picker, frame, status])
         style = Style.from_dict(
             {
                 "frame.border": theme.border,
@@ -1456,6 +1488,15 @@ class _ReplApp:
         if self.mp_active:
             self.mp_sel = 0
             self.app.invalidate()
+        if self.fp_active:
+            # The `@` file picker shares the box with regular typing (the `@`
+            # + filter text stays in the prompt) — if the user backspaces past
+            # the `@` that opened it, close quietly rather than filtering "".
+            if "@" not in self.input.text:
+                self._fp_close()
+            else:
+                self.fp_sel = 0
+                self.app.invalidate()
 
     def _open_model_picker(self, refresh: bool = False) -> None:
         self.mp_active = True
@@ -1567,6 +1608,106 @@ class _ReplApp:
         self.input.text = ""
         self.app.invalidate()
 
+    # --- @ file picker (filterable, triggered inline by typing `@`) ---
+
+    # Rows shown at once — capped at 9 so digit quick-select (1-9) maps
+    # 1:1 onto the printed row numbers, mirroring the ask_user picker.
+    _FP_WINDOW = 9
+
+    def _open_file_picker(self, root: Path | None = None) -> None:
+        """Populate the candidate list and switch the input box into filing
+        mode. Synchronous — `iter_project_files` is a plain filesystem walk,
+        unlike the /model picker's network fetch, so no executor hop needed."""
+        from veles.cli.repl.file_index import iter_project_files
+
+        self.fp_active = True
+        self.fp_sel = 0
+        try:
+            self.fp_files = [p.as_posix() for p in iter_project_files(root or self.project.root)]
+        except OSError:
+            self.fp_files = []
+        self.app.invalidate()
+
+    def _fp_filter_text(self) -> str:
+        """The filter is whatever follows the LAST `@` in the input box —
+        the `@` itself (and anything before it) stays put while filtering."""
+        text = self.input.text
+        idx = text.rfind("@")
+        return text[idx + 1 :] if idx != -1 else ""
+
+    def _fp_filtered(self) -> list[str]:
+        return _filter_files(self.fp_files, self._fp_filter_text())
+
+    def _fp_window_start(self, filtered_len: int) -> int:
+        window = self._FP_WINDOW
+        if filtered_len <= window:
+            return 0
+        sel = max(0, min(self.fp_sel, filtered_len - 1))
+        return max(0, min(sel - window // 2, filtered_len - window))
+
+    def _fp_fragments(self):
+        from prompt_toolkit.formatted_text import FormattedText
+
+        if not self.fp_files:
+            return FormattedText([("class:picker.dim", f" {t('repl.no_files')}\n")])
+        filtered = self._fp_filtered()
+        header = t("repl.file_header", count=len(self.fp_files))
+        frags: list[tuple[str, str]] = [("class:picker", f" {header}\n")]
+        if not filtered:
+            frags.append(("class:picker.dim", f"  {t('repl.no_matches')}\n"))
+            return FormattedText(frags)
+        window = self._FP_WINDOW
+        start = self._fp_window_start(len(filtered))
+        sel = max(0, min(self.fp_sel, len(filtered) - 1))
+        for i in range(start, min(start + window, len(filtered))):
+            path = filtered[i]
+            is_sel = i == sel
+            marker = "❯" if is_sel else " "
+            row_no = i - start + 1
+            frags.append(
+                ("class:picker.sel" if is_sel else "class:picker", f"  {marker} {row_no}. {path}\n")
+            )
+        if len(filtered) > window:
+            frags.append(("class:picker.dim", f"  {t('repl.more_matches', count=len(filtered))}\n"))
+        return FormattedText(frags)
+
+    def _fp_move(self, delta: int) -> None:
+        n = len(self._fp_filtered())
+        if n:
+            self.fp_sel = (max(0, min(self.fp_sel, n - 1)) + delta) % n
+        self.app.invalidate()
+
+    def _fp_select_row(self, idx: int) -> None:
+        """Digit quick-select: `idx` is 0-based within the CURRENTLY displayed
+        window, matching the 1-based row numbers `_fp_fragments` prints."""
+        filtered = self._fp_filtered()
+        start = self._fp_window_start(len(filtered))
+        row = start + idx
+        if row < len(filtered):
+            self.fp_sel = row
+            self.app.invalidate()
+
+    def _fp_pick(self) -> None:
+        filtered = self._fp_filtered()
+        if not filtered:
+            return
+        path = filtered[max(0, min(self.fp_sel, len(filtered) - 1))]
+        text = self.input.text
+        idx = text.rfind("@")
+        prefix = text[:idx] if idx != -1 else text
+        new_text = f"{prefix}@{path}"
+        self.input.text = new_text
+        self.input.buffer.cursor_position = len(new_text)
+        self._fp_close()
+
+    def _fp_cancel(self) -> None:
+        self._fp_close()
+
+    def _fp_close(self) -> None:
+        self.fp_active = False
+        self.fp_files = []
+        self.app.invalidate()
+
     def _free_submit(self) -> None:
         txt = self.input.text.strip()
         self.input.text = ""
@@ -1582,10 +1723,12 @@ class _ReplApp:
         #   choosing — arrow-selecting an ask_user option
         #   freeing  — typing a free-text answer to an ask_user question
         #   modeling — filtering/selecting in the /model picker
-        normal = Condition(lambda: not self.q_active and not self.mp_active)
+        #   filing   — filtering/selecting in the @ file picker
+        normal = Condition(lambda: not self.q_active and not self.mp_active and not self.fp_active)
         choosing = Condition(lambda: self.q_active and not self.q_free)
         freeing = Condition(lambda: self.q_active and self.q_free)
         modeling = Condition(lambda: self.mp_active)
+        filing = Condition(lambda: self.fp_active)
 
         @kb.add("enter", filter=normal)
         def _(event) -> None:
@@ -1605,7 +1748,14 @@ class _ReplApp:
         @kb.add(
             "escape",
             "enter",
-            filter=Condition(lambda: not self.q_active and not self.mp_active and not self.busy),
+            filter=Condition(
+                lambda: (
+                    not self.q_active
+                    and not self.mp_active
+                    and not self.fp_active
+                    and not self.busy
+                )
+            ),
         )
         def _(event) -> None:
             self.input.buffer.insert_text("\n")
@@ -1625,6 +1775,17 @@ class _ReplApp:
         @kb.add("down", filter=normal)
         def _(event) -> None:
             self._history_down()
+
+        @kb.add("@", filter=normal)
+        def _(event) -> None:
+            # Type the `@` as usual, then — only at a word boundary (start of
+            # input / after whitespace) — open the file picker. Mid-word (an
+            # email address) it's just a character.
+            before = self.input.buffer.document.text_before_cursor
+            boundary = _at_trigger_boundary(before)
+            self.input.buffer.insert_text("@")
+            if boundary:
+                self._open_file_picker()
 
         @kb.add("up", filter=choosing)
         def _(event) -> None:
@@ -1650,7 +1811,11 @@ class _ReplApp:
 
         @kb.add(
             "escape",
-            filter=Condition(lambda: self.busy and not self.q_active and not self.mp_active),
+            filter=Condition(
+                lambda: (
+                    self.busy and not self.q_active and not self.mp_active and not self.fp_active
+                )
+            ),
         )
         def _(event) -> None:  # Esc during generation → stop + restore the request
             self._cancel_generation()
@@ -1670,6 +1835,28 @@ class _ReplApp:
         @kb.add("escape", filter=modeling)
         def _(event) -> None:
             self._mp_cancel()
+
+        @kb.add("enter", filter=filing)
+        def _(event) -> None:
+            self._fp_pick()
+
+        @kb.add("up", filter=filing)
+        def _(event) -> None:
+            self._fp_move(-1)
+
+        @kb.add("down", filter=filing)
+        def _(event) -> None:
+            self._fp_move(1)
+
+        @kb.add("escape", filter=filing)
+        def _(event) -> None:
+            self._fp_cancel()
+
+        for _i in range(9):
+
+            @kb.add(str(_i + 1), filter=filing)
+            def _(event, idx=_i) -> None:
+                self._fp_select_row(idx)
 
         @kb.add("s-tab", filter=normal)
         def _(event) -> None:
@@ -1752,6 +1939,9 @@ class _ReplApp:
             self._set_input(self._hist[self._hist_pos])
 
     def _on_ctrl_c(self, event) -> None:
+        if self.fp_active:
+            self._fp_cancel()  # cancel the @ file picker
+            return
         if self.mp_active:
             self._mp_cancel()  # cancel the /model picker
             return
