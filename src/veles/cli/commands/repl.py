@@ -833,6 +833,15 @@ def _handle_slash(
         )
     elif result.open_picker == "themes":
         _print_theme_list(console, state.theme_name)
+    elif result.open_picker == "daemon":
+        # The daemon control panel is a standalone Textual surface (`veles
+        # daemon`), not a modal nested inside this REPL — no picker to open
+        # here, so point at the real surface instead of the generic (and
+        # nonsensical, for `/daemon`) "set directly" hint below.
+        console.print(
+            "  [dim]the daemon control panel is a separate surface — "
+            "run `veles daemon` in your shell[/dim]"
+        )
     elif result.open_picker:
         console.print(f"  [dim]{result.open_picker}: set directly, e.g. /model <id>[/dim]")
     return result.quit, result.submit_prompt
@@ -2065,11 +2074,14 @@ class _ReplApp:
         def _(event) -> None:
             # Type the `@` as usual, then — only at a word boundary (start of
             # input / after whitespace) — open the file picker. Mid-word (an
-            # email address) it's just a character.
+            # email address) it's just a character. Never open while a turn is
+            # running (`busy`): a mid-turn `_ask`/`_permission_prompt` can flip
+            # `q_active` on top of an already-open picker, putting two
+            # mutually-exclusive filter states active at once.
             before = self.input.buffer.document.text_before_cursor
             boundary = _at_trigger_boundary(before)
             self.input.buffer.insert_text("@")
-            if boundary:
+            if boundary and not self.busy:
                 self._open_file_picker()
 
         @kb.add("up", filter=choosing)
@@ -2351,11 +2363,21 @@ class _ReplApp:
             parts = text.split()
             # /model with no id (or `refresh`) → the inline filterable picker,
             # driven inside this Application. /model <id> still sets directly
-            # via the shared slash handler below.
+            # via the shared slash handler below. Never while `busy`: a
+            # mid-turn `_ask`/`_permission_prompt` can flip `q_active` on top
+            # of an already-open picker, colliding two filter states at once.
+            # NOTE: fall through to `_slash` below rather than queuing — the
+            # queue drain in `_run_chain` feeds straight into `_blocking_turn`
+            # with no re-dispatch, so a queued "/model" would be sent to the
+            # LLM as a chat prompt once the turn ends. Falling through runs
+            # the same immediate path every other slash command already takes
+            # during `busy` (here, `_handle_slash` prints the static model
+            # list instead of opening the interactive picker).
             if (
                 parts
                 and parts[0].lower() == "/model"
                 and (len(parts) == 1 or parts[1].lower() == "refresh")
+                and not self.busy
             ):
                 self._echo_user(text)
                 self._open_model_picker(refresh=len(parts) > 1)
@@ -2364,8 +2386,9 @@ class _ReplApp:
             # /model above. /theme <name> still sets directly via the shared
             # slash handler below (it goes through the registry's `_theme`,
             # which persists — `_slash` then notices `state.theme_name`
-            # changed and re-applies the live restyle).
-            if parts and parts[0].lower() == "/theme" and len(parts) == 1:
+            # changed and re-applies the live restyle). Same busy-guard (and
+            # same reason) as /model above.
+            if parts and parts[0].lower() == "/theme" and len(parts) == 1 and not self.busy:
                 self._echo_user(text)
                 self._open_theme_picker()
                 return
