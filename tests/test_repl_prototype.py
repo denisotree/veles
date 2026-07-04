@@ -259,6 +259,89 @@ def test_ctrl_i_toggles_meta_expanded_like_ctrl_o(tmp_path) -> None:
         store.close()
 
 
+async def test_tab_still_cycles_completion_with_inspector_binding(tmp_path) -> None:
+    """Regression (M187): `Keys.ControlI IS Keys.Tab` in prompt_toolkit (same
+    key code, see `prompt_toolkit.keys.Keys.Tab = ControlI`). `Application`
+    merges the app's OWN key_bindings ABOVE prompt_toolkit's defaults, so an
+    unguarded `@kb.add("c-i")` shadows the default Tab -> menu-complete
+    cycling the instant a completion menu is open — pressing Tab while
+    typing a slash command toggled the inspector instead of advancing the
+    completion. The isolated `_make_keys()` object (as `_kb_handler` above
+    drives) can't catch this: it only exists once merged into the real
+    `Application`, so this test runs the actual merged app through a piped
+    input, exactly the seam the isolated test misses."""
+    import asyncio
+
+    from prompt_toolkit.application import create_app_session
+    from prompt_toolkit.input import create_pipe_input
+    from prompt_toolkit.output import DummyOutput
+
+    with (
+        create_pipe_input() as pipe_input,
+        create_app_session(input=pipe_input, output=DummyOutput()),
+    ):
+        app, store = _build_app(tmp_path)
+        try:
+            task = asyncio.ensure_future(app.app.run_async())
+            await asyncio.sleep(0.05)
+
+            # Type "/" — complete_while_typing auto-opens the slash
+            # completion menu, so complete_state is already non-None
+            # by the time Tab is pressed (matches real REPL usage).
+            pipe_input.send_text("/")
+            await asyncio.sleep(0.05)
+            assert app.input.buffer.complete_state is not None
+            assert app.input.buffer.complete_state.complete_index is None
+
+            # Tab (== Ctrl+I) while the menu is open must CYCLE the
+            # completion, not toggle the inspector.
+            pipe_input.send_text("\t")
+            await asyncio.sleep(0.05)
+            assert app.input.buffer.complete_state.complete_index == 0
+            assert app.meta_expanded is False  # untouched
+
+            pipe_input.send_text("\t")
+            await asyncio.sleep(0.05)
+            assert app.input.buffer.complete_state.complete_index == 1
+            assert app.meta_expanded is False  # still untouched
+        finally:
+            app.app.exit()
+            await task
+            store.close()
+
+
+async def test_ctrl_i_toggles_inspector_when_no_completion_open(tmp_path) -> None:
+    """Inverse of the regression above: with no completion menu open (plain
+    empty input), Ctrl+I/Tab still toggles the inspector — the filter gate
+    must not disable the feature outright, only defer to completion cycling
+    when a menu is actually open."""
+    import asyncio
+
+    from prompt_toolkit.application import create_app_session
+    from prompt_toolkit.input import create_pipe_input
+    from prompt_toolkit.output import DummyOutput
+
+    with (
+        create_pipe_input() as pipe_input,
+        create_app_session(input=pipe_input, output=DummyOutput()),
+    ):
+        app, store = _build_app(tmp_path)
+        try:
+            task = asyncio.ensure_future(app.app.run_async())
+            await asyncio.sleep(0.05)
+            assert app.input.buffer.complete_state is None
+            assert app.meta_expanded is False
+
+            pipe_input.send_text("\t")
+            await asyncio.sleep(0.05)
+            assert app.input.buffer.complete_state is None  # no menu opened
+            assert app.meta_expanded is True  # inspector toggled
+        finally:
+            app.app.exit()
+            await task
+            store.close()
+
+
 def test_expanded_hud_shows_done_tool_status_and_duration(tmp_path) -> None:
     """A tool call that started and completed shows a done/failed marker plus
     its elapsed duration in the expanded HUD, fed through the SAME on_event

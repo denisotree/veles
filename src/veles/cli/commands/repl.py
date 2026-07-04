@@ -1354,7 +1354,7 @@ class _ReplApp:
             (
                 "class:status",
                 f" {_settled_status(self.state)} · Shift+Tab mode · /help · "
-                "Ctrl+O meta · Ctrl+D exit ",
+                "Ctrl+O/I meta · Ctrl+D exit ",
             )
         ]
 
@@ -2127,7 +2127,12 @@ class _ReplApp:
             self.meta_expanded = not self.meta_expanded
             self.app.invalidate()
 
-        @kb.add("c-i")  # inspector toggle — same flag as Ctrl+O (M187)
+        # Ctrl+I IS Tab in prompt_toolkit (same key code) — gate the inspector
+        # toggle so it only fires when no completion menu is open. Otherwise it
+        # shadows the default Tab binding that cycles slash-command completions
+        # (docs/en/reference/tui.md), since this Application's own bindings take
+        # priority over prompt_toolkit's merged defaults. (M187 regression fix.)
+        @kb.add("c-i", filter=Condition(lambda: self.input.buffer.complete_state is None))
         def _(event) -> None:
             self.meta_expanded = not self.meta_expanded
             self.app.invalidate()
