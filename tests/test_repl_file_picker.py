@@ -80,11 +80,23 @@ def test_filter_files_substring_case_insensitive() -> None:
 
 def test_fp_filter_text_reads_after_last_at_sign(app) -> None:
     app.input.text = "@alp"
+    app.input.buffer.cursor_position = len(app.input.text)
     assert app._fp_filter_text() == "alp"
     app.input.text = "look at @src/al"
+    app.input.buffer.cursor_position = len(app.input.text)
     assert app._fp_filter_text() == "src/al"
     app.input.text = "no at sign here"
+    app.input.buffer.cursor_position = len(app.input.text)
     assert app._fp_filter_text() == ""
+
+
+def test_fp_filter_reads_only_token_before_cursor(app) -> None:
+    # Regression: the filter must not swallow text typed AFTER the `@` token
+    # when the cursor sits mid-buffer (e.g. composing a multi-line message
+    # with Alt+Enter and then editing an earlier line).
+    app.input.text = "explain @foo more context"
+    app.input.buffer.cursor_position = len("explain @foo")
+    assert app._fp_filter_text() == "foo"
 
 
 # --- word-boundary trigger check ---
@@ -135,6 +147,7 @@ def test_fp_pick_inserts_posix_path_after_at(app) -> None:
     app.fp_active = True
     app.fp_files = ["README.md", "src/alpha.py"]
     app.input.text = "@alpha"
+    app.input.buffer.cursor_position = len(app.input.text)
     app.fp_sel = 0
     app._fp_pick()
     assert app.input.text == "@src/alpha.py"
@@ -145,6 +158,7 @@ def test_fp_pick_preserves_text_before_the_at_sign(app) -> None:
     app.fp_active = True
     app.fp_files = ["README.md"]
     app.input.text = "please check @read"
+    app.input.buffer.cursor_position = len(app.input.text)
     app.fp_sel = 0
     app._fp_pick()
     assert app.input.text == "please check @README.md"
@@ -154,9 +168,23 @@ def test_fp_pick_noop_on_no_matches(app) -> None:
     app.fp_active = True
     app.fp_files = ["README.md"]
     app.input.text = "@zzz"
+    app.input.buffer.cursor_position = len(app.input.text)
     app._fp_pick()
     assert app.input.text == "@zzz"  # unchanged
     assert app.fp_active is True  # stays open — nothing to pick
+
+
+def test_fp_pick_preserves_trailing_text(app) -> None:
+    # Regression: picking a path must only replace the `@token` span, not
+    # truncate whatever the user had already typed after it.
+    app.fp_active = True
+    app.fp_files = ["src/alpha.py"]
+    app.input.text = "explain @alpha more context"
+    app.input.buffer.cursor_position = len("explain @alpha")
+    app.fp_sel = 0
+    app._fp_pick()
+    assert app.input.text == "explain @src/alpha.py more context"
+    assert app.input.buffer.cursor_position == len("explain @src/alpha.py")
 
 
 # --- movement / cancel ---

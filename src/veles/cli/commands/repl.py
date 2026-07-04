@@ -1629,11 +1629,14 @@ class _ReplApp:
         self.app.invalidate()
 
     def _fp_filter_text(self) -> str:
-        """The filter is whatever follows the LAST `@` in the input box —
-        the `@` itself (and anything before it) stays put while filtering."""
-        text = self.input.text
-        idx = text.rfind("@")
-        return text[idx + 1 :] if idx != -1 else ""
+        """The filter is whatever follows the LAST `@` before the cursor —
+        the `@` itself (and anything before it) stays put while filtering,
+        and anything after the cursor (e.g. the rest of a multi-line
+        Alt+Enter-composed message) is ignored rather than pollute the
+        filter token."""
+        before_cursor = self.input.buffer.document.text_before_cursor
+        idx = before_cursor.rfind("@")
+        return before_cursor[idx + 1 :] if idx != -1 else ""
 
     def _fp_filtered(self) -> list[str]:
         return _filter_files(self.fp_files, self._fp_filter_text())
@@ -1692,12 +1695,15 @@ class _ReplApp:
         if not filtered:
             return
         path = filtered[max(0, min(self.fp_sel, len(filtered) - 1))]
-        text = self.input.text
-        idx = text.rfind("@")
-        prefix = text[:idx] if idx != -1 else text
-        new_text = f"{prefix}@{path}"
+        doc = self.input.buffer.document
+        before, after = doc.text_before_cursor, doc.text_after_cursor
+        idx = before.rfind("@")
+        prefix = before[:idx] if idx != -1 else before
+        # Preserve whatever came after the cursor verbatim (e.g. the rest of
+        # a multi-line message) instead of truncating it.
+        new_text = f"{prefix}@{path}{after}"
         self.input.text = new_text
-        self.input.buffer.cursor_position = len(new_text)
+        self.input.buffer.cursor_position = len(prefix) + 1 + len(path)
         self._fp_close()
 
     def _fp_cancel(self) -> None:
