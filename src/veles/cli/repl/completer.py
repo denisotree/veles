@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from veles.tui.slash import SlashRegistry
+from veles.cli.repl.slash import SlashRegistry
 
 
 @runtime_checkable

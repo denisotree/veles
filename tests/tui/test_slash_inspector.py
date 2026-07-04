@@ -8,7 +8,7 @@ existing slash-command style.
 
 from __future__ import annotations
 
-from veles.tui.slash import build_default_registry
+from veles.cli.repl.slash import build_default_registry
 
 
 def _reg():

@@ -15,7 +15,7 @@ import contextlib
 import datetime as dt
 from typing import TYPE_CHECKING
 
-from veles.tui.slash.registry import SlashContext, SlashRegistry, SlashResult
+from veles.cli.repl.slash.registry import SlashContext, SlashRegistry, SlashResult
 
 if TYPE_CHECKING:
     from veles.core.project import Project

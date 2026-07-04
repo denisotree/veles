@@ -1,4 +1,4 @@
-"""`tui.screens._model_fetcher.fetch_models` — cache / live / curated
+"""`cli.repl.model_fetcher.fetch_models` — cache / live / curated
 strategy per provider class."""
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from veles.tui.screens import _model_fetcher as mf
+from veles.cli.repl import model_fetcher as mf
 
 
 @pytest.fixture(autouse=True)

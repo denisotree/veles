@@ -14,9 +14,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from veles.cli.repl.slash.builtin import build_default_registry
 from veles.core.project import init_project
 from veles.core.runtime_sessions import RuntimeSessionStore
-from veles.tui.slash.builtin import build_default_registry
 
 # ---- /daemon slash command ----
 

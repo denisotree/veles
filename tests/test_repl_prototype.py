@@ -19,9 +19,9 @@ from veles.cli.commands.repl import (
     _render_answer,
     _update_state_after_turn,
 )
+from veles.cli.repl.slash import build_default_registry
 from veles.core.agent import RunResult, UsageSnapshot
 from veles.core.session_state import AppState
-from veles.tui.slash import build_default_registry
 
 
 def _state() -> AppState:
@@ -529,7 +529,7 @@ def test_filter_models_substring_case_insensitive() -> None:
 
 
 def test_fetch_models_wraps_fetcher(tmp_path, monkeypatch) -> None:
-    from veles.tui.screens import _model_fetcher
+    from veles.cli.repl import model_fetcher as _model_fetcher
 
     class _ML:
         models: typing.ClassVar = ["a/x", "a/y"]
@@ -544,7 +544,7 @@ def test_fetch_models_wraps_fetcher(tmp_path, monkeypatch) -> None:
 
 
 def test_fetch_models_swallows_errors(tmp_path, monkeypatch) -> None:
-    from veles.tui.screens import _model_fetcher
+    from veles.cli.repl import model_fetcher as _model_fetcher
 
     def _boom(*_a, **_k):
         raise RuntimeError("no key")
@@ -597,7 +597,7 @@ def test_model_picker_move_wraps_and_cancel_closes(tmp_path) -> None:
 
 def test_print_model_list_fallback(monkeypatch, capsys: pytest.CaptureFixture[str]) -> None:
     from veles.cli.commands.repl import _print_model_list
-    from veles.tui.screens import _model_fetcher
+    from veles.cli.repl import model_fetcher as _model_fetcher
 
     class _ML:
         models: typing.ClassVar = ["openai/gpt-4o", "anthropic/claude"]

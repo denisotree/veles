@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from veles.tui.history import InputHistory
+from veles.cli.repl.history import InputHistory
 
 
 def test_load_missing_file_returns_empty(tmp_path):

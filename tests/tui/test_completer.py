@@ -7,8 +7,8 @@ to splice substrings.
 
 from __future__ import annotations
 
-from veles.tui.completer import NullCompleter, SlashCompleter
-from veles.tui.slash import SlashRegistry, SlashResult
+from veles.cli.repl.completer import NullCompleter, SlashCompleter
+from veles.cli.repl.slash import SlashRegistry, SlashResult
 
 
 def _reg(*names: str) -> SlashRegistry:

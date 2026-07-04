@@ -30,7 +30,7 @@ async def test_first_ctrl_c_copies_and_warns(
         captured["text"] = text
         return True
 
-    monkeypatch.setattr("veles.tui.clipboard.copy_text", fake_copy)
+    monkeypatch.setattr("veles.cli.repl.clipboard.copy_text", fake_copy)
 
     app = _app(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:
@@ -48,7 +48,7 @@ async def test_ctrl_c_ignores_selection_and_copies_last_reply(
     selection, Ctrl+C copies the last reply (M77) and arms the exit window."""
     captured: dict[str, str] = {}
     monkeypatch.setattr(
-        "veles.tui.clipboard.copy_text",
+        "veles.cli.repl.clipboard.copy_text",
         lambda text: captured.__setitem__("text", text) or True,
     )
 
@@ -69,7 +69,7 @@ async def test_ctrl_c_without_selection_copies_last_reply(
     """No selection → fall back to the M77 last-reply copy."""
     captured: dict[str, str] = {}
     monkeypatch.setattr(
-        "veles.tui.clipboard.copy_text",
+        "veles.cli.repl.clipboard.copy_text",
         lambda text: captured.__setitem__("text", text) or True,
     )
     app = _app(tmp_project, agent_factory_for, text_response)
@@ -114,7 +114,9 @@ async def test_selection_alone_does_not_copy(
     from veles.tui.widgets.chat_log import ChatLog
 
     calls: list[str] = []
-    monkeypatch.setattr("veles.tui.clipboard.copy_text", lambda text: calls.append(text) or True)
+    monkeypatch.setattr(
+        "veles.cli.repl.clipboard.copy_text", lambda text: calls.append(text) or True
+    )
     app = _app(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:
         chat = pilot.app.query_one(ChatLog)
@@ -135,7 +137,7 @@ async def test_copy_selection_action_copies_via_native_clipboard(
     selection through the native clipboard and confirms."""
     captured: dict[str, str] = {}
     monkeypatch.setattr(
-        "veles.tui.clipboard.copy_text",
+        "veles.cli.repl.clipboard.copy_text",
         lambda text: captured.__setitem__("text", text) or True,
     )
     app = _app(tmp_project, agent_factory_for, text_response)
@@ -150,7 +152,9 @@ async def test_copy_selection_action_noop_without_selection(
     tmp_project, agent_factory_for, text_response, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     calls: list[str] = []
-    monkeypatch.setattr("veles.tui.clipboard.copy_text", lambda text: calls.append(text) or True)
+    monkeypatch.setattr(
+        "veles.cli.repl.clipboard.copy_text", lambda text: calls.append(text) or True
+    )
     app = _app(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:
         pilot.app.screen.get_selected_text = lambda: ""  # type: ignore[method-assign]
@@ -166,7 +170,7 @@ async def test_ctrl_shift_c_copies_selection(
     (drives the real key→binding→action path, not a direct call)."""
     captured: dict[str, str] = {}
     monkeypatch.setattr(
-        "veles.tui.clipboard.copy_text",
+        "veles.cli.repl.clipboard.copy_text",
         lambda text: captured.__setitem__("text", text) or True,
     )
     app = _app(tmp_project, agent_factory_for, text_response)
@@ -180,7 +184,7 @@ async def test_ctrl_shift_c_copies_selection(
 async def test_double_ctrl_c_exits(
     tmp_project, agent_factory_for, text_response, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("veles.tui.clipboard.copy_text", lambda _t: False)
+    monkeypatch.setattr("veles.cli.repl.clipboard.copy_text", lambda _t: False)
     app = _app(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:
         pilot.app.state.last_assistant_text = "x"
@@ -195,8 +199,8 @@ async def test_double_ctrl_c_exits(
 async def test_ctrl_v_pastes_text_into_composer(
     tmp_project, agent_factory_for, text_response, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("veles.tui.clipboard.paste_image", lambda _p: False)
-    monkeypatch.setattr("veles.tui.clipboard.paste_text", lambda: "pasted text")
+    monkeypatch.setattr("veles.cli.repl.clipboard.paste_image", lambda _p: False)
+    monkeypatch.setattr("veles.cli.repl.clipboard.paste_text", lambda: "pasted text")
 
     app = _app(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:
@@ -218,9 +222,11 @@ async def test_ctrl_v_image_paste_saves_to_veles_tmp_and_inserts_ref(
         target.write_bytes(b"\x89PNG\r\n\x1a\nfake")
         return True
 
-    monkeypatch.setattr("veles.tui.clipboard.paste_image", fake_image)
+    monkeypatch.setattr("veles.cli.repl.clipboard.paste_image", fake_image)
     # Make sure text paste isn't taken if image succeeded.
-    monkeypatch.setattr("veles.tui.clipboard.paste_text", lambda: pytest.fail("should not run"))
+    monkeypatch.setattr(
+        "veles.cli.repl.clipboard.paste_text", lambda: pytest.fail("should not run")
+    )
 
     app = _app(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:
@@ -235,8 +241,8 @@ async def test_ctrl_v_image_paste_saves_to_veles_tmp_and_inserts_ref(
 async def test_ctrl_v_no_clipboard_content_is_noop(
     tmp_project, agent_factory_for, text_response, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("veles.tui.clipboard.paste_image", lambda _p: False)
-    monkeypatch.setattr("veles.tui.clipboard.paste_text", lambda: None)
+    monkeypatch.setattr("veles.cli.repl.clipboard.paste_image", lambda _p: False)
+    monkeypatch.setattr("veles.cli.repl.clipboard.paste_text", lambda: None)
 
     app = _app(tmp_project, agent_factory_for, text_response)
     async with app.run_test() as pilot:

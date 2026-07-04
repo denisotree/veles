@@ -181,7 +181,7 @@ async def test_slash_model_no_arg_opens_picker(tmp_project, agent_factory_for, t
         await pilot.press("enter")  # take first row
         await pilot.pause()
     # First model in the openrouter list.
-    from veles.tui.screens.model_picker import known_models
+    from veles.cli.repl.model_catalog import known_models
 
     assert app.state.model == known_models("openrouter")[0]
 
@@ -193,7 +193,7 @@ async def test_slash_model_refresh_opens_picker_with_refresh_flag(
     → `_open_picker("models:refresh")` → `action_pick_model(refresh=True)`.
     The conftest already stubs `fetch_models`, so no network is touched; we
     spy on the stub instead to assert `refresh=True` reached it."""
-    from veles.tui.screens import _model_fetcher
+    from veles.cli.repl import model_fetcher as _model_fetcher
 
     seen: dict[str, bool] = {}
 

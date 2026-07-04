@@ -36,8 +36,8 @@ from textual.binding import Binding
 from textual.message import Message
 from textual.widgets import TextArea
 
-from veles.tui.completer import Completer, NullCompleter
-from veles.tui.history import InputHistory
+from veles.cli.repl.completer import Completer, NullCompleter
+from veles.cli.repl.history import InputHistory
 
 # Returns the text of the most-recent queued prompt to re-edit, or
 # `None` if the queue is empty. Hooked from `TuiApp.on_mount`.

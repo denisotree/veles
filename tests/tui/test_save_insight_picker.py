@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from veles.tui.slash import build_default_registry
+from veles.cli.repl.slash import build_default_registry
 from veles.tui.widgets.status_bar import StatusBar
 
 

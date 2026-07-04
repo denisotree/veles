@@ -1,6 +1,6 @@
 """M78: pick a project file to reference from the Composer via `@`.
 
-Lists files under the project root via `core.project.iter_project_files`
+Lists files under the project root via `cli.repl.file_index.iter_project_files`
 (excludes `.git`, `node_modules`, etc.; keeps `.veles/tmp/` so
 clipboard-paste artifacts are reachable). Returns the chosen relative
 path as a POSIX-style string ready to drop into the prompt; `None` on
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from veles.core.project import iter_project_files
+from veles.cli.repl.file_index import iter_project_files
 from veles.tui.screens.base_picker import PickerItem, PickerScreen
 
 

@@ -639,7 +639,7 @@ def _print_model_list(console, provider: str, current: str, *, refresh: bool = F
     print it, marking the current model. No interactive picker here — the
     default REPL (inline Application) has the filterable picker; the fallback
     just shows the list and relies on `/model <id>` to set one."""
-    from veles.tui.screens._model_fetcher import fetch_models
+    from veles.cli.repl.model_fetcher import fetch_models
 
     try:
         result = fetch_models(provider, refresh=refresh)
@@ -703,7 +703,7 @@ def _handle_slash(
     line: str, registry, state, project, store, console, errors: list[str]
 ) -> tuple[bool, str | None]:
     """Dispatch a `/command`. Returns ``(should_quit, submit_prompt)``."""
-    from veles.tui.slash import SlashContext
+    from veles.cli.repl.slash import SlashContext
 
     cmd = line.split()[0].lower()
     # REPL-local commands that the shared (Textual) registry doesn't own.
@@ -1484,7 +1484,7 @@ class _ReplApp:
     def _fetch_models(self, refresh: bool):
         """Runs in the executor (a refresh / cold cache does network I/O, which
         must not block the event loop). Returns (models, source)."""
-        from veles.tui.screens._model_fetcher import fetch_models
+        from veles.cli.repl.model_fetcher import fetch_models
 
         try:
             result = fetch_models(self.state.provider_name, refresh=refresh)
@@ -1914,7 +1914,7 @@ class _ReplApp:
 
 
 def cmd_repl(args: argparse.Namespace, project: Project) -> int:
-    from veles.tui.slash import build_default_registry
+    from veles.cli.repl.slash import build_default_registry
 
     runtime = _build_runtime(args, project)
     if runtime is None:

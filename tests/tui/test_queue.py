@@ -16,10 +16,10 @@ from collections import deque
 
 from textual.app import App, ComposeResult
 
+from veles.cli.repl.history import InputHistory
 from veles.core.session_state import AppState
 from veles.tui.app import TuiApp
 from veles.tui.bridge import AgentBridge
-from veles.tui.history import InputHistory
 from veles.tui.widgets.composer import Composer
 from veles.tui.widgets.queue_panel import QueuePanel
 

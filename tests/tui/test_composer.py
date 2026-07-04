@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from textual.app import App, ComposeResult
 
-from veles.tui.completer import SlashCompleter
-from veles.tui.history import InputHistory
-from veles.tui.slash import SlashRegistry, SlashResult
+from veles.cli.repl.completer import SlashCompleter
+from veles.cli.repl.history import InputHistory
+from veles.cli.repl.slash import SlashRegistry, SlashResult
 from veles.tui.widgets.composer import Composer
 
 

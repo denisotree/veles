@@ -7,8 +7,8 @@ and the slash in sync.
 
 from __future__ import annotations
 
+from veles.cli.repl.slash.builtin import build_default_registry
 from veles.core.tui_state import load_tui_state
-from veles.tui.slash.builtin import build_default_registry
 
 
 def test_slash_mode_no_args_lists_modes_and_marks_current(slash_ctx) -> None:

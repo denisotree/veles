@@ -8,7 +8,7 @@ Lists are sourced through `_model_fetcher.fetch_models()`:
 - Local providers (`ollama`, `llamacpp`, `openai-compat`) — always
   live, no cache, so a newly-installed model shows up immediately.
 - Everyone else (`anthropic`, `claude-cli`, `gemini-cli`) — curated
-  fallback from `_CURATED_MODELS_BY_PROVIDER` below.
+  fallback from `cli.repl.model_catalog._CURATED_MODELS_BY_PROVIDER`.
 
 Any live-fetch failure (missing key, network error, malformed response)
 collapses to the curated list and is reported via the picker title
@@ -18,37 +18,6 @@ suffix (`[live]` / `[cached]` / `[curated]`).
 from __future__ import annotations
 
 from veles.tui.screens.base_picker import PickerItem, PickerScreen
-
-_CURATED_MODELS_BY_PROVIDER: dict[str, list[str]] = {
-    "openrouter": [
-        "anthropic/claude-sonnet-4.6",
-        "anthropic/claude-opus-4.7",
-        "anthropic/claude-haiku-4.5",
-        "openai/gpt-4o",
-        "openai/gpt-4o-mini",
-        "google/gemini-2.5-pro",
-        "google/gemini-2.5-flash",
-        "meta-llama/llama-3.3-70b-instruct",
-        "deepseek/deepseek-r1",
-    ],
-    "anthropic": [
-        "claude-opus-4-7",
-        "claude-sonnet-4-6",
-        "claude-haiku-4.5",
-    ],
-    "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "o4-mini", "o3"],
-    "gemini": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
-    "claude-cli": [],
-    "gemini-cli": [],
-}
-
-
-def known_models(provider: str) -> list[str]:
-    """Curated fallback list. The fetcher uses this when the live API
-    isn't reachable (no key, network error) and tests can stub it via
-    `monkeypatch.setattr(...)` to avoid hitting the wire."""
-    return list(_CURATED_MODELS_BY_PROVIDER.get(provider, []))
-
 
 _SOURCE_SUFFIX = {
     "live": "[live]",
@@ -65,7 +34,7 @@ class ModelPickerScreen(PickerScreen[str]):
         *,
         refresh: bool = False,
     ) -> None:
-        from veles.tui.screens._model_fetcher import fetch_models
+        from veles.cli.repl.model_fetcher import fetch_models
 
         result = fetch_models(provider, refresh=refresh)
         items: list[PickerItem[str]] = []

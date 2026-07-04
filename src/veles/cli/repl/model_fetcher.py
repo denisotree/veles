@@ -37,7 +37,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from veles.tui.screens.model_picker import known_models
+from veles.cli.repl.model_catalog import known_models
 
 _logger = logging.getLogger(__name__)
 

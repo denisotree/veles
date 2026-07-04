@@ -182,12 +182,12 @@ async def _pick_project_model(
     ctx: WizardContext, provider: str, *, default_pref: str | None
 ) -> str | None:
     """Mirror of user-level ModelStep, scoped to the project."""
-    from veles.core.provider_factory import LOCAL_PROVIDERS
-    from veles.core.secrets import get_provider_key
-    from veles.tui.screens._model_fetcher import (
+    from veles.cli.repl.model_fetcher import (
         known_models,
         validate_and_fetch_models,
     )
+    from veles.core.provider_factory import LOCAL_PROVIDERS
+    from veles.core.secrets import get_provider_key
 
     project: Project = ctx.answers["project"]
     slug = project.name

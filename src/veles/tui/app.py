@@ -24,19 +24,19 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
 
+from veles.cli.repl.completer import SlashCompleter
+from veles.cli.repl.history import InputHistory
+from veles.cli.repl.slash import SlashContext, SlashRegistry, build_default_registry
 from veles.core.memory import SessionStore
 from veles.core.project import Project
 from veles.core.session_state import AppState
 from veles.tui import wire
 from veles.tui.bridge import AgentBridge, AgentFactory
-from veles.tui.completer import SlashCompleter
-from veles.tui.history import InputHistory
 from veles.tui.screens import (
     ModelPickerScreen,
     SessionPickerScreen,
     ThemePickerScreen,
 )
-from veles.tui.slash import SlashContext, SlashRegistry, build_default_registry
 from veles.tui.theme_bridge import apply_to_app as apply_theme
 from veles.tui.widgets.chat_log import ChatLog
 from veles.tui.widgets.composer import Composer
@@ -527,7 +527,7 @@ class TuiApp(App[int]):
             self.exit(0)
             return
         self._last_ctrl_c_at = now
-        from veles.tui.clipboard import copy_text
+        from veles.cli.repl.clipboard import copy_text
 
         target = self._state.last_assistant_text or ""
         ok = copy_text(target) if target.strip() else False
@@ -549,7 +549,7 @@ class TuiApp(App[int]):
         its own Copy (e.g. default iTerm2/Terminal.app) intercepts it first.
         Ctrl+Shift+C is forwarded by virtually every terminal; `VELES_TUI_MOUSE=0`
         falls back to native terminal selection + native ⌘C."""
-        from veles.tui.clipboard import copy_text
+        from veles.cli.repl.clipboard import copy_text
 
         try:
             selected = self.screen.get_selected_text() or ""
@@ -576,7 +576,7 @@ class TuiApp(App[int]):
     def action_paste_clipboard(self) -> None:
         """M77: paste — text goes into the composer; image is dropped into
         `<.veles/tmp/paste/>` and the @-reference inserted."""
-        from veles.tui.clipboard import paste_image, paste_text
+        from veles.cli.repl.clipboard import paste_image, paste_text
 
         assert self._composer is not None and self._chat is not None
         if self._project is not None:

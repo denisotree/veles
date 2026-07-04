@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import time
 
+from veles.cli.repl.slash import build_default_registry
 from veles.core.memory import SessionStore
-from veles.tui.slash import build_default_registry
 
 
 def _reg():

@@ -71,7 +71,7 @@ async def test_picker_selection_persists_to_disk(
 ) -> None:
     """Choosing a model via the picker (Ctrl+nothing — opened via /model)
     persists the choice. The first item of the openrouter list is taken."""
-    from veles.tui.screens.model_picker import known_models
+    from veles.cli.repl.model_catalog import known_models
 
     project, store = tmp_project
     app = TuiApp(
@@ -101,7 +101,7 @@ async def test_picker_arrow_keys_work_without_tab(
     """M81: opening the picker should land focus on the ListView so Up/Down
     work immediately — no extra Tab press. Pressing Down then Enter must
     pick the *second* row."""
-    from veles.tui.screens.model_picker import known_models
+    from veles.cli.repl.model_catalog import known_models
 
     project, store = tmp_project
     app = TuiApp(
@@ -247,8 +247,8 @@ async def test_picker_pick_persists_to_project_config(
 ) -> None:
     """Same guarantee for the picker path — `_after_model_pick` mirrors
     into project config too."""
+    from veles.cli.repl.model_catalog import known_models
     from veles.core.project_config import load_project_config
-    from veles.tui.screens.model_picker import known_models
 
     project, store = tmp_project
     app = TuiApp(
