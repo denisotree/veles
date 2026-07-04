@@ -108,7 +108,7 @@ def test_turn_callbacks_route_meta_to_sink() -> None:
     meta: list[tuple[str, str]] = []
     theme = _resolve_theme(_state())
     _post, on_text, on_event, _holder, _flush = _make_turn_callbacks(
-        _console(), theme, [], on_meta=lambda k, t: meta.append((k, t))
+        _console(), theme, [], on_meta=lambda k, t, **_kw: meta.append((k, t))
     )
     on_text("hello")  # → ("stream", "hello")
     _post(SystemLine(text="[auto -> writing]"))  # → ("mode", ...)
@@ -218,6 +218,145 @@ def test_meta_timer_frozen_when_idle(tmp_path) -> None:
         app.busy = False
         text = "".join(f[1] for f in app._meta_fragments())
         assert "done" in text and "42s" in text  # frozen duration, not now - turn_start
+    finally:
+        store.close()
+
+
+def _kb_handler(kb, key_name: str):
+    """Look up the real handler bound to `key_name` (e.g. "c-i") in a
+    KeyBindings object built by `_ReplApp._make_keys()`, so the test drives
+    the exact production code path instead of re-asserting the state change
+    by hand."""
+    from prompt_toolkit.keys import Keys
+
+    key = getattr(Keys, {"c-o": "ControlO", "c-i": "ControlI"}[key_name])
+    matches = kb.get_bindings_for_keys((key,))
+    assert matches, f"no binding for {key_name}"
+    return matches[0].handler
+
+
+def test_ctrl_i_toggles_meta_expanded_like_ctrl_o(tmp_path) -> None:
+    """Ctrl+I is a second toggle for the same expanded activity view Ctrl+O
+    already drives — it must not replace Ctrl+O, just mirror it."""
+    import types
+
+    app, store = _build_app(tmp_path)
+    try:
+        app.app = types.SimpleNamespace(invalidate=lambda: None)  # handler pokes self.app
+        kb = app._make_keys()
+        ctrl_i = _kb_handler(kb, "c-i")
+        ctrl_o = _kb_handler(kb, "c-o")
+
+        assert app.meta_expanded is False
+        ctrl_i(None)
+        assert app.meta_expanded is True
+        ctrl_i(None)
+        assert app.meta_expanded is False
+        # Ctrl+O is untouched by adding Ctrl+I.
+        ctrl_o(None)
+        assert app.meta_expanded is True
+    finally:
+        store.close()
+
+
+def test_expanded_hud_shows_done_tool_status_and_duration(tmp_path) -> None:
+    """A tool call that started and completed shows a done/failed marker plus
+    its elapsed duration in the expanded HUD, fed through the SAME on_event
+    path the real turn callbacks use (tool_call then tool_result)."""
+    from veles.cli.commands.repl import _make_turn_callbacks
+
+    app, store = _build_app(tmp_path)
+    try:
+        _post, _on_text, on_event, _holder, _flush = _make_turn_callbacks(
+            app.console, app.theme, [], on_meta=app._push_meta
+        )
+
+        class _Call:
+            type = "tool_call"
+            name = "read_file"
+            arguments: typing.ClassVar = {"path": "bar.py"}
+            tool_call_id = "abc123"
+
+        class _Result:
+            type = "tool_result"
+            tool_call_id = "abc123"
+            error = None
+
+        on_event(_Call())
+        rec = app.tool_activity["abc123"]
+        rec["start"] -= 1.5  # backdate so duration is deterministic and > 0
+        on_event(_Result())
+
+        app.meta_expanded = True
+        text = "".join(f[1] for f in app._meta_fragments())
+        assert "bar.py" in text
+        assert "✓ read_file" in text  # done marker on this row
+        assert "s)" in text  # a duration is rendered
+    finally:
+        store.close()
+
+
+def test_expanded_hud_shows_running_tool_with_no_end_time(tmp_path) -> None:
+    """A tool call with no matching result yet renders a running indicator,
+    not a done/failed one."""
+    from veles.cli.commands.repl import _make_turn_callbacks
+
+    app, store = _build_app(tmp_path)
+    try:
+        _post, _on_text, on_event, _holder, _flush = _make_turn_callbacks(
+            app.console, app.theme, [], on_meta=app._push_meta
+        )
+
+        class _Call:
+            type = "tool_call"
+            name = "run_shell"
+            arguments: typing.ClassVar = {"path": ""}
+            tool_call_id = "still-running"
+
+        on_event(_Call())
+        rec = app.tool_activity["still-running"]
+        assert rec["status"] == "running"
+        assert rec["end"] is None
+
+        app.busy = True  # matches reality: the turn is still running
+        app.meta_expanded = True
+        text = "".join(f[1] for f in app._meta_fragments())
+        # The row marker is checked next to the tool name, not as a bare glyph —
+        # the head line's own turn-status symbol ("working"/"done") is unrelated.
+        assert "⏳ run_shell" in text
+        assert "✓ run_shell" not in text and "✗ run_shell" not in text
+    finally:
+        store.close()
+
+
+def test_expanded_hud_shows_failed_tool_status(tmp_path) -> None:
+    """A tool_result carrying an error marks the row failed, not done."""
+    from veles.cli.commands.repl import _make_turn_callbacks
+
+    app, store = _build_app(tmp_path)
+    try:
+        _post, _on_text, on_event, _holder, _flush = _make_turn_callbacks(
+            app.console, app.theme, [], on_meta=app._push_meta
+        )
+
+        class _Call:
+            type = "tool_call"
+            name = "write_file"
+            arguments: typing.ClassVar = {"path": "boom.py"}
+            tool_call_id = "f1"
+
+        class _Result:
+            type = "tool_result"
+            tool_call_id = "f1"
+            error = "boom: permission denied"
+
+        on_event(_Call())
+        on_event(_Result())
+
+        app.meta_expanded = True
+        text = "".join(f[1] for f in app._meta_fragments())
+        assert "✗ write_file" in text  # failed marker on this row
+        assert "✓ write_file" not in text
     finally:
         store.close()
 

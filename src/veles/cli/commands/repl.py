@@ -196,6 +196,19 @@ def _fmt_tok(n: int) -> str:
     return f"{n // 1_000_000}M"
 
 
+def _tool_row(rec: dict[str, object]) -> str:
+    """One line of the inspector's expanded activity view: a
+    running/done/failed marker, the tool label, and its elapsed duration.
+    `rec` is a `_ReplApp.tool_activity` entry — `end` is None while running,
+    so the duration ticks live off the HUD's 0.3s redraw."""
+    status = rec["status"]
+    start = float(rec["start"])  # type: ignore[arg-type]
+    end = rec["end"]
+    duration = (float(end) if end is not None else time.monotonic()) - start  # type: ignore[arg-type]
+    marker = {"running": "⏳", "done": "✓", "failed": "✗"}.get(str(status), "⚒")
+    return f"{marker} {rec['name']} ({duration:.1f}s)"
+
+
 def _settled_status(state) -> str:
     """The quiet bottom bar of the inline app: current mode + settled token /
     cache stats ONLY. It changes after a turn completes (never mid-generation),
@@ -430,11 +443,15 @@ def _make_turn_callbacks(console, theme, errors: list[str], on_meta=None):
     Application's `patch_stdout`, writes from the executor thread appear above
     the live input box.
 
-    `on_meta(kind, text)` (optional) is the live-generation HUD sink: it
-    receives ``("stream", chunk)`` for every answer chunk (so the app can show a
-    running token estimate), ``("mode", text)`` on a mode switch, and
-    ``("tool", text)`` on each tool call. When it's None (the fallback simple
-    loop) mode switches print inline instead.
+    `on_meta(kind, text, *, tool_call_id="", error=None)` (optional) is the
+    live-generation HUD sink: it receives ``("stream", chunk)`` for every
+    answer chunk (so the app can show a running token estimate), ``("mode",
+    text)`` on a mode switch, ``("tool", text, tool_call_id=...)`` on each tool
+    call (the id starts the inspector's per-tool timer/status row), and
+    ``("tool_result", "", tool_call_id=..., error=...)`` when that call's
+    result comes back — the inspector uses it to mark the row done/failed and
+    freeze its duration. When it's None (the fallback simple loop) mode
+    switches print inline instead.
 
     Returns ``(post, on_text, on_event, holder, flush)``.
     """
@@ -477,13 +494,26 @@ def _make_turn_callbacks(console, theme, errors: list[str], on_meta=None):
         _emit(text)
 
     def on_event(event) -> None:
-        if getattr(event, "type", "") != "tool_call":
+        etype = getattr(event, "type", "")
+        if etype == "tool_result":
+            # Completion signal for the inspector's per-tool status/duration —
+            # correlated with the tool_call above via tool_call_id. Carries no
+            # display text of its own (the "tool" line was already pushed).
+            if on_meta is not None:
+                on_meta(
+                    "tool_result",
+                    "",
+                    tool_call_id=getattr(event, "tool_call_id", "") or "",
+                    error=getattr(event, "error", None),
+                )
+            return
+        if etype != "tool_call":
             return
         name = getattr(event, "name", "")
         args = getattr(event, "arguments", {}) or {}
         if on_meta is not None:
             label = f"{name} {args.get('path', '')}".strip()
-            on_meta("tool", label)
+            on_meta("tool", label, tool_call_id=getattr(event, "tool_call_id", "") or "")
         # Preview file edits as a coloured diff, in order with the answer text.
         if name in ("edit_file", "write_file"):
             flush()  # render any pending answer text first, so ordering holds
@@ -1083,6 +1113,11 @@ class _ReplApp:
         self.stream_chars = 0
         self.turn_start = 0.0
         self.turn_elapsed = 0.0  # frozen duration once the turn finishes
+        # Per-tool inspector rows (Ctrl+I/Ctrl+O expanded view), keyed by
+        # tool_call_id → {"name", "start", "end", "status"}. `end` is None
+        # while the matching tool_result hasn't arrived yet (still running).
+        # Insertion order is display order (dicts preserve it).
+        self.tool_activity: dict[str, dict[str, object]] = {}
         self._tick = 0
         # --- mid-turn ask_user picker state (answered inside THIS app; a nested
         # prompt_toolkit Application can't run under the live loop) ---
@@ -1348,8 +1383,14 @@ class _ReplApp:
         if self.meta_expanded:
             for mode in modes:
                 frags.append(("class:meta.dim", f"     ↳ {mode}\n"))
-            for tl in tools[-10:]:
-                frags.append(("class:meta.dim", f"     ⚒ {tl}\n"))
+            if self.tool_activity:
+                for rec in list(self.tool_activity.values())[-10:]:
+                    frags.append(("class:meta.dim", f"     {_tool_row(rec)}\n"))
+            else:
+                # Plain tool labels pushed with no tool_call_id (e.g. direct
+                # `_push_meta("tool", ...)` calls) — no status/duration to show.
+                for tl in tools[-10:]:
+                    frags.append(("class:meta.dim", f"     ⚒ {tl}\n"))
         return FormattedText(frags)
 
     def _picker_fragments(self):
@@ -1369,12 +1410,30 @@ class _ReplApp:
         frags.append(("class:picker.dim", f"  {t('repl.picker_hint')}\n"))
         return FormattedText(frags)
 
-    def _push_meta(self, kind: str, text: str) -> None:
-        """Meta sink for the turn callbacks (called from the executor thread)."""
+    def _push_meta(
+        self, kind: str, text: str, *, tool_call_id: str = "", error: str | None = None
+    ) -> None:
+        """Meta sink for the turn callbacks (called from the executor thread).
+
+        `tool_call_id`/`error` are only meaningful for the "tool"/"tool_result"
+        kinds and drive `self.tool_activity`, the inspector's per-tool
+        running/done/failed + duration state (Ctrl+I/Ctrl+O expanded view)."""
         if kind == "stream":
             self.stream_chars += len(text)
+        elif kind == "tool_result":
+            rec = self.tool_activity.get(tool_call_id)
+            if rec is not None:
+                rec["end"] = time.monotonic()
+                rec["status"] = "failed" if error else "done"
         else:
             self.meta_events.append((kind, text))
+            if kind == "tool" and tool_call_id:
+                self.tool_activity[tool_call_id] = {
+                    "name": text,
+                    "start": time.monotonic(),
+                    "end": None,
+                    "status": "running",
+                }
         self._invalidate_threadsafe()
 
     async def _tick_meta(self) -> None:
@@ -2068,6 +2127,11 @@ class _ReplApp:
             self.meta_expanded = not self.meta_expanded
             self.app.invalidate()
 
+        @kb.add("c-i")  # inspector toggle — same flag as Ctrl+O (M187)
+        def _(event) -> None:
+            self.meta_expanded = not self.meta_expanded
+            self.app.invalidate()
+
         @kb.add("c-d")
         def _(event) -> None:
             event.app.exit()
@@ -2261,6 +2325,7 @@ class _ReplApp:
                 # Reset the live meta HUD for this turn.
                 self.meta_events = []
                 self.stream_chars = 0
+                self.tool_activity = {}
                 self.turn_start = time.monotonic()
                 self._last_submitted = text  # remember it so Esc can restore it
                 self._echo_user(text)
