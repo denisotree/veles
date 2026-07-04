@@ -3,10 +3,11 @@
 Right-sized for a curated set of tens of entries — no FTS index, no embeddings,
 deterministic and offline. The `MIN_DISTINCT_MATCHES` gate is what makes the
 recall surface self-gating: a query must share at least two distinct tokens
-with an entry's title/body to clear the gate, so a single common-word title
-hit (e.g. "run", "add" — both note titles and common English verbs) does not
-let a generic coding query through. The weighted `score` (title-vs-body) is
-used only to order the hits that do clear the gate.
+with an entry's *title + topics* (the curated surface) to clear the gate. Body
+prose is deliberately excluded from the gate — an incidental generic verb in a
+note body ("add", "run") must not let a generic coding query through — but body
+tokens still feed the weighted `score` used only to order the hits that clear
+the gate (title-vs-body weighting).
 """
 
 from __future__ import annotations
