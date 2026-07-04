@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import pytest
 
+from veles.core.session_state import AppState
 from veles.tui.app import TuiApp
-from veles.tui.state import AppState
 from veles.tui.widgets.chat_log import ChatLog
 from veles.tui.widgets.composer import Composer
 from veles.tui.widgets.status_bar import StatusBar

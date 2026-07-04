@@ -17,8 +17,8 @@ sole seam we need to mock. The tests assert two things:
 from __future__ import annotations
 
 from veles.core.permission.prompt import PromptAnswer, PromptRequest
+from veles.core.session_state import AppState
 from veles.tui.bridge import AgentBridge
-from veles.tui.state import AppState
 from veles.tui.widgets.composer_prompt import PromptOption
 
 

@@ -7,7 +7,7 @@ from textual.widgets import Static
 
 from veles.core.model_naming import strip_provider_prefix
 from veles.core.model_windows import context_window_for
-from veles.tui.state import AppState
+from veles.core.session_state import AppState
 
 
 def _fmt_tokens(n: int) -> str:

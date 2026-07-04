@@ -231,9 +231,9 @@ def test_wiki_slash_not_registered_on_bare(bare_project: Project, tmp_path: Path
 
 def test_bare_help_omits_wiki(bare_project: Project) -> None:
     from veles.core.memory import SessionStore
+    from veles.core.session_state import AppState
     from veles.tui.slash.builtin import _help
     from veles.tui.slash.registry import SlashContext
-    from veles.tui.state import AppState
 
     state = AppState(session_id=None, provider_name="openrouter", model="m")
     store = SessionStore(bare_project.memory_db_path)
@@ -250,9 +250,9 @@ def test_bare_save_slash_falls_back_to_insight(bare_project: Project) -> None:
     """`/save <slug>` on a non-wiki layout keeps the reply as a memory
     insight instead of crashing on the absent wiki/queries/ tree."""
     from veles.core.memory import SessionStore
+    from veles.core.session_state import AppState
     from veles.tui.slash.builtin import _save
     from veles.tui.slash.registry import SlashContext
-    from veles.tui.state import AppState
 
     state = AppState(session_id="ses-x", provider_name="openrouter", model="m")
     state.last_assistant_text = "Terraform applies after migrations run."

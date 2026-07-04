@@ -65,7 +65,7 @@ def test_unknown_slug_falls_back_to_legacy_queries_save(slash_ctx):
 
 
 def test_status_bar_shows_insight_badge():
-    from veles.tui.state import AppState
+    from veles.core.session_state import AppState
 
     bar = StatusBar()
     state = AppState(session_id=None, provider_name="openrouter", model="m")

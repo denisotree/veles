@@ -8,13 +8,13 @@ command line.
 
 from __future__ import annotations
 
+from veles.core.session_state import AppState
 from veles.core.tui_state import (
     TuiPersistentState,
     load_tui_state,
     save_tui_state,
 )
 from veles.tui.app import TuiApp
-from veles.tui.state import AppState
 from veles.tui.widgets.composer import Composer
 
 

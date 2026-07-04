@@ -19,9 +19,9 @@ from typing import Any
 
 from tests.conftest import FakeAgent as _FakeAgent
 from veles.core.agent import RunResult
+from veles.core.agent_events import TurnDone
 from veles.core.modes import ModeContext, WritingMode
-from veles.tui.messages import TurnDone
-from veles.tui.state import AppState
+from veles.core.session_state import AppState
 
 
 @dataclass

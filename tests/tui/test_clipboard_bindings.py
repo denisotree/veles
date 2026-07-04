@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from veles.core.session_state import AppState
 from veles.tui.app import TuiApp
-from veles.tui.state import AppState
 from veles.tui.widgets.composer import Composer
 
 

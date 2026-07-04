@@ -77,7 +77,7 @@ class AutoMode:
     system_block: str = ""
 
     def run_turn(self, prompt: str, ctx: ModeContext) -> None:
-        from veles.tui.messages import SystemLine
+        from veles.core.agent_events import SystemLine
 
         # Build a throwaway Agent in writing-mode config to harvest its
         # `provider` reference. Agent.__init__ is cheap (no SessionStore

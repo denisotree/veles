@@ -72,9 +72,9 @@ def run_tui(args: argparse.Namespace, project: Project) -> int:
         resolve_effective_provider,
     )
     from veles.core.modes import get_mode
+    from veles.core.session_state import AppState
     from veles.core.tui_state import load_for_project
     from veles.tui.app import TuiApp
-    from veles.tui.state import AppState
 
     # Provider + model both cascade through argparse → project config →
     # user wizard → built-in default. Without the cascade, picking OpenAI

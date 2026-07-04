@@ -12,9 +12,9 @@ reboot lands on the same mode.
 from __future__ import annotations
 
 from veles.core.modes import CYCLE_ORDER
+from veles.core.session_state import AppState
 from veles.core.tui_state import load_tui_state
 from veles.tui.app import TuiApp
-from veles.tui.state import AppState
 
 
 def _new_app(tmp_project, agent_factory_for, text_response):

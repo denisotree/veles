@@ -5,9 +5,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from veles.core.session_state import AppState
 from veles.tui.app import TuiApp
 from veles.tui.screens import FilePickerScreen
-from veles.tui.state import AppState
 from veles.tui.widgets.composer import Composer
 
 

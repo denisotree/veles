@@ -11,6 +11,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import Input
 
 from veles.core.provider import Message
+from veles.core.session_state import AppState
 from veles.tui.app import TuiApp
 from veles.tui.screens import (
     ModelPickerScreen,
@@ -19,7 +20,6 @@ from veles.tui.screens import (
     SessionPickerScreen,
     ThemePickerScreen,
 )
-from veles.tui.state import AppState
 
 # ---------------- base picker ----------------
 

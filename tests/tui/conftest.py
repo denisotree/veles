@@ -157,8 +157,8 @@ def tmp_project(tmp_path):
 def slash_ctx(tmp_project):
     """Builds a `SlashContext` over a fresh project. Tests that only
     poke pure handlers (no UI) consume this directly."""
+    from veles.core.session_state import AppState
     from veles.tui.slash.registry import SlashContext
-    from veles.tui.state import AppState
 
     project, store = tmp_project
     state = AppState(session_id=None, provider_name="stub", model="m")

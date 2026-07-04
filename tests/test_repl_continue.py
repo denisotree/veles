@@ -159,7 +159,7 @@ def test_resume_recap_replays_recent_conversation(project, capsys) -> None:
 
     from veles.cli.commands.repl import _print_resume_recap, _resolve_theme
     from veles.core.provider import Message
-    from veles.tui.state import AppState
+    from veles.core.session_state import AppState
 
     store = SessionStore(project.memory_db_path)
     try:

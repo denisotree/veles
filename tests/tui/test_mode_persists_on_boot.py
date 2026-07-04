@@ -8,8 +8,8 @@ write the file directly, then construct AppState the way `run_tui` does.
 
 from __future__ import annotations
 
+from veles.core.session_state import AppState
 from veles.core.tui_state import TuiPersistentState, save_tui_state
-from veles.tui.state import AppState
 
 
 def _make_state_after_boot(project) -> AppState:

@@ -22,9 +22,9 @@ from veles.core.events import (
     ToolResult,
     now_iso,
 )
+from veles.core.session_state import AppState
+from veles.tui import wire
 from veles.tui.app import TuiApp
-from veles.tui.messages import AgentEvent
-from veles.tui.state import AppState
 from veles.tui.widgets.inspector import Inspector
 
 # ---------------- inspector-only harness ----------------
@@ -272,7 +272,7 @@ async def test_agent_event_message_routes_to_inspector(
         await pilot.press("ctrl+i")  # expand so rows render
         await pilot.pause()
         ev = _tool_call("c1", "demo.tool", {"k": "v"})
-        pilot.app.post_message(AgentEvent(ev))
+        pilot.app.post_message(wire.AgentEvent(ev))
         await pilot.pause()
         insp = pilot.app.query_one(Inspector)
         assert any("demo.tool" in row for row in insp.activity_log)

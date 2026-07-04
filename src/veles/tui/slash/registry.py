@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from veles.core.memory import SessionStore
     from veles.core.project import Project
-    from veles.tui.state import AppState
+    from veles.core.session_state import AppState
 
 
 @dataclass(slots=True)

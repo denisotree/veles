@@ -8,8 +8,8 @@ bridge with a single `TurnDone`. PreviousSession_id is mirrored back into
 
 from __future__ import annotations
 
+from veles.core.agent_events import TurnDone
 from veles.core.modes.base import Mode, ModeContext, wrap_mode_switch_observation
-from veles.tui.messages import TurnDone
 
 # Injected once, into the first prompt after switching TO writing from another
 # mode. WritingMode's `system_block` is empty (the base prompt IS the writing

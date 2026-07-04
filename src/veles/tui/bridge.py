@@ -27,11 +27,25 @@ from typing import Any
 from textual.app import App
 
 from veles.core.agent import Agent
+from veles.core.agent_events import AgentError, AgentEvent, ChatDelta, SystemLine, TurnDone
 from veles.core.events import Event
 from veles.core.modules import ModuleRegistry
 from veles.core.project import Project
-from veles.tui.messages import AgentError, AgentEvent, ChatDelta
-from veles.tui.state import AppState
+from veles.core.session_state import AppState
+from veles.tui import wire
+
+# `core.agent_events` dataclasses carry no Textual base (core must not import
+# textual — see that module's docstring); `App.post_message` requires a real
+# `textual.message.Message` though. This maps each plain dataclass to its
+# `tui.wire` counterpart (identical field names) so `post()` can convert
+# right before handing the message to Textual.
+_WIRE_TYPES: dict[type, type] = {
+    ChatDelta: wire.ChatDelta,
+    AgentEvent: wire.AgentEvent,
+    TurnDone: wire.TurnDone,
+    AgentError: wire.AgentError,
+    SystemLine: wire.SystemLine,
+}
 
 AgentFactory = Callable[..., Agent]
 """Builds (or rebuilds) the Agent for the next turn from the current
@@ -163,8 +177,10 @@ class AgentBridge:
             set_question_prompter,
         )
 
-        def post(msg) -> None:
-            self._app.call_from_thread(self._app.post_message, msg)
+        def post(msg: object) -> None:
+            wire_cls = _WIRE_TYPES.get(type(msg))
+            wired = wire_cls(**vars(msg)) if wire_cls is not None else msg
+            self._app.call_from_thread(self._app.post_message, wired)
 
         def on_text(text: str) -> None:
             post(ChatDelta(text))

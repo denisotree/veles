@@ -31,8 +31,8 @@ from veles.core.modules import (
     reset_module_registry,
     set_module_registry,
 )
+from veles.core.session_state import AppState
 from veles.tui.bridge import AgentBridge
-from veles.tui.state import AppState
 
 
 class _FakeApp:

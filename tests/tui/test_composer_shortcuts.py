@@ -57,8 +57,8 @@ def test_super_line_bindings_registered():
 
 
 async def _mounted_composer(tmp_project, agent_factory_for, text_response):
+    from veles.core.session_state import AppState
     from veles.tui.app import TuiApp
-    from veles.tui.state import AppState
 
     project, store = tmp_project
     app = TuiApp(

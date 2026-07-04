@@ -20,8 +20,8 @@ from veles.cli.commands.repl import (
     _update_state_after_turn,
 )
 from veles.core.agent import RunResult, UsageSnapshot
+from veles.core.session_state import AppState
 from veles.tui.slash import build_default_registry
-from veles.tui.state import AppState
 
 
 def _state() -> AppState:
@@ -46,7 +46,7 @@ def test_turn_callbacks_stream_and_capture_result(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     from veles.cli.commands.repl import _resolve_theme
-    from veles.tui.messages import ChatDelta, SystemLine, TurnDone
+    from veles.core.agent_events import ChatDelta, SystemLine, TurnDone
 
     errors: list[str] = []
     theme = _resolve_theme(_state())
@@ -103,7 +103,7 @@ def test_turn_callbacks_route_meta_to_sink() -> None:
     """With an on_meta sink, stream chunks / mode switches / tool calls flow to
     the live HUD instead of printing inline."""
     from veles.cli.commands.repl import _make_turn_callbacks, _resolve_theme
-    from veles.tui.messages import SystemLine
+    from veles.core.agent_events import SystemLine
 
     meta: list[tuple[str, str]] = []
     theme = _resolve_theme(_state())

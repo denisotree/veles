@@ -29,8 +29,8 @@ A planning turn ends one of three ways:
 
 from __future__ import annotations
 
+from veles.core.agent_events import TurnDone
 from veles.core.modes.base import Mode, ModeContext, wrap_mode_switch_observation
-from veles.tui.messages import TurnDone
 
 _SYSTEM_BLOCK = """\
 <mode name="planning">

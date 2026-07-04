@@ -26,17 +26,17 @@ from textual.containers import Vertical
 
 from veles.core.memory import SessionStore
 from veles.core.project import Project
+from veles.core.session_state import AppState
+from veles.tui import wire
 from veles.tui.bridge import AgentBridge, AgentFactory
 from veles.tui.completer import SlashCompleter
 from veles.tui.history import InputHistory
-from veles.tui.messages import AgentError, AgentEvent, ChatDelta, SystemLine, TurnDone
 from veles.tui.screens import (
     ModelPickerScreen,
     SessionPickerScreen,
     ThemePickerScreen,
 )
 from veles.tui.slash import SlashContext, SlashRegistry, build_default_registry
-from veles.tui.state import AppState
 from veles.tui.theme_bridge import apply_to_app as apply_theme
 from veles.tui.widgets.chat_log import ChatLog
 from veles.tui.widgets.composer import Composer
@@ -445,15 +445,15 @@ class TuiApp(App[int]):
 
     # ---- bridge → UI fan-in ----
 
-    def on_chat_delta(self, message: ChatDelta) -> None:
+    def on_chat_delta(self, message: wire.ChatDelta) -> None:
         assert self._chat is not None
         self._chat.append_assistant_delta(message.text)
 
-    def on_agent_event(self, message: AgentEvent) -> None:
+    def on_agent_event(self, message: wire.AgentEvent) -> None:
         if self._inspector is not None:
             self._inspector.notify_event(message.event)
 
-    def on_system_line(self, message: SystemLine) -> None:
+    def on_system_line(self, message: wire.SystemLine) -> None:
         """Mode-emitted informational lines (e.g. `[auto → planning]`).
         Routed to the chat as a system message — same visual treatment
         as slash-command output."""
@@ -461,7 +461,7 @@ class TuiApp(App[int]):
             self._chat.seal_assistant()
             self._chat.append_system(message.text)
 
-    def on_turn_done(self, message: TurnDone) -> None:
+    def on_turn_done(self, message: wire.TurnDone) -> None:
         assert self._chat is not None and self._bridge is not None
         self._chat.seal_assistant()
         self._state.busy = False
@@ -495,7 +495,7 @@ class TuiApp(App[int]):
         self._refresh_status()
         del message
 
-    def on_agent_error(self, message: AgentError) -> None:
+    def on_agent_error(self, message: wire.AgentError) -> None:
         assert self._chat is not None
         self._chat.append_error(f"{type(message.exc).__name__}: {message.exc}")
         self._state.busy = False

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from veles.tui.state import AppState
+from veles.core.session_state import AppState
 from veles.tui.widgets.status_bar import StatusBar
 
 

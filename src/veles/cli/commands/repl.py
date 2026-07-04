@@ -317,7 +317,7 @@ def _build_runtime(args: argparse.Namespace, project: Project):
     )
     from veles.core.model_windows import default_hard_ceiling_for
     from veles.core.modes import get_mode
-    from veles.tui.state import AppState
+    from veles.core.session_state import AppState
 
     args.provider = resolve_effective_provider(args, project)
     try:
@@ -439,7 +439,7 @@ def _make_turn_callbacks(console, theme, errors: list[str], on_meta=None):
 
     Returns ``(post, on_text, on_event, holder, flush)``.
     """
-    from veles.tui.messages import AgentError, ChatDelta, SystemLine, TurnDone
+    from veles.core.agent_events import AgentError, ChatDelta, SystemLine, TurnDone
 
     holder: dict[str, object] = {}
     buf = [""]  # mutable string cell shared across chunks
