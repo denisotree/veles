@@ -23,6 +23,8 @@ setups (matches the convention used by `trust_store`, `skills`,
 
 from __future__ import annotations
 
+import contextlib
+import dataclasses
 import logging
 import os
 import tempfile
@@ -110,6 +112,21 @@ def save_user_config(cfg: UserConfig, path: Path | None = None) -> None:
     except Exception:
         Path(tmp_name).unlink(missing_ok=True)
         raise
+
+
+def persist_tui_theme(theme_name: str, path: Path | None = None) -> None:
+    """Persist an interactive `/theme` pick to `~/.veles/config.toml`.
+
+    Mirrors `core.tui_state.persist_model_choice`'s best-effort semantics:
+    the pick already took effect in memory (`state.theme_name` + the live
+    restyle), so a transient I/O error here must not roll that back — it
+    only means the choice won't survive to the next session. If the
+    first-run wizard hasn't run yet (no config file), seed sane defaults
+    for the other required fields so the write still succeeds."""
+    cfg = load_user_config(path) or UserConfig(language="en", default_provider="openrouter")
+    cfg = dataclasses.replace(cfg, tui_theme=theme_name)
+    with contextlib.suppress(OSError):
+        save_user_config(cfg, path)
 
 
 def _render_toml(cfg: UserConfig) -> str:

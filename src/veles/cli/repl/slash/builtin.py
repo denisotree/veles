@@ -1,8 +1,11 @@
 """Slash-commands as pure handlers (line, ctx) -> SlashResult.
 
-Removed in M80: `/load`, `/show`, `/search`, `/theme`, `/init`. Sessions
-and themes are now picker-only (Ctrl+R / Ctrl+T). Project init is
-handled by the project wizard on first run (M82).
+Removed in M80: `/load`, `/show`, `/search`, `/theme`, `/init` (all picker-only,
+via the Textual chat UI's Ctrl+R / Ctrl+T hotkeys). Project init is handled by
+the project wizard on first run (M82). M187 (Task 5) reinstated `/theme` as a
+slash command once the Textual chat UI was deleted and its Ctrl+T theme picker
+had no replacement: `/theme` opens an inline filterable picker in the App
+(mirrors `/model`), `/theme <name>` sets one directly.
 
 The dispatcher in `registry.py` strips the leading `/` and command word
 before calling each handler — every handler receives just the remaining
@@ -78,6 +81,7 @@ def _help(line: str, ctx: SlashContext) -> SlashResult:
         ]
     rows += [
         "  /model [<id>]                show or set the active model",
+        "  /theme [<name>]              show or set the active TUI theme",
         "  /mode [<name>]               show or set the active mode (Shift+Tab cycles)",
         "                               modes: auto, planning, writing, goal",
         "  /schema [validate|fix]       inspect or fix AGENTS.md sections",
@@ -90,7 +94,6 @@ def _help(line: str, ctx: SlashContext) -> SlashResult:
         "",
         "Hotkeys:",
         "  Ctrl+R                       open session picker",
-        "  Ctrl+T                       open theme picker",
         "  Shift+Tab                    cycle mode",
         "  Mouse wheel / trackpad       scroll the chat (back to bottom re-arms follow)",
         "  Drag-select output           selects text (does NOT copy on its own)",
@@ -285,6 +288,30 @@ def _model(line: str, ctx: SlashContext) -> SlashResult:
 
     persist_model_choice(ctx.project, new)
     return SlashResult.ok(f"model set to {new}")
+
+
+# ---------------- /theme ----------------
+
+
+def _theme(line: str, ctx: SlashContext) -> SlashResult:
+    """Two shapes, mirroring `/model`:
+    - `/theme` — open the inline filterable picker (App-side; the fallback
+      simple-loop REPL instead prints the list, see `_print_theme_list`).
+    - `/theme <name>` — set a theme directly without opening the picker.
+    """
+    from veles.cli.tui_theme import list_themes, load_theme
+    from veles.core.user_config import persist_tui_theme
+
+    new = line.split()[0] if line else ""
+    if not new:
+        return SlashResult(open_picker="themes")
+    if load_theme(new) is None:
+        return SlashResult.err(
+            f"/theme: unknown theme {new!r}; try one of: {', '.join(list_themes())}"
+        )
+    ctx.state.theme_name = new
+    persist_tui_theme(new)
+    return SlashResult.ok(f"theme set to {new}")
 
 
 # ---------------- /schema ----------------
@@ -629,6 +656,7 @@ def build_default_registry(project: Project | None = None) -> SlashRegistry:
         reg.register("/wiki", _wiki, summary="wiki: add <path|url> | query <question>")
 
     reg.register("/model", _model, summary="show or set the active model")
+    reg.register("/theme", _theme, summary="show or set the active TUI theme")
     reg.register("/mode", _mode, summary="show or set the active mode (auto|planning|writing|goal)")
     reg.register("/schema", _schema, summary="schema: validate | fix")
     reg.register("/self-doc", _self_doc, summary="refresh project self-documentation")

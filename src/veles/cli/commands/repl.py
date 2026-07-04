@@ -268,6 +268,7 @@ def _print_repl_help(console) -> None:
         ("/help", "show this help"),
         ("/mode [name]", "show/set mode (auto·planning·writing·goal); Shift+Tab cycles"),
         ("/model [id]", "show or set the active model"),
+        ("/theme [name]", "show or set the active TUI theme"),
         ("/sessions", "list recent sessions and resume one"),
         ("/history [N]", "list recent sessions"),
         ("/tokens · /context", "token totals · context vs model window"),
@@ -677,6 +678,23 @@ def _print_model_list(console, provider: str, current: str, *, refresh: bool = F
     console.print("  set with /model <id>", style="dim", markup=False)
 
 
+def _print_theme_list(console, current: str) -> None:
+    """Fallback (simple-loop) theme lister, mirroring `_print_model_list`: the
+    inline Application has the filterable `/theme` picker; the fallback just
+    shows the list and relies on `/theme <name>` to set one."""
+    from veles.cli.tui_theme import list_themes
+
+    names = list_themes()
+    if not names:
+        console.print("  no themes found", style="yellow", markup=False)
+        return
+    console.print(f"  {len(names)} themes", style="cyan", markup=False)
+    for name in names:
+        marker = "  ← current" if name == current else ""
+        console.print(f"    {name}{marker}", style="dim", markup=False)
+    console.print("  set with /theme <name>", style="dim", markup=False)
+
+
 def _pick_session(store, state, console) -> None:
     """Inline session picker: a rich table of recent sessions + a numbered
     prompt to resume one. Stays in the normal buffer (no alt screen)."""
@@ -769,6 +787,8 @@ def _handle_slash(
             state.model,
             refresh=result.open_picker.endswith("refresh"),
         )
+    elif result.open_picker == "themes":
+        _print_theme_list(console, state.theme_name)
     elif result.open_picker:
         console.print(f"  [dim]{result.open_picker}: set directly, e.g. /model <id>[/dim]")
     return result.quit, result.submit_prompt
@@ -1034,7 +1054,6 @@ class _ReplApp:
         from prompt_toolkit.layout import ConditionalContainer, HSplit, Layout, Window
         from prompt_toolkit.layout.controls import FormattedTextControl
         from prompt_toolkit.layout.dimension import Dimension
-        from prompt_toolkit.styles import Style
         from prompt_toolkit.widgets import Frame, TextArea
 
         from veles.core.modes import next_mode
@@ -1091,6 +1110,12 @@ class _ReplApp:
         self.fp_active = False
         self.fp_files: list[str] = []
         self.fp_sel = 0
+        # --- /theme picker state (mirrors the /model picker, but synchronous —
+        # `list_themes()` is a dict + directory glob, no network hop like the
+        # provider fetch behind /model).
+        self.tp_active = False
+        self.tp_themes: list[str] = []
+        self.tp_sel = 0
         # Capture the caller's ContextVars NOW (constructed inside the CLI's
         # `set_active_project` scope) so background turns can re-enter them —
         # `run_in_executor` does not copy context, and without the active
@@ -1103,7 +1128,7 @@ class _ReplApp:
         class _SlashCompleter(Completer):
             def get_completions(self, document, complete_event):
                 # No slash completion while the model/file filter owns the input box.
-                if outer.mp_active or outer.fp_active:
+                if outer.mp_active or outer.fp_active or outer.tp_active:
                     return
                 text = document.text_before_cursor
                 if not text.startswith("/") or " " in text:
@@ -1155,6 +1180,7 @@ class _ReplApp:
                     and not self.q_active
                     and not self.mp_active
                     and not self.fp_active
+                    and not self.tp_active
                 )
             ),
         )
@@ -1185,22 +1211,20 @@ class _ReplApp:
             ),
             filter=Condition(lambda: self.fp_active),
         )
+        # /theme filterable picker — shown when the user opens it.
+        theme_picker = ConditionalContainer(
+            Window(
+                FormattedTextControl(self._tp_fragments),
+                dont_extend_height=True,
+                style="class:picker",
+            ),
+            filter=Condition(lambda: self.tp_active),
+        )
         status = Window(
             FormattedTextControl(self._status_fragments), height=1, style="class:status"
         )
-        root = HSplit([meta, picker, model_picker, file_picker, frame, status])
-        style = Style.from_dict(
-            {
-                "frame.border": theme.border,
-                "prompt": f"bold {theme.accent}",
-                "status": theme.muted,
-                "meta": theme.accent,
-                "meta.dim": theme.muted,
-                "picker": "",  # normal item — inherit the terminal foreground
-                "picker.sel": theme.pt_selected,
-                "picker.dim": theme.pt_hint,
-            }
-        )
+        root = HSplit([meta, picker, model_picker, file_picker, theme_picker, frame, status])
+        style = self._build_style(theme)
         self.app = Application(
             layout=Layout(root, focused_element=self.input),
             key_bindings=self._make_keys(),
@@ -1497,6 +1521,28 @@ class _ReplApp:
             else:
                 self.fp_sel = 0
                 self.app.invalidate()
+        if self.tp_active:
+            self.tp_sel = 0
+            self.app.invalidate()
+
+    def _build_style(self, theme):
+        """The prompt_toolkit `Style` built from `theme`. Shared by `__init__`
+        (initial render) and `_apply_theme_live` (`/theme` restyles the running
+        Application) so the two never drift."""
+        from prompt_toolkit.styles import Style
+
+        return Style.from_dict(
+            {
+                "frame.border": theme.border,
+                "prompt": f"bold {theme.accent}",
+                "status": theme.muted,
+                "meta": theme.accent,
+                "meta.dim": theme.muted,
+                "picker": "",  # normal item — inherit the terminal foreground
+                "picker.sel": theme.pt_selected,
+                "picker.dim": theme.pt_hint,
+            }
+        )
 
     def _open_model_picker(self, refresh: bool = False) -> None:
         self.mp_active = True
@@ -1714,6 +1760,118 @@ class _ReplApp:
         self.fp_files = []
         self.app.invalidate()
 
+    # --- /theme picker (filterable, driven inside this Application) ---
+
+    # Same window/digit-select shape as the `@` file picker (capped at 9 so
+    # 1-9 maps 1:1 onto printed row numbers).
+    _TP_WINDOW = 9
+
+    def _open_theme_picker(self) -> None:
+        """Populate the candidate list and switch the input box into theming
+        mode. Synchronous — `list_themes()` is a dict + `~/.veles/themes/`
+        glob, unlike the /model picker's provider fetch, so no executor hop
+        needed."""
+        from veles.cli.tui_theme import list_themes
+
+        self.tp_active = True
+        self.tp_sel = 0
+        self.tp_themes = list_themes()
+        self.input.text = ""
+        self.app.invalidate()
+
+    def _tp_filtered(self) -> list[str]:
+        return _filter_models(self.tp_themes, self.input.text)
+
+    def _tp_window_start(self, filtered_len: int) -> int:
+        window = self._TP_WINDOW
+        if filtered_len <= window:
+            return 0
+        sel = max(0, min(self.tp_sel, filtered_len - 1))
+        return max(0, min(sel - window // 2, filtered_len - window))
+
+    def _tp_fragments(self):
+        from prompt_toolkit.formatted_text import FormattedText
+
+        if not self.tp_themes:
+            return FormattedText([("class:picker.dim", f" {t('repl.no_themes')}\n")])
+        filtered = self._tp_filtered()
+        header = t("repl.theme_header", count=len(self.tp_themes))
+        frags: list[tuple[str, str]] = [("class:picker", f" {header}\n")]
+        if not filtered:
+            frags.append(("class:picker.dim", f"  {t('repl.no_matches')}\n"))
+            return FormattedText(frags)
+        window = self._TP_WINDOW
+        start = self._tp_window_start(len(filtered))
+        sel = max(0, min(self.tp_sel, len(filtered) - 1))
+        for i in range(start, min(start + window, len(filtered))):
+            name = filtered[i]
+            is_sel = i == sel
+            marker = "❯" if is_sel else " "
+            row_no = i - start + 1
+            cur = "  ← current" if name == self.state.theme_name else ""
+            frags.append(
+                (
+                    "class:picker.sel" if is_sel else "class:picker",
+                    f"  {marker} {row_no}. {name}{cur}\n",
+                )
+            )
+        if len(filtered) > window:
+            frags.append(("class:picker.dim", f"  {t('repl.more_matches', count=len(filtered))}\n"))
+        return FormattedText(frags)
+
+    def _tp_move(self, delta: int) -> None:
+        n = len(self._tp_filtered())
+        if n:
+            self.tp_sel = (max(0, min(self.tp_sel, n - 1)) + delta) % n
+        self.app.invalidate()
+
+    def _tp_select_row(self, idx: int) -> None:
+        """Digit quick-select: `idx` is 0-based within the CURRENTLY displayed
+        window, matching the 1-based row numbers `_tp_fragments` prints."""
+        filtered = self._tp_filtered()
+        start = self._tp_window_start(len(filtered))
+        row = start + idx
+        if row < len(filtered):
+            self.tp_sel = row
+            self.app.invalidate()
+
+    def _apply_theme_live(self) -> None:
+        """Rebuild the active `TuiTheme` + prompt_toolkit `Style` from
+        `state.theme_name` and assign it to the running Application, so
+        SUBSEQUENT rendering (input frame, status bar, future console.print
+        calls) picks up the new palette. Already-emitted scrollback can't be
+        recoloured — the terminal buffer is immutable, not a bug here."""
+        self.theme = _resolve_theme(self.state)
+        self.app.style = self._build_style(self.theme)
+        self.app.invalidate()
+
+    def _tp_pick(self) -> None:
+        filtered = self._tp_filtered()
+        if not filtered:
+            return
+        name = filtered[max(0, min(self.tp_sel, len(filtered) - 1))]
+        self.state.theme_name = name  # subsequent turns/renders read this fresh
+        self._apply_theme_live()
+
+        import contextlib
+
+        from veles.core.user_config import persist_tui_theme
+
+        with contextlib.suppress(Exception):
+            persist_tui_theme(name)
+        self._tp_close()
+        self.console.print(f"  ⋅ theme set to {name}", style=self.theme.muted, markup=False)
+
+    def _tp_cancel(self) -> None:
+        self._tp_close()
+        self.console.print(f"  ⋅ {t('repl.theme_cancelled')}", style=self.theme.muted, markup=False)
+
+    def _tp_close(self) -> None:
+        self.tp_active = False
+        self.tp_themes = []
+        self.input.text = ""
+        self.app.invalidate()
+
     def _free_submit(self) -> None:
         txt = self.input.text.strip()
         self.input.text = ""
@@ -1730,11 +1888,20 @@ class _ReplApp:
         #   freeing  — typing a free-text answer to an ask_user question
         #   modeling — filtering/selecting in the /model picker
         #   filing   — filtering/selecting in the @ file picker
-        normal = Condition(lambda: not self.q_active and not self.mp_active and not self.fp_active)
+        #   theming  — filtering/selecting in the /theme picker
+        normal = Condition(
+            lambda: (
+                not self.q_active
+                and not self.mp_active
+                and not self.fp_active
+                and not self.tp_active
+            )
+        )
         choosing = Condition(lambda: self.q_active and not self.q_free)
         freeing = Condition(lambda: self.q_active and self.q_free)
         modeling = Condition(lambda: self.mp_active)
         filing = Condition(lambda: self.fp_active)
+        theming = Condition(lambda: self.tp_active)
 
         @kb.add("enter", filter=normal)
         def _(event) -> None:
@@ -1759,6 +1926,7 @@ class _ReplApp:
                     not self.q_active
                     and not self.mp_active
                     and not self.fp_active
+                    and not self.tp_active
                     and not self.busy
                 )
             ),
@@ -1819,7 +1987,11 @@ class _ReplApp:
             "escape",
             filter=Condition(
                 lambda: (
-                    self.busy and not self.q_active and not self.mp_active and not self.fp_active
+                    self.busy
+                    and not self.q_active
+                    and not self.mp_active
+                    and not self.fp_active
+                    and not self.tp_active
                 )
             ),
         )
@@ -1863,6 +2035,28 @@ class _ReplApp:
             @kb.add(str(_i + 1), filter=filing)
             def _(event, idx=_i) -> None:
                 self._fp_select_row(idx)
+
+        @kb.add("enter", filter=theming)
+        def _(event) -> None:
+            self._tp_pick()
+
+        @kb.add("up", filter=theming)
+        def _(event) -> None:
+            self._tp_move(-1)
+
+        @kb.add("down", filter=theming)
+        def _(event) -> None:
+            self._tp_move(1)
+
+        @kb.add("escape", filter=theming)
+        def _(event) -> None:
+            self._tp_cancel()
+
+        for _i in range(9):
+
+            @kb.add(str(_i + 1), filter=theming)
+            def _(event, idx=_i) -> None:
+                self._tp_select_row(idx)
 
         @kb.add("s-tab", filter=normal)
         def _(event) -> None:
@@ -1945,6 +2139,9 @@ class _ReplApp:
             self._set_input(self._hist[self._hist_pos])
 
     def _on_ctrl_c(self, event) -> None:
+        if self.tp_active:
+            self._tp_cancel()  # cancel the /theme picker
+            return
         if self.fp_active:
             self._fp_cancel()  # cancel the @ file picker
             return
@@ -2010,6 +2207,15 @@ class _ReplApp:
                 self._echo_user(text)
                 self._open_model_picker(refresh=len(parts) > 1)
                 return
+            # /theme with no name → the inline filterable picker, mirroring
+            # /model above. /theme <name> still sets directly via the shared
+            # slash handler below (it goes through the registry's `_theme`,
+            # which persists — `_slash` then notices `state.theme_name`
+            # changed and re-applies the live restyle).
+            if parts and parts[0].lower() == "/theme" and len(parts) == 1:
+                self._echo_user(text)
+                self._open_theme_picker()
+                return
             await self._slash(text)
             return
         if self.busy:
@@ -2020,6 +2226,7 @@ class _ReplApp:
 
     async def _slash(self, text: str) -> None:
         self._echo_user(text)
+        prev_theme = self.state.theme_name
         box: dict = {}
 
         def _do() -> None:
@@ -2030,6 +2237,11 @@ class _ReplApp:
         # run_in_terminal: /sessions may read input (rich.Prompt.ask), which
         # needs the terminal handed back from the app.
         await self._in_terminal(_do)
+        # `/theme <name>` sets state.theme_name via the registry's `_theme`
+        # handler (already persisted there) — restyle the running app here so
+        # the direct-set path applies live too, same as picking from `_tp_pick`.
+        if self.state.theme_name != prev_theme:
+            self._apply_theme_live()
         should_quit, submit = box.get("res", (False, None))
         if should_quit:
             self.app.exit()
