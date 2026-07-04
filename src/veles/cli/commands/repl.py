@@ -677,6 +677,16 @@ def _at_trigger_boundary(text_before_cursor: str) -> bool:
     return not text_before_cursor or text_before_cursor[-1].isspace()
 
 
+def _new_paste_filename() -> str:
+    """Timestamp + short hash, e.g. `20260704-153000-a1b2c3d4.png` — same
+    naming scheme the old Textual composer used for Ctrl+V image pastes."""
+    import hashlib
+
+    ts = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+    sha = hashlib.sha1(str(time.time_ns()).encode()).hexdigest()[:8]
+    return f"{ts}-{sha}.png"
+
+
 def _print_model_list(console, provider: str, current: str, *, refresh: bool = False) -> None:
     """Fallback (simple-loop) model lister: fetch the provider's catalogue and
     print it, marking the current model. No interactive picker here — the
@@ -1713,6 +1723,44 @@ class _ReplApp:
         self.input.text = ""
         self.app.invalidate()
 
+    # --- Ctrl+V image paste (M187 Task 7) ---
+
+    def _paste_clipboard(self) -> None:
+        """An image on the clipboard is saved under `.veles/tmp/paste/` and
+        referenced via `@<relative-path>` inserted at the cursor — the same
+        reference syntax the `@` file picker inserts. Falls back to a plain
+        text paste when the clipboard holds no image. Both clipboard ops are
+        best-effort (see `cli/repl/clipboard.py`) and no-op silently when the
+        platform/tooling doesn't support them. Same no-TTY guard as `_ask`/
+        `_confirm_critical` so a headless run degrades instead of hanging."""
+        from veles.cli.repl.clipboard import paste_image, paste_text
+
+        if not sys.stdin.isatty():
+            return
+        paste_dir = self.project.tmp_dir / "paste"
+        target = paste_dir / _new_paste_filename()
+        if paste_image(target):
+            try:
+                rel = target.relative_to(self.project.root).as_posix()
+            except ValueError:
+                rel = target.as_posix()
+            doc = self.input.buffer.document
+            before, after = doc.text_before_cursor, doc.text_after_cursor
+            ref = f"@{rel} "
+            self.input.text = f"{before}{ref}{after}"
+            self.input.buffer.cursor_position = len(before) + len(ref)
+            return
+        text = paste_text()
+        if text:
+            # Same document-splice shape as the image-ref branch above (and
+            # `_fp_pick`) rather than `Buffer.insert_text` — that path also
+            # kicks off the completer's background task, which needs a
+            # running Application event loop.
+            doc = self.input.buffer.document
+            before, after = doc.text_before_cursor, doc.text_after_cursor
+            self.input.text = f"{before}{text}{after}"
+            self.input.buffer.cursor_position = len(before) + len(text)
+
     # --- @ file picker (filterable, triggered inline by typing `@`) ---
 
     # Rows shown at once — capped at 9 so digit quick-select (1-9) maps
@@ -2136,6 +2184,38 @@ class _ReplApp:
         def _(event) -> None:
             self.meta_expanded = not self.meta_expanded
             self.app.invalidate()
+
+        # $EDITOR compose (M187 Task 7): prompt_toolkit ships an emacs
+        # `c-x c-e` -> `Buffer.open_in_editor()` binding via
+        # `load_open_in_editor_bindings()`, but this Application's default
+        # bindings come from `load_key_bindings()` (key_binding/defaults.py),
+        # which does NOT merge that one in — so `c-x c-e` does nothing here
+        # out of the box. We wire it ourselves, straight onto the input
+        # buffer, rather than merging in the stock bindings (keeps one
+        # KeyBindings object to reason about). No collision: neither the
+        # emacs `c-x` prefix map (`c-u`/`r y`/`(`/`)`/`e`/`c-x` as the second
+        # key — see `key_binding/bindings/emacs.py`) nor any binding of ours
+        # uses "c-e" as the second key of a `c-x` chord. Same no-TTY guard as
+        # `_ask`/`_confirm_critical` so a headless run/test degrades to a
+        # no-op instead of hanging on a real editor subprocess spawn.
+        @kb.add("c-x", "c-e", filter=normal)
+        def _(event) -> None:
+            if not sys.stdin.isatty():
+                return
+            self.input.buffer.open_in_editor()
+
+        # Image paste (M187 Task 7). Deliberately NOT Ctrl+G — the old
+        # Textual composer's binding — because Ctrl+G is prompt_toolkit's
+        # DEFAULT abort/keyboard-quit (`c-g` in both `basic.py` and
+        # `emacs.py`: cancel-selection / abort-incremental-search). Left
+        # unbound here so that default keeps working. Ctrl+V has no default
+        # binding that matters in this Application: `basic.py`'s `c-v` is a
+        # no-op placeholder, and the emacs `c-v` -> scroll-page-down only
+        # activates under `enable_page_navigation_bindings`, which is gated
+        # on `full_screen` — this Application passes `full_screen=False`.
+        @kb.add("c-v", filter=normal)
+        def _(event) -> None:
+            self._paste_clipboard()
 
         @kb.add("c-d")
         def _(event) -> None:
