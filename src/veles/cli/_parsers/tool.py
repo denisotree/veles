@@ -40,3 +40,19 @@ def register(sub: argparse._SubParsersAction) -> None:
         action="store_true",
         help="Skip the confirmation prompt.",
     )
+
+    tool_approve = tool_sub.add_parser(
+        "approve",
+        help="Review + approve a self-authored tool file so the loader will run it.",
+    )
+    tool_approve.add_argument(
+        "name",
+        nargs="?",
+        help="Tool file stem to approve. Omit to list unapproved; use --all for every one.",
+    )
+    tool_approve.add_argument(
+        "--all", action="store_true", help="Approve every unapproved tool file."
+    )
+    tool_approve.add_argument(
+        "--yes", "-y", action="store_true", help="Skip the per-file confirmation prompt."
+    )

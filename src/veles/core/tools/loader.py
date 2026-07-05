@@ -59,6 +59,8 @@ class LoadReport:
     overridden: tuple[tuple[str, str], ...] = ()
     # name, error string for files that failed to import
     errors: tuple[tuple[str, str], ...] = ()
+    # M199: files whose SHA-256 isn't human-approved — skipped, never imported.
+    unapproved: tuple[Path, ...] = ()
 
 
 # ---------- public API ----------
@@ -86,9 +88,12 @@ def load_into_registry(
     project tool shadows a builtin, the loader removes the builtin
     entry from the registry first so the project version wins.
     """
+    from veles.core.tools.approvals import is_approved
+
     loaded: list[LoadedTool] = []
     overridden: list[tuple[str, str]] = []
     errors: list[tuple[str, str]] = []
+    unapproved: list[Path] = []
 
     # `claimed[name] = scope` — which file-based scope already owns the
     # name. Used to disambiguate "duplicate in same scope" (record the
@@ -100,6 +105,11 @@ def load_into_registry(
     user_files = _list_python_files(user_tools_dir)
 
     for source in project_files:
+        # M199: refuse to import a self-authored tool whose bytes aren't
+        # human-approved — its module-level code would run on exec_module.
+        if not is_approved(source):
+            unapproved.append(source)
+            continue
         result = _load_one_file(
             source,
             registry=registry,
@@ -116,6 +126,9 @@ def load_into_registry(
             claimed[lt.entry.name] = "project"
 
     for source in user_files:
+        if not is_approved(source):
+            unapproved.append(source)
+            continue
         result = _load_one_file(
             source,
             registry=registry,
@@ -140,6 +153,7 @@ def load_into_registry(
         loaded=tuple(loaded),
         overridden=tuple(overridden),
         errors=tuple(errors),
+        unapproved=tuple(unapproved),
     )
 
 

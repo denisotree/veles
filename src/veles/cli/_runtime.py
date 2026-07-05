@@ -618,6 +618,14 @@ def _load_skills(
         tool_names = [lt.entry.name for lt in report.loaded]
         for name, scope in report.errors:
             logger.warning("project tool %s failed to load: %s", name, scope)
+        if report.unapproved:
+            names = ", ".join(sorted(p.stem for p in report.unapproved))
+            logger.warning(
+                "%d self-authored tool file(s) not loaded (unapproved): %s — "
+                "review and run `veles tool approve <name>` (or --all) to enable them",
+                len(report.unapproved),
+                names,
+            )
     except Exception as exc:
         logger.warning("project tools unavailable: %s", exc)
 

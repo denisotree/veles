@@ -54,6 +54,13 @@ def ensure_mcp_project_tools(project: Project) -> list[str]:
         try:
             tools_dir.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(src, dst)
+            # M199: Veles wrote this file from its own bundled template (not the
+            # LLM), so auto-approve it — the load gate only needs to stop
+            # agent-authored / user-dropped code. If the agent later edits it,
+            # the SHA changes and it becomes unapproved again.
+            from veles.core.tools.approvals import approve
+
+            approve(dst)
             provisioned.append(template_name)
             logger.info("provisioned MCP tool %s -> %s", template_name, dst)
         except OSError as exc:
