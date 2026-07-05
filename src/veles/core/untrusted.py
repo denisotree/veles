@@ -134,6 +134,16 @@ def wrap_untrusted(
     body = content
     if redact:
         body, _ = redact_secrets(body)
+    # M198: record the (redacted) body in the run's untrusted corpus so the
+    # permission engine can gate an egress tool whose destination appears in
+    # content read this run. Best-effort — never let taint bookkeeping break a
+    # tool result. Redacted body still carries hosts/URLs (only secrets go).
+    try:
+        from veles.core.agent_state import record_untrusted
+
+        record_untrusted(body)
+    except Exception:
+        pass
     fetched = fetched or _now_iso()
     safe_source = source.replace('"', "%22")
     return (

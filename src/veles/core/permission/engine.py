@@ -29,6 +29,7 @@ populated by the existing M38 UI — the engine reads it through
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -138,17 +139,66 @@ def _draft_commit_rule(entry: ToolEntry) -> Decision | None:
     )
 
 
-def _untrusted_args_rule(entry: ToolEntry, args: dict[str, Any]) -> Decision | None:
-    """Stub for §8.6 — blocks tool args derived from `trust=external` content.
+# M198: egress tools whose argument is (or names) the destination data leaves
+# by. A tool call to a host that appears in untrusted content read this run is
+# the prompt-injection exfiltration signal we gate on.
+_EGRESS_TOOLS = frozenset({"fetch_url", "web_search"})
 
-    Returns None when the rule doesn't apply (current behaviour). M66 set up
-    the data labels in fetch_url / web_search wrappers; M64's job here is to
-    define the contract. The actual context-tracking (which arg came from
-    which trust-labelled block) lands when the model context plumbing knows
-    how to mark args as untrusted — likely M71 (Planning state) or later.
-    """
-    del entry, args
+# Domain-like host token: labels separated by dots ending in a 2+ char TLD.
+_HOST_RE = re.compile(r"\b((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,})\b", re.IGNORECASE)
+
+
+def _untrusted_egress_host(args: dict[str, Any]) -> str | None:
+    """Return a host in `args` that also appears in the run's untrusted corpus,
+    or None. High-signal, low-false-positive: matches attacker-*named*
+    destinations and verbatim host forwarding — not paraphrased/re-encoded
+    exfil (a known gap; the model's own discretion + the boundary reminder
+    remain the backstop there)."""
+    from veles.core.agent_state import untrusted_corpus
+
+    corpus = untrusted_corpus()
+    if not corpus:
+        return None
+    corpus_l = "\n".join(corpus).lower()
+    for value in args.values():
+        if not isinstance(value, str):
+            continue
+        for match in _HOST_RE.finditer(value):
+            host = match.group(1).lower()
+            if len(host) >= 4 and host in corpus_l:
+                return host
     return None
+
+
+def _untrusted_args_rule(entry: ToolEntry, args: dict[str, Any]) -> Decision | None:
+    """M198 (§8.6): gate an egress tool whose destination appears in untrusted
+    content read earlier this run — the prompt-injection exfiltration signal.
+
+    Forces a hard confirmation. Runs *before* `_policy_gate`, so the autopilot
+    allow can't reach it; non-TTY `confirm_critical` refuses → fail-closed deny.
+    Returns None (no gate) for non-egress tools or when no host overlaps.
+    """
+    if entry.name not in _EGRESS_TOOLS:
+        return None
+    host = _untrusted_egress_host(args)
+    if host is None:
+        return None
+    ok = confirm_critical(
+        f"dispatch {entry.name}",
+        f"{entry.name!r} targets {host!r}, which appears in untrusted content read "
+        f"this run — possible prompt-injection exfiltration.",
+    )
+    if ok:
+        return Decision(
+            kind="allow",
+            rule="untrusted_args",
+            reason="user confirmed untrusted-derived egress",
+        )
+    return Decision(
+        kind="deny",
+        rule="untrusted_args",
+        reason=f"egress to {host!r} (from untrusted content) declined",
+    )
 
 
 def _policy_gate(entry: ToolEntry, args: dict[str, Any]) -> Decision:

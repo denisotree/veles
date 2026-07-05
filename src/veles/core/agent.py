@@ -21,8 +21,10 @@ from dataclasses import dataclass, field
 from veles.core.agent_state import (
     AgentState,
     clear_invoked_tools,
+    clear_untrusted,
     reset_invoked_tools,
     reset_state,
+    reset_untrusted,
     set_state,
 )
 from veles.core.cancel import TurnCancelled, current_cancel_token
@@ -238,6 +240,7 @@ class Agent:
             )
         state_token = set_state(AgentState.PLANNING if self._plan_mode else AgentState.IDLE)
         invoked_token = clear_invoked_tools()
+        untrusted_token = clear_untrusted()  # M198: fresh untrusted corpus per run
         self._event_listener = event_listener
         try:
             return self._run_inner(user_msg, on_text_delta=on_text_delta)
@@ -277,6 +280,7 @@ class Agent:
         finally:
             self._event_listener = None
             reset_invoked_tools(invoked_token)
+            reset_untrusted(untrusted_token)
             reset_state(state_token)
 
     def _run_inner(
