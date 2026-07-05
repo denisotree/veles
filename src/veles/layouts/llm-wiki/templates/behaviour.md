@@ -35,8 +35,11 @@ Treat it as a **patch to existing knowledge**, not a new article:
 
 ### Conventions carried over
 
-- `sources/` holds raw first-sources, by convention — don't edit a file
-  already under `sources/`; it's evidence, not a working copy.
+- The top-level `sources/` directory holds raw first-sources, by
+  convention — don't edit a file already under `sources/`; it's evidence,
+  not a working copy. (This is the project-root `sources/` tree, NOT the
+  `wiki/sources/` category — raw originals go to top-level `sources/`,
+  never into `wiki/`.)
 - Kebab-case slugs, `[[wikilinks]]` between related pages, one
   `wiki_append_log` line per write.
 - Don't fabricate content. If a file can't be read or confidently

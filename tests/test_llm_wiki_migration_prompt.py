@@ -98,7 +98,14 @@ def test_run_toolset_has_migration_tools() -> None:
     """The `run` toolset (used for prompt-driven migration in a normal
     `veles run`) must expose search/read/write-page and file relocation."""
     run_tools = TOOLSETS["run"]
-    for tool in ("wiki_search", "wiki_read_page", "wiki_write_page", "move_file"):
+    # Every tool behaviour.md instructs the agent to use during migration.
+    for tool in (
+        "wiki_search",
+        "wiki_read_page",
+        "wiki_write_page",
+        "wiki_append_log",
+        "move_file",
+    ):
         assert tool in run_tools, f"{tool} missing from the `run` toolset"
 
 
