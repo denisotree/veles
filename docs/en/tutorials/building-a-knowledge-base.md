@@ -12,9 +12,10 @@ You should have finished [Getting started](getting-started.md) first.
 
 A Veles project has two content zones:
 
-- `sources/` — raw, immutable material you give it (read-only to the agent).
-- `wiki/` — the agent's own, LLM-generated knowledge (the only zone it writes
-  content into).
+- `sources/` — raw material you give it, kept as-is by convention (not
+  hard-enforced — the agent can technically write anywhere in the project).
+- `wiki/` — the agent's own, LLM-generated knowledge, and the zone it's
+  expected to write content into.
 
 You feed in sources; Veles distils them into linked wiki pages; you query the
 wiki in natural language. See [layout packs & the LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)

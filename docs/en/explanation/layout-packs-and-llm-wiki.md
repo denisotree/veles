@@ -28,7 +28,7 @@ skill and template files). The manifest declares:
 
 | Pack | What `veles init --layout <name>` produces |
 |---|---|
-| `llm-wiki` *(default)* | The [Karpathy-style LLM-Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): `sources/` (read-only), `wiki/` (agent-writable), `INDEX.md` injected into the prompt, `ingest`/`query`/`lint` skills, the wiki engine on. |
+| `llm-wiki` *(default)* | The [Karpathy-style LLM-Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): `sources/` (raw, readonly by convention — not enforced), `wiki/` (agent-writable), `INDEX.md` injected into the prompt, `ingest`/`query`/`lint` skills, the wiki engine on. The pack declares no writable zones, so writes are actually permissive anywhere in the project; a layout-declared behavioural prompt (`templates/behaviour.md`) carries the sources/wiki discipline and the migration/log-patch rules instead. |
 | `notes` | A single flat `notes/` directory the agent writes into. No wiki machinery. |
 | `bare` | No content scaffold at all — for code repositories and free-form work. Writes are permissive inside the project root (still subject to the trust ladder). |
 

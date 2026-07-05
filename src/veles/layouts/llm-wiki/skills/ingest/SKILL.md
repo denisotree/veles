@@ -16,9 +16,11 @@ You ingest a source into the project's LLM Wiki.
 2. Read the content carefully. Identify what it's about, the key claims, the
    shape (article / tutorial / reference / dataset).
 3. Pick a slug: short, kebab-case, descriptive (e.g. `attention-is-all-you-need`).
-   Pick a category: usually `concepts` for ideas, `sources` for cited material,
-   `notes` for ad-hoc captures. Don't write into `sources/` itself — that zone
-   is read-only.
+   Pick a wiki category: usually `concepts` for ideas, `sources` for cited
+   material, `notes` for ad-hoc captures — this is a `wiki/<category>/` folder,
+   not the project's top-level `sources/` directory. The raw original stays
+   under (or is relocated to) top-level `sources/`, kept as-is by convention;
+   the distilled page you write goes under `wiki/`.
 4. Call `wiki_write_page` with the chosen category and slug. The body should
    capture the source's claims in your own words, with citations back to the
    source URL/path. Keep it 200–800 words for a typical article.
