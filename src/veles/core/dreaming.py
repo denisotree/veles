@@ -265,6 +265,11 @@ def dream_cycle(
                 lambda: _step_insight_dedup(project, result, dry_run=dry_run),
                 result,
             )
+        if include_consolidation and not dry_run:
+            # M192: embed survivor insights (after dedup, so embeds aren't spent
+            # on superseded rows) for MemoryRouter's semantic recall. Off the
+            # per-turn hot path; local-adapter-gated inside.
+            _run_dream_step("embed_insights", lambda: _step_embed_insights(project, result), result)
         if include_consolidation and provider is not None:
             _run_dream_step(
                 "consolidation",
@@ -311,6 +316,17 @@ def _step_insights(
         except Exception as exc:  # pragma: no cover - extractor handles its own errors
             result.notes.append(f"insight extractor on {session_id}: {exc}")
     result.insights_written = written
+
+
+def _step_embed_insights(project: Project, result: DreamResult) -> None:
+    """M192: embed survivor insights that still lack a vector so recall can KNN
+    over them. Local-adapter-gated (no cloud egress); a no-op with no local
+    embedder. Best-effort via `_run_dream_step`."""
+    from veles.core.memory.insight_embeddings import embed_survivor_insights
+
+    n = embed_survivor_insights(project)
+    if n:
+        result.notes.append(f"embedded {n} insight(s)")
 
 
 def _step_insight_dedup(project: Project, result: DreamResult, *, dry_run: bool) -> None:

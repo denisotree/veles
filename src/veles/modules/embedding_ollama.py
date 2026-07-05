@@ -42,6 +42,11 @@ class OllamaEmbeddingAdapter:
     `embed` call opens a fresh HTTP request, which is fine for the
     expected batch shapes (≤100 strings per call)."""
 
+    # M192: marks this adapter as on-device — recall/backfill only send text
+    # (queries, insight bodies) to `is_local` adapters, so a cloud embedder
+    # never receives project content (local-first no-egress guarantee).
+    is_local = True
+
     def __init__(
         self,
         *,

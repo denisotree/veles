@@ -70,6 +70,19 @@ def get_embedding_adapter() -> EmbeddingAdapter | None:
     return _REGISTERED
 
 
+def get_local_embedding_adapter() -> EmbeddingAdapter | None:
+    """M192: the registered adapter only if it is on-device (`is_local`).
+
+    The single gate for "may I send text to this embedder without egress?".
+    Recall (query text) and backfill (insight bodies) both use it so a cloud
+    embedder never receives project content. Returns None for a cloud adapter
+    or no adapter — callers then stay on FTS-only recall."""
+    adapter = _REGISTERED
+    if adapter is not None and getattr(adapter, "is_local", False):
+        return adapter
+    return None
+
+
 def reset_embedding_adapter() -> None:
     """Test helper — clear any installed adapter."""
     global _REGISTERED
@@ -80,6 +93,7 @@ __all__ = [
     "EmbeddingAdapter",
     "EmbeddingError",
     "get_embedding_adapter",
+    "get_local_embedding_adapter",
     "register_embedding_adapter",
     "reset_embedding_adapter",
 ]
