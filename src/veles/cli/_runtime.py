@@ -182,6 +182,13 @@ def build_run_system_prompt(
     rules = _rules_digest_block(project)
     if rules:
         stable_parts.append(rules)
+    # M188: the pack's declared behavioural prompt (`prompt_file`), if any.
+    # Engine-independent — placed right after AGENTS.md/rules and before the
+    # wiki-gated blocks below so the cache prefix stays stable regardless of
+    # which engines are on.
+    layout_prompt = _load_layout_prompt(project)
+    if layout_prompt:
+        stable_parts.append(layout_prompt)
     # M163: the wiki-specific stable blocks (context file + RAG habits)
     # appear only when the active layout pack enables the wiki engine.
     from veles.core.layout.engines import wiki_enabled
@@ -425,6 +432,35 @@ def _load_context_file(project: Project) -> str | None:
 
 # Legacy alias — `cli/__init__.py` re-exports `_load_index_md`.
 _load_index_md = _load_context_file
+
+
+def _load_layout_prompt(project: Project) -> str | None:
+    """M188: read the active layout pack's declared `prompt_file` — a
+    behavioural-prompt `.md` injected into the stable system prompt.
+
+    CRITICAL DIFFERENCE from `_load_context_file`: `context_file` is read
+    from the PROJECT root (a file the project itself owns, e.g. INDEX.md);
+    `prompt_file` is read from the PACK ROOT (`find_layout(...).root`), so
+    editing the pack's prompt reaches every existing project using it, not
+    just newly-scaffolded ones. Engine-independent — no `wiki_enabled` gate;
+    any pack may declare `prompt_file`. No pack / no declaration / missing
+    file → no block, never an exception."""
+    from veles.core.layout.discovery import find_layout
+    from veles.core.safety import scan_for_injection
+
+    pack = find_layout(project.layout_name, project)
+    if pack is None or not pack.manifest.prompt_file:
+        return None
+    path = pack.root / pack.manifest.prompt_file
+    if not path.is_file():
+        return None
+    raw = path.read_text(encoding="utf-8", errors="replace")
+    text, _ = scan_for_injection(raw, source_label=pack.manifest.prompt_file)
+    if not text:
+        return None
+    if len(text) > _INDEX_INJECTION_CAP:
+        text = text[:_INDEX_INJECTION_CAP] + "\n\n<truncated>"
+    return "Layout behaviour instructions:\n\n" + text
 
 
 # ---- compressor / skills / providers ----

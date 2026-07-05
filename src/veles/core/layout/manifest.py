@@ -100,6 +100,12 @@ class LayoutManifest:
     # M162: project-root-relative file injected into the stable system
     # prompt (e.g. the wiki's `INDEX.md`). None → no injection.
     context_file: str | None = None
+    # M188: pack-root-relative path of a behavioural-prompt `.md` file
+    # injected into the stable system prompt (e.g. `templates/behaviour.md`).
+    # Unlike `context_file` (read from the PROJECT root), this is read from
+    # the PACK root so a pack edit reaches existing projects. Engine-
+    # independent — any pack may declare it. None → no injection.
+    prompt_file: str | None = None
     # M162: directories `veles init` creates for this pack (relative to
     # the project root).
     scaffold_dirs: tuple[str, ...] = field(default_factory=tuple)
@@ -169,6 +175,10 @@ def read_manifest(path: Path) -> LayoutManifest:
             "[layout].context_file must be a non-empty string", path=toml_path
         )
 
+    prompt_file = layout_section.get("prompt_file")
+    if prompt_file is not None and (not isinstance(prompt_file, str) or not prompt_file.strip()):
+        raise LayoutManifestError("[layout].prompt_file must be a non-empty string", path=toml_path)
+
     zones = _parse_zones(layout_section.get("writable_zones", []), toml_path)
     operations = _parse_operations(layout_section.get("operations", []), toml_path)
     engines = _parse_engines(layout_section.get("engines", {}), toml_path)
@@ -185,6 +195,7 @@ def read_manifest(path: Path) -> LayoutManifest:
         operations=operations,
         engines=engines,
         context_file=context_file.strip() if isinstance(context_file, str) else None,
+        prompt_file=prompt_file.strip() if isinstance(prompt_file, str) else None,
         scaffold_dirs=scaffold_dirs,
         agents_md_template=agents_md_template,
         wiki_categories=wiki_categories,
