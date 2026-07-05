@@ -30,7 +30,7 @@ from veles.core.events import (
 from veles.core.modules import VetoResult, fire_hook
 from veles.core.permission import evaluate as evaluate_permission
 from veles.core.provider import Message, ToolCall
-from veles.core.tools.registry import Registry
+from veles.core.tools.registry import Registry, ToolEntry
 from veles.core.trace import now_iso
 
 logger = logging.getLogger(__name__)
@@ -363,7 +363,11 @@ def _dispatch(
             )
     except Exception:
         pass
-    if via_autopilot:
+    if via_autopilot or (entry is not None and _egress_under_autopilot(entry)):
+        # M200: `via_autopilot` covers trust-ladder tools the autopilot window
+        # auto-allowed. `_egress_under_autopilot` adds the allow-policy network
+        # tools (fetch_url/web_search) that skip the ladder — under autopilot
+        # they must still reach the review journal (VISION §8).
         _audit_autopilot_dispatch(call.name, error)
     fire_hook(
         "post_tool_call",
@@ -407,6 +411,17 @@ def _emit(
     if listener is not None:
         with contextlib.suppress(Exception):
             listener(event)
+
+
+def _egress_under_autopilot(entry: ToolEntry) -> bool:
+    """M200: True for an allow-policy network-egress tool (fetch_url/web_search)
+    while an autopilot window is open. Those tools skip the trust ladder, so
+    `via_autopilot` never flags them — but an unattended run must still leave a
+    reviewable record of what left the machine (VISION §8)."""
+    from veles.core.autopilot import is_active
+    from veles.core.risk import RiskClass
+
+    return entry.risk_class == RiskClass.NETWORK_OPEN_WORLD and is_active()
 
 
 def _audit_autopilot_dispatch(tool_name: str, error: str | None) -> None:
