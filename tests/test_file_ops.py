@@ -2,8 +2,10 @@
 
 `move_file` is additionally covered via the organize re-export in
 `test_organize.py`; here we cover the new `delete_file` / `make_dir`, the
-writable-zone gating (read-only `sources/` refused), and `[run]` membership —
-the fix for the interactive surface having no first-class move/rename/delete.
+writable-zone gating (M189: llm-wiki declares no zones, so it's permissive —
+mechanism enforcement for packs that DO declare zones is covered in
+`test_layout_writable.py`), and `[run]` membership — the fix for the
+interactive surface having no first-class move/rename/delete.
 """
 
 from __future__ import annotations
@@ -52,12 +54,14 @@ def test_delete_file_removes_within_writable_zone(wiki_project) -> None:
     assert not f.exists()
 
 
-def test_delete_file_refuses_readonly_zone(wiki_project) -> None:
+def test_delete_file_in_sources_succeeds_under_llm_wiki(wiki_project) -> None:
+    """M189: llm-wiki declares no writable_zones, so `sources/` is no
+    longer hard-readonly — deleting there is now permitted."""
     f = wiki_project.root / "sources" / "keep.md"
     f.write_text("original", encoding="utf-8")
     msg = delete_file(str(f))
-    assert "refused" in msg  # sources/ is read-only
-    assert f.exists()
+    assert "deleted" in msg
+    assert not f.exists()
 
 
 def test_delete_file_errors_on_dir_and_missing(wiki_project) -> None:
@@ -76,11 +80,13 @@ def test_make_dir_creates_nested_in_writable_zone(wiki_project) -> None:
     assert "created directory" in make_dir(str(target))
 
 
-def test_make_dir_refuses_readonly_zone(wiki_project) -> None:
+def test_make_dir_in_sources_succeeds_under_llm_wiki(wiki_project) -> None:
+    """M189: llm-wiki declares no writable_zones — `sources/` is writable
+    now, so creating a directory there is permitted too."""
     target = wiki_project.root / "sources" / "newdir"
     msg = make_dir(str(target))
-    assert "refused" in msg
-    assert not target.exists()
+    assert "created directory" in msg
+    assert target.is_dir()
 
 
 def test_move_file_creates_nested_parents(wiki_project) -> None:

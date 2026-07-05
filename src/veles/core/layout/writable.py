@@ -1,17 +1,30 @@
-"""M117c-final: enforce layout-pack writable_zones at write time.
+"""M117c-final / M189: `writable_zones` is a UNIVERSAL, OPT-IN, layout-level
+write-permission mechanism.
 
-Design rule (VISION §4): writable zones are declarative. The concrete
-zones depend on the layout the user picked and are declared in
-AGENTS.md. In the default LLM Wiki layout the LLM writes only to
-`wiki/` and `<cwd>/.veles/`; `sources/` is read-only.
+**The contract:**
+- A layout pack MAY declare zones with permissions in `layout.toml`
+  (`[[layout.writable_zones]]` — `path` + optional `readonly = true`).
+- **A layout that declares NO zones has NO write restriction**: the agent
+  may write anywhere inside the project root. Only `path_guard`'s
+  project-boundary + `..`/symlink rules still apply (reads stay
+  project-wide regardless — this module gates WRITES only, never reads).
+- A layout that DOES declare zones is restricted to them: writable zones
+  are allow-listed, `readonly = true` zones are hard-refused, and anything
+  outside all declared zones is refused too.
+- The builtin `llm-wiki` pack declares no zones (M189) — it is permissive
+  by design; the sources/wiki discipline is a *prompt* convention, not an
+  enforced write boundary. Packs that want a hard boundary (e.g. a custom
+  pack keeping `sources/` immutable) opt in by declaring zones themselves;
+  the mechanism below is unchanged and still enforces them.
 
 `is_writable(project, path)` is the runtime check the builtin
 `write_file` tool (and any agent-generated write tool) consults
-before persisting bytes. The read sandbox (`path_guard.py`) stays
-unchanged — read remains full-project — but writes are restricted
-to whatever the active layout-pack declares.
+before persisting bytes, via `_fs_write_guard.guard_write` — the single
+chokepoint every builtin write/move/delete tool calls. The read sandbox
+(`path_guard.py`) stays unchanged — read remains full-project.
 
-Always-writable zones, regardless of pack:
+Always-writable zones, regardless of pack (even a pack that declares
+zones and would otherwise refuse these):
 - `<cwd>/.veles/`  — project memory, agent's own scratch space.
 - `AGENTS.md`      — the project's context file. Veles generates it for
   every layout (`scaffold.apply_scaffold`), so the agent may edit it
@@ -25,10 +38,11 @@ manifest (`find_layout(project.layout_name)`) via the
 zones.
 
 When no pack is active (custom layout that didn't ship a layout.toml,
-or the project's `layout_name` points at a missing pack), fall back
-to permissive mode — allow everything inside the project root. This
-preserves the pre-M117 contract: a project without a layout-pack
-can still write anywhere in its tree.
+or the project's `layout_name` points at a missing pack) — or when the
+active pack simply declares no zones at all — fall back to permissive
+mode: allow everything inside the project root. This is the SAME
+"no zones ⇒ unrestricted" contract stated above, just reached via a
+different route (no pack resolves, vs. a pack resolves but is empty).
 """
 
 from __future__ import annotations
@@ -56,9 +70,15 @@ _ALWAYS_WRITABLE_FILES: tuple[str, ...] = ("AGENTS.md",)
 
 def is_writable(project: Project, path: str | Path) -> bool:
     """True iff the agent may write to `path` under `project`'s active
-    layout-pack. Always-writable zones (`.veles/`) override the
-    pack's declaration; pack-declared zones extend the write surface
-    beyond that minimum.
+    layout-pack. Always-writable zones (`.veles/`, `AGENTS.md`) override
+    the pack's declaration regardless of what the pack declares.
+
+    Otherwise this is a **universal, opt-in** contract: if the active
+    pack declares `writable_zones` in its `layout.toml`, `path` must fall
+    inside a non-readonly declared zone. If the pack declares NO zones
+    at all — as `llm-wiki` does since M189 — there is no restriction and
+    every in-project path is writable. Gates writes only; reads stay
+    project-wide via `path_guard` regardless of this check.
 
     `path` is normalised relative to `project.root`. Absolute paths
     outside the project root are rejected (those should never reach
@@ -87,7 +107,10 @@ def is_writable(project: Project, path: str | Path) -> bool:
 
     zones = _effective_writable_zones(project)
     if not zones:
-        # Permissive fallback when no pack declares zones.
+        # Contract anchor (M189): a layout that declares NO writable_zones
+        # is UNRESTRICTED — every path inside the project root is writable.
+        # This covers both "no pack resolves" and "pack resolves but its
+        # manifest declares zero writable_zones" (e.g. llm-wiki, bare).
         return True
     for zone in zones:
         # Zone may be `wiki/` or `wiki` — match both forms.

@@ -43,40 +43,60 @@ def test_veles_state_write_succeeds(project) -> None:
 
 
 def test_agents_md_write_succeeds(project) -> None:
-    """AGENTS.md is writable like any other file Veles generates, even
-    under llm-wiki whose zones are wiki/ + sources/."""
+    """AGENTS.md is writable like any other file Veles generates."""
     target = project.root / "AGENTS.md"
     msg = write_file(str(target), "# AGENTS\n")
     assert "wrote" in msg
     assert target.read_text(encoding="utf-8") == "# AGENTS\n"
 
 
-# ---- refused paths ----
+# ---- M189: llm-wiki is permissive — no more zone refusals ----
 
 
-def test_sources_refused_as_readonly(project) -> None:
-    """sources/ is declared readonly in llm-wiki pack."""
+def test_sources_write_succeeds_under_llm_wiki(project) -> None:
+    """M189: llm-wiki declares no writable_zones, so `sources/` is no
+    longer hard-readonly — it's a prompt convention now, not a guard."""
     target = project.root / "sources" / "raw.txt"
     msg = write_file(str(target), "x")
-    assert "refused" in msg
-    assert "writable zones" in msg
-    assert not target.exists()
+    assert "wrote" in msg
+    assert target.read_text(encoding="utf-8") == "x"
 
 
-def test_root_level_file_refused(project) -> None:
-    """A file at project root outside wiki/ or .veles/ isn't writable
-    under llm-wiki."""
+def test_root_level_file_write_succeeds_under_llm_wiki(project) -> None:
+    """M189: a file at project root outside wiki/ or .veles/ is writable
+    too — llm-wiki declares no zones, so it is fully permissive."""
     target = project.root / "random.txt"
     msg = write_file(str(target), "x")
+    assert "wrote" in msg
+    assert target.read_text(encoding="utf-8") == "x"
+
+
+# ---- mechanism preserved: a pack that DOES declare zones still refuses ----
+
+
+def test_refusal_message_lists_allowed_zones(isolated_home: Path, tmp_path: Path) -> None:
+    """A pack that opts into `writable_zones` still refuses writes outside
+    them, with a helpful message listing what IS allowed. Proves M189
+    didn't weaken the mechanism itself — only llm-wiki's declaration."""
+    pack_dir = isolated_home / ".veles" / "layouts" / "custom-restricted"
+    pack_dir.mkdir(parents=True, exist_ok=True)
+    (pack_dir / "layout.toml").write_text(
+        '[layout]\nname = "custom-restricted"\n[[layout.writable_zones]]\npath = "wiki/"\n',
+        encoding="utf-8",
+    )
+    restricted = init_project(
+        tmp_path / "restricted", name="restricted", layout="custom-restricted"
+    )
+    token = set_active_project(restricted)
+    try:
+        target = restricted.root / "anywhere.txt"
+        msg = write_file(str(target), "x")
+    finally:
+        reset_active_project(token)
     assert "refused" in msg
-    assert not target.exists()
-
-
-def test_refusal_message_lists_allowed_zones(project) -> None:
-    target = project.root / "anywhere.txt"
-    msg = write_file(str(target), "x")
-    # The error message should help the agent: show what IS allowed
+    assert "writable zones" in msg
     assert ".veles" in msg or "wiki" in msg
+    assert not target.exists()
 
 
 # ---- permissive fallback ----

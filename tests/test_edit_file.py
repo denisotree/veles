@@ -102,13 +102,13 @@ def test_empty_old_string_refused(project) -> None:
 # ---- shared write-guard applies to edits too ----
 
 
-def test_readonly_zone_refused(project) -> None:
-    """An existing file in a read-only zone (sources/ under llm-wiki)
-    cannot be edited — proves edit_file shares write_file's zone guard."""
+def test_sources_edit_succeeds_under_llm_wiki(project) -> None:
+    """M189: llm-wiki declares no writable_zones, so `sources/` is no
+    longer hard-readonly — edit_file can touch it like any other
+    in-project path (shares write_file's guard_write chokepoint)."""
     src = project.root / "sources" / "raw.txt"
     src.parent.mkdir(parents=True, exist_ok=True)
-    src.write_text("original\n", encoding="utf-8")  # placed directly, bypassing the tool
+    src.write_text("original\n", encoding="utf-8")
     msg = edit_file(str(src), "original", "tampered")
-    assert "refused" in msg
-    assert "writable zones" in msg
-    assert src.read_text(encoding="utf-8") == "original\n"  # untouched
+    assert "edited" in msg
+    assert src.read_text(encoding="utf-8") == "tampered\n"

@@ -18,14 +18,11 @@ agents_md_template = "templates/AGENTS.md"
 # add categories via `[layout.wiki].categories = [...]`, but the framework itself
 # hardcodes no project schema.
 
-[[layout.writable_zones]]
-path = "wiki/"
-description = "LLM-generated knowledge — the only zone the agent writes content into"
-
-[[layout.writable_zones]]
-path = "sources/"
-readonly = true
-description = "Raw, immutable source material that ingest extracts from"
+# No [[layout.writable_zones]] declared (M189): llm-wiki is permissive — the
+# agent may read/write/relocate any file under the project root (the
+# universal opt-in mechanism in `core/layout/writable.py` treats "no
+# declared zones" as unrestricted). The sources/wiki split below is a
+# CONVENTION carried in the prompt/AGENTS.md, not a hard-enforced boundary.
 
 [[layout.operations]]
 name = "ingest"

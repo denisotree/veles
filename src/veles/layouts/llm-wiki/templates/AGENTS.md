@@ -6,7 +6,7 @@ subdirectory).
 
 ## Layout
 
-- `sources/` — immutable raw inputs.
+- `sources/` — raw inputs, kept as-is by convention (not hard-enforced).
 - `wiki/` — agent-curated knowledge (concepts, entities, sources, queries, sessions).
 - `INDEX.md` — auto-generated catalogue, refreshed on every wiki write.
 - `LOG.md` — append-only journal of content operations.
@@ -15,7 +15,10 @@ subdirectory).
 
 - Wiki pages use kebab-case slugs.
 - Content tool calls log to `LOG.md` via `wiki_append_log`.
-- LLM-only writes go under `wiki/`; `sources/` is read-only.
+- Convention (not an enforced restriction): raw inputs live in `sources/`,
+  curated knowledge lives in `wiki/`. The agent may read/write anywhere in
+  the project — keep raw material under `sources/` and distilled pages
+  under `wiki/` to preserve the audit trail.
 
 ## Workflows
 
