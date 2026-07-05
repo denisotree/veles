@@ -23,7 +23,6 @@ _COMMAND_MODULES = (
     "sessions",
     "skills",
     "subprojects",
-    "tui",
 )
 
 _HELPER_MODULES = (
@@ -63,7 +62,6 @@ def test_backward_compat_reexports_present() -> None:
         _cmd_sessions,
         _cmd_skill,
         _cmd_subproject,
-        _cmd_tui,
     )
 
     for fn in (
@@ -79,7 +77,6 @@ def test_backward_compat_reexports_present() -> None:
         _cmd_sessions,
         _cmd_skill,
         _cmd_subproject,
-        _cmd_tui,
     ):
         assert callable(fn)
         assert fn.__module__.startswith("veles.cli.commands."), fn.__module__
@@ -154,7 +151,6 @@ def test_parser_lists_all_top_level_verbs() -> None:
         "route",
         "export",
         "import",
-        "tui",
     }
     missing = expected - choices
     assert not missing, f"parser is missing verbs: {missing}"

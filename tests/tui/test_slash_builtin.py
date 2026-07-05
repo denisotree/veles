@@ -9,9 +9,9 @@ pages or recorded sessions seed them inline.
 
 from __future__ import annotations
 
+from veles.cli.repl.slash import build_default_registry
 from veles.core.provider import Message
 from veles.modules.wiki.wiki import Wiki
-from veles.tui.slash import build_default_registry
 
 
 def _reg():
@@ -33,6 +33,7 @@ def test_help_lists_every_top_level_command(slash_ctx):
         "/history",
         "/wiki",
         "/model",
+        "/theme",
         "/mode",
         "/schema",
         "/self-doc",
@@ -41,10 +42,13 @@ def test_help_lists_every_top_level_command(slash_ctx):
 
 
 def test_help_omits_removed_commands(slash_ctx):
-    """M80: /load /show /search /theme /init removed; Ctrl+R/Ctrl+T cover pickers."""
+    """M80: /load /show /search /init removed (picker-only, via the now-deleted
+    Textual chat UI's Ctrl+R/Ctrl+T hotkeys). `/theme` was reinstated in M187
+    Task 5 as a real slash command once Ctrl+T had no replacement — see
+    `test_bare_theme_opens_picker` and friends below."""
     res = _reg().dispatch("/help", slash_ctx)
     assert res is not None
-    for cmd in ("/load", "/show", "/search ", "/theme", "/init"):
+    for cmd in ("/load", "/show", "/search ", "/init"):
         assert cmd not in res.text, cmd
 
 
@@ -180,6 +184,33 @@ def test_model_refresh_opens_picker_with_refresh_sentinel(slash_ctx):
     assert res.open_picker == "models:refresh"
     # `refresh` is the picker intent, not a model id — state must stay put.
     assert slash_ctx.state.model != "refresh"
+
+
+# ---------------- /theme ----------------
+
+
+def test_bare_theme_opens_picker(slash_ctx):
+    """M187 Task 5: `/theme` with no args defers to the App's theme picker,
+    mirroring `/model`."""
+    res = _reg().dispatch("/theme", slash_ctx)
+    assert res is not None and res.open_picker == "themes"
+
+
+def test_theme_set_updates_state_and_persists(slash_ctx, tmp_path, monkeypatch):
+    from veles.core import user_config as _user_config
+
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    res = _reg().dispatch("/theme dracula", slash_ctx)
+    assert res is not None and not res.is_error
+    assert slash_ctx.state.theme_name == "dracula"
+    assert _user_config.load_user_config().tui_theme == "dracula"  # persisted
+
+
+def test_theme_set_unknown_name_errors_without_touching_state(slash_ctx):
+    slash_ctx.state.theme_name = "everforest"
+    res = _reg().dispatch("/theme not-a-real-theme", slash_ctx)
+    assert res is not None and res.is_error
+    assert slash_ctx.state.theme_name == "everforest"  # unchanged
 
 
 # ---------------- /schema ----------------

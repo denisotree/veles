@@ -337,7 +337,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 | 参数 | 默认值 | 用途 |
 |---|---|---|
-| `--model <id>` | 从项目 `[provider]` 的 model 解析 → 用户 `default_model`（无硬编码默认值） | 模型 ID |
+| `--model <id>` | 从项目 `[engine]` 的 model 解析 → 用户 `default_model`（无硬编码默认值） | 模型 ID |
 | `--provider <name>` | `openrouter` | 提供方（见下） |
 | `--max-tokens-total <n>` | `100000` | 累计 token 预算；`0` 表示禁用 |
 | `--max-iterations <n>` | `30` | 每个回合的最大 tool 调用迭代次数 |

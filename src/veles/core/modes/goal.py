@@ -42,8 +42,8 @@ import json
 import re
 from typing import Literal
 
+from veles.core.agent_events import SystemLine, TurnDone
 from veles.core.modes.base import Mode, ModeContext
-from veles.tui.messages import SystemLine, TurnDone
 
 # ---- system prompts per phase ----
 
@@ -414,8 +414,8 @@ class GoalMode:
         assistant message; the user's next reply will land in history
         normally."""
         from veles.core.agent import RunResult
+        from veles.core.agent_events import ChatDelta
         from veles.core.i18n import t
-        from veles.tui.messages import ChatDelta
 
         text = (
             t("goal.confirm_line", summary=goal.interview_summary)

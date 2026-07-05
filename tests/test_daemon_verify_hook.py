@@ -36,7 +36,7 @@ def _daemon_args():
 def _project_with_provider(tmp_path: Path, *, extra: str = ""):
     project = init_project(tmp_path, name=None, force=False)
     (project.state_dir / "config.toml").write_text(
-        f'[provider]\ndefault = "ollama"\nmodel = "base-m"\n{extra}',
+        f'[engine]\nprovider = "ollama"\nmodel = "base-m"\n{extra}',
         encoding="utf-8",
     )
     return project

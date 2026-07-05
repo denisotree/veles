@@ -27,8 +27,8 @@ sont **fixés pour toute sa durée de vie** — définissez-les avant de démarr
 
 ```toml
 # <project>/.veles/config.toml
-[provider]
-default = "ollama"            # nom du fournisseur
+[engine]
+provider = "ollama"            # nom du fournisseur
 model = "qwen3:4b-instruct"   # id du modèle
 ```
 

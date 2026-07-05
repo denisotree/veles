@@ -163,7 +163,7 @@ async def run_agent_in_background(
     # on the *operator's* stdin instead of asking the channel user. Skip for
     # now (→ "proceed on best assumption"); routing the question to the channel
     # is M148b.
-    question_token = set_question_prompter(lambda _q: None)
+    question_token = set_question_prompter(lambda _q, _opts=None: None)
     turn_token = begin_trust_turn()
 
     def _worker() -> RunResult:

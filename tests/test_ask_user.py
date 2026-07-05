@@ -31,15 +31,39 @@ from veles.core.user_prompt import (
 
 
 def test_returns_prompter_answer() -> None:
-    token = set_question_prompter(lambda q: f"answer to: {q}")
+    token = set_question_prompter(lambda q, opts=None: f"answer to: {q}")
     try:
         assert ask_user("which env?") == "answer to: which env?"
     finally:
         reset_question_prompter(token)
 
 
+def test_options_are_passed_to_prompter() -> None:
+    seen: dict = {}
+
+    def _p(q, opts=None):
+        seen["q"] = q
+        seen["opts"] = opts
+        return opts[0] if opts else None
+
+    token = set_question_prompter(_p)
+    try:
+        assert ask_user("pick?", options=["a", "b", "c"]) == "a"
+        assert seen["opts"] == ["a", "b", "c"]
+    finally:
+        reset_question_prompter(token)
+
+
+def test_default_prompter_numeric_choice_maps_to_option(monkeypatch) -> None:
+    from veles.core import user_prompt
+
+    monkeypatch.setattr(user_prompt.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda: "2")
+    assert user_prompt.ask_user_question("pick?", ["red", "green", "blue"]) == "green"
+
+
 def test_no_human_returns_assumption_notice() -> None:
-    token = set_question_prompter(lambda _q: None)
+    token = set_question_prompter(lambda _q, _opts=None: None)
     try:
         assert ask_user("anything?") == _NO_HUMAN
     finally:
@@ -47,7 +71,7 @@ def test_no_human_returns_assumption_notice() -> None:
 
 
 def test_blank_answer_treated_as_no_human() -> None:
-    token = set_question_prompter(lambda _q: "   ")
+    token = set_question_prompter(lambda _q, _opts=None: "   ")
     try:
         assert ask_user("?") == _NO_HUMAN
     finally:
@@ -108,7 +132,7 @@ class _OneAskProvider:
 def test_agent_receives_user_answer_as_tool_result() -> None:
     from veles.core.agent import Agent
 
-    token = set_question_prompter(lambda _q: "prod")
+    token = set_question_prompter(lambda _q, _opts=None: "prod")
     try:
         agent = Agent(_OneAskProvider(), registry.subset(["ask_user"]), model="m")
         result = agent.run("deploy it")

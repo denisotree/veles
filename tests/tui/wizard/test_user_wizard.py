@@ -28,7 +28,7 @@ def _isolate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeKeyring:
     # Mock validate_and_fetch_models so the wizard never hits the real
     # network during tests. Always succeed with 2 fake models — tests
     # that need failure paths override this locally.
-    from veles.tui.screens import _model_fetcher
+    from veles.cli.repl import model_fetcher as _model_fetcher
 
     monkeypatch.setattr(
         _model_fetcher,
@@ -175,7 +175,7 @@ async def test_model_step_bad_key_continues_with_no(
 ) -> None:
     """When validate_and_fetch_models reports failure, the ModelStep
     offers BACK or continue-without-model. Pressing No → SKIP."""
-    from veles.tui.screens import _model_fetcher
+    from veles.cli.repl import model_fetcher as _model_fetcher
 
     monkeypatch.setattr(
         _model_fetcher,

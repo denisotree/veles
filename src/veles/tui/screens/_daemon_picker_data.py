@@ -44,7 +44,7 @@ _MODEL_COL_WIDTH = 32
 def _fmt_model(model: str | None) -> str:
     """Pad / truncate the model id to a fixed column so rows align.
 
-    `None` (no project config or no `[provider] model` key) renders as
+    `None` (no project config or no `[engine] model` key) renders as
     a centred dash so the column reads cleanly across mixed daemons."""
     if not model:
         return f"{'-':<{_MODEL_COL_WIDTH}}"
@@ -204,7 +204,7 @@ class DaemonRowFormatter:
         unpadded so very long paths overflow rather than truncate.
 
         The `model` column reads `<project>/.veles/config.toml
-        [provider] model` (resolver's canonical source after the TUI
+        [engine] model` (resolver's canonical source after the TUI
         `/model` fix); `None` renders as a dash so the alignment stays
         consistent across daemons with and without a configured model.
         `channels` (enabled global `[channels.*]`) render as a trailing

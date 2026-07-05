@@ -27,8 +27,8 @@ todo o seu ciclo de vida** — defina-os antes de iniciar:
 
 ```toml
 # <project>/.veles/config.toml
-[provider]
-default = "ollama"            # provider name
+[engine]
+provider = "ollama"            # provider name
 model = "qwen3:4b-instruct"   # model id
 ```
 

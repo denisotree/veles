@@ -149,16 +149,15 @@ def test_llm_wiki_pack_declares_three_operations(isolated_home: Path) -> None:
     assert {"ingest", "query", "lint"} <= op_names
 
 
-def test_llm_wiki_pack_declares_writable_wiki_dir(isolated_home: Path) -> None:
-    """wiki/ is writable, sources/ is read-only — the VISION §4 contract
-    'sources read-only for the agent' is encoded in the manifest."""
+def test_llm_wiki_pack_declares_no_writable_zones(isolated_home: Path) -> None:
+    """M189: llm-wiki declares NO `writable_zones` — it is permissive by
+    design (the universal opt-in mechanism treats "no zones" as no write
+    restriction at all). The sources/wiki split is a prompt convention
+    now, not an enforced manifest boundary."""
     entry = find_layout(LAYOUT_DEFAULT, project=None)
     assert entry is not None
-    writable = entry.manifest.writable_path_strings()
-    assert "wiki/" in writable
-    # sources/ exists as a readonly zone — not in writable_path_strings.
-    sources_zones = [z for z in entry.manifest.writable_zones if z.path == "sources/"]
-    assert sources_zones and sources_zones[0].readonly is True
+    assert entry.manifest.writable_zones == ()
+    assert entry.manifest.writable_path_strings() == ()
 
 
 def test_llm_wiki_pack_skill_md_files_exist(isolated_home: Path) -> None:

@@ -1,20 +1,20 @@
-"""Pre-existing `tui_state.json` is honoured on TUI boot.
+"""Pre-existing `tui_state.json` is honoured on REPL boot.
 
-A user who toggled to `planning` yesterday should see `[planning]` in
-the status bar on first start today — the load happens inside
-`run_tui` (which `cmd_tui` calls). We bypass the CLI layer here and
-write the file directly, then construct AppState the way `run_tui` does.
+A user who toggled to `planning` yesterday should still be in `planning`
+mode on first start today — the load happens inside the REPL's boot path
+(`cli/commands/repl.py`). We bypass the CLI layer here and write the file
+directly, then construct `AppState` the way the REPL's boot path does.
 """
 
 from __future__ import annotations
 
+from veles.core.session_state import AppState
 from veles.core.tui_state import TuiPersistentState, save_tui_state
-from veles.tui.state import AppState
 
 
 def _make_state_after_boot(project) -> AppState:
-    """Mirrors the AppState construction in `veles.tui:run_tui` (after
-    persistence is loaded). Keeps the test focused on the persistence
+    """Mirrors the `AppState` construction the REPL's boot path performs
+    (after persistence is loaded). Keeps the test focused on the persistence
     surface instead of dragging in the whole CLI argparse path."""
     from veles.core.tui_state import load_for_project
 

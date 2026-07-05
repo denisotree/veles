@@ -11,7 +11,7 @@ Two enforcement layers, both intentional:
 
   * `[planning]` toolset — UX layer. The model never sees `write_file`
     or `run_shell` schemas, so it doesn't burn a turn discovering they're
-    denied. The factory in `veles.tui:run_tui` reads the active mode and
+    denied. The REPL's per-turn Agent factory reads the active mode and
     picks this toolset's registry.
 
 Mid-session mode switches inject a `<mode-switch-observation>` block
@@ -29,8 +29,8 @@ A planning turn ends one of three ways:
 
 from __future__ import annotations
 
+from veles.core.agent_events import TurnDone
 from veles.core.modes.base import Mode, ModeContext, wrap_mode_switch_observation
-from veles.tui.messages import TurnDone
 
 _SYSTEM_BLOCK = """\
 <mode name="planning">

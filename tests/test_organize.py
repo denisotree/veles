@@ -89,14 +89,16 @@ def test_move_file_within_writable_zone(wiki_project) -> None:
     assert dst.read_text(encoding="utf-8") == "# A\n"
 
 
-def test_move_file_refuses_out_of_zone(wiki_project) -> None:
+def test_move_file_to_project_root_succeeds(wiki_project) -> None:
+    """M189: llm-wiki declares no writable_zones, so it is permissive —
+    moving a file to a bare project-root path is no longer refused."""
     src = wiki_project.root / "wiki" / "concepts" / "b.md"
     src.write_text("# B\n", encoding="utf-8")
-    dst = wiki_project.root / "escaped.md"  # project root is not a writable zone
+    dst = wiki_project.root / "escaped.md"
     msg = move_file(str(src), str(dst))
-    assert "refused" in msg
-    assert src.exists()
-    assert not dst.exists()
+    assert "moved" in msg
+    assert not src.exists()
+    assert dst.read_text(encoding="utf-8") == "# B\n"
 
 
 def test_move_file_errors_on_existing_dst(wiki_project) -> None:

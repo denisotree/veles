@@ -19,8 +19,8 @@ nomenclatura do fornecedor.
 | `openai-compat` | Local/personalizado | nenhuma | `OPENAI_COMPAT_BASE_URL` (obrigatória, sem predefinição) |
 
 Fornecedor predefinido: `openrouter`. **Não existe um modelo predefinido rígido** — defina
-um através do assistente de configuração, de `[provider] model`, ou de `--model` (caso
-contrário o agente reporta "no model configured"). As rotas por tarefa herdam `[provider]`
+um através do assistente de configuração, de `[engine] model`, ou de `--model` (caso
+contrário o agente reporta "no model configured"). As rotas por tarefa herdam `[engine]`
 como base, a menos que sejam sobrepostas em `[routing.tasks]` — ver
 [encaminhamento por tarefa](../how-to/per-task-routing.md).
 

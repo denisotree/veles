@@ -118,7 +118,7 @@ def _no_live_model_fetch(monkeypatch):
     fixture, opening the picker for a cloud provider would try the live
     API (or fail noisily on the missing key) depending on the dev's env.
     Force every test to see the curated list unless it opts back in."""
-    from veles.tui.screens import _model_fetcher
+    from veles.cli.repl import model_fetcher as _model_fetcher
 
     def _curated(provider: str, *, refresh: bool = False) -> _model_fetcher.ModelList:
         del refresh
@@ -157,8 +157,8 @@ def tmp_project(tmp_path):
 def slash_ctx(tmp_project):
     """Builds a `SlashContext` over a fresh project. Tests that only
     poke pure handlers (no UI) consume this directly."""
-    from veles.tui.slash.registry import SlashContext
-    from veles.tui.state import AppState
+    from veles.cli.repl.slash.registry import SlashContext
+    from veles.core.session_state import AppState
 
     project, store = tmp_project
     state = AppState(session_id=None, provider_name="stub", model="m")

@@ -337,7 +337,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 | 旗標 | 預設 | 用途 |
 |---|---|---|
-| `--model <id>` | 由專案 `[provider]` model → 使用者 `default_model` 解析（無硬寫死的預設） | 模型 ID |
+| `--model <id>` | 由專案 `[engine]` model → 使用者 `default_model` 解析（無硬寫死的預設） | 模型 ID |
 | `--provider <name>` | `openrouter` | 供應商（見下方） |
 | `--max-tokens-total <n>` | `100000` | 累積 token 預算；`0` 表停用 |
 | `--max-iterations <n>` | `30` | 每輪最多的工具呼叫迭代數 |

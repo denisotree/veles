@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 
 # Empty by design (M165): no hardcoded fallback model. The effective model is
-# resolved from explicit `--model`, the project `[provider] model`, or the user
+# resolved from explicit `--model`, the project `[engine] model`, or the user
 # `default_model`; when none is configured veles raises a clear "model not
 # configured" error instead of silently using a cloud model.
 DEFAULT_MODEL = ""
@@ -46,7 +46,7 @@ def add_common_run_flags(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--model",
         default=DEFAULT_MODEL,
-        help="Model id (default: resolved from project [provider] model or user "
+        help="Model id (default: resolved from project [engine] model or user "
         "default_model; required if neither is configured).",
     )
     p.add_argument(

@@ -16,13 +16,13 @@ Veles' CLI provider names (`openrouter`, `anthropic`, `openai`,
 `gemini`, `claude-cli`, `gemini-cli`); `<model>` is whatever the chosen
 provider expects (slug for OpenRouter, bare name for direct adapters).
 
-**M125 — config unification + `[provider]` as routing base.** Before
+**M125 — config unification + `[engine]` as routing base.** Before
 M125 these task routes lived in a separate `<project>/.veles/routing.toml`
-that had *zero* interaction with `config.toml [provider]` (which only
-ever fed the main agent). A user who set `[provider] default = "ollama"`
+that had *zero* interaction with `config.toml [engine]` (which only
+ever fed the main agent). A user who set `[engine] provider = "ollama"`
 for a fully-local project still had compressor/insights silently hit the
 hard-coded `openrouter:anthropic/claude-haiku-4.5` default → 404. M125
-folds `[routing.tasks]` into `config.toml`, makes `[provider]` the base
+folds `[routing.tasks]` into `config.toml`, makes `[engine]` the base
 layer for every ensemble task, and mirrors M124-perm-unify's project →
 user → hardcoded layering (see `core/permission/policy.py::effective_policy`
 and `core/model_resolver.py`). M149 removed the pre-M125 standalone
@@ -33,7 +33,7 @@ Resolution order in `effective_route(task_type, project)` — first hit wins:
 2.  project `[routing.tasks].default`           (`project-route-default`)
 3.  project NL `routing.nl.toml`  [task_type]   (`nl`)
 4.  project NL `routing.nl.toml`  default        (`nl-default`)
-5.  project `[provider]` base  (M125)            (`project-provider`)
+5.  project `[engine]` base  (M125)              (`project-provider`)
 6.  user `[routing.tasks][task_type]`  (M125)    (`user-route`)
 7.  user `[routing.tasks].default`  (M125)       (`user-route-default`)
 8.  user `[user] default_provider/model`  (M125) (`user-provider`)
@@ -45,7 +45,7 @@ type System A raises) instead of silently using `openrouter:claude-*`.
 Sub-agent callers (compressor, advisor, insights, vision, …) catch it and
 degrade — the feature goes off, never silently cloud.
 
-NL sits *above* the `[provider]` base on purpose: a complete `[provider]`
+NL sits *above* the `[engine]` base on purpose: a complete `[engine]`
 yields a spec for every task, so placed above NL it would shadow every
 per-task AGENTS.md hint. `embedding` bypasses the base (see `effective_route`):
 a chat base model is not an embedding model, so only an explicit
@@ -65,7 +65,7 @@ from veles.core.project import Project
 
 # M165c/M165d: no hardcoded cloud fallback anywhere. Every task — chat tasks
 # (default/curator/compressor/insights/skills/advisor/vision) and `embedding` —
-# resolves from `[routing.tasks]`, the `[provider]` base (chat tasks only; see
+# resolves from `[routing.tasks]`, the `[engine]` base (chat tasks only; see
 # the embedding bypass in `effective_route`), or `default_provider/model`. When
 # nothing is configured `effective_route` raises `ConfigurationError` instead of
 # silently using a cloud model; callers catch it and degrade (skip the feature).
@@ -142,7 +142,7 @@ def reset_project_route(project: Project, task: str | None = None) -> bool:
 
 
 def provider_to_spec(provider: str | None, model: str | None) -> str | None:
-    """Turn a `[provider]`/`[user]` base into a routing spec, or `None`.
+    """Turn a `[engine]`/`[user]` base into a routing spec, or `None`.
 
     A base contributes a layer ONLY when BOTH provider and model are set.
     We never synthesize `<provider>:DEFAULT_MODEL` — `DEFAULT_MODEL`
@@ -175,8 +175,8 @@ def _first_spec(
     from veles.core.model_resolver import ConfigurationError
 
     raise ConfigurationError(
-        f"no model configured for routed task {task_type!r}. Set `[provider]` "
-        "(default + model) or `default_provider`/`default_model` in "
+        f"no model configured for routed task {task_type!r}. Set `[engine]` "
+        "(provider + model) or `default_provider`/`default_model` in "
         f"~/.veles/config.toml, or `[routing.tasks].{task_type}` in "
         "<project>/.veles/config.toml."
     )
@@ -197,7 +197,7 @@ def effective_route(task_type: str, project: Project) -> tuple[str, str, str]:
     user_routes = get_user_section("routing", "tasks")
 
     # EMBEDDING BYPASS — a chat base model (e.g. ollama:qwen3) is not an
-    # embedding model, so `embedding` must never inherit a `[provider]`/`[user]`
+    # embedding model, so `embedding` must never inherit a `[engine]`/`[user]`
     # base or any `default` catch-all. Only an explicit per-task route answers
     # it; with none configured `_first_spec` raises (M165d removed the hardcoded
     # `openai:text-embedding-3-small` default — its one consumer, skill_dedup,
@@ -220,8 +220,8 @@ def effective_route(task_type: str, project: Project) -> tuple[str, str, str]:
     from veles.core.project_config import get_section, load_project_config
     from veles.core.user_config import load_user_config
 
-    proj_prov = get_section(load_project_config(project), "provider")
-    proj_base = provider_to_spec(proj_prov.get("default"), proj_prov.get("model"))
+    proj_prov = get_section(load_project_config(project), "engine")
+    proj_base = provider_to_spec(proj_prov.get("provider"), proj_prov.get("model"))
 
     user_cfg = load_user_config()
     user_base = (

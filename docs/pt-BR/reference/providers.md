@@ -19,9 +19,9 @@ nomenclatura própria de cada provedor.
 | `openai-compat` | Local/customizado | nenhuma | `OPENAI_COMPAT_BASE_URL` (obrigatório, sem padrão) |
 
 Provedor padrão: `openrouter`. **Não há modelo padrão fixo no código** — defina um
-pelo assistente de configuração, por `[provider] model` ou por `--model` (caso
+pelo assistente de configuração, por `[engine] model` ou por `--model` (caso
 contrário, o agente informa "no model configured"). As rotas por tarefa herdam
-`[provider]` como base, a menos que sejam sobrescritas em `[routing.tasks]` — veja
+`[engine]` como base, a menos que sejam sobrescritas em `[routing.tasks]` — veja
 [roteamento por tarefa](../how-to/per-task-routing.md).
 
 ## Provedores locais

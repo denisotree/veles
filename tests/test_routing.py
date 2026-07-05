@@ -147,14 +147,14 @@ def test_route_unknown_task_with_no_overrides_raises(tmp_path: Path) -> None:
 
 
 def test_nl_hint_beats_provider_base(tmp_path: Path) -> None:
-    """M125 Conflict-1 regression: a complete `[provider]` base yields a
+    """M125 Conflict-1 regression: a complete `[engine]` base yields a
     spec for every task, but per-task AGENTS.md NL hints must still win —
     so NL sits ABOVE the provider base in the cascade."""
     from veles.core.project_config import save_project_config
     from veles.core.routing import RoutingConfig, save_nl_routing_config
 
     project = init_project(tmp_path / "p", name="p")
-    save_project_config(project, {"provider": {"default": "ollama", "model": "qwen3"}})
+    save_project_config(project, {"engine": {"provider": "ollama", "model": "qwen3"}})
     save_nl_routing_config(project, RoutingConfig(tasks={"compressor": "openai:gpt-4o-mini"}))
     # NL wins for compressor; advisor (no NL) inherits the provider base.
     assert route("compressor", project) == ("openai", "gpt-4o-mini")
@@ -186,10 +186,10 @@ def test_route_embedding_raises_when_unconfigured(tmp_path: Path) -> None:
     from veles.core.model_resolver import ConfigurationError
 
     project = init_project(tmp_path / "p", name="p")
-    # A `[provider]` base must NOT satisfy embedding (bypass).
+    # A `[engine]` base must NOT satisfy embedding (bypass).
     from veles.core.project_config import save_project_config
 
-    save_project_config(project, {"provider": {"default": "ollama", "model": "qwen3"}})
+    save_project_config(project, {"engine": {"provider": "ollama", "model": "qwen3"}})
     with pytest.raises(ConfigurationError):
         route("embedding", project)
 

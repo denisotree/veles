@@ -32,7 +32,9 @@ Work in this order:
      stronger one, then remove the duplicate (after repointing its inbound
      links).
    - Append one `LOG.md` line per change via `wiki_append_log`.
-4. **Never touch** `sources/` (read-only) or `sessions/` (curator-owned).
+4. **Leave alone** the `sources/` category (material derived from a cited
+   source — reorganize it like any other page only if it's genuinely
+   misplaced) and `sessions/` (curator-owned, don't touch).
 
 If you are in PROPOSE mode, do not call any mutating tool — instead, your final
 message must be the concrete plan: each move/rename/link/merge you would make,

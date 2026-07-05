@@ -73,7 +73,7 @@ Per ogni task, vince il primo livello che produce una specifica:
 1. `[routing.tasks][task]` del progetto
 2. `[routing.tasks].default` del progetto
 3. suggerimento NL del progetto (`routing.nl.toml`)
-4. base `[provider]` del progetto
+4. base `[engine]` del progetto
 5. `[routing.tasks][task]` / `.default` dell'utente
 6. `[user] default_provider` + `default_model` dell'utente
 

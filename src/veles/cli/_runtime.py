@@ -182,6 +182,13 @@ def build_run_system_prompt(
     rules = _rules_digest_block(project)
     if rules:
         stable_parts.append(rules)
+    # M188: the pack's declared behavioural prompt (`prompt_file`), if any.
+    # Engine-independent — placed right after AGENTS.md/rules and before the
+    # wiki-gated blocks below so the cache prefix stays stable regardless of
+    # which engines are on.
+    layout_prompt = _load_layout_prompt(project)
+    if layout_prompt:
+        stable_parts.append(layout_prompt)
     # M163: the wiki-specific stable blocks (context file + RAG habits)
     # appear only when the active layout pack enables the wiki engine.
     from veles.core.layout.engines import wiki_enabled
@@ -195,6 +202,13 @@ def build_run_system_prompt(
                 "Use wiki_read_page/wiki_search to explore:\n\n" + index
             )
     if wiki_on:
+        # A compact map of the project root + current wiki tree, so the model
+        # works with the REAL folder/page names instead of guessing. Prompt-
+        # independent → stable (cached when the tree is unchanged; the whole
+        # prompt is rebuilt each turn, so a mid-session move is still reflected).
+        workspace = _workspace_block(project)
+        if workspace:
+            stable_parts.append(workspace)
         stable_parts.append(_RUN_WIKI_RAG_BLOCK)
     volatile_parts: list[str] = []
     recall = _recall_block(project, prompt or "")
@@ -303,6 +317,84 @@ def _relevant_paths_block(project: Project, query: str) -> str | None:
     return "\n".join(lines)
 
 
+# Bounds for the wiki-layout workspace map — kept tight because the block is
+# volatile (re-sent every turn) so it reflects the agent's own moves/creates.
+_WS_ROOT_LIMIT = 50
+_WS_TREE_MAX_LINES = 120
+_WS_TREE_DIR_CAP = 30
+_WS_TREE_MAX_DEPTH = 3
+
+
+def _ws_should_skip(name: str) -> bool:
+    return name == ".veles" or name.startswith(".")
+
+
+def _ws_list_root(root: Path) -> list[str]:
+    """Flat, dirs-first listing of the project root (real top-level names)."""
+    try:
+        entries = sorted(root.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
+    except OSError:
+        return []
+    names = [f"{p.name}/" if p.is_dir() else p.name for p in entries if not _ws_should_skip(p.name)]
+    if len(names) > _WS_ROOT_LIMIT:
+        names = [*names[:_WS_ROOT_LIMIT], f"… (+{len(names) - _WS_ROOT_LIMIT} more)"]
+    return names
+
+
+def _ws_render_tree(root: Path) -> list[str]:
+    """Indented, depth- and size-capped tree of `root` (dirs first)."""
+    lines: list[str] = []
+
+    def walk(d: Path, prefix: str, depth: int) -> None:
+        if depth > _WS_TREE_MAX_DEPTH or len(lines) >= _WS_TREE_MAX_LINES:
+            return
+        try:
+            entries = sorted(d.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
+        except OSError:
+            return
+        entries = [p for p in entries if not _ws_should_skip(p.name)]
+        shown = entries[:_WS_TREE_DIR_CAP]
+        for p in shown:
+            if len(lines) >= _WS_TREE_MAX_LINES:
+                lines.append(f"{prefix}…")
+                return
+            lines.append(f"{prefix}{p.name}/" if p.is_dir() else f"{prefix}{p.name}")
+            if p.is_dir():
+                walk(p, prefix + "  ", depth + 1)
+        if len(entries) > len(shown):
+            lines.append(f"{prefix}… (+{len(entries) - len(shown)} more)")
+
+    walk(root, "", 1)
+    return lines
+
+
+def _workspace_block(project: Project) -> str | None:
+    """Wiki-layout only: a compact map of the project ROOT (real top-level
+    names) plus the current `wiki/` tree, so the model SEES what exists —
+    e.g. `-- Daily --/` — instead of guessing at folder names or wrongly
+    concluding "nothing found". Volatile (per-turn) so it reflects the agent's
+    own moves. Best-effort: any FS error yields no block."""
+    root = project.root
+    root_names = _ws_list_root(root)
+    wiki_dir = root / "wiki"
+    wiki_tree = _ws_render_tree(wiki_dir) if wiki_dir.is_dir() else []
+    if not root_names and not wiki_tree:
+        return None
+    out = [
+        "<workspace>",
+        "Your real workspace (wiki layout). Work with THESE paths — never invent "
+        "folder names, and list/read before concluding something is missing or "
+        "asking the user where things are.",
+        "",
+        "Project root:",
+        *(f"- {n}" for n in root_names),
+    ]
+    if wiki_tree:
+        out += ["", "Current wiki structure (`wiki/`):", *wiki_tree]
+    out.append("</workspace>")
+    return "\n".join(out)
+
+
 def _proposals_block(project: Project) -> str | None:
     """M62 — surface fresh subproject proposals into the system prompt.
 
@@ -340,6 +432,35 @@ def _load_context_file(project: Project) -> str | None:
 
 # Legacy alias — `cli/__init__.py` re-exports `_load_index_md`.
 _load_index_md = _load_context_file
+
+
+def _load_layout_prompt(project: Project) -> str | None:
+    """M188: read the active layout pack's declared `prompt_file` — a
+    behavioural-prompt `.md` injected into the stable system prompt.
+
+    CRITICAL DIFFERENCE from `_load_context_file`: `context_file` is read
+    from the PROJECT root (a file the project itself owns, e.g. INDEX.md);
+    `prompt_file` is read from the PACK ROOT (`find_layout(...).root`), so
+    editing the pack's prompt reaches every existing project using it, not
+    just newly-scaffolded ones. Engine-independent — no `wiki_enabled` gate;
+    any pack may declare `prompt_file`. No pack / no declaration / missing
+    file → no block, never an exception."""
+    from veles.core.layout.discovery import find_layout
+    from veles.core.safety import scan_for_injection
+
+    pack = find_layout(project.layout_name, project)
+    if pack is None or not pack.manifest.prompt_file:
+        return None
+    path = pack.root / pack.manifest.prompt_file
+    if not path.is_file():
+        return None
+    raw = path.read_text(encoding="utf-8", errors="replace")
+    text, _ = scan_for_injection(raw, source_label=pack.manifest.prompt_file)
+    if not text:
+        return None
+    if len(text) > _INDEX_INJECTION_CAP:
+        text = text[:_INDEX_INJECTION_CAP] + "\n\n<truncated>"
+    return "Layout behaviour instructions:\n\n" + text
 
 
 # ---- compressor / skills / providers ----

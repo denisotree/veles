@@ -219,7 +219,7 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
     )
 
     # M165: resolve provider + model from config (explicit flag → project
-    # `[provider]` → user defaults) instead of letting the bare argparse
+    # `[engine]` → user defaults) instead of letting the bare argparse
     # default through. An unconfigured model errors clearly rather than
     # silently booting on a cloud model.
     args.provider = resolve_effective_provider(args, project)

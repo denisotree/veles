@@ -361,7 +361,7 @@ start`:
 
 | Opción | Predeterminado | Propósito |
 |---|---|---|
-| `--model <id>` | resuelto desde el modelo de `[provider]` del proyecto → `default_model` del usuario (sin valor por defecto codificado) | ID del modelo |
+| `--model <id>` | resuelto desde el modelo de `[engine]` del proyecto → `default_model` del usuario (sin valor por defecto codificado) | ID del modelo |
 | `--provider <name>` | `openrouter` | Proveedor (ver más abajo) |
 | `--max-tokens-total <n>` | `100000` | Presupuesto de tokens acumulado; `0` lo desactiva |
 | `--max-iterations <n>` | `30` | Máximo de iteraciones de llamada a herramientas por turno |

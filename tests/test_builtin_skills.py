@@ -26,7 +26,19 @@ def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def test_builtin_skills_discovered() -> None:
     skills = mount_builtin_skills()
     names = {s.name for s in skills}
-    assert {"tool_authoring", "tool_installer"} <= names
+    assert {"tool_authoring", "tool_installer", "structure_design"} <= names
+
+
+def test_structure_design_skill_scaffolds_via_wiki_add_category() -> None:
+    """The structure_design skill designs a wiki structure from the user's
+    description and scaffolds it — its tool budget must include the runtime
+    category-declaration tool, and its body must NOT bake in a fixed schema."""
+    by_name = {s.name: s for s in mount_builtin_skills()}
+    skill = by_name["structure_design"]
+    assert "wiki_add_category" in skill.tools and "make_dir" in skill.tools
+    assert {"data_type"} <= {p["name"] for p in skill.parameters}
+    # Derives schema from the description; diary/tasks/projects are examples only.
+    assert "hardcode" in skill.body.lower() and "{data_type}" in skill.body
 
 
 def test_builtin_skills_have_builtin_scope() -> None:

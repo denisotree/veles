@@ -40,14 +40,14 @@ def test_explicit_provider_wins(tmp_path: Path) -> None:
 
 def test_project_config_overrides_argparse_default(tmp_path: Path) -> None:
     project = init_project(tmp_path, name=None, force=False)
-    save_project_config(project, {"provider": {"default": "openai"}})
+    save_project_config(project, {"engine": {"provider": "openai"}})
     args = _ns()
     assert resolve_effective_provider(args, project) == "openai"
 
 
 def test_user_config_overrides_when_no_project_provider(tmp_path: Path) -> None:
     project = init_project(tmp_path, name=None, force=False)
-    # No project [provider] section — fall through to user config.
+    # No project [engine] section — fall through to user config.
     from veles.core.user_config import UserConfig, save_user_config
 
     save_user_config(UserConfig(language="en", default_provider="gemini"))
@@ -85,7 +85,7 @@ def test_persisted_overrides_argparse_default(tmp_path: Path) -> None:
 
 
 def test_project_config_model_overrides_persisted_and_user(tmp_path: Path) -> None:
-    """Wizard's project-scope model pick (saved to `[provider] model` in
+    """Wizard's project-scope model pick (saved to `[engine] model` in
     `<project>/.veles/config.toml`) must beat both the per-project
     persisted tui_state and the user-config default. Regression for the
     bug where users picked a model X in the wizard and runs still
@@ -93,7 +93,7 @@ def test_project_config_model_overrides_persisted_and_user(tmp_path: Path) -> No
     project = init_project(tmp_path, name=None, force=False)
     save_project_config(
         project,
-        {"provider": {"default": "anthropic", "model": "anthropic/claude-3.7-sonnet"}},
+        {"engine": {"provider": "anthropic", "model": "anthropic/claude-3.7-sonnet"}},
     )
     from veles.core.user_config import UserConfig, save_user_config
 

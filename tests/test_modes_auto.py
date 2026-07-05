@@ -21,11 +21,11 @@ from typing import Any
 
 from tests.conftest import FakeAgent as _FakeAgent
 from veles.core.agent import RunResult
+from veles.core.agent_events import SystemLine, TurnDone
 from veles.core.modes import AutoMode, ModeContext
 from veles.core.modes.auto import classify
 from veles.core.provider import ProviderResponse, TokenUsage
-from veles.tui.messages import SystemLine, TurnDone
-from veles.tui.state import AppState
+from veles.core.session_state import AppState
 
 
 @dataclass

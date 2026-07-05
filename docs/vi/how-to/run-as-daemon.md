@@ -26,8 +26,8 @@ Model và nhà cung cấp của daemon lấy từ config dự án và **cố đ�
 
 ```toml
 # <project>/.veles/config.toml
-[provider]
-default = "ollama"            # provider name
+[engine]
+provider = "ollama"            # provider name
 model = "qwen3:4b-instruct"   # model id
 ```
 

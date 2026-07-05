@@ -100,12 +100,23 @@ class LayoutManifest:
     # M162: project-root-relative file injected into the stable system
     # prompt (e.g. the wiki's `INDEX.md`). None → no injection.
     context_file: str | None = None
+    # M188: pack-root-relative path of a behavioural-prompt `.md` file
+    # injected into the stable system prompt (e.g. `templates/behaviour.md`).
+    # Unlike `context_file` (read from the PROJECT root), this is read from
+    # the PACK root so a pack edit reaches existing projects. Engine-
+    # independent — any pack may declare it. None → no injection.
+    prompt_file: str | None = None
     # M162: directories `veles init` creates for this pack (relative to
     # the project root).
     scaffold_dirs: tuple[str, ...] = field(default_factory=tuple)
     # M162: pack-root-relative path of an AGENTS.md template ({name} is
     # substituted). None → core's layout-agnostic default template.
     agents_md_template: str | None = None
+    # Extra wiki categories this pack adds on top of the core defaults
+    # (`[layout.wiki].categories`). Nested paths like `projects/work` allowed.
+    # Empty → the core default category set only. Sourced by `Wiki` so the
+    # allowed category list is pack-configurable, not a hardcoded constant.
+    wiki_categories: tuple[str, ...] = field(default_factory=tuple)
     # Source path of the manifest file. Useful for error messages and
     # for the discovery layer to compute the pack's root directory.
     source: Path | None = None
@@ -164,12 +175,17 @@ def read_manifest(path: Path) -> LayoutManifest:
             "[layout].context_file must be a non-empty string", path=toml_path
         )
 
+    prompt_file = layout_section.get("prompt_file")
+    if prompt_file is not None and (not isinstance(prompt_file, str) or not prompt_file.strip()):
+        raise LayoutManifestError("[layout].prompt_file must be a non-empty string", path=toml_path)
+
     zones = _parse_zones(layout_section.get("writable_zones", []), toml_path)
     operations = _parse_operations(layout_section.get("operations", []), toml_path)
     engines = _parse_engines(layout_section.get("engines", {}), toml_path)
     scaffold_dirs, agents_md_template = _parse_scaffold(
         layout_section.get("scaffold", {}), toml_path
     )
+    wiki_categories = _parse_wiki_categories(layout_section.get("wiki", {}), toml_path)
 
     return LayoutManifest(
         name=name.strip(),
@@ -179,10 +195,36 @@ def read_manifest(path: Path) -> LayoutManifest:
         operations=operations,
         engines=engines,
         context_file=context_file.strip() if isinstance(context_file, str) else None,
+        prompt_file=prompt_file.strip() if isinstance(prompt_file, str) else None,
         scaffold_dirs=scaffold_dirs,
         agents_md_template=agents_md_template,
+        wiki_categories=wiki_categories,
         source=toml_path,
     )
+
+
+def _parse_wiki_categories(raw: object, toml_path: Path) -> tuple[str, ...]:
+    """Parse `[layout.wiki].categories` — a list of extra wiki category paths
+    (nested like `projects/work` allowed) the pack adds to the core defaults.
+    Each entry must be a safe project-relative path (no leading `/`, no `..`)."""
+    if not isinstance(raw, dict):
+        raise LayoutManifestError("[layout.wiki] must be a table", path=toml_path)
+    cats_raw = raw.get("categories", [])
+    if not isinstance(cats_raw, list) or not all(
+        isinstance(c, str) and c.strip() for c in cats_raw
+    ):
+        raise LayoutManifestError(
+            "[layout.wiki].categories must be a list of non-empty strings", path=toml_path
+        )
+    out: list[str] = []
+    for c in cats_raw:
+        clean = c.strip().strip("/")
+        if not clean or ".." in Path(clean).parts:
+            raise LayoutManifestError(
+                f"[layout.wiki].categories entry escapes the wiki root: {c!r}", path=toml_path
+            )
+        out.append(clean)
+    return tuple(out)
 
 
 def _parse_engines(raw: object, toml_path: Path) -> tuple[str, ...]:

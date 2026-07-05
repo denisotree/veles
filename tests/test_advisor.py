@@ -167,7 +167,7 @@ def test_advisor_review_returns_unavailable_when_no_api_key(
     # `route("advisor")` resolves (these tests exercise the advisor flow, not
     # the unconfigured-routing path).
     save_project_config(
-        project, {"provider": {"default": "openrouter", "model": "anthropic/claude-sonnet-4.6"}}
+        project, {"engine": {"provider": "openrouter", "model": "anthropic/claude-sonnet-4.6"}}
     )
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
@@ -189,7 +189,7 @@ def test_advisor_review_renders_stub_verdict(
     # `route("advisor")` resolves (these tests exercise the advisor flow, not
     # the unconfigured-routing path).
     save_project_config(
-        project, {"provider": {"default": "openrouter", "model": "anthropic/claude-sonnet-4.6"}}
+        project, {"engine": {"provider": "openrouter", "model": "anthropic/claude-sonnet-4.6"}}
     )
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
     stub = _stub_provider('{"ok": false, "concerns": ["scope unclear"], "suggestions": []}')
@@ -214,7 +214,7 @@ def test_advisor_review_handles_provider_construction_failure(
     # `route("advisor")` resolves (these tests exercise the advisor flow, not
     # the unconfigured-routing path).
     save_project_config(
-        project, {"provider": {"default": "openrouter", "model": "anthropic/claude-sonnet-4.6"}}
+        project, {"engine": {"provider": "openrouter", "model": "anthropic/claude-sonnet-4.6"}}
     )
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
 
@@ -239,7 +239,7 @@ def test_advisor_review_handles_subagent_exception(
     # `route("advisor")` resolves (these tests exercise the advisor flow, not
     # the unconfigured-routing path).
     save_project_config(
-        project, {"provider": {"default": "openrouter", "model": "anthropic/claude-sonnet-4.6"}}
+        project, {"engine": {"provider": "openrouter", "model": "anthropic/claude-sonnet-4.6"}}
     )
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
 

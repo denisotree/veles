@@ -13,9 +13,11 @@ from pathlib import Path
 
 import pytest
 
+from veles.core.project import Project
 from veles.core.tui_state import (
     TuiPersistentState,
     load_tui_state,
+    persist_model_choice,
     save_tui_state,
     tui_state_path,
 )
@@ -98,3 +100,60 @@ def test_load_rejects_non_string_active_goal_id(tmp_path: Path) -> None:
 def test_all_four_mode_names_round_trip(tmp_path: Path, mode: str) -> None:
     save_tui_state(tmp_path, TuiPersistentState(mode=mode))
     assert load_tui_state(tmp_path).mode == mode
+
+
+# ---- persist_model_choice: project-config mirror (resolver-cascade fix) ----
+#
+# `core.model_resolver.resolve_effective_model` puts
+# `<project>/.veles/config.toml [engine] model` ABOVE tui_state.json. If
+# the wizard wrote a model there, writing only tui_state.json on `/model X`
+# would silently lose the user's pick on next boot. `persist_model_choice`
+# mirrors the value into project config so the cascade picks the latest
+# interactive choice. These tests pin that behaviour (restored from the
+# deleted `tests/tui/test_model_persists_on_boot.py`, M187 — the chat-TUI
+# tests around them were dropped, but `persist_model_choice` itself is
+# still live: called from the REPL `/model` command).
+
+
+@pytest.fixture
+def project(tmp_path: Path) -> Project:
+    from veles.core.project import init_project
+
+    return init_project(tmp_path / "proj", name="proj")
+
+
+def test_persist_model_choice_writes_project_config(project: Project) -> None:
+    from veles.core.project_config import load_project_config
+
+    persist_model_choice(project, "openai/gpt-4o")
+    cfg = load_project_config(project)
+    assert cfg.get("engine", {}).get("model") == "openai/gpt-4o"
+
+
+def test_persist_model_choice_preserves_other_keys(project: Project) -> None:
+    """Pre-seed config with unrelated sections + a provider default; the
+    helper must keep them intact while overwriting only `[engine] model`."""
+    from veles.core.project_config import load_project_config, save_project_config
+
+    save_project_config(
+        project,
+        {
+            "engine": {"provider": "openrouter", "model": "old-model"},
+            "daemon": {"enabled": True, "port": 8765},
+        },
+    )
+    persist_model_choice(project, "anthropic/claude-3.7-sonnet")
+    cfg = load_project_config(project)
+    assert cfg["engine"]["model"] == "anthropic/claude-3.7-sonnet"
+    assert cfg["engine"]["provider"] == "openrouter"
+    assert cfg["daemon"] == {"enabled": True, "port": 8765}
+
+
+def test_persist_model_choice_also_updates_tui_state(project: Project) -> None:
+    """Both surfaces stay in sync — tui_state.json keeps its role as a
+    fallback when project config doesn't exist yet."""
+    save_tui_state(project.state_dir, TuiPersistentState(mode="planning"))
+    persist_model_choice(project, "openai/gpt-4o")
+    reloaded = load_tui_state(project.state_dir)
+    assert reloaded.model == "openai/gpt-4o"
+    assert reloaded.mode == "planning"  # untouched

@@ -69,7 +69,7 @@ def test_render_includes_model_when_supplied() -> None:
 
 
 def test_render_uses_dash_when_model_missing() -> None:
-    """A daemon without a `[provider] model` in its project config
+    """A daemon without a `[engine] model` in its project config
     still renders cleanly with a `-` placeholder so columns stay
     aligned and the user knows nothing is pinned."""
     row = DaemonRowFormatter.render(_entry(), now=10.0, model=None)
@@ -98,11 +98,11 @@ def test_render_truncates_long_model_id() -> None:
 
 
 def test_entry_model_reads_project_config(tmp_path: Path) -> None:
-    """When `<project>/.veles/config.toml` has `[provider] model = X`,
+    """When `<project>/.veles/config.toml` has `[engine] model = X`,
     the helper returns X."""
     (tmp_path / ".veles").mkdir()
     (tmp_path / ".veles" / "config.toml").write_text(
-        '[provider]\ndefault = "openrouter"\nmodel = "openai/gpt-4o"\n',
+        '[engine]\nprovider = "openrouter"\nmodel = "openai/gpt-4o"\n',
         encoding="utf-8",
     )
     entry = _entry(project_path=str(tmp_path))
@@ -119,7 +119,7 @@ def test_entry_model_returns_none_when_config_missing(tmp_path: Path) -> None:
 def test_entry_model_returns_none_when_provider_section_missing(
     tmp_path: Path,
 ) -> None:
-    """Config exists but has no `[provider]` section — still `None`,
+    """Config exists but has no `[engine]` section — still `None`,
     not a crash, not a string-conversion of an empty dict."""
     (tmp_path / ".veles").mkdir()
     (tmp_path / ".veles" / "config.toml").write_text("[daemon]\nport = 8765\n", encoding="utf-8")
@@ -137,7 +137,7 @@ def test_entry_model_prefers_live_active_model_when_daemon_alive(
 
     (tmp_path / ".veles").mkdir()
     (tmp_path / ".veles" / "config.toml").write_text(
-        '[provider]\nmodel = "static-config-model"\n', encoding="utf-8"
+        '[engine]\nmodel = "static-config-model"\n', encoding="utf-8"
     )
     entry = _entry(project_path=str(tmp_path), pid=4242)
     monkeypatch.setattr(picker, "is_alive", lambda pid: True)
@@ -155,7 +155,7 @@ def test_entry_model_falls_back_to_config_when_daemon_unreachable(
 
     (tmp_path / ".veles").mkdir()
     (tmp_path / ".veles" / "config.toml").write_text(
-        '[provider]\nmodel = "config-fallback"\n', encoding="utf-8"
+        '[engine]\nmodel = "config-fallback"\n', encoding="utf-8"
     )
     entry = _entry(project_path=str(tmp_path), pid=4242)
     monkeypatch.setattr(picker, "is_alive", lambda pid: True)

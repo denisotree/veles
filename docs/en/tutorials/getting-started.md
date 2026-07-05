@@ -78,10 +78,10 @@ veles run --stream "What files exist in this project right now?"
 
 ## 5. Open the interactive REPL
 
-For a multi-turn conversation, open the TUI:
+For a multi-turn conversation, open the TUI (bare `veles`, no subcommand):
 
 ```bash
-veles tui
+veles
 ```
 
 Type a message and press Enter. Useful keys: `Ctrl+D` to exit, `Shift+Tab` to

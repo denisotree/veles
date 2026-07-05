@@ -31,9 +31,9 @@ def test_load_malformed_returns_empty_dict(tmp_path: Path) -> None:
 
 def test_round_trip_provider_section(tmp_path: Path) -> None:
     project = init_project(tmp_path, name=None, force=False)
-    save_project_config(project, {"provider": {"default": "openai"}})
+    save_project_config(project, {"engine": {"provider": "openai"}})
     cfg = load_project_config(project)
-    assert cfg["provider"]["default"] == "openai"
+    assert cfg["engine"]["provider"] == "openai"
 
 
 def test_round_trip_preserves_list_and_bool(tmp_path: Path) -> None:
@@ -75,10 +75,10 @@ def test_get_section_on_wrong_type(tmp_path: Path) -> None:
     """If a path segment exists but isn't a dict, get_section returns {}
     instead of raising — protects against malformed configs."""
     project = init_project(tmp_path, name=None, force=False)
-    save_project_config(project, {"provider": {"default": "openai"}})
+    save_project_config(project, {"engine": {"provider": "openai"}})
     cfg = load_project_config(project)
-    # `provider.default` is a string, not a dict → get_section bottoms out.
-    assert get_section(cfg, "provider", "default") == {}
+    # `engine.provider` is a string, not a dict → get_section bottoms out.
+    assert get_section(cfg, "engine", "provider") == {}
 
 
 def test_save_creates_state_dir_if_missing(tmp_path: Path) -> None:

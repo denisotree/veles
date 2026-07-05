@@ -6,7 +6,7 @@ the framework, not to any individual command."""
 
 from __future__ import annotations
 
-from veles.tui.slash.registry import SlashContext, SlashRegistry, SlashResult
+from veles.cli.repl.slash.registry import SlashContext, SlashRegistry, SlashResult
 
 
 def _ctx() -> SlashContext:

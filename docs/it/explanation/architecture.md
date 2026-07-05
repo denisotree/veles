@@ -26,7 +26,7 @@ Tutto ciò che sta nel core serve a uno di cinque compiti:
 3. **Orchestrazione multi-agente** — un manager che scompone un compito e genera
    worker specializzati. Vedi [orchestrazione multi-agente](multi-agent-orchestration.md).
 4. **Un protocollo per i provider** — un'unica interfaccia su molti backend LLM
-   (cloud, locali, delega a CLI). Vedi [provider](../reference/providers.md).
+   (cloud, locali, delega a CLI). Vedi [engine](../reference/providers.md).
 5. **Strumenti e skill minimi** — un piccolo insieme di partenza che **si accumula**
    man mano che Veles scrive i propri strumenti e formalizza i processi ricorrenti in
    skill. Vedi [skill e strumenti](skills-and-tools.md).

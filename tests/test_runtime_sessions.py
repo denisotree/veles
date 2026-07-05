@@ -126,12 +126,12 @@ def test_daemon_session_provider_model_beats_project_provider(tmp_path: Path):
     save_project_config(
         project,
         {
-            "provider": {"default": "openrouter", "model": "anthropic/claude-sonnet-4.6"},
+            "engine": {"provider": "openrouter", "model": "anthropic/claude-sonnet-4.6"},
             "daemon": {"local": {"provider": "ollama", "model": "qwen3:4b-instruct"}},
         },
     )
     args = _ns(provider=None, model=None)
-    # Without daemon_session → project [provider] base.
+    # Without daemon_session → project [engine] base.
     assert resolve_effective_provider(args, project) == "openrouter"
     assert resolve_effective_model(args, project) == "anthropic/claude-sonnet-4.6"
     # With daemon_session=local → the [daemon.local] pins win.
@@ -152,7 +152,7 @@ def test_daemon_session_without_pins_falls_through(tmp_path: Path):
     save_project_config(
         project,
         {
-            "provider": {"default": "openrouter", "model": "x/y"},
+            "engine": {"provider": "openrouter", "model": "x/y"},
             "daemon": {"bare": {"port": 8770}},  # no provider/model pins
         },
     )

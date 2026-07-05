@@ -23,6 +23,7 @@ setups (matches the convention used by `trust_store`, `skills`,
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import tempfile
@@ -30,6 +31,8 @@ import tomllib
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from veles.core.project_config import _emit_toml
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +113,44 @@ def save_user_config(cfg: UserConfig, path: Path | None = None) -> None:
     except Exception:
         Path(tmp_name).unlink(missing_ok=True)
         raise
+
+
+def persist_tui_theme(theme_name: str, path: Path | None = None) -> None:
+    """Persist an interactive `/theme` pick to `~/.veles/config.toml`.
+
+    Mirrors `core.tui_state.persist_model_choice`'s best-effort semantics:
+    the pick already took effect in memory (`state.theme_name` + the live
+    restyle), so a transient I/O error here must not roll that back — it
+    only means the choice won't survive to the next session.
+
+    Merges into the *raw* config dict rather than routing through
+    `save_user_config` (which only knows how to render the `[user]`
+    dataclass and would silently erase any hand-added `[permissions]`
+    or `[routing.tasks]` section — a data-loss bug, since `/theme` is a
+    routine, repeatable action). If the first-run wizard hasn't run yet
+    (no `[user]` section), seed sane defaults for the other required
+    fields so downstream `load_user_config()` calls keep working."""
+    target = path or user_config_path()
+    data = read_user_config_raw(target)
+    user_section = data.setdefault("user", {})
+    if not isinstance(user_section, dict):
+        user_section = {}
+        data["user"] = user_section
+    user_section.setdefault("language", "en")
+    user_section.setdefault("default_provider", "openrouter")
+    user_section["tui_theme"] = theme_name
+
+    text = _emit_toml(data)
+    with contextlib.suppress(OSError):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(prefix=target.name + ".", suffix=".tmp", dir=target.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(text)
+            os.replace(tmp_name, target)
+        except Exception:
+            Path(tmp_name).unlink(missing_ok=True)
+            raise
 
 
 def _render_toml(cfg: UserConfig) -> str:

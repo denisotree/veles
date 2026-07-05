@@ -18,6 +18,7 @@ import pytest
 
 from tests.conftest import FakeAgent as _FakeAgent
 from veles.core.agent import RunResult
+from veles.core.agent_events import SystemLine
 from veles.core.context import reset_active_project, set_active_project
 from veles.core.goal import (
     Goal,
@@ -34,8 +35,7 @@ from veles.core.modes.goal import (
 )
 from veles.core.plan_artifact import active_dir, create_plan, list_active
 from veles.core.project import init_project
-from veles.tui.messages import SystemLine
-from veles.tui.state import AppState
+from veles.core.session_state import AppState
 
 # ---------- pure parser tests ----------
 
@@ -281,7 +281,7 @@ def test_goal_interview_uses_writing_registry_and_interview_prompt(project, stat
 def test_goal_confirm_first_turn_emits_confirmation_line(project, state) -> None:
     """When entering CONFIRM (prompt empty), GoalMode emits the
     localized confirmation line via direct ChatDelta + TurnDone."""
-    from veles.tui.messages import ChatDelta
+    from veles.core.agent_events import ChatDelta
 
     token = set_active_project(project)
     try:

@@ -71,7 +71,7 @@ veles route refresh --force    # even if AGENTS.md hasn't changed
 1. `[routing.tasks][task]` على مستوى المشروع
 2. `[routing.tasks].default` على مستوى المشروع
 3. تلميح اللغة الطبيعية على مستوى المشروع (`routing.nl.toml`)
-4. أساس `[provider]` على مستوى المشروع
+4. أساس `[engine]` على مستوى المشروع
 5. `[routing.tasks][task]` / `.default` على مستوى المستخدم
 6. `[user] default_provider` + `default_model` على مستوى المستخدم
 

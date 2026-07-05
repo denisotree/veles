@@ -92,6 +92,7 @@ from veles.cli.commands.dream import cmd_dream as _cmd_dream
 from veles.cli.commands.goal import cmd_goal as _cmd_goal
 from veles.cli.commands.init import cmd_init as _cmd_init
 from veles.cli.commands.job import cmd_job as _cmd_job
+from veles.cli.commands.layout import cmd_layout as _cmd_layout
 from veles.cli.commands.mcp import cmd_mcp as _cmd_mcp
 from veles.cli.commands.models import cmd_models as _cmd_models
 from veles.cli.commands.modules import cmd_module as _cmd_module
@@ -99,6 +100,7 @@ from veles.cli.commands.organize import cmd_organize as _cmd_organize
 from veles.cli.commands.portability import cmd_export as _cmd_export
 from veles.cli.commands.portability import cmd_import as _cmd_import
 from veles.cli.commands.projects import cmd_project as _cmd_project
+from veles.cli.commands.repl import cmd_repl as _cmd_repl
 from veles.cli.commands.research import cmd_research as _cmd_research
 from veles.cli.commands.route import cmd_route as _cmd_route
 from veles.cli.commands.run import cmd_run as _cmd_run
@@ -110,7 +112,6 @@ from veles.cli.commands.skills import cmd_skill as _cmd_skill
 from veles.cli.commands.subprojects import cmd_subproject as _cmd_subproject
 from veles.cli.commands.tool import cmd_tool as _cmd_tool
 from veles.cli.commands.trust import cmd_trust as _cmd_trust
-from veles.cli.commands.tui import cmd_tui as _cmd_tui
 from veles.core.context import (
     reset_active_project,
     set_active_project,
@@ -185,11 +186,13 @@ __all__ = [
     "_cmd_import",
     "_cmd_init",
     "_cmd_job",
+    "_cmd_layout",
     "_cmd_mcp",
     "_cmd_models",
     "_cmd_module",
     "_cmd_organize",
     "_cmd_project",
+    "_cmd_repl",
     "_cmd_research",
     "_cmd_route",
     "_cmd_run",
@@ -200,7 +203,6 @@ __all__ = [
     "_cmd_skill",
     "_cmd_subproject",
     "_cmd_trust",
-    "_cmd_tui",
     "_confirm",
     "_continuous_curator_eligible",
     "_curate_one_session",
@@ -247,10 +249,9 @@ def main(argv: list[str] | None = None) -> int:
     from veles.core.i18n import set_active_locale
     from veles.core.user_config import load_user_config
 
-    _argv = list(sys.argv[1:]) if argv is None else list(argv)
-    if not _argv:
-        _argv = ["tui"]
-    args = _build_parser().parse_args(_argv)
+    # Bare `veles` (and `veles -c`, `veles --provider …`) parse with no
+    # subcommand → dispatched to the inline interactive REPL below.
+    args = _build_parser().parse_args(list(sys.argv[1:]) if argv is None else list(argv))
     # Resolve the active i18n locale before any user-facing string fires.
     # `set_active_locale` honours `VELES_LOCALE` env over the config so a
     # one-shot invocation can force a language without rewriting toml.
@@ -320,6 +321,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_add(args, project)
         if args.command == "organize":
             return _cmd_organize(args, project)
+        if args.command == "layout":
+            return _cmd_layout(args, project)
         if args.command == "curate":
             return _cmd_curate(args, project)
         if args.command == "skill":
@@ -340,8 +343,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_job(args, project)
         if args.command == "dream":
             return _cmd_dream(args, project)
-        if args.command == "tui":
-            return _cmd_tui(args, project)
+        if args.command is None:  # bare `veles` → the inline interactive REPL
+            return _cmd_repl(args, project)
         if args.command == "route":
             return _cmd_route(args, project)
         if args.command == "export":

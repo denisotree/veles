@@ -9,6 +9,8 @@ import pytest
 from veles.core.user_config import (
     UserConfig,
     load_user_config,
+    persist_tui_theme,
+    read_user_config_raw,
     save_user_config,
     user_config_path,
 )
@@ -111,3 +113,43 @@ def test_save_is_atomic_replaces_existing() -> None:
     assert cfg is not None
     assert cfg.language == "ru"
     assert cfg.default_provider == "anthropic"
+
+
+def test_persist_tui_theme_preserves_other_sections() -> None:
+    """Regression: `/theme` is a routine, repeatable interactive action.
+
+    Before this fix `persist_tui_theme` routed through `save_user_config`,
+    which renders ONLY the `[user]` dataclass — any hand-added
+    `[permissions]` (core/permission/policy.py) or `[routing.tasks]`
+    (core/routing/ensemble.py) section was silently erased on every
+    theme pick. It must instead merge into the full raw config."""
+    p = user_config_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(
+        "\n".join(
+            [
+                "[user]",
+                'language = "ru"',
+                'default_provider = "anthropic"',
+                'default_model = "anthropic/claude-sonnet-4.6"',
+                "",
+                "[permissions]",
+                'fetch_url = "approval_required"',
+                "",
+                "[routing.tasks]",
+                'default = "openrouter/anthropic/claude-sonnet-4.6"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    persist_tui_theme("dracula")
+
+    raw = read_user_config_raw()
+    assert raw["user"]["tui_theme"] == "dracula"
+    assert raw["user"]["language"] == "ru"
+    assert raw["user"]["default_provider"] == "anthropic"
+    assert raw["user"]["default_model"] == "anthropic/claude-sonnet-4.6"
+    assert raw["permissions"] == {"fetch_url": "approval_required"}
+    assert raw["routing"]["tasks"] == {"default": "openrouter/anthropic/claude-sonnet-4.6"}

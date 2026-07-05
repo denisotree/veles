@@ -19,9 +19,9 @@ config. Les identifiants de modèles suivent la nomenclature propre à chaque fo
 | `openai-compat` | Local/personnalisé | aucune | `OPENAI_COMPAT_BASE_URL` (requis, sans valeur par défaut) |
 
 Fournisseur par défaut : `openrouter`. Il n'existe **aucun modèle par défaut codé en
-dur** — définissez-en un via l'assistant de configuration, `[provider] model`, ou
+dur** — définissez-en un via l'assistant de configuration, `[engine] model`, ou
 `--model` (sinon l'agent signale « no model configured »). Les routes par tâche
-héritent de `[provider]` comme base, sauf surcharge dans `[routing.tasks]` — voir
+héritent de `[engine]` comme base, sauf surcharge dans `[routing.tasks]` — voir
 [routage par tâche](../how-to/per-task-routing.md).
 
 ## Fournisseurs locaux

@@ -21,6 +21,7 @@ from veles.cli._parsers import (
     dream,
     goal,
     job,
+    layout,
     mcp,
     models,
     module,
@@ -57,6 +58,7 @@ _REGISTRARS = (
     secret.register,
     goal.register,
     job.register,
+    layout.register,
     dream.register,
     browse.register,
     trust.register,
@@ -84,7 +86,10 @@ def build_parser() -> argparse.ArgumentParser:
             "`VELES_NO_WIZARD=1`."
         ),
     )
-    sub = parser.add_subparsers(dest="command", required=True)
+    # Bare `veles` (no subcommand) launches the inline interactive REPL, so its
+    # flags live on the top-level parser and subcommands are optional.
+    agent_loop.add_interactive_flags(parser)
+    sub = parser.add_subparsers(dest="command", required=False)
     for register in _REGISTRARS:
         register(sub)
     return parser

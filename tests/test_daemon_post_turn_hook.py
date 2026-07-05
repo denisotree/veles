@@ -91,7 +91,7 @@ def test_post_turn_hook_resolves_provider_from_project_config(tmp_path: Path) ->
     """
     project = init_project(tmp_path, name="provres")
     (project.state_dir / "config.toml").write_text(
-        '[provider]\ndefault = "ollama"\n', encoding="utf-8"
+        '[engine]\nprovider = "ollama"\n', encoding="utf-8"
     )
     args = argparse.Namespace(provider=None, model=None)
 
@@ -105,7 +105,7 @@ def test_post_turn_hook_keeps_explicit_provider(tmp_path: Path) -> None:
     project-config default (mirrors the run.py resolution cascade)."""
     project = init_project(tmp_path, name="provexplicit")
     (project.state_dir / "config.toml").write_text(
-        '[provider]\ndefault = "ollama"\n', encoding="utf-8"
+        '[engine]\nprovider = "ollama"\n', encoding="utf-8"
     )
     args = argparse.Namespace(provider="anthropic", model=None)
 

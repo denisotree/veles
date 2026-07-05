@@ -28,11 +28,11 @@ def project(tmp_path: Path) -> Project:
     from veles.core.project_config import save_project_config
 
     p = init_project(tmp_path / "demo", name="demo")
-    # M165c: routing has no cloud fallback — give the project a `[provider]`
+    # M165c: routing has no cloud fallback — give the project a `[engine]`
     # base so `route("default")` resolves (these tests exercise NL refresh,
     # not the unconfigured-routing path).
     save_project_config(
-        p, {"provider": {"default": "openrouter", "model": "anthropic/claude-sonnet-4.6"}}
+        p, {"engine": {"provider": "openrouter", "model": "anthropic/claude-sonnet-4.6"}}
     )
     return p
 

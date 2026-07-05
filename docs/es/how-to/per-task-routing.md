@@ -72,7 +72,7 @@ Para cada tarea, gana la primera capa que produzca una especificación:
 1. proyecto `[routing.tasks][task]`
 2. proyecto `[routing.tasks].default`
 3. pista NL del proyecto (`routing.nl.toml`)
-4. base `[provider]` del proyecto
+4. base `[engine]` del proyecto
 5. usuario `[routing.tasks][task]` / `.default`
 6. usuario `[user] default_provider` + `default_model`
 

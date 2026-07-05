@@ -39,7 +39,7 @@ def test_no_config_file_yields_empty(project: Project) -> None:
 
 
 def test_no_mcp_section_yields_empty(project: Project) -> None:
-    _write_config(project, '[provider]\ndefault = "openrouter"\n')
+    _write_config(project, '[engine]\nprovider = "openrouter"\n')
     assert load_mcp_config(project) == {}
 
 

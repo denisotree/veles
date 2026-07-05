@@ -2,32 +2,30 @@
 
 Each CLI verb gets an `argparse.Namespace` with `provider` and `model`
 attributes pre-filled by argparse defaults. But the user's wizard pick
-(stored in `~/.veles/config.toml`) and the project's `[provider]`
+(stored in `~/.veles/config.toml`) and the project's `[engine]`
 section (stored in `<project>/.veles/config.toml`) should override the
 argparse defaults — otherwise picking OpenAI in the wizard but launching
-`veles tui` would still boot on `openrouter` and show the wrong status.
+`veles` would still boot on `openrouter` and show the wrong status.
 
 The cascade is:
 
     1. `args.provider` if user passed `--provider` explicitly (≠ default).
-    2. Project's `[provider] default` (e.g. wizard's project-scope pick).
+    2. Project's `[engine] provider` (e.g. wizard's project-scope pick).
     3. UserConfig.default_provider (wizard's user-scope pick).
     4. Argparse `DEFAULT_PROVIDER` (last-resort fallback).
 
 `resolve_effective_model` does the same shape but for the model id:
 
     1. `args.model` if user passed `--model` explicitly (≠ default).
-    2. Project's `[provider] model` (e.g. wizard's project-scope pick).
+    2. Project's `[engine] model` (e.g. wizard's project-scope pick).
     3. Per-project persisted state from `/model` slash-command
        (tui_state.json).
     4. UserConfig.default_model.
     5. Argparse `DEFAULT_MODEL`.
 
 The TUI and `cli/commands/daemon.py` (M130) consume both helpers, so a
-daemon launched in a project without its own `[provider]` inherits the
+daemon launched in a project without its own `[engine]` inherits the
 user-level `[user] default_*` instead of dropping to `DEFAULT_MODEL`.
-`cli/commands/run.py` still uses `args.provider` directly — aligning it
-is a separate UX decision tracked in the R3 backlog.
 """
 
 from __future__ import annotations
@@ -51,11 +49,11 @@ def ensure_model_configured(model: str) -> str:
 
     The chokepoint for "no model configured": `DEFAULT_MODEL` is empty by
     design, so `resolve_effective_model` returns `""` when nothing is set in
-    `--model`, the project `[provider] model`, or the user `default_model`."""
+    `--model`, the project `[engine] model`, or the user `default_model`."""
     if model and model.strip():
         return model
     raise ConfigurationError(
-        "no model configured. Pass --model, set `[provider] model` in "
+        "no model configured. Pass --model, set `[engine] model` in "
         "<project>/.veles/config.toml, or `default_model` in ~/.veles/config.toml."
     )
 
@@ -69,10 +67,10 @@ def resolve_effective_provider(
     """Walk the cascade and return the provider Veles should boot with.
 
     M134: when `daemon_session` is given, a `[daemon.<name>] provider` in
-    the project config takes priority over the project-wide `[provider]`
+    the project config takes priority over the project-wide `[engine]`
     base — so several daemon sessions in one project can each pin their own
     provider. The layer sits *below* an explicit `--provider` and *above*
-    the `[provider]` default, keeping the M125/M127/M130 cascade intact."""
+    the `[engine] provider`, keeping the M125/M127/M130 cascade intact."""
     explicit = getattr(args, "provider", None)
     if explicit and explicit != DEFAULT_PROVIDER:
         return explicit
@@ -82,7 +80,7 @@ def resolve_effective_provider(
             ds_provider = get_section(cfg, "daemon", daemon_session).get("provider")
             if isinstance(ds_provider, str) and ds_provider:
                 return ds_provider
-        project_provider = get_section(cfg, "provider").get("default")
+        project_provider = get_section(cfg, "engine").get("provider")
         if isinstance(project_provider, str) and project_provider:
             return project_provider
     from veles.core.user_config import load_user_config
@@ -102,7 +100,7 @@ def resolve_effective_model(
 ) -> str:
     """Resolve the model id with explicit `--model` taking priority,
     then (M134) a `[daemon.<name>] model` when `daemon_session` is given,
-    then the project's `[provider] model` (set by the wizard at project
+    then the project's `[engine] model` (set by the wizard at project
     scope), then per-project persisted state (passed in by the caller
     because loading it pulls in `core/tui_state.py`), then the user
     wizard pick, then the argparse default."""
@@ -115,7 +113,7 @@ def resolve_effective_model(
             ds_model = get_section(cfg, "daemon", daemon_session).get("model")
             if isinstance(ds_model, str) and ds_model:
                 return ds_model
-        project_model = get_section(cfg, "provider").get("model")
+        project_model = get_section(cfg, "engine").get("model")
         if isinstance(project_model, str) and project_model:
             return project_model
     if persisted_model:

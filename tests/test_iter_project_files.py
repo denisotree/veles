@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from veles.core.project import iter_project_files
+from veles.cli.repl.file_index import iter_project_files
 
 
 def test_lists_top_level_files(tmp_path: Path) -> None:

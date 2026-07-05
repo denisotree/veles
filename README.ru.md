@@ -34,7 +34,7 @@
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles        # interactive REPL (bare `veles` == `veles tui`)
+veles        # интерактивный REPL (TUI; просто `veles` без подкоманды)
 ```
 
 ---
@@ -220,8 +220,9 @@ veles module list
 ## TUI
 
 ```bash
-veles                        # new session (bare `veles` launches the TUI)
-veles tui --resume <id>      # continue a session
+veles                        # новая сессия (bare `veles` запускает TUI)
+veles -c                     # продолжить последнюю сессию проекта
+veles --resume <id>          # возобновить конкретную сессию
 ```
 
 <p align="center">
@@ -322,7 +323,7 @@ veles import ./backup.tar.gz --into ./new-dir
 |---|---|
 | `veles init [name]` | Создать новый проект |
 | `veles run "<prompt>"` | Однократный запуск агента |
-| `veles tui` | Интерактивный TUI REPL |
+| `veles` | Интерактивный TUI REPL (без подкоманды) |
 | `veles add <file\|url>` | Добавить источник → вики-страница |
 | `veles research "<question>"` | Глубокое многостороннее исследование |
 | `veles curate` | Консолидировать сессии в вики |

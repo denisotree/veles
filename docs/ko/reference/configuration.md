@@ -55,8 +55,8 @@ args = ["-m", "my_mcp_server"]
 ## 프로젝트 설정 — `<project>/.veles/config.toml`
 
 ```toml
-[provider]
-default = "openrouter"                               # provider name for the main agent + routing base
+[engine]
+provider = "openrouter"                               # provider name for the main agent + routing base
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
@@ -99,7 +99,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 | 섹션 | 용도 |
 |---|---|
-| `[provider]` | 메인 에이전트와 라우팅 캐스케이드의 기반 프로바이더(`default` = 프로바이더 이름) + 모델(`model` = 모델 ID) |
+| `[engine]` | 메인 에이전트와 라우팅 캐스케이드의 기반 프로바이더(`provider` = 프로바이더 이름) + 모델(`model` = 모델 ID) |
 | `[routing.tasks]` | 태스크별 `provider:model` 재정의 — [태스크별 라우팅](../how-to/per-task-routing.md) 참고 |
 | `[permissions]` | 도구별 권한 정책(프로젝트 범위) |
 | `[daemon]` | 이름 없는/"기본" 데몬의 바인드 + 자동 시작 |

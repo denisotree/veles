@@ -29,7 +29,7 @@ def cmd_dream(args: argparse.Namespace, project) -> int:
 
         # Resolve the consolidation provider+model through routing (M125) so
         # they stay consistent. A bare `veles dream --include-consolidation`
-        # on a fully-local project (`[provider]=ollama`) must not ask that
+        # on a fully-local project (`[engine]=ollama`) must not ask that
         # backend for the hardcoded `anthropic/claude-haiku-4.5` slug → 404.
         # An explicit `--provider` still wins; the routed model is adopted
         # only when it belongs to that same provider.

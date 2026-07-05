@@ -37,10 +37,10 @@ def test_set_preserves_other_sections(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     from veles.core.project_config import save_project_config
 
-    save_project_config(project, {"provider": {"default": "ollama", "model": "qwen3"}})
+    save_project_config(project, {"engine": {"provider": "ollama", "model": "qwen3"}})
     _set(_ns(task="advisor", spec="openrouter:anthropic/claude-opus-4.8"), project)
     cfg = load_project_config(project)
-    assert cfg["provider"] == {"default": "ollama", "model": "qwen3"}
+    assert cfg["engine"] == {"provider": "ollama", "model": "qwen3"}
     assert get_section(cfg, "routing", "tasks") == {
         "advisor": "openrouter:anthropic/claude-opus-4.8"
     }
@@ -89,7 +89,7 @@ def test_show_prints_source_labels(tmp_path: Path, capsys: pytest.CaptureFixture
     project = init_project(tmp_path / "p", name="p")
     from veles.core.project_config import save_project_config
 
-    save_project_config(project, {"provider": {"default": "ollama", "model": "qwen3"}})
+    save_project_config(project, {"engine": {"provider": "ollama", "model": "qwen3"}})
     _set(_ns(task="compressor", spec="openai:gpt-4o-mini"), project)
     rc = _show(project)
     out = capsys.readouterr().out
@@ -108,7 +108,7 @@ def test_show_warns_on_incomplete_provider(
     project = init_project(tmp_path / "p", name="p")
     from veles.core.project_config import save_project_config
 
-    save_project_config(project, {"provider": {"default": "ollama"}})
+    save_project_config(project, {"engine": {"provider": "ollama"}})
     _show(project)
     assert "has no model" in capsys.readouterr().err
 

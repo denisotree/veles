@@ -103,6 +103,35 @@ def test_prompt_injects_context_file_when_engine_on(wiki_project: Project) -> No
     assert "wiki/concepts/page.md" in prompt
 
 
+def test_workspace_block_lists_root_and_wiki_tree_when_engine_on(wiki_project: Project) -> None:
+    """The model must SEE the real folder names (the fix for guessing at
+    `-- Daily --/` and wrongly concluding nothing exists)."""
+    from veles.cli._runtime import build_run_system_prompt
+
+    # A source folder at the root + a page in the canonical wiki tree.
+    (wiki_project.root / "-- Daily --").mkdir()
+    (wiki_project.root / "-- Daily --" / "daily-log.md").write_text("x", encoding="utf-8")
+    (wiki_project.root / "wiki" / "concepts").mkdir(parents=True, exist_ok=True)
+    (wiki_project.root / "wiki" / "concepts" / "mde.md").write_text("x", encoding="utf-8")
+
+    prompt = build_run_system_prompt(wiki_project, prompt="migrate diaries")
+    assert prompt is not None
+    assert "<workspace>" in prompt
+    assert "-- Daily --/" in prompt  # real root folder surfaced
+    assert "Current wiki structure" in prompt and "mde.md" in prompt  # wiki tree
+    # `.veles` state dir is never leaked into the map.
+    assert ".veles/" not in prompt
+
+
+def test_workspace_block_absent_when_engine_off(nowiki_project: Project) -> None:
+    from veles.cli._runtime import build_run_system_prompt
+
+    (nowiki_project.root / "-- Daily --").mkdir()
+    prompt = build_run_system_prompt(nowiki_project, prompt="anything")
+    assert prompt is not None
+    assert "<workspace>" not in prompt  # wiki-layout only
+
+
 # ---- recall ----
 
 

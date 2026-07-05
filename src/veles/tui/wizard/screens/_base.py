@@ -1,7 +1,7 @@
 """Shared CSS + helpers for wizard modal screens.
 
-Visual style mirrors `tui.screens.base_picker.PickerScreen` so the
-wizard feels native — same border, padding, centred panel."""
+Visual style mirrors the daemon picker's modal chrome so the wizard
+feels native — same border, padding, centred panel."""
 
 from __future__ import annotations
 

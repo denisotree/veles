@@ -218,12 +218,12 @@ class ModelStep:
     title: str = "Step 4/6 — Default model"
 
     async def run(self, ctx: WizardContext) -> WizardOutcome:
-        from veles.core.provider_factory import LOCAL_PROVIDERS
-        from veles.core.secrets import get_provider_key
-        from veles.tui.screens._model_fetcher import (
+        from veles.cli.repl.model_fetcher import (
             known_models,
             validate_and_fetch_models,
         )
+        from veles.core.provider_factory import LOCAL_PROVIDERS
+        from veles.core.secrets import get_provider_key
 
         provider = ctx.answers["default_provider"]
         api_status = ctx.answers.get("api_key_status", "")

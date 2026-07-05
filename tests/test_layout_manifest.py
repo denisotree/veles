@@ -86,6 +86,31 @@ skill = "query"
     )
 
 
+def test_prompt_file_parses(tmp_path: Path) -> None:
+    p = _write(
+        tmp_path / "layout.toml",
+        """\
+[layout]
+name = "x"
+prompt_file = "templates/behaviour.md"
+""",
+    )
+    m = read_manifest(p)
+    assert m.prompt_file == "templates/behaviour.md"
+
+
+def test_prompt_file_absent_defaults_to_none(tmp_path: Path) -> None:
+    p = _write(
+        tmp_path / "layout.toml",
+        """\
+[layout]
+name = "x"
+""",
+    )
+    m = read_manifest(p)
+    assert m.prompt_file is None
+
+
 def test_read_manifest_accepts_directory_path(tmp_path: Path) -> None:
     """read_manifest can be called with the pack directory, not just
     the toml file — the discovery layer expects this."""

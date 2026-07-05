@@ -13,7 +13,7 @@ import sys
 
 
 def cmd_models(args: argparse.Namespace) -> int:
-    from veles.tui.screens._model_fetcher import fetch_models
+    from veles.cli.repl.model_fetcher import fetch_models
 
     result = fetch_models(args.provider, refresh=bool(args.refresh))
     if args.as_json:
