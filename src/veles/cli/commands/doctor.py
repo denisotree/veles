@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from veles.core.doctor import run_all
+from veles.core.doctor import repair_memory_fts, run_all
 from veles.core.project import Project
 
 
@@ -13,8 +13,11 @@ def cmd_doctor(args: argparse.Namespace, project: Project | None) -> int:
 
     Returns 0 when no `error`-level result fired (warnings are tolerated by
     default — they're advisory). Pass `--strict` to treat warnings as
-    failing too; useful for CI gating after a release.
+    failing too; useful for CI gating after a release. Pass `--fix` to run
+    safe repairs (rebuild a broken memory recall index) before checking.
     """
+    if getattr(args, "fix", False) and repair_memory_fts(project):
+        print("fixed: rebuilt the memory recall (FTS) index")
     report = run_all(project)
     if getattr(args, "json", False):
         print(report.to_json())

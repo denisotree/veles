@@ -205,9 +205,25 @@ class MemoryRouter:
         """
         if self._store is None:
             return []
-        since = time.time() - _TURN_RECENCY_WINDOW_SEC
+        # M193: the 30-day window assumes the curator already distilled older
+        # turns into insights. Until the first curator/dream pass, raw turns are
+        # the ONLY memory, so applying the window would silently drop it.
+        since = None if _never_curated(self._project) else time.time() - _TURN_RECENCY_WINDOW_SEC
         turn_hits = self._store.search_turns(query, limit=limit, since=since)
         return [_turn_hit_to_recall(h) for h in turn_hits]
+
+
+def _never_curated(project) -> bool:
+    """M193: True when no curator or dream pass has ever run for the project.
+    Until then, the 30-day turn-recall window would silently discard the only
+    copy of older memory (nothing has been distilled into insights yet)."""
+    from veles.core.curator_state import load
+
+    try:
+        state = load(project.state_dir / "curator.state.json")
+    except Exception:
+        return True
+    return state.last_curated_at == 0.0 and state.dream_count == 0
 
 
 def _local_query_vector(query: str) -> list[float] | None:

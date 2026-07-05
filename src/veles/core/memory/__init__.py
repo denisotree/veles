@@ -21,6 +21,7 @@ existing rows), bump to 2.
 from __future__ import annotations
 
 import json
+import logging
 import secrets
 import sqlite3
 import time
@@ -30,6 +31,8 @@ from pathlib import Path
 from typing import Any
 
 from veles.core.provider import Message, ToolCall
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -561,7 +564,14 @@ class SessionStore:
         sql = " ".join(sql_parts)
         try:
             rows = self._conn.execute(sql, params).fetchall()
-        except sqlite3.OperationalError:
+        except sqlite3.OperationalError as exc:
+            # M193: don't go silent. A corrupt/missing FTS index looks like
+            # "no memory" otherwise. Degrade to [] (recall must never raise)
+            # but log so `veles doctor` / the user can repair it.
+            logger.warning(
+                "search_turns: FTS unavailable (%s); recall degraded — run `veles doctor --fix`",
+                exc,
+            )
             return []
         return [
             TurnHit(
@@ -595,7 +605,11 @@ class SessionStore:
                 " ORDER BY rank LIMIT ?",
                 (escaped, limit),
             ).fetchall()
-        except sqlite3.OperationalError:
+        except sqlite3.OperationalError as exc:
+            logger.warning(
+                "search_insights: FTS unavailable (%s); recall degraded — run `veles doctor --fix`",
+                exc,
+            )
             return []
         return [
             InsightHit(
@@ -607,6 +621,35 @@ class SessionStore:
             )
             for r in rows
         ]
+
+    def fts_ok(self) -> bool:
+        """M193: probe the FTS shadow indexes. Returns False when a MATCH raises
+        (dropped/corrupt index) — the exact condition under which recall would
+        silently return nothing. Repair with `rebuild_fts`."""
+        probe = '"__healthprobe__"'
+        try:
+            self._conn.execute(
+                "SELECT rowid FROM turns_fts WHERE turns_fts MATCH ? LIMIT 1", (probe,)
+            ).fetchall()
+            self._conn.execute(
+                "SELECT rowid FROM insights_fts WHERE insights_fts MATCH ? LIMIT 1", (probe,)
+            ).fetchall()
+        except sqlite3.OperationalError:
+            return False
+        return True
+
+    def rebuild_fts(self) -> None:
+        """M193: recreate any missing FTS shadow tables/triggers and rebuild each
+        index from its external-content base table. Idempotent — the repair
+        behind `veles doctor --fix`."""
+        self._conn.executescript(_FTS_SCHEMA_SQL)
+        self._conn.executescript(_SCHEMA_V3_SQL)
+        for tbl in ("turns_fts", "insights_fts", "rules_fts"):
+            try:
+                self._conn.execute(f"INSERT INTO {tbl}({tbl}) VALUES('rebuild')")
+            except sqlite3.OperationalError as exc:
+                logger.warning("rebuild_fts: could not rebuild %s (%s)", tbl, exc)
+        self._conn.commit()
 
     def knn_insights(self, query_vec: list[float], *, limit: int = 5) -> list[InsightHit]:
         """M192: nearest-neighbour insights by embedding cosine distance.

@@ -20,3 +20,8 @@ def register(sub: argparse._SubParsersAction) -> None:
         action="store_true",
         help="Exit non-zero when any warning fires (useful for CI gating).",
     )
+    doctor.add_argument(
+        "--fix",
+        action="store_true",
+        help="Attempt safe repairs (currently: rebuild a broken memory recall index).",
+    )

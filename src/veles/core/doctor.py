@@ -178,6 +178,48 @@ def _check_provider_keys() -> CheckResult:
     )
 
 
+def _check_memory_fts(project: Project | None) -> CheckResult:
+    """M193: verify the project's recall FTS index is queryable. A broken index
+    makes memory recall silently empty (the failure this milestone targets)."""
+    if project is None:
+        return CheckResult(name="memory_fts", status="info", message="no active project")
+    db = project.memory_db_path
+    if not db.exists():
+        return CheckResult(
+            name="memory_fts", status="info", message="no memory.db yet (nothing to index)"
+        )
+    from veles.core.memory import SessionStore
+
+    store = SessionStore(db)
+    try:
+        ok = store.fts_ok()
+    finally:
+        store.close()
+    if ok:
+        return CheckResult(name="memory_fts", status="ok", message="recall FTS index healthy")
+    return CheckResult(
+        name="memory_fts",
+        status="error",
+        message="recall FTS index is broken — memory recall is silently returning nothing",
+        fix_hint="run `veles doctor --fix` to rebuild the index",
+    )
+
+
+def repair_memory_fts(project: Project | None) -> bool:
+    """M193: rebuild the project's recall FTS index. Returns True when a repair
+    ran (the index is healthy afterwards), False when there's nothing to do."""
+    if project is None or not project.memory_db_path.exists():
+        return False
+    from veles.core.memory import SessionStore
+
+    store = SessionStore(project.memory_db_path)
+    try:
+        store.rebuild_fts()
+        return store.fts_ok()
+    finally:
+        store.close()
+
+
 def _check_active_project(project: Project | None) -> CheckResult:
     if project is None:
         return CheckResult(
@@ -460,6 +502,7 @@ def run_all(project: Project | None) -> DoctorReport:
     ]
     project_aware: list[Callable[[Project | None], CheckResult]] = [
         _check_active_project,
+        _check_memory_fts,
         _check_agents_md,
         _check_agents_md_identity,
         _check_registry_paths,
