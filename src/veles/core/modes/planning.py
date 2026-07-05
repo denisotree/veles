@@ -90,7 +90,8 @@ class PlanningMode:
         ):
             effective_prompt = wrap_mode_switch_observation(prompt, self.name, self.system_block)
 
-        agent = ctx.factory(ctx.state, mode_override=self.name)
+        # M191: raw prompt as recall query (see WritingMode for the rationale).
+        agent = ctx.factory(ctx.state, mode_override=self.name, query=prompt)
         result = agent.run(
             effective_prompt,
             on_text_delta=ctx.on_text,

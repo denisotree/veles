@@ -30,10 +30,12 @@ class _Recorder:
     project: object = None
     posted: list[Any] = field(default_factory=list)
     factory_calls: list[AppState] = field(default_factory=list)
+    query_calls: list[str | None] = field(default_factory=list)
 
     def make_ctx(self, agent: _FakeAgent) -> ModeContext:
-        def factory(state: AppState) -> _FakeAgent:
+        def factory(state: AppState, *, query: str | None = None, **_kw: Any) -> _FakeAgent:
             self.factory_calls.append(state)
+            self.query_calls.append(query)
             return agent
 
         def post(msg: Any) -> None:
@@ -51,6 +53,21 @@ class _Recorder:
 
 def _state(*, session_id: str | None = None) -> AppState:
     return AppState(session_id=session_id, provider_name="stub", model="m")
+
+
+def test_writing_mode_forwards_raw_query_to_factory_for_recall() -> None:
+    """M191: the raw user prompt is forwarded to the factory as `query=` so the
+    per-turn system prompt can inject <memory-context> recall for it. The query
+    must be the RAW prompt, not the mode-switch-wrapped effective prompt (recall
+    on the wrapper text would pollute retrieval)."""
+    state = _state()
+    state.last_mode_in_session = "planning"  # forces effective_prompt wrapping
+    agent = _FakeAgent(result=RunResult(text="ok", iterations=1, session_id="s1"))
+    rec = _Recorder(state=state)
+
+    WritingMode().run_turn("how do I add a source?", rec.make_ctx(agent))
+
+    assert rec.query_calls == ["how do I add a source?"]
 
 
 def test_writing_mode_delegates_to_factory_and_agent_run() -> None:

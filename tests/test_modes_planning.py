@@ -168,3 +168,15 @@ def test_planning_mode_has_non_empty_system_block() -> None:
     assert block.strip()
     assert "PLANNING mode" in block
     assert "create_plan" in block
+
+
+def test_planning_mode_forwards_raw_query_to_factory_for_recall() -> None:
+    """M191: PlanningMode forwards the raw user prompt to the factory as
+    `query=` so the per-turn system prompt injects <memory-context> recall."""
+    state = _state(session_id="s0", last_mode="writing")  # forces prompt wrapping
+    agent = _FakeAgent(result=RunResult(text="ok", iterations=1, session_id="s1"))
+    rec = _Recorder(state=state)
+
+    PlanningMode().run_turn("design the wiki structure", rec.make_ctx(agent))
+
+    assert rec.factory_calls[0][1].get("query") == "design the wiki structure"

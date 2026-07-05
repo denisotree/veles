@@ -305,6 +305,63 @@ def _print_repl_help(console) -> None:
     )
 
 
+def _repl_turn_system_prompt(
+    args: argparse.Namespace,
+    project: Project,
+    *,
+    mode,
+    query: str | None,
+    extra_system: str | None,
+) -> str | None:
+    """Assemble one REPL turn's system prompt.
+
+    M191: `query` (the raw user prompt) drives `<memory-context>` recall +
+    `<relevant-files>`. Before M191 the REPL passed an empty query, so the
+    flagship UX never recalled project memory. An empty query still yields no
+    recall (matches `veles run` with no prompt), so batch/mode-less callers
+    keep the cache-stable stable-only prefix.
+    """
+    from veles.cli import build_run_system_prompt
+
+    sys_chunks: list[str] = []
+    base = build_run_system_prompt(
+        project,
+        prompt=query or "",
+        include_agents_md=not getattr(args, "no_agents_md", False),
+        include_index=not getattr(args, "no_index", False),
+    )
+    if base:
+        sys_chunks.append(base)
+    if mode.system_block.strip():
+        sys_chunks.append(mode.system_block.strip())
+    if extra_system and extra_system.strip():
+        # A phase prompt is driving this turn (goal mode's own FSM, which is
+        # deliberately one-step-per-turn) — don't inject the persistence block,
+        # it would contradict "run the step, then STOP".
+        sys_chunks.append(extra_system.strip())
+    else:
+        sys_chunks.append(_REPL_BEHAVIOUR_BLOCK)
+    return "\n\n".join(sys_chunks) if sys_chunks else None
+
+
+def _run_repl_post_turn_hooks(args: argparse.Namespace, project: Project, result) -> None:
+    """M191: after each REPL turn, run the same learning-loop upkeep `veles run`
+    fires — insight extraction on the completed turn + post-turn curation (the
+    light dream pass rides inside the curator). Before M191 the flagship REPL
+    ran none of this, so raw turns were stored but never distilled into recall.
+
+    Skipped entirely when the turn produced no result (error) or was cancelled
+    (Ctrl+C) — there is nothing to extract, and memory upkeep must never distil
+    a half-finished turn.
+    """
+    if result is None or getattr(result, "stopped_reason", "") == "cancelled":
+        return
+    from veles.cli import _maybe_run_insight_extractor, _maybe_run_post_turn_curator
+
+    _maybe_run_insight_extractor(args, project, result.history, result.session_id)
+    _maybe_run_post_turn_curator(args, project)
+
+
 def _build_runtime(args: argparse.Namespace, project: Project):
     """Resolve provider/model, gate the API key, and build the per-turn Agent
     factory + AppState + store for the interactive REPL.
@@ -316,7 +373,6 @@ def _build_runtime(args: argparse.Namespace, project: Project):
         _PROVIDER_API_KEY_ENVS,
         _RUN_TOOLS,
         _build_compressor,
-        _build_run_system_prompt,
         _ensure_api_key,
         _load_skills,
         _make_provider,
@@ -354,7 +410,7 @@ def _build_runtime(args: argparse.Namespace, project: Project):
     }
     store = SessionStore(project.memory_db_path)
 
-    def factory(state, *, mode_override=None, extra_system=None):
+    def factory(state, *, mode_override=None, extra_system=None, query=None):
         active = mode_override or state.mode
         mode = get_mode(active)
         is_planning = active == "planning"
@@ -365,20 +421,12 @@ def _build_runtime(args: argparse.Namespace, project: Project):
         # on resume. Without this, the strict PLANNING block baked on a first
         # planning turn stays frozen for the whole session and the model keeps
         # insisting it can't execute even after the turn routed to writing.
-        sys_chunks: list[str] = []
-        base = _build_run_system_prompt(args, project)
-        if base:
-            sys_chunks.append(base)
-        if mode.system_block.strip():
-            sys_chunks.append(mode.system_block.strip())
-        if extra_system and extra_system.strip():
-            # A phase prompt is driving this turn (goal mode's own FSM, which is
-            # deliberately one-step-per-turn) — don't inject the persistence
-            # block, it would contradict "run the step, then STOP".
-            sys_chunks.append(extra_system.strip())
-        else:
-            sys_chunks.append(_REPL_BEHAVIOUR_BLOCK)
-        system_prompt = "\n\n".join(sys_chunks) if sys_chunks else None
+        # M191: `query` (the raw user prompt, passed by the mode) drives the
+        # per-turn `<memory-context>` recall — empty before M191, so the REPL
+        # never recalled project memory.
+        system_prompt = _repl_turn_system_prompt(
+            args, project, mode=mode, query=query, extra_system=extra_system
+        )
         return Agent(
             provider=provider,
             registry=registries[registry_key],
@@ -1073,6 +1121,8 @@ def _simple_repl_loop(
             console.rule(style=theme.border, characters="─")
             continue
         _update_state_after_turn(state, result)
+        # M191: learning loop on the completed turn (parity with `veles run`).
+        _run_repl_post_turn_hooks(args, project, result)
         console.rule(style=theme.border, characters="─")
 
 
@@ -2459,6 +2509,9 @@ class _ReplApp:
                 self.console.print()  # trailing blank after the streamed answer
                 self.turn_elapsed = time.monotonic() - self.turn_start  # freeze the timer
                 _update_state_after_turn(self.state, result)
+                # M191: run the learning loop (insight extraction + curation)
+                # on the completed turn, same as `veles run`. Skips None/cancel.
+                _run_repl_post_turn_hooks(self.args, self.project, result)
                 if self.queue:
                     text = self.queue.popleft()
                 else:

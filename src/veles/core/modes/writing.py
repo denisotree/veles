@@ -43,7 +43,10 @@ class WritingMode:
             and ctx.state.last_mode_in_session != self.name
         ):
             effective_prompt = wrap_mode_switch_observation(prompt, self.name, _SWITCH_NOTE)
-        agent = ctx.factory(ctx.state)
+        # M191: pass the RAW user prompt as the recall query so the factory's
+        # per-turn system prompt injects <memory-context> for it. Raw, not
+        # `effective_prompt` — the mode-switch wrapper would pollute retrieval.
+        agent = ctx.factory(ctx.state, query=prompt)
         result = agent.run(
             effective_prompt,
             on_text_delta=ctx.on_text,
