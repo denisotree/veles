@@ -42,6 +42,7 @@ tools = [
     "wiki_list_pages",
     "wiki_read_page",
     "wiki_search",
+    "veles_help",
 ]
 
 [run]

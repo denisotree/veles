@@ -73,11 +73,12 @@ class MemoryRouter:
     def recall(self, query: str, *, limit: int = 5) -> list[RecallHit]:
         if not query.strip():
             return []
+        about_hits = self._collect_about_veles(query, limit=limit)
         wiki_hits = self._collect_wiki(query, limit=limit)
         insight_hits = self._collect_insights(query, limit=limit)
         turn_hits = self._collect_turns(query, limit=limit)
         extra_hits = self._collect_extra(query, limit=limit)
-        streams = [wiki_hits, insight_hits, turn_hits, extra_hits]
+        streams = [about_hits, wiki_hits, insight_hits, turn_hits, extra_hits]
         # M141: scored rerank by default; `VELES_MEMORY_RERANK=0` falls back to
         # the round-robin merge. (M161 made insights SQL-only, so the old
         # wiki↔insight title dedupe is gone — the streams no longer overlap.)
@@ -113,6 +114,27 @@ class MemoryRouter:
         return out
 
     # ---- collectors ----
+
+    def _collect_about_veles(self, query: str, *, limit: int) -> list[RecallHit]:
+        """Framework-global Veles usage knowledge (M186). Engine-independent:
+        the store is package-shipped, so this never consults `wiki_enabled`.
+        Below-threshold queries return [], keeping non-Veles turns clean."""
+        from veles.core.knowledge.store import get_default_store
+
+        hits: list[RecallHit] = []
+        for h in get_default_store().search(query, limit=limit):
+            summary = h.body.strip().replace("\n", " ")
+            if len(summary) > _TURN_SUMMARY_CAP:
+                summary = summary[: _TURN_SUMMARY_CAP - 1].rstrip() + "…"
+            hits.append(
+                RecallHit(
+                    rel_path=f"about-veles:{h.ref}",
+                    title=h.title,
+                    summary=summary or h.title,
+                    score=float(h.score),
+                )
+            )
+        return hits
 
     def _collect_wiki(self, query: str, *, limit: int) -> list[RecallHit]:
         """Wiki-engine collector (M163: layout-gated). A project whose

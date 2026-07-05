@@ -25,6 +25,7 @@ from veles.core.tools.builtin import (  # noqa: F401
     search_files,
     stat_file,
     task_tools,
+    veles_help,
     web_search,
     write_file,
 )
