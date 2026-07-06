@@ -26,7 +26,7 @@
 **A minimal CLI agent framework that gets smarter with every session.**
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/denisotree/veles/main/docs/assets/tui-hero.gif" alt="Veles TUI — ask a question, get an answer grounded in the project's own memory" width="800">
+  <img src="https://raw.githubusercontent.com/denisotree/veles/main/docs/assets/tui-hero.gif" alt="Veles REPL — ask a question, get an answer grounded in the project's own memory" width="800">
 </p>
 
 Unlike chat tools that start fresh every time, Veles maintains **structured project memory** — insights, rules, and curated knowledge that accumulate across sessions and make the agent more useful the longer you use it. How your *content* is organised is pluggable: a Karpathy-style LLM wiki by default, flat notes, or no structure at all for code repos. Built clean: no god-files, no vendor lock-in, no cloud sync.
@@ -34,7 +34,7 @@ Unlike chat tools that start fresh every time, Veles maintains **structured proj
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles        # interactive REPL (the TUI; just run `veles` with no subcommand)
+veles        # interactive REPL (just run `veles` with no subcommand)
 ```
 
 ---
@@ -79,7 +79,7 @@ veles init
 veles run "Read AGENTS.md and describe this project."
 ```
 
-Open the interactive TUI instead (bare `veles` does the same):
+Open the interactive REPL instead (bare `veles` does the same):
 
 ```bash
 veles
@@ -217,16 +217,16 @@ veles module list
 
 ---
 
-## TUI
+## Interactive session (REPL)
 
 ```bash
-veles                        # new session (bare `veles` launches the TUI)
+veles                        # new session (bare `veles` launches the interactive REPL)
 veles -c                     # continue the most recent session in this project
 veles --resume <id>          # resume a specific session
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/denisotree/veles/main/docs/assets/tui-tour.gif" alt="Veles TUI — slash inspectors (/status, /context), mode switching, and the command palette" width="800">
+  <img src="https://raw.githubusercontent.com/denisotree/veles/main/docs/assets/tui-tour.gif" alt="Veles REPL — slash inspectors (/status, /context), mode switching, and the command palette" width="800">
 </p>
 
 Slash commands surface everything live — `/status`, `/tokens`, `/context`, `/mode`, `/help` — and `Shift+Tab` cycles modes (auto / planning / writing / goal).
@@ -323,7 +323,7 @@ veles import ./backup.tar.gz --into ./new-dir
 |---|---|
 | `veles init [name]` | Create a new project |
 | `veles run "<prompt>"` | Single-turn agent run |
-| `veles` | Interactive TUI REPL (no subcommand) |
+| `veles` | Interactive REPL (no subcommand) |
 | `veles add <file\|url>` | Ingest a source → wiki page (llm-wiki layout) |
 | `veles research "<question>"` | Deep multi-angle research |
 | `veles curate` | Distil sessions into project memory (`.veles/`, any layout) |
