@@ -1,4 +1,4 @@
-Output hero.gif
+Output tui-hero.gif
 
 Set Shell "zsh"
 Set FontSize 18
