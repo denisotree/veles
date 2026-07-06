@@ -223,19 +223,20 @@ def _log_hint(node: DaemonNode) -> str:
 
     if node.kind == "registry" and node.entry is not None:
         path = daemon_log_path(node.entry.slug)
-    elif node.record is not None:
-        slug = getattr(node.record, "slug", None) or node.name
-        path = instance_log_path(str(slug), node.name)
+    elif node.kind == "named" and node.project_name:
+        # A named daemon logs to daemon-<project_slug>-<name>.log (mirrors
+        # `_instance_log_slug` = f"{project.name}-{name}").
+        path = instance_log_path(node.project_name, node.name)
     else:
-        return f"{node.name}: no log path (try `veles daemon status`)"
+        return f"{node.name}: no dedicated log (try `veles daemon status`)"
     return f"{node.name}: log at {path}  (tail it, or `veles daemon status`)"
 
 
 def run_daemon_picker(project, theme=None, console=None) -> None:
     """Interactive loop for bare `veles daemon`. Caller must have verified a
-    real TTY (the non-TTY path prints the daemon list instead)."""
-    from veles.cli.commands.repl import _suspend_live
-
+    real TTY (the non-TTY path prints the daemon list instead). Standalone —
+    no REPL status Live to suspend, so the picker Application owns the
+    terminal directly."""
     if theme is None:
         theme = _resolve_theme()
     if console is None:
@@ -249,8 +250,7 @@ def run_daemon_picker(project, theme=None, console=None) -> None:
         nodes = _flatten(tree)
         if sel >= len(nodes):
             sel = max(0, len(nodes) - 1)
-        with _suspend_live():
-            action, sel = _run_picker_once(theme, tree, sel)
+        action, sel = _run_picker_once(theme, tree, sel)
         if action == "quit":
             return
         if action == "refresh":
