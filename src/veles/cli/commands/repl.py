@@ -21,12 +21,10 @@ Textual app + bridge + widgets become print-based callbacks.
 from __future__ import annotations
 
 import argparse
-import asyncio
 import atexit
 import contextvars
 import os
 import sys
-import time
 from collections import deque
 
 from veles.cli.repl.history import HistoryMixin
@@ -58,6 +56,7 @@ from veles.cli.repl.terminal import (  # noqa: F401  (_settled_status is a test 
 )
 from veles.cli.repl.turn import (  # noqa: F401  (some names are re-export shims)
     _REPL_BEHAVIOUR_BLOCK,
+    TurnMixin,
     _handle_slash,
     _make_turn_callbacks,
     _render_answer,
@@ -97,6 +96,7 @@ def _suspend_live():
 
 
 class _ReplApp(
+    TurnMixin,
     KeysMixin,
     HistoryMixin,
     PromptsMixin,
@@ -383,175 +383,6 @@ class _ReplApp(
             reset_critical_confirmer(ctoken)
             if dtoken is not None:
                 reset_subagent_factory(dtoken)
-
-    def _spawn(self, coro) -> None:
-        task = asyncio.ensure_future(coro)
-        self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
-
-    def _invalidate_threadsafe(self) -> None:
-        """Ask the app to redraw. `Application.invalidate` schedules the redraw
-        on the loop, so it's safe to call from the executor thread (streaming
-        callbacks) as well as the loop thread."""
-        import contextlib
-
-        with contextlib.suppress(Exception):
-            self.app.invalidate()
-
-    async def _in_terminal(self, func) -> None:
-        from prompt_toolkit.application import run_in_terminal
-
-        await run_in_terminal(func)
-
-    def _echo_user(self, text: str) -> None:
-        """Echo the request into the scrollback, accent-marked as user input
-        (distinct from the agent's streamed answer below it). Under
-        `patch_stdout` this lands above the live input box."""
-        self.console.print()
-        self.console.print(f"❯ {text}", style=f"bold {self.theme.accent}", markup=False)
-
-    async def _dispatch(self, text: str) -> None:
-        if text.startswith("/"):
-            parts = text.split()
-            # /model with no id (or `refresh`) → the inline filterable picker,
-            # driven inside this Application. /model <id> still sets directly
-            # via the shared slash handler below. Never while `busy`: a
-            # mid-turn `_ask`/`_permission_prompt` can flip `q_active` on top
-            # of an already-open picker, colliding two filter states at once.
-            # NOTE: fall through to `_slash` below rather than queuing — the
-            # queue drain in `_run_chain` feeds straight into `_blocking_turn`
-            # with no re-dispatch, so a queued "/model" would be sent to the
-            # LLM as a chat prompt once the turn ends. Falling through runs
-            # the same immediate path every other slash command already takes
-            # during `busy` (here, `_handle_slash` prints the static model
-            # list instead of opening the interactive picker).
-            if (
-                parts
-                and parts[0].lower() == "/model"
-                and (len(parts) == 1 or parts[1].lower() == "refresh")
-                and not self.busy
-            ):
-                self._echo_user(text)
-                self._open_model_picker(refresh=len(parts) > 1)
-                return
-            # /theme with no name → the inline filterable picker, mirroring
-            # /model above. /theme <name> still sets directly via the shared
-            # slash handler below (it goes through the registry's `_theme`,
-            # which persists — `_slash` then notices `state.theme_name`
-            # changed and re-applies the live restyle). Same busy-guard (and
-            # same reason) as /model above.
-            if parts and parts[0].lower() == "/theme" and len(parts) == 1 and not self.busy:
-                self._echo_user(text)
-                self._open_theme_picker()
-                return
-            await self._slash(text)
-            return
-        if self.busy:
-            self.queue.append(text)
-            self.console.print(f"  ⋅ queued: {text}", style=self.theme.muted, markup=False)
-            return
-        await self._run_chain(text)
-
-    async def _slash(self, text: str) -> None:
-        self._echo_user(text)
-        prev_theme = self.state.theme_name
-        box: dict = {}
-
-        def _do() -> None:
-            box["res"] = _handle_slash(
-                text, self.registry, self.state, self.project, self.store, self.console, self.errors
-            )
-
-        # run_in_terminal: /sessions may read input (rich.Prompt.ask), which
-        # needs the terminal handed back from the app.
-        await self._in_terminal(_do)
-        # `/theme <name>` sets state.theme_name via the registry's `_theme`
-        # handler (already persisted there) — restyle the running app here so
-        # the direct-set path applies live too, same as picking from `_tp_pick`.
-        if self.state.theme_name != prev_theme:
-            self._apply_theme_live()
-        should_quit, submit = box.get("res", (False, None))
-        if should_quit:
-            self.app.exit()
-        elif submit:
-            await self._dispatch(submit)
-
-    async def _run_chain(self, text: str) -> None:
-        from veles.core.cancel import CancelToken
-
-        self.busy = True
-        self._tick = 0
-        self._spawn(self._tick_meta())  # animate the working HUD while busy
-        self.app.invalidate()
-        loop = asyncio.get_event_loop()
-        try:
-            while True:
-                # Reset the live meta HUD for this turn.
-                self.meta_events = []
-                self.stream_chars = 0
-                self.tool_activity = {}
-                self.turn_start = time.monotonic()
-                self._last_submitted = text  # remember it so Esc can restore it
-                self._echo_user(text)
-                self.cancel_token = CancelToken()
-                # A fresh copy of the captured parent context per turn (a Context
-                # can't be run concurrently); the executor runs the turn inside it
-                # so the active project / module registry / i18n reach the tools.
-                turn_ctx = self._parent_ctx.run(contextvars.copy_context)
-                try:
-                    result = await loop.run_in_executor(
-                        None, lambda c=turn_ctx, t=text: c.run(self._blocking_turn, t)
-                    )
-                except Exception as exc:
-                    self.errors.append(str(exc))
-                    self.console.print(f"\nerror: {exc}", style=self.theme.error, markup=False)
-                    result = None
-                if getattr(result, "stopped_reason", "") == "cancelled":
-                    self.console.print("  ⋅ cancelled", style=self.theme.muted, markup=False)
-                self.console.print()  # trailing blank after the streamed answer
-                self.turn_elapsed = time.monotonic() - self.turn_start  # freeze the timer
-                _update_state_after_turn(self.state, result)
-                # M191: run the learning loop (insight extraction + curation)
-                # on the completed turn, same as `veles run`. Skips None/cancel.
-                _run_repl_post_turn_hooks(self.args, self.project, result)
-                if self.queue:
-                    text = self.queue.popleft()
-                else:
-                    break
-        finally:
-            self.cancel_token = None
-            self.busy = False
-            self.app.invalidate()
-
-    def _blocking_turn(self, text: str):
-        """Runs in the executor thread and streams the answer live via the
-        callbacks. Activates the cancel token in *this* thread so the agent's
-        cooperative cancel checks see it. Returns the RunResult."""
-        from veles.core.cancel import reset_cancel_token, set_cancel_token
-        from veles.core.modes import ModeContext, get_mode
-
-        tok = set_cancel_token(self.cancel_token)
-        post, on_text, on_event, holder, flush = _make_turn_callbacks(
-            self.console,
-            self.theme,
-            self.errors,
-            on_meta=self._push_meta,
-            stop_check=lambda: self.cancel_token is not None and self.cancel_token.cancelled,
-        )
-        try:
-            ctx = ModeContext(
-                state=self.state,
-                project=self.project,
-                factory=self.factory,
-                post=post,
-                on_text=on_text,
-                on_event=on_event,
-            )
-            get_mode(self.state.mode).run_turn(text, ctx)
-        finally:
-            reset_cancel_token(tok)
-            flush()  # render the trailing block even if the turn raised
-        return holder.get("result")
 
 
 def cmd_repl(args: argparse.Namespace, project: Project) -> int:
