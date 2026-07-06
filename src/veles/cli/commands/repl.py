@@ -484,7 +484,7 @@ def _build_runtime(args: argparse.Namespace, project: Project):
     return state, factory, store, subagent_factory
 
 
-def _make_turn_callbacks(console, theme, errors: list[str], on_meta=None):
+def _make_turn_callbacks(console, theme, errors: list[str], on_meta=None, stop_check=None):
     """Build (post, on_text, on_event) for a `ModeContext`, plus a holder for
     the final `RunResult`.
 
@@ -513,6 +513,11 @@ def _make_turn_callbacks(console, theme, errors: list[str], on_meta=None):
     buf = [""]  # mutable string cell shared across chunks
 
     def _emit(chunk: str) -> None:
+        # Esc-to-stop: once the turn is cancelled, drop further tokens at the
+        # source so visible output halts instantly (the cooperative cancel in
+        # the agent loop only unwinds at the next ~100ms check).
+        if stop_check is not None and stop_check():
+            return
         if on_meta is not None:
             on_meta("stream", chunk)
         buf[0] += chunk
@@ -522,6 +527,9 @@ def _make_turn_callbacks(console, theme, errors: list[str], on_meta=None):
                 _render_answer(console, block)
 
     def flush() -> None:
+        if stop_check is not None and stop_check():
+            buf[0] = ""
+            return
         if buf[0].strip():
             _render_answer(console, buf[0])
         buf[0] = ""
@@ -2386,14 +2394,18 @@ class _ReplApp:
         )
 
     def _cancel_generation(self) -> None:
-        """Esc while a turn runs: stop generation and drop the input box back to
-        the request that was running, so the user can edit and resubmit it. Also
-        clears the queue so Esc fully stops (not just the current turn)."""
+        """Esc while a turn runs: stop it *now*. Cancelling the token both
+        unwinds the agent loop (at its next ~100ms check) and instantly gates
+        the output callbacks (see `_make_turn_callbacks` `stop_check`), so
+        visible generation halts immediately. The request text is dropped back
+        into the input box for editing ONLY when nothing was generated yet;
+        once the answer has started streaming, Esc is a plain stop. Also clears
+        the queue so Esc fully stops (not just the current turn)."""
         if self.cancel_token is not None:
-            self.cancel_token.cancel()  # cooperative cancel of the running turn
+            self.cancel_token.cancel()  # stop the turn + gate its output at once
         self.queue.clear()  # a full stop — don't run queued follow-ups
-        if self._last_submitted:
-            self._set_input(self._last_submitted)  # restore for editing
+        if self.stream_chars == 0 and self._last_submitted:
+            self._set_input(self._last_submitted)  # restore only before first output
         self.app.invalidate()
 
     async def _in_terminal(self, func) -> None:
@@ -2530,7 +2542,11 @@ class _ReplApp:
 
         tok = set_cancel_token(self.cancel_token)
         post, on_text, on_event, holder, flush = _make_turn_callbacks(
-            self.console, self.theme, self.errors, on_meta=self._push_meta
+            self.console,
+            self.theme,
+            self.errors,
+            on_meta=self._push_meta,
+            stop_check=lambda: self.cancel_token is not None and self.cancel_token.cancelled,
         )
         try:
             ctx = ModeContext(
