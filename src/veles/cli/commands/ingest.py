@@ -73,9 +73,15 @@ def _batch_ingest_files(root: Path, pattern: str) -> list[Path]:
 def _run_batch_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) -> int:
     """Recursive `veles add <dir> --recursive [--glob PATTERN]`.
 
-    Iterates each matching file through the single-source runner. Keeps every
-    ingest a separate agent task (no cross-file context); this is just the
-    fan-out loop the single-source command never had.
+    Iterates each matching file through the single-source runner.
+
+    **Must stay strictly sequential (M203).** Content-aware ingestion dedups by
+    `wiki_search` before writing: file N+1's search only sees file N's pages if
+    N has already finished. Parallelizing this loop would race two same-topic
+    files past each other's search → duplicate topic pages, defeating
+    find-or-create-or-patch. Each ingest is still its own agent task (no shared
+    turn context); the on-disk wiki is the only cross-file state, and that is
+    exactly what makes create-vs-patch work across files.
     """
     root = Path(source)
     if not root.is_dir():
