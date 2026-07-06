@@ -174,7 +174,7 @@ def wiki_append_log(op: str, summary: str) -> str:
 @tool(risk_class=RiskClass.WRITE_LOCAL_PROJECT, side_effects=["network", "filesystem"])
 def wiki_ingest(
     source: str,
-    category: str = "sources",
+    category: str = "concepts",
     slug: str | None = None,
     title: str | None = None,
 ) -> str:
@@ -182,10 +182,12 @@ def wiki_ingest(
     it as a wiki page.
 
     `source` is either a URL (http:// / https://) or a path. `category`
-    defaults to 'sources' (raw inputs); use 'concepts' / 'entities' when
-    you've distilled the material. `slug` defaults to a kebab-case form
-    of `title` or the source basename. The page body is the raw text
-    when no `title` is supplied, or a minimal markdown wrap otherwise.
+    defaults to 'concepts'; use 'entities' for people/orgs/works, or a topical
+    project category. (M203: there is no `sources` page category — raw
+    originals live in the top-level `sources/` tree, not the wiki.) `slug`
+    defaults to a kebab-case form of `title` or the source basename. The page
+    body is the raw text when no `title` is supplied, or a minimal markdown
+    wrap otherwise.
 
     Call this when the user shares a link / file worth preserving, or
     when you discover an authoritative reference mid-turn — it short-cuts

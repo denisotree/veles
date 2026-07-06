@@ -49,10 +49,15 @@ _FTS_DB = "wiki_index.db"
 # SQL table), not user content.
 # Core categories always present regardless of layout pack (curator writes
 # `sessions`, self-doc writes `self-doc`, ingest writes concepts/entities/sources).
+# M203: `sources` is NOT here. The top-level `sources/` tree holds raw,
+# immutable audit copies; a `wiki/sources/` *page* category was a redundant,
+# confusing collision (same name, opposite meaning) and the exact bucket a
+# weak model dumped a 1:1 `wiki/sources/2025-02-27` page into. Ingestion routes
+# distilled knowledge to topical categories (concepts/entities); raw goes to
+# top-level `sources/` via move_file.
 _DEFAULT_CATEGORIES = (
     "concepts",
     "entities",
-    "sources",
     "queries",
     "sessions",
     "self-doc",
