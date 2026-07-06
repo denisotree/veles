@@ -74,5 +74,7 @@ SO (escopo default) → variável de ambiente.
 
 ## Internas / testes
 
-`VELES_BUNDLE_VERSION`, `VELES_CACHE_BREAKPOINT` — internas; você não deveria
-precisar defini-las.
+| Variável | Finalidade |
+|---|---|
+| `VELES_BUNDLE_VERSION` | Interna; você não deveria precisar defini-la |
+| `VELES_REPL_SIMPLE` | Defina como `1` para forçar o loop de REPL simples baseado em linhas em vez do app `prompt_toolkit` de tela cheia (fallback para terminais limitados) |

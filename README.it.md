@@ -26,7 +26,7 @@
 **Un framework minimale per agenti da CLI che diventa più intelligente a ogni sessione.**
 
 <p align="center">
-  <img src="docs/assets/tui-hero.gif" alt="TUI di Veles — poni una domanda e ottieni una risposta fondata sulla memoria del progetto stesso" width="800">
+  <img src="docs/assets/tui-hero.gif" alt="REPL di Veles — poni una domanda e ottieni una risposta fondata sulla memoria del progetto stesso" width="800">
 </p>
 
 A differenza degli strumenti di chat che ripartono da zero ogni volta, Veles mantiene una **memoria di progetto strutturata** — insight, regole e conoscenza curata che si accumulano attraverso le sessioni e rendono l'agente sempre più utile più a lungo lo usi. Il modo in cui sono organizzati i tuoi *contenuti* è modulare: una wiki LLM in stile Karpathy come impostazione predefinita, note piatte, oppure nessuna struttura per i repository di codice. Costruito in modo pulito: niente god-file, niente vendor lock-in, niente sincronizzazione cloud.
@@ -34,7 +34,7 @@ A differenza degli strumenti di chat che ripartono da zero ogni volta, Veles man
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles        # interactive REPL (bare `veles` == `veles tui`)
+veles        # interactive REPL (just run `veles` with no subcommand)
 ```
 
 ---
@@ -79,7 +79,7 @@ veles init
 veles run "Read AGENTS.md and describe this project."
 ```
 
-In alternativa apri la TUI interattiva (il semplice `veles` fa lo stesso):
+In alternativa apri la REPL interattiva (il semplice `veles` fa lo stesso):
 
 ```bash
 veles
@@ -217,15 +217,16 @@ veles module list
 
 ---
 
-## TUI
+## Sessione interattiva (REPL)
 
 ```bash
-veles                        # new session (bare `veles` launches the TUI)
-veles tui --resume <id>      # continue a session
+veles                        # new session (bare `veles` launches the interactive REPL)
+veles -c                     # continue the most recent session in this project
+veles --resume <id>          # resume a specific session
 ```
 
 <p align="center">
-  <img src="docs/assets/tui-tour.gif" alt="TUI di Veles — ispettori slash (/status, /context), cambio di modalità e palette dei comandi" width="800">
+  <img src="docs/assets/tui-tour.gif" alt="REPL di Veles — ispettori slash (/status, /context), cambio di modalità e palette dei comandi" width="800">
 </p>
 
 I comandi slash mostrano tutto in tempo reale — `/status`, `/tokens`, `/context`, `/mode`, `/help` — e `Shift+Tab` cicla tra le modalità (auto / planning / writing / goal).
@@ -322,7 +323,7 @@ veles import ./backup.tar.gz --into ./new-dir
 |---|---|
 | `veles init [name]` | Crea un nuovo progetto |
 | `veles run "<prompt>"` | Esecuzione dell'agente a turno singolo |
-| `veles tui` | REPL TUI interattivo |
+| `veles` | REPL interattiva (nessun sottocomando) |
 | `veles add <file\|url>` | Acquisisce una fonte → pagina wiki |
 | `veles research "<question>"` | Ricerca approfondita multi-angolo |
 | `veles curate` | Consolida le sessioni nella wiki |

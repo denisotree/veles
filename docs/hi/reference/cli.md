@@ -50,6 +50,12 @@ user-global state और सक्रिय प्रोजेक्ट पर h
 |---|---|---|
 | `--json` | off | एक JSON report निकालें |
 | `--strict` | off | किसी भी warning पर non-zero exit (CI gating) |
+| `--fix` | off | जाँच से पहले सुरक्षित मरम्मत का प्रयास करें — फ़िलहाल एक भ्रष्ट memory-recall (FTS) index को फिर से बनाता है |
+
+`doctor` `config.toml` के सुरक्षा-संबंधी sections (`[channels.*]`, `[daemon.*]`,
+`[mcp.servers.*]`) को भी validate करता है और अज्ञात keys को एक error के रूप में
+रिपोर्ट करता है — `whitelist` के लिए `whitlist` जैसी एक typo चुपचाप एक access
+control को अक्षम कर देती है, इसलिए यहाँ यह ज़ोर से विफल होता है।
 
 ### `veles export {full,template} <path>`
 प्रोजेक्ट को एक `.tar.gz` bundle में पैक करें। देखें [बैकअप और साझा करना](../how-to/backup-and-share.md)।
@@ -154,13 +160,20 @@ suggestions → wiki lint, वैकल्पिक रूप से LLM consoli
 | `dedup [--mode auto\|embedding\|tfidf] [--embedding-threshold f] [--tfidf-threshold f]` | लगभग-डुप्लिकेट skills खोजें |
 | `suggest-promote [--save] [--min-uses n] [--min-success-rate f]` | auto-promote की सीमा पूरी करने वाली skills सूचीबद्ध करें |
 
-### `veles tool {list,show,promote}`
+### `veles tool {list,show,promote,approve}`
 
 | Subcommand | उद्देश्य |
 |---|---|
 | `list` | इस प्रोजेक्ट की `memory.db` में सूचीबद्ध tools दिखाएँ |
 | `show <name>` | किसी tool का manifest + telemetry प्रिंट करें |
 | `promote <name> [-y]` | एक project tool को `~/.veles/tools/` (cross-project) में ले जाएँ |
+| `approve [<name>] [--all] [-y]` | एक self-authored tool file की समीक्षा करें + approve करें ताकि loader उसे चलाए |
+
+self-authored tools (`.veles/tools/*.py`) अपना module-level code तब चलाते हैं जब
+loader उन्हें import करता है, इसलिए एक नई या edited file **तब तक load नहीं होती जब
+तक आप उसे approve न करें** — `veles tool approve` code दिखाता है और उसका hash
+रिकॉर्ड करता है। सादा `veles tool approve` दिखाता है कि क्या लंबित है। यही कारण है
+कि agent द्वारा लिखे गए tool को callable बनने से पहले एक review step की ज़रूरत होती है।
 
 ### `veles module {list,show,add,remove}`
 

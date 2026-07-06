@@ -26,7 +26,7 @@
 **एक मिनिमल CLI एजेंट फ्रेमवर्क जो हर सेशन के साथ और स्मार्ट होता जाता है।**
 
 <p align="center">
-  <img src="docs/assets/tui-hero.gif" alt="Veles TUI — एक सवाल पूछें, और प्रोजेक्ट की अपनी memory पर आधारित जवाब पाएं" width="800">
+  <img src="docs/assets/tui-hero.gif" alt="Veles REPL — एक सवाल पूछें, और प्रोजेक्ट की अपनी memory पर आधारित जवाब पाएं" width="800">
 </p>
 
 उन चैट टूल्स के विपरीत जो हर बार शून्य से शुरू होते हैं, Veles **संरचित प्रोजेक्ट memory** बनाए रखता है — insights, rules, और curated knowledge जो सेशनों के बीच जमा होते रहते हैं और जितना ज़्यादा आप इसका इस्तेमाल करते हैं, एजेंट उतना ही उपयोगी बनता जाता है। आपका *content* कैसे व्यवस्थित होता है, यह pluggable है: डिफ़ॉल्ट रूप से Karpathy-शैली का LLM wiki, flat notes, या कोड रिपॉज़ के लिए बिल्कुल भी कोई संरचना नहीं। साफ़-सुथरा बनाया गया: कोई god-files नहीं, कोई vendor lock-in नहीं, कोई cloud sync नहीं।
@@ -34,7 +34,7 @@
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles        # interactive REPL (bare `veles` == `veles tui`)
+veles        # interactive REPL (bare `veles` with no subcommand)
 ```
 
 ---
@@ -79,7 +79,7 @@ veles init
 veles run "Read AGENTS.md and describe this project."
 ```
 
-इसके बजाय interactive TUI खोलें (खाली `veles` यही करता है):
+इसके बजाय interactive REPL खोलें (खाली `veles` यही करता है):
 
 ```bash
 veles
@@ -217,15 +217,15 @@ veles module list
 
 ---
 
-## TUI
+## Interactive session (REPL)
 
 ```bash
-veles                        # new session (bare `veles` launches the TUI)
-veles tui --resume <id>      # continue a session
+veles                        # new session (bare `veles` launches the interactive REPL)
+veles --resume <id>      # continue a session
 ```
 
 <p align="center">
-  <img src="docs/assets/tui-tour.gif" alt="Veles TUI — slash inspectors (/status, /context), mode switching, और command palette" width="800">
+  <img src="docs/assets/tui-tour.gif" alt="Veles REPL — slash inspectors (/status, /context), mode switching, और command palette" width="800">
 </p>
 
 Slash commands सब कुछ live दिखाते हैं — `/status`, `/tokens`, `/context`, `/mode`, `/help` — और `Shift+Tab` modes को cycle करता है (auto / planning / writing / goal)।
@@ -322,7 +322,7 @@ veles import ./backup.tar.gz --into ./new-dir
 |---|---|
 | `veles init [name]` | एक नया project बनाएँ |
 | `veles run "<prompt>"` | Single-turn agent run |
-| `veles tui` | Interactive TUI REPL |
+| `veles` | Interactive REPL |
 | `veles add <file\|url>` | एक source को ingest करें → wiki page |
 | `veles research "<question>"` | Deep multi-angle research |
 | `veles curate` | सेशनों को wiki में consolidate करें |

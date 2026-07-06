@@ -51,6 +51,12 @@ Funciona com ou sem um projeto ativo.
 |---|---|---|
 | `--json` | desligado | Emite um relatório JSON |
 | `--strict` | desligado | Sai com código diferente de zero diante de qualquer aviso (controle de CI) |
+| `--fix` | desligado | Tenta reparos seguros antes de verificar — atualmente reconstrói um índice de recall de memória (FTS) corrompido |
+
+O `doctor` também valida as seções de `config.toml` relevantes para segurança
+(`[channels.*]`, `[daemon.*]`, `[mcp.servers.*]`) e reporta chaves desconhecidas
+como erro — um erro de digitação como `whitlist` em vez de `whitelist` desativa
+silenciosamente um controle de acesso, então aqui ele falha de forma ruidosa.
 
 ### `veles export {full,template} <path>`
 Empacota o projeto em um bundle `.tar.gz`. Veja [Fazer backup e compartilhar](../how-to/backup-and-share.md).
@@ -158,13 +164,21 @@ consolidação por LLM).
 | `dedup [--mode auto\|embedding\|tfidf] [--embedding-threshold f] [--tfidf-threshold f]` | Encontra skills quase duplicadas |
 | `suggest-promote [--save] [--min-uses n] [--min-success-rate f]` | Lista skills que atingem o limiar de promoção automática |
 
-### `veles tool {list,show,promote}`
+### `veles tool {list,show,promote,approve}`
 
 | Subcomando | Finalidade |
 |---|---|
 | `list` | Lista as tools catalogadas no `memory.db` deste projeto |
 | `show <name>` | Imprime o manifesto + telemetria de uma tool |
 | `promote <name> [-y]` | Move uma tool de projeto para `~/.veles/tools/` (entre projetos) |
+| `approve [<name>] [--all] [-y]` | Revisa + aprova um arquivo de tool autoescrita para que o loader a execute |
+
+Tools autoescritas (`.veles/tools/*.py`) executam seu código de nível de módulo
+quando o loader as importa, então um arquivo novo ou editado **não é carregado
+até você aprová-lo** — `veles tool approve` mostra o código e registra seu hash.
+`veles tool approve` sem argumentos lista o que está pendente. É por isso que uma
+tool escrita pelo agente precisa de uma etapa de revisão antes de se tornar
+chamável.
 
 ### `veles module {list,show,add,remove}`
 

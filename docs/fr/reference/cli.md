@@ -50,6 +50,12 @@ Fonctionne avec ou sans projet actif.
 |---|---|---|
 | `--json` | désactivé | Émet un rapport JSON |
 | `--strict` | désactivé | Sort avec un code non nul au moindre avertissement (contrôle CI) |
+| `--fix` | désactivé | Tente des réparations sûres avant les contrôles — reconstruit actuellement un index de rappel mémoire (FTS) corrompu |
+
+`doctor` valide aussi les sections sensibles pour la sécurité de `config.toml`
+(`[channels.*]`, `[daemon.*]`, `[mcp.servers.*]`) et signale les clés inconnues comme
+une erreur — une faute de frappe telle que `whitlist` au lieu de `whitelist` désactive
+silencieusement un contrôle d'accès, elle échoue donc bruyamment ici.
 
 ### `veles export {full,template} <path>`
 Empaquette le projet dans une archive `.tar.gz`. Voir [Sauvegarder et partager](../how-to/backup-and-share.md).
@@ -155,13 +161,21 @@ skills → suggestions de promotion → lint du wiki, et éventuellement consoli
 | `dedup [--mode auto\|embedding\|tfidf] [--embedding-threshold f] [--tfidf-threshold f]` | Détecte les skills quasi-doublons |
 | `suggest-promote [--save] [--min-uses n] [--min-success-rate f]` | Liste les skills qui atteignent le seuil de promotion automatique |
 
-### `veles tool {list,show,promote}`
+### `veles tool {list,show,promote,approve}`
 
 | Sous-commande | Rôle |
 |---|---|
 | `list` | Liste les outils catalogués dans le `memory.db` de ce projet |
 | `show <name>` | Affiche le manifeste + la télémétrie d'un outil |
 | `promote <name> [-y]` | Déplace un outil projet vers `~/.veles/tools/` (inter-projets) |
+| `approve [<name>] [--all] [-y]` | Relit + approuve un fichier d'outil auto-écrit pour que le chargeur l'exécute |
+
+Les outils auto-écrits (`.veles/tools/*.py`) exécutent leur code au niveau module
+lorsque le chargeur les importe ; un fichier nouveau ou modifié n'est donc **pas
+chargé tant que vous ne l'avez pas approuvé** — `veles tool approve` affiche le code
+et enregistre son hash. `veles tool approve` seul liste ce qui est en attente. C'est
+pourquoi un outil écrit par l'agent nécessite une étape de relecture avant de devenir
+appelable.
 
 ### `veles module {list,show,add,remove}`
 

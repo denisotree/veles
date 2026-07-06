@@ -26,7 +26,7 @@
 **Uma framework minimalista de agente CLI que fica mais inteligente a cada sessão.**
 
 <p align="center">
-  <img src="docs/assets/tui-hero.gif" alt="TUI do Veles — faz uma pergunta e obtém uma resposta fundamentada na própria memória do projeto" width="800">
+  <img src="docs/assets/tui-hero.gif" alt="REPL do Veles — faz uma pergunta e obtém uma resposta fundamentada na própria memória do projeto" width="800">
 </p>
 
 Ao contrário das ferramentas de chat que recomeçam do zero de cada vez, o Veles mantém uma **memória de projeto estruturada** — descobertas, regras e conhecimento curado que se acumulam ao longo das sessões e tornam o agente mais útil quanto mais o utilizas. A forma como o teu *conteúdo* está organizado é configurável: por predefinição, uma wiki LLM ao estilo Karpathy, notas planas ou nenhuma estrutura de todo para repositórios de código. Construído de forma limpa: sem ficheiros-monstro, sem dependência de fornecedores, sem sincronização na nuvem.
@@ -34,7 +34,7 @@ Ao contrário das ferramentas de chat que recomeçam do zero de cada vez, o Vele
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles        # interactive REPL (bare `veles` == `veles tui`)
+veles        # interactive REPL (just run `veles` with no subcommand)
 ```
 
 ---
@@ -79,7 +79,7 @@ veles init
 veles run "Read AGENTS.md and describe this project."
 ```
 
-Em alternativa, abre a TUI interativa (o comando `veles` simples faz o mesmo):
+Em alternativa, abre o REPL interativo (o comando `veles` simples faz o mesmo):
 
 ```bash
 veles
@@ -217,15 +217,15 @@ veles module list
 
 ---
 
-## TUI
+## Sessão interativa (REPL)
 
 ```bash
-veles                        # new session (bare `veles` launches the TUI)
-veles tui --resume <id>      # continue a session
+veles                        # new session (bare `veles` launches the interactive REPL)
+veles --resume <id>      # continue a session
 ```
 
 <p align="center">
-  <img src="docs/assets/tui-tour.gif" alt="TUI do Veles — inspetores de barra (/status, /context), troca de modos e a paleta de comandos" width="800">
+  <img src="docs/assets/tui-tour.gif" alt="REPL do Veles — inspetores de barra (/status, /context), troca de modos e a paleta de comandos" width="800">
 </p>
 
 Os comandos de barra revelam tudo em tempo real — `/status`, `/tokens`, `/context`, `/mode`, `/help` — e `Shift+Tab` alterna entre modos (auto / planning / writing / goal).
@@ -322,7 +322,7 @@ veles import ./backup.tar.gz --into ./new-dir
 |---|---|
 | `veles init [name]` | Criar um novo projeto |
 | `veles run "<prompt>"` | Execução do agente num único turno |
-| `veles tui` | REPL interativo em TUI |
+| `veles` | REPL interativo |
 | `veles add <file\|url>` | Ingerir uma fonte → página da wiki |
 | `veles research "<question>"` | Investigação aprofundada multifacetada |
 | `veles curate` | Consolidar sessões na wiki |

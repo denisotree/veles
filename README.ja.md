@@ -26,7 +26,7 @@
 **セッションを重ねるごとに賢くなる、ミニマルな CLI エージェントフレームワーク。**
 
 <p align="center">
-  <img src="docs/assets/tui-hero.gif" alt="Veles TUI — 質問を投げると、プロジェクト自身のメモリに基づいた回答が返ってくる" width="800">
+  <img src="docs/assets/tui-hero.gif" alt="Veles REPL — 質問を投げると、プロジェクト自身のメモリに基づいた回答が返ってくる" width="800">
 </p>
 
 毎回ゼロから始まるチャットツールとは違い、Veles は**構造化されたプロジェクトメモリ**を保持します。インサイト、ルール、キュレーションされた知識がセッションを越えて蓄積され、使い込むほどエージェントが役に立つようになります。*コンテンツ*の整理方法は差し替え可能です。デフォルトは Karpathy 流の LLM ウィキ、フラットなノート、あるいはコードリポジトリ向けに構造をまったく持たせない形式も選べます。クリーンな設計を貫いています。神クラスのファイルなし、ベンダーロックインなし、クラウド同期なし。
@@ -34,7 +34,7 @@
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles        # interactive REPL (bare `veles` == `veles tui`)
+veles        # interactive REPL (bare `veles` with no subcommand)
 ```
 
 ---
@@ -79,7 +79,7 @@ veles init
 veles run "Read AGENTS.md and describe this project."
 ```
 
-代わりにインタラクティブな TUI を開く(素の `veles` でも同じことができます):
+代わりにインタラクティブな REPL を開く(素の `veles` でも同じことができます):
 
 ```bash
 veles
@@ -217,15 +217,15 @@ veles module list
 
 ---
 
-## TUI
+## インタラクティブセッション(REPL)
 
 ```bash
-veles                        # new session (bare `veles` launches the TUI)
-veles tui --resume <id>      # continue a session
+veles                        # new session (bare `veles` launches the interactive REPL)
+veles --resume <id>      # continue a session
 ```
 
 <p align="center">
-  <img src="docs/assets/tui-tour.gif" alt="Veles TUI — スラッシュインスペクター(/status、/context)、モード切り替え、コマンドパレット" width="800">
+  <img src="docs/assets/tui-tour.gif" alt="Veles REPL — スラッシュインスペクター(/status、/context)、モード切り替え、コマンドパレット" width="800">
 </p>
 
 スラッシュコマンドがすべてをライブで表示します — `/status`、`/tokens`、`/context`、`/mode`、`/help` — そして `Shift+Tab` でモード(auto / planning / writing / goal)を順に切り替えられます。
@@ -322,7 +322,7 @@ veles import ./backup.tar.gz --into ./new-dir
 |---|---|
 | `veles init [name]` | 新しいプロジェクトを作成 |
 | `veles run "<prompt>"` | シングルターンのエージェント実行 |
-| `veles tui` | インタラクティブな TUI REPL |
+| `veles` | インタラクティブな REPL |
 | `veles add <file\|url>` | ソースを取り込み → ウィキページへ |
 | `veles research "<question>"` | 多角的なディープリサーチ |
 | `veles curate` | セッションをウィキへ統合 |

@@ -26,7 +26,7 @@
 **Минималистичный фреймворк CLI-агента, который умнеет с каждой сессией.**
 
 <p align="center">
-  <img src="docs/assets/tui-hero.gif" alt="Veles TUI — задайте вопрос и получите ответ, опирающийся на собственную память проекта" width="800">
+  <img src="docs/assets/tui-hero.gif" alt="Veles REPL — задайте вопрос и получите ответ, опирающийся на собственную память проекта" width="800">
 </p>
 
 В отличие от чат-инструментов, которые каждый раз начинают с чистого листа, Veles ведёт **структурированную проектную память** — инсайты, правила и выверенные знания, которые накапливаются между сессиями и делают агента тем полезнее, чем дольше вы им пользуетесь. То, как организован ваш *контент*, можно подключать как плагин: по умолчанию — LLM-вики в стиле Карпати, плоские заметки или вовсе без структуры для репозиториев с кодом. Сделано чисто: без god-файлов, без вендорлока, без облачной синхронизации.
@@ -34,7 +34,7 @@
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles        # интерактивный REPL (TUI; просто `veles` без подкоманды)
+veles        # интерактивный REPL (просто `veles` без подкоманды)
 ```
 
 ---
@@ -79,7 +79,7 @@ veles init
 veles run "Read AGENTS.md and describe this project."
 ```
 
-Или откройте интерактивный TUI (голый `veles` делает то же самое):
+Или откройте интерактивный REPL (голый `veles` делает то же самое):
 
 ```bash
 veles
@@ -217,16 +217,16 @@ veles module list
 
 ---
 
-## TUI
+## Интерактивная сессия (REPL)
 
 ```bash
-veles                        # новая сессия (bare `veles` запускает TUI)
+veles                        # новая сессия (bare `veles` запускает интерактивный REPL)
 veles -c                     # продолжить последнюю сессию проекта
 veles --resume <id>          # возобновить конкретную сессию
 ```
 
 <p align="center">
-  <img src="docs/assets/tui-tour.gif" alt="Veles TUI — слэш-инспекторы (/status, /context), переключение режимов и палитра команд" width="800">
+  <img src="docs/assets/tui-tour.gif" alt="Veles REPL — слэш-инспекторы (/status, /context), переключение режимов и палитра команд" width="800">
 </p>
 
 Слэш-команды показывают всё вживую — `/status`, `/tokens`, `/context`, `/mode`, `/help` — а `Shift+Tab` циклически переключает режимы (auto / planning / writing / goal).
@@ -323,7 +323,7 @@ veles import ./backup.tar.gz --into ./new-dir
 |---|---|
 | `veles init [name]` | Создать новый проект |
 | `veles run "<prompt>"` | Однократный запуск агента |
-| `veles` | Интерактивный TUI REPL (без подкоманды) |
+| `veles` | Интерактивный REPL (без подкоманды) |
 | `veles add <file\|url>` | Добавить источник → вики-страница |
 | `veles research "<question>"` | Глубокое многостороннее исследование |
 | `veles curate` | Консолидировать сессии в вики |

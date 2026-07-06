@@ -43,6 +43,9 @@ veles [--no-wizard] <command> [subcommand] [options]
 |---|---|---|
 | `--json` | off | JSON 보고서 출력 |
 | `--strict` | off | 경고가 하나라도 있으면 비정상 종료(CI 게이팅) |
+| `--fix` | off | 점검 전에 안전한 복구를 시도 — 현재는 손상된 메모리 리콜(FTS) 인덱스를 재구축합니다 |
+
+`doctor`는 `config.toml`의 보안 관련 섹션(`[channels.*]`, `[daemon.*]`, `[mcp.servers.*]`)도 검증하며, 알 수 없는 키는 오류로 보고합니다 — `whitelist`를 `whitlist`처럼 오타 내면 접근 제어가 조용히 비활성화되므로, 여기서 크게 실패시킵니다.
 
 ### `veles export {full,template} <path>`
 프로젝트를 `.tar.gz` 번들로 묶습니다. [백업 및 공유](../how-to/backup-and-share.md)를 참고하세요.
@@ -140,13 +143,16 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `dedup [--mode auto\|embedding\|tfidf] [--embedding-threshold f] [--tfidf-threshold f]` | 거의 중복인 스킬 찾기 |
 | `suggest-promote [--save] [--min-uses n] [--min-success-rate f]` | 자동 승격 기준을 충족하는 스킬 나열 |
 
-### `veles tool {list,show,promote}`
+### `veles tool {list,show,promote,approve}`
 
 | 하위 명령 | 용도 |
 |---|---|
 | `list` | 이 프로젝트의 `memory.db`에 등록된 도구 나열 |
 | `show <name>` | 도구의 매니페스트 + 텔레메트리 출력 |
 | `promote <name> [-y]` | 프로젝트 도구를 `~/.veles/tools/`로 이동(프로젝트 간 공유) |
+| `approve [<name>] [--all] [-y]` | 로더가 실행하도록 직접 작성한 도구 파일을 검토 + 승인 |
+
+직접 작성한 도구(`.veles/tools/*.py`)는 로더가 임포트할 때 모듈 수준 코드를 실행하므로, 새로 만들거나 수정한 파일은 **승인하기 전에는 로드되지 않습니다** — `veles tool approve`는 코드를 보여주고 그 해시를 기록합니다. 인자 없는 `veles tool approve`는 대기 중인 항목을 나열합니다. 에이전트가 작성한 도구가 호출 가능해지기 전에 검토 단계가 필요한 이유입니다.
 
 ### `veles module {list,show,add,remove}`
 

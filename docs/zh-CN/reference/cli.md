@@ -43,6 +43,9 @@ veles [--no-wizard] <command> [subcommand] [options]
 |---|---|---|
 | `--json` | 关闭 | 输出 JSON 报告 |
 | `--strict` | 关闭 | 任何警告都以非零状态退出（用于 CI 把关） |
+| `--fix` | 关闭 | 在检查前尝试安全修复——目前会重建损坏的记忆召回（FTS）索引 |
+
+`doctor` 还会校验 `config.toml` 中与安全相关的章节（`[channels.*]`、`[daemon.*]`、`[mcp.servers.*]`），并将未知键报告为错误——像把 `whitelist` 误写成 `whitlist` 这样的拼写错误会悄无声息地禁用一项访问控制，因此这里会显式报错。
 
 ### `veles export {full,template} <path>`
 将项目打包为 `.tar.gz` 归档。参见[备份与分享](../how-to/backup-and-share.md)。
@@ -140,13 +143,16 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `dedup [--mode auto\|embedding\|tfidf] [--embedding-threshold f] [--tfidf-threshold f]` | 查找近似重复的 skills |
 | `suggest-promote [--save] [--min-uses n] [--min-success-rate f]` | 列出达到自动晋升门槛的 skills |
 
-### `veles tool {list,show,promote}`
+### `veles tool {list,show,promote,approve}`
 
 | 子命令 | 用途 |
 |---|---|
 | `list` | 列出本项目 `memory.db` 中编目的 tools |
 | `show <name>` | 打印某个 tool 的清单 + 遥测数据 |
 | `promote <name> [-y]` | 将项目级 tool 移动到 `~/.veles/tools/`（跨项目） |
+| `approve [<name>] [--all] [-y]` | 审阅并批准一个自撰写的 tool 文件，使加载器会运行它 |
+
+自撰写的 tools（`.veles/tools/*.py`）在加载器导入它们时会运行其模块级代码，因此新增或编辑过的文件在获得批准前**不会被加载**——`veles tool approve` 会显示代码并记录其哈希值。不带参数的 `veles tool approve` 会列出待批准的内容。
 
 ### `veles module {list,show,add,remove}`
 

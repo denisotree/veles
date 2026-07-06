@@ -71,4 +71,7 @@ API 金鑰的查詢串接順序：OS 鑰匙圈（專案範圍）→ OS 鑰匙圈
 
 ## 內部／測試
 
-`VELES_BUNDLE_VERSION`、`VELES_CACHE_BREAKPOINT`——內部用途；你不應需要設定這些。
+| 變數 | 用途 |
+|---|---|
+| `VELES_BUNDLE_VERSION` | 內部用途；你不應需要設定它 |
+| `VELES_REPL_SIMPLE` | 設為 `1` 可強制使用純以行為單位的 REPL 迴圈，取代全螢幕的 `prompt_toolkit` 應用（為受限終端機提供的退路） |

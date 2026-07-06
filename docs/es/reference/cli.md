@@ -50,6 +50,12 @@ activo. Funciona con o sin un proyecto activo.
 |---|---|---|
 | `--json` | desactivado | Emite un informe JSON |
 | `--strict` | desactivado | Sale con código distinto de cero ante cualquier advertencia (para bloquear CI) |
+| `--fix` | desactivado | Intenta reparaciones seguras antes de comprobar — actualmente reconstruye un índice de recall de memoria (FTS) corrupto |
+
+`doctor` también valida las secciones de `config.toml` relevantes para la seguridad
+(`[channels.*]`, `[daemon.*]`, `[mcp.servers.*]`) y notifica las claves desconocidas
+como un error — una errata como `whitlist` en vez de `whitelist` desactiva
+silenciosamente un control de acceso, así que aquí falla de forma ruidosa.
 
 ### `veles export {full,template} <path>`
 Empaqueta el proyecto en un paquete `.tar.gz`. Consulta [Copia de seguridad y compartir](../how-to/backup-and-share.md).
@@ -155,13 +161,20 @@ sugerencias de promoción → lint de wiki, opcionalmente consolidación con LLM
 | `dedup [--mode auto\|embedding\|tfidf] [--embedding-threshold f] [--tfidf-threshold f]` | Encuentra skills casi duplicadas |
 | `suggest-promote [--save] [--min-uses n] [--min-success-rate f]` | Lista las skills que cumplen el umbral de autopromoción |
 
-### `veles tool {list,show,promote}`
+### `veles tool {list,show,promote,approve}`
 
 | Subcomando | Propósito |
 |---|---|
 | `list` | Lista las herramientas catalogadas en el `memory.db` de este proyecto |
 | `show <name>` | Imprime el manifiesto + la telemetría de una herramienta |
 | `promote <name> [-y]` | Mueve una herramienta de proyecto a `~/.veles/tools/` (entre proyectos) |
+| `approve [<name>] [--all] [-y]` | Revisa + aprueba un archivo de herramienta de autoría propia para que el cargador lo ejecute |
+
+Las herramientas de autoría propia (`.veles/tools/*.py`) ejecutan su código a nivel
+de módulo cuando el cargador las importa, por lo que un archivo nuevo o editado **no
+se carga hasta que lo apruebas** — `veles tool approve` muestra el código y registra
+su hash. `veles tool approve` a secas lista lo que está pendiente. Por eso una
+herramienta escrita por el agente necesita un paso de revisión antes de poder invocarse.
 
 ### `veles module {list,show,add,remove}`
 

@@ -26,7 +26,7 @@
 **一个极简的 CLI 智能体框架，每一次会话都让它变得更聪明。**
 
 <p align="center">
-  <img src="docs/assets/tui-hero.gif" alt="Veles TUI —— 提出问题，得到一个基于项目自身内存的答案" width="800">
+  <img src="docs/assets/tui-hero.gif" alt="Veles REPL —— 提出问题，得到一个基于项目自身内存的答案" width="800">
 </p>
 
 与每次都从零开始的聊天工具不同，Veles 维护着**结构化的项目内存**——洞见、规则和经过整理的知识，它们会跨会话不断积累，让你用得越久，智能体越有用。你的*内容*如何组织是可插拔的：默认采用 Karpathy 风格的 LLM wiki，也可以用扁平笔记，或者对代码仓库完全不施加任何结构。代码构建干净：没有巨型文件，没有厂商锁定，没有云端同步。
@@ -34,7 +34,7 @@
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles        # interactive REPL (bare `veles` == `veles tui`)
+veles        # interactive REPL (just run `veles` with no subcommand)
 ```
 
 ---
@@ -79,7 +79,7 @@ veles init
 veles run "Read AGENTS.md and describe this project."
 ```
 
-或者打开交互式 TUI（直接运行 `veles` 效果相同）：
+或者打开交互式 REPL（直接运行 `veles` 效果相同）：
 
 ```bash
 veles
@@ -217,15 +217,16 @@ veles module list
 
 ---
 
-## TUI
+## 交互式会话（REPL）
 
 ```bash
-veles                        # new session (bare `veles` launches the TUI)
-veles tui --resume <id>      # continue a session
+veles                        # new session (bare `veles` launches the interactive REPL)
+veles -c                     # continue the most recent session in this project
+veles --resume <id>          # resume a specific session
 ```
 
 <p align="center">
-  <img src="docs/assets/tui-tour.gif" alt="Veles TUI —— 斜杠检查器（/status、/context）、模式切换以及命令面板" width="800">
+  <img src="docs/assets/tui-tour.gif" alt="Veles REPL —— 斜杠检查器（/status、/context）、模式切换以及命令面板" width="800">
 </p>
 
 斜杠命令实时呈现一切——`/status`、`/tokens`、`/context`、`/mode`、`/help`——而 `Shift+Tab` 则在各模式之间循环（auto / planning / writing / goal）。
@@ -322,7 +323,7 @@ veles import ./backup.tar.gz --into ./new-dir
 |---|---|
 | `veles init [name]` | 创建一个新项目 |
 | `veles run "<prompt>"` | 单轮智能体运行 |
-| `veles tui` | 交互式 TUI REPL |
+| `veles` | 交互式 REPL（无子命令） |
 | `veles add <file\|url>` | 摄取一个来源 → wiki 页面 |
 | `veles research "<question>"` | 多角度深度研究 |
 | `veles curate` | 将会话整合进 wiki |

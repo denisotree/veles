@@ -26,7 +26,7 @@
 **إطار عمل بسيط لوكيل سطر الأوامر يزداد ذكاءً مع كل جلسة.**
 
 <p align="center">
-  <img src="docs/assets/tui-hero.gif" alt="واجهة Veles النصية — اطرح سؤالاً واحصل على إجابة مستندة إلى ذاكرة المشروع نفسه" width="800">
+  <img src="docs/assets/tui-hero.gif" alt="Veles REPL — اطرح سؤالاً واحصل على إجابة مستندة إلى ذاكرة المشروع نفسه" width="800">
 </p>
 
 على عكس أدوات المحادثة التي تبدأ من الصفر في كل مرة، يحتفظ Veles بـ**ذاكرة مشروع منظّمة** — استنتاجات وقواعد ومعرفة منسَّقة تتراكم عبر الجلسات وتجعل الوكيل أكثر فائدة كلما طالت مدة استخدامك له. وطريقة تنظيم *محتواك* قابلة للتوصيل: ويكي LLM على نمط Karpathy افتراضيًا، أو ملاحظات مسطّحة، أو بلا أي بنية على الإطلاق لمستودعات الشيفرة. مبنيّ بنظافة: لا ملفات عملاقة، ولا تقييد بمورّد، ولا مزامنة سحابية.
@@ -34,7 +34,7 @@
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles        # interactive REPL (bare `veles` == `veles tui`)
+veles        # interactive REPL (just run `veles` with no subcommand)
 ```
 
 ---
@@ -79,7 +79,7 @@ veles init
 veles run "Read AGENTS.md and describe this project."
 ```
 
-افتح الواجهة النصية التفاعلية بدلًا من ذلك (الأمر المجرّد `veles` يفعل الشيء نفسه):
+افتح REPL التفاعلية بدلًا من ذلك (الأمر المجرّد `veles` يفعل الشيء نفسه):
 
 ```bash
 veles
@@ -217,15 +217,15 @@ veles module list
 
 ---
 
-## الواجهة النصية (TUI)
+## جلسة تفاعلية (REPL)
 
 ```bash
-veles                        # new session (bare `veles` launches the TUI)
-veles tui --resume <id>      # continue a session
+veles                        # new session (bare `veles` launches the interactive REPL)
+veles --resume <id>          # resume a specific session
 ```
 
 <p align="center">
-  <img src="docs/assets/tui-tour.gif" alt="واجهة Veles النصية — أدوات الفحص بالشرطة المائلة (‎/status و‎/context)، وتبديل الأوضاع، ولوحة الأوامر" width="800">
+  <img src="docs/assets/tui-tour.gif" alt="Veles REPL — أدوات الفحص بالشرطة المائلة (‎/status و‎/context)، وتبديل الأوضاع، ولوحة الأوامر" width="800">
 </p>
 
 تُظهِر أوامر الشرطة المائلة كل شيء مباشرةً — `/status` و`/tokens` و`/context` و`/mode` و`/help` — ويتنقّل `Shift+Tab` بين الأوضاع (تلقائي / تخطيط / كتابة / هدف).
@@ -322,7 +322,7 @@ veles import ./backup.tar.gz --into ./new-dir
 |---|---|
 | `veles init [name]` | إنشاء مشروع جديد |
 | `veles run "<prompt>"` | تشغيل وكيل بدورة واحدة |
-| `veles tui` | واجهة REPL النصية التفاعلية |
+| `veles` | واجهة REPL التفاعلية (دون أمر فرعي) |
 | `veles add <file\|url>` | ابتلاع مصدر ← صفحة ويكي |
 | `veles research "<question>"` | بحث معمّق متعدّد الزوايا |
 | `veles curate` | دمج الجلسات في الويكي |

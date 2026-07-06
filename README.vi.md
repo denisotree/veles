@@ -26,7 +26,7 @@
 **Một framework agent CLI tối giản, ngày càng thông minh hơn sau mỗi phiên làm việc.**
 
 <p align="center">
-  <img src="docs/assets/tui-hero.gif" alt="Veles TUI — đặt một câu hỏi và nhận câu trả lời dựa trên bộ nhớ của chính dự án" width="800">
+  <img src="docs/assets/tui-hero.gif" alt="Veles REPL — đặt một câu hỏi và nhận câu trả lời dựa trên bộ nhớ của chính dự án" width="800">
 </p>
 
 Khác với các công cụ trò chuyện luôn bắt đầu lại từ đầu mỗi lần, Veles duy trì **bộ nhớ dự án có cấu trúc** — các insight, quy tắc, và kiến thức đã được chắt lọc, tích lũy qua từng phiên và khiến agent càng hữu ích hơn khi bạn dùng càng lâu. Cách tổ chức *nội dung* của bạn có thể tùy biến: mặc định là wiki LLM kiểu Karpathy, hoặc ghi chú dạng phẳng, hoặc không cấu trúc gì cả cho các kho mã nguồn. Được xây dựng gọn gàng: không có file khổng lồ, không bị khóa vào nhà cung cấp, không đồng bộ đám mây.
@@ -34,7 +34,7 @@ Khác với các công cụ trò chuyện luôn bắt đầu lại từ đầu m
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles        # interactive REPL (bare `veles` == `veles tui`)
+veles        # interactive REPL (just run `veles` with no subcommand)
 ```
 
 ---
@@ -79,7 +79,7 @@ veles init
 veles run "Read AGENTS.md and describe this project."
 ```
 
-Hoặc mở TUI tương tác (chạy `veles` trống cũng cho kết quả tương tự):
+Hoặc mở REPL tương tác (chạy `veles` trống cũng cho kết quả tương tự):
 
 ```bash
 veles
@@ -217,15 +217,16 @@ veles module list
 
 ---
 
-## TUI
+## Phiên tương tác (REPL)
 
 ```bash
-veles                        # new session (bare `veles` launches the TUI)
-veles tui --resume <id>      # continue a session
+veles                        # new session (bare `veles` launches the interactive REPL)
+veles -c                     # continue the most recent session in this project
+veles --resume <id>          # resume a specific session
 ```
 
 <p align="center">
-  <img src="docs/assets/tui-tour.gif" alt="Veles TUI — các slash inspector (/status, /context), chuyển đổi chế độ, và bảng lệnh" width="800">
+  <img src="docs/assets/tui-tour.gif" alt="Veles REPL — các slash inspector (/status, /context), chuyển đổi chế độ, và bảng lệnh" width="800">
 </p>
 
 Các lệnh slash hiển thị mọi thứ trực tiếp — `/status`, `/tokens`, `/context`, `/mode`, `/help` — và `Shift+Tab` chuyển vòng giữa các chế độ (auto / planning / writing / goal).
@@ -322,7 +323,7 @@ veles import ./backup.tar.gz --into ./new-dir
 |---|---|
 | `veles init [name]` | Tạo một dự án mới |
 | `veles run "<prompt>"` | Lần chạy agent một lượt |
-| `veles tui` | REPL TUI tương tác |
+| `veles` | REPL tương tác (không có lệnh con) |
 | `veles add <file\|url>` | Nạp một nguồn → trang wiki |
 | `veles research "<question>"` | Nghiên cứu sâu nhiều góc độ |
 | `veles curate` | Hợp nhất các phiên vào wiki |

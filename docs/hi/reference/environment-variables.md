@@ -73,5 +73,7 @@ API-key lookup cascade: OS keychain (project scope) → OS keychain (default sco
 
 ## Internal / testing
 
-`VELES_BUNDLE_VERSION`, `VELES_CACHE_BREAKPOINT` — internal; इन्हें set करने की आपको
-आवश्यकता नहीं होनी चाहिए।
+| Variable | उद्देश्य |
+|---|---|
+| `VELES_BUNDLE_VERSION` | Internal; इसे set करने की आपको आवश्यकता नहीं होनी चाहिए |
+| `VELES_REPL_SIMPLE` | full-screen `prompt_toolkit` app के बजाय सादा line-आधारित REPL loop बाध्य करने के लिए `1` पर set करें (सीमित terminals के लिए fallback) |
