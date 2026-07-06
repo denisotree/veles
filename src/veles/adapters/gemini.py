@@ -72,7 +72,7 @@ class GeminiProvider:
 
         The SDK yields entries whose `name` looks like `"models/gemini-2.5-pro"`;
         we strip the `models/` prefix so the result is what `create_message(model=…)`
-        expects. Re-raises network/auth errors — `tui.screens._model_fetcher`
+        expects. Re-raises network/auth errors — `cli.repl.model_fetcher`
         decides whether to fall back to a curated list.
         """
         ids: list[str] = []
