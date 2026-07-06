@@ -115,3 +115,37 @@ def test_builtin_toolset_has_wiki_read_surface() -> None:
     builtin_tools = TOOLSETS["builtin"]
     for tool in ("wiki_search", "wiki_read_page", "wiki_list_pages"):
         assert tool in builtin_tools
+
+
+# ---------- M203: content-aware, multi-topic behaviour ----------
+
+
+def test_behaviour_prompt_covers_multi_topic_extraction(
+    isolated_home: Path, tmp_path: Path
+) -> None:
+    """M203: one source may be ABOUT several distinct topics (a diary day →
+    concept + entities). The prompt must tell the model to extract topics and
+    fan out — page identity is the TOPIC, never the filename/date."""
+    from veles.cli._runtime import _load_layout_prompt
+
+    project = init_project(tmp_path / "proj", name="proj")
+    text = _load_layout_prompt(project)
+
+    assert text is not None
+    lower = text.lower()
+    assert "topic" in lower
+    assert "several" in lower  # "a source may cover several distinct topics"
+    # page identity is the topic, not the file name/date
+    assert "never the filename" in lower or "not the filename" in lower
+
+
+def test_behaviour_prompt_covers_valueless_source(isolated_home: Path, tmp_path: Path) -> None:
+    """M203 case (e): a valueless source (empty/boilerplate/dup) yields no
+    page and is archived, not deleted."""
+    from veles.cli._runtime import _load_layout_prompt
+
+    project = init_project(tmp_path / "proj", name="proj")
+    text = _load_layout_prompt(project)
+
+    assert text is not None
+    assert "sources/_archive" in text

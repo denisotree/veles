@@ -1,36 +1,38 @@
-"""Ingest primitives shared by CLI (`veles add` / `veles ingest`) and TUI
-(`/wiki add` from M83). Owns the agent's system prompt and the user
-message template so prompt drift can't happen between entry points.
+"""Ingest user-message template, shared by the CLI (`veles add`) and the
+REPL `/wiki add` slash command so the kickoff turn is identical between
+entry points.
 
-Provider/model/agent construction stays at the call-site — CLI knows
-about budget tracking and console output; TUI talks to its widgets via
-the Textual event loop. Keeping this module pure ASCII makes it easy to
-import from both surfaces without dragging in either runtime.
+M203 retired the single-page `INGEST_SYSTEM_PROMPT`: `veles add` now builds
+its system prompt via `cli.commands.ingest.ingest_system_prompt`
+(→ `build_run_system_prompt`), so the llm-wiki layout behaviour (topic
+extraction → find-or-create-or-patch) drives ingestion instead of a hardcoded
+1:1 dump. The REPL `/wiki add` path already ran under the full run prompt.
+Keeping this module pure ASCII makes it easy to import from both surfaces.
 """
 
 from __future__ import annotations
 
-INGEST_SYSTEM_PROMPT = (
-    "You are the Veles ingest agent. Read the source named by the user and"
-    " write a single wiki page summarizing it.\n\n"
-    "Workflow:\n"
-    "- For URLs (http:// or https://): call fetch_url(url).\n"
-    "- For file paths: call read_file(path).\n"
-    "- Decide a category. Allowed: 'concepts' (ideas, frameworks),"
-    " 'entities' (people, products, organizations), 'sources' (notes about"
-    " the raw source itself).\n"
-    "- Choose a short kebab-case slug.\n"
-    "- Compose a markdown wiki page: H1 title, then a few sections."
-    " Keep it focused; cite specific facts.\n"
-    "- Call wiki_write_page(category, slug, title, content).\n"
-    "- Call wiki_append_log(op='ingest', summary='<one-line description>').\n"
-    "- Reply with a one-sentence confirmation that includes the page path."
-)
-
 
 def ingest_user_message(source: str) -> str:
-    """The user-side prompt that kicks off an ingest run for `source`."""
-    return f"Ingest this source: {source}"
+    """The user-side turn that kicks off a content-aware ingest run.
+
+    The directive lives in the USER turn (always read) — not only in the
+    layout behaviour prompt, which is ambient/conditional and which a weak
+    model (gpt-4o-mini) was observed to ignore, falling back to a single
+    date-named `wiki/sources/2025-02-27` dump (M203 live eval)."""
+    return (
+        f"Ingest this source into the wiki: {source}\n\n"
+        "Read it, then identify the distinct topics it is ABOUT — a single "
+        "source may cover several (an event, the people involved, a concept). "
+        "For EACH topic: search the existing wiki by meaning (wiki_search) and "
+        "PATCH the page if one exists, otherwise CREATE a topical page (usually "
+        "under concepts/ or entities/). A page's identity is the TOPIC: never "
+        "create a page named after the file or a date (no `2025-02-27` page), "
+        "never write it into the wiki `sources` category, and never dump the "
+        "whole file into one page. When done, move the raw file into the "
+        "top-level `sources/` directory (leave it in place if the move is "
+        "refused — don't fail the ingest over archiving)."
+    )
 
 
-__all__ = ["INGEST_SYSTEM_PROMPT", "ingest_user_message"]
+__all__ = ["ingest_user_message"]

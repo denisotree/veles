@@ -8,11 +8,49 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from veles.core.layout.engines import wiki_enabled
 from veles.core.project import Project
-from veles.modules.wiki.ingest import INGEST_SYSTEM_PROMPT, ingest_user_message
+
+if TYPE_CHECKING:
+    from veles.core.provider import Provider
+from veles.modules.wiki.ingest import ingest_user_message
 from veles.modules.wiki.wiki import Wiki
+
+# Fallback only for the (unreachable-in-practice) case where the run prompt
+# assembles empty — `veles add` is gated on `wiki_enabled`, and the run prompt
+# always carries at least the identity header, so this is a belt-and-braces
+# guard. It still states the content-aware contract, never a 1:1 dump.
+_INGEST_FALLBACK_PROMPT = (
+    "You are the Veles ingest agent. Read the source the user names, extract the"
+    " distinct topics it is about, and for each topic find an existing wiki page"
+    " by meaning (wiki_search) — patch it if found, otherwise create a topical"
+    " page (wiki_write_page). A page's identity is the TOPIC, never the filename"
+    " or a date. Relocate a raw file source into top-level sources/ with"
+    " move_file, and wiki_append_log one line per page touched."
+)
+
+
+def ingest_system_prompt(
+    project: Project,
+    provider: Provider,
+    tools: tuple[str, ...],
+) -> str:
+    """Content-aware ingest system prompt (M203).
+
+    Routes `veles add` through `build_run_system_prompt` so the llm-wiki layout
+    behaviour (topic extraction → find-or-create-or-patch, M190/M203) is
+    injected — the same prompt a `veles run` migration turn gets — instead of
+    the retired single-page `INGEST_SYSTEM_PROMPT`. The result is qualified for
+    the provider's MCP tool namespace (claude-cli/gemini-cli)."""
+    from veles.cli import _qualify_for_provider
+    from veles.cli._runtime import build_run_system_prompt
+
+    base = build_run_system_prompt(project, prompt="ingest a source into the wiki")
+    if not base:
+        base = _INGEST_FALLBACK_PROMPT
+    return _qualify_for_provider(base, provider, tools)
 
 
 def _batch_ingest_files(root: Path, pattern: str) -> list[Path]:
@@ -71,7 +109,6 @@ def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) 
         _PROVIDER_API_KEY_ENVS,
         _ensure_api_key,
         _print_run_summary,
-        _qualify_for_provider,
         _run_agent_streaming_aware,
         _warn_if_agents_md_invalid,
         build_command_agent,
@@ -102,9 +139,7 @@ def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) 
         args,
         project,
         tools=_INGEST_TOOLS,
-        system_prompt=lambda provider: _qualify_for_provider(
-            INGEST_SYSTEM_PROMPT, provider, _INGEST_TOOLS
-        ),
+        system_prompt=lambda provider: ingest_system_prompt(project, provider, _INGEST_TOOLS),
         check_api_key=False,
         tool_aware=True,
     )

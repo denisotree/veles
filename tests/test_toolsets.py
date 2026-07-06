@@ -27,6 +27,34 @@ def test_run_toolset_inherits_from_builtin() -> None:
     assert "wiki_search" in TOOLSETS["run"]
 
 
+def test_ingest_toolset_is_content_aware() -> None:
+    """M203: `veles add` needs to dedup/patch/fan-out, not dump one page.
+
+    The ingest toolset must include the search/read tools (via `builtin`)
+    so it can find an existing page by meaning, plus move/add-category/
+    delegate so it can relocate raw sources and route topics to workers.
+    """
+    ingest = TOOLSETS["ingest"]
+    # find-or-patch: needs to search existing pages by meaning + read them
+    assert "wiki_search" in ingest
+    assert "wiki_read_page" in ingest
+    assert "wiki_list_pages" in ingest
+    # create + organize
+    assert "wiki_write_page" in ingest
+    assert "wiki_add_category" in ingest
+    # source disposition + topic fan-out
+    assert "move_file" in ingest
+    assert "delegate" in ingest
+
+
+def test_ingest_toolset_stays_scoped() -> None:
+    """M203 + M198–M201: ingest must NOT get the full run blast radius —
+    no shell, no delete, no arbitrary edit/write outside the wiki tools."""
+    ingest = TOOLSETS["ingest"]
+    for banned in ("run_shell", "delete_file", "edit_file", "write_file"):
+        assert banned not in ingest
+
+
 # ---------- include resolution ----------
 
 

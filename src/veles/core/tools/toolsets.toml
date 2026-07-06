@@ -84,17 +84,31 @@ tools = [
 ]
 
 [ingest]
-# `veles ingest <source>` — read inputs, write wiki pages.
+# `veles add <source>` — content-aware ingestion (M203). Not a 1:1 dump: the
+# agent extracts the topics a source is *about*, finds an existing page by
+# meaning (wiki_search/wiki_read_page via `builtin`), and creates OR patches
+# the topical page — then relocates the raw source. `includes=["builtin"]`
+# supplies the read/search half; the writers below supply create/patch/organize
+# + source disposition + per-topic fan-out (`delegate`).
+#
+# Deliberately SCOPED (M198–M201 blast-radius discipline): no `run_shell`,
+# `delete_file`, `edit_file`, non-wiki `write_file`, or `web_search`. A
+# valueless source is archived (move_file), never deleted, by default.
+includes = ["builtin"]
 tools = [
-    "read_file",
     "fetch_url",
-    "web_search",
     "pdf_read",
     "image_ocr",
     "image_describe",
     "wiki_write_page",
+    "wiki_add_category",
     "wiki_append_log",
     "wiki_ingest",
+    "move_file",
+    "make_dir",
+    "delegate",
+    "ask_user",
+    "memory_save_insight",
 ]
 
 [organize]
