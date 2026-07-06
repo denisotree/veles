@@ -430,27 +430,24 @@ def _cmd_daemon_status(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---- M98: bare `veles daemon` opens a TUI picker ----
+# ---- bare `veles daemon` opens a keyboard-only picker ----
 
 
 def _cmd_daemon_picker(args: argparse.Namespace) -> int:
-    try:
-        from veles.tui.screens.daemon_picker import DaemonPickerApp
-    except ImportError as exc:
-        print(f"error: TUI picker unavailable: {exc}", file=sys.stderr)
-        return 1
+    # The picker needs a real terminal on both ends (prompt_toolkit
+    # Application). Headless / piped invocations (`veles daemon | cat`) fall
+    # back to the plain daemon list instead of crashing — symmetry with the
+    # wizards' TTY guard.
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return _cmd_daemon_list(args)
     # Resolve the project from cwd (best-effort) so the picker can also show
-    # this project's runtime sessions (named daemons + the kind=tui row);
-    # None just hides that section (M138-followup).
+    # this project's runtime sessions (named daemons + the interactive row);
+    # None just hides that section.
     from veles.cli import _resolve_active_project
+    from veles.cli.commands.daemon_picker_cli import run_daemon_picker
 
     project = _resolve_active_project(args)
-    # Disable Textual mouse-mode so the terminal handles drag-to-select +
-    # the system clipboard shortcut — same fix M115.3/.5 applied to the
-    # main chat TUI (see veles/tui/app.py:158-163). Trade-off: no
-    # scroll-wheel / click-to-focus, but the daemon picker is keyboard-only
-    # anyway (s/t/r/d/F5/q).
-    DaemonPickerApp(project=project).run(mouse=False)
+    run_daemon_picker(project)
     return 0
 
 

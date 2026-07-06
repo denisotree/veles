@@ -330,29 +330,8 @@ def test_graceful_stop_escalates_to_sigkill_after_timeout(
     assert _signal.SIGKILL in signals
 
 
-def test_daemon_picker_runs_with_mouse_disabled(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The bare `veles daemon` picker must launch Textual with
-    `mouse=False` so the terminal handles native text selection +
-    the system clipboard shortcut (regression guard for the M115.x
-    selection policy applied to the daemon picker)."""
-    captured: dict[str, object] = {}
-
-    class _FakeApp:
-        def __init__(self, *args, **kwargs):
-            captured["init_kwargs"] = kwargs
-
-        def run(self, *args, **kwargs):
-            captured["args"] = args
-            captured["kwargs"] = kwargs
-
-    import veles.tui.screens.daemon_picker as picker_mod
-
-    monkeypatch.setattr(picker_mod, "DaemonPickerApp", _FakeApp)
-    rc = daemon_cmd._cmd_daemon_picker(_ns())
-    assert rc == 0
-    assert captured["kwargs"].get("mouse") is False
+# The bare `veles daemon` picker (prompt_toolkit, M197) is covered by
+# tests/test_daemon_picker_cli.py — the non-TTY guard + the TTY hand-off.
 
 
 # ---------------- M173: host/port cascade + channel offer ----------------
