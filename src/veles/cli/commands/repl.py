@@ -29,6 +29,7 @@ import sys
 import time
 from collections import deque
 
+from veles.cli.repl.history import HistoryMixin
 from veles.cli.repl.hud import HudMixin
 from veles.cli.repl.pickers.file import FilePickerMixin
 from veles.cli.repl.pickers.helpers import (  # noqa: F401  (_print_model_list is a test shim)
@@ -94,7 +95,9 @@ def _suspend_live():
     return _cm()
 
 
-class _ReplApp(PromptsMixin, HudMixin, ModelPickerMixin, ThemePickerMixin, FilePickerMixin):
+class _ReplApp(
+    HistoryMixin, PromptsMixin, HudMixin, ModelPickerMixin, ThemePickerMixin, FilePickerMixin
+):
     """Inline prompt_toolkit Application (no alt-screen). A bordered input box
     stays live while a turn runs in a background executor; input typed during
     generation is queued and drained on completion. Output renders ABOVE the
@@ -703,56 +706,6 @@ class _ReplApp(PromptsMixin, HudMixin, ModelPickerMixin, ThemePickerMixin, FileP
             return  # ignore empty input
         self._record_history(raw)
         self._spawn(self._dispatch(text))
-
-    # --- input history (explicit; the Buffer's async FileHistory didn't resync
-    # a just-submitted command in this embedded Application) ---
-
-    def _record_history(self, text: str) -> None:
-        """Append a submitted command to the in-memory history and persist it to
-        the shared `repl_history` file. Skips a consecutive duplicate. Resets the
-        recall cursor so the next Up starts from the newest entry."""
-        text = text.rstrip("\n")
-        if text and (not self._hist or self._hist[-1] != text):
-            self._hist.append(text)
-            import contextlib
-
-            with contextlib.suppress(Exception):
-                self._hist_store.store_string(text)  # cross-run persistence
-        self._hist_pos = None
-
-    def _set_input(self, text: str) -> None:
-        self.input.text = text
-        self.input.buffer.cursor_position = len(text)  # cursor at end of recall
-
-    def _history_up(self) -> None:
-        # Multiline: move the cursor up within the text unless already on the
-        # first row — only then recall an older command.
-        doc = self.input.buffer.document
-        if doc.cursor_position_row > 0:
-            self.input.buffer.cursor_up()
-            return
-        if not self._hist:
-            return
-        if self._hist_pos is None:  # starting recall — stash the draft line
-            self._hist_draft = self.input.text
-            self._hist_pos = len(self._hist)
-        if self._hist_pos > 0:
-            self._hist_pos -= 1
-            self._set_input(self._hist[self._hist_pos])
-
-    def _history_down(self) -> None:
-        doc = self.input.buffer.document
-        if doc.cursor_position_row < doc.line_count - 1:
-            self.input.buffer.cursor_down()
-            return
-        if self._hist_pos is None:
-            return
-        self._hist_pos += 1
-        if self._hist_pos >= len(self._hist):  # past the newest → restore draft
-            self._hist_pos = None
-            self._set_input(self._hist_draft)
-        else:
-            self._set_input(self._hist[self._hist_pos])
 
     def _on_ctrl_c(self, event) -> None:
         if self.tp_active:
