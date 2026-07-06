@@ -17,6 +17,12 @@ ask_channel_type = "Тип канала"
 channel_field_required = "  ! обязательное поле канала {channel} пустое; настройка пропущена."
 channel_written = "  · записан канал {channel} → {path}"
 indexed_wiki = "  · проиндексировано {pages} страниц(ы) wiki в FTS-базу."
+ask_daemon = "Запускать проект как постоянный daemon? (включает управление через `veles daemon`, удалённые сессии, каналы)"
+ask_daemon_host = "Хост daemon'а"
+ask_daemon_port = "Порт daemon'а"
+daemon_written = "  · записан конфиг daemon'а → {path}"
+daemon_spawned = "  · daemon запущен (pid {pid}) на http://{host}:{port}/"
+daemon_spawn_failed = "  ! не удалось запустить daemon для {name}"
 
 [goal]
 confirm_line = "Давай проверим, верно ли я понял что нужно: {summary}"

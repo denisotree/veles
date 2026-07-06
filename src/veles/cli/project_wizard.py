@@ -92,12 +92,25 @@ def should_run_project_wizard(args: argparse.Namespace, cwd: Path) -> bool:
     return find_project_root(cwd) is None
 
 
-def run_project_wizard(cwd: Path) -> Project | None:
-    """Interactive flow. Returns the new Project on bootstrap, or None
-    if the user declined step 1."""
+def run_project_wizard(
+    cwd: Path,
+    *,
+    skip_bootstrap_confirm: bool = False,
+    autostart_daemon: bool = True,
+) -> Project | None:
+    """Interactive stdin flow. Returns the new Project on bootstrap, or None
+    if the user declined step 1.
+
+    `skip_bootstrap_confirm=True` (set when the first-run wizard already got an
+    affirmative "initialize here?") skips the duplicate Initialize? prompt.
+    `autostart_daemon=False` is set by `veles daemon start`, which starts the
+    daemon itself afterwards — so the wizard's own daemon step must not spawn a
+    second one (the pid is a global single-instance lock)."""
     prompter = _project_wizard_prompter.get() or _default_prompter
     print("\n" + t("project_wizard.intro_no_project", cwd=cwd) + "\n", file=sys.stderr)
-    if not _ask_yes_no(prompter, t("project_wizard.ask_initialize"), default=True):
+    if not skip_bootstrap_confirm and not _ask_yes_no(
+        prompter, t("project_wizard.ask_initialize"), default=True
+    ):
         return None
 
     try:
@@ -127,6 +140,8 @@ def run_project_wizard(cwd: Path) -> Project | None:
             pages = 0
     if pages:
         print(t("project_wizard.indexed_wiki", pages=pages), file=sys.stderr)
+
+    _step_daemon(project, prompter, autostart=autostart_daemon)
 
     print("\n" + t("project_wizard.ready", name=project.name) + "\n", file=sys.stderr)
     return project
@@ -217,6 +232,47 @@ def _step_channel(project: Project, prompter: Prompter) -> None:
     )
 
 
+def _step_daemon(project: Project, prompter: Prompter, *, autostart: bool) -> None:
+    """Offer to run the project as a long-lived daemon (host/port → `[daemon]`
+    config), then optionally spawn it. Mirrors the retired TUI DaemonModeStep.
+    `autostart=False` writes the config but skips the spawn (so `veles daemon
+    start`, which spawns afterwards, doesn't race a second instance)."""
+    if not _ask_yes_no(prompter, t("project_wizard.ask_daemon"), default=False):
+        return
+    host = prompter(t("project_wizard.ask_daemon_host"), "127.0.0.1").strip() or "127.0.0.1"
+    port_raw = prompter(t("project_wizard.ask_daemon_port"), "8765").strip() or "8765"
+    try:
+        port = int(port_raw)
+    except ValueError:
+        port = 8765
+    cfg = _load_project_toml(project)
+    cfg.setdefault("daemon", {})
+    cfg["daemon"]["enabled"] = True
+    cfg["daemon"]["host"] = host
+    cfg["daemon"]["port"] = port
+    cfg["daemon"]["autostart"] = True
+    _save_project_toml(project, cfg)
+    print(
+        t("project_wizard.daemon_written", path=_project_config_path(project)),
+        file=sys.stderr,
+    )
+    if autostart:
+        _autostart_daemon(project, host, port)
+
+
+def _autostart_daemon(project: Project, host: str, port: int) -> None:
+    from veles.daemon.spawn import spawn_daemon
+
+    proc = spawn_daemon(project_root=project.root, host=host, port=port)
+    if proc is None:
+        print(t("project_wizard.daemon_spawn_failed", name=project.name), file=sys.stderr)
+        return
+    print(
+        t("project_wizard.daemon_spawned", pid=proc.pid, host=host, port=port),
+        file=sys.stderr,
+    )
+
+
 # ---------------- helpers ----------------
 
 
@@ -302,48 +358,24 @@ def _default_prompter(prompt: str, default: str | None) -> str:
 
 
 def maybe_run_project_wizard(args: argparse.Namespace, cwd: Path) -> Project | None:
-    """Safe wrapper. Prefers the TUI flow (M95) when Textual is
-    importable; falls back to the stdin flow on any failure or
-    headless invocation. Returns the bootstrapped Project on success,
-    None when the user declines / cancels or any step explodes."""
+    """Safe wrapper around the stdin project wizard. Returns the bootstrapped
+    Project on success, None when the user declines / cancels or any step
+    explodes."""
     if not should_run_project_wizard(args, cwd):
         return None
     try:
-        tui_eligible = sys.stdin.isatty() and sys.stdout.isatty()
-        try:
-            if not tui_eligible:
-                raise ImportError("TUI not eligible in non-interactive shell")
-            from veles.tui.wizard.project_runner import run_project_wizard_tui
-
-            # Forward the "user already said Yes" flag set by the first-run
-            # wizard so the project-wizard's BootstrapStep skips the
-            # duplicate Initialize? confirm screen.
-            skip_bootstrap = bool(getattr(args, "_wizard_init_project_here", False))
-            # M129: `veles daemon start` runs the wizard but starts the
-            # daemon itself afterwards — don't let the wizard autostart a
-            # second one (single-instance pid collision).
-            autostart_daemon = not getattr(args, "_suppress_wizard_daemon_autostart", False)
-            project = run_project_wizard_tui(
-                cwd,
-                skip_bootstrap_confirm=skip_bootstrap,
-                autostart_daemon=autostart_daemon,
-            )
-            if project is not None:
-                return project
-            # TUI returned None — either cancelled or user declined the
-            # bootstrap. Don't double-prompt via stdin. Mark the conscious
-            # decline so main() exits 0 instead of the generic error.
-            args._wizard_user_chose_no_project = True
-            return None
-        except ImportError:
-            pass
-        except Exception as exc:
-            print(
-                f"warning: TUI project wizard failed ({type(exc).__name__}: {exc}); "
-                "falling back to stdin prompts.",
-                file=sys.stderr,
-            )
-        return run_project_wizard(cwd)
+        # Forward the "user already said Yes" flag set by the first-run wizard
+        # so the bootstrap Initialize? prompt isn't asked twice.
+        skip_bootstrap = bool(getattr(args, "_wizard_init_project_here", False))
+        # `veles daemon start` runs the wizard but starts the daemon itself
+        # afterwards — don't let the wizard autostart a second one
+        # (single-instance pid collision).
+        autostart_daemon = not getattr(args, "_suppress_wizard_daemon_autostart", False)
+        return run_project_wizard(
+            cwd,
+            skip_bootstrap_confirm=skip_bootstrap,
+            autostart_daemon=autostart_daemon,
+        )
     except KeyboardInterrupt:
         print(
             "\n<project wizard interrupted; partial scaffolding may remain in .veles/>",

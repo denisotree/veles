@@ -162,55 +162,13 @@ def maybe_run_first_run_wizard(args: argparse.Namespace) -> None:
     """Run the wizard if the gate allows, swallowing all I/O errors.
 
     Called from `cli/__init__.py::main` before dispatching the verb.
-    Prefers the M94 Textual flow (`tui/wizard/user_runner`) when stdin
-    is a TTY; falls back to the legacy stdin flow on any failure or on
-    headless invocations. Best-effort: failure is reported to stderr but
-    never blocks the user's actual command — the next launch will retry.
-
-    The user wizard's optional final step asks "initialize project here?"
-    On `No` we set `args.no_wizard = True` so the dispatcher's downstream
-    project-wizard hook stays quiet.
+    Runs the stdin flow (`run_wizard`). Best-effort: failure is reported
+    to stderr but never blocks the user's actual command — the next
+    launch will retry.
     """
     if not should_run_wizard(args):
         return
     try:
-        # TUI wizard requires a real terminal on both sides. Pytest captures
-        # stdout (isatty=False) so test runs fall through to the stdin path.
-        tui_eligible = sys.stdin.isatty() and sys.stdout.isatty()
-        try:
-            if not tui_eligible:
-                raise ImportError("TUI not eligible in non-interactive shell")
-            from veles.tui.wizard.user_runner import run_user_wizard_tui
-
-            cfg, raw = run_user_wizard_tui()
-            if cfg is None:
-                print(
-                    "\n<wizard cancelled; will retry next launch>",
-                    file=sys.stderr,
-                )
-                args._wizard_user_chose_no_project = True
-                return
-            # Respect "No" on the final init-project question by
-            # suppressing the project-wizard hook downstream AND telling
-            # main() that the user made a conscious choice — main() then
-            # exits 0 instead of printing the generic "no project" error.
-            if raw.get("init_project_here") is False:
-                args.no_wizard = True
-                args._wizard_user_chose_no_project = True
-            elif raw.get("init_project_here") is True:
-                # Carry the answer into the project-wizard so its
-                # BootstrapStep skips the duplicate Initialize? confirm.
-                args._wizard_init_project_here = True
-            return
-        except ImportError:
-            # Textual not available (degraded environment). Fall back.
-            pass
-        except Exception as exc:
-            print(
-                f"warning: TUI wizard failed ({type(exc).__name__}: {exc}); "
-                "falling back to stdin prompts.",
-                file=sys.stderr,
-            )
         run_wizard()
     except KeyboardInterrupt:
         print("\n<wizard interrupted; will retry next launch>", file=sys.stderr)
