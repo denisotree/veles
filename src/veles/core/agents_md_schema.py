@@ -87,7 +87,7 @@ def default_template(name: str) -> str:
     return (
         f"# {name}\n\n"
         f"Add your project context here. Auto-loaded into the system prompt\n"
-        f"when you run `veles run` or `veles tui` from this directory (or any\n"
+        f"when you run `veles run` or bare `veles` from this directory (or any\n"
         f"subdirectory).\n\n"
         f"## Layout\n\n"
         f"Describe how this project organises its files — which directories\n"

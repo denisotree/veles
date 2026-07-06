@@ -1,7 +1,7 @@
 # {name}
 
 Add your project context here. Auto-loaded into the system prompt
-when you run `veles run` or `veles tui` from this directory (or any
+when you run `veles run` or bare `veles` from this directory (or any
 subdirectory).
 
 ## Layout

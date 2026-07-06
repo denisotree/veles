@@ -206,7 +206,7 @@ def _default_section_content(section: str) -> str:
         ),
         "Workflows": (
             "## Workflows\n\n"
-            '- `veles run "<prompt>"` / `veles tui` — drive the agent.\n'
+            '- `veles run "<prompt>"` / bare `veles` — drive the agent.\n'
             "- `veles curate` — distil sessions into project memory.\n"
         ),
     }

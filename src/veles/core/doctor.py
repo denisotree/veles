@@ -118,7 +118,7 @@ def _check_user_home() -> CheckResult:
             status="info",
             message=f"{home} not created yet (first-run wizard will set it up)",
             fix_hint=(
-                "run `veles tui` to trigger the first-run wizard, or `veles init` inside a project"
+                "run bare `veles` to trigger the first-run wizard, or `veles init` inside a project"
             ),
         )
     if not os.access(home, os.W_OK):
