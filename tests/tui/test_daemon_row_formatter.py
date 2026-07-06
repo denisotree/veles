@@ -133,7 +133,7 @@ def test_entry_model_prefers_live_active_model_when_daemon_alive(
     """When the daemon is reachable, the picker shows what /v1/health
     reports as `active_model` — i.e. the last /model swap — not the
     static project config."""
-    import veles.tui.screens._daemon_picker_data as picker
+    import veles.daemon.picker_data as picker
 
     (tmp_path / ".veles").mkdir()
     (tmp_path / ".veles" / "config.toml").write_text(
@@ -151,7 +151,7 @@ def test_entry_model_falls_back_to_config_when_daemon_unreachable(
     """Daemon process is alive but the HTTP probe fails (firewall,
     crash during shutdown, timeout). Picker degrades to project
     config instead of showing a dash."""
-    import veles.tui.screens._daemon_picker_data as picker
+    import veles.daemon.picker_data as picker
 
     (tmp_path / ".veles").mkdir()
     (tmp_path / ".veles" / "config.toml").write_text(

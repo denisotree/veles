@@ -18,7 +18,7 @@ from veles.core.project import init_project
 from veles.core.project_config import load_project_config, save_project_config
 from veles.core.runtime_sessions import RuntimeSessionStore
 from veles.daemon.registry import DaemonEntry, DaemonRegistry
-from veles.tui.screens._daemon_picker_data import build_daemon_tree
+from veles.daemon.picker_data import build_daemon_tree
 
 
 @pytest.fixture(autouse=True)
@@ -103,7 +103,7 @@ def test_named_and_live_tui_sessions_under_current_project(tmp_path, monkeypatch
     store.close()
     # The tui row shows only while its pid is alive.
     monkeypatch.setattr(
-        "veles.tui.screens._daemon_picker_data.is_alive", lambda pid: pid == 999_001
+        "veles.daemon.picker_data.is_alive", lambda pid: pid == 999_001
     )
 
     tree = build_daemon_tree(project)
@@ -131,7 +131,7 @@ def test_stopped_or_orphaned_tui_is_hidden(tmp_path, monkeypatch):
     tui = store.create("tui", "tui")
     store.mark_started(tui.id, pid=45_171)
     store.close()
-    monkeypatch.setattr("veles.tui.screens._daemon_picker_data.is_alive", lambda pid: False)
+    monkeypatch.setattr("veles.daemon.picker_data.is_alive", lambda pid: False)
 
     tree = build_daemon_tree(project)
     assert [n.name for n in tree.current] == ["default"]

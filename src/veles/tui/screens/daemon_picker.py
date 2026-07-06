@@ -57,7 +57,7 @@ from veles.daemon.registry import (
 # re-exported for the test suites that import them from this module
 # (tests/tui/test_daemon_picker.py, test_daemon_row_formatter.py,
 # test_daemon_tree_model.py, tests/test_daemon_picker_channel_nofocus.py).
-from veles.tui.screens._daemon_picker_data import (
+from veles.daemon.picker_data import (
     DaemonNode,
     DaemonRowFormatter,  # noqa: F401 — re-export for tests
     _enabled_channel_names,  # noqa: F401 — re-export for tests

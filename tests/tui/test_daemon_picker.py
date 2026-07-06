@@ -281,7 +281,7 @@ async def test_cursor_and_focus_survive_stop_action(
     # the flag instead of a real os.kill(pid, 0) — otherwise the global os.kill
     # patch below would flip the flag during the very first refresh.
     monkeypatch.setattr(dp, "is_alive", lambda pid: alive["v"])
-    monkeypatch.setattr("veles.tui.screens._daemon_picker_data.is_alive", lambda pid: alive["v"])
+    monkeypatch.setattr("veles.daemon.picker_data.is_alive", lambda pid: alive["v"])
     monkeypatch.setattr("veles.daemon.registry.is_alive", lambda pid: alive["v"])
     monkeypatch.setattr(dp.os, "kill", lambda pid, sig: alive.__setitem__("v", False))
 
@@ -312,7 +312,7 @@ async def test_restart_kills_before_spawn_and_keeps_focus(
     alive = {"v": True}
     seq: list[str] = []
     monkeypatch.setattr(dp, "is_alive", lambda pid: alive["v"])
-    monkeypatch.setattr("veles.tui.screens._daemon_picker_data.is_alive", lambda pid: alive["v"])
+    monkeypatch.setattr("veles.daemon.picker_data.is_alive", lambda pid: alive["v"])
     monkeypatch.setattr("veles.daemon.registry.is_alive", lambda pid: alive["v"])
 
     def fake_kill(pid, sig):
@@ -596,7 +596,7 @@ def _daemon_rec(**kw):
 
 def test_runtime_action_start_spawns(tmp_path, monkeypatch):
     import veles.daemon.spawn as spawn_mod
-    import veles.tui.screens._daemon_picker_data as picker_mod
+    import veles.daemon.picker_data as picker_mod
     from veles.tui.screens.daemon_picker import runtime_session_action
 
     project = init_project(tmp_path / "p", name="p")
@@ -609,7 +609,7 @@ def test_runtime_action_start_spawns(tmp_path, monkeypatch):
 
 
 def test_runtime_action_start_already_running(tmp_path, monkeypatch):
-    import veles.tui.screens._daemon_picker_data as picker_mod
+    import veles.daemon.picker_data as picker_mod
     from veles.tui.screens.daemon_picker import runtime_session_action
 
     project = init_project(tmp_path / "p", name="p")
@@ -619,7 +619,7 @@ def test_runtime_action_start_already_running(tmp_path, monkeypatch):
 
 
 def test_runtime_action_stop_sends_sigterm(tmp_path, monkeypatch):
-    import veles.tui.screens._daemon_picker_data as picker_mod
+    import veles.daemon.picker_data as picker_mod
     from veles.tui.screens.daemon_picker import runtime_session_action
 
     project = init_project(tmp_path / "p", name="p")
