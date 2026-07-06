@@ -220,6 +220,34 @@ def repair_memory_fts(project: Project | None) -> bool:
         store.close()
 
 
+def _check_config_schema(project: Project | None) -> CheckResult:
+    """M201: flag unknown keys in security-relevant config.toml sections — a
+    typo (`whitlist` for `whitelist`) silently disables an access control."""
+    if project is None:
+        return CheckResult(name="config_schema", status="info", message="no active project")
+    from veles.core.config_schema import validate_config
+    from veles.core.project_config import load_project_config
+
+    try:
+        findings = validate_config(load_project_config(project))
+    except Exception as exc:
+        return CheckResult(
+            name="config_schema", status="warn", message=f"could not validate config: {exc}"
+        )
+    if not findings:
+        return CheckResult(
+            name="config_schema", status="ok", message="security config keys recognised"
+        )
+    detail = "; ".join(f"[{f.section}] unknown key {f.key!r}" for f in findings[:5])
+    return CheckResult(
+        name="config_schema",
+        status="error",
+        message=f"unknown config keys (likely typos, silently ignored): {detail}",
+        fix_hint="a typo in a security section (e.g. 'whitlist' → 'whitelist') disables the "
+        "control — correct or remove the key",
+    )
+
+
 def _check_active_project(project: Project | None) -> CheckResult:
     if project is None:
         return CheckResult(
@@ -502,6 +530,7 @@ def run_all(project: Project | None) -> DoctorReport:
     ]
     project_aware: list[Callable[[Project | None], CheckResult]] = [
         _check_active_project,
+        _check_config_schema,
         _check_memory_fts,
         _check_agents_md,
         _check_agents_md_identity,

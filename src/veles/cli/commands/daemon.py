@@ -130,6 +130,26 @@ def cmd_daemon(args: argparse.Namespace) -> int:
 # ---- start / stop / status ----
 
 
+def _warn_on_security_config_typos(project) -> None:
+    """M201: before the daemon serves unattended, loudly flag unknown keys in
+    security-relevant config sections — a typo (`whitlist` → `whitelist`)
+    silently disables an access control (e.g. leaves a channel open to all)."""
+    try:
+        from veles.core.config_schema import validate_config
+        from veles.core.project_config import load_project_config
+
+        findings = validate_config(load_project_config(project))
+    except Exception:
+        return
+    for f in findings:
+        print(
+            f"WARNING: config [{f.section}] has unknown key {f.key!r} — likely a typo, "
+            f"silently ignored. Known keys: {', '.join(f.known)}. "
+            "Fix before serving, or a security control may be disabled.",
+            file=sys.stderr,
+        )
+
+
 def _cmd_daemon_start(args: argparse.Namespace) -> int:
     from veles.cli import _ensure_api_key, _resolve_active_project
     from veles.core.memory import SessionStore
@@ -158,6 +178,8 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
+
+    _warn_on_security_config_typos(project)
 
     # Named daemon session (M135): must already be declared (config block or
     # runtime_sessions row). Its `[daemon.<name>]` block is the declarative
