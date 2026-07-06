@@ -110,6 +110,8 @@ asyncio_mode = "auto"
 python_version = "3.13"
 strict = true
 files = [
+    "src/veles/core/defaults.py",
+    "src/veles/core/log_util.py",
     "src/veles/core/risk.py",
     "src/veles/core/tool_result.py",
     "src/veles/core/trace.py",

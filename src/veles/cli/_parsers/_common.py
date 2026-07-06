@@ -10,14 +10,13 @@ from __future__ import annotations
 
 import argparse
 
-# Empty by design (M165): no hardcoded fallback model. The effective model is
-# resolved from explicit `--model`, the project `[engine] model`, or the user
-# `default_model`; when none is configured veles raises a clear "model not
-# configured" error instead of silently using a cloud model.
-DEFAULT_MODEL = ""
+# DEFAULT_MODEL/DEFAULT_PROVIDER live in veles.core.defaults so core.model_resolver
+# can import them without reaching up into veles.cli (M194); re-exported here so the
+# argparse wiring below and existing `from ..._common import DEFAULT_*` sites keep working.
+from veles.core.defaults import DEFAULT_MODEL, DEFAULT_PROVIDER
+
 DEFAULT_MAX_ITERATIONS = 30
 DEFAULT_MAX_TOKENS_TOTAL = 100_000
-DEFAULT_PROVIDER = "openrouter"
 DEFAULT_COMPRESSOR_MODEL = "anthropic/claude-haiku-4.5"
 DEFAULT_COMPRESS_THRESHOLD_TOKENS = 50_000
 PROVIDER_CHOICES = (

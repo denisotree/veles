@@ -27,6 +27,7 @@ from veles.core.events import (
 from veles.core.events import (
     ToolResult as ToolResultEvent,
 )
+from veles.core.log_util import truncate_for_log
 from veles.core.modules import VetoResult, fire_hook
 from veles.core.permission import evaluate as evaluate_permission
 from veles.core.provider import Message, ToolCall
@@ -231,12 +232,8 @@ def _dispatch(
     # File-backed daemon log: every tool call surfaces by name and args
     # (truncated) so debugging from `~/.veles/logs/daemon-*.log` is
     # tractable without replaying the full event-stream JSONL.
-    try:
-        from veles.daemon.logging import truncate_for_log
-
+    with contextlib.suppress(Exception):
         logger.info("tool.call name=%s args=%s", call.name, truncate_for_log(call.arguments))
-    except Exception:
-        pass
     _emit(
         event_writer,
         ToolCallEvent(
@@ -351,8 +348,6 @@ def _dispatch(
 
     output, error = _invoke_tool_safely(registry, call, artifact_dir=artifact_dir)
     try:
-        from veles.daemon.logging import truncate_for_log
-
         if error:
             logger.warning("tool.error name=%s err=%s", call.name, error)
         else:

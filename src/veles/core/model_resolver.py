@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import argparse
 
-from veles.cli._parsers._common import DEFAULT_MODEL, DEFAULT_PROVIDER
+from veles.core.defaults import DEFAULT_MODEL, DEFAULT_PROVIDER
 from veles.core.project import Project
 from veles.core.project_config import get_section, load_project_config
 
