@@ -35,7 +35,6 @@ from veles.cli.repl.pickers.helpers import (  # noqa: F401  (_print_model_list i
     _at_trigger_boundary,
     _filter_files,
     _filter_models,
-    _new_paste_filename,
     _print_model_list,
 )
 from veles.cli.repl.pickers.model import ModelPickerMixin
@@ -44,7 +43,6 @@ from veles.cli.repl.prompts import PromptsMixin
 from veles.cli.repl.runtime import _build_runtime
 from veles.cli.repl.simple import _ask_repl, _run_simple_repl  # noqa: F401  (_ask_repl is a shim)
 from veles.cli.repl.terminal import (  # noqa: F401  (_settled_status is a test shim)
-    _CTRL_C_EXIT_WINDOW_S,
     _KITTY_ENABLE,
     _banner,
     _console,
@@ -111,8 +109,6 @@ class _ReplApp(
     box via `run_in_terminal`, landing in the terminal's own scrollback — so
     native scroll / selection / copy are preserved.
     """
-
-    # The final picker item — selecting it switches to free-text entry.
 
     def __init__(
         self,
