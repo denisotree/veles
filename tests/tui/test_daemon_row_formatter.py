@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from veles.daemon.picker_data import DaemonRowFormatter, _entry_model
 from veles.daemon.registry import DaemonEntry
-from veles.tui.screens.daemon_picker import DaemonRowFormatter, _entry_model
 
 
 def _entry(**overrides) -> DaemonEntry:

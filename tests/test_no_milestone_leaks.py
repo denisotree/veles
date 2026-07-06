@@ -85,8 +85,8 @@ def _scan_toml(path: Path) -> list[tuple[int, str]]:
     "rel_path",
     [
         "src/veles/cli/_parsers",
-        "src/veles/tui/wizard",
-        "src/veles/tui/screens/daemon_picker.py",
+        "src/veles/cli/commands/daemon_picker_cli.py",
+        "src/veles/daemon/picker_data.py",
     ],
 )
 def test_user_facing_python_strings_have_no_milestone_leaks(rel_path: str) -> None:
