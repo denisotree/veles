@@ -160,6 +160,7 @@ class _ReplApp(
         self.stream_chars = 0
         self.turn_start = 0.0
         self.turn_elapsed = 0.0  # frozen duration once the turn finishes
+        self.last_stopped_reason = "completed"  # honest end-state for the HUD marker
         # Per-tool inspector rows (Ctrl+I/Ctrl+O expanded view), keyed by
         # tool_call_id → {"name", "start", "end", "status"}. `end` is None
         # while the matching tool_result hasn't arrived yet (still running).

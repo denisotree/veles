@@ -47,7 +47,20 @@ class HudMixin:
             elapsed = int(time.monotonic() - self.turn_start) if self.turn_start else 0
         else:
             elapsed = int(self.turn_elapsed)
-        label = f" ⏳ working{'.' * (1 + (self._tick % 3))}" if self.busy else " ✓ done"
+        if self.busy:
+            label = f" ⏳ working{'.' * (1 + (self._tick % 3))}"
+        else:
+            # Honest end-state — a turn that hit the step/budget limit did NOT
+            # finish the task; showing "✓ done" for it misled users into thinking
+            # a partial migration had completed.
+            label = {
+                "completed": " ✓ done",
+                "empty": " ✓ done",
+                "cancelled": " ⏹ stopped",
+                "max_iterations": " ⚠ hit step limit — incomplete",
+                "budget_exhausted": " ⚠ token budget hit — incomplete",
+                "error": " ✗ error",
+            }.get(getattr(self, "last_stopped_reason", "completed"), " ✓ done")
         head = f"{label} · ≈{approx} tok · {len(tools)} tool(s) · {elapsed}s"
         hint = t("repl.meta_collapse") if self.meta_expanded else t("repl.meta_expand")
         frags: list[tuple[str, str]] = [("class:meta", head + hint + "\n")]

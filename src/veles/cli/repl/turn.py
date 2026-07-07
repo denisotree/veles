@@ -567,8 +567,29 @@ class TurnMixin:
                     self.errors.append(str(exc))
                     self.console.print(f"\nerror: {exc}", style=self.theme.error, markup=False)
                     result = None
-                if getattr(result, "stopped_reason", "") == "cancelled":
+                reason = (
+                    getattr(result, "stopped_reason", "error") if result is not None else "error"
+                )
+                self.last_stopped_reason = reason
+                if reason == "cancelled":
                     self.console.print("  ⋅ cancelled", style=self.theme.muted, markup=False)
+                elif reason == "max_iterations":
+                    # The turn ran out of steps — it did NOT finish the task. Say
+                    # so plainly (the HUD marker alone reads like success), and
+                    # point at the ways to actually complete a big job.
+                    self.console.print(
+                        f"  ⚠ stopped at the {self.args.max_iterations}-step limit — the task is "
+                        "NOT finished. Continue with another message, raise --max-iterations, or "
+                        "for a whole-folder migration use `veles add <dir> --recursive`.",
+                        style=self.theme.error,
+                        markup=False,
+                    )
+                elif reason == "budget_exhausted":
+                    self.console.print(
+                        "  ⚠ stopped — token budget exhausted; the task is not finished.",
+                        style=self.theme.error,
+                        markup=False,
+                    )
                 self.console.print()  # trailing blank after the streamed answer
                 self.turn_elapsed = time.monotonic() - self.turn_start  # freeze the timer
                 _update_state_after_turn(self.state, result)

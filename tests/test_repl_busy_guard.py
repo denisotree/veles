@@ -92,6 +92,29 @@ def _at_handler(app):
     return matches[0].handler
 
 
+# --- HUD honesty: a truncated turn is not "✓ done" ---
+
+
+def _hud_text(app) -> str:
+    return "".join(text for _style, text in app._meta_fragments())
+
+
+def test_hud_marks_completed_turn_done(app) -> None:
+    app.busy = False
+    app.last_stopped_reason = "completed"
+    assert "✓ done" in _hud_text(app)
+
+
+def test_hud_marks_max_iterations_as_incomplete_not_done(app) -> None:
+    """A turn that hit the step limit did NOT finish — the HUD must not show a
+    success checkmark (users read '✓ done' as 'migration complete')."""
+    app.busy = False
+    app.last_stopped_reason = "max_iterations"
+    text = _hud_text(app)
+    assert "✓ done" not in text
+    assert "⚠" in text and "limit" in text.lower()
+
+
 # --- follow-up queue: type + submit a plain prompt while a turn runs ---
 
 
