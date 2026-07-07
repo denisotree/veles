@@ -92,6 +92,19 @@ def _at_handler(app):
     return matches[0].handler
 
 
+# --- follow-up queue: type + submit a plain prompt while a turn runs ---
+
+
+async def test_plain_prompt_while_busy_is_queued_as_followup(app) -> None:
+    """Even during a background turn, submitting a plain prompt must not be lost
+    — it queues as a follow-up and runs after the current turn (the `_run_chain`
+    loop drains `queue`). This is what keeps the chat usable while it's working."""
+    app.busy = True
+    app.queue = []
+    await app._dispatch("follow up while busy")
+    assert app.queue == ["follow up while busy"]  # queued, not dropped, not run now
+
+
 # --- Fix 1a: `@` file picker forbidden while busy ---
 
 

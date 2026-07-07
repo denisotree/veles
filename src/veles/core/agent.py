@@ -29,7 +29,7 @@ from veles.core.agent_state import (
     set_current_toolset,
     set_state,
 )
-from veles.core.cancel import TurnCancelled, current_cancel_token
+from veles.core.cancel import TurnCancelled, current_cancel_token, run_cancellable
 from veles.core.context import current_budget, current_project
 from veles.core.context_scrubber import scrub_text
 from veles.core.events import (
@@ -509,11 +509,19 @@ class Agent:
                 history=history, tools=tools, on_text_delta=on_text_delta
             )
         else:
-            response = self._provider.create_message(
-                history,
-                tools=tools,
-                model=self._model,
-                max_tokens=self._max_tokens,
+            # Run the blocking provider call so a cancel (Ctrl+C / Esc) unwinds
+            # within one poll interval instead of waiting out the 120s HTTP
+            # timeout — the between-iterations checkpoint alone can't interrupt a
+            # call already in flight. Workers inherit the token (copy_context),
+            # so this makes parallel delegation cancellable too.
+            response = run_cancellable(
+                lambda: self._provider.create_message(
+                    history,
+                    tools=tools,
+                    model=self._model,
+                    max_tokens=self._max_tokens,
+                ),
+                current_cancel_token(),
             )
         total_latency_ms = int((time.monotonic() - call_started) * 1000)
         self._emit_trace(

@@ -69,6 +69,24 @@ def test_esc_before_generation_cancels_and_restores(app) -> None:
     assert app.input.text == "my question"  # restored for editing
 
 
+def test_ctrl_c_in_busy_escalates_to_force_quit(app, monkeypatch) -> None:
+    """First Ctrl+C while busy → cooperative cancel; a second (the turn still
+    hasn't stopped) → force-quit, so a wedged turn is never a dead end."""
+    import types
+
+    forced = {"n": 0}
+    monkeypatch.setattr(app, "_force_quit", lambda: forced.__setitem__("n", forced["n"] + 1))
+    monkeypatch.setattr(app, "_spawn", lambda *_a, **_k: None)  # no live loop in the test
+    ev = types.SimpleNamespace(app=types.SimpleNamespace(exit=lambda: None))
+
+    app._on_ctrl_c(ev)  # first: cooperative cancel, no force-quit
+    assert app.cancel_token.cancelled is True
+    assert forced["n"] == 0
+
+    app._on_ctrl_c(ev)  # second: still busy + already cancelled → force-quit
+    assert forced["n"] == 1
+
+
 def test_esc_after_generation_cancels_without_restore(app) -> None:
     app.stream_chars = 42  # the answer already started streaming
     app._cancel_generation()

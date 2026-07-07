@@ -349,7 +349,21 @@ class KeysMixin:
             self._answer(None)  # cancel the pending question
             return
         if self.busy and self.cancel_token is not None:
+            if self.cancel_token.cancelled:
+                # A cancel was already requested and the turn still hasn't
+                # stopped (a truly wedged call the cooperative path can't reach).
+                # Escape hatch: force-quit so the chat is never a dead end.
+                self._force_quit()
+                return
             self.cancel_token.cancel()  # cooperative cancel of the running turn
+            self._spawn(
+                self._in_terminal(
+                    lambda: self.console.print(
+                        "(cancelling… press Ctrl+C again to force-quit)",
+                        style=self.theme.muted,
+                    )
+                )
+            )
             return
         if self.input.text:
             self.input.text = ""  # clear the current line
@@ -366,6 +380,24 @@ class KeysMixin:
                 )
             )
         )
+
+    def _force_quit(self) -> None:
+        """Last-resort escape from a wedged turn (a call the cooperative cancel
+        can't reach). Restore the terminal, then hard-exit — `os._exit` bypasses
+        the ThreadPoolExecutor's atexit join, which would otherwise hang forever
+        on the blocked provider call. Skips normal cleanup by design; this only
+        runs when the user has already asked to cancel and it didn't take."""
+        import os
+
+        from veles.cli.repl.terminal import _kitty_disable_keyboard
+
+        try:
+            _kitty_disable_keyboard()
+            sys.stdout.write("\x1b[?25h\r\n")  # show cursor, fresh line
+            sys.stdout.flush()
+        except Exception:
+            pass
+        os._exit(130)
 
     def _cancel_generation(self) -> None:
         """Esc while a turn runs: stop it *now*. Cancelling the token both
