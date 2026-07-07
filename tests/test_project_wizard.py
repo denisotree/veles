@@ -267,99 +267,62 @@ def test_maybe_wrapper_returns_none_when_gate_blocks(tmp_cwd: Path) -> None:
     assert pw.maybe_run_project_wizard(_args(no_wizard=True), tmp_cwd) is None
 
 
-# ---------------- daemon step: autostart + suppression (stdin flow, M197) ----------------
+# ---------------- M129: daemon-start bootstrap + autostart suppression ----------------
 
 
-def test_run_project_wizard_autostarts_daemon(
-    tmp_cwd: Path, monkeypatch: pytest.MonkeyPatch
+def test_run_project_wizard_tui_respects_autostart_flag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The stdin daemon step writes `[daemon]` config and, by default, spawns
-    the daemon."""
-    calls: list[tuple[str, int]] = []
-    monkeypatch.setattr(
-        pw, "_autostart_daemon", lambda proj, host, port: calls.append((host, port))
+    """M129: the wizard's daemon-autostart fires by default, but
+    `autostart_daemon=False` (set by `veles daemon start`) suppresses it
+    so the two don't race on the global single-instance daemon pid."""
+    from veles.core.project import Project
+    from veles.tui.wizard import project_runner as pr
+
+    proj = Project(
+        root=tmp_path, name="x", created_at=0.0, schema_version=2, layout_name="llm-wiki"
     )
 
-    token_p = pw.set_project_wizard_prompter(
-        _scripted(
-            [
-                "y",  # bootstrap
-                "n",  # provider override
-                "n",  # wiki seed (skipped if no candidates; harmless otherwise)
-                "n",  # add a channel?
-                "y",  # run as daemon?
-                "127.0.0.1",  # host
-                "9001",  # port
-            ]
-        )
-    )
-    try:
-        project = pw.run_project_wizard(tmp_cwd)
-    finally:
-        pw.reset_project_wizard_prompter(token_p)
-    assert project is not None
-    cfg = (project.state_dir / "config.toml").read_text(encoding="utf-8")
-    assert "[daemon]" in cfg
-    assert "9001" in cfg
-    assert calls == [("127.0.0.1", 9001)]
+    class _FakeApp:
+        def __init__(self, *a, **k) -> None:
+            pass
 
+        def run(self):
+            return {"project": proj, "daemon": {"host": "127.0.0.1", "port": 8765}}
 
-def test_run_project_wizard_suppresses_autostart(
-    tmp_cwd: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """`autostart_daemon=False` (set by `veles daemon start`) writes the config
-    but does not spawn — the caller starts the daemon itself, so the two don't
-    race on the global single-instance pid."""
+    monkeypatch.setattr(pr, "WizardApp", _FakeApp)
     calls: list[tuple] = []
-    monkeypatch.setattr(pw, "_autostart_daemon", lambda *a: calls.append(a))
+    monkeypatch.setattr(pr, "_autostart_daemon", lambda p, d: calls.append((p, d)))
 
-    token_p = pw.set_project_wizard_prompter(
-        _scripted(["y", "n", "n", "n", "y", "127.0.0.1", "9002"])
-    )
-    try:
-        project = pw.run_project_wizard(tmp_cwd, autostart_daemon=False)
-    finally:
-        pw.reset_project_wizard_prompter(token_p)
-    assert project is not None
-    cfg = (project.state_dir / "config.toml").read_text(encoding="utf-8")
-    assert "[daemon]" in cfg
+    # Suppressed → no autostart, but project still returned.
+    out = pr.run_project_wizard_tui(tmp_path, autostart_daemon=False)
+    assert out is proj
     assert calls == []
 
+    # Default → autostart fires.
+    out2 = pr.run_project_wizard_tui(tmp_path, autostart_daemon=True)
+    assert out2 is proj
+    assert len(calls) == 1
 
-def test_maybe_wrapper_threads_suppress_flag_into_stdin(
+
+def test_maybe_wrapper_threads_suppress_flag_into_tui(
     tmp_cwd: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`args._suppress_wizard_daemon_autostart` must reach the stdin wizard as
-    `autostart_daemon=False`."""
+    """`args._suppress_wizard_daemon_autostart` must reach the TUI runner
+    as `autostart_daemon=False`."""
+    from veles.tui.wizard import project_runner as pr
+
     monkeypatch.setattr(pw, "should_run_project_wizard", lambda args, cwd: True)
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
 
     captured: dict[str, object] = {}
 
-    def _fake_run(cwd, *, skip_bootstrap_confirm=False, autostart_daemon=True):
+    def _fake_tui(cwd, *, skip_bootstrap_confirm=False, autostart_daemon=True):
         captured["autostart_daemon"] = autostart_daemon
-        captured["skip_bootstrap_confirm"] = skip_bootstrap_confirm
         return None
 
-    monkeypatch.setattr(pw, "run_project_wizard", _fake_run)
+    monkeypatch.setattr(pr, "run_project_wizard_tui", _fake_tui)
 
     pw.maybe_run_project_wizard(_args(_suppress_wizard_daemon_autostart=True), tmp_cwd)
     assert captured.get("autostart_daemon") is False
-
-
-def test_maybe_wrapper_threads_skip_bootstrap_into_stdin(
-    tmp_cwd: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """`args._wizard_init_project_here` must skip the duplicate Initialize?
-    prompt in the stdin wizard."""
-    monkeypatch.setattr(pw, "should_run_project_wizard", lambda args, cwd: True)
-
-    captured: dict[str, object] = {}
-
-    def _fake_run(cwd, *, skip_bootstrap_confirm=False, autostart_daemon=True):
-        captured["skip_bootstrap_confirm"] = skip_bootstrap_confirm
-        return None
-
-    monkeypatch.setattr(pw, "run_project_wizard", _fake_run)
-
-    pw.maybe_run_project_wizard(_args(_wizard_init_project_here=True), tmp_cwd)
-    assert captured.get("skip_bootstrap_confirm") is True

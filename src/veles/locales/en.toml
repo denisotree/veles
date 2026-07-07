@@ -17,12 +17,6 @@ ask_channel_type = "Channel type"
 channel_field_required = "  ! a required {channel} field was left blank; skipping channel setup."
 channel_written = "  · wrote {channel} channel → {path}"
 indexed_wiki = "  · indexed {pages} wiki page(s) into the FTS database."
-ask_daemon = "Run this project as a long-lived daemon? (enables `veles daemon` control, remote sessions, channels)"
-ask_daemon_host = "Daemon host"
-ask_daemon_port = "Daemon port"
-daemon_written = "  · wrote daemon config → {path}"
-daemon_spawned = "  · daemon spawned (pid {pid}) on http://{host}:{port}/"
-daemon_spawn_failed = "  ! failed to spawn daemon for {name}"
 
 [rules_digest]
 header = "House rules (learned from this project)"

@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from veles.core.project import init_project
 from veles.core.project_config import load_project_config, save_project_config
-from veles.daemon import picker_data as dpd
 from veles.daemon.registry import DaemonEntry
+from veles.tui.screens import _daemon_picker_data as dpd
 
 
 def _entry(project_root: str = "", *, pid: int = 0) -> DaemonEntry:

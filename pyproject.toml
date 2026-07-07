@@ -50,6 +50,7 @@ dependencies = [
     "html2text>=2024.0",
     "markdown-it-py>=3.0",
     "keyring>=24",
+    "textual>=0.85",
     "croniter>=2.0",
     "mcp>=1.0",
 ]
