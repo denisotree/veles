@@ -85,7 +85,7 @@ Open the interactive REPL instead (bare `veles` does the same):
 veles
 ```
 
-On first run, a setup wizard will ask for your preferred language, provider, and project name.
+On first run, a setup wizard walks you through your preferred language, LLM provider, API key, default model, colour theme, and whether to initialise a project in the current directory.
 
 ---
 
@@ -324,14 +324,19 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | Create a new project |
 | `veles run "<prompt>"` | Single-turn agent run |
 | `veles` | Interactive REPL (no subcommand) |
-| `veles add <file\|url>` | Ingest a source → wiki page (llm-wiki layout) |
+| `veles add <file\|url>` | Ingest a source → topical wiki pages (llm-wiki layout) |
+| `veles organize` | Reorganize project content per the active layout (propose-then-apply) |
 | `veles research "<question>"` | Deep multi-angle research |
 | `veles curate` | Distil sessions into project memory (`.veles/`, any layout) |
 | `veles sessions {list,show,delete,search}` | Session management |
-| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | Skill management |
-| `veles tool {list,show,promote}` | Tool management |
+| `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | Skill management |
+| `veles tool {list,show,promote,approve}` | Tool management (`approve` gates self-authored tools) |
 | `veles module {list,add,remove}` | Plugin management |
+| `veles browse {modules,skills}` | Search the curated module / skill registries |
 | `veles route {show,set,reset,refresh}` | Model routing |
+| `veles schema {validate,edit}` | Validate / edit AGENTS.md |
+| `veles self-doc` | Generate project self-documentation |
+| `veles layout {sync}` | Layout-pack maintenance |
 | `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | Long-horizon goals |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | Scheduled jobs |
 | `veles dream` | Background memory-consolidation cycle |
@@ -341,7 +346,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles autopilot {enable,disable,status}` | Temporary trust bypass |
 | `veles secret {set,get,list,delete}` | OS-keychain secrets |
 | `veles daemon {start,stop,status,list,restart,delete,session,token}` | HTTP/WS daemon |
-| `veles channel {run,list-sessions,reset-session}` | External channel gateway |
+| `veles channel {list,run,list-sessions,reset-session,add,remove}` | External channel gateway |
 | `veles mcp {list,test}` | External MCP servers |
 | `veles models <provider>` | List provider models |
 | `veles doctor` | Health checks |

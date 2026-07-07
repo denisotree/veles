@@ -85,7 +85,7 @@ veles run "Read AGENTS.md and describe this project."
 veles
 ```
 
-При первом запуске мастер настройки спросит предпочитаемый язык, провайдера и название проекта.
+При первом запуске мастер настройки проведёт вас через выбор языка, LLM-провайдера, API-ключа, модели по умолчанию, цветовой темы и того, инициализировать ли проект в текущем каталоге.
 
 ---
 
@@ -324,14 +324,19 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | Создать новый проект |
 | `veles run "<prompt>"` | Однократный запуск агента |
 | `veles` | Интерактивный REPL (без подкоманды) |
-| `veles add <file\|url>` | Добавить источник → вики-страница |
+| `veles add <file\|url>` | Добавить источник → тематические вики-страницы |
+| `veles organize` | Реорганизовать контент по активному layout (предложить и применить) |
 | `veles research "<question>"` | Глубокое многостороннее исследование |
 | `veles curate` | Консолидировать сессии в вики |
 | `veles sessions {list,show,delete,search}` | Управление сессиями |
-| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | Управление навыками |
-| `veles tool {list,show,promote}` | Управление инструментами |
+| `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | Управление навыками |
+| `veles tool {list,show,promote,approve}` | Управление инструментами (`approve` — гейт самописных) |
 | `veles module {list,add,remove}` | Управление плагинами |
+| `veles browse {modules,skills}` | Поиск по кураторским реестрам модулей / навыков |
 | `veles route {show,set,reset,refresh}` | Маршрутизация моделей |
+| `veles schema {validate,edit}` | Проверить / отредактировать AGENTS.md |
+| `veles self-doc` | Сгенерировать самодокументацию проекта |
+| `veles layout {sync}` | Обслуживание layout-паков |
 | `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | Долгосрочные цели |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | Задачи по расписанию |
 | `veles dream` | Фоновый цикл консолидации памяти |
@@ -341,7 +346,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles autopilot {enable,disable,status}` | Временный обход доверия |
 | `veles secret {set,get,list,delete}` | Секреты в системном хранилище ключей |
 | `veles daemon {start,stop,status,list,restart,delete,session,token}` | HTTP/WS демон |
-| `veles channel {run,list-sessions,reset-session}` | Шлюз внешних каналов |
+| `veles channel {list,run,list-sessions,reset-session,add,remove}` | Шлюз внешних каналов |
 | `veles mcp {list,test}` | Внешние MCP-серверы |
 | `veles models <provider>` | Список моделей провайдера |
 | `veles doctor` | Проверки работоспособности |
