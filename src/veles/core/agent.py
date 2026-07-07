@@ -146,7 +146,8 @@ class Agent:
         registry: Registry,
         *,
         model: str,
-        max_iterations: int = 30,
+        # Runaway backstop, not a task budget — the StallGuard is the real stop.
+        max_iterations: int = 1000,
         system_prompt: str | None = None,
         max_tokens: int = 4096,
         verbose: bool = False,

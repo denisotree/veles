@@ -39,6 +39,20 @@ def _call(name: str, args: dict, call_id: str = "c1") -> ToolCall:
 # --- unit: StallGuard ------------------------------------------------------
 
 
+def test_default_max_iterations_is_a_high_backstop_not_a_task_budget() -> None:
+    """The 30-round cap used to cut off legitimate long jobs (a big migration)
+    mid-task. The default is now a runaway backstop; the StallGuard (loop
+    detection) is the real "am I stuck?" stop — see
+    test_agent_forces_answer_when_tool_call_repeats below."""
+    import inspect
+
+    from veles.cli._parsers._common import DEFAULT_MAX_ITERATIONS
+    from veles.core.agent import Agent
+
+    assert DEFAULT_MAX_ITERATIONS >= 500
+    assert inspect.signature(Agent.__init__).parameters["max_iterations"].default >= 500
+
+
 def test_same_signature_trips_once_at_repeat_limit() -> None:
     guard = StallGuard(repeat_limit=3)
     calls = [_call("read_file", {"path": "a.py"})]

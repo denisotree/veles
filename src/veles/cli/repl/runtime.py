@@ -106,7 +106,7 @@ def _build_runtime(args: argparse.Namespace, project: Project):
             provider=provider,
             registry=_global_registry.subset(tools),
             model=args.model,
-            max_iterations=min(args.max_iterations, 20),
+            max_iterations=min(args.max_iterations, 200),  # generous: a batch worker isn't 20 calls
             system_prompt=system_prompt,
             store=None,
             compressor=compressor,
