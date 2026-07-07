@@ -46,7 +46,12 @@ if TYPE_CHECKING:
     from veles.core.provider import Provider
 
 
-_CHARS_PER_TOKEN = 4  # rough heuristic; tiktoken is ~3.5-4.5 across English/code
+# Estimate over UTF-8 BYTES, not characters: ASCII is 1 byte/char (~4/token, as
+# before) but Cyrillic/CJK are 2-3 bytes/char and tokenise close to that. Counting
+# chars/4 undercut a Cyrillic session ~2x, so a "150k-token" summariser middle was
+# really ~267k and overflowed the model window. Bytes/4 is accurate for ASCII and
+# conservative (slightly high) for non-ASCII — exactly the safe direction.
+_BYTES_PER_TOKEN = 4
 
 logger = logging.getLogger(__name__)
 
@@ -85,13 +90,13 @@ def estimate_tokens(history: list[Message]) -> int:
     n = 0
     for m in history:
         if m.content:
-            n += len(m.content)
+            n += len(m.content.encode("utf-8"))
         for tc in m.tool_calls:
-            n += len(json.dumps(tc.arguments, separators=(",", ":")))
-            n += len(tc.name)
+            n += len(json.dumps(tc.arguments, separators=(",", ":")).encode("utf-8"))
+            n += len(tc.name.encode("utf-8"))
         if m.tool_call_id:
-            n += len(m.tool_call_id)
-    return n // _CHARS_PER_TOKEN
+            n += len(m.tool_call_id.encode("utf-8"))
+    return n // _BYTES_PER_TOKEN
 
 
 def needs_compression(history: list[Message], cfg: CompressionConfig) -> bool:
@@ -279,13 +284,13 @@ def make_default_compressor(
         # the same provider, and the run dies with the same "prompt is
         # too long" error the compressor was meant to prevent.
         rendered = render_middle_for_summary(middle)
-        rendered_tokens = len(rendered) // _CHARS_PER_TOKEN
+        rendered_tokens = len(rendered.encode("utf-8")) // _BYTES_PER_TOKEN
         if rendered_tokens > cfg.max_summariser_input_tokens:
             original_len = len(middle)
             while middle and rendered_tokens > cfg.max_summariser_input_tokens:
                 middle = middle[1:]
                 rendered = render_middle_for_summary(middle)
-                rendered_tokens = len(rendered) // _CHARS_PER_TOKEN
+                rendered_tokens = len(rendered.encode("utf-8")) // _BYTES_PER_TOKEN
             logger.info(
                 "compressor summariser-input-truncated session=%s "
                 "dropped_from_front=%d kept_middle=%d input_tokens=%d "
