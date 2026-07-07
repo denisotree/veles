@@ -133,107 +133,25 @@ from veles.core.provider_factory import make_provider as _make_provider
 # `veles.cli._add_common_run_flags` etc. keep working.
 
 
-# Backward-compat surface: every name extracted to a sibling module is
-# re-exported here under its original `_<name>`. `__all__` suppresses the
-# F401 "imported but unused" lint and documents the public-ish surface
-# that tests + downstream code rely on (e.g. `monkeypatch.setattr(
-# "veles.cli._run_agent_streaming_aware", ...)`).
+# This package `__init__` is a re-export hub. Every helper extracted to a
+# sibling module (`_runtime`, `_curator`, `_project`, `commands.*`, …) is
+# re-imported here under its original `_<name>` for two reasons: (a) internal
+# modules do `from veles.cli import _x` as a circular-import-avoidance seam, and
+# (b) tests monkey-patch `veles.cli._cmd_*` / helpers via attribute lookup —
+# `main` calls the verb dispatchers as module globals, so the patch takes.
+#
+# Those private `_name` re-exports stay importable as module attributes but are
+# NOT public API, so they are deliberately kept OUT of `__all__` (S3 hygiene,
+# 2026-07-07): `__all__` lists only the genuinely public surface. Ruff's F401 on
+# this file is disabled via `per-file-ignores` in pyproject — the whole module
+# exists to re-export, so "imported but unused" is by design here.
 __all__ = [
     "DEFAULT_COMPRESSOR_MODEL",
-    # locally-defined utilities / parser entry points
     "DEFAULT_COMPRESS_THRESHOLD_TOKENS",
     "DEFAULT_MAX_ITERATIONS",
     "DEFAULT_MAX_TOKENS_TOTAL",
     "DEFAULT_MODEL",
     "DEFAULT_PROVIDER",
-    # curator helpers + constants
-    "_CURATE_CHARS_LIMIT",
-    "_CURATE_DEFAULT_LIMIT",
-    "_CURATE_QUIET_WINDOW_SEC",
-    "_CURATE_TOOLS",
-    "_CURATE_TURN_LIMIT",
-    "_CURATOR_IDLE_LIMIT",
-    "_CURATOR_IDLE_THRESHOLD_SEC",
-    "_CURATOR_POSTRUN_LIMIT",
-    # run-loop helpers + constants
-    "_INDEX_INJECTION_CAP",
-    "_INGEST_TOOLS",
-    "_PLANNING_TOOLS",
-    "_PROPOSER_IDLE_THRESHOLD_SEC",
-    # provider factory aliases (live in core.provider_factory)
-    "_PROVIDER_API_KEY_ENVS",
-    "_PROVIDER_CHOICES",
-    "_RECALL_BLOCK_CHARS_CAP",
-    "_RECALL_LIMIT",
-    "_RUN_TOOLS",
-    "_SELF_DOC_IDLE_SEC",
-    "_CuratorPassResult",
-    "_budget_scope",
-    "_build_compressor",
-    "_build_parser",
-    "_build_run_system_prompt",
-    "_cmd_add",
-    # verb dispatchers
-    "_cmd_autopilot",
-    "_cmd_browse",
-    "_cmd_channel",
-    "_cmd_curate",
-    "_cmd_daemon",
-    "_cmd_doctor",
-    "_cmd_dream",
-    "_cmd_export",
-    "_cmd_goal",
-    "_cmd_import",
-    "_cmd_init",
-    "_cmd_job",
-    "_cmd_layout",
-    "_cmd_mcp",
-    "_cmd_models",
-    "_cmd_module",
-    "_cmd_organize",
-    "_cmd_project",
-    "_cmd_repl",
-    "_cmd_research",
-    "_cmd_route",
-    "_cmd_run",
-    "_cmd_schema_dispatch",
-    "_cmd_secret",
-    "_cmd_self_doc",
-    "_cmd_sessions",
-    "_cmd_skill",
-    "_cmd_subproject",
-    "_cmd_trust",
-    "_confirm",
-    "_continuous_curator_eligible",
-    "_curate_one_session",
-    "_ensure_api_key",
-    "_has_api_key_for_provider",
-    "_load_index_md",
-    # project lifecycle helpers
-    "_load_project_modules",
-    "_load_skills",
-    "_make_provider",
-    "_make_tool_aware_provider",
-    "_maybe_apply_project_slash_prefix",
-    "_maybe_refresh_nl_routing",
-    "_maybe_refresh_self_doc",
-    "_maybe_run_idle_curator",
-    "_maybe_run_insight_extractor",
-    "_maybe_run_post_turn_curator",
-    "_maybe_run_subproject_proposer",
-    "_maybe_suggest_promotions",
-    "_print_run_summary",
-    "_proposals_block",
-    "_qualify_for_provider",
-    "_recall_block",
-    "_register_project",
-    "_render_message",
-    "_resolve_active_project",
-    "_run_agent_streaming_aware",
-    "_run_curator_pass",
-    "_touch_active_project",
-    "_truncate_session_messages",
-    "_warn_if_agents_md_invalid",
     "build_command_agent",
     "build_compressor",
     "build_run_system_prompt",
