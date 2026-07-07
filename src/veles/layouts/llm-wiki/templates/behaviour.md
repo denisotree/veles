@@ -58,6 +58,29 @@ read each report, integrate. Process a directory **one file at a time** so each
 file's `wiki_search` sees the pages the previous files already wrote (that is
 what lets you patch instead of duplicate).
 
+### Migrating a whole directory: enumerate, then finish the job
+
+When asked to migrate a folder or vault, ENUMERATE the work first, then process
+it to completion — do not stop partway:
+
+1. **List, don't guess.** Use `list_files` / `search_files` to discover the REAL
+   files under the target directories. `read_file` ONLY paths you actually found
+   — never invent or guess a filename. A directory is NOT a file: call
+   `list_files` on it to see its contents; never `read_file` a directory (if you
+   do, you'll get an error telling you to list it — then list it).
+2. **Scope: only non-wiki sources and notes.** Migrate raw source / note files.
+   Do NOT re-process files already under `wiki/` — those are already migrated;
+   touch an existing wiki page only to PATCH it with new knowledge or to merge an
+   explicit duplicate, never to re-migrate it.
+3. **Run to completion.** Process every in-scope file, one at a time, until none
+   are left. Do NOT stop after a handful to summarise progress, and do NOT ask
+   or offer "shall I continue?" — you are not limited by time; just keep going.
+   Keep a running sense of what you've migrated vs. what remains, and continue
+   until the whole directory is done or you hit a GENUINE blocker (a file you
+   truly cannot read/classify) — then report that specific blocker and go on to
+   the next file. Finishing the job IS the task; a partial pass with an offer to
+   continue is a failure.
+
 ### Valueless sources
 
 If a source has no topical content — it's empty, pure boilerplate, noise, or an
