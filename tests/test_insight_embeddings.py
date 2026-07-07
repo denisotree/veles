@@ -88,9 +88,7 @@ def test_explicit_registration_suppresses_lazy_autodetect(monkeypatch) -> None:
     def boom(*, force: bool = False):
         raise AssertionError("autodetect must not run after explicit registration")
 
-    monkeypatch.setattr(
-        "veles.modules.embedding_autodetect.autodetect_embedding_adapter", boom
-    )
+    monkeypatch.setattr("veles.modules.embedding_autodetect.autodetect_embedding_adapter", boom)
     try:
         assert emb.get_local_embedding_adapter() is preset
     finally:

@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] — 2026-07-07
+
+Supersedes the internal-only 0.10.0 bump; this is the first release cut since 0.9.0.
+
+### Added
+
+- **Project memory is alive in the default REPL (M191).** Every turn injects
+  relevant recall and runs the learning loop (insight extraction + curation)
+  after the turn — the "never forgets" promise now holds in the main interface,
+  not only in batch `veles curate`.
+- **Embedding-backed semantic recall (M192).** Insights are recalled by meaning
+  through an on-device embedding backend (Ollama), with **no cloud egress** of
+  your content; it self-initialises on first use and degrades cleanly to
+  keyword search when no local embedder is present.
+- **Content-aware ingestion (M203).** `veles add` extracts the distinct topics
+  a source is *about* and routes each to a topical wiki page via
+  find-or-create-or-patch — no more 1:1 file→page dumps named by filename or
+  date. One file can yield several topic pages, and a related source patches the
+  existing page instead of duplicating it. `veles add <dir> --recursive` walks a
+  whole folder.
+- **Human-approval gate for self-authored tools (M199).** Tools the agent writes
+  to `.veles/tools/` must be reviewed with `veles tool approve` before they run;
+  the approval store lives outside the agent's write sandbox, so a dropped file
+  cannot self-approve.
+- **Fail-loud config validation (M201).** `veles doctor` and `veles daemon
+  start` flag unknown keys in the security-relevant config sections
+  (channels / daemon / mcp) instead of silently ignoring a typo.
+- **Layout-declared behaviour prompts (M188–M190)** with opt-in writable zones
+  (M189); the default llm-wiki layout uses them for migration + log-patch
+  behaviour.
+
+### Changed
+
+- **The bare `veles` chat is now the inline prompt_toolkit REPL (M187).** The
+  full-screen Textual chat was retired so native terminal selection/copy work;
+  the first-run + project setup wizards and the `veles daemon` control panel
+  remain interactive Textual TUIs.
+- Internal hardening: `veles.core` decoupled from the cli/daemon/channels layers
+  with a CI invariant (M194); the REPL was decomposed from a single 2600-line
+  module into focused mixins (M195).
+
+### Security
+
+- **Untrusted-content egress gate (M198).** A tool call that would send data to
+  a destination named in untrusted content read during the run is gated (hard
+  confirm; fail-closed when unattended), and runs *before* the autopilot policy
+  so an autopilot window cannot bypass it.
+- **Autopilot network egress is journaled (M200)** to the project log.
+- **`veles add` hardened against prompt-injection in ingested files.** The
+  ingest agent has no network-egress tool; a URL source is fetched by the CLI
+  (wrapped as untrusted) and handed to the agent inline, so injected
+  instructions inside a source document have no exfiltration channel.
+- **Delegated workers cannot exceed their parent's tools** — `delegate`
+  intersects the requested toolset with the running agent's scoped tools.
+
+### Fixed
+
+- **Memory recall no longer goes silent (M193).** A broken full-text index
+  surfaces via `veles doctor` (repairable with `veles doctor --fix`) instead of
+  silently returning nothing; un-distilled recent turns survive until the first
+  curation.
+- **Semantic recall is no longer dormant** on the first REPL turn or in a
+  single-shot `veles run` (the embedding backend self-initialises on first use).
+- **`veles daemon` no longer hangs when piped / non-interactive** — it falls
+  back to printing the daemon list.
+- **Documentation honesty (M196 + docs sweep).** The CLI reference and all 14
+  README translations were corrected: accurate first-run wizard steps, complete
+  command tables (`tool approve`, `organize`, `browse`, `schema`, `self-doc`,
+  `layout`, full channel subcommands), and no phantom environment variables.
+
 ## [0.9.0] — 2026-07-04
 
 ### Added
