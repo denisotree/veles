@@ -171,7 +171,6 @@ def test_provider_override_writes_config(tmp_cwd: Path) -> None:
                 "y",  # provider override
                 "openai",  # provider
                 "openai/gpt-4o",  # model
-                "n",  # wiki seed (no candidates anyway)
                 "n",  # telegram
             ]
         )
@@ -188,24 +187,22 @@ def test_provider_override_writes_config(tmp_cwd: Path) -> None:
     assert "gpt-4o" in content
 
 
-def test_wiki_seed_copies_docs_into_sources_seed(tmp_cwd: Path) -> None:
+def test_wizard_does_not_bulk_copy_into_sources(tmp_cwd: Path) -> None:
+    """The removed wiki-seed step used to bulk-copy README/docs into
+    sources/seed/. Content now enters only via content-aware `veles add`, so a
+    bare wizard run must leave no seed pile."""
     (tmp_cwd / "README.md").write_text("# Hello", encoding="utf-8")
     (tmp_cwd / "docs").mkdir()
     (tmp_cwd / "docs" / "intro.md").write_text("# Intro", encoding="utf-8")
     token = pw.set_project_wizard_prompter(
-        _scripted(["y", "n", "y", "n"])  # bootstrap, no provider, yes seed, no tg
+        _scripted(["y", "n", "n"])  # bootstrap, no provider, no channel
     )
     try:
         project = pw.run_project_wizard(tmp_cwd)
     finally:
         pw.reset_project_wizard_prompter(token)
     assert project is not None
-    seed_dir = project.wiki_root / "sources" / "seed"
-    assert seed_dir.is_dir()
-    # The README and the docs/ entry both land under seed_dir.
-    found = list(seed_dir.rglob("*.md"))
-    assert any(p.name == "README.md" for p in found)
-    assert any(p.name == "intro.md" for p in found)
+    assert not (project.wiki_root / "sources" / "seed").exists()
 
 
 def test_channel_writes_token_and_whitelist(tmp_cwd: Path) -> None:
@@ -216,7 +213,6 @@ def test_channel_writes_token_and_whitelist(tmp_cwd: Path) -> None:
             [
                 "y",  # bootstrap
                 "n",  # provider override
-                "n",  # wiki seed
                 "y",  # add a channel?
                 "telegram",  # channel type (only registered platform)
                 "bot-abc",  # bot_token cred
@@ -248,7 +244,6 @@ def test_channel_skips_when_required_field_blank(tmp_cwd: Path) -> None:
             [
                 "y",  # bootstrap
                 "n",  # provider
-                "n",  # seed
                 "y",  # add a channel?
                 "telegram",  # channel type
                 "",  # bot_token blank (required) → abort

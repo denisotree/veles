@@ -11,10 +11,7 @@ Steps (each gated by its own y/N, default `n` = skip):
      the standard "no project found" error.
   2. Provider override — optional `.veles/config.toml` `[engine]` block.
      Default = inherit from user-level config.
-  3. Wiki seed from existing docs — copy `README.md`, `*.md` in `docs/`,
-     and top-level `*.md` files into `wiki/sources/`. Pure file copy;
-     no LLM ingest at wizard time (offline-friendly, no API key needed).
-  4. Channel — optional. Pick a type from the platform registry (M172),
+  3. Channel — optional. Pick a type from the platform registry (M172),
      then fill that platform's cred fields; secret → keychain, the rest →
      `.veles/config.toml`. Shared `apply_channel` path; no online validation.
 
@@ -26,13 +23,11 @@ the wizard from re-firing on the next invocation.
 from __future__ import annotations
 
 import argparse
-import contextlib
 import os
 import sys
 from collections.abc import Callable
 from contextvars import ContextVar, Token
 from pathlib import Path
-from shutil import copyfile
 
 from veles.core.i18n import t
 from veles.core.project import Project, ProjectAlreadyExists, init_project
@@ -112,8 +107,6 @@ def run_project_wizard(cwd: Path) -> Project | None:
     from veles.core.layout.engines import wiki_enabled
 
     _step_provider_override(project, prompter)
-    if wiki_enabled(project):
-        _step_wiki_seed(project, prompter, cwd)
     _step_channel(project, prompter)
 
     # Seed the FTS index so the post-init promise — "files will be
@@ -152,22 +145,6 @@ def _step_provider_override(project: Project, prompter: Prompter) -> None:
         t("project_wizard.provider_written", path=_project_config_path(project)),
         file=sys.stderr,
     )
-
-
-def _step_wiki_seed(project: Project, prompter: Prompter, cwd: Path) -> None:
-    candidates = _collect_seed_candidates(cwd)
-    if not candidates:
-        return
-    sample = ", ".join(str(p.relative_to(cwd)) for p in candidates[:3])
-    extra = f" (+ {len(candidates) - 3} more)" if len(candidates) > 3 else ""
-    if not _ask_yes_no(
-        prompter,
-        t("project_wizard.ask_wiki_seed", sample=sample, extra=extra),
-        default=False,
-    ):
-        return
-    seeded = _copy_seed_files(project, candidates)
-    print(t("project_wizard.wiki_seed_done", count=seeded), file=sys.stderr)
 
 
 def _step_channel(project: Project, prompter: Prompter) -> None:
@@ -218,57 +195,6 @@ def _step_channel(project: Project, prompter: Prompter) -> None:
 
 
 # ---------------- helpers ----------------
-
-
-def _collect_seed_candidates(cwd: Path, *, cap: int = 25) -> list[Path]:
-    """README.md + every `*.md` under cwd one level deep + `docs/**/*.md`."""
-    seen: list[Path] = []
-    readme = cwd / "README.md"
-    if readme.is_file():
-        seen.append(readme)
-    try:
-        for entry in sorted(cwd.glob("*.md")):
-            if entry.is_file() and entry not in seen:
-                seen.append(entry)
-    except OSError:
-        pass
-    docs = cwd / "docs"
-    if docs.is_dir():
-        try:
-            for entry in sorted(docs.rglob("*.md")):
-                if entry.is_file() and entry not in seen:
-                    seen.append(entry)
-        except OSError:
-            pass
-    return seen[:cap]
-
-
-def _copy_seed_files(project: Project, candidates: list[Path]) -> int:
-    """Raw copy into `<wiki_root>/sources/seed/<relpath>`. The agent can
-    `veles add` (or `/wiki add`) each later; the dream cycle's reindex
-    picks up the new pages automatically."""
-    Wiki(project.wiki_root).ensure_layout()
-    target_root = project.wiki_root / "sources" / "seed"
-    target_root.mkdir(parents=True, exist_ok=True)
-    count = 0
-    for src in candidates:
-        try:
-            rel = src.relative_to(project.root)
-        except ValueError:
-            rel = Path(src.name)
-        dst = target_root / rel
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            copyfile(src, dst)
-            count += 1
-        except OSError as exc:
-            print(f"  ! skipping {src}: {exc}", file=sys.stderr)
-    if count:
-        with contextlib.suppress(OSError):
-            Wiki(project.wiki_root).append_log(
-                op="seed", summary=f"wizard copied {count} file(s) into sources/seed/"
-            )
-    return count
 
 
 def _ask_yes_no(prompter: Prompter, prompt: str, *, default: bool) -> bool:
