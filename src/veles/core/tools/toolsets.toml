@@ -92,11 +92,13 @@ tools = [
 # + source disposition + per-topic fan-out (`delegate`).
 #
 # Deliberately SCOPED (M198–M201 blast-radius discipline): no `run_shell`,
-# `delete_file`, `edit_file`, non-wiki `write_file`, or `web_search`. A
-# valueless source is archived (move_file), never deleted, by default.
+# `delete_file`, `edit_file`, non-wiki `write_file`, or `web_search`. And NO
+# `fetch_url` (B1, 2026-07-07 audit): ingested content is untrusted, so the
+# agent gets NO network-egress tool — an injected `fetch_url(evil)` has no
+# channel. URL sources are pre-fetched by the CLI (wrapped untrusted) and
+# handed to the agent inline; a local file never needs the network.
 includes = ["builtin"]
 tools = [
-    "fetch_url",
     "pdf_read",
     "image_ocr",
     "image_describe",

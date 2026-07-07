@@ -46,6 +46,20 @@ def test_user_message_handles_local_path():
     assert "./docs/foo.md" in msg
 
 
+def test_user_message_embeds_prefetched_content():
+    """B1 (2026-07-07 audit): the ingest agent has no fetch_url, so a URL
+    source is pre-fetched by the CLI and its (untrusted-wrapped) content is
+    handed to the agent inline — the message must carry the content and tell
+    the agent NOT to fetch it again."""
+    wrapped = '<untrusted source="https://x.com">\nfetched body\n</untrusted>'
+    msg = ingest_user_message("https://x.com", content=wrapped)
+    assert "https://x.com" in msg
+    assert "fetched body" in msg
+    assert "not" in msg.lower() and "fetch" in msg.lower()  # "do not fetch it again"
+    # still content-aware
+    assert "topic" in msg.lower()
+
+
 def test_user_message_carries_content_aware_directive():
     """M203: the kickoff turn itself must steer a weak model to topic pages —
     behaviour.md alone (conditional, ambient) let gpt-4o-mini fall back to a

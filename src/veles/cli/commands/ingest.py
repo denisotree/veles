@@ -149,8 +149,16 @@ def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) 
         check_api_key=False,
         tool_aware=True,
     )
-    result, budget = _run_agent_streaming_aware(
-        agent, ingest_user_message(source), args, project=project
-    )
+    # B1 (2026-07-07 audit): the ingest toolset has no `fetch_url` — ingested
+    # content is untrusted and must not be able to open an egress channel. A URL
+    # source is fetched HERE (fetch_url wraps the body untrusted) and handed to
+    # the agent inline; a local file the agent reads itself.
+    if source.startswith(("http://", "https://")):
+        from veles.core.tools.builtin.fetch_url import fetch_url
+
+        user_msg = ingest_user_message(source, content=fetch_url(source))
+    else:
+        user_msg = ingest_user_message(source)
+    result, budget = _run_agent_streaming_aware(agent, user_msg, args, project=project)
     _print_run_summary(args, result, budget)
     return 0 if result.stopped_reason == "completed" else 1
