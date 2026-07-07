@@ -19,6 +19,23 @@ Classify every source by CONTENT (never by filename or extension). A single
 file can be about **several distinct topics** at once (one diary day → an
 event + two people). Extract each topic and handle it on its own.
 
+### Grounding and granularity — don't build a wiki of thin stubs
+
+- **Ground every page in the source.** A page's content is what the SOURCE
+  actually says — never write a generic definition from your own prior
+  knowledge. If a standup mentions "ClickHouse", do NOT create a `clickhouse`
+  page explaining what ClickHouse is; that is fabrication, not migration.
+- **A passing mention is NOT a topic.** Create a page only for something the
+  source has SUBSTANTIVE content about. A tool, technology, person, or term
+  merely name-dropped becomes a fact ON the relevant project/entity page — not
+  its own page. One substantive page beats ten 15-word stubs. If you have almost
+  nothing to say about a candidate topic beyond that it was mentioned, don't
+  make a page for it.
+- **Consolidate, don't fragment.** Recurring notes about the same project (e.g.
+  a daily standup) accumulate into that project's page — `wiki_search` it first
+  and PATCH it with each new fact, building one rich page over time. Do not
+  spawn a fresh page per meeting, per date, or per sub-topic mentioned.
+
 ### Pipeline for each source
 
 1. **Read** it (`read_file`, or `fetch_url` for a URL, `pdf_read` for a PDF).
