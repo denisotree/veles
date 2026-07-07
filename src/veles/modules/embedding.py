@@ -53,14 +53,38 @@ class EmbeddingError(RuntimeError):
 
 
 _REGISTERED: EmbeddingAdapter | None = None
+# B2 (2026-07-07 audit): distinguishes "autodetect has not run yet" from
+# "autodetect ran and found no backend" — both leave `_REGISTERED is None`.
+# Without this, `get_local_embedding_adapter` couldn't know whether to probe,
+# so vector recall stayed inert until the post-turn curator happened to run
+# autodetect (never on REPL turn 1 or a single-shot `veles run`).
+_AUTODETECTED = False
 
 
 def register_embedding_adapter(adapter: EmbeddingAdapter | None) -> None:
     """Install (or clear with None) the process-global embedding
     adapter. Called once at daemon startup by the autodetect path;
     tests use `reset_embedding_adapter` to keep state isolated."""
-    global _REGISTERED
+    global _REGISTERED, _AUTODETECTED
     _REGISTERED = adapter
+    _AUTODETECTED = True  # an explicit install counts as detection — no lazy probe
+
+
+def _ensure_autodetected() -> None:
+    """Run backend autodetection once (lazily) if nothing has registered an
+    adapter yet. Cached via `_AUTODETECTED` so recall probes at most once per
+    process, not on every turn. Best-effort — a probe failure leaves the
+    token-based fallback intact."""
+    global _AUTODETECTED
+    if _AUTODETECTED:
+        return
+    _AUTODETECTED = True  # set first so a failing probe never retries per-call
+    try:
+        from veles.modules.embedding_autodetect import autodetect_embedding_adapter
+
+        autodetect_embedding_adapter()
+    except Exception:
+        pass
 
 
 def get_embedding_adapter() -> EmbeddingAdapter | None:
@@ -77,6 +101,7 @@ def get_local_embedding_adapter() -> EmbeddingAdapter | None:
     Recall (query text) and backfill (insight bodies) both use it so a cloud
     embedder never receives project content. Returns None for a cloud adapter
     or no adapter — callers then stay on FTS-only recall."""
+    _ensure_autodetected()  # B2: self-initialise so recall isn't inert on turn 1
     adapter = _REGISTERED
     if adapter is not None and getattr(adapter, "is_local", False):
         return adapter
@@ -84,9 +109,11 @@ def get_local_embedding_adapter() -> EmbeddingAdapter | None:
 
 
 def reset_embedding_adapter() -> None:
-    """Test helper — clear any installed adapter."""
-    global _REGISTERED
+    """Test helper — clear any installed adapter AND the autodetect latch, so
+    the next `get_local_embedding_adapter` re-probes from a clean slate."""
+    global _REGISTERED, _AUTODETECTED
     _REGISTERED = None
+    _AUTODETECTED = False
 
 
 __all__ = [

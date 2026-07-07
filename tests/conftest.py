@@ -200,6 +200,27 @@ class FakeKeyring:
 
 
 @pytest.fixture(autouse=True)
+def _deterministic_embedding_backend() -> Iterator[None]:
+    """Pin the embedding backend to "none" for every test (B2, 2026-07-07).
+
+    B2 made `get_local_embedding_adapter` lazily autodetect on first call, which
+    probes `localhost:11434` for Ollama. Left unpinned, any recall test would
+    hit the network — a real Ollama on a dev box would register itself and flip
+    recall to vector mode mid-suite (non-deterministic, dev-box-dependent), and
+    a registered adapter would leak across tests. Marking autodetect as already
+    done (with no backend) keeps the suite on deterministic FTS ranking; tests
+    that want embeddings call `register_embedding_adapter(fake)` explicitly,
+    which overrides this. Reset afterwards so state never leaks."""
+    from veles.modules.embedding import register_embedding_adapter, reset_embedding_adapter
+
+    register_embedding_adapter(None)  # marks _AUTODETECTED — suppresses the live probe
+    try:
+        yield
+    finally:
+        reset_embedding_adapter()
+
+
+@pytest.fixture(autouse=True)
 def _hermetic_user_home(
     tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:

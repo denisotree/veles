@@ -44,6 +44,59 @@ class _FakeEmbedder:
         return [self.mapping.get(t, [0.0, 0.0, 1.0]) for t in texts]
 
 
+def test_get_local_lazily_autodetects_once(monkeypatch) -> None:
+    """B2 (2026-07-07 audit): vector recall must not be inert on REPL turn 1 or
+    in a single-shot `veles run` (where the curator — the only place autodetect
+    ran — never fires). get_local_embedding_adapter lazily runs autodetect once
+    when nothing is registered, then caches, so it self-initialises without a
+    separate startup hook and without re-probing on every recall."""
+    from veles.modules import embedding as emb
+
+    emb.reset_embedding_adapter()
+    calls = {"n": 0}
+    fake = _FakeEmbedder({}, is_local=True)
+
+    def fake_autodetect(*, force: bool = False):
+        calls["n"] += 1
+        emb.register_embedding_adapter(fake)
+        return fake
+
+    monkeypatch.setattr(
+        "veles.modules.embedding_autodetect.autodetect_embedding_adapter",
+        fake_autodetect,
+    )
+    try:
+        got1 = emb.get_local_embedding_adapter()
+        got2 = emb.get_local_embedding_adapter()
+    finally:
+        emb.reset_embedding_adapter()
+
+    assert got1 is fake  # autodetect ran on first call → recall not inert
+    assert got2 is fake
+    assert calls["n"] == 1  # cached; not re-probed on the hot path every turn
+
+
+def test_explicit_registration_suppresses_lazy_autodetect(monkeypatch) -> None:
+    """A test/host that registers an adapter directly must not have it clobbered
+    by a lazy autodetect on first get_local."""
+    from veles.modules import embedding as emb
+
+    emb.reset_embedding_adapter()
+    preset = _FakeEmbedder({}, is_local=True)
+    emb.register_embedding_adapter(preset)
+
+    def boom(*, force: bool = False):
+        raise AssertionError("autodetect must not run after explicit registration")
+
+    monkeypatch.setattr(
+        "veles.modules.embedding_autodetect.autodetect_embedding_adapter", boom
+    )
+    try:
+        assert emb.get_local_embedding_adapter() is preset
+    finally:
+        emb.reset_embedding_adapter()
+
+
 def _insert_insight(store: SessionStore, *, title: str, body: str) -> int:
     cur = store._conn.execute(
         "INSERT INTO insights(title, body, category, created_at) VALUES (?, ?, ?, ?)",
