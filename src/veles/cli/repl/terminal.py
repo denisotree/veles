@@ -72,6 +72,18 @@ def _register_kitty_sequences() -> None:
     # Ctrl+a..z → Keys.ControlA..ControlZ (same enum as legacy \x01..\x1a).
     for i in range(26):
         seqs[f"\x1b[{ord('a') + i};5u"] = getattr(Keys, f"Control{chr(ord('A') + i)}")
+    # JCUKEN (Russian) layout: under the kitty protocol `Ctrl+<letter>` reports
+    # the Cyrillic codepoint, not the Latin one — e.g. Ctrl+C on a Russian
+    # keyboard sends the letter "es" (U+0441 = 1089) as `\x1b[1089;5u`, which the
+    # Latin loop above doesn't cover, so pt prints the raw sequence into the input
+    # instead of interrupting. Map each Cyrillic letter to the SAME control key as
+    # the Latin letter on its physical key (QWERTY position), for both cases.
+    _qwerty = "qwertyuiopasdfghjklzxcvbnm"
+    _jcuken = "йцукенгшщзфывапролдячсмить"  # physical-key order over _qwerty
+    for latin, cyr in zip(_qwerty, _jcuken, strict=True):
+        ctrl = getattr(Keys, f"Control{latin.upper()}")
+        for ch in (cyr, cyr.upper()):
+            seqs[f"\x1b[{ord(ch)};5u"] = ctrl
 
 
 def _console():
