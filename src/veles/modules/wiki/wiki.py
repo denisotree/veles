@@ -12,9 +12,9 @@ Layout under that root:
         sources/
     sources/<category>/ raw immutable sources
 
-Allowed category roots = the core defaults (`concepts`, `entities`, `sources`,
-`queries`, `sessions`, `self-doc`) plus the active layout pack's
-`[layout.wiki].categories`. A category may be a nested path (`projects/work`),
+Allowed category roots = the core defaults (`concepts`, `entities`, `queries`,
+`sessions`, `self-doc` — NOT `sources`, removed in M203) plus the active layout
+pack's `[layout.wiki].categories`. A category may be a nested path (`projects/work`),
 so the wiki layout is extensible for iterative data (diary/tasks/projects).
 
 Path semantics:
