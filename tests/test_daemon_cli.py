@@ -347,12 +347,44 @@ def test_daemon_picker_runs_with_mouse_disabled(
             captured["args"] = args
             captured["kwargs"] = kwargs
 
+    import sys as _sys
+
     import veles.tui.screens.daemon_picker as picker_mod
 
+    monkeypatch.setattr(_sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(_sys.stdout, "isatty", lambda: True)
     monkeypatch.setattr(picker_mod, "DaemonPickerApp", _FakeApp)
     rc = daemon_cmd._cmd_daemon_picker(_ns())
     assert rc == 0
     assert captured["kwargs"].get("mouse") is False
+
+
+def test_daemon_picker_non_tty_falls_back_to_list(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """Bare `veles daemon` piped/redirected (non-TTY) must NOT launch the
+    Textual picker — with no real terminal it hangs. Fall back to the plain
+    daemon list. (Regression guard: the M197 revert dropped this guard;
+    restored 2026-07-07.)"""
+    import sys as _sys
+
+    launched = {"picker": False}
+
+    class _Boom:
+        def __init__(self, *a, **k):
+            launched["picker"] = True
+
+        def run(self, *a, **k):
+            launched["picker"] = True
+
+    import veles.tui.screens.daemon_picker as picker_mod
+
+    monkeypatch.setattr(_sys.stdin, "isatty", lambda: False)
+    monkeypatch.setattr(_sys.stdout, "isatty", lambda: False)
+    monkeypatch.setattr(picker_mod, "DaemonPickerApp", _Boom)
+    rc = daemon_cmd._cmd_daemon_picker(_ns())
+    assert launched["picker"] is False  # never launched Textual into a non-tty
+    assert rc == 0
 
 
 # ---------------- M173: host/port cascade + channel offer ----------------

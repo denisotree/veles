@@ -434,6 +434,12 @@ def _cmd_daemon_status(args: argparse.Namespace) -> int:
 
 
 def _cmd_daemon_picker(args: argparse.Namespace) -> int:
+    # Non-TTY (piped / redirected / no controlling terminal): the Textual
+    # picker needs a real terminal or it hangs forever. Fall back to the plain
+    # daemon list instead of launching a full-screen app into nothing.
+    # (Regression guard — the M197 revert dropped this; restored 2026-07-07.)
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return _cmd_daemon_list(args)
     try:
         from veles.tui.screens.daemon_picker import DaemonPickerApp
     except ImportError as exc:
