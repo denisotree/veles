@@ -72,6 +72,12 @@ Supersedes the internal-only 0.10.0 bump; this is the first release cut since 0.
   single-shot `veles run` (the embedding backend self-initialises on first use).
 - **`veles daemon` no longer hangs when piped / non-interactive** — it falls
   back to printing the daemon list.
+- **`--provider <name>` is honored even when it equals the default provider.**
+  Previously `--provider openrouter` (openrouter being the built-in default) was
+  indistinguishable from "not passed", so a user whose config `default_provider`
+  was a different backend (e.g. `ollama`) could not CLI-override back to
+  openrouter — sub-agents and the curator fell through to the config default and
+  errored. The flag is now tracked explicitly.
 - **Documentation honesty (M196 + docs sweep).** The CLI reference and all 14
   README translations were corrected: accurate first-run wizard steps, complete
   command tables (`tool approve`, `organize`, `browse`, `schema`, `self-doc`,

@@ -71,8 +71,13 @@ def resolve_effective_provider(
     base — so several daemon sessions in one project can each pin their own
     provider. The layer sits *below* an explicit `--provider` and *above*
     the `[engine] provider`, keeping the M125/M127/M130 cascade intact."""
+    # An explicit `--provider` wins — detected by the parser's marker
+    # (`_provider_explicit`), NOT by comparing to DEFAULT_PROVIDER. Comparing
+    # to the default made `--provider openrouter` (== DEFAULT_PROVIDER)
+    # indistinguishable from "not passed", so a user whose config default was a
+    # different provider could not CLI-override back to openrouter (2026-07-07).
     explicit = getattr(args, "provider", None)
-    if explicit and explicit != DEFAULT_PROVIDER:
+    if explicit and getattr(args, "_provider_explicit", False):
         return explicit
     if project is not None:
         cfg = load_project_config(project)

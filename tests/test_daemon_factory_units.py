@@ -82,6 +82,7 @@ def test_factory_settings_honors_explicit_args(tmp_path: Path) -> None:
     project = init_project(tmp_path, name=None, force=False)
     args = argparse.Namespace(
         provider="openai",
+        _provider_explicit=True,  # simulate an explicit `--provider openai`
         model="gpt-4o",
         max_iterations=5,
         max_tokens=8192,
@@ -171,7 +172,9 @@ def test_factory_settings_cli_overrides_project_config(tmp_path: Path) -> None:
         '[engine]\nmodel = "google/gemini-3.1-pro-preview"\n',
         encoding="utf-8",
     )
-    args = argparse.Namespace(model="anthropic/claude-haiku-4.5", provider="anthropic")
+    args = argparse.Namespace(
+        model="anthropic/claude-haiku-4.5", provider="anthropic", _provider_explicit=True
+    )
     s = _factory_settings_from_args(args, project)
     assert s.model == "anthropic/claude-haiku-4.5"
     assert s.provider_name == "anthropic"

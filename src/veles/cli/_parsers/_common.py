@@ -32,6 +32,20 @@ PROVIDER_CHOICES = (
 )
 
 
+class _ExplicitProviderAction(argparse.Action):
+    """Record that `--provider` was passed on the command line.
+
+    `resolve_effective_provider` keys off `_provider_explicit` (set here) rather
+    than comparing the value to `DEFAULT_PROVIDER`, so `--provider openrouter`
+    (which equals the default) is still honored over a differing config default.
+    Keeping the stored value a plain string (default `DEFAULT_PROVIDER`) means no
+    call site ever sees `None` — zero blast radius (2026-07-07)."""
+
+    def __call__(self, parser, namespace, values, option_string=None):  # type: ignore[override]
+        setattr(namespace, self.dest, values)
+        namespace._provider_explicit = True
+
+
 def add_project_root_flag(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--project-root",
@@ -58,6 +72,7 @@ def add_common_run_flags(p: argparse.ArgumentParser) -> None:
         "--provider",
         choices=PROVIDER_CHOICES,
         default=DEFAULT_PROVIDER,
+        action=_ExplicitProviderAction,
         help=f"LLM provider (default: {DEFAULT_PROVIDER}).",
     )
     p.add_argument(
