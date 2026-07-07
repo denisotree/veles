@@ -228,9 +228,9 @@ def build_run_system_prompt(
 
 
 def _build_run_system_prompt(args: argparse.Namespace, project: Project) -> str | None:
-    """Legacy shim — extracts kwargs from `args` and delegates. Kept so
-    plugins / tests that imported the underscored name keep working
-    through one release."""
+    """argparse-Namespace adapter over `build_run_system_prompt` — the live
+    entry the CLI verbs use (`veles run`/tui), pulling the prompt + include
+    flags off `args`. The public kwargs form is `build_run_system_prompt`."""
     return build_run_system_prompt(
         project,
         prompt=getattr(args, "prompt", "") or "",
@@ -531,7 +531,8 @@ def build_compressor(
 
 
 def _build_compressor(args: argparse.Namespace, project: Project, provider: Provider):
-    """Legacy shim — extracts kwargs from `args` and delegates."""
+    """argparse-Namespace adapter over `build_compressor` — the live entry the
+    CLI verbs use, pulling the compressor flags off `args`."""
     return build_compressor(
         project,
         provider,

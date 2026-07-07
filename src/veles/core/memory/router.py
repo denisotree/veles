@@ -257,13 +257,6 @@ def _subproject_wiki_enabled(sub_root) -> bool:
         return False
 
 
-def _interleave(
-    wiki_hits: list[RecallHit], turn_hits: list[RecallHit], limit: int
-) -> list[RecallHit]:
-    """Two-stream round-robin (retained for back-compat; callers may import)."""
-    return _interleave_many([wiki_hits, turn_hits], limit)
-
-
 def _interleave_many(streams: list[list[RecallHit]], limit: int) -> list[RecallHit]:
     """Round-robin merge across N streams, capped at `limit`.
 
