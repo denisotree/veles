@@ -60,7 +60,7 @@ from veles.core.provider import (
     ProviderResponse,
     ToolCall,
 )
-from veles.core.stall_guard import STALL_NUDGE, StallGuard
+from veles.core.stall_guard import STALL_NUDGE, TOKEN_WARN_NUDGE, StallGuard
 
 # M156: streaming response consumer extracted to `stream_consumer.py`.
 from veles.core.stream_consumer import consume_stream
@@ -160,6 +160,7 @@ class Agent:
         plan_mode: bool = False,
         role: str | None = None,
         stall_repeat_limit: int | None = 3,
+        token_warn_threshold: int | None = 500_000,
         fenced_tools: bool = True,
     ) -> None:
         self._provider = provider
@@ -213,6 +214,9 @@ class Agent:
         # round so the model answers instead of looping a dead call. None/0
         # disables.
         self._stall_repeat_limit = stall_repeat_limit
+        # Soft one-time nudge once a single turn's cumulative tokens cross this,
+        # so a looping turn is told to stop before it burns millions. None disables.
+        self._token_warn_threshold = token_warn_threshold
         # M143: present tools as fenced `veles-tool` text blocks (and parse
         # calls back out of prose) when the provider lacks native function
         # calling. Default on — it's what makes local models usable with
@@ -328,8 +332,14 @@ class Agent:
         # tool call repeated round after round — and force a single tool-free
         # answer round when it trips. `force_answer` withholds tools for the
         # next provider call only.
-        stall_guard = StallGuard(repeat_limit=self._stall_repeat_limit)
+        stall_guard = StallGuard(
+            repeat_limit=self._stall_repeat_limit,
+            # Per-call guard (re-reading the same file all turn) rides the same
+            # on/off knob — disabling the stall guard disables both signals.
+            call_repeat_limit=7 if self._stall_repeat_limit else None,
+        )
         force_answer = False
+        token_warned = False
 
         for iteration in range(1, self._max_iterations + 1):
             # Cooperative cancellation checkpoint #1: between iterations,
@@ -466,6 +476,24 @@ class Agent:
                 nudge = Message(role="user", content=STALL_NUDGE)
                 history.append(nudge)
                 self._persist(nudge)
+
+            # Soft token-budget heads-up: once the turn crosses the threshold,
+            # tell the model ONCE it has burned a lot of tokens so it stops if it
+            # is looping. Unlike the stall guard this does NOT withhold tools — a
+            # genuinely progressing long turn keeps going.
+            if (
+                not token_warned
+                and self._token_warn_threshold is not None
+                and usage_acc.total_tokens >= self._token_warn_threshold
+            ):
+                token_warned = True
+                self._log(f"-> turn crossed {usage_acc.total_tokens} tokens; nudging")
+                warn = Message(
+                    role="user",
+                    content=TOKEN_WARN_NUDGE.format(tokens=usage_acc.total_tokens),
+                )
+                history.append(warn)
+                self._persist(warn)
 
         self._log("-> max_iterations reached")
         last_text = next(
