@@ -85,7 +85,7 @@ veles run "Read AGENTS.md and describe this project."
 veles
 ```
 
-पहली बार चलाने पर, एक setup wizard आपकी पसंदीदा भाषा, provider, और project name पूछेगा।
+पहली बार चलाने पर, एक setup wizard आपको इनके ज़रिए ले जाता है: आपकी पसंदीदा भाषा, LLM provider, API key, default model, colour theme, और क्या आप current directory में एक project initialise करना चाहते हैं।
 
 ---
 
@@ -323,14 +323,19 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | एक नया project बनाएँ |
 | `veles run "<prompt>"` | Single-turn agent run |
 | `veles` | Interactive REPL |
-| `veles add <file\|url>` | एक source को ingest करें → wiki page |
+| `veles add <file\|url>` | एक source को ingest करें → topical wiki pages |
+| `veles organize` | सक्रिय layout के अनुसार project content पुनर्गठित करें (propose-then-apply) |
 | `veles research "<question>"` | Deep multi-angle research |
 | `veles curate` | सेशनों को wiki में consolidate करें |
 | `veles sessions {list,show,delete,search}` | Session management |
-| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | Skill management |
-| `veles tool {list,show,promote}` | Tool management |
+| `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | Skill management |
+| `veles tool {list,show,promote,approve}` | Tool management (`approve` self-authored tools को gate करता है) |
 | `veles module {list,add,remove}` | Plugin management |
+| `veles browse {modules,skills}` | curated module / skill registries खोजें |
 | `veles route {show,set,reset,refresh}` | Model routing |
+| `veles schema {validate,edit}` | AGENTS.md validate / edit करें |
+| `veles self-doc` | project self-documentation generate करें |
+| `veles layout {sync}` | Layout-pack maintenance |
 | `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | Long-horizon goals |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | Scheduled jobs |
 | `veles dream` | Background memory-consolidation cycle |
@@ -340,7 +345,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles autopilot {enable,disable,status}` | Temporary trust bypass |
 | `veles secret {set,get,list,delete}` | OS-keychain secrets |
 | `veles daemon {start,stop,status,list,restart,delete,session,token}` | HTTP/WS daemon |
-| `veles channel {run,list-sessions,reset-session}` | External channel gateway |
+| `veles channel {list,run,list-sessions,reset-session,add,remove}` | External channel gateway |
 | `veles mcp {list,test}` | External MCP servers |
 | `veles models <provider>` | provider models की सूची |
 | `veles doctor` | Health checks |

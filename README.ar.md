@@ -85,7 +85,7 @@ veles run "Read AGENTS.md and describe this project."
 veles
 ```
 
-عند التشغيل الأول، سيطلب منك معالج الإعداد لغتك المفضّلة، والمورّد، واسم المشروع.
+عند التشغيل الأول، يرشدك معالج الإعداد عبر لغتك المفضّلة، ومورّد نموذج اللغة، ومفتاح واجهة برمجة التطبيقات، والنموذج الافتراضي، وسمة الألوان، وما إذا كنت تريد تهيئة مشروع في المجلد الحالي.
 
 ---
 
@@ -323,14 +323,19 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | إنشاء مشروع جديد |
 | `veles run "<prompt>"` | تشغيل وكيل بدورة واحدة |
 | `veles` | واجهة REPL التفاعلية (دون أمر فرعي) |
-| `veles add <file\|url>` | ابتلاع مصدر ← صفحة ويكي |
+| `veles add <file\|url>` | ابتلاع مصدر ← صفحات ويكي موضوعية |
+| `veles organize` | إعادة تنظيم محتوى المشروع وفق التخطيط النشط (اقتراح ثم تطبيق) |
 | `veles research "<question>"` | بحث معمّق متعدّد الزوايا |
 | `veles curate` | دمج الجلسات في الويكي |
 | `veles sessions {list,show,delete,search}` | إدارة الجلسات |
-| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | إدارة المهارات |
-| `veles tool {list,show,promote}` | إدارة الأدوات |
+| `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | إدارة المهارات |
+| `veles tool {list,show,promote,approve}` | إدارة الأدوات (`approve` يضبط الأدوات المؤلَّفة ذاتيًا) |
 | `veles module {list,add,remove}` | إدارة الإضافات |
+| `veles browse {modules,skills}` | البحث في سجلّات الوحدات / المهارات المنسَّقة |
 | `veles route {show,set,reset,refresh}` | توجيه النماذج |
+| `veles schema {validate,edit}` | التحقّق من AGENTS.md / تحريره |
+| `veles self-doc` | توليد توثيق ذاتي للمشروع |
+| `veles layout {sync}` | صيانة حزمة التخطيط |
 | `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | الأهداف طويلة الأفق |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | المهام المجدولة |
 | `veles dream` | دورة دمج الذاكرة في الخلفية |
@@ -340,7 +345,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles autopilot {enable,disable,status}` | تجاوز مؤقت للثقة |
 | `veles secret {set,get,list,delete}` | أسرار سلسلة مفاتيح نظام التشغيل |
 | `veles daemon {start,stop,status,list,restart,delete,session,token}` | خادم HTTP/WS الخفي |
-| `veles channel {run,list-sessions,reset-session}` | بوابة القنوات الخارجية |
+| `veles channel {list,run,list-sessions,reset-session,add,remove}` | بوابة القنوات الخارجية |
 | `veles mcp {list,test}` | خوادم MCP الخارجية |
 | `veles models <provider>` | سرد نماذج المورّد |
 | `veles doctor` | فحوص السلامة |

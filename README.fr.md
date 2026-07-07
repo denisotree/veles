@@ -85,7 +85,7 @@ Ouvrez plutôt le REPL interactif (le simple `veles` fait la même chose) :
 veles
 ```
 
-Au premier lancement, un assistant de configuration vous demandera votre langue préférée, votre fournisseur et le nom du projet.
+Au premier lancement, un assistant de configuration vous guide à travers votre langue préférée, votre fournisseur de LLM, votre clé d'API, le modèle par défaut, le thème de couleur et le choix d'initialiser ou non un projet dans le répertoire courant.
 
 ---
 
@@ -324,14 +324,19 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | Créer un nouveau projet |
 | `veles run "<prompt>"` | Exécution d'agent en un seul tour |
 | `veles` | REPL interactif (sans sous-commande) |
-| `veles add <file\|url>` | Ingérer une source → page de wiki |
+| `veles add <file\|url>` | Ingérer une source → pages de wiki thématiques |
+| `veles organize` | Réorganiser le contenu du projet selon le layout actif (proposer puis appliquer) |
 | `veles research "<question>"` | Recherche approfondie multi-angles |
 | `veles curate` | Consolider les sessions dans le wiki |
 | `veles sessions {list,show,delete,search}` | Gestion des sessions |
-| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | Gestion des compétences |
-| `veles tool {list,show,promote}` | Gestion des outils |
+| `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | Gestion des compétences |
+| `veles tool {list,show,promote,approve}` | Gestion des outils (`approve` autorise les outils auto-générés) |
 | `veles module {list,add,remove}` | Gestion des plugins |
+| `veles browse {modules,skills}` | Rechercher dans les registres curatés de modules / compétences |
 | `veles route {show,set,reset,refresh}` | Routage de modèles |
+| `veles schema {validate,edit}` | Valider / éditer AGENTS.md |
+| `veles self-doc` | Générer l'auto-documentation du projet |
+| `veles layout {sync}` | Maintenance du layout-pack |
 | `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | Objectifs à long horizon |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | Tâches planifiées |
 | `veles dream` | Cycle de consolidation mémoire en arrière-plan |
@@ -341,7 +346,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles autopilot {enable,disable,status}` | Contournement temporaire de confiance |
 | `veles secret {set,get,list,delete}` | Secrets du trousseau de l'OS |
 | `veles daemon {start,stop,status,list,restart,delete,session,token}` | Démon HTTP/WS |
-| `veles channel {run,list-sessions,reset-session}` | Passerelle de canal externe |
+| `veles channel {list,run,list-sessions,reset-session,add,remove}` | Passerelle de canal externe |
 | `veles mcp {list,test}` | Serveurs MCP externes |
 | `veles models <provider>` | Lister les modèles d'un fournisseur |
 | `veles doctor` | Vérifications de santé |

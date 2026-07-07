@@ -85,7 +85,7 @@ veles run "Read AGENTS.md and describe this project."
 veles
 ```
 
-처음 실행할 때, 설정 마법사가 선호하는 언어, 프로바이더, 프로젝트 이름을 묻습니다.
+처음 실행할 때, 설정 마법사가 언어, LLM 프로바이더, API 키, 기본 모델, 색상 테마, 그리고 현재 디렉터리에 프로젝트를 초기화할지 여부를 차례로 안내합니다.
 
 ---
 
@@ -323,14 +323,19 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | 새 프로젝트 생성 |
 | `veles run "<prompt>"` | 단일 턴 에이전트 실행 |
 | `veles` | 대화형 REPL |
-| `veles add <file\|url>` | 소스 수집 → 위키 페이지 |
+| `veles add <file\|url>` | 소스 수집 → 주제별 위키 페이지 |
+| `veles organize` | 활성 레이아웃에 따라 프로젝트 콘텐츠 재구성(제안 후 적용)|
 | `veles research "<question>"` | 다각도 심층 리서치 |
 | `veles curate` | 세션을 위키로 통합 |
 | `veles sessions {list,show,delete,search}` | 세션 관리 |
-| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | 스킬 관리 |
-| `veles tool {list,show,promote}` | 도구 관리 |
+| `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | 스킬 관리 |
+| `veles tool {list,show,promote,approve}` | 도구 관리 (`approve`는 자체 작성 도구를 승인) |
 | `veles module {list,add,remove}` | 플러그인 관리 |
+| `veles browse {modules,skills}` | 엄선된 모듈 / 스킬 레지스트리 검색 |
 | `veles route {show,set,reset,refresh}` | 모델 라우팅 |
+| `veles schema {validate,edit}` | AGENTS.md 검증 / 편집 |
+| `veles self-doc` | 프로젝트 자체 문서 생성 |
+| `veles layout {sync}` | 레이아웃 팩 유지 관리 |
 | `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | 장기 목표 |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | 예약 작업 |
 | `veles dream` | 백그라운드 메모리 통합 사이클 |
@@ -340,7 +345,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles autopilot {enable,disable,status}` | 임시 신뢰 우회 |
 | `veles secret {set,get,list,delete}` | OS 키체인 시크릿 |
 | `veles daemon {start,stop,status,list,restart,delete,session,token}` | HTTP/WS 데몬 |
-| `veles channel {run,list-sessions,reset-session}` | 외부 채널 게이트웨이 |
+| `veles channel {list,run,list-sessions,reset-session,add,remove}` | 외부 채널 게이트웨이 |
 | `veles mcp {list,test}` | 외부 MCP 서버 |
 | `veles models <provider>` | 프로바이더 모델 목록 |
 | `veles doctor` | 상태 점검 |

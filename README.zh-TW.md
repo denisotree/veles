@@ -85,7 +85,7 @@ veles run "Read AGENTS.md and describe this project."
 veles
 ```
 
-第一次執行時，設定精靈會詢問你偏好的語言、供應商與專案名稱。
+第一次執行時，設定精靈會引導你依序設定語言、LLM 供應商、API 金鑰、預設模型、配色主題，以及是否在目前目錄中初始化專案。
 
 ---
 
@@ -323,14 +323,19 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | 建立新專案 |
 | `veles run "<prompt>"` | 單回合代理執行 |
 | `veles` | 互動式 REPL |
-| `veles add <file\|url>` | 攝取一個來源 → wiki 頁面 |
+| `veles add <file\|url>` | 攝取一個來源 → 依主題拆分的 wiki 頁面 |
+| `veles organize` | 依目前佈局重新組織專案內容（先提議後套用）|
 | `veles research "<question>"` | 深度多角度研究 |
 | `veles curate` | 將工作階段整併進 wiki |
 | `veles sessions {list,show,delete,search}` | 工作階段管理 |
-| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | 技能管理 |
-| `veles tool {list,show,promote}` | 工具管理 |
+| `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | 技能管理 |
+| `veles tool {list,show,promote,approve}` | 工具管理（`approve` 用於核准自建工具）|
 | `veles module {list,add,remove}` | 外掛管理 |
+| `veles browse {modules,skills}` | 搜尋精選的模組 / 技能登錄 |
 | `veles route {show,set,reset,refresh}` | 模型路由 |
+| `veles schema {validate,edit}` | 驗證 / 編輯 AGENTS.md |
+| `veles self-doc` | 產生專案自我文件 |
+| `veles layout {sync}` | 佈局包維護 |
 | `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | 長時程目標 |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | 排程工作 |
 | `veles dream` | 背景記憶整併循環 |
@@ -340,7 +345,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles autopilot {enable,disable,status}` | 暫時性信任繞過 |
 | `veles secret {set,get,list,delete}` | 作業系統金鑰圈祕密 |
 | `veles daemon {start,stop,status,list,restart,delete,session,token}` | HTTP/WS 常駐程式 |
-| `veles channel {run,list-sessions,reset-session}` | 外部頻道閘道 |
+| `veles channel {list,run,list-sessions,reset-session,add,remove}` | 外部頻道閘道 |
 | `veles mcp {list,test}` | 外部 MCP 伺服器 |
 | `veles models <provider>` | 列出供應商模型 |
 | `veles doctor` | 健康檢查 |

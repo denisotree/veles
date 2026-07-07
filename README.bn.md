@@ -85,7 +85,7 @@ veles run "Read AGENTS.md and describe this project."
 veles
 ```
 
-প্রথমবার চালানোর সময়, একটি সেটআপ উইজার্ড আপনার পছন্দের ভাষা, প্রোভাইডার এবং প্রকল্পের নাম জিজ্ঞাসা করবে।
+প্রথমবার চালানোর সময়, একটি সেটআপ উইজার্ড আপনাকে ধাপে ধাপে নিয়ে যায়: আপনার পছন্দের ভাষা, LLM প্রোভাইডার, API কী, ডিফল্ট মডেল, রঙের থিম, এবং বর্তমান ডিরেক্টরিতে একটি প্রকল্প চালু করবেন কিনা।
 
 ---
 
@@ -324,14 +324,19 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | একটি নতুন প্রকল্প তৈরি করুন |
 | `veles run "<prompt>"` | একক-টার্ন এজেন্ট রান |
 | `veles` | ইন্টারঅ্যাকটিভ REPL (কোনো সাবকমান্ড নেই) |
-| `veles add <file\|url>` | একটি সোর্স ইনজেস্ট করুন → উইকি পৃষ্ঠা |
+| `veles add <file\|url>` | একটি সোর্স ইনজেস্ট করুন → বিষয়ভিত্তিক উইকি পৃষ্ঠা |
+| `veles organize` | সক্রিয় লেআউট অনুযায়ী প্রকল্পের কনটেন্ট পুনর্গঠন করুন (প্রস্তাব-তারপর-প্রয়োগ) |
 | `veles research "<question>"` | গভীর বহুমাত্রিক গবেষণা |
 | `veles curate` | সেশনগুলোকে উইকিতে একত্রীকরণ করুন |
 | `veles sessions {list,show,delete,search}` | সেশন ব্যবস্থাপনা |
-| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | স্কিল ব্যবস্থাপনা |
-| `veles tool {list,show,promote}` | টুল ব্যবস্থাপনা |
+| `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | স্কিল ব্যবস্থাপনা |
+| `veles tool {list,show,promote,approve}` | টুল ব্যবস্থাপনা (`approve` স্ব-রচিত টুলগুলোকে নিয়ন্ত্রণ করে) |
 | `veles module {list,add,remove}` | প্লাগইন ব্যবস্থাপনা |
+| `veles browse {modules,skills}` | কিউরেটেড মডিউল / স্কিল রেজিস্ট্রিতে অনুসন্ধান করুন |
 | `veles route {show,set,reset,refresh}` | মডেল রাউটিং |
+| `veles schema {validate,edit}` | AGENTS.md যাচাই / সম্পাদনা করুন |
+| `veles self-doc` | প্রকল্পের স্ব-ডকুমেন্টেশন তৈরি করুন |
+| `veles layout {sync}` | লেআউট-প্যাক রক্ষণাবেক্ষণ |
 | `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | দীর্ঘমেয়াদী লক্ষ্য |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | নির্ধারিত জব |
 | `veles dream` | ব্যাকগ্রাউন্ড মেমরি-একত্রীকরণ চক্র |
@@ -341,7 +346,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles autopilot {enable,disable,status}` | অস্থায়ী ট্রাস্ট বাইপাস |
 | `veles secret {set,get,list,delete}` | OS-কীচেইন সিক্রেট |
 | `veles daemon {start,stop,status,list,restart,delete,session,token}` | HTTP/WS ডেমন |
-| `veles channel {run,list-sessions,reset-session}` | বাহ্যিক চ্যানেল গেটওয়ে |
+| `veles channel {list,run,list-sessions,reset-session,add,remove}` | বাহ্যিক চ্যানেল গেটওয়ে |
 | `veles mcp {list,test}` | বাহ্যিক MCP সার্ভার |
 | `veles models <provider>` | প্রোভাইডার মডেল তালিকাভুক্ত করুন |
 | `veles doctor` | স্বাস্থ্য পরীক্ষা |

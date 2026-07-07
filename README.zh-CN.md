@@ -85,7 +85,7 @@ veles run "Read AGENTS.md and describe this project."
 veles
 ```
 
-首次运行时，设置向导会询问你偏好的语言、提供商以及项目名称。
+首次运行时，设置向导会引导你依次设置语言、LLM 提供商、API 密钥、默认模型、配色主题，以及是否在当前目录中初始化项目。
 
 ---
 
@@ -324,14 +324,19 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | 创建一个新项目 |
 | `veles run "<prompt>"` | 单轮智能体运行 |
 | `veles` | 交互式 REPL（无子命令） |
-| `veles add <file\|url>` | 摄取一个来源 → wiki 页面 |
+| `veles add <file\|url>` | 摄取一个来源 → 按主题拆分的 wiki 页面 |
+| `veles organize` | 按当前布局重新组织项目内容（先提议后应用）|
 | `veles research "<question>"` | 多角度深度研究 |
 | `veles curate` | 将会话整合进 wiki |
 | `veles sessions {list,show,delete,search}` | 会话管理 |
-| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | 技能管理 |
-| `veles tool {list,show,promote}` | 工具管理 |
+| `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | 技能管理 |
+| `veles tool {list,show,promote,approve}` | 工具管理（`approve` 用于批准自建工具）|
 | `veles module {list,add,remove}` | 插件管理 |
+| `veles browse {modules,skills}` | 搜索精选的模块 / 技能注册表 |
 | `veles route {show,set,reset,refresh}` | 模型路由 |
+| `veles schema {validate,edit}` | 校验 / 编辑 AGENTS.md |
+| `veles self-doc` | 生成项目自文档 |
+| `veles layout {sync}` | 布局包维护 |
 | `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | 长周期目标 |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | 计划作业 |
 | `veles dream` | 后台内存整合循环 |
@@ -341,7 +346,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles autopilot {enable,disable,status}` | 临时信任旁路 |
 | `veles secret {set,get,list,delete}` | 操作系统钥匙串密钥 |
 | `veles daemon {start,stop,status,list,restart,delete,session,token}` | HTTP/WS 守护进程 |
-| `veles channel {run,list-sessions,reset-session}` | 外部通道网关 |
+| `veles channel {list,run,list-sessions,reset-session,add,remove}` | 外部通道网关 |
 | `veles mcp {list,test}` | 外部 MCP 服务器 |
 | `veles models <provider>` | 列出提供商的模型 |
 | `veles doctor` | 健康检查 |

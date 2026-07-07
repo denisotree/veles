@@ -85,7 +85,7 @@ veles run "Read AGENTS.md and describe this project."
 veles
 ```
 
-初回起動時には、セットアップウィザードが希望する言語、プロバイダー、プロジェクト名を尋ねます。
+初回起動時には、セットアップウィザードが、言語、LLM プロバイダー、API キー、デフォルトモデル、カラーテーマ、そして現在のディレクトリにプロジェクトを初期化するかどうかを順番に案内します。
 
 ---
 
@@ -323,14 +323,19 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | 新しいプロジェクトを作成 |
 | `veles run "<prompt>"` | シングルターンのエージェント実行 |
 | `veles` | インタラクティブな REPL |
-| `veles add <file\|url>` | ソースを取り込み → ウィキページへ |
+| `veles add <file\|url>` | ソースを取り込み → トピック別のウィキページ群へ |
+| `veles organize` | アクティブなレイアウトに沿ってプロジェクトの内容を再編成（提案してから適用）|
 | `veles research "<question>"` | 多角的なディープリサーチ |
 | `veles curate` | セッションをウィキへ統合 |
 | `veles sessions {list,show,delete,search}` | セッション管理 |
-| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | スキル管理 |
-| `veles tool {list,show,promote}` | ツール管理 |
+| `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | スキル管理 |
+| `veles tool {list,show,promote,approve}` | ツール管理（`approve` は自作ツールを承認）|
 | `veles module {list,add,remove}` | プラグイン管理 |
+| `veles browse {modules,skills}` | 厳選されたモジュール／スキルのレジストリを検索 |
 | `veles route {show,set,reset,refresh}` | モデルルーティング |
+| `veles schema {validate,edit}` | AGENTS.md の検証／編集 |
+| `veles self-doc` | プロジェクトの自己ドキュメントを生成 |
+| `veles layout {sync}` | レイアウトパックのメンテナンス |
 | `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | 長期ホライズンのゴール |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | スケジュールジョブ |
 | `veles dream` | バックグラウンドのメモリ統合サイクル |
@@ -340,7 +345,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles autopilot {enable,disable,status}` | 一時的なトラストバイパス |
 | `veles secret {set,get,list,delete}` | OS キーチェーンのシークレット |
 | `veles daemon {start,stop,status,list,restart,delete,session,token}` | HTTP/WS デーモン |
-| `veles channel {run,list-sessions,reset-session}` | 外部チャンネルゲートウェイ |
+| `veles channel {list,run,list-sessions,reset-session,add,remove}` | 外部チャンネルゲートウェイ |
 | `veles mcp {list,test}` | 外部 MCP サーバー |
 | `veles models <provider>` | プロバイダーのモデルを一覧 |
 | `veles doctor` | ヘルスチェック |
