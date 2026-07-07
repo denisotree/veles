@@ -318,8 +318,7 @@ class _ReplApp(
         )
 
     def run(self) -> None:
-        from prompt_toolkit.patch_stdout import patch_stdout
-
+        from veles.cli.repl.terminal import patch_stdout_nonblocking as patch_stdout
         from veles.core.critical_ops import reset_critical_confirmer, set_critical_confirmer
         from veles.core.orchestration.delegation import (
             reset_subagent_factory,

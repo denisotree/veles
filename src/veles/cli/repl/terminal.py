@@ -14,6 +14,10 @@ from __future__ import annotations
 import datetime as _dt
 import sys
 import time
+from contextlib import contextmanager
+
+from prompt_toolkit.application import run_in_terminal
+from prompt_toolkit.patch_stdout import StdoutProxy
 
 # Window inside which a second Ctrl+C at the prompt is treated as exit.
 _CTRL_C_EXIT_WINDOW_S = 1.5
@@ -27,6 +31,52 @@ _CTRL_C_EXIT_WINDOW_S = 1.5
 # the enable sequence, so there's no regression.
 _KITTY_ENABLE = "\x1b[>1u"  # push flags: disambiguate escape codes
 _KITTY_DISABLE = "\x1b[<u"  # pop flags
+
+
+class _NonBlockingStdoutProxy(StdoutProxy):
+    """`StdoutProxy` that runs the terminal write in an executor thread instead
+    of on the event loop.
+
+    Confirmed root cause of the REPL "freeze" (HUD timer + spinner stop, Esc goes
+    dead) on heavy turns: prompt_toolkit's stock proxy writes via
+    `run_in_terminal(..., in_executor=False)`, so the actual `write()` runs on the
+    event-loop thread. When a turn streams output faster than the terminal can
+    drain it, the OS output buffer fills, `write()` blocks, and the whole loop
+    freezes. Running the write `in_executor=True` blocks only a pool thread — the
+    loop keeps animating the HUD and stays responsive to Esc/Ctrl+C. Ordering is
+    preserved: the base class serialises `_write_and_flush` on its flush thread,
+    and `run_in_terminal` queues concurrent requests."""
+
+    def _write_and_flush(self, loop, text: str) -> None:  # type: ignore[override]
+        def write_and_flush() -> None:
+            self._output.enable_autowrap()
+            if self.raw:
+                self._output.write_raw(text)
+            else:
+                self._output.write(text)
+            self._output.flush()
+
+        if loop is None:
+            write_and_flush()  # no app running — write immediately (pt's fallback)
+        else:
+            loop.call_soon_threadsafe(
+                lambda: run_in_terminal(write_and_flush, in_executor=True)
+            )
+
+
+@contextmanager
+def patch_stdout_nonblocking(raw: bool = True):
+    """Drop-in for prompt_toolkit's `patch_stdout` using `_NonBlockingStdoutProxy`,
+    so heavy streamed output can't block the event loop and freeze the REPL."""
+    with _NonBlockingStdoutProxy(raw=raw) as proxy:
+        original_stdout, original_stderr = sys.stdout, sys.stderr
+        sys.stdout = proxy  # type: ignore[assignment]
+        sys.stderr = proxy  # type: ignore[assignment]
+        try:
+            yield
+        finally:
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
 
 
 def _kitty_disable_keyboard() -> None:
