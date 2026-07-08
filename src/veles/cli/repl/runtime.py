@@ -56,7 +56,14 @@ def _build_runtime(args: argparse.Namespace, project: Project):
     _touch_active_project(project)
     _warn_if_agents_md_invalid(project)
 
-    provider = _make_provider(args.provider)
+    # Pass the resolved model so local providers auto-detect native tool-call
+    # support (provider_factory._apply_local_tool_policy probes ollama's
+    # /api/show). Without it the REPL forced supports_tools=False and pushed
+    # every local model through the fragile fenced-tools path (live
+    # 2026-07-08) while `veles run`/curator already used native calls. NOTE:
+    # detection is bound to the STARTUP model — an in-session /model switch
+    # keeps the provider instance (pre-existing behaviour).
+    provider = _make_provider(args.provider, model=args.model)
     compressor = _build_compressor(args, project, provider)
     registries = {
         "writing": _load_skills(project, _RUN_TOOLS, provider=provider, model=args.model),
