@@ -119,6 +119,14 @@ def _clear(line: str, ctx: SlashContext) -> SlashResult:
     del line
     ctx.state.session_id = None
     ctx.state.last_assistant_text = None
+    # A fresh session starts its counters from zero — the status bar kept
+    # showing the OLD session's cumulative totals after /clear (live
+    # 2026-07-08: `tok 4M/108k · ctx 58k · cache 178k` on an empty chat).
+    ctx.state.tokens_in = 0
+    ctx.state.tokens_out = 0
+    ctx.state.last_turn_total_tokens = 0
+    ctx.state.last_prompt_tokens = 0
+    ctx.state.last_turn_cache_read = 0
     return SlashResult(clear_chat=True, text="session cleared")
 
 
@@ -649,7 +657,7 @@ def build_default_registry(project: Project | None = None) -> SlashRegistry:
         summary="exit the TUI",
         aliases=("/q", "/exit"),
     )
-    reg.register("/clear", _clear, summary="start a fresh session")
+    reg.register("/clear", _clear, summary="start a fresh session", aliases=("/new",))
     reg.register("/session", _session, summary="print current session id")
 
     save_summary = (
