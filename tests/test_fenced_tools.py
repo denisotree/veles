@@ -137,6 +137,42 @@ def test_nested_arguments_still_win_over_flat_extras() -> None:
     assert calls[0].arguments == {"path": "a"}  # explicit nested form is canonical
 
 
+def test_parse_multiple_objects_in_one_block() -> None:
+    """Small local models (seen live 2026-07-08: ollama qwen3.5:9b) violate the
+    "one JSON object per block" rule and stack several calls in a single fence.
+    Dropping the whole block silently ended the turn mid-task — recover one
+    call per object instead."""
+    text = (
+        "```veles-tool\n"
+        '{"name": "list_files", "arguments": {"path": "a"}}\n'
+        '{"name": "list_files", "arguments": {"path": "b"}}\n'
+        "```"
+    )
+    calls = parse_tool_calls(text)
+    assert [c.arguments["path"] for c in calls] == ["a", "b"]
+    assert calls[0].id != calls[1].id
+
+
+def test_parse_unclosed_final_block_with_trailing_garbage() -> None:
+    """The exact shape seen live 2026-07-08 (ollama qwen3.5:9b): the model's
+    last round is a veles-tool fence that is never closed and ends in junk
+    (`, `` ` ``). The block regex required a closing fence, so the calls
+    vanished and the loop treated the response as a final answer."""
+    text = (
+        "```veles-tool\n"
+        '{"name": "list_files", "arguments": {"path": "-- Daily --", "glob": "**/*"}}\n'
+        '{"name": "list_files", "arguments": {"path": "-- Companies --", "glob": "**/*"}}, `'
+    )
+    calls = parse_tool_calls(text)
+    assert [c.arguments["path"] for c in calls] == ["-- Daily --", "-- Companies --"]
+
+
+def test_parse_multi_object_skips_bad_and_keeps_good() -> None:
+    text = '```veles-tool\n{"name": "read_file", "arguments": {"path": "a"}}\nnot json at all\n```'
+    calls = parse_tool_calls(text)
+    assert [c.name for c in calls] == ["read_file"]
+
+
 # --- display scrubbing (M143 follow-up, live 2026-07-08) -------------------
 # In fenced mode the model's raw text IS the tool calls; streaming it verbatim
 # dumped `{"name": …}` JSON and dangling ``` fences into the chat (observed

@@ -56,8 +56,12 @@ _FENCE_LANG = "veles-tool"
 
 # Matches a fenced block whose language tag is exactly `veles-tool`. DOTALL so
 # the JSON body can span lines; non-greedy so adjacent blocks don't merge.
+# `\Z` alternative (live 2026-07-08, ollama qwen3.5:9b): a model's last round
+# may end mid-fence — the calls are complete but the closing ``` never comes.
+# Requiring it made the whole block vanish and the loop treated the response
+# as a final answer, silently killing the turn.
 _BLOCK_RE = re.compile(
-    r"```[ \t]*" + re.escape(_FENCE_LANG) + r"[ \t]*\r?\n(.*?)```",
+    r"```[ \t]*" + re.escape(_FENCE_LANG) + r"[ \t]*\r?\n(.*?)(?:```|\Z)",
     re.DOTALL,
 )
 
@@ -110,38 +114,50 @@ def render_tools_prompt(schemas: list[dict]) -> str:
 def parse_tool_calls(text: str) -> list[ToolCall]:
     """Extract tool calls from a non-native model's response text.
 
-    Returns one `ToolCall` per well-formed `veles-tool` block, in order.
-    Malformed blocks (bad JSON, missing/empty name) are skipped silently — a
-    block that doesn't parse simply doesn't run, and the loop treats a response
-    with no valid calls as the final answer.
+    Returns one `ToolCall` per well-formed JSON object found inside
+    `veles-tool` blocks, in order. Small local models routinely violate the
+    "one object per block" rule and stack several calls in one fence (seen
+    live 2026-07-08, ollama qwen3.5:9b), so each block is scanned object by
+    object with `raw_decode`; separators (whitespace, commas) between objects
+    are skipped and trailing junk ends the scan of that block. Malformed
+    content (bad JSON, missing/empty name) is skipped silently — a call that
+    doesn't parse simply doesn't run, and the loop treats a response with no
+    valid calls as the final answer.
     """
     if not text:
         return []
     calls: list[ToolCall] = []
-    for idx, match in enumerate(_BLOCK_RE.finditer(text)):
+    decoder = json.JSONDecoder()
+    for match in _BLOCK_RE.finditer(text):
         body = match.group(1).strip()
-        if not body:
-            continue
-        try:
-            obj = json.loads(body)
-        except (ValueError, TypeError):
-            continue
-        if not isinstance(obj, dict):
-            continue
-        name = obj.get("name")
-        if not isinstance(name, str) or not name:
-            continue
-        args = obj.get("arguments")
-        if not isinstance(args, dict):  # flat-shape recovery below
-            # Flat shape (seen live 2026-07-08, ollama qwen3.5:9b): small local
-            # models put the arguments at the TOP LEVEL next to "name" —
-            # `{"name": "search_files", "pattern": "…", "path": "."}`. Dropping
-            # them silently ran tools with empty args (wrong results, or a
-            # missing-positional TypeError). Recover every key that isn't
-            # call-envelope metadata. The nested "arguments" form stays
-            # canonical and wins when present.
-            args = {k: v for k, v in obj.items() if k not in ("name", "id", "type", "arguments")}
-        calls.append(ToolCall(id=f"fenced-{idx}", name=name, arguments=args))
+        pos = 0
+        while pos < len(body):
+            while pos < len(body) and body[pos] in " \t\r\n,":
+                pos += 1
+            if pos >= len(body):
+                break
+            try:
+                obj, pos = decoder.raw_decode(body, pos)
+            except ValueError:
+                break  # non-JSON tail — nothing more to recover in this block
+            if not isinstance(obj, dict):
+                continue
+            name = obj.get("name")
+            if not isinstance(name, str) or not name:
+                continue
+            args = obj.get("arguments")
+            if not isinstance(args, dict):  # flat-shape recovery below
+                # Flat shape (seen live 2026-07-08, ollama qwen3.5:9b): small
+                # local models put the arguments at the TOP LEVEL next to
+                # "name" — `{"name": "search_files", "pattern": "…", "path":
+                # "."}`. Dropping them silently ran tools with empty args
+                # (wrong results, or a missing-positional TypeError). Recover
+                # every key that isn't call-envelope metadata. The nested
+                # "arguments" form stays canonical and wins when present.
+                args = {
+                    k: v for k, v in obj.items() if k not in ("name", "id", "type", "arguments")
+                }
+            calls.append(ToolCall(id=f"fenced-{len(calls)}", name=name, arguments=args))
     return calls
 
 
