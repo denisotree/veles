@@ -52,7 +52,8 @@ from veles.core.fenced_tools import (
     FENCED_SENTINEL,
     FencedToolScrubber,
     fenced_tools_enabled_by_env,
-    parse_tool_calls,
+    parse_tool_calls_with_errors,
+    render_parse_errors,
     render_tools_prompt,
 )
 from veles.core.history_repair import repair_tool_pairing
@@ -94,6 +95,11 @@ from veles.core.trace import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Fenced mode: how many times per run a zero-calls parse failure is fed back
+# to the model before the garbage round is allowed to end the turn. Bounded so
+# a model stuck emitting broken JSON can't loop to max_iterations on nudges.
+_PARSE_NUDGE_LIMIT = 3
 
 
 @dataclass(slots=True)
@@ -350,6 +356,12 @@ class Agent:
         force_answer = False
         token_warned = False
         invoked: set[str] = set()
+        # Live 2026-07-08 (ollama qwen3.5:9b): small local models emit broken
+        # JSON in veles-tool fences constantly. A round whose block parses to
+        # ZERO calls used to be treated as the final answer — the turn died
+        # silently mid-task. Feed the parse errors back (bounded, so a model
+        # stuck on garbage can't loop forever).
+        parse_nudges = 0
 
         for iteration in range(1, self._max_iterations + 1):
             # Cooperative cancellation checkpoint #1: between iterations,
@@ -475,8 +487,9 @@ class Agent:
             # parse them out of the response and record the assistant turn
             # WITHOUT native tool_calls (keeps the wire plain on resend). The
             # native path is unchanged.
+            parse_errors: list[str] = []
             if fenced:
-                effective_calls = parse_tool_calls(response.text or "")
+                effective_calls, parse_errors = parse_tool_calls_with_errors(response.text or "")
                 self._record_fenced_assistant(response, effective_calls, history)
             else:
                 self._record_assistant_response(response, history)
@@ -491,6 +504,20 @@ class Agent:
             )
 
             if not effective_calls:
+                # Fenced garbage round: the model TRIED to call tools but
+                # nothing parsed. Ending the turn here (the pre-fix behaviour)
+                # silently killed it mid-task — feed the parse errors back and
+                # let the model re-emit, up to _PARSE_NUDGE_LIMIT per run.
+                if parse_errors and parse_nudges < _PARSE_NUDGE_LIMIT:
+                    parse_nudges += 1
+                    self._log(
+                        f"-> fenced block parsed to 0 calls "
+                        f"(nudge {parse_nudges}/{_PARSE_NUDGE_LIMIT}); feeding errors back"
+                    )
+                    nudge = Message(role="user", content=render_parse_errors(parse_errors))
+                    history.append(nudge)
+                    self._persist(nudge)
+                    continue
                 final_text = response.text or ""
                 return self._finalize(
                     RunResult(
@@ -505,7 +532,7 @@ class Agent:
                 )
 
             if fenced:
-                self._dispatch_fenced_calls(effective_calls, history)
+                self._dispatch_fenced_calls(effective_calls, history, parse_errors=parse_errors)
             else:
                 self._dispatch_tool_calls(response, history)
             invoked.update(call.name for call in effective_calls)
@@ -673,12 +700,22 @@ class Agent:
             )
         )
 
-    def _dispatch_fenced_calls(self, calls: list[ToolCall], history: list[Message]) -> None:
+    def _dispatch_fenced_calls(
+        self,
+        calls: list[ToolCall],
+        history: list[Message],
+        parse_errors: list[str] | None = None,
+    ) -> None:
         """M143: execute fenced tool calls and feed every result back as ONE
         user-role message. Reuses `_dispatch` (permission / veto / event
         machinery) but discards its `role=tool` Message — that shape would
         serialise to the native tool-call wire form a non-tool server may
-        reject. Results return as plain text instead, clearly framed as data."""
+        reject. Results return as plain text instead, clearly framed as data.
+
+        `parse_errors`: junk that was dropped from the same veles-tool block
+        (live 2026-07-08, ollama qwen3.5:9b — broken JSON among valid calls).
+        Reported alongside the results so the model can re-emit the dropped
+        calls instead of silently losing them."""
         project = current_project()
         artifact_dir = project.state_dir if project is not None else None
         approval_dir = project.state_dir if project is not None else None
@@ -695,6 +732,8 @@ class Agent:
                 approval_dir=approval_dir,
             )
             chunks.append(f"[{call.name}]\n{tool_message.content or ''}")
+        if parse_errors:
+            chunks.append(render_parse_errors(parse_errors))
         combined = Message(
             role="user",
             content=f"{FENCED_RESULT_HEADER}\n\n" + "\n\n".join(chunks),

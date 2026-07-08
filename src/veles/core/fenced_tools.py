@@ -114,19 +114,38 @@ def render_tools_prompt(schemas: list[dict]) -> str:
 def parse_tool_calls(text: str) -> list[ToolCall]:
     """Extract tool calls from a non-native model's response text.
 
+    Thin wrapper over `parse_tool_calls_with_errors` for callers that don't
+    care about the parse diagnostics.
+    """
+    calls, _errors = parse_tool_calls_with_errors(text)
+    return calls
+
+
+# Snippet cap for parse-error reports — long enough to show the broken value,
+# short enough to not re-feed the model its whole garbage output.
+_ERROR_SNIPPET_CHARS = 120
+
+
+def parse_tool_calls_with_errors(text: str) -> tuple[list[ToolCall], list[str]]:
+    """Extract tool calls AND a report of what didn't parse.
+
     Returns one `ToolCall` per well-formed JSON object found inside
     `veles-tool` blocks, in order. Small local models routinely violate the
     "one object per block" rule and stack several calls in one fence (seen
     live 2026-07-08, ollama qwen3.5:9b), so each block is scanned object by
     object with `raw_decode`; separators (whitespace, commas) between objects
-    are skipped and trailing junk ends the scan of that block. Malformed
-    content (bad JSON, missing/empty name) is skipped silently — a call that
-    doesn't parse simply doesn't run, and the loop treats a response with no
-    valid calls as the final answer.
+    are skipped and undecodable content ends the scan of that block.
+
+    Every dropped piece lands in the errors list (with a short snippet) —
+    the same live models emit broken JSON constantly (a lost opening quote,
+    key-without-value salad), and dropping it *silently* meant the model
+    never learned its calls vanished. The agent feeds these errors back so
+    the model can re-emit the calls (see `render_parse_errors`).
     """
     if not text:
-        return []
+        return [], []
     calls: list[ToolCall] = []
+    errors: list[str] = []
     decoder = json.JSONDecoder()
     for match in _BLOCK_RE.finditer(text):
         body = match.group(1).strip()
@@ -139,11 +158,18 @@ def parse_tool_calls(text: str) -> list[ToolCall]:
             try:
                 obj, pos = decoder.raw_decode(body, pos)
             except ValueError:
-                break  # non-JSON tail — nothing more to recover in this block
+                snippet = body[pos : pos + _ERROR_SNIPPET_CHARS]
+                errors.append(f"invalid JSON (dropped): {snippet}")
+                break  # nothing more to recover in this block
             if not isinstance(obj, dict):
+                errors.append(f"not a JSON object (dropped): {str(obj)[:_ERROR_SNIPPET_CHARS]}")
                 continue
             name = obj.get("name")
             if not isinstance(name, str) or not name:
+                errors.append(
+                    'object without a valid "name" (dropped): '
+                    f"{json.dumps(obj)[:_ERROR_SNIPPET_CHARS]}"
+                )
                 continue
             args = obj.get("arguments")
             if not isinstance(args, dict):  # flat-shape recovery below
@@ -158,7 +184,26 @@ def parse_tool_calls(text: str) -> list[ToolCall]:
                     k: v for k, v in obj.items() if k not in ("name", "id", "type", "arguments")
                 }
             calls.append(ToolCall(id=f"fenced-{len(calls)}", name=name, arguments=args))
-    return calls
+    return calls, errors
+
+
+def render_parse_errors(errors: list[str]) -> str:
+    """Corrective feedback for the model when veles-tool content didn't parse.
+
+    Used two ways by the agent: appended to the tool-results message when
+    SOME calls parsed (so the model can re-emit the dropped ones), and sent
+    as a standalone user message when NOTHING parsed (so a garbage round
+    doesn't end the turn as a "final answer")."""
+    lines = ["Some veles-tool call(s) could not be parsed and did NOT run:"]
+    lines += [f"- {e}" for e in errors[:5]]
+    if len(errors) > 5:
+        lines.append(f"- …and {len(errors) - 5} more")
+    lines.append(
+        "Re-emit the dropped call(s), fixed: ONE JSON object per line inside a "
+        "```veles-tool fence — "
+        '{"name": "<tool>", "arguments": {…}} — all strings double-quoted.'
+    )
+    return "\n".join(lines)
 
 
 _OPEN_TAG = "veles-tool"
