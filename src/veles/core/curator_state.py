@@ -10,7 +10,7 @@ session in the store, which is the desired bootstrap behavior.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 _log = logging.getLogger(__name__)
@@ -24,6 +24,10 @@ class CuratorState:
     last_post_turn_dream_at: float = 0.0
     last_deep_dream_at: float = 0.0
     dream_count: int = 0
+    # Poison-pill guard (2026-07-08): per-session consecutive curation failures.
+    # A session failing `_CURATE_MAX_ATTEMPTS` times is skipped (cursor advances
+    # past it) instead of blocking the whole curator queue forever.
+    failed_attempts: dict[str, int] = field(default_factory=dict)
 
 
 def load(path: Path) -> CuratorState:
@@ -34,12 +38,17 @@ def load(path: Path) -> CuratorState:
     if not isinstance(d, dict):
         return CuratorState()
     try:
+        raw_failed = d.get("failed_attempts", {})
+        failed = (
+            {str(k): int(v) for k, v in raw_failed.items()} if isinstance(raw_failed, dict) else {}
+        )
         return CuratorState(
             last_curated_at=float(d.get("last_curated_at", 0.0)),
             sessions_curated_total=int(d.get("sessions_curated_total", 0)),
             last_post_turn_dream_at=float(d.get("last_post_turn_dream_at", 0.0)),
             last_deep_dream_at=float(d.get("last_deep_dream_at", 0.0)),
             dream_count=int(d.get("dream_count", 0)),
+            failed_attempts=failed,
         )
     except (ValueError, TypeError) as exc:
         _log.warning("curator state at %s malformed: %s — defaulting", path, exc)
@@ -58,5 +67,6 @@ def save_atomic(path: Path, state: CuratorState) -> None:
             "last_post_turn_dream_at": state.last_post_turn_dream_at,
             "last_deep_dream_at": state.last_deep_dream_at,
             "dream_count": state.dream_count,
+            "failed_attempts": state.failed_attempts,
         },
     )

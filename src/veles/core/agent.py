@@ -50,6 +50,7 @@ from veles.core.events import (
 from veles.core.fenced_tools import (
     FENCED_RESULT_HEADER,
     FENCED_SENTINEL,
+    FencedToolScrubber,
     fenced_tools_enabled_by_env,
     parse_tool_calls,
     render_tools_prompt,
@@ -424,12 +425,30 @@ class Agent:
             # placeholder for any unanswered call and drop any orphaned result.
             history = repair_tool_pairing(history)
 
+            # M143 follow-up: in fenced mode the raw stream IS the tool-call
+            # channel — scrub ```veles-tool blocks out of the DISPLAY deltas so
+            # the chat shows prose only (the full raw text is still parsed for
+            # calls below). Fresh scrubber per round; fences never span rounds.
+            round_delta = on_text_delta
+            round_scrubber = None
+            if fenced and on_text_delta is not None:
+                round_scrubber = FencedToolScrubber()
+
+                def round_delta(chunk: str, _cb=on_text_delta, _scrub=round_scrubber) -> None:  # type: ignore[misc]
+                    cleaned = _scrub.feed(chunk)
+                    if cleaned:
+                        _cb(cleaned)
+
             response = self._request_completion(
                 history=history,
                 tools=round_tools,
-                on_text_delta=on_text_delta,
+                on_text_delta=round_delta,
                 budget=budget,
             )
+            if round_scrubber is not None and on_text_delta is not None:
+                tail = round_scrubber.finalize()
+                if tail:
+                    on_text_delta(tail)
             usage_acc.add(response.usage)
             # Real per-round usage for live HUDs: a tool-call-only round streams
             # no text, so a chars/4 estimate over text deltas would read 0.

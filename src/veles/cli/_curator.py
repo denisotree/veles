@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import dataclasses
 import datetime as _dt
 import sys
 import time
@@ -39,7 +40,6 @@ from veles.core.curator import (
     _CuratorPassResult,
     _truncate_session_messages,
 )
-from veles.core.curator_state import CuratorState
 from veles.core.curator_state import load as load_curator_state
 from veles.core.curator_state import save_atomic as save_curator_state
 from veles.core.insight_extractor import make_insight_extractor
@@ -65,6 +65,9 @@ _PROPOSER_STATE_FILE = "proposer.state.json"
 # `.veles/memory/proposals/promote-*.md` mtimes stay stable.
 _PROMOTE_SUGGEST_IDLE_THRESHOLD_SEC = 7 * 24 * 3600
 _PROMOTE_SUGGEST_STATE_FILE = "promote_suggest.state.json"
+# Poison-pill guard: consecutive curation failures before a session is
+# abandoned (cursor advances past it) instead of blocking the queue forever.
+_CURATE_MAX_ATTEMPTS = 3
 
 
 def _run_curator_pass(
@@ -92,6 +95,7 @@ def _run_curator_pass(
 
     next_cursor = state.last_curated_at
     successes = 0
+    failed = dict(state.failed_attempts)
 
     with SessionStore(project.memory_db_path) as store:
         candidates = [
@@ -109,22 +113,48 @@ def _run_curator_pass(
         for session in candidates:
             ok = _curate_one_session(store, session, args, project)
             if not ok:
+                # Poison-pill guard (live 2026-07-08): one persistently failing
+                # session used to block the queue FOREVER — every pass retried
+                # it, failed, and stopped, so nothing behind it ever got
+                # curated. Track consecutive failures; after
+                # `_CURATE_MAX_ATTEMPTS` give up on that session and advance
+                # the cursor past it.
+                attempts = failed.get(session.id, 0) + 1
+                if attempts >= _CURATE_MAX_ATTEMPTS:
+                    print(
+                        f"<curate ({mode_label}) failed for {session.id} "
+                        f"{attempts} times; giving up on it and moving on>",
+                        file=sys.stderr,
+                    )
+                    failed.pop(session.id, None)
+                    next_cursor = session.last_activity_at
+                    continue
+                failed[session.id] = attempts
                 print(
                     f"<curate ({mode_label}) failed for {session.id}; stopping>",
                     file=sys.stderr,
                 )
                 break
+            failed.pop(session.id, None)
             next_cursor = session.last_activity_at
             successes += 1
 
-    if successes > 0:
+    state_changed = (
+        successes > 0 or next_cursor != state.last_curated_at or failed != state.failed_attempts
+    )
+    if state_changed:
+        # dataclasses.replace: keep the dream cursors — rebuilding CuratorState
+        # from scratch here used to silently reset last_*_dream_at every pass.
         save_curator_state(
             state_path,
-            CuratorState(
+            dataclasses.replace(
+                state,
                 last_curated_at=next_cursor,
                 sessions_curated_total=state.sessions_curated_total + successes,
+                failed_attempts=failed,
             ),
         )
+    if successes > 0:
         append_memory_log(
             project,
             op=f"curate-{mode_label}",

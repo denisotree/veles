@@ -132,7 +132,7 @@ def parse_tool_calls(text: str) -> list[ToolCall]:
         if not isinstance(name, str) or not name:
             continue
         args = obj.get("arguments")
-        if not isinstance(args, dict):
+        if not isinstance(args, dict):  # flat-shape recovery below
             # Flat shape (seen live 2026-07-08, ollama qwen3.5:9b): small local
             # models put the arguments at the TOP LEVEL next to "name" —
             # `{"name": "search_files", "pattern": "…", "path": "."}`. Dropping
@@ -143,3 +143,123 @@ def parse_tool_calls(text: str) -> list[ToolCall]:
             args = {k: v for k, v in obj.items() if k not in ("name", "id", "type", "arguments")}
         calls.append(ToolCall(id=f"fenced-{idx}", name=name, arguments=args))
     return calls
+
+
+_OPEN_TAG = "veles-tool"
+
+
+class FencedToolScrubber:
+    """Strip ```veles-tool blocks from a STREAMED display text.
+
+    In fenced mode the model's raw text IS the tool-call channel; streaming it
+    verbatim dumps `{"name": …}` JSON and dangling ``` fences into the chat
+    (observed live 2026-07-08, ollama qwen3.5:9b). The agent wraps
+    `on_text_delta` with this scrubber per provider round, so the user sees
+    prose only while `parse_tool_calls` still reads the full raw text.
+
+    Streaming-safe: holds back text that might be the start of a fence until
+    it can be classified. Normal code fences (```python …) pass through
+    untouched. Handles the shapes seen live: fences split across chunks, a
+    closing fence glued to the next opener (`` `````` ``), and prose glued to
+    a closing fence (```The output…).
+    """
+
+    __slots__ = ("_buf", "_state")
+
+    def __init__(self) -> None:
+        self._buf = ""
+        self._state = "outside"  # outside | tool | tool_end | normal
+
+    def feed(self, chunk: str) -> str:
+        self._buf += chunk
+        return self._drain(final=False)
+
+    def finalize(self) -> str:
+        """Flush at end of the round. Held-back ambiguous text is emitted;
+        an unclosed veles-tool block is dropped (it was a tool call)."""
+        out = self._drain(final=True)
+        rest = "" if self._state == "tool" else self._buf
+        self._buf = ""
+        self._state = "outside"
+        return out + rest
+
+    def _drain(self, *, final: bool) -> str:
+        out: list[str] = []
+        while True:
+            if self._state == "tool_end":
+                # Just closed a tool block: swallow ONE newline so the prose
+                # before and after the block joins cleanly.
+                if not self._buf:
+                    if final:
+                        self._state = "outside"
+                    break
+                if self._buf.startswith("\n"):
+                    self._buf = self._buf[1:]
+                self._state = "outside"
+                continue
+            if self._state == "tool":
+                j = self._buf.find("```")
+                if j == -1:
+                    if final:
+                        self._buf = ""  # unclosed tool block — drop
+                    break
+                self._buf = self._buf[j + 3 :]
+                self._state = "tool_end"
+                continue
+            if self._state == "normal":
+                j = self._buf.find("```")
+                if j == -1:
+                    keep = 0 if final else _trailing_backticks(self._buf)
+                    cut = len(self._buf) - keep
+                    out.append(self._buf[:cut])
+                    self._buf = self._buf[cut:]
+                    break
+                out.append(self._buf[: j + 3])
+                self._buf = self._buf[j + 3 :]
+                self._state = "outside"
+                continue
+            # outside
+            i = self._buf.find("```")
+            if i == -1:
+                keep = 0 if final else _trailing_backticks(self._buf)
+                cut = len(self._buf) - keep
+                out.append(self._buf[:cut])
+                self._buf = self._buf[cut:]
+                break
+            out.append(self._buf[:i])
+            self._buf = self._buf[i:]
+            after = self._buf[3:]
+            if after.startswith(_OPEN_TAG):
+                nxt = after[len(_OPEN_TAG) : len(_OPEN_TAG) + 1]
+                if nxt in ("\n", "\r") or (nxt == "" and final):
+                    self._buf = self._buf[3 + len(_OPEN_TAG) :]
+                    if self._buf.startswith("\n"):
+                        self._buf = self._buf[1:]
+                    self._state = "tool"
+                    continue
+                if nxt == "":
+                    break  # could still become veles-tool<letter> — wait
+                # veles-tool<something> — an ordinary fence tag.
+                out.append("```")
+                self._buf = self._buf[3:]
+                self._state = "normal"
+                continue
+            if _OPEN_TAG.startswith(after) and not final:
+                break  # partial tag — wait for more
+            # An ordinary (non-tool) fence: pass it through untouched.
+            out.append("```")
+            self._buf = self._buf[3:]
+            self._state = "normal"
+            continue
+        return "".join(out)
+
+
+def _trailing_backticks(s: str) -> int:
+    """Length of the trailing backtick run (capped at 2) — a possible start of
+    a fence split across chunks, held back until the next feed."""
+    n = 0
+    for ch in reversed(s):
+        if ch != "`" or n >= 2:
+            break
+        n += 1
+    return n

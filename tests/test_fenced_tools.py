@@ -137,6 +137,101 @@ def test_nested_arguments_still_win_over_flat_extras() -> None:
     assert calls[0].arguments == {"path": "a"}  # explicit nested form is canonical
 
 
+# --- display scrubbing (M143 follow-up, live 2026-07-08) -------------------
+# In fenced mode the model's raw text IS the tool calls; streaming it verbatim
+# dumped `{"name": …}` JSON and dangling ``` fences into the chat (observed
+# with ollama qwen3.5:9b). The scrubber strips veles-tool blocks from the
+# DISPLAY stream; the agent still parses the full raw text for calls.
+
+
+def _scrub_all(chunks: list[str]) -> str:
+    from veles.core.fenced_tools import FencedToolScrubber
+
+    s = FencedToolScrubber()
+    out = "".join(s.feed(c) for c in chunks)
+    return out + s.finalize()
+
+
+def test_scrubber_passes_plain_prose() -> None:
+    assert _scrub_all(["hello ", "world"]) == "hello world"
+
+
+def test_scrubber_strips_tool_block_split_across_chunks() -> None:
+    chunks = ["Sure.\n``", '`veles-tool\n{"name": "read_file"}\n``', "`\nDone."]
+    assert _scrub_all(chunks) == "Sure.\nDone."
+
+
+def test_scrubber_keeps_normal_code_fences() -> None:
+    text = "look:\n```python\nprint(1)\n```\nend"
+    assert _scrub_all([text]) == text
+
+
+def test_scrubber_handles_glued_fences() -> None:
+    # Observed live: closing fence immediately followed by the next opener.
+    text = '```veles-tool\n{"name": "a"}\n``````veles-tool\n{"name": "b"}\n```after'
+    assert _scrub_all([text]) == "after"
+
+
+def test_scrubber_closing_fence_with_trailing_prose() -> None:
+    # Observed live: "```The output is truncated." — prose glued to the close.
+    text = '```veles-tool\n{"name": "a"}\n```The output is truncated.'
+    assert _scrub_all([text]) == "The output is truncated."
+
+
+def test_scrubber_finalize_drops_unclosed_tool_block() -> None:
+    assert _scrub_all(['text ```veles-tool\n{"name": "x"']) == "text "
+
+
+def test_streaming_fenced_turn_shows_no_tool_json_in_chat() -> None:
+    """Agent-level: a fenced streaming turn must not leak tool-call JSON into
+    on_text_delta (the chat)."""
+    from veles.core.provider import StreamEnd, TextDelta
+
+    class _StreamingLocalProvider:
+        name = "ollama"
+        supports_tools = False
+        supports_streaming = True
+        n = 0
+
+        def create_message(self, *a, **k):  # pragma: no cover
+            raise AssertionError("streaming path expected")
+
+        def stream_message(self, messages, tools=None, *, model, max_tokens=4096):
+            del messages, tools, model, max_tokens
+            type(self).n += 1
+            if type(self).n == 1:
+                parts = [
+                    "I'll list first:\n",
+                    '```veles-tool\n{"name": "read_file", "arguments": {"path": "a.py"}}\n```',
+                ]
+            else:
+                parts = ["All done."]
+            full = "".join(parts)
+            for p in parts:
+                yield TextDelta(text=p)
+            yield StreamEnd(response=_resp(full))
+
+    def _resp(text):
+        from veles.core.provider import ProviderResponse, TokenUsage
+
+        return ProviderResponse(
+            text=text,
+            tool_calls=[],
+            usage=TokenUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+            finish_reason="stop",
+        )
+
+    from veles.core.agent import Agent
+
+    chat: list[str] = []
+    agent = Agent(_StreamingLocalProvider(), _registry_with_read(), model="m")
+    agent.run("go", on_text_delta=chat.append)
+    joined = "".join(chat)
+    assert "veles-tool" not in joined
+    assert '"name"' not in joined
+    assert "I'll list first:" in joined and "All done." in joined
+
+
 def test_parse_skips_malformed_and_plain_text() -> None:
     assert parse_tool_calls("just a normal answer, no tools") == []
     assert parse_tool_calls("```veles-tool\nnot json\n```") == []

@@ -265,6 +265,46 @@ def test_cmd_curate_failure_stops_batch_and_does_not_advance(
     assert state.sessions_curated_total == 1
 
 
+def test_persistently_failing_session_is_skipped_after_three_attempts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Poison-pill guard (live 2026-07-08): one session failing curation forever
+    blocked the whole curator queue — every post-turn pass retried it, failed,
+    and stopped ("<curate (post-turn) failed …; stopping>" on every turn). After
+    3 failed attempts the cursor must advance past it so curation continues."""
+    project = init_project(tmp_path, name="t")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "fake")
+    store = SessionStore(project.memory_db_path)
+    _seed_session(store, n_turns=2, age_sec=200)
+    store.close()
+
+    calls = {"n": 0}
+
+    def always_fail(*_a: Any, **_kw: Any) -> tuple[RunResult, TokenBudget]:
+        calls["n"] += 1
+        return _make_failed()
+
+    monkeypatch.setattr("veles.cli._run_agent_streaming_aware", always_fail)
+    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _stub_provider())
+    monkeypatch.setattr(
+        "veles.cli._load_skills",
+        lambda project, base, *, provider, model: _empty_registry(),
+    )
+    monkeypatch.setattr("veles.cli._qualify_for_provider", lambda p, *a, **kw: p)
+
+    for _ in range(3):
+        _cmd_curate(_make_args(), project)
+    assert calls["n"] == 3
+
+    state = load_curator_state(project.state_dir / "curator.state.json")
+    assert state.last_curated_at > 0  # cursor advanced PAST the poison session
+    assert state.sessions_curated_total == 0  # skipped, never counted as curated
+
+    # A 4th pass must NOT retry the abandoned session.
+    _cmd_curate(_make_args(), project)
+    assert calls["n"] == 3
+
+
 # ---- helpers ----
 
 
