@@ -109,6 +109,34 @@ def test_parse_multiple_blocks_in_order() -> None:
     assert calls[0].id != calls[1].id
 
 
+def test_parse_flat_arguments_shape() -> None:
+    """Small local models (seen live 2026-07-08: ollama qwen3.5:9b) put the
+    arguments at the TOP LEVEL next to "name" instead of nesting them under
+    "arguments". Dropping them silently ran list_files with no path and
+    crashed search_files with a missing positional — recover them instead."""
+    text = (
+        "```veles-tool\n"
+        '{"name": "search_files", "pattern": "\\\\.md$", "path": ".", "max_results": 50}\n'
+        "```"
+    )
+    calls = parse_tool_calls(text)
+    assert len(calls) == 1
+    assert calls[0].name == "search_files"
+    assert calls[0].arguments == {"pattern": "\\.md$", "path": ".", "max_results": 50}
+
+
+def test_parse_flat_shape_ignores_id_and_type_keys() -> None:
+    body = '{"name": "read_file", "id": "x", "type": "function", "path": "a.py"}'
+    calls = parse_tool_calls(f"```veles-tool\n{body}\n```")
+    assert calls[0].arguments == {"path": "a.py"}
+
+
+def test_nested_arguments_still_win_over_flat_extras() -> None:
+    text = '```veles-tool\n{"name": "read_file", "arguments": {"path": "a"}, "path": "b"}\n```'
+    calls = parse_tool_calls(text)
+    assert calls[0].arguments == {"path": "a"}  # explicit nested form is canonical
+
+
 def test_parse_skips_malformed_and_plain_text() -> None:
     assert parse_tool_calls("just a normal answer, no tools") == []
     assert parse_tool_calls("```veles-tool\nnot json\n```") == []

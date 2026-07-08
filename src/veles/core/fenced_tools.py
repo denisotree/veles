@@ -131,8 +131,15 @@ def parse_tool_calls(text: str) -> list[ToolCall]:
         name = obj.get("name")
         if not isinstance(name, str) or not name:
             continue
-        args = obj.get("arguments", {})
+        args = obj.get("arguments")
         if not isinstance(args, dict):
-            args = {}
+            # Flat shape (seen live 2026-07-08, ollama qwen3.5:9b): small local
+            # models put the arguments at the TOP LEVEL next to "name" —
+            # `{"name": "search_files", "pattern": "…", "path": "."}`. Dropping
+            # them silently ran tools with empty args (wrong results, or a
+            # missing-positional TypeError). Recover every key that isn't
+            # call-envelope metadata. The nested "arguments" form stays
+            # canonical and wins when present.
+            args = {k: v for k, v in obj.items() if k not in ("name", "id", "type", "arguments")}
         calls.append(ToolCall(id=f"fenced-{idx}", name=name, arguments=args))
     return calls
