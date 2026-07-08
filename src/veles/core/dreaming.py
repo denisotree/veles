@@ -42,7 +42,7 @@ import datetime as _dt
 import logging
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -167,9 +167,13 @@ def _persist_dream_state(
     include_consolidation: bool,
     dry_run: bool,
 ) -> None:
-    new_state = CuratorState(
-        last_curated_at=state.last_curated_at,
-        sessions_curated_total=state.sessions_curated_total,
+    # replace(): touch ONLY the dream cursors. Rebuilding CuratorState from
+    # scratch silently wiped `failed_attempts` (live 2026-07-08) — the
+    # curator's give-up-after-3 poison-pill counter reset every dream, so one
+    # persistently failing session blocked the curation queue forever. Mirror
+    # bug of the dream-cursor reset fixed in `cli/_curator.py`.
+    new_state = replace(
+        state,
         last_post_turn_dream_at=at if not include_consolidation else state.last_post_turn_dream_at,
         last_deep_dream_at=at if include_consolidation else state.last_deep_dream_at,
         dream_count=state.dream_count + 1,
