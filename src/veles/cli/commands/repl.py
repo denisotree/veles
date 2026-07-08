@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import atexit
+import contextlib
 import contextvars
 import os
 import sys
@@ -382,6 +383,31 @@ class _ReplApp(
                 reset_subagent_factory(dtoken)
 
 
+@contextlib.contextmanager
+def _veles_log_redirect(project: Project):
+    """Route `veles.*` log records to `.veles/repl.log` while the REPL runs.
+
+    Live 2026-07-08: `logger.warning` lines (e.g. tool_dispatch's `tool.error
+    name=… err=…`) hit the default stderr handler and printed straight into
+    the chat area — redundant noise there (the HUD already marks failed tools
+    and every tool error is persisted to events.jsonl), but still worth
+    keeping on disk for diagnosis."""
+    import logging
+
+    logger = logging.getLogger("veles")
+    handler = logging.FileHandler(project.state_dir / "repl.log", encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    prev_propagate = logger.propagate
+    logger.addHandler(handler)
+    logger.propagate = False
+    try:
+        yield
+    finally:
+        logger.propagate = prev_propagate
+        logger.removeHandler(handler)
+        handler.close()
+
+
 def cmd_repl(args: argparse.Namespace, project: Project) -> int:
     from veles.cli.repl.slash import build_default_registry
 
@@ -395,41 +421,42 @@ def cmd_repl(args: argparse.Namespace, project: Project) -> int:
     errors: list[str] = []
 
     try:
-        _banner(console, args.provider, args.model, state.mode, theme)
-        if state.session_id:  # -c / --resume → show the conversation we continue
-            _print_resume_recap(console, theme, store, state.session_id)
-        # Default: the inline Application — a settled bottom status bar (mode +
-        # token/cache stats), a live "working…" HUD during generation (Ctrl+O
-        # expands tool/mode activity), and the in-app ask_user picker. It pins
-        # the status bar correctly over long scrolling output (rich.Live can't).
-        # The blocking-prompt loop is a fallback via VELES_REPL_SIMPLE=1 for
-        # terminals where the Application misbehaves.
-        if os.environ.get("VELES_REPL_SIMPLE"):
-            _run_simple_repl(
-                args,
-                project,
-                state,
-                factory,
-                store,
-                registry,
-                console,
-                theme,
-                errors,
-                subagent_factory=subagent_factory,
-            )
-        else:
-            _ReplApp(
-                args,
-                project,
-                state,
-                factory,
-                store,
-                registry,
-                console,
-                theme,
-                errors,
-                subagent_factory=subagent_factory,
-            ).run()
+        with _veles_log_redirect(project):
+            _banner(console, args.provider, args.model, state.mode, theme)
+            if state.session_id:  # -c / --resume → show the conversation we continue
+                _print_resume_recap(console, theme, store, state.session_id)
+            # Default: the inline Application — a settled bottom status bar (mode +
+            # token/cache stats), a live "working…" HUD during generation (Ctrl+O
+            # expands tool/mode activity), and the in-app ask_user picker. It pins
+            # the status bar correctly over long scrolling output (rich.Live can't).
+            # The blocking-prompt loop is a fallback via VELES_REPL_SIMPLE=1 for
+            # terminals where the Application misbehaves.
+            if os.environ.get("VELES_REPL_SIMPLE"):
+                _run_simple_repl(
+                    args,
+                    project,
+                    state,
+                    factory,
+                    store,
+                    registry,
+                    console,
+                    theme,
+                    errors,
+                    subagent_factory=subagent_factory,
+                )
+            else:
+                _ReplApp(
+                    args,
+                    project,
+                    state,
+                    factory,
+                    store,
+                    registry,
+                    console,
+                    theme,
+                    errors,
+                    subagent_factory=subagent_factory,
+                ).run()
     finally:
         store.close()
     return 0
