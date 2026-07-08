@@ -32,6 +32,7 @@ from veles.core.agent import Agent
 from veles.core.curator import (
     _CURATE_CHARS_LIMIT,
     _CURATE_QUIET_WINDOW_SEC,
+    _CURATE_TOKEN_BUDGET,
     _CURATE_TOOLS,
     _CURATE_TURN_LIMIT,
     _CURATOR_IDLE_LIMIT,
@@ -621,25 +622,31 @@ def _curate_one_session(
         system_prompt=system_prompt,
         verbose=args.verbose,
     )
+    # The curator is a system task: it gets its own token budget (the caller's
+    # --max-tokens-total guards the USER'S run — the ~24k-token curate prompt
+    # re-counts every round and blew the 100k default mid-pass, live
+    # 2026-07-08) and runs silently (emit_output=False; its raw result text,
+    # e.g. "<budget exhausted: …>", used to print straight into the chat).
+    curate_args = argparse.Namespace(**vars(args))
+    curate_args.max_tokens_total = _CURATE_TOKEN_BUDGET
     result, budget = _run_agent_streaming_aware(
         agent,
         f"Curate session {session.id}.",
-        args,
+        curate_args,
         project=project,
+        emit_output=False,
     )
     if args.verbose:
-        _print_run_summary(args, result, budget)
+        _print_run_summary(curate_args, result, budget)
     if result.stopped_reason == "completed":
         return True
     # Live 2026-07-08 (ollama qwen3.5:9b): a thinking model does all the
-    # persist work and then ends the run with EMPTY final content (the
-    # confirmation sentence lands in the reasoning channel). Judging success
-    # by non-empty prose re-curated the same session after every turn,
-    # duplicating wiki pages forever — judge by the persist tools having
-    # actually run instead.
-    return result.stopped_reason == "empty" and bool(
-        {"wiki_write_page", "memory_save_insight"} & result.invoked_tools
-    )
+    # persist work and then ends the run with empty final content, or a
+    # budget/iteration stop lands AFTER the page was written. Judging success
+    # by non-empty final prose re-curated the same session after every turn,
+    # duplicating wiki pages forever — the real criterion is "did the
+    # distillation persist", i.e. did a persist tool actually run.
+    return bool({"wiki_write_page", "memory_save_insight"} & result.invoked_tools)
 
 
 _SELF_DOC_IDLE_SEC = 3600  # refresh at most once per hour

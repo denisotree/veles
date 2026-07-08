@@ -41,6 +41,14 @@ _CURATE_DEFAULT_LIMIT = 20
 _CURATE_TURN_LIMIT = 80
 _CURATE_CHARS_LIMIT = 64_000
 _CURATE_QUIET_WINDOW_SEC = 60.0
+# The curator's own cumulative token budget, NOT the caller's per-run
+# `--max-tokens-total` (default 100k — a cost guard for the USER'S task).
+# The curate prompt carries the serialized session (up to _CURATE_CHARS_LIMIT
+# chars ≈ 16-25k tokens) and re-counts against the budget every round, so a
+# normal 4-6-round curation needs ~150k; 100k killed it mid-run (live
+# 2026-07-08, ollama qwen3.5:9b). 250k covers ~10 rounds of a worst-case
+# prompt while still bounding a runaway pass on a paid provider.
+_CURATE_TOKEN_BUDGET = 250_000
 
 # M28: idle curator fires at 24h gap
 _CURATOR_IDLE_THRESHOLD_SEC = 24 * 3600
