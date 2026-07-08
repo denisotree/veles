@@ -230,6 +230,7 @@ class OpenAICompatibleProvider:
 
         text_buffer = ""
         tool_calls_acc: dict[int, dict[str, Any]] = {}
+        tool_call_ids: dict[str, int] = {}  # id → bucket, for index-less deltas
         finish_reason: str | None = None
         usage = TokenUsage()
 
@@ -270,7 +271,24 @@ class OpenAICompatibleProvider:
                 yield TextDelta(text=delta.content)
                 text_buffer += delta.content
             for tc_delta in getattr(delta, "tool_calls", None) or []:
-                idx = getattr(tc_delta, "index", 0)
+                idx = getattr(tc_delta, "index", None)
+                if idx is None:
+                    # Some providers/models (seen live 2026-07-08: openrouter +
+                    # anthropic/claude-sonnet-5) omit `index` on parallel
+                    # tool-call deltas. Bucketing them all under one key would
+                    # concatenate argument strings from DIFFERENT calls
+                    # (`{"a":1}{"b":2}`) → JSON decode fails → `{"_raw": …}` →
+                    # every tool call in the turn dies. Recover the boundaries:
+                    # a delta carrying a NEW id starts a new call; an id-less
+                    # delta continues the last one.
+                    tc_id = getattr(tc_delta, "id", None)
+                    if tc_id and tc_id in tool_call_ids:
+                        idx = tool_call_ids[tc_id]
+                    elif tc_id:
+                        idx = (max(tool_calls_acc) + 1) if tool_calls_acc else 0
+                        tool_call_ids[tc_id] = idx
+                    else:
+                        idx = max(tool_calls_acc) if tool_calls_acc else 0
                 acc = tool_calls_acc.setdefault(idx, {"id": "", "name": "", "arguments": ""})
                 if tc_delta.id:
                     acc["id"] = tc_delta.id

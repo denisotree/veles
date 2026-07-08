@@ -120,6 +120,18 @@ class Registry:
         first, then re-enters the path-2 / path-3 decision.
         """
         entry = self.get(name)
+        # `decode_tool_args` wraps undecodable argument payloads as
+        # `{"_raw": <string>}` (M151). Its contract is "surface to the model,
+        # never crash" — calling `handler(**{"_raw": …})` would raise
+        # TypeError on every tool. Return a readable error the model can
+        # react to (re-issue the call with valid JSON).
+        if "_raw" in arguments:
+            snippet = str(arguments["_raw"])[:200]
+            return (
+                f"<error: the arguments for {name} were not valid JSON — "
+                f"re-issue the call with a single well-formed JSON object. "
+                f"Received: {snippet!r}>"
+            )
         if entry.is_async:
             raw = asyncio.run(entry.handler(**arguments))
         else:
