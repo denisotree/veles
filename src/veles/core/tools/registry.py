@@ -167,8 +167,11 @@ def tool(
                          `sensitive` is left unset, `sensitive` is derived
                          from the class (`is_sensitive_class`).
       side_effects     — free-form labels: e.g. ["filesystem", "network"].
-      timeout_s        — soft per-call budget (enforced at dispatch site
-                         once M64 lands).
+      timeout_s        — advisory per-call budget. NOT enforced for builtin
+                         tools (audit 2026-07-08: no dispatch-site reader
+                         exists); only the MCP client applies its own call
+                         budgets. A deliberately long tool (e.g. `wiki_add`
+                         batch ingest) is therefore never timeout-killed.
       max_result_chars — visible-payload cap. Excess lands in an artifact.
 
     Legacy `sensitive=True` keeps working — it's still the gate for the

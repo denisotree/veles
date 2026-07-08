@@ -26,6 +26,7 @@ tools = [
     "wiki_append_log",
     "wiki_ingest",
     "wiki_rename_page",
+    "wiki_add",
 ]
 
 [builtin]
@@ -71,6 +72,7 @@ tools = [
     "wiki_add_category",
     "wiki_append_log",
     "wiki_ingest",
+    "wiki_add",
     "memory_save_insight",
     "memory_save_rule",
     "memory_query",
@@ -106,6 +108,7 @@ tools = [
     "wiki_add_category",
     "wiki_append_log",
     "wiki_ingest",
+    "wiki_add",
     "move_file",
     "make_dir",
     "delegate",

@@ -153,7 +153,8 @@ def test_toolset_membership() -> None:
 
 
 def test_batch_ingest_skips_dot_dirs(tmp_path: Path) -> None:
-    from veles.cli.commands.ingest import _batch_ingest_files
+    # M204: the collector moved to the module kernel (shared by CLI + wiki_add).
+    from veles.modules.wiki.ingest import batch_ingest_files as _batch_ingest_files
 
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs" / "a.md").write_text("a", encoding="utf-8")

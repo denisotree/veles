@@ -53,36 +53,16 @@ def ingest_system_prompt(
     return _qualify_for_provider(base, provider, tools)
 
 
-def _batch_ingest_files(root: Path, pattern: str) -> list[Path]:
-    """Files under `root` matching `pattern`, skipping dot-dirs (.git/.veles/…).
-
-    Sorted for deterministic ordering. A dotfile or any path with a
-    dot-prefixed component is skipped so we never ingest VCS internals or
-    Veles' own state tree.
-    """
-    out: list[Path] = []
-    for p in sorted(root.rglob(pattern)):
-        if not p.is_file():
-            continue
-        if any(part.startswith(".") for part in p.relative_to(root).parts):
-            continue
-        out.append(p)
-    return out
-
-
 def _run_batch_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) -> int:
     """Recursive `veles add <dir> --recursive [--glob PATTERN]`.
 
-    Iterates each matching file through the single-source runner.
-
-    **Must stay strictly sequential (M203).** Content-aware ingestion dedups by
-    `wiki_search` before writing: file N+1's search only sees file N's pages if
-    N has already finished. Parallelizing this loop would race two same-topic
-    files past each other's search → duplicate topic pages, defeating
-    find-or-create-or-patch. Each ingest is still its own agent task (no shared
-    turn context); the on-disk wiki is the only cross-file state, and that is
-    exactly what makes create-vs-patch work across files.
+    M204: the sequential loop lives in the module kernel
+    (`modules/wiki/ingest.py::run_batch_ingest` — see its docstring for the
+    strictly-sequential M203 dedup invariant); this CLI wrapper only supplies
+    `spawn_one` = the single-source top-level runner, plus stderr progress.
     """
+    from veles.modules.wiki.ingest import IngestOutcome, batch_ingest_files, run_batch_ingest
+
     root = Path(source)
     if not root.is_dir():
         print(
@@ -91,20 +71,28 @@ def _run_batch_ingest_cli(args: argparse.Namespace, project: Project, *, source:
         )
         return 2
     pattern = getattr(args, "glob", "*") or "*"
-    files = _batch_ingest_files(root, pattern)
+    files = batch_ingest_files(root, pattern)
     if not files:
         print(f"no files under {source!r} match {pattern!r}; nothing to add.", file=sys.stderr)
         return 0
     print(f"batch add: {len(files)} file(s) under {source!r} matching {pattern!r}", file=sys.stderr)
-    failures = 0
-    for i, path in enumerate(files, 1):
-        print(f"[{i}/{len(files)}] {path}", file=sys.stderr)
-        if _run_ingest_cli(args, project, source=str(path)) != 0:
-            failures += 1
-    if failures:
-        print(f"batch add finished with {failures}/{len(files)} failure(s).", file=sys.stderr)
+
+    def spawn_one(path: Path) -> IngestOutcome:
+        rc = _run_ingest_cli(args, project, source=str(path))
+        return IngestOutcome(source=str(path), ok=rc == 0, detail=f"exit code {rc}" if rc else "")
+
+    result = run_batch_ingest(
+        files,
+        spawn_one=spawn_one,
+        on_progress=lambda i, total, path: print(f"[{i}/{total}] {path}", file=sys.stderr),
+    )
+    if result.failures:
+        print(
+            f"batch add finished with {len(result.failures)}/{result.total} failure(s).",
+            file=sys.stderr,
+        )
         return 1
-    print(f"batch add finished: {len(files)} file(s) ingested.", file=sys.stderr)
+    print(f"batch add finished: {result.total} file(s) ingested.", file=sys.stderr)
     return 0
 
 
