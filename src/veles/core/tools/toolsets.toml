@@ -83,6 +83,26 @@ tools = [
     "job_add",
     "job_list",
     "job_remove",
+    "research",
+]
+
+[research]
+# Deep-research explorer surface (M147/M204): read + network + wiki-read ONLY —
+# explorers gather evidence, never mutate state. Mirrors
+# `core/orchestration/research.py::RESEARCH_EXPLORER_TOOLS`; declared here so
+# the daemon's scoped sub-agent factory can cap background research workers
+# declaratively (`_make_scoped_subagent_factory(..., toolset="research")`).
+tools = [
+    "read_file",
+    "search_files",
+    "list_files",
+    "stat_file",
+    "wiki_list_pages",
+    "wiki_read_page",
+    "wiki_search",
+    "fetch_url",
+    "web_search",
+    "pdf_read",
 ]
 
 [ingest]

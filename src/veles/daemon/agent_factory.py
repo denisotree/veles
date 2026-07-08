@@ -86,9 +86,13 @@ def _attach_background_runners(
         from veles.daemon.background_ops import (
             make_ingest_kind_handler,
             make_on_op_finished,
+            make_research_kind_handler,
         )
 
-        kind_handlers = {"ingest": make_ingest_kind_handler(args, project=project, store=store)}
+        kind_handlers = {
+            "ingest": make_ingest_kind_handler(args, project=project, store=store),
+            "research": make_research_kind_handler(args, project=project, store=store),
+        }
         on_op_finished = make_on_op_finished(state)
         state.subagent_factory = _make_scoped_subagent_factory(
             args, project=project, store=store, toolset="run"

@@ -124,3 +124,103 @@ def job_remove(job_id: str) -> str:
     finally:
         store.close()
     return f"removed job {job_id}" if ok else f"<error: no job {job_id!r}>"
+
+
+@tool(risk_class=RiskClass.COMPUTE_ONLY, side_effects=[])
+def research(question: str, max_subquestions: int = 4) -> str:
+    """Deep-research a question: plan → parallel web/wiki explorers → a
+    synthesised, source-cited report (the tool form of `veles research`, M204).
+
+    Use this for a non-trivial question that needs EVIDENCE gathered from
+    several angles (the web, the wiki, project files) — not for something you
+    can answer directly or with one search. Each explorer is a fresh sub-agent
+    with read+network tools only; their verbatim findings go to a writer that
+    returns the report with source URLs. In a chat/daemon context long research
+    runs in the background and reports back here when done.
+    """
+    from veles.core.orchestration.delegation import (
+        MAX_DELEGATE_DEPTH,
+        current_delegate_depth,
+        current_subagent_factory,
+        enter_delegate,
+        exit_delegate,
+    )
+
+    factory = current_subagent_factory()
+    if factory is None:
+        return (
+            "<error: research needs a sub-agent factory and none is available "
+            "in this context — answer from web_search/fetch_url directly instead>"
+        )
+    if current_delegate_depth() >= MAX_DELEGATE_DEPTH:
+        return (
+            f"<refused: max delegation depth {MAX_DELEGATE_DEPTH} reached — "
+            "research directly with the tools you already have>"
+        )
+    if not question.strip():
+        return "<error: question is empty>"
+
+    # M204 async-by-context: under a chat/daemon turn, deep research is a LONG
+    # job — submit a structured job and let the daemon notify+resume this chat.
+    from veles.core.context import current_origin
+
+    origin = current_origin()
+    if origin:
+        return _submit_background_research(question.strip(), max_subquestions, origin)
+
+    from veles.core.agent_state import current_toolset
+    from veles.core.orchestration.research import (
+        RESEARCH_EXPLORER_TOOLS,
+        make_factory_planner,
+        run_deep_research,
+    )
+
+    # S1: explorers never exceed the calling agent's own scope.
+    parent = current_toolset()
+    explorer_tools = [t for t in RESEARCH_EXPLORER_TOOLS if not parent or t in parent]
+
+    tok = enter_delegate()
+    try:
+        result = run_deep_research(
+            question.strip(),
+            agent_factory=factory,
+            planner=make_factory_planner(factory, max_subquestions=max_subquestions),
+            max_subquestions=max_subquestions,
+            factory_kwargs={"tools": explorer_tools},
+        )
+    finally:
+        exit_delegate(tok)
+    if result.error:
+        return f"<research failed: {result.error}>"
+    return result.final_text or "(research produced no report)"
+
+
+def _submit_background_research(question: str, max_subquestions: int, origin: str) -> str:
+    """Submit deep research as a structured one-shot job (mirrors the
+    `wiki_add` background path — concrete `deliver_to`, resume-depth guard)."""
+    from veles.core.context import current_project, current_resume_depth
+    from veles.core.jobs_store import JobsStore
+
+    project = current_project()
+    if project is None:
+        return "<error: no active project — cannot schedule background research>"
+    store = JobsStore(project.memory_db_path)
+    try:
+        rec = store.add_job(
+            name=f"research: {question[:60]}",
+            prompt="",
+            schedule_expr="once:+0s",
+            kind="research",
+            params={
+                "question": question,
+                "max_subquestions": max_subquestions,
+                "resume_depth": current_resume_depth(),
+            },
+            deliver_to=origin,
+        )
+    finally:
+        store.close()
+    return (
+        f"Started background research (job {rec.id}). I'll report back in this "
+        "chat with the synthesised, source-cited report when it's done."
+    )
