@@ -59,9 +59,7 @@ class _NonBlockingStdoutProxy(StdoutProxy):
         if loop is None:
             write_and_flush()  # no app running — write immediately (pt's fallback)
         else:
-            loop.call_soon_threadsafe(
-                lambda: run_in_terminal(write_and_flush, in_executor=True)
-            )
+            loop.call_soon_threadsafe(lambda: run_in_terminal(write_and_flush, in_executor=True))
 
 
 @contextmanager
