@@ -138,6 +138,70 @@ def test_curate_one_session_advances_on_completed(
     store.close()
 
 
+def test_curate_one_session_empty_final_text_counts_as_success_when_persisted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Seen live 2026-07-08 (ollama qwen3.5:9b): a thinking model does ALL the
+    persist work (wiki_write_page + memory_save_insight) and then ends the run
+    with empty final content — reasoning goes to the thinking channel. That
+    run used to be classified failed (stopped_reason='empty'), so the cursor
+    never advanced and the same session was re-curated after every turn,
+    writing duplicate wiki pages forever."""
+    project = init_project(tmp_path, name="t")
+    store = SessionStore(project.memory_db_path)
+    sid = _seed_session(store, n_turns=3, age_sec=120)
+    session = store.get_session(sid)
+    assert session is not None
+
+    def _empty_but_persisted(*a: Any, **kw: Any) -> tuple[RunResult, TokenBudget]:
+        result = RunResult(
+            text="",
+            iterations=4,
+            stopped_reason="empty",
+            invoked_tools=frozenset({"wiki_write_page", "memory_save_insight"}),
+        )
+        return result, TokenBudget(limit=0)
+
+    monkeypatch.setattr("veles.cli._run_agent_streaming_aware", _empty_but_persisted)
+    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _stub_provider())
+    monkeypatch.setattr(
+        "veles.cli._load_skills",
+        lambda project, base, *, provider, model: _empty_registry(),
+    )
+    monkeypatch.setattr("veles.cli._qualify_for_provider", lambda p, *a, **kw: p)
+
+    ok = _curate_one_session(store, session, _make_args(), project)
+    assert ok is True
+    store.close()
+
+
+def test_curate_one_session_empty_without_persist_tools_still_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An empty run that never called a persist tool distilled nothing —
+    that stays a failure (retry next pass)."""
+    project = init_project(tmp_path, name="t")
+    store = SessionStore(project.memory_db_path)
+    sid = _seed_session(store, n_turns=2, age_sec=120)
+    session = store.get_session(sid)
+    assert session is not None
+
+    def _empty_no_tools(*a: Any, **kw: Any) -> tuple[RunResult, TokenBudget]:
+        return RunResult(text="", iterations=1, stopped_reason="empty"), TokenBudget(limit=0)
+
+    monkeypatch.setattr("veles.cli._run_agent_streaming_aware", _empty_no_tools)
+    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _stub_provider())
+    monkeypatch.setattr(
+        "veles.cli._load_skills",
+        lambda project, base, *, provider, model: _empty_registry(),
+    )
+    monkeypatch.setattr("veles.cli._qualify_for_provider", lambda p, *a, **kw: p)
+
+    ok = _curate_one_session(store, session, _make_args(), project)
+    assert ok is False
+    store.close()
+
+
 def test_curate_one_session_returns_false_on_max_iterations(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

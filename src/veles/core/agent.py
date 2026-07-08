@@ -132,6 +132,11 @@ class RunResult:
     stopped_reason: str = "completed"  # completed | max_iterations | empty
     session_id: str | None = None
     usage: UsageSnapshot = field(default_factory=UsageSnapshot)
+    # Names of every tool the run dispatched. Lets callers judge success by
+    # "did the work actually happen" instead of by non-empty final prose — a
+    # thinking local model routinely ends with empty content after doing all
+    # the tool work (seen live 2026-07-08, ollama qwen3.5:9b).
+    invoked_tools: frozenset[str] = frozenset()
 
 
 class ManagerNeverWritesError(RuntimeError):
@@ -344,6 +349,7 @@ class Agent:
         )
         force_answer = False
         token_warned = False
+        invoked: set[str] = set()
 
         for iteration in range(1, self._max_iterations + 1):
             # Cooperative cancellation checkpoint #1: between iterations,
@@ -362,6 +368,7 @@ class Agent:
                         stopped_reason="budget_exhausted",
                         session_id=self._session_id,
                         usage=usage_acc,
+                        invoked_tools=frozenset(invoked),
                     )
                 )
 
@@ -493,6 +500,7 @@ class Agent:
                         stopped_reason="completed" if final_text else "empty",
                         session_id=self._session_id,
                         usage=usage_acc,
+                        invoked_tools=frozenset(invoked),
                     )
                 )
 
@@ -500,6 +508,7 @@ class Agent:
                 self._dispatch_fenced_calls(effective_calls, history)
             else:
                 self._dispatch_tool_calls(response, history)
+            invoked.update(call.name for call in effective_calls)
 
             # M144: with the repeated tool's results now in history (so the
             # assistant→tool message pairing stays valid for the next call),
@@ -543,6 +552,7 @@ class Agent:
                 stopped_reason="max_iterations",
                 session_id=self._session_id,
                 usage=usage_acc,
+                invoked_tools=frozenset(invoked),
             )
         )
 

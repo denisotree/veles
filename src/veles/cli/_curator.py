@@ -629,7 +629,17 @@ def _curate_one_session(
     )
     if args.verbose:
         _print_run_summary(args, result, budget)
-    return result.stopped_reason == "completed"
+    if result.stopped_reason == "completed":
+        return True
+    # Live 2026-07-08 (ollama qwen3.5:9b): a thinking model does all the
+    # persist work and then ends the run with EMPTY final content (the
+    # confirmation sentence lands in the reasoning channel). Judging success
+    # by non-empty prose re-curated the same session after every turn,
+    # duplicating wiki pages forever — judge by the persist tools having
+    # actually run instead.
+    return result.stopped_reason == "empty" and bool(
+        {"wiki_write_page", "memory_save_insight"} & result.invoked_tools
+    )
 
 
 _SELF_DOC_IDLE_SEC = 3600  # refresh at most once per hour
