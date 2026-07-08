@@ -11,6 +11,7 @@ the prompt_toolkit `Style` from the theme. All state lives on `_ReplApp`.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 
 from veles.cli.repl.terminal import _settled_status, _tool_row
@@ -38,7 +39,9 @@ class HudMixin:
         toggle works in both states because the block is visible in both."""
         from prompt_toolkit.formatted_text import FormattedText
 
-        approx = self.stream_chars // 4
+        # Real usage (round_usage events) wins; the chars/4 text estimate is
+        # only the live lower bound while a round is still streaming.
+        approx = max(getattr(self, "turn_tokens_out", 0), self.stream_chars // 4)
         tools = [t for k, t in self.meta_events if k == "tool"]
         modes = [t for k, t in self.meta_events if k == "mode"]
         # Live while the turn runs; FROZEN once done (else every idle re-render
@@ -104,6 +107,11 @@ class HudMixin:
         running/done/failed + duration state (Ctrl+I/Ctrl+O expanded view)."""
         if kind == "stream":
             self.stream_chars += len(text)
+        elif kind == "usage":
+            # Real cumulative output tokens (round_usage event) — what makes
+            # `≈N tok` non-zero on a tool-call-only turn.
+            with contextlib.suppress(ValueError):
+                self.turn_tokens_out = int(text)
         elif kind == "tool_result":
             rec = self.tool_activity.get(tool_call_id)
             if rec is not None:

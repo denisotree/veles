@@ -180,6 +180,25 @@ class ThinkingDelta:
     type: str = "thinking"
 
 
+@dataclass(slots=True, frozen=True)
+class RoundUsage:
+    """Real token usage of ONE provider round + the turn's running totals.
+
+    Emitted by the agent loop after every provider response. This is what
+    lets a live HUD show a real `≈N tok` for a tool-call-heavy turn — such a
+    turn streams no answer text, so a chars/4 estimate over text deltas reads
+    0 while the model is actually burning tokens on tool-call JSON."""
+
+    ts: str
+    session_id: str | None
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    cumulative_completion: int
+    cumulative_total: int
+    type: str = "round_usage"
+
+
 Event = (
     UserMessage
     | AssistantMessage
@@ -193,6 +212,7 @@ Event = (
     | ConnectorCall
     | ErrorEvent
     | ThinkingDelta
+    | RoundUsage
 )
 
 

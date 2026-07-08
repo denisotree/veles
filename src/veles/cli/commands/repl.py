@@ -158,6 +158,7 @@ class _ReplApp(
         self.meta_events: list[tuple[str, str]] = []  # ("mode"|"tool", text)
         self.meta_expanded = False
         self.stream_chars = 0
+        self.turn_tokens_out = 0  # real cumulative output tokens (round_usage)
         self.turn_start = 0.0
         self.turn_elapsed = 0.0  # frozen duration once the turn finishes
         self.last_stopped_reason = "completed"  # honest end-state for the HUD marker

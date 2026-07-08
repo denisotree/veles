@@ -42,6 +42,9 @@ from veles.core.events import (
     events_path_for_project,
 )
 from veles.core.events import (
+    RoundUsage as RoundUsageEvent,
+)
+from veles.core.events import (
     UserMessage as UserMessageEvent,
 )
 from veles.core.fenced_tools import (
@@ -428,6 +431,19 @@ class Agent:
                 budget=budget,
             )
             usage_acc.add(response.usage)
+            # Real per-round usage for live HUDs: a tool-call-only round streams
+            # no text, so a chars/4 estimate over text deltas would read 0.
+            self._emit_event(
+                RoundUsageEvent(
+                    ts=now_iso(),
+                    session_id=self._session_id,
+                    prompt_tokens=getattr(response.usage, "prompt_tokens", 0),
+                    completion_tokens=getattr(response.usage, "completion_tokens", 0),
+                    total_tokens=getattr(response.usage, "total_tokens", 0),
+                    cumulative_completion=usage_acc.completion_tokens,
+                    cumulative_total=usage_acc.total_tokens,
+                )
+            )
 
             # M143: in fenced mode the model expresses tool calls as text, so
             # parse them out of the response and record the assistant turn

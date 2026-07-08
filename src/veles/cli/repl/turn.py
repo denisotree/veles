@@ -201,6 +201,12 @@ def _make_turn_callbacks(console, theme, errors: list[str], on_meta=None, stop_c
 
     def on_event(event) -> None:
         etype = getattr(event, "type", "")
+        if etype == "round_usage":
+            # Real cumulative output tokens for the HUD — a tool-call-only
+            # turn streams no text, so the chars/4 estimate alone reads ≈0.
+            if on_meta is not None:
+                on_meta("usage", str(getattr(event, "cumulative_completion", 0)))
+            return
         if etype == "tool_result":
             # Completion signal for the inspector's per-tool status/duration —
             # correlated with the tool_call above via tool_call_id. Carries no
@@ -550,6 +556,7 @@ class TurnMixin:
                 # Reset the live meta HUD for this turn.
                 self.meta_events = []
                 self.stream_chars = 0
+                self.turn_tokens_out = 0
                 self.tool_activity = {}
                 self.turn_start = time.monotonic()
                 self._last_submitted = text  # remember it so Esc can restore it

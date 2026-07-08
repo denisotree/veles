@@ -167,4 +167,6 @@ def _event_type_name(e: Event) -> str:
         "Compaction": "compaction",
         "ConnectorCall": "connector_call",
         "ErrorEvent": "error",
+        "ThinkingDelta": "thinking",
+        "RoundUsage": "round_usage",
     }[type(e).__name__]
