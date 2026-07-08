@@ -269,7 +269,9 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     state.post_turn_hook = _make_post_turn_hook(args, project)
     state.verify_hook = _make_verify_hook(args, project=project, store=store, daemon_session=name)
     state.worker_agent_factory = worker_agent_factory
-    jobs_store = _attach_background_runners(state, project, agent_factory, provider_name)
+    jobs_store = _attach_background_runners(
+        state, project, agent_factory, provider_name, args=args, store=store
+    )
 
     app = make_app(state)
 

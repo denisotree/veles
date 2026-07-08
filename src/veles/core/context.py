@@ -47,6 +47,27 @@ def reset_origin(token: Token) -> None:
     _current_origin.reset(token)
 
 
+# ---- background-op resume depth (M204 auto-resume loop guard) ----
+# When a background op (structured job) completes, the daemon resumes the
+# origin session with a follow-up turn. That turn runs with resume depth =
+# job depth + 1; a `wiki_add` submitted DURING a resume turn carries the
+# depth on its job record, and completions at depth >= 1 degrade to
+# notify-only — so completion → resume → new-op can't recurse unboundedly.
+_resume_depth: ContextVar[int] = ContextVar("veles_resume_depth", default=0)
+
+
+def current_resume_depth() -> int:
+    return _resume_depth.get()
+
+
+def set_resume_depth(depth: int) -> Token:
+    return _resume_depth.set(depth)
+
+
+def reset_resume_depth(token: Token) -> None:
+    _resume_depth.reset(token)
+
+
 # ---- skill call stack (cycle / depth guard for cross-skill composition) ----
 
 _skill_stack: ContextVar[tuple[str, ...]] = ContextVar("veles_skill_stack", default=())

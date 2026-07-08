@@ -25,10 +25,18 @@ import sys
 logger = logging.getLogger(__name__)
 
 
-def _attach_background_runners(state, project, agent_factory, provider_name: str):
+def _attach_background_runners(
+    state, project, agent_factory, provider_name: str, *, args=None, store=None
+):
     """Wire the JobRunner + DreamRunner onto `state` so the daemon's
     aiohttp lifecycle picks them up. Returns the `JobsStore` so the
-    caller can close it in `finally`."""
+    caller can close it in `finally`.
+
+    `args`/`store` (M204): when supplied, additionally wire the structured
+    background-op machinery — the ingest kind handler (batch kernel driven by
+    ingest-scoped sub-agents), the notify+resume completion callback, and the
+    daemon-wide sub-agent factory (`state.subagent_factory`, capped at [run])
+    that makes delegate/wiki_add usable in daemon turns at all."""
     from veles.channels.delivery import DeliveryRouter
     from veles.cli import _make_provider as _make_provider_for_dream
     from veles.core.dream_runner import DreamRunner
@@ -69,6 +77,23 @@ def _attach_background_runners(state, project, agent_factory, provider_name: str
 
     from veles.core.job_schedule import resolve_schedule_tz
 
+    # M204: structured background ops need `args` (factory settings) + the
+    # session store — wire the ingest handler, the notify+resume callback,
+    # and the daemon-wide sub-agent factory when the caller supplies them.
+    kind_handlers = None
+    on_op_finished = None
+    if args is not None and store is not None:
+        from veles.daemon.background_ops import (
+            make_ingest_kind_handler,
+            make_on_op_finished,
+        )
+
+        kind_handlers = {"ingest": make_ingest_kind_handler(args, project=project, store=store)}
+        on_op_finished = make_on_op_finished(state)
+        state.subagent_factory = _make_scoped_subagent_factory(
+            args, project=project, store=store, toolset="run"
+        )
+
     jobs_store = JobsStore(project.memory_db_path)
     state.job_runner = JobRunner(
         store=jobs_store,
@@ -78,6 +103,8 @@ def _attach_background_runners(state, project, agent_factory, provider_name: str
         # M167: calendar schedules fire in the project's configured zone
         # (`[schedule] timezone`), host-local by default.
         tz=resolve_schedule_tz(project),
+        kind_handlers=kind_handlers,
+        on_op_finished=on_op_finished,
     )
 
     # M166: the reminder sweep shares the SAME delivery_router (the one channels
@@ -277,6 +304,7 @@ def _build_agent_for_turn(
     system_prompt_override: str | None = None,
     provider=None,
     compressor=_UNSET,
+    tools: tuple[str, ...] | None = None,
 ):
     """Assemble one Agent for a single turn.
 
@@ -315,7 +343,10 @@ def _build_agent_for_turn(
         provider = _make_provider(settings.provider_name, settings.model)
     registry = _load_skills(
         project,
-        _RUN_TOOLS,
+        # M204: `tools` narrows the surface for scoped sub-agents (e.g. the
+        # [ingest] set for background ingest workers — no run_shell/fetch_url,
+        # B1). Default stays the full run surface.
+        tools if tools is not None else _RUN_TOOLS,
         provider=provider,
         model=settings.model,
         skills_cache_ttl=settings.skills_cache_ttl,
@@ -483,6 +514,40 @@ def _make_worker_agent_factory(args: argparse.Namespace, *, project, store):
             session_id=None,
             prompt=None,
             system_prompt_override=worker_system_prompt,
+        )
+
+    return factory
+
+
+def _make_scoped_subagent_factory(args: argparse.Namespace, *, project, store, toolset: str):
+    """M204: a `factory(*, system_prompt, tools) -> Agent` for sub-agents whose
+    registry is CAPPED at the named toolset.
+
+    This is what makes `delegate`/`wiki_add` work under the daemon at all —
+    `set_subagent_factory` used to be wired only in the REPL. The cap is the
+    security half (B1): a background ingest worker built through
+    `toolset="ingest"` can never obtain `run_shell`/`fetch_url`, whatever the
+    requested `tools` list says — requests are intersected with the toolset
+    ceiling, and an empty intersection falls back to the full (still-capped)
+    set. Fresh sub-session per call (`session_id=None`), mirroring
+    `_make_worker_agent_factory`.
+    """
+    from veles.core.tools.toolsets import TOOLSETS
+
+    settings = _factory_settings_from_args(args, project)
+    ceiling: tuple[str, ...] = TOOLSETS[toolset]
+
+    def factory(*, system_prompt: str | None = None, tools: list[str] | None = None, **_kw):
+        allowed = set(ceiling)
+        resolved = tuple(t for t in (tools or ceiling) if t in allowed) or ceiling
+        return _build_agent_for_turn(
+            settings,
+            project=project,
+            store=store,
+            session_id=None,
+            prompt=None,
+            system_prompt_override=system_prompt,
+            tools=resolved,
         )
 
     return factory

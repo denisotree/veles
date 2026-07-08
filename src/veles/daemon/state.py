@@ -100,6 +100,16 @@ class DaemonState:
     # M126: per-session overrides for model/mode/provider. Keyed by
     # session_id; set via `PATCH /v1/sessions/{id}`.
     session_overrides: dict[str, SessionOverrides] = field(default_factory=dict)
+    # M204: `factory(*, system_prompt, tools) -> Agent` installed around every
+    # daemon turn so delegate/wiki_add can spawn scoped sub-agents (this used
+    # to be REPL-only). Built by `_attach_background_runners`, capped at [run].
+    subagent_factory: Any | None = None
+    # M204: per-session turn serializer — a background-op RESUME turn queues
+    # behind a live user turn on the same session instead of racing it.
+    session_locks: dict[str, asyncio.Lock] = field(default_factory=dict)
+
+    def session_lock(self, session_id: str) -> asyncio.Lock:
+        return self.session_locks.setdefault(session_id, asyncio.Lock())
 
     def get_overrides(self, session_id: str | None) -> SessionOverrides | None:
         if session_id is None:

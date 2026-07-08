@@ -278,6 +278,15 @@ def wiki_add(source: str, recursive: bool = False, glob: str = "*") -> str:
     if recursive:
         if not src.is_dir():
             return f"<error: recursive wiki_add needs a directory, but {source!r} is not one>"
+        # M204 async-by-context: under a chat/daemon turn (origin set) a whole
+        # directory is a LONG job — submit a structured one-shot job and return
+        # now; the daemon notifies + resumes this chat when it finishes. A plain
+        # REPL turn (no origin) runs inline below.
+        from veles.core.context import current_origin
+
+        origin = current_origin()
+        if origin:
+            return _submit_background_ingest(src, glob or "*", origin)
         files = batch_ingest_files(src, glob or "*")
         if not files:
             return f"<error: no files under {source!r} match {glob!r}>"
@@ -308,6 +317,44 @@ def wiki_add(source: str, recursive: bool = False, glob: str = "*") -> str:
     finally:
         exit_delegate(tok)
     return result.summary()
+
+
+def _submit_background_ingest(src, glob: str, origin: str) -> str:
+    """Submit the recursive ingest as a structured one-shot job (M204).
+
+    Deterministic by design (audit M5): `kind="ingest"` + machine `params` are
+    dispatched by the JobRunner straight to the batch kernel — the "I'll report
+    back" promise never depends on an LLM re-interpreting a prompt. The
+    CONCRETE origin string is stored as `deliver_to` (audit M1: the literal
+    "origin" is undeliverable from a detached/restarted job) and doubles as
+    the SessionMap key the resume path uses. `resume_depth` carries the
+    auto-resume loop guard."""
+    from veles.core.context import current_project, current_resume_depth
+    from veles.core.jobs_store import JobsStore
+
+    project = current_project()
+    if project is None:
+        return "<error: no active project — cannot schedule a background ingest>"
+    store = JobsStore(project.memory_db_path)
+    try:
+        rec = store.add_job(
+            name=f"ingest {src}",
+            prompt="",
+            schedule_expr="once:+0s",
+            kind="ingest",
+            params={
+                "source": str(src),
+                "glob": glob,
+                "resume_depth": current_resume_depth(),
+            },
+            deliver_to=origin,
+        )
+    finally:
+        store.close()
+    return (
+        f"Started background ingest of {src} (job {rec.id}). It runs file-by-file "
+        "with fresh sub-agents; I'll report back in this chat when it's done."
+    )
 
 
 def _ingest_worker_tools() -> list[str]:
