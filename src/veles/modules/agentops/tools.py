@@ -1,4 +1,8 @@
-"""Recurring scheduled-job tools (M167b).
+"""Agent-ops tools: scheduled jobs (M167b; relocated from core in M204).
+
+Module-resident by invariant — agent-callable command tools live in
+`src/veles/modules/`, never in `src/veles/core/`. Registered by the
+unconditional `import veles.modules.agentops.tools` in `_load_skills`.
 
 Lets the bot schedule recurring autonomous actions from chat — a monitoring
 check, a daily digest. Distinct from `task_add`, which is a ONE-SHOT personal

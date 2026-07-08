@@ -574,10 +574,16 @@ def _load_skills(
         # Register the wiki engine's tools lazily — a non-wiki project never
         # imports the wiki module (it lives in modules/, not core; the
         # wiki-extraction refactor, 2026-06-19).
-        import veles.modules.wiki.tools  # noqa: F401
+        import veles.modules.wiki.tools
     else:
         gated = set(_TOOLSETS.get("engine-wiki", ()))
         base_tools = tuple(t for t in base_tools if t not in gated)
+    # M204: agent-ops command tools (job_add/…) are module-resident (the
+    # "tools never live in core" invariant) but UNCONDITIONAL — they are agent
+    # operations present whenever the agent runs, unlike the layout-gated
+    # wiki engine.
+    import veles.modules.agentops.tools  # noqa: F401
+
     # M117b: include layout-pack skills (`ingest`/`query`/`lint` for the
     # default `llm-wiki`) so the runtime agent can call them by name.
     skills = discover_skills(project, include_layout=True, cache_ttl=skills_cache_ttl)
