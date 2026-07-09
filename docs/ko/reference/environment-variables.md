@@ -71,4 +71,7 @@ API 키 조회 순서: OS 키체인(프로젝트 범위) → OS 키체인(기본
 
 ## 내부 / 테스트
 
-`VELES_BUNDLE_VERSION`, `VELES_CACHE_BREAKPOINT` — 내부용이며 직접 설정할 필요가 없습니다.
+| 변수 | 용도 |
+|---|---|
+| `VELES_BUNDLE_VERSION` | 내부용이며 직접 설정할 필요가 없습니다 |
+| `VELES_REPL_SIMPLE` | `1`로 설정하면 전체 화면 `prompt_toolkit` 앱 대신 단순한 줄 기반 REPL 루프를 강제합니다(제한적인 터미널용 폴백) |

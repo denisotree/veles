@@ -26,7 +26,7 @@
 **세션을 거듭할수록 더 똑똑해지는 미니멀 CLI 에이전트 프레임워크.**
 
 <p align="center">
-  <img src="docs/assets/tui-hero.gif" alt="Veles TUI — 질문을 던지면 프로젝트 자체의 메모리에 기반한 답을 받습니다" width="800">
+  <img src="docs/assets/tui-hero.gif" alt="Veles REPL — 질문을 던지면 프로젝트 자체의 메모리에 기반한 답을 받습니다" width="800">
 </p>
 
 매번 처음부터 시작하는 채팅 도구와 달리, Veles는 **구조화된 프로젝트 메모리** — 인사이트, 규칙, 큐레이션된 지식 — 를 유지합니다. 이 지식은 세션을 거치며 축적되어, 오래 사용할수록 에이전트가 더 유용해집니다. *콘텐츠*를 어떻게 구성할지는 플러그형으로 선택할 수 있습니다. 기본값은 Karpathy 스타일의 LLM 위키, 평면 노트, 또는 코드 저장소를 위한 무구조 방식입니다. 깔끔하게 설계되었습니다. god-file 없음, 벤더 종속 없음, 클라우드 동기화 없음.
@@ -34,7 +34,7 @@
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles        # interactive REPL (bare `veles` == `veles tui`)
+veles        # interactive REPL (bare `veles` with no subcommand)
 ```
 
 ---
@@ -79,13 +79,13 @@ veles init
 veles run "Read AGENTS.md and describe this project."
 ```
 
-대신 대화형 TUI를 여세요(인자 없는 `veles`도 동일하게 동작합니다):
+대신 대화형 REPL을 여세요(인자 없는 `veles`도 동일하게 동작합니다):
 
 ```bash
 veles
 ```
 
-처음 실행할 때, 설정 마법사가 선호하는 언어, 프로바이더, 프로젝트 이름을 묻습니다.
+처음 실행할 때, 설정 마법사가 언어, LLM 프로바이더, API 키, 기본 모델, 색상 테마, 그리고 현재 디렉터리에 프로젝트를 초기화할지 여부를 차례로 안내합니다.
 
 ---
 
@@ -217,15 +217,15 @@ veles module list
 
 ---
 
-## TUI
+## 대화형 세션 (REPL)
 
 ```bash
-veles                        # new session (bare `veles` launches the TUI)
-veles tui --resume <id>      # continue a session
+veles                        # new session (bare `veles` launches the interactive REPL)
+veles --resume <id>      # continue a session
 ```
 
 <p align="center">
-  <img src="docs/assets/tui-tour.gif" alt="Veles TUI — 슬래시 인스펙터(/status, /context), 모드 전환, 그리고 명령 팔레트" width="800">
+  <img src="docs/assets/tui-tour.gif" alt="Veles REPL — 슬래시 인스펙터(/status, /context), 모드 전환, 그리고 명령 팔레트" width="800">
 </p>
 
 슬래시 명령이 모든 것을 실시간으로 보여줍니다 — `/status`, `/tokens`, `/context`, `/mode`, `/help` — 그리고 `Shift+Tab`으로 모드(auto / planning / writing / goal)를 순환합니다.
@@ -322,15 +322,20 @@ veles import ./backup.tar.gz --into ./new-dir
 |---|---|
 | `veles init [name]` | 새 프로젝트 생성 |
 | `veles run "<prompt>"` | 단일 턴 에이전트 실행 |
-| `veles tui` | 대화형 TUI REPL |
-| `veles add <file\|url>` | 소스 수집 → 위키 페이지 |
+| `veles` | 대화형 REPL |
+| `veles add <file\|url>` | 소스 수집 → 주제별 위키 페이지 |
+| `veles organize` | 활성 레이아웃에 따라 프로젝트 콘텐츠 재구성(제안 후 적용)|
 | `veles research "<question>"` | 다각도 심층 리서치 |
 | `veles curate` | 세션을 위키로 통합 |
 | `veles sessions {list,show,delete,search}` | 세션 관리 |
-| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | 스킬 관리 |
-| `veles tool {list,show,promote}` | 도구 관리 |
+| `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | 스킬 관리 |
+| `veles tool {list,show,promote,approve}` | 도구 관리 (`approve`는 자체 작성 도구를 승인) |
 | `veles module {list,add,remove}` | 플러그인 관리 |
+| `veles browse {modules,skills}` | 엄선된 모듈 / 스킬 레지스트리 검색 |
 | `veles route {show,set,reset,refresh}` | 모델 라우팅 |
+| `veles schema {validate,edit}` | AGENTS.md 검증 / 편집 |
+| `veles self-doc` | 프로젝트 자체 문서 생성 |
+| `veles layout {sync}` | 레이아웃 팩 유지 관리 |
 | `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | 장기 목표 |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | 예약 작업 |
 | `veles dream` | 백그라운드 메모리 통합 사이클 |
@@ -340,7 +345,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles autopilot {enable,disable,status}` | 임시 신뢰 우회 |
 | `veles secret {set,get,list,delete}` | OS 키체인 시크릿 |
 | `veles daemon {start,stop,status,list,restart,delete,session,token}` | HTTP/WS 데몬 |
-| `veles channel {run,list-sessions,reset-session}` | 외부 채널 게이트웨이 |
+| `veles channel {list,run,list-sessions,reset-session,add,remove}` | 외부 채널 게이트웨이 |
 | `veles mcp {list,test}` | 외부 MCP 서버 |
 | `veles models <provider>` | 프로바이더 모델 목록 |
 | `veles doctor` | 상태 점검 |

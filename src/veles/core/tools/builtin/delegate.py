@@ -59,7 +59,15 @@ def delegate(subtask: str, tools: list[str] | None = None, context: str = "") ->
         return "<error: subtask is empty>"
 
     requested = list(tools) if tools else list(_DEFAULT_READONLY_TOOLS)
-    known = set(registry.list_names())
+    # S1 (2026-07-07 audit): a worker may never exceed the delegating agent's
+    # own scope. Intersect with the running agent's toolset (`current_toolset`)
+    # so a scoped run — e.g. `veles add`, whose `[ingest]` toolset omits
+    # `run_shell`/`fetch_url` — can't `delegate(tools=["run_shell"])` to smuggle
+    # a wider capability into a worker. Outside a scoped agent run (empty set)
+    # fall back to the global registry (historic behaviour, e.g. direct tests).
+    from veles.core.agent_state import current_toolset
+
+    known = current_toolset() or frozenset(registry.list_names())
     resolved = [t for t in requested if t in known]
     dropped = [t for t in requested if t not in known]
     if not resolved:

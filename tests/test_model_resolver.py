@@ -26,7 +26,12 @@ def _isolate_home(tmp_path, monkeypatch):
 def _ns(**overrides) -> argparse.Namespace:
     base = {"provider": DEFAULT_PROVIDER, "model": DEFAULT_MODEL}
     base.update(overrides)
-    return argparse.Namespace(**base)
+    ns = argparse.Namespace(**base)
+    # An overridden provider simulates an explicit `--provider` on the CLI (the
+    # parser action sets this marker); a bare `_ns()` is "not passed".
+    if "provider" in overrides:
+        ns._provider_explicit = True
+    return ns
 
 
 # ---- provider cascade ----
@@ -64,6 +69,33 @@ def test_default_when_nothing_set(tmp_path: Path) -> None:
 def test_no_project_falls_to_user_then_default(tmp_path: Path) -> None:
     args = _ns()
     assert resolve_effective_provider(args, None) == DEFAULT_PROVIDER
+
+
+def test_explicit_default_valued_provider_still_wins_over_config(tmp_path: Path) -> None:
+    """Regression (2026-07-07): `--provider openrouter` must be honored even
+    though openrouter IS `DEFAULT_PROVIDER`. A user whose config default is a
+    different provider must still be able to CLI-override back to openrouter;
+    before the fix, an explicit value equal to the default was indistinguishable
+    from 'not passed' and fell through to the config default (ollama)."""
+    project = init_project(tmp_path, name=None, force=False)
+    from veles.core.user_config import UserConfig, save_user_config
+
+    save_user_config(UserConfig(language="en", default_provider="ollama"))
+    # Simulate the CLI parser: --provider openrouter → value + explicit marker.
+    args = _ns(provider=DEFAULT_PROVIDER)
+    args._provider_explicit = True
+    assert resolve_effective_provider(args, project) == DEFAULT_PROVIDER
+
+
+def test_non_explicit_default_provider_still_cascades(tmp_path: Path) -> None:
+    """Bare `veles run` (no --provider) must still cascade to the config default
+    — the fix must not turn every default-valued provider into 'explicit'."""
+    project = init_project(tmp_path, name=None, force=False)
+    from veles.core.user_config import UserConfig, save_user_config
+
+    save_user_config(UserConfig(language="en", default_provider="ollama"))
+    args = _ns()  # no provider override → not explicit
+    assert resolve_effective_provider(args, project) == "ollama"
 
 
 # ---- model cascade ----

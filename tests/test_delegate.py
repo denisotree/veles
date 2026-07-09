@@ -100,6 +100,27 @@ def test_delegate_drops_unknown_tools() -> None:
     assert "no_such_tool" in out  # reported
 
 
+def test_delegate_cannot_exceed_parent_toolset() -> None:
+    """S1 (2026-07-07 audit): a worker may never get a tool the running agent
+    itself lacks. When the current scoped toolset omits `run_shell`, a
+    `delegate(tools=["read_file","run_shell"])` must drop run_shell even though
+    it is globally registered — a scoped `veles add` can't smuggle shell into a
+    worker."""
+    from veles.core.agent_state import reset_current_toolset, set_current_toolset
+
+    rec = _Recorder()
+    tok = _with_factory(rec)
+    # Parent scope = the [ingest]-style set: read_file yes, run_shell no.
+    scope_tok = set_current_toolset(frozenset({"read_file", "wiki_write_page"}))
+    try:
+        out = delegate("x", tools=["read_file", "run_shell"])
+    finally:
+        reset_current_toolset(scope_tok)
+        reset_subagent_factory(tok)
+    assert rec.built[0].tools == ["read_file"]  # run_shell dropped (outside parent scope)
+    assert "run_shell" in out  # reported as dropped
+
+
 def test_delegate_all_tools_unknown_is_an_error() -> None:
     rec = _Recorder()
     tok = _with_factory(rec)
@@ -155,6 +176,9 @@ def test_repl_runtime_subagent_factory_scopes_tools(tmp_path, monkeypatch) -> No
     try:
         args = argparse.Namespace(
             provider="ollama",  # local, keyless — no network at construction
+            _provider_explicit=True,  # as if --provider ollama was passed (else the
+            # resolver falls back to the config default and CI, with no
+            # OPENROUTER_API_KEY, fails the key gate)
             model="m",
             resume=None,
             max_iterations=30,

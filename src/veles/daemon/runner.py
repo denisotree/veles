@@ -105,14 +105,25 @@ async def run_agent_in_background(
     post_turn_hook: Callable[[RunResult], None] | None = None,
     verify_hook: Callable[[str, RunResult], RunResult] | None = None,
     origin: str | None = None,
+    subagent_factory: Callable[..., Any] | None = None,
+    turn_lock: asyncio.Lock | None = None,
 ) -> None:
     """Drive `agent.run(prompt)` to completion, mirroring events into `handle`.
 
     Returns when the agent thread has finished. Exceptions are captured
     into `handle.error` rather than re-raised so the gather'd task never
     crashes the daemon.
+
+    `subagent_factory` (M204): installed via `set_subagent_factory` around the
+    turn (the ContextVar reaches the worker thread through `to_thread`), so
+    `delegate`/`wiki_add` can spawn sub-agents under the daemon — this used to
+    be REPL-only. `turn_lock` (M204): when given, the WHOLE turn runs under it —
+    the per-session serializer that lets a background-op RESUME turn queue
+    behind a live user turn instead of racing it on one session history.
     """
     loop = asyncio.get_running_loop()
+    if turn_lock is not None:
+        await turn_lock.acquire()
 
     def _post(event: dict[str, Any]) -> None:
         loop.call_soon_threadsafe(handle.append_event, event)
@@ -155,6 +166,16 @@ async def run_agent_in_background(
     # before the worker thread starts — `asyncio.to_thread` copies the context,
     # so the agent's tools see it.
     origin_token = set_origin(origin)
+    # M204: the sub-agent factory, so delegate/wiki_add can spawn workers under
+    # the daemon (used to be REPL-only). Same ContextVar mechanism as origin.
+    from veles.core.orchestration.delegation import (
+        reset_subagent_factory,
+        set_subagent_factory,
+    )
+
+    subagent_token = (
+        set_subagent_factory(subagent_factory) if subagent_factory is not None else None
+    )
     # The unified prompter carries `arguments` and `reason` to the
     # Telegram trust-prompt render and serves both trust and approval.
     unified_token = set_unified_prompter(make_unified_prompter(handle, loop))
@@ -220,6 +241,8 @@ async def run_agent_in_background(
     finally:
         end_trust_turn(turn_token)
         reset_origin(origin_token)
+        if subagent_token is not None:
+            reset_subagent_factory(subagent_token)
         reset_unified_prompter(unified_token)
         reset_question_prompter(question_token)
         # Any prompt still pending at this point is orphaned (the agent
@@ -229,6 +252,8 @@ async def run_agent_in_background(
         for pid, pending in list(handle.pending_prompts.items()):
             pending.future.cancel()
             handle.pending_prompts.pop(pid, None)
+        if turn_lock is not None:
+            turn_lock.release()
 
 
 def new_run_handle(*, session_id: str | None = None) -> RunHandle:

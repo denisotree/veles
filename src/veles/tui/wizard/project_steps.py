@@ -12,10 +12,14 @@ Step order:
     3. Provider override    (optional; per-project API-key flow)
     4. AGENTS.md normalize  (only when CLAUDE.md/GEMINI.md conflicts exist;
                              stub here — full implementation lands in M96)
-    5. Wiki seed            (only with the wiki engine + seed candidates)
-    6. Daemon mode          (optional; if accepted → host/port + a channel
+    5. Daemon mode          (optional; if accepted → host/port + a channel
                              via the shared registry-driven flow; else skipped)
-    7. Recap                (always shown)
+    6. Recap                (always shown)
+
+The old "wiki seed" step (bulk-copy README/docs into sources/seed/) was removed:
+content enters the wiki only via content-aware `veles add`, which distils each
+source into topical pages and relocates the raw — a blind bulk copy just made a
+redundant, unstructured pile.
 """
 
 from __future__ import annotations
@@ -23,7 +27,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from shutil import copyfile
 
 from veles.core.i18n import t
 from veles.core.project import Project, ProjectAlreadyExists, init_project, load_project
@@ -349,48 +352,7 @@ def _detect_context_file_conflicts(root: Path) -> list[str]:
     return real_files if len(real_files) >= 2 else []
 
 
-# ---------------- Step 4: Wiki seed ----------------
-
-
-@dataclass
-class WikiSeedStep:
-    cwd: Path
-    name: str = "wiki_seed"
-    title: str = "Seed wiki/sources/"
-
-    async def run(self, ctx: WizardContext) -> WizardOutcome:
-        from veles.core.layout.engines import wiki_enabled
-
-        project: Project | None = ctx.answers.get("project")
-        if project is None or not wiki_enabled(project):
-            # M162: seeding sources/ only makes sense for wiki layouts.
-            ctx.answers["wiki_seed_count"] = 0
-            return WizardOutcome.SKIP
-        candidates = _collect_seed_candidates(self.cwd)
-        if not candidates:
-            ctx.answers["wiki_seed_count"] = 0
-            return WizardOutcome.SKIP
-        sample = ", ".join(str(p.relative_to(self.cwd)) for p in candidates[:3])
-        extra = f" (+ {len(candidates) - 3} more)" if len(candidates) > 3 else ""
-        wants = await ctx.app.push_screen_wait(
-            ConfirmScreen(
-                title=self.title,
-                question=t("project_wizard.ask_wiki_seed", sample=sample, extra=extra),
-                default=False,
-            )
-        )
-        nav = _nav(wants)
-        if nav is not None:
-            return nav
-        if not wants:
-            ctx.answers["wiki_seed_count"] = 0
-            return WizardOutcome.SKIP
-        seeded = _copy_seed_files(project, candidates)
-        ctx.answers["wiki_seed_count"] = seeded
-        return WizardOutcome.NEXT
-
-
-# ---------------- Step 5: Daemon mode + channel ----------------
+# ---------------- Step 4: Daemon mode + channel ----------------
 
 
 @dataclass
@@ -512,8 +474,6 @@ class RecapStep:
             ov = ctx.answers["provider_override"]
             model = ov["model"] or "<inherit-model>"
             lines.append(f"  · provider override: {ov['provider']}/{model}")
-        if ctx.answers.get("wiki_seed_count"):
-            lines.append(f"  · seeded {ctx.answers['wiki_seed_count']} file(s) into wiki/sources/")
         d = ctx.answers.get("daemon")
         if d:
             lines.append(f"  · daemon: {d['host']}:{d['port']}")
@@ -534,58 +494,12 @@ class RecapStep:
         return WizardOutcome.NEXT
 
 
-# ---------------- helpers (re-used from cli/project_wizard.py) ----------------
-
-
-def _collect_seed_candidates(cwd: Path, *, cap: int = 25) -> list[Path]:
-    seen: list[Path] = []
-    readme = cwd / "README.md"
-    if readme.is_file():
-        seen.append(readme)
-    try:
-        for entry in sorted(cwd.glob("*.md")):
-            if entry.is_file() and entry not in seen:
-                seen.append(entry)
-    except OSError:
-        pass
-    docs = cwd / "docs"
-    if docs.is_dir():
-        try:
-            for entry in sorted(docs.rglob("*.md")):
-                if entry.is_file() and entry not in seen:
-                    seen.append(entry)
-        except OSError:
-            pass
-    return seen[:cap]
-
-
-def _copy_seed_files(project: Project, candidates: list[Path]) -> int:
-    Wiki(project.wiki_root).ensure_layout()
-    target_root = project.wiki_root / "sources" / "seed"
-    target_root.mkdir(parents=True, exist_ok=True)
-    count = 0
-    for src in candidates:
-        try:
-            rel = src.relative_to(project.root)
-        except ValueError:
-            rel = Path(src.name)
-        dst = target_root / rel
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            copyfile(src, dst)
-            count += 1
-        except OSError:
-            continue
-    return count
-
-
 def project_wizard_steps(cwd: Path) -> list:
     return [
         LayoutPickerStep(),
         BootstrapStep(cwd=cwd),
         ProviderOverrideStep(),
         NormalizationStep(),
-        WikiSeedStep(cwd=cwd),
         DaemonModeStep(),
         RecapStep(),
     ]
@@ -648,6 +562,5 @@ __all__ = [
     "NormalizationStep",
     "ProviderOverrideStep",
     "RecapStep",
-    "WikiSeedStep",
     "project_wizard_steps",
 ]

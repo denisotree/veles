@@ -75,5 +75,7 @@ variabile d'ambiente.
 
 ## Interne / test
 
-`VELES_BUNDLE_VERSION`, `VELES_CACHE_BREAKPOINT` — interne; non dovresti aver
-bisogno di impostarle.
+| Variabile | Scopo |
+|---|---|
+| `VELES_BUNDLE_VERSION` | Interna; non dovresti aver bisogno di impostarla |
+| `VELES_REPL_SIMPLE` | Imposta a `1` per forzare la REPL semplice basata su righe invece dell'app `prompt_toolkit` a schermo intero (ripiego per terminali limitati) |

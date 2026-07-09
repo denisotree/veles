@@ -50,6 +50,26 @@ def test_dream_advances_state_cursor(project: Project) -> None:
     assert after.last_deep_dream_at == before.last_deep_dream_at  # not deep
 
 
+def test_dream_preserves_curator_failed_attempts(project: Project) -> None:
+    """Live 2026-07-08: `_persist_dream_state` rebuilt CuratorState from
+    scratch and silently wiped `failed_attempts` — so the curator's
+    give-up-after-3 poison-pill guard never fired when the post-turn dream ran
+    in the same pass, and one persistently failing session blocked the
+    curation queue forever. The dream must only touch its own cursors."""
+    from veles.core.curator_state import CuratorState
+    from veles.core.curator_state import save_atomic as save_state
+
+    state_path = project.state_dir / "curator.state.json"
+    save_state(
+        state_path,
+        CuratorState(last_curated_at=111.0, failed_attempts={"sess-1": 2}),
+    )
+    dream_cycle(project, now=1_700_000_000.0)
+    after = load_state(state_path)
+    assert after.failed_attempts == {"sess-1": 2}
+    assert after.last_curated_at == 111.0
+
+
 def test_deep_dream_updates_deep_cursor(project: Project) -> None:
     dream_cycle(
         project,

@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
 _DEFAULT_STALE_DAYS = 365
 _DEFAULT_DUPLICATE_THRESHOLD = 0.6
-_LINKABLE_CATEGORIES = frozenset({"concepts", "entities", "sources", "queries"})
+_LINKABLE_CATEGORIES = frozenset({"concepts", "entities", "queries"})
 _NOISE_CATEGORIES = frozenset({"sessions"})
 
 _DATE_RE = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")

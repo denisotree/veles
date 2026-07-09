@@ -50,6 +50,12 @@ veles [--no-wizard] <command> [subcommand] [options]
 |---|---|---|
 | `--json` | off | একটি JSON রিপোর্ট প্রদান করে |
 | `--strict` | off | যেকোনো ওয়ার্নিং-এ non-zero exit (CI গেটিং) |
+| `--fix` | off | চেক করার আগে নিরাপদ মেরামতের চেষ্টা করে — বর্তমানে একটি ক্ষতিগ্রস্ত memory-recall (FTS) ইনডেক্স পুনর্নির্মাণ করে |
+
+`doctor` `config.toml`-এর নিরাপত্তা-সংশ্লিষ্ট সেকশনগুলোও (`[channels.*]`,
+`[daemon.*]`, `[mcp.servers.*]`) যাচাই করে এবং অজানা কী-কে একটি এরর হিসেবে রিপোর্ট
+করে — `whitelist`-এর জায়গায় `whitlist`-এর মতো একটি টাইপো নীরবে একটি অ্যাক্সেস
+কন্ট্রোল নিষ্ক্রিয় করে দেয়, তাই এখানে এটি জোরালোভাবে ব্যর্থ হয়।
 
 ### `veles export {full,template} <path>`
 প্রজেক্টটিকে একটি `.tar.gz` বান্ডলে প্যাক করে। দেখুন [ব্যাকআপ ও শেয়ার করুন](../how-to/backup-and-share.md)।
@@ -154,13 +160,20 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `dedup [--mode auto\|embedding\|tfidf] [--embedding-threshold f] [--tfidf-threshold f]` | প্রায়-ডুপ্লিকেট skills খুঁজে বের করে |
 | `suggest-promote [--save] [--min-uses n] [--min-success-rate f]` | অটো-প্রোমোট মানদণ্ড পূরণ করা skills তালিকাভুক্ত করে |
 
-### `veles tool {list,show,promote}`
+### `veles tool {list,show,promote,approve}`
 
 | সাবকমান্ড | উদ্দেশ্য |
 |---|---|
 | `list` | এই প্রজেক্টের `memory.db`-তে ক্যাটালগ করা tools তালিকাভুক্ত করে |
 | `show <name>` | একটি tool-এর ম্যানিফেস্ট + টেলিমেট্রি প্রিন্ট করে |
 | `promote <name> [-y]` | একটি প্রজেক্ট tool `~/.veles/tools/`-এ সরায় (ক্রস-প্রজেক্ট) |
+| `approve [<name>] [--all] [-y]` | একটি সেলফ-অথরড tool ফাইল রিভিউ + অনুমোদন করে যাতে লোডার এটি চালায় |
+
+সেলফ-অথরড tools (`.veles/tools/*.py`) লোডার ইমপোর্ট করার সময় তাদের মডিউল-লেভেল
+কোড চালায়, তাই একটি নতুন বা সম্পাদিত ফাইল **আপনি অনুমোদন না করা পর্যন্ত লোড হয়
+না** — `veles tool approve` কোডটি দেখায় এবং এর হ্যাশ রেকর্ড করে। শুধু
+`veles tool approve` কী কী পেন্ডিং আছে তা তালিকাভুক্ত করে। এই কারণেই একটি
+এজেন্ট-লিখিত tool কলযোগ্য হওয়ার আগে একটি রিভিউ ধাপ প্রয়োজন।
 
 ### `veles module {list,show,add,remove}`
 

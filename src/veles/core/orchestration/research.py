@@ -155,6 +155,23 @@ def make_llm_planner(
     return _plan
 
 
+def make_factory_planner(
+    factory, *, max_subquestions: int = _DEFAULT_MAX_SUBQUESTIONS
+) -> Callable[[str], list[str]]:
+    """Planner built from a `SubagentFactory` (M204) — for the `research` TOOL
+    and the daemon's structured research job, which hold a factory rather than
+    a raw provider. `factory(system_prompt=…, tools=[])` yields a tool-less
+    planner agent; parsing mirrors `make_llm_planner` (defensive, [] on
+    failure → single-explorer fallback)."""
+
+    def _plan(question: str) -> list[str]:
+        agent = factory(system_prompt=_PLANNER_SYSTEM, tools=[])
+        result = agent.run(f"Research question: {question}")
+        return parse_subquestions(result.text, max_subquestions)
+
+    return _plan
+
+
 def parse_subquestions(text: str | None, cap: int) -> list[str]:
     """Pull research angles out of a planner response: a JSON array if present,
     else non-empty lines with list bullets/numbers stripped. Capped at `cap`."""
@@ -181,6 +198,7 @@ def parse_subquestions(text: str | None, cap: int) -> list[str]:
 __all__ = [
     "RESEARCH_EXPLORER_TOOLS",
     "build_research_plan",
+    "make_factory_planner",
     "make_llm_planner",
     "parse_subquestions",
     "run_deep_research",

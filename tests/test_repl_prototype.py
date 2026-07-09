@@ -730,6 +730,13 @@ def test_kitty_sequences_remap_and_binding(tmp_path) -> None:
     assert aes.ANSI_SEQUENCES["\x1b[99;5u"] == Keys.ControlC  # Ctrl+C (== legacy)
     assert aes.ANSI_SEQUENCES["\x1b[97;5u"] == Keys.ControlA  # Ctrl+A → line-home
     assert aes.ANSI_SEQUENCES["\x1b[106;5u"] == Keys.ControlJ  # Ctrl+J → newline
+    # Cyrillic (JCUKEN) layout: Ctrl+<letter> reports the Cyrillic codepoint.
+    # Map by physical key so Ctrl+C (es = U+0441 = 1089, physical C key) acts as
+    # Ctrl+C instead of printing the raw `[1089;5u` into the input.
+    assert aes.ANSI_SEQUENCES["\x1b[1089;5u"] == Keys.ControlC  # Ctrl + es (physical C)
+    assert aes.ANSI_SEQUENCES[f"\x1b[{0x43C};5u"] == Keys.ControlV  # Ctrl + em (physical V)
+    assert aes.ANSI_SEQUENCES[f"\x1b[{0x444};5u"] == Keys.ControlA  # Ctrl + ef (physical A)
+    assert aes.ANSI_SEQUENCES[f"\x1b[{0x421};5u"] == Keys.ControlC  # uppercase Es (Caps/Shift)
 
     app, store = _build_app(tmp_path)
     try:

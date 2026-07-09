@@ -120,6 +120,18 @@ class Registry:
         first, then re-enters the path-2 / path-3 decision.
         """
         entry = self.get(name)
+        # `decode_tool_args` wraps undecodable argument payloads as
+        # `{"_raw": <string>}` (M151). Its contract is "surface to the model,
+        # never crash" — calling `handler(**{"_raw": …})` would raise
+        # TypeError on every tool. Return a readable error the model can
+        # react to (re-issue the call with valid JSON).
+        if "_raw" in arguments:
+            snippet = str(arguments["_raw"])[:200]
+            return (
+                f"<error: the arguments for {name} were not valid JSON — "
+                f"re-issue the call with a single well-formed JSON object. "
+                f"Received: {snippet!r}>"
+            )
         if entry.is_async:
             raw = asyncio.run(entry.handler(**arguments))
         else:
@@ -167,8 +179,11 @@ def tool(
                          `sensitive` is left unset, `sensitive` is derived
                          from the class (`is_sensitive_class`).
       side_effects     — free-form labels: e.g. ["filesystem", "network"].
-      timeout_s        — soft per-call budget (enforced at dispatch site
-                         once M64 lands).
+      timeout_s        — advisory per-call budget. NOT enforced for builtin
+                         tools (audit 2026-07-08: no dispatch-site reader
+                         exists); only the MCP client applies its own call
+                         budgets. A deliberately long tool (e.g. `wiki_add`
+                         batch ingest) is therefore never timeout-killed.
       max_result_chars — visible-payload cap. Excess lands in an artifact.
 
     Legacy `sensitive=True` keeps working — it's still the gate for the

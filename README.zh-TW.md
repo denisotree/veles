@@ -26,7 +26,7 @@
 **一個極簡的 CLI 代理框架，每次工作階段都讓它變得更聰明。**
 
 <p align="center">
-  <img src="docs/assets/tui-hero.gif" alt="Veles TUI — 提出一個問題，獲得一個立基於專案自身記憶的回答" width="800">
+  <img src="docs/assets/tui-hero.gif" alt="Veles REPL — 提出一個問題，獲得一個立基於專案自身記憶的回答" width="800">
 </p>
 
 不同於每次都從零開始的聊天工具，Veles 維護著**結構化的專案記憶**——洞見、規則與精心整理的知識會跨工作階段不斷累積，讓代理使用得越久就越有用。你的*內容*如何組織是可插拔的：預設採用 Karpathy 風格的 LLM wiki、扁平筆記，或對於程式碼儲存庫完全不施加任何結構。架構乾淨：沒有巨型檔案、沒有供應商鎖定、沒有雲端同步。
@@ -34,7 +34,7 @@
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles        # interactive REPL (bare `veles` == `veles tui`)
+veles        # interactive REPL (bare `veles` with no subcommand)
 ```
 
 ---
@@ -79,13 +79,13 @@ veles init
 veles run "Read AGENTS.md and describe this project."
 ```
 
-改為開啟互動式 TUI（直接執行 `veles` 效果相同）：
+改為開啟互動式 REPL（直接執行 `veles` 效果相同）：
 
 ```bash
 veles
 ```
 
-第一次執行時，設定精靈會詢問你偏好的語言、供應商與專案名稱。
+第一次執行時，設定精靈會引導你依序設定語言、LLM 供應商、API 金鑰、預設模型、配色主題，以及是否在目前目錄中初始化專案。
 
 ---
 
@@ -217,11 +217,11 @@ veles module list
 
 ---
 
-## TUI
+## 互動式工作階段（REPL）
 
 ```bash
-veles                        # new session (bare `veles` launches the TUI)
-veles tui --resume <id>      # continue a session
+veles                        # new session (bare `veles` launches the interactive REPL)
+veles --resume <id>      # continue a session
 ```
 
 <p align="center">
@@ -322,15 +322,20 @@ veles import ./backup.tar.gz --into ./new-dir
 |---|---|
 | `veles init [name]` | 建立新專案 |
 | `veles run "<prompt>"` | 單回合代理執行 |
-| `veles tui` | 互動式 TUI REPL |
-| `veles add <file\|url>` | 攝取一個來源 → wiki 頁面 |
+| `veles` | 互動式 REPL |
+| `veles add <file\|url>` | 攝取一個來源 → 依主題拆分的 wiki 頁面 |
+| `veles organize` | 依目前佈局重新組織專案內容（先提議後套用）|
 | `veles research "<question>"` | 深度多角度研究 |
 | `veles curate` | 將工作階段整併進 wiki |
 | `veles sessions {list,show,delete,search}` | 工作階段管理 |
-| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | 技能管理 |
-| `veles tool {list,show,promote}` | 工具管理 |
+| `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | 技能管理 |
+| `veles tool {list,show,promote,approve}` | 工具管理（`approve` 用於核准自建工具）|
 | `veles module {list,add,remove}` | 外掛管理 |
+| `veles browse {modules,skills}` | 搜尋精選的模組 / 技能登錄 |
 | `veles route {show,set,reset,refresh}` | 模型路由 |
+| `veles schema {validate,edit}` | 驗證 / 編輯 AGENTS.md |
+| `veles self-doc` | 產生專案自我文件 |
+| `veles layout {sync}` | 佈局包維護 |
 | `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | 長時程目標 |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | 排程工作 |
 | `veles dream` | 背景記憶整併循環 |
@@ -340,7 +345,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles autopilot {enable,disable,status}` | 暫時性信任繞過 |
 | `veles secret {set,get,list,delete}` | 作業系統金鑰圈祕密 |
 | `veles daemon {start,stop,status,list,restart,delete,session,token}` | HTTP/WS 常駐程式 |
-| `veles channel {run,list-sessions,reset-session}` | 外部頻道閘道 |
+| `veles channel {list,run,list-sessions,reset-session,add,remove}` | 外部頻道閘道 |
 | `veles mcp {list,test}` | 外部 MCP 伺服器 |
 | `veles models <provider>` | 列出供應商模型 |
 | `veles doctor` | 健康檢查 |

@@ -347,12 +347,44 @@ def test_daemon_picker_runs_with_mouse_disabled(
             captured["args"] = args
             captured["kwargs"] = kwargs
 
+    import sys as _sys
+
     import veles.tui.screens.daemon_picker as picker_mod
 
+    monkeypatch.setattr(_sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(_sys.stdout, "isatty", lambda: True)
     monkeypatch.setattr(picker_mod, "DaemonPickerApp", _FakeApp)
     rc = daemon_cmd._cmd_daemon_picker(_ns())
     assert rc == 0
     assert captured["kwargs"].get("mouse") is False
+
+
+def test_daemon_picker_non_tty_falls_back_to_list(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """Bare `veles daemon` piped/redirected (non-TTY) must NOT launch the
+    Textual picker — with no real terminal it hangs. Fall back to the plain
+    daemon list. (Regression guard: the M197 revert dropped this guard;
+    restored 2026-07-07.)"""
+    import sys as _sys
+
+    launched = {"picker": False}
+
+    class _Boom:
+        def __init__(self, *a, **k):
+            launched["picker"] = True
+
+        def run(self, *a, **k):
+            launched["picker"] = True
+
+    import veles.tui.screens.daemon_picker as picker_mod
+
+    monkeypatch.setattr(_sys.stdin, "isatty", lambda: False)
+    monkeypatch.setattr(_sys.stdout, "isatty", lambda: False)
+    monkeypatch.setattr(picker_mod, "DaemonPickerApp", _Boom)
+    rc = daemon_cmd._cmd_daemon_picker(_ns())
+    assert launched["picker"] is False  # never launched Textual into a non-tty
+    assert rc == 0
 
 
 # ---------------- M173: host/port cascade + channel offer ----------------
@@ -465,7 +497,62 @@ def _interactive(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(_sys.stdout, "isatty", lambda: True)
 
 
-def test_maybe_offer_channel_runs_wizard_when_accepted(
+def _force_stdin_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the Textual path unavailable so the legacy stdin flow runs."""
+    import veles.tui.wizard.daemon_runner as dr
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("no TUI in tests")
+
+    monkeypatch.setattr(dr, "run_daemon_start_wizard_tui", _boom)
+
+
+def test_start_wizard_prefers_tui_and_applies_bind(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Live 2026-07-09: an interactive `veles daemon start` with no channel
+    configured must run the Textual start wizard (bind + channel steps), not
+    a bare stdin [y/N] prompt — and the host/port the user picked must apply
+    to THIS launch."""
+    import veles.tui.wizard.daemon_runner as dr
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path, name="p")
+    _interactive(monkeypatch)
+    seen: dict[str, object] = {}
+
+    def _fake_tui(project_, *, session, host, port):
+        seen.update(session=session, host=host, port=port)
+        return {"daemon_bind": {"host": "0.0.0.0", "port": 9100}, "channel": None}
+
+    monkeypatch.setattr(dr, "run_daemon_start_wizard_tui", _fake_tui)
+    args = _ns(no_wizard=False, host="127.0.0.1", port=8765)
+    daemon_cmd._maybe_run_start_wizard(args, project, session=None)
+    assert seen == {"session": None, "host": "127.0.0.1", "port": 8765}
+    assert args.host == "0.0.0.0"
+    assert args.port == 9100
+
+
+def test_start_wizard_tui_cancel_keeps_args(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Ctrl+Q in the wizard = start with what we already have, not abort."""
+    import veles.cli.channel_wizard as cw
+    import veles.tui.wizard.daemon_runner as dr
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path, name="p")
+    _interactive(monkeypatch)
+    monkeypatch.setattr(dr, "run_daemon_start_wizard_tui", lambda *a, **k: None)
+    calls: dict[str, object] = {}
+    monkeypatch.setattr(cw, "add_channel", lambda *a, **k: calls.update(called=True))
+    args = _ns(no_wizard=False, host="127.0.0.1", port=8765)
+    daemon_cmd._maybe_run_start_wizard(args, project, session=None)
+    assert args.host == "127.0.0.1" and args.port == 8765
+    assert calls.get("called") is None  # no stdin fallback after a real TUI run
+
+
+def test_start_wizard_falls_back_to_stdin_when_accepted(
     isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     import veles.cli.channel_wizard as cw
@@ -474,6 +561,7 @@ def test_maybe_offer_channel_runs_wizard_when_accepted(
 
     project = init_project(tmp_path, name="p")
     _interactive(monkeypatch)
+    _force_stdin_fallback(monkeypatch)
     monkeypatch.setattr(pw, "_ask_yes_no", lambda *a, **k: True)
     calls: dict[str, object] = {}
     monkeypatch.setattr(
@@ -482,15 +570,16 @@ def test_maybe_offer_channel_runs_wizard_when_accepted(
         lambda project, *, session=None: calls.update(called=True, session=session),
     )
 
-    daemon_cmd._maybe_offer_channel(_ns(no_wizard=False), project, session=None)
+    daemon_cmd._maybe_run_start_wizard(_ns(no_wizard=False), project, session=None)
     assert calls.get("called") is True
     assert calls.get("session") is None
 
 
-def test_maybe_offer_channel_skips_when_channel_exists(
+def test_start_wizard_skips_when_channel_exists(
     isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     import veles.cli.channel_wizard as cw
+    import veles.tui.wizard.daemon_runner as dr
     from veles.cli.channel_wizard import apply_channel
     from veles.core.project import init_project
 
@@ -501,12 +590,15 @@ def test_maybe_offer_channel_skips_when_channel_exists(
     _interactive(monkeypatch)
     calls: dict[str, object] = {}
     monkeypatch.setattr(cw, "add_channel", lambda *a, **k: calls.update(called=True))
+    monkeypatch.setattr(
+        dr, "run_daemon_start_wizard_tui", lambda *a, **k: calls.update(called=True)
+    )
 
-    daemon_cmd._maybe_offer_channel(_ns(no_wizard=False), project, session=None)
-    assert calls.get("called") is None  # a channel already exists → no offer
+    daemon_cmd._maybe_run_start_wizard(_ns(no_wizard=False), project, session=None)
+    assert calls.get("called") is None  # a channel already exists → no wizard at all
 
 
-def test_maybe_offer_channel_skips_when_declined(
+def test_start_wizard_stdin_fallback_skips_when_declined(
     isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     import veles.cli.channel_wizard as cw
@@ -515,15 +607,16 @@ def test_maybe_offer_channel_skips_when_declined(
 
     project = init_project(tmp_path, name="p")
     _interactive(monkeypatch)
+    _force_stdin_fallback(monkeypatch)
     monkeypatch.setattr(pw, "_ask_yes_no", lambda *a, **k: False)
     calls: dict[str, object] = {}
     monkeypatch.setattr(cw, "add_channel", lambda *a, **k: calls.update(called=True))
 
-    daemon_cmd._maybe_offer_channel(_ns(no_wizard=False), project, session=None)
+    daemon_cmd._maybe_run_start_wizard(_ns(no_wizard=False), project, session=None)
     assert calls.get("called") is None
 
 
-def test_maybe_offer_channel_skips_when_no_wizard(
+def test_start_wizard_skips_when_no_wizard(
     isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     import veles.cli.channel_wizard as cw
@@ -534,5 +627,5 @@ def test_maybe_offer_channel_skips_when_no_wizard(
     calls: dict[str, object] = {}
     monkeypatch.setattr(cw, "add_channel", lambda *a, **k: calls.update(called=True))
 
-    daemon_cmd._maybe_offer_channel(_ns(no_wizard=True), project, session=None)
+    daemon_cmd._maybe_run_start_wizard(_ns(no_wizard=True), project, session=None)
     assert calls.get("called") is None

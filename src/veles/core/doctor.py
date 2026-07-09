@@ -118,7 +118,7 @@ def _check_user_home() -> CheckResult:
             status="info",
             message=f"{home} not created yet (first-run wizard will set it up)",
             fix_hint=(
-                "run `veles tui` to trigger the first-run wizard, or `veles init` inside a project"
+                "run bare `veles` to trigger the first-run wizard, or `veles init` inside a project"
             ),
         )
     if not os.access(home, os.W_OK):
@@ -175,6 +175,76 @@ def _check_provider_keys() -> CheckResult:
         status="ok",
         message=f"keys present for: {', '.join(present)}",
         details={"providers": present},
+    )
+
+
+def _check_memory_fts(project: Project | None) -> CheckResult:
+    """M193: verify the project's recall FTS index is queryable. A broken index
+    makes memory recall silently empty (the failure this milestone targets)."""
+    if project is None:
+        return CheckResult(name="memory_fts", status="info", message="no active project")
+    db = project.memory_db_path
+    if not db.exists():
+        return CheckResult(
+            name="memory_fts", status="info", message="no memory.db yet (nothing to index)"
+        )
+    from veles.core.memory import SessionStore
+
+    store = SessionStore(db)
+    try:
+        ok = store.fts_ok()
+    finally:
+        store.close()
+    if ok:
+        return CheckResult(name="memory_fts", status="ok", message="recall FTS index healthy")
+    return CheckResult(
+        name="memory_fts",
+        status="error",
+        message="recall FTS index is broken — memory recall is silently returning nothing",
+        fix_hint="run `veles doctor --fix` to rebuild the index",
+    )
+
+
+def repair_memory_fts(project: Project | None) -> bool:
+    """M193: rebuild the project's recall FTS index. Returns True when a repair
+    ran (the index is healthy afterwards), False when there's nothing to do."""
+    if project is None or not project.memory_db_path.exists():
+        return False
+    from veles.core.memory import SessionStore
+
+    store = SessionStore(project.memory_db_path)
+    try:
+        store.rebuild_fts()
+        return store.fts_ok()
+    finally:
+        store.close()
+
+
+def _check_config_schema(project: Project | None) -> CheckResult:
+    """M201: flag unknown keys in security-relevant config.toml sections — a
+    typo (`whitlist` for `whitelist`) silently disables an access control."""
+    if project is None:
+        return CheckResult(name="config_schema", status="info", message="no active project")
+    from veles.core.config_schema import validate_config
+    from veles.core.project_config import load_project_config
+
+    try:
+        findings = validate_config(load_project_config(project))
+    except Exception as exc:
+        return CheckResult(
+            name="config_schema", status="warn", message=f"could not validate config: {exc}"
+        )
+    if not findings:
+        return CheckResult(
+            name="config_schema", status="ok", message="security config keys recognised"
+        )
+    detail = "; ".join(f"[{f.section}] unknown key {f.key!r}" for f in findings[:5])
+    return CheckResult(
+        name="config_schema",
+        status="error",
+        message=f"unknown config keys (likely typos, silently ignored): {detail}",
+        fix_hint="a typo in a security section (e.g. 'whitlist' → 'whitelist') disables the "
+        "control — correct or remove the key",
     )
 
 
@@ -460,6 +530,8 @@ def run_all(project: Project | None) -> DoctorReport:
     ]
     project_aware: list[Callable[[Project | None], CheckResult]] = [
         _check_active_project,
+        _check_config_schema,
+        _check_memory_fts,
         _check_agents_md,
         _check_agents_md_identity,
         _check_registry_paths,

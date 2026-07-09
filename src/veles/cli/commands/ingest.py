@@ -8,37 +8,61 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from veles.core.layout.engines import wiki_enabled
 from veles.core.project import Project
-from veles.modules.wiki.ingest import INGEST_SYSTEM_PROMPT, ingest_user_message
+
+if TYPE_CHECKING:
+    from veles.core.provider import Provider
+from veles.modules.wiki.ingest import ingest_user_message
 from veles.modules.wiki.wiki import Wiki
 
+# Fallback only for the (unreachable-in-practice) case where the run prompt
+# assembles empty — `veles add` is gated on `wiki_enabled`, and the run prompt
+# always carries at least the identity header, so this is a belt-and-braces
+# guard. It still states the content-aware contract, never a 1:1 dump.
+_INGEST_FALLBACK_PROMPT = (
+    "You are the Veles ingest agent. Read the source the user names, extract the"
+    " distinct topics it is about, and for each topic find an existing wiki page"
+    " by meaning (wiki_search) — patch it if found, otherwise create a topical"
+    " page (wiki_write_page). A page's identity is the TOPIC, never the filename"
+    " or a date. Relocate a raw file source into top-level sources/ with"
+    " move_file, and wiki_append_log one line per page touched."
+)
 
-def _batch_ingest_files(root: Path, pattern: str) -> list[Path]:
-    """Files under `root` matching `pattern`, skipping dot-dirs (.git/.veles/…).
 
-    Sorted for deterministic ordering. A dotfile or any path with a
-    dot-prefixed component is skipped so we never ingest VCS internals or
-    Veles' own state tree.
-    """
-    out: list[Path] = []
-    for p in sorted(root.rglob(pattern)):
-        if not p.is_file():
-            continue
-        if any(part.startswith(".") for part in p.relative_to(root).parts):
-            continue
-        out.append(p)
-    return out
+def ingest_system_prompt(
+    project: Project,
+    provider: Provider,
+    tools: tuple[str, ...],
+) -> str:
+    """Content-aware ingest system prompt (M203).
+
+    Routes `veles add` through `build_run_system_prompt` so the llm-wiki layout
+    behaviour (topic extraction → find-or-create-or-patch, M190/M203) is
+    injected — the same prompt a `veles run` migration turn gets — instead of
+    the retired single-page `INGEST_SYSTEM_PROMPT`. The result is qualified for
+    the provider's MCP tool namespace (claude-cli/gemini-cli)."""
+    from veles.cli import _qualify_for_provider
+    from veles.cli._runtime import build_run_system_prompt
+
+    base = build_run_system_prompt(project, prompt="ingest a source into the wiki")
+    if not base:
+        base = _INGEST_FALLBACK_PROMPT
+    return _qualify_for_provider(base, provider, tools)
 
 
 def _run_batch_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) -> int:
     """Recursive `veles add <dir> --recursive [--glob PATTERN]`.
 
-    Iterates each matching file through the single-source runner. Keeps every
-    ingest a separate agent task (no cross-file context); this is just the
-    fan-out loop the single-source command never had.
+    M204: the sequential loop lives in the module kernel
+    (`modules/wiki/ingest.py::run_batch_ingest` — see its docstring for the
+    strictly-sequential M203 dedup invariant); this CLI wrapper only supplies
+    `spawn_one` = the single-source top-level runner, plus stderr progress.
     """
+    from veles.modules.wiki.ingest import IngestOutcome, batch_ingest_files, run_batch_ingest
+
     root = Path(source)
     if not root.is_dir():
         print(
@@ -47,20 +71,28 @@ def _run_batch_ingest_cli(args: argparse.Namespace, project: Project, *, source:
         )
         return 2
     pattern = getattr(args, "glob", "*") or "*"
-    files = _batch_ingest_files(root, pattern)
+    files = batch_ingest_files(root, pattern)
     if not files:
         print(f"no files under {source!r} match {pattern!r}; nothing to add.", file=sys.stderr)
         return 0
     print(f"batch add: {len(files)} file(s) under {source!r} matching {pattern!r}", file=sys.stderr)
-    failures = 0
-    for i, path in enumerate(files, 1):
-        print(f"[{i}/{len(files)}] {path}", file=sys.stderr)
-        if _run_ingest_cli(args, project, source=str(path)) != 0:
-            failures += 1
-    if failures:
-        print(f"batch add finished with {failures}/{len(files)} failure(s).", file=sys.stderr)
+
+    def spawn_one(path: Path) -> IngestOutcome:
+        rc = _run_ingest_cli(args, project, source=str(path))
+        return IngestOutcome(source=str(path), ok=rc == 0, detail=f"exit code {rc}" if rc else "")
+
+    result = run_batch_ingest(
+        files,
+        spawn_one=spawn_one,
+        on_progress=lambda i, total, path: print(f"[{i}/{total}] {path}", file=sys.stderr),
+    )
+    if result.failures:
+        print(
+            f"batch add finished with {len(result.failures)}/{result.total} failure(s).",
+            file=sys.stderr,
+        )
         return 1
-    print(f"batch add finished: {len(files)} file(s) ingested.", file=sys.stderr)
+    print(f"batch add finished: {result.total} file(s) ingested.", file=sys.stderr)
     return 0
 
 
@@ -71,7 +103,6 @@ def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) 
         _PROVIDER_API_KEY_ENVS,
         _ensure_api_key,
         _print_run_summary,
-        _qualify_for_provider,
         _run_agent_streaming_aware,
         _warn_if_agents_md_invalid,
         build_command_agent,
@@ -102,14 +133,20 @@ def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) 
         args,
         project,
         tools=_INGEST_TOOLS,
-        system_prompt=lambda provider: _qualify_for_provider(
-            INGEST_SYSTEM_PROMPT, provider, _INGEST_TOOLS
-        ),
+        system_prompt=lambda provider: ingest_system_prompt(project, provider, _INGEST_TOOLS),
         check_api_key=False,
         tool_aware=True,
     )
-    result, budget = _run_agent_streaming_aware(
-        agent, ingest_user_message(source), args, project=project
-    )
+    # B1 (2026-07-07 audit): the ingest toolset has no `fetch_url` — ingested
+    # content is untrusted and must not be able to open an egress channel. A URL
+    # source is fetched HERE (fetch_url wraps the body untrusted) and handed to
+    # the agent inline; a local file the agent reads itself.
+    if source.startswith(("http://", "https://")):
+        from veles.core.tools.builtin.fetch_url import fetch_url
+
+        user_msg = ingest_user_message(source, content=fetch_url(source))
+    else:
+        user_msg = ingest_user_message(source)
+    result, budget = _run_agent_streaming_aware(agent, user_msg, args, project=project)
     _print_run_summary(args, result, budget)
     return 0 if result.stopped_reason == "completed" else 1

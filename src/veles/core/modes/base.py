@@ -31,7 +31,10 @@ if TYPE_CHECKING:
     from veles.core.session_state import AppState
 
 
-AgentFactory = Callable[["AppState"], "Agent"]
+# The per-turn Agent factory. Callable with the AppState plus optional
+# keyword args (`mode_override`, `extra_system`, and M191's recall `query`);
+# typed permissively because concrete factories accept different kwargs.
+AgentFactory = Callable[..., "Agent"]
 PostFn = Callable[[Any], None]
 TextSink = Callable[[str], None]
 EventSink = Callable[["Event"], None]

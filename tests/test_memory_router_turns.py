@@ -78,7 +78,15 @@ def test_recall_interleaves_wiki_and_turns(
 
 
 def test_recall_skips_old_turns(project: Project) -> None:
-    """Default 30-day cutoff should bury ancient turn hits."""
+    """Default 30-day cutoff should bury ancient turn hits — once curation has
+    run. (M193: the window only applies after the first curator/dream pass; an
+    un-curated project keeps all turns since they're the only memory.)"""
+    from veles.core.curator_state import CuratorState, save_atomic
+
+    save_atomic(
+        project.state_dir / "curator.state.json",
+        CuratorState(last_curated_at=time.time(), sessions_curated_total=1),
+    )
     store = SessionStore(project.memory_db_path)
     try:
         sid = store.create_session()

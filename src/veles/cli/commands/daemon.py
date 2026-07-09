@@ -41,6 +41,7 @@ working. New code should import from the canonical modules.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import signal
@@ -130,6 +131,26 @@ def cmd_daemon(args: argparse.Namespace) -> int:
 # ---- start / stop / status ----
 
 
+def _warn_on_security_config_typos(project) -> None:
+    """M201: before the daemon serves unattended, loudly flag unknown keys in
+    security-relevant config sections — a typo (`whitlist` → `whitelist`)
+    silently disables an access control (e.g. leaves a channel open to all)."""
+    try:
+        from veles.core.config_schema import validate_config
+        from veles.core.project_config import load_project_config
+
+        findings = validate_config(load_project_config(project))
+    except Exception:
+        return
+    for f in findings:
+        print(
+            f"WARNING: config [{f.section}] has unknown key {f.key!r} — likely a typo, "
+            f"silently ignored. Known keys: {', '.join(f.known)}. "
+            "Fix before serving, or a security control may be disabled.",
+            file=sys.stderr,
+        )
+
+
 def _cmd_daemon_start(args: argparse.Namespace) -> int:
     from veles.cli import _ensure_api_key, _resolve_active_project
     from veles.core.memory import SessionStore
@@ -158,6 +179,8 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
+
+    _warn_on_security_config_typos(project)
 
     # Named daemon session (M135): must already be declared (config block or
     # runtime_sessions row). Its `[daemon.<name>]` block is the declarative
@@ -209,13 +232,14 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     # continuous curator on `args.provider`; a bare None silently disables it.
     args.provider = provider_name
 
-    # M173: in an already-initialised project with no channel configured, offer
-    # to connect one before we detach. The fresh-project path already offers a
-    # channel inside the wizard; this closes the gap for `daemon start` on an
-    # existing project. Parent only — the detached child re-enters with
-    # `--foreground` and must not re-prompt.
+    # M173/M208: in an already-initialised project with no channel configured,
+    # run the Textual start wizard (bind + channel) before we detach. The
+    # fresh-project path already offers a channel inside the project wizard;
+    # this closes the gap for `daemon start` on an existing project. Parent
+    # only — the detached child re-enters with `--foreground` and must not
+    # re-prompt.
     if not getattr(args, "foreground", False):
-        _maybe_offer_channel(args, project, session=name)
+        _maybe_run_start_wizard(args, project, session=name)
 
     # M113: detach by default. The child re-enters this function with
     # `--foreground` set and falls through to the real server loop.
@@ -247,7 +271,9 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     state.post_turn_hook = _make_post_turn_hook(args, project)
     state.verify_hook = _make_verify_hook(args, project=project, store=store, daemon_session=name)
     state.worker_agent_factory = worker_agent_factory
-    jobs_store = _attach_background_runners(state, project, agent_factory, provider_name)
+    jobs_store = _attach_background_runners(
+        state, project, agent_factory, provider_name, args=args, store=store
+    )
 
     app = make_app(state)
 
@@ -314,12 +340,17 @@ def _resolve_daemon_bind(args: argparse.Namespace, project, name: str | None) ->
         args.port = int(cfg_port) if cfg_port is not None else 8765
 
 
-def _maybe_offer_channel(args: argparse.Namespace, project, *, session: str | None) -> None:
-    """M173: offer the registry-driven channel wizard when this daemon has no
-    channel configured. Skips silently when non-interactive, opted out
-    (`--no-wizard` / `VELES_NO_WIZARD=1`), or a channel already exists. Shares
-    the `add_channel` flow with `veles channel add` and the TUI picker, so the
-    'pick a type, then configure it' shape is identical everywhere (M172)."""
+def _maybe_run_start_wizard(args: argparse.Namespace, project, *, session: str | None) -> None:
+    """M208: an interactive `daemon start` with no channel configured walks the
+    Textual start wizard — bind (host/port, persisted to the project config)
+    then the registry-driven channel flow, the same modal shape as the project
+    wizard and the daemon picker — instead of a bare stdin `[y/N]` prompt
+    (live 2026-07-09). Host/port picked in the wizard apply to THIS launch.
+
+    Skips silently when non-interactive, opted out (`--no-wizard` /
+    `VELES_NO_WIZARD=1`), or a channel already exists. Falls back to the
+    legacy stdin offer (M173, shared `add_channel` flow) when Textual is
+    unavailable or the TUI fails."""
     if getattr(args, "no_wizard", False) or os.environ.get("VELES_NO_WIZARD") == "1":
         return
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
@@ -333,6 +364,34 @@ def _maybe_offer_channel(args: argparse.Namespace, project, *, session: str | No
     if any(isinstance(v, dict) for v in channels.values()):
         return  # a channel is already configured for this daemon
 
+    host = str(getattr(args, "host", None) or "127.0.0.1")
+    try:
+        port = int(getattr(args, "port", None) or 8765)
+    except (TypeError, ValueError):
+        port = 8765
+    try:
+        from veles.tui.wizard.daemon_runner import run_daemon_start_wizard_tui
+
+        answers = run_daemon_start_wizard_tui(project, session=session, host=host, port=port)
+    except Exception as exc:
+        print(
+            f"warning: daemon start wizard failed ({type(exc).__name__}: {exc}); "
+            "falling back to stdin prompts.",
+            file=sys.stderr,
+        )
+        _offer_channel_stdin(project, session=session)
+        return
+    if not answers:
+        return  # cancelled (Ctrl+Q) → start with what we already have
+    bind = answers.get("daemon_bind")
+    if isinstance(bind, dict):
+        args.host = str(bind.get("host") or args.host)
+        with contextlib.suppress(TypeError, ValueError):
+            args.port = int(bind.get("port") or args.port)
+
+
+def _offer_channel_stdin(project, *, session: str | None) -> None:
+    """Legacy stdin channel offer (M173) — the degraded-terminal fallback."""
     from veles.cli.project_wizard import _ask_yes_no, _default_prompter
 
     if not _ask_yes_no(
@@ -412,6 +471,12 @@ def _cmd_daemon_status(args: argparse.Namespace) -> int:
 
 
 def _cmd_daemon_picker(args: argparse.Namespace) -> int:
+    # Non-TTY (piped / redirected / no controlling terminal): the Textual
+    # picker needs a real terminal or it hangs forever. Fall back to the plain
+    # daemon list instead of launching a full-screen app into nothing.
+    # (Regression guard — the M197 revert dropped this; restored 2026-07-07.)
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return _cmd_daemon_list(args)
     try:
         from veles.tui.screens.daemon_picker import DaemonPickerApp
     except ImportError as exc:

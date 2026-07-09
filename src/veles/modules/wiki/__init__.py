@@ -8,10 +8,10 @@ Submodules:
 - `wiki`   — the `Wiki` store (write/read/search, INDEX/LOG, FTS reindex).
 - `tools`  — the `wiki_*` agent tools (registered when the engine is active).
 - `linter` — wiki lint (orphans / stale / duplicates) used by dream.
-- `ingest` — ingest system prompt + user-message template.
+- `ingest` — ingest user-message template (system prompt is the run prompt, M203).
 """
 
-from veles.modules.wiki.ingest import INGEST_SYSTEM_PROMPT, ingest_user_message
+from veles.modules.wiki.ingest import ingest_user_message
 from veles.modules.wiki.wiki import Wiki, WikiPageInfo
 
-__all__ = ["INGEST_SYSTEM_PROMPT", "Wiki", "WikiPageInfo", "ingest_user_message"]
+__all__ = ["Wiki", "WikiPageInfo", "ingest_user_message"]

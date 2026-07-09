@@ -50,6 +50,12 @@ veles [--no-wizard] <command> [subcommand] [options]
 |---|---|---|
 | `--json` | معطّل | إصدار تقرير بصيغة JSON |
 | `--strict` | معطّل | الخروج برمز غير صفري عند أي تحذير (بوّابة CI) |
+| `--fix` | معطّل | محاولة إصلاحات آمنة قبل الفحص — يعيد حاليًا بناء فهرس استدعاء الذاكرة (FTS) التالف |
+
+كما يتحقّق `doctor` من الأقسام المتعلّقة بالأمان في `config.toml`
+(`[channels.*]` و`[daemon.*]` و`[mcp.servers.*]`) ويُبلِغ عن المفاتيح غير المعروفة
+كخطأ — فخطأ إملائي مثل `whitlist` بدلًا من `whitelist` يُعطِّل عنصر تحكّم في الوصول
+بصمت، لذا يفشل هنا بصوت عالٍ.
 
 ### `veles export {full,template} <path>`
 احزم المشروع في حزمة `.tar.gz`. راجع [النسخ الاحتياطي والمشاركة](../how-to/backup-and-share.md).
@@ -154,13 +160,20 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `dedup [--mode auto\|embedding\|tfidf] [--embedding-threshold f] [--tfidf-threshold f]` | إيجاد المهارات شبه المكرّرة |
 | `suggest-promote [--save] [--min-uses n] [--min-success-rate f]` | سرد المهارات التي تستوفي حدّ الترقية التلقائي |
 
-### `veles tool {list,show,promote}`
+### `veles tool {list,show,promote,approve}`
 
 | الأمر الفرعي | الغرض |
 |---|---|
 | `list` | سرد الأدوات المفهرسة في `memory.db` لهذا المشروع |
 | `show <name>` | طباعة بيان أداة + القياسات عن بُعد |
 | `promote <name> [-y]` | نقل أداة مشروع إلى `~/.veles/tools/` (عبر المشاريع) |
+| `approve [<name>] [--all] [-y]` | مراجعة ملف أداة من تأليف ذاتي والموافقة عليه كي يُشغّله المُحمِّل |
+
+تُشغِّل الأدوات ذاتية التأليف (`.veles/tools/*.py`) شيفرتها على مستوى الوحدة عندما
+يستوردها المُحمِّل، لذا **لا يُحمَّل** ملف جديد أو مُحرَّر **حتى توافق عليه** — يعرض
+`veles tool approve` الشيفرة ويسجّل بصمتها (hash). ويسرد `veles tool approve`
+المجرّد ما هو قيد الانتظار. لهذا تحتاج أداة كتبها وكيل إلى خطوة مراجعة قبل أن
+تصبح قابلة للاستدعاء.
 
 ### `veles module {list,show,add,remove}`
 

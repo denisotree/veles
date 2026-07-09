@@ -68,3 +68,44 @@ def set_cancel_token(token: CancelToken | None) -> Token:
 
 def reset_cancel_token(token: Token) -> None:
     _cancel_token.reset(token)
+
+
+def run_cancellable(fn, cancel, *, poll: float = 0.1):
+    """Run blocking `fn()` but stay responsive to `cancel`.
+
+    The agent loop's cooperative checkpoints only fire *between* iterations, so a
+    single blocking `provider.create_message` (slow model, big context, hung
+    socket) runs to completion before a cancel is noticed — up to the 120s HTTP
+    timeout, ×N parallel workers. Run `fn` on a daemon thread and poll for its
+    result; if `cancel` fires first, raise `TurnCancelled` immediately and leave
+    the thread to die with the process (or when its own I/O timeout trips). We
+    never block on a hung provider call.
+
+    No token (headless / non-interactive) → a plain direct call, no thread.
+    The call's own exception is re-raised in the caller's thread.
+    """
+    if cancel is None:
+        return fn()
+    if cancel.cancelled:
+        raise TurnCancelled
+    import queue as _queue
+
+    box: _queue.Queue = _queue.Queue(maxsize=1)
+
+    def _worker() -> None:
+        try:
+            box.put((True, fn()))
+        except BaseException as exc:  # deliver ANY failure back to the caller thread
+            box.put((False, exc))
+
+    threading.Thread(target=_worker, daemon=True).start()
+    while True:
+        if cancel.cancelled:
+            raise TurnCancelled
+        try:
+            ok, value = box.get(timeout=poll)
+        except _queue.Empty:
+            continue
+        if ok:
+            return value
+        raise value

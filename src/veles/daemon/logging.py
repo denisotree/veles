@@ -24,6 +24,7 @@ import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from veles.core.log_util import DEFAULT_TRUNCATE_CHARS, truncate_for_log
 from veles.daemon.paths import daemon_log_path
 
 _LOGGER_NAMES = (
@@ -36,7 +37,6 @@ _LOGGER_NAMES = (
 
 DEFAULT_MAX_BYTES = 10 * 1024 * 1024  # 10 MiB
 DEFAULT_BACKUP_COUNT = 5
-DEFAULT_TRUNCATE_CHARS = 2000
 DEFAULT_LEVEL = "INFO"
 
 
@@ -79,16 +79,6 @@ def setup_daemon_logging(
             log.addHandler(handler)
         log.setLevel(resolved_level)
     return log_path
-
-
-def truncate_for_log(text: object, cap: int = DEFAULT_TRUNCATE_CHARS) -> str:
-    """Convert `text` to str and elide if over `cap`. The suffix records
-    the original byte count so a reader can spot when an interesting
-    payload was trimmed."""
-    s = str(text) if text is not None else ""
-    if cap <= 0 or len(s) <= cap:
-        return s
-    return f"{s[:cap]}… (truncated, {len(s)} chars total)"
 
 
 __all__ = ["DEFAULT_TRUNCATE_CHARS", "setup_daemon_logging", "truncate_for_log"]

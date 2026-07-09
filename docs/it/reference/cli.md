@@ -53,6 +53,12 @@ attivo. Funziona con o senza un progetto attivo.
 |---|---|---|
 | `--json` | off | Emette un report JSON |
 | `--strict` | off | Esce con codice diverso da zero in presenza di qualsiasi warning (gating CI) |
+| `--fix` | off | Tenta riparazioni sicure prima dei controlli — attualmente ricostruisce un indice di memory-recall (FTS) corrotto |
+
+`doctor` convalida inoltre le sezioni rilevanti per la sicurezza di `config.toml`
+(`[channels.*]`, `[daemon.*]`, `[mcp.servers.*]`) e segnala le chiavi sconosciute
+come errore — un refuso come `whitlist` al posto di `whitelist` disabilita
+silenziosamente un controllo di accesso, perciò qui fallisce in modo esplicito.
 
 ### `veles export {full,template} <path>`
 Impacchetta il progetto in un bundle `.tar.gz`. Vedi [Backup e condivisione](../how-to/backup-and-share.md).
@@ -161,13 +167,21 @@ consolidamento LLM).
 | `dedup [--mode auto\|embedding\|tfidf] [--embedding-threshold f] [--tfidf-threshold f]` | Trova skill quasi duplicate |
 | `suggest-promote [--save] [--min-uses n] [--min-success-rate f]` | Elenca le skill che soddisfano la soglia di auto-promozione |
 
-### `veles tool {list,show,promote}`
+### `veles tool {list,show,promote,approve}`
 
 | Sottocomando | Scopo |
 |---|---|
 | `list` | Elenca i tool catalogati nel `memory.db` di questo progetto |
 | `show <name>` | Stampa il manifest + la telemetria di un tool |
 | `promote <name> [-y]` | Sposta un tool di progetto in `~/.veles/tools/` (cross-progetto) |
+| `approve [<name>] [--all] [-y]` | Revisiona + approva un file di tool auto-scritto affinché il loader lo esegua |
+
+I tool auto-scritti (`.veles/tools/*.py`) eseguono il codice a livello di modulo
+quando il loader li importa, perciò un file nuovo o modificato **non viene
+caricato finché non lo approvi** — `veles tool approve` mostra il codice e ne
+registra l'hash. `veles tool approve` da solo elenca ciò che è in attesa. È per
+questo che un tool scritto dall'agente richiede un passaggio di revisione prima
+di diventare richiamabile.
 
 ### `veles module {list,show,add,remove}`
 

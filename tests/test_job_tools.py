@@ -1,4 +1,4 @@
-"""M167b — job_add / job_list / job_remove tools."""
+"""M167b — job_add / job_list / job_remove tools (module-resident since M204)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from veles.core.context import (
 )
 from veles.core.jobs_store import JobsStore
 from veles.core.project import init_project
-from veles.core.tools.builtin.job_tools import job_add, job_list, job_remove
+from veles.modules.agentops.tools import job_add, job_list, job_remove
 
 
 @pytest.fixture()

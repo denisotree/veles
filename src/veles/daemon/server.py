@@ -267,6 +267,10 @@ async def _handle_create_run(request: web.Request) -> web.Response:
             post_turn_hook=state.post_turn_hook,
             verify_hook=state.verify_hook,
             origin=origin,
+            # M204: sub-agent factory (delegate/wiki_add under the daemon) +
+            # per-session serialization against background-op resume turns.
+            subagent_factory=state.subagent_factory,
+            turn_lock=state.session_lock(session_id) if session_id else None,
         )
     )
     state.run_tasks.add(task)

@@ -26,6 +26,7 @@ tools = [
     "wiki_append_log",
     "wiki_ingest",
     "wiki_rename_page",
+    "wiki_add",
 ]
 
 [builtin]
@@ -71,6 +72,7 @@ tools = [
     "wiki_add_category",
     "wiki_append_log",
     "wiki_ingest",
+    "wiki_add",
     "memory_save_insight",
     "memory_save_rule",
     "memory_query",
@@ -81,20 +83,57 @@ tools = [
     "job_add",
     "job_list",
     "job_remove",
+    "research",
+]
+
+[research]
+# Deep-research explorer surface (M147/M204): read + network + wiki-read ONLY —
+# explorers gather evidence, never mutate state. Mirrors
+# `core/orchestration/research.py::RESEARCH_EXPLORER_TOOLS`; declared here so
+# the daemon's scoped sub-agent factory can cap background research workers
+# declaratively (`_make_scoped_subagent_factory(..., toolset="research")`).
+tools = [
+    "read_file",
+    "search_files",
+    "list_files",
+    "stat_file",
+    "wiki_list_pages",
+    "wiki_read_page",
+    "wiki_search",
+    "fetch_url",
+    "web_search",
+    "pdf_read",
 ]
 
 [ingest]
-# `veles ingest <source>` — read inputs, write wiki pages.
+# `veles add <source>` — content-aware ingestion (M203). Not a 1:1 dump: the
+# agent extracts the topics a source is *about*, finds an existing page by
+# meaning (wiki_search/wiki_read_page via `builtin`), and creates OR patches
+# the topical page — then relocates the raw source. `includes=["builtin"]`
+# supplies the read/search half; the writers below supply create/patch/organize
+# + source disposition + per-topic fan-out (`delegate`).
+#
+# Deliberately SCOPED (M198–M201 blast-radius discipline): no `run_shell`,
+# `delete_file`, `edit_file`, non-wiki `write_file`, or `web_search`. And NO
+# `fetch_url` (B1, 2026-07-07 audit): ingested content is untrusted, so the
+# agent gets NO network-egress tool — an injected `fetch_url(evil)` has no
+# channel. URL sources are pre-fetched by the CLI (wrapped untrusted) and
+# handed to the agent inline; a local file never needs the network.
+includes = ["builtin"]
 tools = [
-    "read_file",
-    "fetch_url",
-    "web_search",
     "pdf_read",
     "image_ocr",
     "image_describe",
     "wiki_write_page",
+    "wiki_add_category",
     "wiki_append_log",
     "wiki_ingest",
+    "wiki_add",
+    "move_file",
+    "make_dir",
+    "delegate",
+    "ask_user",
+    "memory_save_insight",
 ]
 
 [organize]

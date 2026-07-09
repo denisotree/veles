@@ -62,7 +62,12 @@ def _args(**extras):
         compressor_model="default-compressor",
     )
     base.update(extras)
-    return _ns(**base)
+    ns = _ns(**base)
+    # Passing a provider simulates an explicit `--provider` (the parser sets
+    # this marker; resolve_effective_provider keys off it, not the value).
+    if extras.get("provider"):
+        ns._provider_explicit = True
+    return ns
 
 
 def test_factory_uses_config_model_without_state(project, store) -> None:

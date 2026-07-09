@@ -138,6 +138,146 @@ def test_curate_one_session_advances_on_completed(
     store.close()
 
 
+def test_curate_one_session_empty_final_text_counts_as_success_when_persisted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Seen live 2026-07-08 (ollama qwen3.5:9b): a thinking model does ALL the
+    persist work (wiki_write_page + memory_save_insight) and then ends the run
+    with empty final content — reasoning goes to the thinking channel. That
+    run used to be classified failed (stopped_reason='empty'), so the cursor
+    never advanced and the same session was re-curated after every turn,
+    writing duplicate wiki pages forever."""
+    project = init_project(tmp_path, name="t")
+    store = SessionStore(project.memory_db_path)
+    sid = _seed_session(store, n_turns=3, age_sec=120)
+    session = store.get_session(sid)
+    assert session is not None
+
+    def _empty_but_persisted(*a: Any, **kw: Any) -> tuple[RunResult, TokenBudget]:
+        result = RunResult(
+            text="",
+            iterations=4,
+            stopped_reason="empty",
+            invoked_tools=frozenset({"wiki_write_page", "memory_save_insight"}),
+        )
+        return result, TokenBudget(limit=0)
+
+    monkeypatch.setattr("veles.cli._run_agent_streaming_aware", _empty_but_persisted)
+    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _stub_provider())
+    monkeypatch.setattr(
+        "veles.cli._load_skills",
+        lambda project, base, *, provider, model: _empty_registry(),
+    )
+    monkeypatch.setattr("veles.cli._qualify_for_provider", lambda p, *a, **kw: p)
+
+    ok = _curate_one_session(store, session, _make_args(), project)
+    assert ok is True
+    store.close()
+
+
+def test_curate_one_session_uses_own_budget_and_runs_silently(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Live 2026-07-08 (ollama qwen3.5:9b): the curator inherited the caller's
+    per-run token budget (default 100k). Its ~24k-token prompt re-counts
+    against the budget every round, so the pass died with budget_exhausted
+    after 4 rounds — and `<budget exhausted: …>` plus streamed curator prose
+    printed straight into the user's chat. The curator is a system task: it
+    gets its own budget and runs silently."""
+    from veles.core.curator import _CURATE_TOKEN_BUDGET
+
+    project = init_project(tmp_path, name="t")
+    store = SessionStore(project.memory_db_path)
+    sid = _seed_session(store, n_turns=3, age_sec=120)
+    session = store.get_session(sid)
+    assert session is not None
+
+    seen: dict[str, Any] = {}
+
+    def _capture(agent: Any, prompt: str, args: Any, **kw: Any) -> tuple[RunResult, TokenBudget]:
+        seen["max_tokens_total"] = args.max_tokens_total
+        seen["emit_output"] = kw.get("emit_output")
+        return _make_completed()
+
+    monkeypatch.setattr("veles.cli._run_agent_streaming_aware", _capture)
+    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _stub_provider())
+    monkeypatch.setattr(
+        "veles.cli._load_skills",
+        lambda project, base, *, provider, model: _empty_registry(),
+    )
+    monkeypatch.setattr("veles.cli._qualify_for_provider", lambda p, *a, **kw: p)
+
+    caller_args = _make_args(max_tokens_total=100)
+    ok = _curate_one_session(store, session, caller_args, project)
+    assert ok is True
+    assert seen["max_tokens_total"] == _CURATE_TOKEN_BUDGET
+    assert seen["emit_output"] is False
+    # The caller's namespace is untouched — the override lives on a copy.
+    assert caller_args.max_tokens_total == 100
+    store.close()
+
+
+def test_curate_one_session_budget_exhausted_after_persist_counts_as_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If the budget (or any other stop) kills the run AFTER the persist tools
+    ran, the distillation already landed — retrying would only duplicate the
+    wiki page. Success is 'the work persisted', whatever the stop reason."""
+    project = init_project(tmp_path, name="t")
+    store = SessionStore(project.memory_db_path)
+    sid = _seed_session(store, n_turns=2, age_sec=120)
+    session = store.get_session(sid)
+    assert session is not None
+
+    def _exhausted_but_persisted(*a: Any, **kw: Any) -> tuple[RunResult, TokenBudget]:
+        result = RunResult(
+            text="<budget exhausted: 100342/100000 tokens>",
+            iterations=5,
+            stopped_reason="budget_exhausted",
+            invoked_tools=frozenset({"wiki_write_page"}),
+        )
+        return result, TokenBudget(limit=100_000)
+
+    monkeypatch.setattr("veles.cli._run_agent_streaming_aware", _exhausted_but_persisted)
+    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _stub_provider())
+    monkeypatch.setattr(
+        "veles.cli._load_skills",
+        lambda project, base, *, provider, model: _empty_registry(),
+    )
+    monkeypatch.setattr("veles.cli._qualify_for_provider", lambda p, *a, **kw: p)
+
+    ok = _curate_one_session(store, session, _make_args(), project)
+    assert ok is True
+    store.close()
+
+
+def test_curate_one_session_empty_without_persist_tools_still_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An empty run that never called a persist tool distilled nothing —
+    that stays a failure (retry next pass)."""
+    project = init_project(tmp_path, name="t")
+    store = SessionStore(project.memory_db_path)
+    sid = _seed_session(store, n_turns=2, age_sec=120)
+    session = store.get_session(sid)
+    assert session is not None
+
+    def _empty_no_tools(*a: Any, **kw: Any) -> tuple[RunResult, TokenBudget]:
+        return RunResult(text="", iterations=1, stopped_reason="empty"), TokenBudget(limit=0)
+
+    monkeypatch.setattr("veles.cli._run_agent_streaming_aware", _empty_no_tools)
+    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _stub_provider())
+    monkeypatch.setattr(
+        "veles.cli._load_skills",
+        lambda project, base, *, provider, model: _empty_registry(),
+    )
+    monkeypatch.setattr("veles.cli._qualify_for_provider", lambda p, *a, **kw: p)
+
+    ok = _curate_one_session(store, session, _make_args(), project)
+    assert ok is False
+    store.close()
+
+
 def test_curate_one_session_returns_false_on_max_iterations(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -263,6 +403,46 @@ def test_cmd_curate_failure_stops_batch_and_does_not_advance(
     state = load_curator_state(project.state_dir / "curator.state.json")
     # Only the first session counted; cursor advanced to its last_activity_at
     assert state.sessions_curated_total == 1
+
+
+def test_persistently_failing_session_is_skipped_after_three_attempts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Poison-pill guard (live 2026-07-08): one session failing curation forever
+    blocked the whole curator queue — every post-turn pass retried it, failed,
+    and stopped ("<curate (post-turn) failed …; stopping>" on every turn). After
+    3 failed attempts the cursor must advance past it so curation continues."""
+    project = init_project(tmp_path, name="t")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "fake")
+    store = SessionStore(project.memory_db_path)
+    _seed_session(store, n_turns=2, age_sec=200)
+    store.close()
+
+    calls = {"n": 0}
+
+    def always_fail(*_a: Any, **_kw: Any) -> tuple[RunResult, TokenBudget]:
+        calls["n"] += 1
+        return _make_failed()
+
+    monkeypatch.setattr("veles.cli._run_agent_streaming_aware", always_fail)
+    monkeypatch.setattr("veles.cli._make_tool_aware_provider", lambda *a, **kw: _stub_provider())
+    monkeypatch.setattr(
+        "veles.cli._load_skills",
+        lambda project, base, *, provider, model: _empty_registry(),
+    )
+    monkeypatch.setattr("veles.cli._qualify_for_provider", lambda p, *a, **kw: p)
+
+    for _ in range(3):
+        _cmd_curate(_make_args(), project)
+    assert calls["n"] == 3
+
+    state = load_curator_state(project.state_dir / "curator.state.json")
+    assert state.last_curated_at > 0  # cursor advanced PAST the poison session
+    assert state.sessions_curated_total == 0  # skipped, never counted as curated
+
+    # A 4th pass must NOT retry the abandoned session.
+    _cmd_curate(_make_args(), project)
+    assert calls["n"] == 3
 
 
 # ---- helpers ----

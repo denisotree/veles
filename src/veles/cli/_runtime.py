@@ -228,9 +228,9 @@ def build_run_system_prompt(
 
 
 def _build_run_system_prompt(args: argparse.Namespace, project: Project) -> str | None:
-    """Legacy shim — extracts kwargs from `args` and delegates. Kept so
-    plugins / tests that imported the underscored name keep working
-    through one release."""
+    """argparse-Namespace adapter over `build_run_system_prompt` — the live
+    entry the CLI verbs use (`veles run`/tui), pulling the prompt + include
+    flags off `args`. The public kwargs form is `build_run_system_prompt`."""
     return build_run_system_prompt(
         project,
         prompt=getattr(args, "prompt", "") or "",
@@ -531,7 +531,8 @@ def build_compressor(
 
 
 def _build_compressor(args: argparse.Namespace, project: Project, provider: Provider):
-    """Legacy shim — extracts kwargs from `args` and delegates."""
+    """argparse-Namespace adapter over `build_compressor` — the live entry the
+    CLI verbs use, pulling the compressor flags off `args`."""
     return build_compressor(
         project,
         provider,
@@ -573,10 +574,16 @@ def _load_skills(
         # Register the wiki engine's tools lazily — a non-wiki project never
         # imports the wiki module (it lives in modules/, not core; the
         # wiki-extraction refactor, 2026-06-19).
-        import veles.modules.wiki.tools  # noqa: F401
+        import veles.modules.wiki.tools
     else:
         gated = set(_TOOLSETS.get("engine-wiki", ()))
         base_tools = tuple(t for t in base_tools if t not in gated)
+    # M204: agent-ops command tools (job_add/…) are module-resident (the
+    # "tools never live in core" invariant) but UNCONDITIONAL — they are agent
+    # operations present whenever the agent runs, unlike the layout-gated
+    # wiki engine.
+    import veles.modules.agentops.tools  # noqa: F401
+
     # M117b: include layout-pack skills (`ingest`/`query`/`lint` for the
     # default `llm-wiki`) so the runtime agent can call them by name.
     skills = discover_skills(project, include_layout=True, cache_ttl=skills_cache_ttl)
@@ -618,6 +625,14 @@ def _load_skills(
         tool_names = [lt.entry.name for lt in report.loaded]
         for name, scope in report.errors:
             logger.warning("project tool %s failed to load: %s", name, scope)
+        if report.unapproved:
+            names = ", ".join(sorted(p.stem for p in report.unapproved))
+            logger.warning(
+                "%d self-authored tool file(s) not loaded (unapproved): %s — "
+                "review and run `veles tool approve <name>` (or --all) to enable them",
+                len(report.unapproved),
+                names,
+            )
     except Exception as exc:
         logger.warning("project tools unavailable: %s", exc)
 

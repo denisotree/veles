@@ -69,7 +69,8 @@ def test_emits_user_and_assistant_events(tmp_path: Path) -> None:
     agent.run("ping")
     events = read_events(tmp_path / "events.jsonl")
     types = [e["type"] for e in events]
-    assert types == ["user_message", "assistant_message"]
+    # round_usage: real per-round token usage for live HUDs (2026-07-08).
+    assert types == ["user_message", "round_usage", "assistant_message"]
     assert filter_events(events, type_="user_message")[0]["text"] == "ping"
     assert filter_events(events, type_="assistant_message")[0]["text"] == "hi"
 

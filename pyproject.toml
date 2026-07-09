@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "veles-ai"
-version = "0.10.0"
+version = "0.21.0"
 description = "Veles — a minimalist agent framework: clean, decomposed code, compounding per-project memory, and a modular core with optional pluggable modules."
 requires-python = ">=3.13"
 readme = "README.md"
@@ -94,6 +94,15 @@ ignore = ["N818"]  # Veles uses Python-stdlib exception naming (FileNotFoundErro
 # sites carry a targeted noqa instead.
 allowed-confusables = ["–", "×", "❯"]
 
+[tool.ruff.lint.per-file-ignores]
+# `veles.cli.__init__` is a deliberate re-export hub: it re-imports private
+# `_<name>` helpers from sibling modules so internal code (`from veles.cli
+# import _x`, circular-import seam) and tests (`monkeypatch.setattr("veles.cli.
+# _cmd_*", …)`) resolve them via the package root. They are intentionally NOT in
+# `__all__` (public API is the short list there), so F401 "imported but unused"
+# is by design for this file only (S3, 2026-07-07).
+"src/veles/cli/__init__.py" = ["F401"]
+
 [tool.ruff.format]
 docstring-code-format = true
 
@@ -110,6 +119,8 @@ asyncio_mode = "auto"
 python_version = "3.13"
 strict = true
 files = [
+    "src/veles/core/defaults.py",
+    "src/veles/core/log_util.py",
     "src/veles/core/risk.py",
     "src/veles/core/tool_result.py",
     "src/veles/core/trace.py",

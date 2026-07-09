@@ -10,14 +10,17 @@ from __future__ import annotations
 
 import argparse
 
-# Empty by design (M165): no hardcoded fallback model. The effective model is
-# resolved from explicit `--model`, the project `[engine] model`, or the user
-# `default_model`; when none is configured veles raises a clear "model not
-# configured" error instead of silently using a cloud model.
-DEFAULT_MODEL = ""
-DEFAULT_MAX_ITERATIONS = 30
+# DEFAULT_MODEL/DEFAULT_PROVIDER live in veles.core.defaults so core.model_resolver
+# can import them without reaching up into veles.cli (M194); re-exported here so the
+# argparse wiring below and existing `from ..._common import DEFAULT_*` sites keep working.
+from veles.core.defaults import DEFAULT_MODEL, DEFAULT_PROVIDER
+
+# A high runaway backstop, NOT a task budget. A turn may make as many tool calls
+# as the work needs; the real "am I stuck?" stop is the StallGuard (M144, repeats
+# of the same tool-call signature → forced answer round) plus the token budget.
+# 30 used to cut off legitimate long jobs (a big migration) mid-task.
+DEFAULT_MAX_ITERATIONS = 1000
 DEFAULT_MAX_TOKENS_TOTAL = 100_000
-DEFAULT_PROVIDER = "openrouter"
 DEFAULT_COMPRESSOR_MODEL = "anthropic/claude-haiku-4.5"
 DEFAULT_COMPRESS_THRESHOLD_TOKENS = 50_000
 PROVIDER_CHOICES = (
@@ -31,6 +34,20 @@ PROVIDER_CHOICES = (
     "llamacpp",
     "openai-compat",
 )
+
+
+class _ExplicitProviderAction(argparse.Action):
+    """Record that `--provider` was passed on the command line.
+
+    `resolve_effective_provider` keys off `_provider_explicit` (set here) rather
+    than comparing the value to `DEFAULT_PROVIDER`, so `--provider openrouter`
+    (which equals the default) is still honored over a differing config default.
+    Keeping the stored value a plain string (default `DEFAULT_PROVIDER`) means no
+    call site ever sees `None` — zero blast radius (2026-07-07)."""
+
+    def __call__(self, parser, namespace, values, option_string=None):  # type: ignore[override]
+        setattr(namespace, self.dest, values)
+        namespace._provider_explicit = True
 
 
 def add_project_root_flag(p: argparse.ArgumentParser) -> None:
@@ -59,6 +76,7 @@ def add_common_run_flags(p: argparse.ArgumentParser) -> None:
         "--provider",
         choices=PROVIDER_CHOICES,
         default=DEFAULT_PROVIDER,
+        action=_ExplicitProviderAction,
         help=f"LLM provider (default: {DEFAULT_PROVIDER}).",
     )
     p.add_argument(

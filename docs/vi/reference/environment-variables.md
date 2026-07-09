@@ -74,5 +74,7 @@ hệ điều hành (phạm vi default) → biến môi trường.
 
 ## Nội bộ / kiểm thử
 
-`VELES_BUNDLE_VERSION`, `VELES_CACHE_BREAKPOINT` — nội bộ; bạn không cần phải đặt
-các biến này.
+| Biến | Mục đích |
+|---|---|
+| `VELES_BUNDLE_VERSION` | Nội bộ; bạn không cần phải đặt biến này |
+| `VELES_REPL_SIMPLE` | Đặt `1` để bắt buộc dùng vòng lặp REPL đơn giản theo từng dòng thay vì ứng dụng `prompt_toolkit` toàn màn hình (phương án dự phòng cho các terminal hạn chế) |

@@ -120,7 +120,7 @@ def test_wiki_rename_page_moves_and_repairs_links(wiki_project) -> None:
 
     wiki = Wiki(wiki_project.wiki_root)
     wiki.ensure_layout()
-    wiki.write_page(category="sources", slug="old-note", title="Old Note", content="raw")
+    wiki.write_page(category="queries", slug="old-note", title="Old Note", content="raw")
     wiki.write_page(
         category="concepts",
         slug="topic",
@@ -128,10 +128,10 @@ def test_wiki_rename_page_moves_and_repairs_links(wiki_project) -> None:
         content="See [[old-note]] for context.",
     )
 
-    msg = wt.wiki_rename_page("wiki/sources/old-note.md", "concepts", "new-note")
+    msg = wt.wiki_rename_page("wiki/queries/old-note.md", "concepts", "new-note")
     assert "renamed" in msg
     assert (wiki_project.wiki_root / "wiki" / "concepts" / "new-note.md").is_file()
-    assert not (wiki_project.wiki_root / "wiki" / "sources" / "old-note.md").exists()
+    assert not (wiki_project.wiki_root / "wiki" / "queries" / "old-note.md").exists()
     topic = (wiki_project.wiki_root / "wiki" / "concepts" / "topic.md").read_text(encoding="utf-8")
     assert "[[new-note]]" in topic
     assert "[[old-note]]" not in topic
@@ -153,7 +153,8 @@ def test_toolset_membership() -> None:
 
 
 def test_batch_ingest_skips_dot_dirs(tmp_path: Path) -> None:
-    from veles.cli.commands.ingest import _batch_ingest_files
+    # M204: the collector moved to the module kernel (shared by CLI + wiki_add).
+    from veles.modules.wiki.ingest import batch_ingest_files as _batch_ingest_files
 
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs" / "a.md").write_text("a", encoding="utf-8")

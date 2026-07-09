@@ -165,7 +165,7 @@ def require_api_key(
     if hint:
         raise RuntimeError(
             f"no API key configured for provider {provider_name!r}. "
-            f"Set ${hint}, configure it via `veles tui` (wizard) or "
+            f"Set ${hint}, configure it via bare `veles` (first-run wizard) or "
             f"`veles secret add {provider_name}`."
         )
     raise RuntimeError(f"no API key configured for provider {provider_name!r}.")

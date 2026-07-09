@@ -43,6 +43,9 @@ veles [--no-wizard] <command> [subcommand] [options]
 |---|---|---|
 | `--json` | 關閉 | 輸出 JSON 報告 |
 | `--strict` | 關閉 | 出現任何警告即以非零退出（CI 把關） |
+| `--fix` | 關閉 | 在檢查前嘗試安全修復——目前會重建損毀的記憶召回（FTS）索引 |
+
+`doctor` 也會驗證 `config.toml` 中與安全相關的章節（`[channels.*]`、`[daemon.*]`、`[mcp.servers.*]`），並將未知鍵回報為錯誤——像 `whitlist` 這種把 `whitelist` 拼錯的錯字會悄悄停用一項存取控制，因此在此會明確地報錯。
 
 ### `veles export {full,template} <path>`
 將專案打包為 `.tar.gz` 套件。參見[備份與分享](../how-to/backup-and-share.md)。
@@ -140,13 +143,16 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `dedup [--mode auto\|embedding\|tfidf] [--embedding-threshold f] [--tfidf-threshold f]` | 找出近乎重複的技能 |
 | `suggest-promote [--save] [--min-uses n] [--min-success-rate f]` | 列出符合自動晉升門檻的技能 |
 
-### `veles tool {list,show,promote}`
+### `veles tool {list,show,promote,approve}`
 
 | 子命令 | 用途 |
 |---|---|
 | `list` | 列出本專案 `memory.db` 中編目的工具 |
 | `show <name>` | 印出某工具的清單檔＋遙測 |
 | `promote <name> [-y]` | 將專案工具移至 `~/.veles/tools/`（跨專案） |
+| `approve [<name>] [--all] [-y]` | 審閱並核准一個自撰工具檔，使載入器會執行它 |
+
+自撰工具（`.veles/tools/*.py`）在載入器匯入時會執行其模組層級的程式碼，因此**新建或編輯過的檔案在你核准前不會被載入**——`veles tool approve` 會顯示程式碼並記錄其雜湊值。單獨執行 `veles tool approve` 會列出待核准的項目。這就是為什麼代理所撰寫的工具在能被呼叫之前需要一個審閱步驟。
 
 ### `veles module {list,show,add,remove}`
 

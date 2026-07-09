@@ -75,6 +75,10 @@ class InProcessRunBackend:
                 post_turn_hook=self._state.post_turn_hook,
                 verify_hook=self._state.verify_hook,
                 origin=origin,
+                # M204: sub-agent factory (delegate/wiki_add under channels) +
+                # per-session serialization against background-op resume turns.
+                subagent_factory=getattr(self._state, "subagent_factory", None),
+                turn_lock=self._state.session_lock(session_id) if session_id else None,
             )
         )
         self._state.run_tasks.add(task)

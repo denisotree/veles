@@ -16,7 +16,6 @@ from veles.tui.wizard.project_steps import (
     NormalizationStep,
     ProviderOverrideStep,
     RecapStep,
-    WikiSeedStep,
     project_wizard_steps,
 )
 
@@ -152,32 +151,6 @@ async def test_provider_override_skip(tmp_cwd: Path) -> None:
     assert answers["provider_override"] is None
 
 
-# ---------------- Wiki seed ----------------
-
-
-async def test_wiki_seed_no_says_no(tmp_cwd: Path) -> None:
-    """init_project leaves AGENTS.md (+ CLAUDE.md/GEMINI.md symlinks) so
-    candidates is non-empty even on a bare directory. The user picks No
-    on the seed prompt → count stays 0."""
-    steps = [BootstrapStep(cwd=tmp_cwd), WikiSeedStep(cwd=tmp_cwd), RecapStep()]
-    answers = await _drive(steps, ["y", "n", "enter"])
-    assert answers["wiki_seed_count"] == 0
-
-
-async def test_wiki_seed_yes_copies(tmp_cwd: Path) -> None:
-    (tmp_cwd / "README.md").write_text("hi", encoding="utf-8")
-    (tmp_cwd / "DESIGN.md").write_text("design", encoding="utf-8")
-    steps = [BootstrapStep(cwd=tmp_cwd), WikiSeedStep(cwd=tmp_cwd), RecapStep()]
-    answers = await _drive(steps, ["y", "y", "enter"])
-    # README + DESIGN + AGENTS.md (init_project) + CLAUDE.md/GEMINI.md symlinks
-    # all match `*.md`. We don't care about the exact count, but the
-    # two we explicitly created must be present.
-    assert answers["wiki_seed_count"] >= 2
-    project = answers["project"]
-    seeded = {p.name for p in (project.wiki_root / "sources" / "seed").rglob("*.md")}
-    assert {"README.md", "DESIGN.md"}.issubset(seeded)
-
-
 # ---------------- Normalization (M96 stub) ----------------
 
 
@@ -213,7 +186,6 @@ def test_project_wizard_steps_order(tmp_cwd: Path) -> None:
         "bootstrap",
         "provider_override",
         "agents_md_normalization",
-        "wiki_seed",
         "daemon_mode",
         "recap",
     ]

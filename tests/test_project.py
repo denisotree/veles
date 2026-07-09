@@ -65,8 +65,9 @@ def test_init_project_creates_skeleton(tmp_path: Path) -> None:
     # It sits in the root, next to AGENTS.md.
     assert (tmp_path / "wiki" / "concepts").is_dir()
     assert (tmp_path / "wiki" / "entities").is_dir()
-    assert (tmp_path / "wiki" / "sources").is_dir()
     assert (tmp_path / "wiki" / "queries").is_dir()
+    # M203: `sources` is not a wiki page category; raw sources live at root level.
+    assert not (tmp_path / "wiki" / "sources").exists()
     assert (tmp_path / "sources").is_dir()  # raw sources at root level
     assert p.name == "alpha"
     assert p.schema_version == 2

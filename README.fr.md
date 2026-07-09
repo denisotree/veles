@@ -26,7 +26,7 @@
 **Un framework d'agent CLI minimaliste qui devient plus intelligent à chaque session.**
 
 <p align="center">
-  <img src="docs/assets/tui-hero.gif" alt="TUI Veles — posez une question, obtenez une réponse ancrée dans la mémoire propre du projet" width="800">
+  <img src="docs/assets/tui-hero.gif" alt="REPL Veles — posez une question, obtenez une réponse ancrée dans la mémoire propre du projet" width="800">
 </p>
 
 Contrairement aux outils de chat qui repartent de zéro à chaque fois, Veles entretient une **mémoire de projet structurée** — des enseignements, des règles et des connaissances curées qui s'accumulent au fil des sessions et rendent l'agent d'autant plus utile que vous l'utilisez longtemps. La façon dont votre *contenu* est organisé est modulable : un wiki LLM façon Karpathy par défaut, des notes à plat, ou aucune structure du tout pour les dépôts de code. Conçu proprement : pas de fichiers fourre-tout, pas de dépendance à un fournisseur, pas de synchronisation cloud.
@@ -34,7 +34,7 @@ Contrairement aux outils de chat qui repartent de zéro à chaque fois, Veles en
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles        # interactive REPL (bare `veles` == `veles tui`)
+veles        # interactive REPL (just run `veles` with no subcommand)
 ```
 
 ---
@@ -79,13 +79,13 @@ veles init
 veles run "Read AGENTS.md and describe this project."
 ```
 
-Ouvrez plutôt le TUI interactif (le simple `veles` fait la même chose) :
+Ouvrez plutôt le REPL interactif (le simple `veles` fait la même chose) :
 
 ```bash
 veles
 ```
 
-Au premier lancement, un assistant de configuration vous demandera votre langue préférée, votre fournisseur et le nom du projet.
+Au premier lancement, un assistant de configuration vous guide à travers votre langue préférée, votre fournisseur de LLM, votre clé d'API, le modèle par défaut, le thème de couleur et le choix d'initialiser ou non un projet dans le répertoire courant.
 
 ---
 
@@ -217,15 +217,16 @@ veles module list
 
 ---
 
-## TUI
+## Session interactive (REPL)
 
 ```bash
-veles                        # new session (bare `veles` launches the TUI)
-veles tui --resume <id>      # continue a session
+veles                        # new session (bare `veles` launches the interactive REPL)
+veles -c                     # continue the most recent session in this project
+veles --resume <id>          # resume a specific session
 ```
 
 <p align="center">
-  <img src="docs/assets/tui-tour.gif" alt="TUI Veles — inspecteurs en slash (/status, /context), changement de mode et palette de commandes" width="800">
+  <img src="docs/assets/tui-tour.gif" alt="REPL Veles — inspecteurs en slash (/status, /context), changement de mode et palette de commandes" width="800">
 </p>
 
 Les commandes en slash exposent tout en direct — `/status`, `/tokens`, `/context`, `/mode`, `/help` — et `Shift+Tab` fait défiler les modes (auto / planification / écriture / objectif).
@@ -322,15 +323,20 @@ veles import ./backup.tar.gz --into ./new-dir
 |---|---|
 | `veles init [name]` | Créer un nouveau projet |
 | `veles run "<prompt>"` | Exécution d'agent en un seul tour |
-| `veles tui` | REPL TUI interactif |
-| `veles add <file\|url>` | Ingérer une source → page de wiki |
+| `veles` | REPL interactif (sans sous-commande) |
+| `veles add <file\|url>` | Ingérer une source → pages de wiki thématiques |
+| `veles organize` | Réorganiser le contenu du projet selon le layout actif (proposer puis appliquer) |
 | `veles research "<question>"` | Recherche approfondie multi-angles |
 | `veles curate` | Consolider les sessions dans le wiki |
 | `veles sessions {list,show,delete,search}` | Gestion des sessions |
-| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | Gestion des compétences |
-| `veles tool {list,show,promote}` | Gestion des outils |
+| `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | Gestion des compétences |
+| `veles tool {list,show,promote,approve}` | Gestion des outils (`approve` autorise les outils auto-générés) |
 | `veles module {list,add,remove}` | Gestion des plugins |
+| `veles browse {modules,skills}` | Rechercher dans les registres curatés de modules / compétences |
 | `veles route {show,set,reset,refresh}` | Routage de modèles |
+| `veles schema {validate,edit}` | Valider / éditer AGENTS.md |
+| `veles self-doc` | Générer l'auto-documentation du projet |
+| `veles layout {sync}` | Maintenance du layout-pack |
 | `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | Objectifs à long horizon |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | Tâches planifiées |
 | `veles dream` | Cycle de consolidation mémoire en arrière-plan |
@@ -340,7 +346,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles autopilot {enable,disable,status}` | Contournement temporaire de confiance |
 | `veles secret {set,get,list,delete}` | Secrets du trousseau de l'OS |
 | `veles daemon {start,stop,status,list,restart,delete,session,token}` | Démon HTTP/WS |
-| `veles channel {run,list-sessions,reset-session}` | Passerelle de canal externe |
+| `veles channel {list,run,list-sessions,reset-session,add,remove}` | Passerelle de canal externe |
 | `veles mcp {list,test}` | Serveurs MCP externes |
 | `veles models <provider>` | Lister les modèles d'un fournisseur |
 | `veles doctor` | Vérifications de santé |

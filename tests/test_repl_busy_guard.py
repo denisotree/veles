@@ -92,6 +92,42 @@ def _at_handler(app):
     return matches[0].handler
 
 
+# --- HUD honesty: a truncated turn is not "✓ done" ---
+
+
+def _hud_text(app) -> str:
+    return "".join(text for _style, text in app._meta_fragments())
+
+
+def test_hud_marks_completed_turn_done(app) -> None:
+    app.busy = False
+    app.last_stopped_reason = "completed"
+    assert "✓ done" in _hud_text(app)
+
+
+def test_hud_marks_max_iterations_as_incomplete_not_done(app) -> None:
+    """A turn that hit the step limit did NOT finish — the HUD must not show a
+    success checkmark (users read '✓ done' as 'migration complete')."""
+    app.busy = False
+    app.last_stopped_reason = "max_iterations"
+    text = _hud_text(app)
+    assert "✓ done" not in text
+    assert "⚠" in text and "limit" in text.lower()
+
+
+# --- follow-up queue: type + submit a plain prompt while a turn runs ---
+
+
+async def test_plain_prompt_while_busy_is_queued_as_followup(app) -> None:
+    """Even during a background turn, submitting a plain prompt must not be lost
+    — it queues as a follow-up and runs after the current turn (the `_run_chain`
+    loop drains `queue`). This is what keeps the chat usable while it's working."""
+    app.busy = True
+    app.queue = []
+    await app._dispatch("follow up while busy")
+    assert app.queue == ["follow up while busy"]  # queued, not dropped, not run now
+
+
 # --- Fix 1a: `@` file picker forbidden while busy ---
 
 

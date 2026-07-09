@@ -21,6 +21,7 @@ existing rows), bump to 2.
 from __future__ import annotations
 
 import json
+import logging
 import secrets
 import sqlite3
 import time
@@ -30,6 +31,8 @@ from pathlib import Path
 from typing import Any
 
 from veles.core.provider import Message, ToolCall
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -561,7 +564,14 @@ class SessionStore:
         sql = " ".join(sql_parts)
         try:
             rows = self._conn.execute(sql, params).fetchall()
-        except sqlite3.OperationalError:
+        except sqlite3.OperationalError as exc:
+            # M193: don't go silent. A corrupt/missing FTS index looks like
+            # "no memory" otherwise. Degrade to [] (recall must never raise)
+            # but log so `veles doctor` / the user can repair it.
+            logger.warning(
+                "search_turns: FTS unavailable (%s); recall degraded — run `veles doctor --fix`",
+                exc,
+            )
             return []
         return [
             TurnHit(
@@ -595,7 +605,11 @@ class SessionStore:
                 " ORDER BY rank LIMIT ?",
                 (escaped, limit),
             ).fetchall()
-        except sqlite3.OperationalError:
+        except sqlite3.OperationalError as exc:
+            logger.warning(
+                "search_insights: FTS unavailable (%s); recall degraded — run `veles doctor --fix`",
+                exc,
+            )
             return []
         return [
             InsightHit(
@@ -607,6 +621,77 @@ class SessionStore:
             )
             for r in rows
         ]
+
+    def fts_ok(self) -> bool:
+        """M193: probe the FTS shadow indexes. Returns False when a MATCH raises
+        (dropped/corrupt index) — the exact condition under which recall would
+        silently return nothing. Repair with `rebuild_fts`."""
+        probe = '"__healthprobe__"'
+        try:
+            self._conn.execute(
+                "SELECT rowid FROM turns_fts WHERE turns_fts MATCH ? LIMIT 1", (probe,)
+            ).fetchall()
+            self._conn.execute(
+                "SELECT rowid FROM insights_fts WHERE insights_fts MATCH ? LIMIT 1", (probe,)
+            ).fetchall()
+        except sqlite3.OperationalError:
+            return False
+        return True
+
+    def rebuild_fts(self) -> None:
+        """M193: recreate any missing FTS shadow tables/triggers and rebuild each
+        index from its external-content base table. Idempotent — the repair
+        behind `veles doctor --fix`."""
+        self._conn.executescript(_FTS_SCHEMA_SQL)
+        self._conn.executescript(_SCHEMA_V3_SQL)
+        for tbl in ("turns_fts", "insights_fts", "rules_fts"):
+            try:
+                self._conn.execute(f"INSERT INTO {tbl}({tbl}) VALUES('rebuild')")
+            except sqlite3.OperationalError as exc:
+                logger.warning("rebuild_fts: could not rebuild %s (%s)", tbl, exc)
+        self._conn.commit()
+
+    def knn_insights(self, query_vec: list[float], *, limit: int = 5) -> list[InsightHit]:
+        """M192: nearest-neighbour insights by embedding cosine distance.
+
+        Returns `InsightHit`s (rank = cosine distance, lower is nearer) ordered
+        nearest-first, excluding superseded rows — vector recall must hide
+        exactly what `search_insights` hides. Degrades to `[]` on any error."""
+        from veles.core.memory.vector import knn
+
+        try:
+            # Over-fetch: some neighbours may be superseded and filtered out.
+            neighbours = knn(self._conn, query_vec, ref_kind="insight", limit=limit * 3)
+        except sqlite3.OperationalError:
+            return []
+        if not neighbours:
+            return []
+        ids = [h.ref_id for h in neighbours]
+        placeholders = ",".join("?" * len(ids))
+        rows = self._conn.execute(
+            "SELECT id, title, body, COALESCE(last_referenced_at, created_at) AS ts"
+            f" FROM insights WHERE id IN ({placeholders})"
+            " AND id NOT IN (SELECT from_insight_id FROM insight_refs)",
+            ids,
+        ).fetchall()
+        by_id = {int(r["id"]): r for r in rows}
+        out: list[InsightHit] = []
+        for n in neighbours:  # preserve nearest-first order from knn
+            r = by_id.get(n.ref_id)
+            if r is None:
+                continue
+            out.append(
+                InsightHit(
+                    id=int(r["id"]),
+                    title=r["title"] or "",
+                    body=r["body"] or "",
+                    rank=float(n.distance),
+                    ts=float(r["ts"]),
+                )
+            )
+            if len(out) >= limit:
+                break
+        return out
 
     def touch_insights(self, ids: list[int], at: float) -> None:
         """M140: stamp `last_referenced_at` for recalled insights (decay/aging).

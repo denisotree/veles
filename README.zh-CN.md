@@ -26,7 +26,7 @@
 **一个极简的 CLI 智能体框架，每一次会话都让它变得更聪明。**
 
 <p align="center">
-  <img src="docs/assets/tui-hero.gif" alt="Veles TUI —— 提出问题，得到一个基于项目自身内存的答案" width="800">
+  <img src="docs/assets/tui-hero.gif" alt="Veles REPL —— 提出问题，得到一个基于项目自身内存的答案" width="800">
 </p>
 
 与每次都从零开始的聊天工具不同，Veles 维护着**结构化的项目内存**——洞见、规则和经过整理的知识，它们会跨会话不断积累，让你用得越久，智能体越有用。你的*内容*如何组织是可插拔的：默认采用 Karpathy 风格的 LLM wiki，也可以用扁平笔记，或者对代码仓库完全不施加任何结构。代码构建干净：没有巨型文件，没有厂商锁定，没有云端同步。
@@ -34,7 +34,7 @@
 ```bash
 uv tool install veles-ai          # installs the `veles` command
 veles init && veles run "Summarize the project architecture."
-veles        # interactive REPL (bare `veles` == `veles tui`)
+veles        # interactive REPL (just run `veles` with no subcommand)
 ```
 
 ---
@@ -79,13 +79,13 @@ veles init
 veles run "Read AGENTS.md and describe this project."
 ```
 
-或者打开交互式 TUI（直接运行 `veles` 效果相同）：
+或者打开交互式 REPL（直接运行 `veles` 效果相同）：
 
 ```bash
 veles
 ```
 
-首次运行时，设置向导会询问你偏好的语言、提供商以及项目名称。
+首次运行时，设置向导会引导你依次设置语言、LLM 提供商、API 密钥、默认模型、配色主题，以及是否在当前目录中初始化项目。
 
 ---
 
@@ -217,15 +217,16 @@ veles module list
 
 ---
 
-## TUI
+## 交互式会话（REPL）
 
 ```bash
-veles                        # new session (bare `veles` launches the TUI)
-veles tui --resume <id>      # continue a session
+veles                        # new session (bare `veles` launches the interactive REPL)
+veles -c                     # continue the most recent session in this project
+veles --resume <id>          # resume a specific session
 ```
 
 <p align="center">
-  <img src="docs/assets/tui-tour.gif" alt="Veles TUI —— 斜杠检查器（/status、/context）、模式切换以及命令面板" width="800">
+  <img src="docs/assets/tui-tour.gif" alt="Veles REPL —— 斜杠检查器（/status、/context）、模式切换以及命令面板" width="800">
 </p>
 
 斜杠命令实时呈现一切——`/status`、`/tokens`、`/context`、`/mode`、`/help`——而 `Shift+Tab` 则在各模式之间循环（auto / planning / writing / goal）。
@@ -322,15 +323,20 @@ veles import ./backup.tar.gz --into ./new-dir
 |---|---|
 | `veles init [name]` | 创建一个新项目 |
 | `veles run "<prompt>"` | 单轮智能体运行 |
-| `veles tui` | 交互式 TUI REPL |
-| `veles add <file\|url>` | 摄取一个来源 → wiki 页面 |
+| `veles` | 交互式 REPL（无子命令） |
+| `veles add <file\|url>` | 摄取一个来源 → 按主题拆分的 wiki 页面 |
+| `veles organize` | 按当前布局重新组织项目内容（先提议后应用）|
 | `veles research "<question>"` | 多角度深度研究 |
 | `veles curate` | 将会话整合进 wiki |
 | `veles sessions {list,show,delete,search}` | 会话管理 |
-| `veles skill {list,add,remove,promote,demote,dedup,suggest-promote}` | 技能管理 |
-| `veles tool {list,show,promote}` | 工具管理 |
+| `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | 技能管理 |
+| `veles tool {list,show,promote,approve}` | 工具管理（`approve` 用于批准自建工具）|
 | `veles module {list,add,remove}` | 插件管理 |
+| `veles browse {modules,skills}` | 搜索精选的模块 / 技能注册表 |
 | `veles route {show,set,reset,refresh}` | 模型路由 |
+| `veles schema {validate,edit}` | 校验 / 编辑 AGENTS.md |
+| `veles self-doc` | 生成项目自文档 |
+| `veles layout {sync}` | 布局包维护 |
 | `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | 长周期目标 |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | 计划作业 |
 | `veles dream` | 后台内存整合循环 |
@@ -340,7 +346,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles autopilot {enable,disable,status}` | 临时信任旁路 |
 | `veles secret {set,get,list,delete}` | 操作系统钥匙串密钥 |
 | `veles daemon {start,stop,status,list,restart,delete,session,token}` | HTTP/WS 守护进程 |
-| `veles channel {run,list-sessions,reset-session}` | 外部通道网关 |
+| `veles channel {list,run,list-sessions,reset-session,add,remove}` | 外部通道网关 |
 | `veles mcp {list,test}` | 外部 MCP 服务器 |
 | `veles models <provider>` | 列出提供商的模型 |
 | `veles doctor` | 健康检查 |

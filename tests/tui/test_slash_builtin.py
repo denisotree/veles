@@ -79,6 +79,37 @@ def test_clear_resets_session_and_signals_chat_clear(slash_ctx):
     assert slash_ctx.state.last_assistant_text is None
 
 
+def test_clear_resets_token_and_context_counters(slash_ctx):
+    """Live 2026-07-08: after /clear the status bar kept showing the old
+    session's cumulative totals (`tok 4M/108k · ctx 58k · cache 178k`) — a
+    fresh session must start its counters from zero."""
+    st = slash_ctx.state
+    st.session_id = "old"
+    st.tokens_in = 4_000_000
+    st.tokens_out = 108_000
+    st.last_turn_total_tokens = 60_000
+    st.last_prompt_tokens = 58_000
+    st.last_turn_cache_read = 178_000
+    res = _reg().dispatch("/clear", slash_ctx)
+    assert res is not None and res.clear_chat
+    assert st.tokens_in == 0
+    assert st.tokens_out == 0
+    assert st.last_turn_total_tokens == 0
+    assert st.last_prompt_tokens == 0
+    assert st.last_turn_cache_read == 0
+
+
+def test_new_is_an_alias_of_clear(slash_ctx):
+    st = slash_ctx.state
+    st.session_id = "old"
+    st.tokens_in = 123
+    res = _reg().dispatch("/new", slash_ctx)
+    assert res is not None
+    assert res.clear_chat
+    assert st.session_id is None
+    assert st.tokens_in == 0
+
+
 # ---------------- save / history / load / show ----------------
 
 

@@ -20,6 +20,7 @@ import argparse
 import datetime as _dt
 import shutil
 import sys
+from pathlib import Path
 
 from veles.core.memory import SessionStore
 from veles.core.project import Project
@@ -42,8 +43,68 @@ def cmd_tool(args: argparse.Namespace, project: Project) -> int:
         return _cmd_show(args, project)
     if sub == "promote":
         return _cmd_promote(args, project)
+    if sub == "approve":
+        return _cmd_approve(args, project)
     print(f"unknown tool subcommand: {sub!r}", file=sys.stderr)
     return 2
+
+
+# ---------- approve (M199) ----------
+
+
+def _list_tool_py(directory: Path) -> list[Path]:
+    if not directory.is_dir():
+        return []
+    return sorted(
+        p
+        for p in directory.iterdir()
+        if p.is_file() and p.suffix == ".py" and not p.name.startswith("_")
+    )
+
+
+def _cmd_approve(args: argparse.Namespace, project: Project) -> int:
+    """Review and human-approve self-authored tool files so the loader will
+    execute them (M199). Until approved, `.veles/tools/*.py` are skipped — their
+    module-level code never runs. Approval records the file's current SHA-256 in
+    `~/.veles/tool-approvals.json` (outside the agent's write sandbox)."""
+    from veles.core.tools.approvals import approve, is_approved
+
+    candidates = _list_tool_py(project.state_dir / "tools") + _list_tool_py(user_home() / "tools")
+    unapproved = [p for p in candidates if not is_approved(p)]
+    if not unapproved:
+        print("all self-authored tool files are already approved.")
+        return 0
+
+    if getattr(args, "all", False):
+        targets = unapproved
+    elif getattr(args, "name", None):
+        targets = [p for p in unapproved if p.stem == args.name]
+        if not targets:
+            print(f"no unapproved tool file named {args.name!r}.", file=sys.stderr)
+            return 1
+    else:
+        print("unapproved tool files (pass a name or --all to approve):")
+        for p in unapproved:
+            print(f"  {p.stem}  ({p})")
+        return 0
+
+    for f in targets:
+        print(f"\n===== {f} =====")
+        print(f.read_text())
+        print("=" * (len(str(f)) + 12))
+        if not getattr(args, "yes", False):
+            try:
+                resp = (
+                    input(f"Approve '{f.name}' to execute its code at load? [y/N] ").strip().lower()
+                )
+            except EOFError:
+                resp = ""
+            if resp not in {"y", "yes"}:
+                print(f"skipped {f.name}")
+                continue
+        sha = approve(f)
+        print(f"approved {f.name} ({sha[:12]}…)")
+    return 0
 
 
 # ---------- list ----------
@@ -174,6 +235,12 @@ def _cmd_promote(args: argparse.Namespace, project: Project) -> int:
             return 0
 
     shutil.move(str(src), str(dst))
+    # M199: promote is a human action on an already-reviewed tool — carry the
+    # approval to the new path so the user-level loader still runs it (the
+    # approval store is keyed by absolute path, which the move changed).
+    from veles.core.tools.approvals import approve
+
+    approve(dst)
 
     # Update the catalogue. The next load_into_registry call will see
     # the file at the new path and refresh manifest_json; this

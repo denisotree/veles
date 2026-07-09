@@ -8,6 +8,8 @@ assumption rather than blocking, so it is safe in headless and unattended runs.
 
 from __future__ import annotations
 
+import json
+
 from veles.core.risk import RiskClass
 from veles.core.tools.registry import tool
 from veles.core.user_prompt import ask_user_question
@@ -17,6 +19,28 @@ _NO_HUMAN = (
     "best assumption and state the assumption you made, so it can be corrected "
     "later.)"
 )
+
+
+def _coerce_options(options: object) -> list[str] | None:
+    """Normalise `options` into a clean list (or None).
+
+    Weaker models often pass the choices as a JSON STRING —
+    `'["Alpha", "Beta"]'` — rather than a real list; unhandled, the picker
+    iterates the string character by character and renders one glyph per line.
+    Parse a JSON-array string back into a list; wrap a plain string as one
+    option; drop blanks; empty → None."""
+    if options is None:
+        return None
+    if isinstance(options, str):
+        try:
+            parsed = json.loads(options)
+        except (ValueError, TypeError):
+            parsed = None
+        options = parsed if isinstance(parsed, list) else [options]
+    if not isinstance(options, (list, tuple)):
+        return None
+    cleaned = [str(o) for o in options if str(o).strip()]
+    return cleaned or None
 
 
 @tool(risk_class=RiskClass.READ_ONLY, side_effects=[])
@@ -38,7 +62,7 @@ def ask_user(question: str, options: list[str] | None = None) -> str:
     If no interactive user is available the tool returns a notice telling you to
     proceed on your best assumption instead of blocking.
     """
-    answer = ask_user_question(question, options or None)
+    answer = ask_user_question(question, _coerce_options(options))
     if answer is None or not answer.strip():
         return _NO_HUMAN
     return answer

@@ -1,4 +1,4 @@
-Output tour.gif
+Output tui-tour.gif
 
 Set Shell "zsh"
 Set FontSize 18

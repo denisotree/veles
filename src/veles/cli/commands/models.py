@@ -1,8 +1,8 @@
 """`veles models <provider>` — print the model list a provider exposes.
 
-Thin shell wrapper over `tui.screens._model_fetcher.fetch_models`, so the
-same cache + curated-fallback logic the TUI picker uses also powers shell
-scripts (`veles models openrouter | grep claude`).
+Thin shell wrapper over `cli.repl.model_fetcher.fetch_models`, so the
+same cache + curated-fallback logic the REPL model picker uses also powers
+shell scripts (`veles models openrouter | grep claude`).
 """
 
 from __future__ import annotations

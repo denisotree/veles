@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import dataclasses
 import datetime as _dt
 import sys
 import time
@@ -31,6 +32,7 @@ from veles.core.agent import Agent
 from veles.core.curator import (
     _CURATE_CHARS_LIMIT,
     _CURATE_QUIET_WINDOW_SEC,
+    _CURATE_TOKEN_BUDGET,
     _CURATE_TOOLS,
     _CURATE_TURN_LIMIT,
     _CURATOR_IDLE_LIMIT,
@@ -39,7 +41,6 @@ from veles.core.curator import (
     _CuratorPassResult,
     _truncate_session_messages,
 )
-from veles.core.curator_state import CuratorState
 from veles.core.curator_state import load as load_curator_state
 from veles.core.curator_state import save_atomic as save_curator_state
 from veles.core.insight_extractor import make_insight_extractor
@@ -65,6 +66,9 @@ _PROPOSER_STATE_FILE = "proposer.state.json"
 # `.veles/memory/proposals/promote-*.md` mtimes stay stable.
 _PROMOTE_SUGGEST_IDLE_THRESHOLD_SEC = 7 * 24 * 3600
 _PROMOTE_SUGGEST_STATE_FILE = "promote_suggest.state.json"
+# Poison-pill guard: consecutive curation failures before a session is
+# abandoned (cursor advances past it) instead of blocking the queue forever.
+_CURATE_MAX_ATTEMPTS = 3
 
 
 def _run_curator_pass(
@@ -92,6 +96,7 @@ def _run_curator_pass(
 
     next_cursor = state.last_curated_at
     successes = 0
+    failed = dict(state.failed_attempts)
 
     with SessionStore(project.memory_db_path) as store:
         candidates = [
@@ -109,22 +114,48 @@ def _run_curator_pass(
         for session in candidates:
             ok = _curate_one_session(store, session, args, project)
             if not ok:
+                # Poison-pill guard (live 2026-07-08): one persistently failing
+                # session used to block the queue FOREVER — every pass retried
+                # it, failed, and stopped, so nothing behind it ever got
+                # curated. Track consecutive failures; after
+                # `_CURATE_MAX_ATTEMPTS` give up on that session and advance
+                # the cursor past it.
+                attempts = failed.get(session.id, 0) + 1
+                if attempts >= _CURATE_MAX_ATTEMPTS:
+                    print(
+                        f"<curate ({mode_label}) failed for {session.id} "
+                        f"{attempts} times; giving up on it and moving on>",
+                        file=sys.stderr,
+                    )
+                    failed.pop(session.id, None)
+                    next_cursor = session.last_activity_at
+                    continue
+                failed[session.id] = attempts
                 print(
                     f"<curate ({mode_label}) failed for {session.id}; stopping>",
                     file=sys.stderr,
                 )
                 break
+            failed.pop(session.id, None)
             next_cursor = session.last_activity_at
             successes += 1
 
-    if successes > 0:
+    state_changed = (
+        successes > 0 or next_cursor != state.last_curated_at or failed != state.failed_attempts
+    )
+    if state_changed:
+        # dataclasses.replace: keep the dream cursors — rebuilding CuratorState
+        # from scratch here used to silently reset last_*_dream_at every pass.
         save_curator_state(
             state_path,
-            CuratorState(
+            dataclasses.replace(
+                state,
                 last_curated_at=next_cursor,
                 sessions_curated_total=state.sessions_curated_total + successes,
+                failed_attempts=failed,
             ),
         )
+    if successes > 0:
         append_memory_log(
             project,
             op=f"curate-{mode_label}",
@@ -591,15 +622,31 @@ def _curate_one_session(
         system_prompt=system_prompt,
         verbose=args.verbose,
     )
+    # The curator is a system task: it gets its own token budget (the caller's
+    # --max-tokens-total guards the USER'S run — the ~24k-token curate prompt
+    # re-counts every round and blew the 100k default mid-pass, live
+    # 2026-07-08) and runs silently (emit_output=False; its raw result text,
+    # e.g. "<budget exhausted: …>", used to print straight into the chat).
+    curate_args = argparse.Namespace(**vars(args))
+    curate_args.max_tokens_total = _CURATE_TOKEN_BUDGET
     result, budget = _run_agent_streaming_aware(
         agent,
         f"Curate session {session.id}.",
-        args,
+        curate_args,
         project=project,
+        emit_output=False,
     )
     if args.verbose:
-        _print_run_summary(args, result, budget)
-    return result.stopped_reason == "completed"
+        _print_run_summary(curate_args, result, budget)
+    if result.stopped_reason == "completed":
+        return True
+    # Live 2026-07-08 (ollama qwen3.5:9b): a thinking model does all the
+    # persist work and then ends the run with empty final content, or a
+    # budget/iteration stop lands AFTER the page was written. Judging success
+    # by non-empty final prose re-curated the same session after every turn,
+    # duplicating wiki pages forever — the real criterion is "did the
+    # distillation persist", i.e. did a persist tool actually run.
+    return bool({"wiki_write_page", "memory_save_insight"} & result.invoked_tools)
 
 
 _SELF_DOC_IDLE_SEC = 3600  # refresh at most once per hour

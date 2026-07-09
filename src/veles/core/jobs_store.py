@@ -46,7 +46,9 @@ CREATE TABLE IF NOT EXISTS jobs (
     last_run_at         REAL,
     last_status         TEXT,
     last_error          TEXT,
-    last_output_path    TEXT
+    last_output_path    TEXT,
+    kind                TEXT NOT NULL DEFAULT 'prompt',
+    params_json         TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_jobs_due
@@ -68,7 +70,10 @@ CREATE INDEX IF NOT EXISTS idx_job_runs_by_job
     ON job_runs(job_id, started_at DESC);
 """
 
-_JOBS_USER_VERSION = 3
+# v4 (M204): structured job kinds — `kind` ('prompt' | 'ingest' | …) + machine
+# params. A structured job is dispatched by JobRunner straight to a registered
+# kind handler (no LLM turn); 'prompt' jobs behave exactly as before.
+_JOBS_USER_VERSION = 4
 
 
 @dataclass(slots=True)
@@ -89,6 +94,10 @@ class JobRecord:
     last_status: str | None
     last_error: str | None
     last_output_path: str | None
+    # M204: structured kinds. 'prompt' = classic agent.run(prompt); any other
+    # kind is dispatched to a registered handler with `params` (no LLM turn).
+    kind: str = "prompt"
+    params: dict | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -136,6 +145,13 @@ class JobsStore:
             c.execute("PRAGMA journal_mode = WAL")
             c.execute("PRAGMA synchronous = NORMAL")
         c.executescript(_JOBS_SCHEMA_SQL)
+        # v3 → v4 (M204): CREATE TABLE IF NOT EXISTS doesn't touch an existing
+        # v3 table, so add the structured-kind columns in place.
+        cols = {row[1] for row in c.execute("PRAGMA table_info(jobs)")}
+        if "kind" not in cols:
+            c.execute("ALTER TABLE jobs ADD COLUMN kind TEXT NOT NULL DEFAULT 'prompt'")
+        if "params_json" not in cols:
+            c.execute("ALTER TABLE jobs ADD COLUMN params_json TEXT")
         current = c.execute("PRAGMA user_version").fetchone()[0]
         if current < _JOBS_USER_VERSION:
             c.execute(f"PRAGMA user_version = {_JOBS_USER_VERSION}")
@@ -154,10 +170,14 @@ class JobsStore:
         enabled: bool = True,
         now: float | None = None,
         tz: dt.tzinfo | None = None,
+        kind: str = "prompt",
+        params: dict | None = None,
     ) -> JobRecord:
         if not name.strip():
             raise ValueError("job name must be non-empty")
-        if not prompt.strip():
+        # Structured kinds (M204) carry their instruction in `params`, not in a
+        # prompt — only classic prompt jobs require one.
+        if kind == "prompt" and not prompt.strip():
             raise ValueError("job prompt must be non-empty")
         sched = parse_schedule(schedule_expr)
         at = now if now is not None else time.time()
@@ -176,8 +196,8 @@ class JobsStore:
                 INSERT INTO jobs
                   (id, name, prompt, schedule_kind, schedule_expr, schedule_meta_json,
                    repeat_times, repeat_completed, context_from, deliver_to, enabled,
-                   state, created_at, next_run_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   state, created_at, next_run_at, kind, params_json)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     jid,
@@ -194,6 +214,8 @@ class JobsStore:
                     "scheduled",
                     at,
                     next_at,
+                    kind,
+                    json.dumps(params) if params is not None else None,
                 ),
             )
         rec = self.get_job(jid)
@@ -366,6 +388,8 @@ def _row_to_job(row: sqlite3.Row) -> JobRecord:
         last_status=row["last_status"],
         last_error=row["last_error"],
         last_output_path=row["last_output_path"],
+        kind=row["kind"] or "prompt",
+        params=json.loads(row["params_json"]) if row["params_json"] else None,
     )
 
 

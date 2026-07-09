@@ -34,6 +34,7 @@ from veles.cli.commands.tool import cmd_tool
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.core.skills import mount_builtin_skills
+from veles.core.tools.approvals import approve
 from veles.core.tools.loader import load_into_registry
 from veles.core.tools.persistence import (
     get_tool,
@@ -93,6 +94,7 @@ def test_agent_generated_file_loads_into_registry(isolated_home: Path, tmp_path:
     tools_dir = project.state_dir / "tools"
     tools_dir.mkdir(parents=True, exist_ok=True)
     (tools_dir / "count_substrings.py").write_text(_AGENT_GENERATED_TOOL, encoding="utf-8")
+    approve(tools_dir / "count_substrings.py")  # M199: human review before the loader runs it
 
     registry = Registry()
     store = SessionStore(project.memory_db_path)
@@ -113,6 +115,7 @@ def test_loaded_tool_dispatchable(isolated_home: Path, tmp_path: Path) -> None:
     tools_dir = project.state_dir / "tools"
     tools_dir.mkdir(parents=True, exist_ok=True)
     (tools_dir / "count_substrings.py").write_text(_AGENT_GENERATED_TOOL, encoding="utf-8")
+    approve(tools_dir / "count_substrings.py")  # M199: human review before the loader runs it
 
     registry = Registry()
     load_into_registry(registry, project_tools_dir=tools_dir)
@@ -129,6 +132,7 @@ def test_tool_catalogued_with_correct_scope_and_origin(isolated_home: Path, tmp_
     tools_dir = project.state_dir / "tools"
     tools_dir.mkdir(parents=True, exist_ok=True)
     (tools_dir / "count_substrings.py").write_text(_AGENT_GENERATED_TOOL, encoding="utf-8")
+    approve(tools_dir / "count_substrings.py")  # M199: human review before the loader runs it
 
     registry = Registry()
     store = SessionStore(project.memory_db_path)
@@ -149,6 +153,7 @@ def test_telemetry_accumulates_after_invocations(isolated_home: Path, tmp_path: 
     tools_dir = project.state_dir / "tools"
     tools_dir.mkdir(parents=True, exist_ok=True)
     (tools_dir / "count_substrings.py").write_text(_AGENT_GENERATED_TOOL, encoding="utf-8")
+    approve(tools_dir / "count_substrings.py")  # M199: human review before the loader runs it
 
     registry = Registry()
     store = SessionStore(project.memory_db_path)
@@ -177,6 +182,7 @@ def test_promote_round_trip(isolated_home: Path, tmp_path: Path) -> None:
     tools_dir.mkdir(parents=True, exist_ok=True)
     src = tools_dir / "count_substrings.py"
     src.write_text(_AGENT_GENERATED_TOOL, encoding="utf-8")
+    approve(src)  # M199: human review before the loader runs it
 
     registry = Registry()
     store = SessionStore(project.memory_db_path)
@@ -226,6 +232,7 @@ def test_full_lifecycle_in_one_go(isolated_home: Path, tmp_path: Path) -> None:
     tools_dir = project.state_dir / "tools"
     tools_dir.mkdir(parents=True, exist_ok=True)
     (tools_dir / "count_substrings.py").write_text(_AGENT_GENERATED_TOOL, encoding="utf-8")
+    approve(tools_dir / "count_substrings.py")  # M199: human review before the loader runs it
 
     registry = Registry()
     store = SessionStore(project.memory_db_path)

@@ -109,6 +109,208 @@ def test_parse_multiple_blocks_in_order() -> None:
     assert calls[0].id != calls[1].id
 
 
+def test_parse_flat_arguments_shape() -> None:
+    """Small local models (seen live 2026-07-08: ollama qwen3.5:9b) put the
+    arguments at the TOP LEVEL next to "name" instead of nesting them under
+    "arguments". Dropping them silently ran list_files with no path and
+    crashed search_files with a missing positional — recover them instead."""
+    text = (
+        "```veles-tool\n"
+        '{"name": "search_files", "pattern": "\\\\.md$", "path": ".", "max_results": 50}\n'
+        "```"
+    )
+    calls = parse_tool_calls(text)
+    assert len(calls) == 1
+    assert calls[0].name == "search_files"
+    assert calls[0].arguments == {"pattern": "\\.md$", "path": ".", "max_results": 50}
+
+
+def test_parse_flat_shape_ignores_id_and_type_keys() -> None:
+    body = '{"name": "read_file", "id": "x", "type": "function", "path": "a.py"}'
+    calls = parse_tool_calls(f"```veles-tool\n{body}\n```")
+    assert calls[0].arguments == {"path": "a.py"}
+
+
+def test_nested_arguments_still_win_over_flat_extras() -> None:
+    text = '```veles-tool\n{"name": "read_file", "arguments": {"path": "a"}, "path": "b"}\n```'
+    calls = parse_tool_calls(text)
+    assert calls[0].arguments == {"path": "a"}  # explicit nested form is canonical
+
+
+def test_parse_multiple_objects_in_one_block() -> None:
+    """Small local models (seen live 2026-07-08: ollama qwen3.5:9b) violate the
+    "one JSON object per block" rule and stack several calls in a single fence.
+    Dropping the whole block silently ended the turn mid-task — recover one
+    call per object instead."""
+    text = (
+        "```veles-tool\n"
+        '{"name": "list_files", "arguments": {"path": "a"}}\n'
+        '{"name": "list_files", "arguments": {"path": "b"}}\n'
+        "```"
+    )
+    calls = parse_tool_calls(text)
+    assert [c.arguments["path"] for c in calls] == ["a", "b"]
+    assert calls[0].id != calls[1].id
+
+
+def test_parse_unclosed_final_block_with_trailing_garbage() -> None:
+    """The exact shape seen live 2026-07-08 (ollama qwen3.5:9b): the model's
+    last round is a veles-tool fence that is never closed and ends in junk
+    (`, `` ` ``). The block regex required a closing fence, so the calls
+    vanished and the loop treated the response as a final answer."""
+    text = (
+        "```veles-tool\n"
+        '{"name": "list_files", "arguments": {"path": "-- Daily --", "glob": "**/*"}}\n'
+        '{"name": "list_files", "arguments": {"path": "-- Companies --", "glob": "**/*"}}, `'
+    )
+    calls = parse_tool_calls(text)
+    assert [c.arguments["path"] for c in calls] == ["-- Daily --", "-- Companies --"]
+
+
+def test_parse_multi_object_skips_bad_and_keeps_good() -> None:
+    text = '```veles-tool\n{"name": "read_file", "arguments": {"path": "a"}}\nnot json at all\n```'
+    calls = parse_tool_calls(text)
+    assert [c.name for c in calls] == ["read_file"]
+
+
+# --- parse diagnostics (live 2026-07-08, ollama qwen3.5:9b) -----------------
+# The model emits broken JSON constantly (a lost opening quote, key-without-
+# value salad). Dropping those objects SILENTLY meant the model never learned
+# its calls vanished — it degraded round after round, and a block of pure
+# garbage ended the turn as a "final answer".
+
+
+def test_parse_with_errors_reports_undecodable_tail() -> None:
+    """The live turn-2 shape: object 1 fine, objects 2-3 lost the opening
+    quote of the path value. One call parses; the junk is reported."""
+    from veles.core.fenced_tools import parse_tool_calls_with_errors
+
+    text = (
+        "```veles-tool\n"
+        '{"name": "list_files", "arguments": {"path": "A/", "glob": "**/*"}}\n'
+        '{"name": "list_files", "arguments": {"path": -- Companies--/", "glob": "**/*.md"}}\n'
+        "```"
+    )
+    calls, errors = parse_tool_calls_with_errors(text)
+    assert [c.name for c in calls] == ["list_files"]
+    assert len(errors) == 1
+    assert "-- Companies--" in errors[0]  # snippet of the junk is included
+
+
+def test_parse_with_errors_reports_missing_name() -> None:
+    from veles.core.fenced_tools import parse_tool_calls_with_errors
+
+    text = '```veles-tool\n{"arguments": {"path": "a.py"}}\n```'
+    calls, errors = parse_tool_calls_with_errors(text)
+    assert calls == []
+    assert len(errors) == 1
+    assert "name" in errors[0]
+
+
+def test_parse_with_errors_clean_block_has_no_errors() -> None:
+    from veles.core.fenced_tools import parse_tool_calls_with_errors
+
+    text = '```veles-tool\n{"name": "read_file", "arguments": {"path": "a"}}\n```'
+    calls, errors = parse_tool_calls_with_errors(text)
+    assert len(calls) == 1
+    assert errors == []
+
+
+# --- display scrubbing (M143 follow-up, live 2026-07-08) -------------------
+# In fenced mode the model's raw text IS the tool calls; streaming it verbatim
+# dumped `{"name": …}` JSON and dangling ``` fences into the chat (observed
+# with ollama qwen3.5:9b). The scrubber strips veles-tool blocks from the
+# DISPLAY stream; the agent still parses the full raw text for calls.
+
+
+def _scrub_all(chunks: list[str]) -> str:
+    from veles.core.fenced_tools import FencedToolScrubber
+
+    s = FencedToolScrubber()
+    out = "".join(s.feed(c) for c in chunks)
+    return out + s.finalize()
+
+
+def test_scrubber_passes_plain_prose() -> None:
+    assert _scrub_all(["hello ", "world"]) == "hello world"
+
+
+def test_scrubber_strips_tool_block_split_across_chunks() -> None:
+    chunks = ["Sure.\n``", '`veles-tool\n{"name": "read_file"}\n``', "`\nDone."]
+    assert _scrub_all(chunks) == "Sure.\nDone."
+
+
+def test_scrubber_keeps_normal_code_fences() -> None:
+    text = "look:\n```python\nprint(1)\n```\nend"
+    assert _scrub_all([text]) == text
+
+
+def test_scrubber_handles_glued_fences() -> None:
+    # Observed live: closing fence immediately followed by the next opener.
+    text = '```veles-tool\n{"name": "a"}\n``````veles-tool\n{"name": "b"}\n```after'
+    assert _scrub_all([text]) == "after"
+
+
+def test_scrubber_closing_fence_with_trailing_prose() -> None:
+    # Observed live: "```The output is truncated." — prose glued to the close.
+    text = '```veles-tool\n{"name": "a"}\n```The output is truncated.'
+    assert _scrub_all([text]) == "The output is truncated."
+
+
+def test_scrubber_finalize_drops_unclosed_tool_block() -> None:
+    assert _scrub_all(['text ```veles-tool\n{"name": "x"']) == "text "
+
+
+def test_streaming_fenced_turn_shows_no_tool_json_in_chat() -> None:
+    """Agent-level: a fenced streaming turn must not leak tool-call JSON into
+    on_text_delta (the chat)."""
+    from veles.core.provider import StreamEnd, TextDelta
+
+    class _StreamingLocalProvider:
+        name = "ollama"
+        supports_tools = False
+        supports_streaming = True
+        n = 0
+
+        def create_message(self, *a, **k):  # pragma: no cover
+            raise AssertionError("streaming path expected")
+
+        def stream_message(self, messages, tools=None, *, model, max_tokens=4096):
+            del messages, tools, model, max_tokens
+            type(self).n += 1
+            if type(self).n == 1:
+                parts = [
+                    "I'll list first:\n",
+                    '```veles-tool\n{"name": "read_file", "arguments": {"path": "a.py"}}\n```',
+                ]
+            else:
+                parts = ["All done."]
+            full = "".join(parts)
+            for p in parts:
+                yield TextDelta(text=p)
+            yield StreamEnd(response=_resp(full))
+
+    def _resp(text):
+        from veles.core.provider import ProviderResponse, TokenUsage
+
+        return ProviderResponse(
+            text=text,
+            tool_calls=[],
+            usage=TokenUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+            finish_reason="stop",
+        )
+
+    from veles.core.agent import Agent
+
+    chat: list[str] = []
+    agent = Agent(_StreamingLocalProvider(), _registry_with_read(), model="m")
+    agent.run("go", on_text_delta=chat.append)
+    joined = "".join(chat)
+    assert "veles-tool" not in joined
+    assert '"name"' not in joined
+    assert "I'll list first:" in joined and "All done." in joined
+
+
 def test_parse_skips_malformed_and_plain_text() -> None:
     assert parse_tool_calls("just a normal answer, no tools") == []
     assert parse_tool_calls("```veles-tool\nnot json\n```") == []
@@ -201,6 +403,67 @@ def test_local_model_calls_tool_via_fenced_block() -> None:
     assert "contents of a.py" in result_msgs[0].content
     # The tool instructions were injected into the system prompt.
     assert any(m.role == "system" and FENCED_SENTINEL in (m.content or "") for m in result.history)
+
+
+def test_garbage_only_block_gets_parse_feedback_and_turn_continues() -> None:
+    """Live 2026-07-08 (ollama qwen3.5:9b): a round whose veles-tool block is
+    ALL malformed used to yield zero calls → treated as the final answer →
+    the turn silently died mid-task. Now the model gets one corrective user
+    message describing the parse errors and the loop continues."""
+    garbage = '```veles-tool\n{"name": "read_file", "arguments": {"path": -- A--/"}}\n```'
+    provider = _LocalProvider(responses=[_final(garbage), _final("recovered answer")])
+    agent = Agent(provider, _registry_with_read(), model="m")
+    result = agent.run("read the file")
+
+    assert result.stopped_reason == "completed"
+    assert result.text == "recovered answer"
+    assert provider.n == 2  # the garbage round did NOT end the turn
+    feedback = [
+        m for m in result.history if m.role == "user" and "could not be parsed" in (m.content or "")
+    ]
+    assert len(feedback) == 1
+    assert "-- A--" in feedback[0].content  # the junk snippet reaches the model
+
+
+def test_parse_feedback_is_capped_per_run() -> None:
+    """A model that emits garbage every round must not loop forever on
+    corrective nudges: after the cap, the garbage round ends the turn the
+    old way (raw text = final answer)."""
+    garbage = '```veles-tool\n{"name": "read_file", "arguments": {"path": -- A--/"}}\n```'
+    provider = _LocalProvider(responses=[_final(garbage)] * 10)
+    agent = Agent(provider, _registry_with_read(), model="m", max_iterations=20)
+    result = agent.run("read the file")
+
+    assert result.stopped_reason == "completed"
+    # 3 nudged retries + the final capped round = 4 provider calls, not 10/20.
+    assert provider.n == 4
+    feedback = [
+        m for m in result.history if m.role == "user" and "could not be parsed" in (m.content or "")
+    ]
+    assert len(feedback) == 3
+
+
+def test_partial_parse_errors_reported_alongside_results() -> None:
+    """When some calls parse and some junk is dropped, the results message
+    carries a parse-errors section so the model can fix the dropped calls."""
+    mixed = (
+        "```veles-tool\n"
+        '{"name": "read_file", "arguments": {"path": "a.py"}}\n'
+        '{"name": "read_file", "arguments": {"path": -- B--/"}}\n'
+        "```"
+    )
+    provider = _LocalProvider(responses=[_final(mixed), _final("done")])
+    agent = Agent(provider, _registry_with_read(), model="m")
+    result = agent.run("read files")
+
+    assert result.stopped_reason == "completed"
+    result_msgs = [
+        m for m in result.history if m.role == "user" and FENCED_RESULT_HEADER in (m.content or "")
+    ]
+    assert len(result_msgs) == 1
+    assert "contents of a.py" in result_msgs[0].content  # the good call ran
+    assert "could not be parsed" in result_msgs[0].content  # the junk is reported
+    assert "-- B--" in result_msgs[0].content
 
 
 def test_env_kill_switch_disables_fenced(monkeypatch) -> None:

@@ -1,7 +1,7 @@
-"""`veles add` — read a source and write a wiki page via agent (M85).
+"""`veles add` — read a source and route its topics into the wiki (M85, M203).
 
-The canonical name; `veles ingest` remains as a deprecated alias and
-both delegate to the shared runner in `cli.commands.ingest`."""
+The canonical (and only) name — the `veles ingest` alias was removed in
+M117c-removal. Delegates to the shared runner in `cli.commands.ingest`."""
 
 from __future__ import annotations
 

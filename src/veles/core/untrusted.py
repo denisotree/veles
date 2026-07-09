@@ -2,10 +2,13 @@
 
 Veles already has a *passive* injection scrubber (`core/safety.py`) that runs
 when AGENTS.md / INDEX.md / wiki pages are loaded into the system prompt.
-M66 adds the *active* side: any content arriving from outside the trusted
-boundary (a fetched URL, a web-search result, an MCP tool, an ingested file)
-is wrapped in an explicit `<untrusted>` block with a boundary reminder, and
-secret-shaped patterns inside it are replaced with redacted placeholders.
+M66 adds the *active* side: content arriving from outside the trusted
+boundary (a fetched URL, a web-search result, an MCP tool result, a
+pre-fetched `veles add <url>` source) is wrapped in an explicit `<untrusted>`
+block with a boundary reminder, and secret-shaped patterns inside it are
+replaced with redacted placeholders. (Local `veles add <file>` content is not
+wrapped, but the `[ingest]` toolset has no network-egress tool, so injected
+instructions in a source file have no exfiltration channel — B1, 2026-07-07.)
 
 The Permission Engine (M64) reads these markers and refuses to derive tool
 arguments from untrusted content without explicit user approval. Until M64
@@ -134,6 +137,16 @@ def wrap_untrusted(
     body = content
     if redact:
         body, _ = redact_secrets(body)
+    # M198: record the (redacted) body in the run's untrusted corpus so the
+    # permission engine can gate an egress tool whose destination appears in
+    # content read this run. Best-effort — never let taint bookkeeping break a
+    # tool result. Redacted body still carries hosts/URLs (only secrets go).
+    try:
+        from veles.core.agent_state import record_untrusted
+
+        record_untrusted(body)
+    except Exception:
+        pass
     fetched = fetched or _now_iso()
     safe_source = source.replace('"', "%22")
     return (

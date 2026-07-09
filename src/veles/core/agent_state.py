@@ -86,3 +86,60 @@ def reset_invoked_tools(token: Token[frozenset[str]]) -> None:
 def clear_invoked_tools() -> Token[frozenset[str]]:
     """Wipe the set at the start of a run; returns reset token."""
     return _invoked_tools.set(frozenset())
+
+
+# M198: the untrusted-content corpus for the current run. Every `<untrusted>`
+# block (fetched URL, web-search result, MCP result, pre-fetched ingest URL)
+# records its body here via `wrap_untrusted`, so the permission engine can gate
+# a tool call
+# whose egress destination appears in content read this run (prompt-injection
+# exfiltration signal). Same ContextVar lifecycle as `_invoked_tools`: cleared
+# at run start, reset at run end, inherited across the REPL executor boundary.
+# Per-run scope means the within-run attack (fetch → read → exfil) is caught;
+# cross-turn taint (fetched turn 1, exfil turn 3) is not.
+_untrusted_corpus: ContextVar[tuple[str, ...]] = ContextVar("veles_untrusted_corpus", default=())
+
+
+def untrusted_corpus() -> tuple[str, ...]:
+    """Untrusted-content blocks recorded in the current run."""
+    return _untrusted_corpus.get()
+
+
+def record_untrusted(text: str) -> Token[tuple[str, ...]]:
+    """Append one untrusted-content block to the run corpus. Rebinds an
+    immutable tuple (never mutates in place) so the value can't silently
+    vanish on a reset — mirrors `record_invocation`."""
+    return _untrusted_corpus.set((*_untrusted_corpus.get(), text))
+
+
+def reset_untrusted(token: Token[tuple[str, ...]]) -> None:
+    _untrusted_corpus.reset(token)
+
+
+def clear_untrusted() -> Token[tuple[str, ...]]:
+    """Wipe the corpus at the start of a run; returns the reset token."""
+    return _untrusted_corpus.set(())
+
+
+# S1 (2026-07-07 audit): the names of tools the CURRENTLY running agent is
+# allowed to use (its scoped registry). `delegate` intersects a worker's
+# requested tools with this set so a scoped run (e.g. `veles add`, whose
+# `[ingest]` toolset deliberately omits `run_shell`/`fetch_url`) can't hand a
+# worker MORE than it has itself. Empty = "not inside a scoped agent run" →
+# `delegate` falls back to the global registry (its historic behaviour).
+_current_toolset: ContextVar[frozenset[str]] = ContextVar(
+    "veles_current_toolset", default=frozenset()
+)
+
+
+def current_toolset() -> frozenset[str]:
+    """Tool names the running agent may use, or empty outside a scoped run."""
+    return _current_toolset.get()
+
+
+def set_current_toolset(names: frozenset[str]) -> Token[frozenset[str]]:
+    return _current_toolset.set(names)
+
+
+def reset_current_toolset(token: Token[frozenset[str]]) -> None:
+    _current_toolset.reset(token)

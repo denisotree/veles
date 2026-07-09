@@ -51,6 +51,12 @@ Funciona com ou sem um projecto activo.
 |---|---|---|
 | `--json` | desligado | Emite um relatório JSON |
 | `--strict` | desligado | Termina com código diferente de zero perante qualquer aviso (bloqueio em CI) |
+| `--fix` | desligado | Tenta reparações seguras antes de verificar — actualmente reconstrói um índice de recuperação de memória (FTS) corrompido |
+
+O `doctor` também valida as secções de `config.toml` relevantes para a segurança
+(`[channels.*]`, `[daemon.*]`, `[mcp.servers.*]`) e reporta chaves desconhecidas como
+um erro — uma gralha como `whitlist` em vez de `whitelist` desactiva silenciosamente um
+controlo de acesso, por isso falha de forma ruidosa aqui.
 
 ### `veles export {full,template} <path>`
 Empacota o projecto num bundle `.tar.gz`. Ver [Salvaguardar e partilhar](../how-to/backup-and-share.md).
@@ -157,13 +163,20 @@ skills → sugestões de promoção → lint da wiki, opcionalmente consolidaç�
 | `dedup [--mode auto\|embedding\|tfidf] [--embedding-threshold f] [--tfidf-threshold f]` | Encontra skills quase duplicadas |
 | `suggest-promote [--save] [--min-uses n] [--min-success-rate f]` | Lista skills que cumprem o limiar de auto-promoção |
 
-### `veles tool {list,show,promote}`
+### `veles tool {list,show,promote,approve}`
 
 | Subcomando | Finalidade |
 |---|---|
 | `list` | Lista as ferramentas catalogadas no `memory.db` deste projecto |
 | `show <name>` | Imprime o manifesto + telemetria de uma ferramenta |
 | `promote <name> [-y]` | Move uma ferramenta de projecto para `~/.veles/tools/` (transversal a projectos) |
+| `approve [<name>] [--all] [-y]` | Revê + aprova um ficheiro de ferramenta auto-escrito para que o carregador o execute |
+
+As ferramentas auto-escritas (`.veles/tools/*.py`) executam o seu código ao nível do
+módulo quando o carregador as importa, por isso um ficheiro novo ou editado **não é
+carregado enquanto não o aprovares** — `veles tool approve` mostra o código e regista o
+seu hash. `veles tool approve` simples lista o que está pendente. É por isto que uma
+ferramenta escrita pelo agente precisa de um passo de revisão antes de se tornar invocável.
 
 ### `veles module {list,show,add,remove}`
 

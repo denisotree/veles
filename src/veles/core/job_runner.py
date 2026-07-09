@@ -60,6 +60,15 @@ class JobRunSummary:
     error: str | None
 
 
+@dataclass(slots=True)
+class _StructuredOutcome:
+    """RunResult-shaped shim so `_write_output` renders a structured-kind
+    job's summary the same way it renders an agent turn's text."""
+
+    text: str
+    iterations: int | None = None
+
+
 class JobRunner:
     def __init__(
         self,
@@ -70,6 +79,8 @@ class JobRunner:
         max_parallel: int = 2,
         delivery_router=None,
         tz=None,
+        kind_handlers: dict[str, Callable[[JobRecord], str]] | None = None,
+        on_op_finished: Callable[[JobRecord, str], Any] | None = None,
     ) -> None:
         self._store = store
         self._agent_factory = agent_factory
@@ -78,6 +89,19 @@ class JobRunner:
         self._delivery = delivery_router
         # M167: timezone for calendar schedules (daily@09:00 …); None → host-local.
         self._tz = tz
+        # M204: structured job kinds. A job with kind != 'prompt' is dispatched
+        # to its registered handler (a sync callable run via to_thread — e.g.
+        # the wiki batch-ingest kernel) instead of an LLM `agent.run(prompt)`
+        # turn: deterministic, and untrusted ingested content never enters a
+        # full-tool job-agent context (audit M5+M2). Handlers are wired by the
+        # daemon (core stays module-agnostic — no core→modules import).
+        self._kind_handlers = dict(kind_handlers or {})
+        # Fired (awaited if async) after a structured-kind job completes, with
+        # the summary text — the daemon wires notify+resume here. Structured
+        # kinds skip the plain `deliver_to` delivery in `_execute`: the resume
+        # path owns notification (incl. the no-session fallback), so routing
+        # both would double-post into the chat.
+        self._on_op_finished = on_op_finished
         self._loop_task: asyncio.Task | None = None
         self._running = False
         self._inflight: set[asyncio.Task] = set()
@@ -152,6 +176,8 @@ class JobRunner:
 
     async def _execute(self, job: JobRecord, *, now: float) -> JobRunSummary:
         rid = self._store.mark_run_started(job_id=job.id, started_at=now)
+        if job.kind != "prompt":
+            return await self._execute_structured(job, run_id=rid, now=now)
         started = now
         prompt = job.prompt
         if job.context_from:
@@ -209,6 +235,70 @@ class JobRunner:
             iterations=getattr(result, "iterations", None),
             output_path=str(output_path),
             error=delivery_err,
+        )
+
+    async def _execute_structured(
+        self, job: JobRecord, *, run_id: str, now: float
+    ) -> JobRunSummary:
+        """M204: run a structured-kind job through its registered handler.
+
+        No LLM job-agent is built: the handler (e.g. the wiki batch-ingest
+        kernel closure) does the work in a thread and returns the summary
+        text. Plain `deliver_to` delivery is deliberately SKIPPED here — the
+        `on_op_finished` callback (daemon-wired notify+resume) owns
+        notification, including the no-session fallback delivery."""
+        handler = self._kind_handlers.get(job.kind)
+        if handler is None:
+            err = f"unknown job kind {job.kind!r} — no handler registered"
+            self._store.mark_run_finished(run_id=run_id, status="error", error=err, finished_at=now)
+            self._advance_schedule(job, status="error", last_error=err, now=now)
+            return JobRunSummary(
+                job_id=job.id,
+                run_id=run_id,
+                status="error",
+                iterations=None,
+                output_path=None,
+                error=err,
+            )
+        try:
+            summary_text = await asyncio.to_thread(handler, job)
+        except Exception as exc:
+            err = f"{type(exc).__name__}: {exc}"
+            self._store.mark_run_finished(run_id=run_id, status="error", error=err, finished_at=now)
+            self._advance_schedule(job, status="error", last_error=err, now=now)
+            return JobRunSummary(
+                job_id=job.id,
+                run_id=run_id,
+                status="error",
+                iterations=None,
+                output_path=None,
+                error=err,
+            )
+        output_path = self._write_output(
+            job, _StructuredOutcome(text=summary_text or ""), started_at=now
+        )
+        self._store.mark_run_finished(
+            run_id=run_id,
+            status="ok",
+            iterations=None,
+            output_path=str(output_path),
+            finished_at=now,
+        )
+        self._advance_schedule(job, status="ok", last_output_path=str(output_path), now=now)
+        if self._on_op_finished is not None:
+            try:
+                maybe = self._on_op_finished(job, summary_text or "")
+                if asyncio.iscoroutine(maybe):
+                    await maybe
+            except Exception:  # pragma: no cover - completion hook is best-effort
+                logger.exception("job %s on_op_finished failed", job.id)
+        return JobRunSummary(
+            job_id=job.id,
+            run_id=run_id,
+            status="ok",
+            iterations=None,
+            output_path=str(output_path),
+            error=None,
         )
 
     def _advance_schedule(

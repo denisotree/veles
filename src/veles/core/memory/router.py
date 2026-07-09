@@ -180,7 +180,18 @@ class MemoryRouter:
         under `.veles/memory/insights/` is a rendered view, never searched)."""
         if self._store is None:
             return []
-        hits = self._store.search_insights(query, limit=limit)
+        hits = list(self._store.search_insights(query, limit=limit))
+        # M192: fold in semantic (vector) neighbours, deduped by insight id, so
+        # a paraphrased query that shares no tokens with an insight still
+        # recalls it. Local-first: `_local_query_vector` embeds the query ONLY
+        # via a local adapter — a cloud embedder never receives the query text.
+        qvec = _local_query_vector(query)
+        if qvec is not None:
+            seen = {h.id for h in hits}
+            for vh in self._store.knn_insights(qvec, limit=limit):
+                if vh.id not in seen:
+                    seen.add(vh.id)
+                    hits.append(vh)
         if hits:
             self._store.touch_insights([h.id for h in hits], time.time())
         return [_insight_hit_to_recall(h) for h in hits]
@@ -194,9 +205,44 @@ class MemoryRouter:
         """
         if self._store is None:
             return []
-        since = time.time() - _TURN_RECENCY_WINDOW_SEC
+        # M193: the 30-day window assumes the curator already distilled older
+        # turns into insights. Until the first curator/dream pass, raw turns are
+        # the ONLY memory, so applying the window would silently drop it.
+        since = None if _never_curated(self._project) else time.time() - _TURN_RECENCY_WINDOW_SEC
         turn_hits = self._store.search_turns(query, limit=limit, since=since)
         return [_turn_hit_to_recall(h) for h in turn_hits]
+
+
+def _never_curated(project) -> bool:
+    """M193: True when no curator or dream pass has ever run for the project.
+    Until then, the 30-day turn-recall window would silently discard the only
+    copy of older memory (nothing has been distilled into insights yet)."""
+    from veles.core.curator_state import load
+
+    try:
+        state = load(project.state_dir / "curator.state.json")
+    except Exception:
+        return True
+    return state.last_curated_at == 0.0 and state.dream_count == 0
+
+
+def _local_query_vector(query: str) -> list[float] | None:
+    """M192: embed the recall `query` for vector search — but ONLY through a
+    LOCAL embedding adapter. A cloud embedder must never receive the query
+    text (the local-first no-egress guarantee: the audit flagged embedding
+    autodetect as a silent cloud path). Returns None when there is no adapter,
+    it is not local, or embedding fails — in which case recall stays FTS-only.
+    """
+    from veles.modules.embedding import get_local_embedding_adapter
+
+    adapter = get_local_embedding_adapter()
+    if adapter is None:
+        return None
+    try:
+        vecs = adapter.embed([query])
+    except Exception:
+        return None
+    return vecs[0] if vecs else None
 
 
 def _subproject_wiki_enabled(sub_root) -> bool:
@@ -209,13 +255,6 @@ def _subproject_wiki_enabled(sub_root) -> bool:
         return wiki_enabled(load_project(sub_root))
     except Exception:
         return False
-
-
-def _interleave(
-    wiki_hits: list[RecallHit], turn_hits: list[RecallHit], limit: int
-) -> list[RecallHit]:
-    """Two-stream round-robin (retained for back-compat; callers may import)."""
-    return _interleave_many([wiki_hits, turn_hits], limit)
 
 
 def _interleave_many(streams: list[list[RecallHit]], limit: int) -> list[RecallHit]:

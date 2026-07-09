@@ -62,6 +62,17 @@ def test_builtin_pack_ships_no_project_categories(wiki_project) -> None:
     assert not ({"projects", "diary", "tasks"} & cats)  # project-specific, not shipped
 
 
+def test_sources_is_not_a_wiki_page_category(wiki_project) -> None:
+    """M203: `sources/` is the top-level raw-audit tree, NOT a wiki page
+    category. It was a weak-model date-dump bucket (`wiki/sources/2025-02-27`)
+    that collided with the project-root `sources/` dir, so it's removed from
+    the writable wiki roots — ingestion routes to topical categories instead."""
+    wiki = Wiki(wiki_project.wiki_root)
+    assert "sources" not in wiki.categories()
+    with pytest.raises(ValueError, match="category root"):
+        wiki.write_page(category="sources", slug="2025-02-27", title="X", content="y")
+
+
 def test_project_local_categories_are_picked_up(wiki_project) -> None:
     from veles.modules.wiki.wiki import add_project_category
 

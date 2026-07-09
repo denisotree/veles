@@ -29,6 +29,13 @@ def _write_tool(directory: Path, filename: str, body: str) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / filename
     path.write_text(body, encoding="utf-8")
+    # M199: these tests exercise loading mechanics, which now require a human
+    # approval before the loader will exec a self-authored file. Approve here so
+    # the fixture represents an already-reviewed tool. (The gate itself — that an
+    # UNapproved file is skipped — is covered in tests/test_tool_approvals.py.)
+    from veles.core.tools.approvals import approve
+
+    approve(path)
     return path
 
 

@@ -118,7 +118,11 @@ def test_list_and_get_daemon_session_config_distinguish_scalars(tmp_path: Path):
 
 
 def _ns(**kw) -> argparse.Namespace:
-    return argparse.Namespace(**kw)
+    ns = argparse.Namespace(**kw)
+    # Passing a provider simulates an explicit `--provider` (parser marker).
+    if kw.get("provider"):
+        ns._provider_explicit = True
+    return ns
 
 
 def test_daemon_session_provider_model_beats_project_provider(tmp_path: Path):

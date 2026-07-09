@@ -50,6 +50,12 @@ without an active project.
 |---|---|---|
 | `--json` | off | Emit a JSON report |
 | `--strict` | off | Exit non-zero on any warning (CI gating) |
+| `--fix` | off | Attempt safe repairs before checking — currently rebuilds a corrupt memory-recall (FTS) index |
+
+`doctor` also validates the security-relevant sections of `config.toml`
+(`[channels.*]`, `[daemon.*]`, `[mcp.servers.*]`) and reports unknown keys as an
+error — a typo like `whitlist` for `whitelist` silently disables an access
+control, so it fails loud here.
 
 ### `veles export {full,template} <path>`
 Pack the project into a `.tar.gz` bundle. See [Back up and share](../how-to/backup-and-share.md).
@@ -162,13 +168,20 @@ suggestions → wiki lint, optionally LLM consolidation).
 | `dedup [--mode auto\|embedding\|tfidf] [--embedding-threshold f] [--tfidf-threshold f]` | Find near-duplicate skills |
 | `suggest-promote [--save] [--min-uses n] [--min-success-rate f]` | List skills that meet the auto-promote bar |
 
-### `veles tool {list,show,promote}`
+### `veles tool {list,show,promote,approve}`
 
 | Subcommand | Purpose |
 |---|---|
 | `list` | List tools catalogued in this project's `memory.db` |
 | `show <name>` | Print a tool's manifest + telemetry |
 | `promote <name> [-y]` | Move a project tool to `~/.veles/tools/` (cross-project) |
+| `approve [<name>] [--all] [-y]` | Review + approve a self-authored tool file so the loader will run it |
+
+Self-authored tools (`.veles/tools/*.py`) run their module-level code when the
+loader imports them, so a new or edited file is **not loaded until you approve
+it** — `veles tool approve` shows the code and records its hash. Bare
+`veles tool approve` lists what's pending. This is why an agent-written tool
+needs a review step before it becomes callable.
 
 ### `veles module {list,show,add,remove}`
 

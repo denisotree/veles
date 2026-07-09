@@ -42,7 +42,7 @@ import datetime as _dt
 import logging
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -167,9 +167,13 @@ def _persist_dream_state(
     include_consolidation: bool,
     dry_run: bool,
 ) -> None:
-    new_state = CuratorState(
-        last_curated_at=state.last_curated_at,
-        sessions_curated_total=state.sessions_curated_total,
+    # replace(): touch ONLY the dream cursors. Rebuilding CuratorState from
+    # scratch silently wiped `failed_attempts` (live 2026-07-08) — the
+    # curator's give-up-after-3 poison-pill counter reset every dream, so one
+    # persistently failing session blocked the curation queue forever. Mirror
+    # bug of the dream-cursor reset fixed in `cli/_curator.py`.
+    new_state = replace(
+        state,
         last_post_turn_dream_at=at if not include_consolidation else state.last_post_turn_dream_at,
         last_deep_dream_at=at if include_consolidation else state.last_deep_dream_at,
         dream_count=state.dream_count + 1,
@@ -265,6 +269,11 @@ def dream_cycle(
                 lambda: _step_insight_dedup(project, result, dry_run=dry_run),
                 result,
             )
+        if include_consolidation and not dry_run:
+            # M192: embed survivor insights (after dedup, so embeds aren't spent
+            # on superseded rows) for MemoryRouter's semantic recall. Off the
+            # per-turn hot path; local-adapter-gated inside.
+            _run_dream_step("embed_insights", lambda: _step_embed_insights(project, result), result)
         if include_consolidation and provider is not None:
             _run_dream_step(
                 "consolidation",
@@ -311,6 +320,17 @@ def _step_insights(
         except Exception as exc:  # pragma: no cover - extractor handles its own errors
             result.notes.append(f"insight extractor on {session_id}: {exc}")
     result.insights_written = written
+
+
+def _step_embed_insights(project: Project, result: DreamResult) -> None:
+    """M192: embed survivor insights that still lack a vector so recall can KNN
+    over them. Local-adapter-gated (no cloud egress); a no-op with no local
+    embedder. Best-effort via `_run_dream_step`."""
+    from veles.core.memory.insight_embeddings import embed_survivor_insights
+
+    n = embed_survivor_insights(project)
+    if n:
+        result.notes.append(f"embedded {n} insight(s)")
 
 
 def _step_insight_dedup(project: Project, result: DreamResult, *, dry_run: bool) -> None:

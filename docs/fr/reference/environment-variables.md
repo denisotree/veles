@@ -74,5 +74,7 @@ trousseau du système (portée par défaut) → variable d'environnement.
 
 ## Interne / tests
 
-`VELES_BUNDLE_VERSION`, `VELES_CACHE_BREAKPOINT` — internes ; vous ne devriez pas
-avoir à les définir.
+| Variable | Rôle |
+|---|---|
+| `VELES_BUNDLE_VERSION` | Interne ; vous ne devriez pas avoir à la définir |
+| `VELES_REPL_SIMPLE` | Mettre à `1` pour forcer la boucle REPL simple, ligne par ligne, au lieu de l'application `prompt_toolkit` en plein écran (repli pour les terminaux limités) |

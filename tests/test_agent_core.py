@@ -92,6 +92,27 @@ def test_max_iterations_cutoff_returns_last_text() -> None:
     assert result.iterations == 2
 
 
+def test_run_result_carries_invoked_tool_names() -> None:
+    """`RunResult.invoked_tools` records every tool the run dispatched — even
+    when the final round is empty. Callers like the curator judge success by
+    "did the persist tool actually run", not by non-empty final prose (a
+    thinking local model routinely ends with empty content after doing all
+    the tool work — seen live 2026-07-08, ollama qwen3.5:9b)."""
+    reg = _echo_registry()
+    provider = _StubProvider(responses=[_tool_call("echo"), _final("")])
+    agent = Agent(provider, reg, model="m", max_iterations=5)
+    result = agent.run("go")
+    assert result.stopped_reason == "empty"
+    assert result.invoked_tools == frozenset({"echo"})
+
+
+def test_run_result_invoked_tools_empty_without_tool_calls() -> None:
+    provider = _StubProvider(responses=[_final("done")])
+    agent = Agent(provider, Registry(), model="m", max_iterations=5)
+    result = agent.run("hi")
+    assert result.invoked_tools == frozenset()
+
+
 def test_usage_accumulates_across_iterations() -> None:
     """Each iteration's `response.usage` rolls into `RunResult.usage`."""
     # Turn 1: tool call with usage 6 total; turn 2: final text with 10 total.

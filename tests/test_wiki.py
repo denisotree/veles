@@ -16,8 +16,10 @@ def _make_wiki(tmp_path: Path) -> Wiki:
 def test_ensure_layout_creates_dirs(tmp_path: Path) -> None:
     w = _make_wiki(tmp_path)
     w.ensure_layout()
-    for cat in ("concepts", "entities", "sources", "queries"):
+    for cat in ("concepts", "entities", "queries"):
         assert (tmp_path / "wiki" / cat).is_dir()
+    # M203: no `wiki/sources` page category; raw sources live at top-level.
+    assert not (tmp_path / "wiki" / "sources").exists()
     assert (tmp_path / "sources").is_dir()
 
 

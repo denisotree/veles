@@ -174,7 +174,7 @@ def wiki_append_log(op: str, summary: str) -> str:
 @tool(risk_class=RiskClass.WRITE_LOCAL_PROJECT, side_effects=["network", "filesystem"])
 def wiki_ingest(
     source: str,
-    category: str = "sources",
+    category: str = "concepts",
     slug: str | None = None,
     title: str | None = None,
 ) -> str:
@@ -182,10 +182,12 @@ def wiki_ingest(
     it as a wiki page.
 
     `source` is either a URL (http:// / https://) or a path. `category`
-    defaults to 'sources' (raw inputs); use 'concepts' / 'entities' when
-    you've distilled the material. `slug` defaults to a kebab-case form
-    of `title` or the source basename. The page body is the raw text
-    when no `title` is supplied, or a minimal markdown wrap otherwise.
+    defaults to 'concepts'; use 'entities' for people/orgs/works, or a topical
+    project category. (M203: there is no `sources` page category — raw
+    originals live in the top-level `sources/` tree, not the wiki.) `slug`
+    defaults to a kebab-case form of `title` or the source basename. The page
+    body is the raw text when no `title` is supplied, or a minimal markdown
+    wrap otherwise.
 
     Call this when the user shares a link / file worth preserving, or
     when you discover an authoritative reference mid-turn — it short-cuts
@@ -221,6 +223,153 @@ def wiki_ingest(
         return f"<error: {exc}>"
     wiki.append_log(op="ingest", summary=f"-> {rel}")
     return f"ingested {source!r} -> {rel}"
+
+
+@tool(risk_class=RiskClass.WRITE_LOCAL_PROJECT, side_effects=["filesystem"])
+def wiki_add(source: str, recursive: bool = False, glob: str = "*") -> str:
+    """Ingest a source file — or a whole directory — into the wiki via fresh
+    per-file sub-agents (the tool form of `veles add`, M204).
+
+    USE THIS for migrating/ingesting files instead of reading and writing pages
+    yourself in this conversation: each file gets its OWN sub-agent with a clean
+    context (no context accumulation over a long migration), run strictly
+    sequentially so same-topic files dedup against each other via wiki_search.
+    `source` is a file path, or a directory with `recursive=True` (`glob`
+    filters, e.g. "*.md"). Each sub-agent applies the content-aware contract:
+    extract topics → find-or-create-or-patch topical pages → relocate the raw
+    file into top-level sources/. Returns a counts summary; per-file failures
+    are recorded and skipped, never fatal to the batch.
+    """
+    from pathlib import Path
+
+    from veles.core.orchestration.delegation import (
+        MAX_DELEGATE_DEPTH,
+        current_delegate_depth,
+        current_subagent_factory,
+        enter_delegate,
+        exit_delegate,
+    )
+    from veles.modules.wiki.ingest import (
+        INGEST_AGENT_SYSTEM_PROMPT,
+        IngestOutcome,
+        batch_ingest_files,
+        ingest_user_message,
+        run_batch_ingest,
+    )
+
+    factory = current_subagent_factory()
+    if factory is None:
+        return (
+            "<error: wiki_add needs a sub-agent factory and none is available in "
+            "this context — ingest directly with wiki_search/wiki_write_page instead>"
+        )
+    if current_delegate_depth() >= MAX_DELEGATE_DEPTH:
+        return (
+            f"<refused: max delegation depth {MAX_DELEGATE_DEPTH} reached — ingest "
+            "directly with wiki tools instead of nesting wiki_add>"
+        )
+
+    src = Path(source)
+    if not src.is_absolute():
+        proj = current_project()
+        if proj is not None:
+            src = proj.root / src
+
+    if recursive:
+        if not src.is_dir():
+            return f"<error: recursive wiki_add needs a directory, but {source!r} is not one>"
+        # M204 async-by-context: under a chat/daemon turn (origin set) a whole
+        # directory is a LONG job — submit a structured one-shot job and return
+        # now; the daemon notifies + resumes this chat when it finishes. A plain
+        # REPL turn (no origin) runs inline below.
+        from veles.core.context import current_origin
+
+        origin = current_origin()
+        if origin:
+            return _submit_background_ingest(src, glob or "*", origin)
+        files = batch_ingest_files(src, glob or "*")
+        if not files:
+            return f"<error: no files under {source!r} match {glob!r}>"
+    else:
+        if not src.is_file():
+            return f"<error: no such file: {source!r} — pass recursive=True for a directory>"
+        files = [src]
+
+    worker_tools = _ingest_worker_tools()
+
+    def spawn_one(path: Path) -> IngestOutcome:
+        from veles.core.orchestration.workers import spawn
+
+        handle = spawn(
+            "worker",
+            ingest_user_message(str(path)),
+            agent_factory=factory,
+            system_prompt=INGEST_AGENT_SYSTEM_PROMPT,
+            factory_kwargs={"tools": worker_tools},
+        )
+        if handle.error:
+            return IngestOutcome(source=str(path), ok=False, detail=str(handle.error))
+        return IngestOutcome(source=str(path), ok=True)
+
+    tok = enter_delegate()
+    try:
+        result = run_batch_ingest(files, spawn_one=spawn_one)
+    finally:
+        exit_delegate(tok)
+    return result.summary()
+
+
+def _submit_background_ingest(src, glob: str, origin: str) -> str:
+    """Submit the recursive ingest as a structured one-shot job (M204).
+
+    Deterministic by design (audit M5): `kind="ingest"` + machine `params` are
+    dispatched by the JobRunner straight to the batch kernel — the "I'll report
+    back" promise never depends on an LLM re-interpreting a prompt. The
+    CONCRETE origin string is stored as `deliver_to` (audit M1: the literal
+    "origin" is undeliverable from a detached/restarted job) and doubles as
+    the SessionMap key the resume path uses. `resume_depth` carries the
+    auto-resume loop guard."""
+    from veles.core.context import current_project, current_resume_depth
+    from veles.core.jobs_store import JobsStore
+
+    project = current_project()
+    if project is None:
+        return "<error: no active project — cannot schedule a background ingest>"
+    store = JobsStore(project.memory_db_path)
+    try:
+        rec = store.add_job(
+            name=f"ingest {src}",
+            prompt="",
+            schedule_expr="once:+0s",
+            kind="ingest",
+            params={
+                "source": str(src),
+                "glob": glob,
+                "resume_depth": current_resume_depth(),
+            },
+            deliver_to=origin,
+        )
+    finally:
+        store.close()
+    return (
+        f"Started background ingest of {src} (job {rec.id}). It runs file-by-file "
+        "with fresh sub-agents; I'll report back in this chat when it's done."
+    )
+
+
+def _ingest_worker_tools() -> list[str]:
+    """The per-file ingest worker's toolset: `[ingest]` minus self-recursion and
+    sub-delegation, intersected with the calling agent's own scope (S1 — a
+    worker may never exceed its parent). `[ingest]` already has no
+    `run_shell`/`fetch_url` (B1: ingested content is untrusted)."""
+    from veles.core.agent_state import current_toolset
+    from veles.core.tools.toolsets import TOOLSETS
+
+    base = [t for t in TOOLSETS["ingest"] if t not in ("wiki_add", "delegate")]
+    parent = current_toolset()
+    if parent:
+        return [t for t in base if t in parent]
+    return base
 
 
 def _infer_title_from_text(text: str) -> str | None:

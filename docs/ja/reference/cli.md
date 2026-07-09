@@ -43,6 +43,9 @@ veles [--no-wizard] <command> [subcommand] [options]
 |---|---|---|
 | `--json` | オフ | JSON レポートを出力する |
 | `--strict` | オフ | 警告が 1 つでもあれば非ゼロで終了する（CI でのゲーティング用） |
+| `--fix` | オフ | チェック前に安全な修復を試みる — 現在は破損したメモリ想起（FTS）インデックスを再構築する |
+
+`doctor` は `config.toml` のセキュリティに関わるセクション（`[channels.*]`、`[daemon.*]`、`[mcp.servers.*]`）も検証し、未知のキーをエラーとして報告します。`whitelist` を `whitlist` とタイプミスするとアクセス制御が黙って無効になるため、ここで明示的に失敗させます。
 
 ### `veles export {full,template} <path>`
 プロジェクトを `.tar.gz` バンドルにまとめます。[バックアップと共有](../how-to/backup-and-share.md)を参照してください。
@@ -140,13 +143,16 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `dedup [--mode auto\|embedding\|tfidf] [--embedding-threshold f] [--tfidf-threshold f]` | ほぼ重複しているスキルを検出する |
 | `suggest-promote [--save] [--min-uses n] [--min-success-rate f]` | 自動プロモーション基準を満たすスキルを一覧表示する |
 
-### `veles tool {list,show,promote}`
+### `veles tool {list,show,promote,approve}`
 
 | サブコマンド | 目的 |
 |---|---|
 | `list` | このプロジェクトの `memory.db` にカタログ化されたツールを一覧表示する |
 | `show <name>` | ツールのマニフェスト + テレメトリを表示する |
 | `promote <name> [-y]` | プロジェクトツールを `~/.veles/tools/`（プロジェクト横断）へ移動する |
+| `approve [<name>] [--all] [-y]` | 自作ツールファイルをレビューして承認し、ローダーが実行できるようにする |
+
+自作ツール（`.veles/tools/*.py`）は、ローダーがインポートするときにモジュールレベルのコードを実行します。そのため、新規または編集されたファイルは**承認するまでロードされません** — `veles tool approve` はコードを表示してそのハッシュを記録します。引数なしの `veles tool approve` は保留中のものを一覧表示します。
 
 ### `veles module {list,show,add,remove}`
 
