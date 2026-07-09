@@ -17,16 +17,47 @@ Three guarantees under test:
 from __future__ import annotations
 
 import argparse
+import json
 import socket
 import subprocess
 import sys
+import threading
 import time
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
 
 from veles.cli.commands import daemon_lifecycle as dl
 from veles.core.project import init_project
+
+
+@contextmanager
+def _health_server(pid: int):
+    """A stand-in daemon: serves `/v1/health` with the given pid on an
+    ephemeral port. Yields the port."""
+
+    class _Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({"status": "ok", "pid": pid}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):  # silence request logging
+            del args
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+    thread = threading.Thread(target=srv.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield srv.server_address[1]
+    finally:
+        srv.shutdown()
+        srv.server_close()
 
 
 @pytest.fixture(autouse=True)
@@ -83,24 +114,40 @@ def test_detach_report_fails_when_child_never_listens(
         child.wait(timeout=5)
 
 
-def test_detach_report_succeeds_when_port_listens(
+def test_detach_report_succeeds_when_child_serves_health(
     project, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     child = _fake_child()
-    listener = socket.socket()
     try:
-        listener.bind(("127.0.0.1", 0))
-        listener.listen(1)
-        port = listener.getsockname()[1]
-        pid_path, _info = dl._resolve_instance_paths(project, None)
-        monkeypatch.setattr("veles.daemon.spawn.spawn_daemon", _spawn_stub(child, pid_path))
-        args = argparse.Namespace(host="127.0.0.1", port=port)
-        rc = dl._detach_and_report(args, project, timeout=5.0)
+        with _health_server(pid=child.pid) as port:
+            pid_path, _info = dl._resolve_instance_paths(project, None)
+            monkeypatch.setattr("veles.daemon.spawn.spawn_daemon", _spawn_stub(child, pid_path))
+            args = argparse.Namespace(host="127.0.0.1", port=port)
+            rc = dl._detach_and_report(args, project, timeout=5.0)
         assert rc == 0
         assert "daemon started" in capsys.readouterr().out
     finally:
-        listener.close()
         child.terminate()
+        child.wait(timeout=5)
+
+
+def test_detach_report_rejects_imposter_on_the_port(
+    project, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The exact live race: a dying predecessor still serves the port while
+    the new child crashes on bind. A plain TCP probe took the predecessor as
+    proof of life; the health-pid identity check must not."""
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(0.5)"])
+    try:
+        with _health_server(pid=child.pid + 1) as port:  # someone else's pid
+            pid_path, _info = dl._resolve_instance_paths(project, None)
+            monkeypatch.setattr("veles.daemon.spawn.spawn_daemon", _spawn_stub(child, pid_path))
+            args = argparse.Namespace(host="127.0.0.1", port=port)
+            rc = dl._detach_and_report(args, project, timeout=3.0)
+        assert rc == 1
+        err = capsys.readouterr().err
+        assert "died" in err or "another process" in err
+    finally:
         child.wait(timeout=5)
 
 

@@ -15,7 +15,6 @@ import argparse
 import json
 import os
 import signal
-import socket
 import sys
 import time
 
@@ -239,12 +238,16 @@ def _detach_and_report(
         _print_log_tail(log_slug)
         return 1
 
-    # Phase 2: the pid file is necessary but not sufficient — wait until the
-    # child actually accepts connections on the bind port before declaring
-    # success. A child that dies here (bind conflict, crash in run_app) is a
-    # loud failure with the log tail, not a phantom "daemon started".
+    # Phase 2: the pid file is necessary but not sufficient — wait until OUR
+    # child serves `/v1/health` (matched by pid) before declaring success. A
+    # plain TCP probe is not enough: in the live failure a dying predecessor
+    # still held the port, so the socket connected fine while the new child
+    # crashed on bind. A child that dies here is a loud failure with the log
+    # tail, not a phantom "daemon started".
     connect_host = "127.0.0.1" if args.host in ("0.0.0.0", "::", "") else args.host
+    health_url = f"http://{connect_host}:{int(args.port)}/v1/health"
     serving = False
+    imposter_pid: int | None = None
     while time.time() < deadline:
         # `proc.poll()` reaps our direct child (a dead-but-unreaped zombie still
         # passes the kill(pid, 0) probe); `_process_alive` covers a pid-file pid
@@ -256,18 +259,27 @@ def _detach_and_report(
             )
             _print_log_tail(log_slug)
             return 1
-        try:
-            with socket.create_connection((connect_host, int(args.port)), timeout=0.2):
-                serving = True
-                break
-        except OSError:
-            time.sleep(0.1)
+        seen_pid = _health_pid(health_url)
+        if seen_pid == child_pid:
+            serving = True
+            break
+        if seen_pid is not None:
+            imposter_pid = seen_pid
+        time.sleep(0.1)
     if not serving:
-        print(
-            f"error: daemon (pid {child_pid}) is up but not serving on "
-            f"{connect_host}:{args.port} after {timeout:g}s. Recent log:",
-            file=sys.stderr,
-        )
+        if imposter_pid is not None:
+            print(
+                f"error: {connect_host}:{args.port} is served by another process "
+                f"(pid {imposter_pid}) and the new daemon (pid {child_pid}) never "
+                f"took over within {timeout:g}s. Recent log:",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"error: daemon (pid {child_pid}) is up but not serving on "
+                f"{connect_host}:{args.port} after {timeout:g}s. Recent log:",
+                file=sys.stderr,
+            )
         _print_log_tail(log_slug)
         return 1
 
@@ -283,6 +295,20 @@ def _detach_and_report(
     print(f"daemon started (pid {child_pid}) on http://{host}:{port}/")
     print(f"log: {log_path}")
     return 0
+
+
+def _health_pid(url: str) -> int | None:
+    """GET the daemon's unauthenticated `/v1/health` and return the serving
+    process's pid — None when nothing (or something that isn't a Veles
+    daemon) answers. Sync on purpose: the detach parent is a plain CLI."""
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(url, timeout=0.5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return int(data.get("pid") or 0) or None
+    except Exception:
+        return None
 
 
 def _print_log_tail(log_slug: str, *, lines: int = 20) -> None:

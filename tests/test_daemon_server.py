@@ -124,6 +124,17 @@ async def test_health_returns_project_info(aiohttp_client, app) -> None:
     assert "provider" in body
 
 
+async def test_health_exposes_serving_pid(aiohttp_client, app) -> None:
+    """`_detach_and_report` verifies startup by matching /v1/health's pid
+    against the spawned child (live 2026-07-09: a plain TCP probe accepted a
+    dying predecessor still holding the port as proof the NEW child serves)."""
+    import os
+
+    client = await aiohttp_client(app)
+    body = await (await client.get("/v1/health")).json()
+    assert body["pid"] == os.getpid()
+
+
 async def test_health_requires_no_auth(aiohttp_client, app) -> None:
     client = await aiohttp_client(app)
     resp = await client.get("/v1/health")

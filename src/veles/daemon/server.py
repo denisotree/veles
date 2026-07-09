@@ -27,6 +27,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
 import time
 from typing import Any
 
@@ -91,6 +92,10 @@ async def _handle_health(request: web.Request) -> web.Response:
         {
             "status": "ok",
             "version": __version__,
+            # Identity for the detach parent's startup gate: it matches this
+            # pid against the child it spawned, so a dying predecessor still
+            # holding the port can't pass for the new daemon (live 2026-07-09).
+            "pid": os.getpid(),
             "project": state.project.name,
             "project_root": sanitize(str(state.project.root), project=state.project),
             "started_at": state.started_at,
