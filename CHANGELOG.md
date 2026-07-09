@@ -28,6 +28,11 @@ tag was never pushed, so this release also delivers everything listed there.
   the same tool call without progress and a token-budget nudge warns the model
   before the budget runs out; the iteration cap is now a runaway backstop
   rather than the everyday stop.
+- **`veles daemon start` walks a Textual wizard (M208).** An interactive start
+  with no channel configured opens the same modal wizard style as the project
+  setup: confirm/adjust host and port (persisted to the project config), then
+  the registry-driven channel flow — instead of a bare stdin `[y/N]` prompt.
+  Falls back to stdin prompts on degraded terminals.
 
 ### Changed
 
