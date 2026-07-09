@@ -177,6 +177,67 @@ def test_resume_recap_replays_recent_conversation(project, capsys) -> None:
     assert "bandit algorithm" in out  # assistant turn shown
 
 
+def _strip_ansi(text: str) -> str:
+    """Rich's number-highlighting drops style codes inside tokens like
+    `msg-5`, breaking plain substring asserts on captured terminal output."""
+    import re
+
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
+
+
+def test_resume_recap_replays_long_content_untruncated(project, capsys) -> None:
+    """Live 2026-07-09: `-c` clamped each replayed message to 600 chars, so a
+    long answer (a full recipe) came back as a stub ending in […]. The whole
+    point of resuming in a scrollback-native REPL is that the full previous
+    content lands back in the terminal."""
+    from rich.console import Console
+
+    from veles.cli.commands.repl import _print_resume_recap, _resolve_theme
+    from veles.core.provider import Message
+    from veles.core.session_state import AppState
+
+    long_answer = "\n\n".join(f"Шаг {i}: описание шага шаг-{i}" for i in range(1, 101))
+    assert len(long_answer) > 600
+    store = SessionStore(project.memory_db_path)
+    try:
+        sid = store.create_session(title="t")
+        store.append_turn(sid, Message(role="user", content="напиши рецепт"))
+        store.append_turn(sid, Message(role="assistant", content=long_answer))
+        theme = _resolve_theme(AppState(session_id=None, provider_name="ollama", model="m"))
+        _print_resume_recap(Console(force_terminal=True), theme, store, sid)
+    finally:
+        store.close()
+
+    out = _strip_ansi(capsys.readouterr().out)
+    assert "[…]" not in out
+    assert "шаг-1" in out
+    assert "шаг-100" in out  # the tail of the long answer survived
+
+
+def test_resume_recap_replays_all_messages_not_just_the_tail(project, capsys) -> None:
+    """The recap must replay the WHOLE conversation, not the last 4 messages."""
+    from rich.console import Console
+
+    from veles.cli.commands.repl import _print_resume_recap, _resolve_theme
+    from veles.core.provider import Message
+    from veles.core.session_state import AppState
+
+    store = SessionStore(project.memory_db_path)
+    try:
+        sid = store.create_session(title="t")
+        for i in range(1, 7):
+            role = "user" if i % 2 else "assistant"
+            store.append_turn(sid, Message(role=role, content=f"сообщение msg-{i}"))
+        theme = _resolve_theme(AppState(session_id=None, provider_name="ollama", model="m"))
+        _print_resume_recap(Console(force_terminal=True), theme, store, sid)
+    finally:
+        store.close()
+
+    out = _strip_ansi(capsys.readouterr().out)
+    for i in range(1, 7):
+        assert f"msg-{i}" in out
+
+
 def test_no_continue_starts_fresh(project) -> None:
     _seed_two_sessions(project)  # sessions exist but -c not passed
     state, _factory, store, _subf = _build_runtime(_args(continue_last=False), project)

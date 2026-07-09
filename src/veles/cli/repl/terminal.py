@@ -214,10 +214,13 @@ def _banner(console, provider: str, model: str, mode: str, theme) -> None:
     console.print(Panel(body, expand=False, border_style=theme.border, padding=(0, 2)))
 
 
-def _print_resume_recap(console, theme, store, session_id: str, *, max_msgs: int = 4) -> None:
-    """On `-c`/`--resume`, replay the tail of the resumed conversation so the
-    user SEES they're continuing it (the agent already has the full history via
-    session_id; this is just the visible recap). Best-effort."""
+def _print_resume_recap(console, theme, store, session_id: str) -> None:
+    """On `-c`/`--resume`, replay the resumed conversation IN FULL so the
+    terminal scrollback holds everything the previous session produced (the
+    agent already has the full history via session_id; this is the visible
+    copy). It used to clamp to the last 4 messages × 600 chars — live
+    2026-07-09 that cut a long answer to a stub ending in […], losing the
+    content the user came back for. Best-effort."""
     from veles.cli.commands.repl import _render_answer
 
     try:
@@ -227,13 +230,9 @@ def _print_resume_recap(console, theme, store, session_id: str, *, max_msgs: int
     convo = [m for m in msgs if m.role in ("user", "assistant") and (m.content or "").strip()]
     if not convo:
         return
-    console.print(
-        f"  [dim]— continuing this conversation ({len(convo)} messages); recent context: —[/dim]\n"
-    )
-    for m in convo[-max_msgs:]:
+    console.print(f"  [dim]— continuing this conversation ({len(convo)} messages) —[/dim]\n")
+    for m in convo:
         body = (m.content or "").strip()
-        if len(body) > 600:
-            body = body[:600].rstrip() + " […]"
         if m.role == "user":
             console.print(f"❯ {body}", style=f"bold {theme.accent}", markup=False)
         else:
