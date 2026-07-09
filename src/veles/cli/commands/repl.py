@@ -27,6 +27,7 @@ import contextvars
 import os
 import sys
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 
 from veles.cli.repl.history import HistoryMixin
 from veles.cli.repl.hud import HudMixin
@@ -155,6 +156,13 @@ class _ReplApp(
         self._last_ctrl_c = 0.0
         self._next_mode = next_mode
         self._tasks: set = set()  # keep strong refs so tasks aren't GC'd mid-flight
+        # M191 post-turn memory upkeep (insight extraction + curation) runs on
+        # this dedicated single worker, NOT the loop thread and NOT the default
+        # executor: one worker serializes back-to-back passes for free, and the
+        # loop's shutdown never joins it (quit stays instant; the interpreter
+        # waits for a mid-flight pass at exit — see `_note_pending_upkeep`).
+        self._upkeep_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="veles-upkeep")
+        self._upkeep_futures: set = set()  # in-flight upkeep jobs (HUD chip + quit note)
         # --- live-generation meta HUD state (reset per turn) ---
         self.meta_events: list[tuple[str, str]] = []  # ("mode"|"tool", text)
         self.meta_expanded = False
@@ -374,6 +382,7 @@ class _ReplApp(
         try:
             with patch_stdout(raw=True):
                 self.app.run(pre_run=_enable_kitty)
+            self._note_pending_upkeep()
         finally:
             _kitty_disable_keyboard()
             reset_question_prompter(qtoken)

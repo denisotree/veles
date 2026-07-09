@@ -456,6 +456,42 @@ class TurnMixin:
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
+    @property
+    def upkeep_busy(self) -> bool:
+        """True while M191 post-turn memory upkeep runs on the worker."""
+        return bool(self._upkeep_futures)
+
+    def _submit_upkeep(self, result) -> None:
+        """Schedule the M191 post-turn hooks (insight extraction + curation) on
+        the dedicated single upkeep worker. The hooks make their own LLM calls
+        — inline on the event-loop thread they froze the whole UI for seconds
+        after the answer finished (live 2026-07-09). One worker = passes from
+        back-to-back turns queue instead of stacking. Runs in a fresh copy of
+        the captured parent context, same as the turn itself (`run_in_executor`
+        / plain threads don't propagate ContextVars — without it the hooks
+        would lose the active project)."""
+        ctx = self._parent_ctx.run(contextvars.copy_context)
+
+        def _job() -> None:
+            ctx.run(_run_repl_post_turn_hooks, self.args, self.project, result)
+
+        fut = self._upkeep_pool.submit(_job)
+        self._upkeep_futures.add(fut)
+        self._invalidate_threadsafe()  # show the HUD upkeep chip
+
+        def _done(f) -> None:
+            self._upkeep_futures.discard(f)
+            self._invalidate_threadsafe()  # drop the chip
+
+        fut.add_done_callback(_done)
+
+    def _note_pending_upkeep(self) -> None:
+        """On quit with upkeep still in flight, say so: the interpreter waits
+        for the worker thread at exit, and a silent multi-second pause after
+        Ctrl+D reads as a hang."""
+        if self.upkeep_busy:
+            self.console.print("  ⋅ finishing memory upkeep…", style=self.theme.muted, markup=False)
+
     def _invalidate_threadsafe(self) -> None:
         """Ask the app to redraw. `Application.invalidate` schedules the redraw
         on the loop, so it's safe to call from the executor thread (streaming
@@ -602,7 +638,11 @@ class TurnMixin:
                 _update_state_after_turn(self.state, result)
                 # M191: run the learning loop (insight extraction + curation)
                 # on the completed turn, same as `veles run`. Skips None/cancel.
-                _run_repl_post_turn_hooks(self.args, self.project, result)
+                # In the background — these hooks make their own LLM calls, and
+                # running them inline here (the event-loop thread) froze the
+                # whole UI for seconds between "answer done" and "✓ done"
+                # (live 2026-07-09).
+                self._submit_upkeep(result)
                 if self.queue:
                     text = self.queue.popleft()
                 else:

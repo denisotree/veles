@@ -65,6 +65,11 @@ class HudMixin:
                 "error": " ✗ error",
             }.get(getattr(self, "last_stopped_reason", "completed"), " ✓ done")
         head = f"{label} · ≈{approx} tok · {len(tools)} tool(s) · {elapsed}s"
+        # M191 memory upkeep (insight extraction + curation) keeps running in
+        # the background after "done" — surface it, muted, only while idle (a
+        # next busy turn owns the line).
+        if not self.busy and self.upkeep_busy:
+            head += " · ⟳ memory upkeep"
         hint = t("repl.meta_collapse") if self.meta_expanded else t("repl.meta_expand")
         frags: list[tuple[str, str]] = [("class:meta", head + hint + "\n")]
         if self.meta_expanded:
