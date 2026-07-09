@@ -295,13 +295,7 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
         file=sys.stderr,
     )
     try:
-        web.run_app(
-            app,
-            host=args.host,
-            port=args.port,
-            print=lambda *_, **__: None,
-            handle_signals=True,
-        )
+        _run_app_logged(app, host=args.host, port=args.port)
     finally:
         _cleanup_daemon_exit(
             project,
@@ -312,6 +306,33 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
             name=name,
         )
     return 0
+
+
+def _run_app_logged(app, *, host, port) -> None:
+    """`web.run_app` with crashes written to the daemon log before re-raising.
+
+    A detached child's stderr historically went to /dev/null, so a failure
+    inside run_app — most commonly "address already in use" while a dying
+    predecessor still holds the socket — killed the daemon with zero trace
+    (live 2026-07-09: the parent had already said "daemon started", and the
+    log ended at "daemon starting"). `spawn_daemon(log_path=…)` now catches
+    raw stderr too; this hook puts a structured traceback in the rotated log
+    regardless of fd plumbing."""
+    import logging
+
+    try:
+        web.run_app(
+            app,
+            host=host,
+            port=port,
+            print=lambda *_, **__: None,
+            handle_signals=True,
+        )
+    except Exception:
+        logging.getLogger("veles.daemon").exception(
+            "daemon crashed in run_app (host=%s port=%s)", host, port
+        )
+        raise
 
 
 def _resolve_daemon_bind(args: argparse.Namespace, project, name: str | None) -> None:

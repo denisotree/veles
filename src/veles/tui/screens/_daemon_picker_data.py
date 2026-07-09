@@ -106,8 +106,16 @@ def runtime_session_action(project, record, action: str) -> str:
     pid = record.pid or 0
 
     def _spawn() -> bool:
+        from veles.daemon.paths import daemon_log_path
+
         return (
-            spawn_daemon(project_root=project.root, host=host, port=port, name=record.name)
+            spawn_daemon(
+                project_root=project.root,
+                host=host,
+                port=port,
+                name=record.name,
+                log_path=daemon_log_path(f"{project.name}-{record.name}"),
+            )
             is not None
         )
 
@@ -515,16 +523,31 @@ def spawn_daemon_node(node: DaemonNode) -> bool:
     """Spawn the daemon backing `node`, detached. Registry/unnamed → host/port
     in its own project root; named → adds `--name` so the child re-attaches its
     `runtime_sessions` row. Returns True on a live child handle."""
+    from veles.daemon.paths import daemon_log_path
     from veles.daemon.spawn import spawn_daemon
 
     host = node.host or "127.0.0.1"
     port = node.port or 8765
     if node.kind == "named":
         return (
-            spawn_daemon(project_root=node.project_path, host=host, port=port, name=node.name)
+            spawn_daemon(
+                project_root=node.project_path,
+                host=host,
+                port=port,
+                name=node.name,
+                log_path=daemon_log_path(f"{node.project_name}-{node.name}"),
+            )
             is not None
         )
-    return spawn_daemon(project_root=node.project_path, host=host, port=port) is not None
+    return (
+        spawn_daemon(
+            project_root=node.project_path,
+            host=host,
+            port=port,
+            log_path=daemon_log_path(node.project_name),
+        )
+        is not None
+    )
 
 
 def soft_delete_runtime(project, record) -> None:

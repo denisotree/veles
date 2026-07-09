@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.1] — 2026-07-09
+
+### Fixed
+
+- **`veles daemon start` can no longer claim success for a daemon that died
+  at birth.** The detach parent used to trust the pid file alone: a child
+  that appeared, got reported as "daemon started (pid …)", then crashed one
+  second later inside `run_app` (port still held by a dying predecessor)
+  left a registry entry pointing at a corpse and no trace of the crash. The
+  parent now waits until the child serves `/v1/health` and the reported pid
+  matches the child it spawned — a mere TCP listener on the port (the dying
+  predecessor) does not pass. A child that dies while coming up, or a port
+  served by another process, is a loud error with the daemon-log tail.
+- **A detached daemon's crash is visible.** The child's stdout/stderr are
+  appended to `~/.veles/logs/daemon-<slug>.log` instead of `/dev/null`
+  (every spawn site: detach, named restart, picker start, wizard
+  autostart), and `run_app` failures additionally log a structured
+  traceback — "address already in use" now shows up both in the terminal
+  and in the log.
+- **Config validation no longer flags the channel keys the wizard itself
+  writes.** `daemon start` validates the security config sections before
+  anything imports a channel module, so the platform registry was empty
+  and the validator degraded to base keys — falsely warning that the
+  legitimate `whitelist` key (the security control itself) was "likely a
+  typo". The validator now bootstraps the builtin platform registry.
+
 ## [0.21.0] — 2026-07-09
 
 First release published since 0.9.0 — the 0.20.0 section below was cut but its

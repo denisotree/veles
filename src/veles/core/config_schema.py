@@ -42,9 +42,14 @@ class ConfigFinding:
 
 
 def _channel_known_keys(platform: str) -> frozenset[str]:
-    from veles.channels.platform_registry import get_platform
+    from veles.channels.platform_registry import ensure_builtins_registered, get_platform
 
     try:
+        # `daemon start` validates the config before anything imports a channel
+        # module — bootstrap the builtin registry here, or `get_platform` raises
+        # on an empty registry and the validator degrades to base keys, falsely
+        # flagging legitimate per-platform keys like `whitelist` (live 2026-07-09).
+        ensure_builtins_registered()
         entry = get_platform(platform)
     except Exception:
         # Unknown platform (possibly itself a typo) — validate only base keys

@@ -19,7 +19,7 @@ def test_autostart_called_when_daemon_answered(tmp_path: Path, monkeypatch) -> N
     class _FakeProc:
         pid = 4242
 
-    def fake_spawn(*, project_root, host, port):
+    def fake_spawn(*, project_root, host, port, name=None, log_path=None):
         calls.append({"project_root": str(project_root), "host": host, "port": port})
         return _FakeProc()
 
