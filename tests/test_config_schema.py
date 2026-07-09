@@ -48,6 +48,20 @@ def test_mcp_server_unknown_key_flagged() -> None:
     assert any(f.key == "comand" and f.section == "mcp.servers.gh" for f in findings)
 
 
+def test_validator_self_registers_builtin_platforms() -> None:
+    """Live 2026-07-09: `veles daemon start` validates the config BEFORE
+    anything imports a channel module, so the platform registry was empty,
+    `get_platform` raised, and the validator degraded to base keys — flagging
+    the legitimate `whitelist` the channel wizard itself wrote ("unknown key
+    'whitelist' … a security control may be disabled"). The validator must
+    bootstrap the builtin registry itself."""
+    from veles.channels.platform_registry import _reset_registry_for_tests
+
+    _reset_registry_for_tests()  # simulate a fresh process, no channel imports
+    cfg = {"channels": {"telegram": {"enabled": True, "bot_token": "x", "whitelist": ["@a"]}}}
+    assert validate_config(cfg) == []
+
+
 def test_unknown_platform_does_not_crash() -> None:
     cfg = {"channels": {"myplatform": {"enabled": True, "weird_key": 1}}}
     # get_platform raises for an unknown platform; the validator must degrade,
