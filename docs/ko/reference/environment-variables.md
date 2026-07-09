@@ -42,11 +42,9 @@ API 키 조회 순서: OS 키체인(프로젝트 범위) → OS 키체인(기본
 | 변수 | 기본값 | 용도 |
 |---|---|---|
 | `VELES_USER_HOME` | `~` | `~/.veles/`(상태, 캐시, 키체인 인덱스)를 담는 홈 재정의 |
-| `VELES_HOME` | — | `VELES_USER_HOME`의 레거시 별칭 |
 | `VELES_REGISTRY_PATH` | `~/.veles/…` | 멀티 프로젝트 레지스트리 경로 재정의 |
 | `VELES_LOCALE` | `[user] language` 또는 `en` | 한 번의 실행 동안 활성 UI 로케일 재정의 |
 | `VELES_LOG_LEVEL` | `INFO` | 데몬/로그 상세도(`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
-| `VELES_CONFIG_FILENAME` | `config.toml` | 설정 파일명 재정의(테스트용) |
 
 ## 동작 & 기능 플래그
 

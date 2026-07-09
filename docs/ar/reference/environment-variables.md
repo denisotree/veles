@@ -44,11 +44,9 @@
 | المتغيّر | الافتراضي | الغرض |
 |---|---|---|
 | `VELES_USER_HOME` | `~` | تجاوز المنزل الذي يحوي `~/.veles/` (الحالة، الذاكرة المؤقتة، فهرس سلسلة المفاتيح) |
-| `VELES_HOME` | — | اسم بديل قديم لـ `VELES_USER_HOME` |
 | `VELES_REGISTRY_PATH` | `~/.veles/…` | تجاوز مسار سجلّ تعدّد المشاريع |
 | `VELES_LOCALE` | `[user] language` أو `en` | تجاوز لغة الواجهة النشطة لتشغيل واحد |
 | `VELES_LOG_LEVEL` | `INFO` | إسهاب العفريت/السجلّ (`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
-| `VELES_CONFIG_FILENAME` | `config.toml` | تجاوز اسم ملف الإعداد (للاختبار) |
 
 ## أعلام السلوك والميزات
 

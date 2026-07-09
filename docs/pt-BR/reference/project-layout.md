@@ -16,7 +16,7 @@ my-project/                  # veles init  (layout llm-wiki padrão)
 ├── GEMINI.md → AGENTS.md    # symlink, para uma CLI `gemini`
 ├── sources/                 # material-fonte bruto e imutável (somente leitura pelo agente)
 ├── wiki/                    # a zona de conhecimento gravável pela LLM
-│   ├── concepts/ entities/ queries/ self-doc/ sessions/ sources/
+│   ├── concepts/ entities/ queries/ self-doc/ sessions/
 └── .veles/                  # estado do projeto (não comitar; gerenciado pela máquina)
     ├── project.toml         # name, created_at, schema_version, layout
     ├── memory.db            # SQLite: sessões, turnos, insights, regras, telemetria

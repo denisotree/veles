@@ -44,11 +44,9 @@ API-key lookup cascade: OS keychain (project scope) → OS keychain (default sco
 | Variable | Default | उद्देश्य |
 |---|---|---|
 | `VELES_USER_HOME` | `~` | `~/.veles/` (state, cache, keychain index) रखने वाली home को override करें |
-| `VELES_HOME` | — | `VELES_USER_HOME` के लिए legacy alias |
 | `VELES_REGISTRY_PATH` | `~/.veles/…` | multi-project registry path override करें |
 | `VELES_LOCALE` | `[user] language` या `en` | एक run के लिए सक्रिय UI locale override करें |
 | `VELES_LOG_LEVEL` | `INFO` | Daemon/log verbosity (`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
-| `VELES_CONFIG_FILENAME` | `config.toml` | config filename override करें (testing) |
 
 ## Behaviour और feature flags
 

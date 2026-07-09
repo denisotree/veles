@@ -37,7 +37,7 @@ Each `add` produces a page under `wiki/` and links it into the wiki graph.
 Look at what was written:
 
 ```bash
-ls wiki/concepts wiki/entities wiki/sources
+ls wiki/concepts wiki/entities
 ```
 
 Pages cross-reference each other. The on-demand `wiki/INDEX.md` catalog keeps a

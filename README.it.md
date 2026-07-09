@@ -51,7 +51,7 @@ veles        # interactive REPL (just run `veles` with no subcommand)
 
 **Local-first + isolato** — Niente telemetria, niente sincronizzazione cloud. L'agente vede solo la directory del progetto attivo. La scala di fiducia chiede conferma per ogni chiamata a uno strumento sensibile; pre-autorizza per la CI.
 
-**Modulare, non monolitico** — Un core minimale (memoria, ciclo dell'agente, protocollo dei provider, registro degli strumenti). Tutto il resto — TUI, daemon, gateway Telegram, deep research, scheduler dei job — è un modulo opzionale e caricabile.
+**Modulare, non monolitico** — Un core minimale (memoria, ciclo dell'agente, protocollo dei provider, registro degli strumenti). Tutto il resto — daemon, gateway Telegram, deep research, scheduler dei job — è un modulo opzionale e caricabile.
 
 ---
 
@@ -237,7 +237,7 @@ I comandi slash mostrano tutto in tempo reale — `/status`, `/tokens`, `/contex
 | `Shift+Enter` | A capo nel compositore |
 | `Ctrl+I` | Attiva/disattiva l'ispettore dell'attività degli strumenti |
 | `Ctrl+R` | Overlay di selezione della sessione |
-| `Ctrl+G` | Apre `$EDITOR` sulla bozza corrente |
+| `Ctrl+X Ctrl+E` | Apre `$EDITOR` sulla bozza corrente |
 | `Tab` | Autocompletamento dei comandi slash |
 | `Ctrl+D` | Esci |
 

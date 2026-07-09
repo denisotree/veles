@@ -31,7 +31,7 @@ veles add ./notes/meeting-2026-06-01.md
 작성된 내용을 확인하세요:
 
 ```bash
-ls wiki/concepts wiki/entities wiki/sources
+ls wiki/concepts wiki/entities
 ```
 
 페이지들은 서로 교차 참조합니다. 온디맨드 `wiki/INDEX.md` 카탈로그는 에이전트가 필요할 때 로드하는 맵을 유지합니다(모놀리식 컨텍스트 덤프가 아닙니다).

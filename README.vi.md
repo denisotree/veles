@@ -51,7 +51,7 @@ veles        # interactive REPL (just run `veles` with no subcommand)
 
 **Local-first + sandbox** — Không thu thập dữ liệu, không đồng bộ đám mây. Agent chỉ nhìn thấy thư mục dự án đang hoạt động. Thang tin cậy (trust ladder) hỏi xác nhận cho từng lời gọi công cụ nhạy cảm; có thể cấp quyền trước cho CI.
 
-**Mô-đun hóa, không phải khối liền** — Phần lõi tối giản (bộ nhớ, vòng lặp agent, giao thức nhà cung cấp, registry công cụ). Mọi thứ còn lại — TUI, daemon, gateway Telegram, deep research, bộ lập lịch tác vụ — đều là mô-đun tùy chọn, có thể nạp được.
+**Mô-đun hóa, không phải khối liền** — Phần lõi tối giản (bộ nhớ, vòng lặp agent, giao thức nhà cung cấp, registry công cụ). Mọi thứ còn lại — daemon, gateway Telegram, deep research, bộ lập lịch tác vụ — đều là mô-đun tùy chọn, có thể nạp được.
 
 ---
 
@@ -237,7 +237,7 @@ Các lệnh slash hiển thị mọi thứ trực tiếp — `/status`, `/tokens
 | `Shift+Enter` | Xuống dòng trong ô soạn thảo |
 | `Ctrl+I` | Bật/tắt trình kiểm tra hoạt động công cụ |
 | `Ctrl+R` | Lớp phủ chọn phiên |
-| `Ctrl+G` | Mở `$EDITOR` với bản nháp hiện tại |
+| `Ctrl+X Ctrl+E` | Mở `$EDITOR` với bản nháp hiện tại |
 | `Tab` | Tự động hoàn thành lệnh slash |
 | `Ctrl+D` | Thoát |
 

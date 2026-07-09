@@ -36,7 +36,7 @@ Mỗi `add` tạo ra một trang dưới `wiki/` và liên kết nó vào đồ 
 Hãy xem những gì đã được viết:
 
 ```bash
-ls wiki/concepts wiki/entities wiki/sources
+ls wiki/concepts wiki/entities
 ```
 
 Các trang tham chiếu chéo lẫn nhau. Danh mục `wiki/INDEX.md` theo nhu cầu giữ một

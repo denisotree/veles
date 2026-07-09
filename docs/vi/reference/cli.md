@@ -376,7 +376,7 @@ Kiểm tra các máy chủ MCP bên ngoài được cấu hình dưới `[mcp.se
 | `--model <id>` | giải quyết từ model `[engine]` của dự án → `default_model` của user (không có mặc định cứng) | ID model |
 | `--provider <name>` | `openrouter` | Nhà cung cấp (xem bên dưới) |
 | `--max-tokens-total <n>` | `100000` | Ngân sách token tích lũy; `0` để tắt |
-| `--max-iterations <n>` | `30` | Số vòng lặp gọi tool tối đa mỗi lượt |
+| `--max-iterations <n>` | `1000` | Số vòng lặp gọi tool tối đa mỗi lượt |
 | `--stream` | tắt | Truyền phát phản hồi theo từng token |
 | `--verbose` / `-v` | tắt | Tiến độ từng lượt ra stderr |
 | `--project-root <path>` | tự dò từ cwd | Thao tác trên một dự án ở nơi khác |

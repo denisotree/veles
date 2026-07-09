@@ -377,7 +377,7 @@ start`:
 | `--model <id>` | resuelto desde el modelo de `[engine]` del proyecto → `default_model` del usuario (sin valor por defecto codificado) | ID del modelo |
 | `--provider <name>` | `openrouter` | Proveedor (ver más abajo) |
 | `--max-tokens-total <n>` | `100000` | Presupuesto de tokens acumulado; `0` lo desactiva |
-| `--max-iterations <n>` | `30` | Máximo de iteraciones de llamada a herramientas por turno |
+| `--max-iterations <n>` | `1000` | Máximo de iteraciones de llamada a herramientas por turno |
 | `--stream` | desactivado | Transmite la respuesta token a token |
 | `--verbose` / `-v` | desactivado | Progreso por turno a stderr |
 | `--project-root <path>` | descubrimiento desde el cwd | Opera sobre un proyecto en otra ubicación |

@@ -42,11 +42,9 @@ API 金鑰的查詢串接順序：OS 鑰匙圈（專案範圍）→ OS 鑰匙圈
 | 變數 | 預設 | 用途 |
 |---|---|---|
 | `VELES_USER_HOME` | `~` | 覆寫存放 `~/.veles/`（狀態、快取、鑰匙圈索引）的家目錄 |
-| `VELES_HOME` | — | `VELES_USER_HOME` 的舊版別名 |
 | `VELES_REGISTRY_PATH` | `~/.veles/…` | 覆寫多專案登錄庫路徑 |
 | `VELES_LOCALE` | `[user] language` 或 `en` | 為單次執行覆寫作用中的 UI 語系 |
 | `VELES_LOG_LEVEL` | `INFO` | daemon／log 的詳盡程度（`DEBUG`/`INFO`/`WARNING`/`ERROR`） |
-| `VELES_CONFIG_FILENAME` | `config.toml` | 覆寫設定檔名（測試用） |
 
 ## 行為與功能旗標
 

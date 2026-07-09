@@ -31,7 +31,7 @@ veles add ./notes/meeting-2026-06-01.md
 যা লেখা হলো তা দেখুন:
 
 ```bash
-ls wiki/concepts wiki/entities wiki/sources
+ls wiki/concepts wiki/entities
 ```
 
 Page-গুলো একে অপরকে cross-reference করে। on-demand `wiki/INDEX.md` ক্যাটালগ একটি map রাখে যা agent প্রয়োজন হলে লোড করে (এক বিশাল monolithic context dump নয়)।

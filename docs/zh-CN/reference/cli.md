@@ -346,7 +346,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `--model <id>` | 从项目 `[engine]` 的 model 解析 → 用户 `default_model`（无硬编码默认值） | 模型 ID |
 | `--provider <name>` | `openrouter` | 提供方（见下） |
 | `--max-tokens-total <n>` | `100000` | 累计 token 预算；`0` 表示禁用 |
-| `--max-iterations <n>` | `30` | 每个回合的最大 tool 调用迭代次数 |
+| `--max-iterations <n>` | `1000` | 每个回合的最大 tool 调用迭代次数 |
 | `--stream` | 关闭 | 逐 token 流式输出响应 |
 | `--verbose` / `-v` | 关闭 | 将每回合进度输出到 stderr |
 | `--project-root <path>` | 从当前目录自动发现 | 在其他位置的项目上操作 |

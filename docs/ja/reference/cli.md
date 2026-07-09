@@ -346,7 +346,7 @@ HTTP+WS デーモンの実行/制御を行います。引数なしの `veles dae
 | `--model <id>` | プロジェクトの `[engine]` モデル → ユーザーの `default_model` の順に解決（ハードコードされたデフォルトなし） | モデル ID |
 | `--provider <name>` | `openrouter` | プロバイダー（下記参照） |
 | `--max-tokens-total <n>` | `100000` | 累積トークン予算。`0` で無効化 |
-| `--max-iterations <n>` | `30` | 1 ターンあたりのツール呼び出しの最大反復回数 |
+| `--max-iterations <n>` | `1000` | 1 ターンあたりのツール呼び出しの最大反復回数 |
 | `--stream` | オフ | レスポンスをトークン単位でストリーミングする |
 | `--verbose` / `-v` | オフ | ターンごとの進捗を stderr に出力する |
 | `--project-root <path>` | cwd から自動検出 | 別の場所にあるプロジェクトを対象に操作する |

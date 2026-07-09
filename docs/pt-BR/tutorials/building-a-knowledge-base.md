@@ -38,7 +38,7 @@ Cada `add` produz uma página em `wiki/` e a interliga ao grafo da wiki.
 Veja o que foi escrito:
 
 ```bash
-ls wiki/concepts wiki/entities wiki/sources
+ls wiki/concepts wiki/entities
 ```
 
 As páginas fazem referências cruzadas entre si. O catálogo sob demanda
