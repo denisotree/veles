@@ -90,7 +90,10 @@ def test_detach_path_default_calls_spawn(
     project, isolated_user_home: Path, monkeypatch, capsys
 ) -> None:
     """No `--foreground` → `_cmd_daemon_start` delegates to
-    `_detach_and_report`, which spawns + polls + returns 0."""
+    `_detach_and_report`, which spawns + polls (pid file AND a listening
+    port — the 2026-07-09 fix) + returns 0."""
+    import socket
+
     from veles.daemon import spawn as spawn_mod
 
     web_run_calls: list[Any] = []
@@ -100,13 +103,20 @@ def test_detach_path_default_calls_spawn(
     info_file = isolated_user_home / "daemon.info.json"
     fake_child_pid = 99_999_111  # very unlikely to clash with real pid
 
+    # The success gate now requires the child to actually LISTEN on the bind
+    # port; play the child's part with a real ephemeral-port listener.
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+    port = listener.getsockname()[1]
+
     class _FakeProc:
         pid = fake_child_pid
 
         def poll(self):
             return None
 
-    def fake_spawn(*, project_root, host, port, name=None):
+    def fake_spawn(*, project_root, host, port, name=None, log_path=None):
         # Simulate the child writing its pid + info before we return.
         pid_file.write_text(f"{fake_child_pid}\n", encoding="utf-8")
         info_file.write_text(
@@ -126,7 +136,10 @@ def test_detach_path_default_calls_spawn(
     monkeypatch.setattr(lifecycle_mod, "_process_alive", lambda pid: pid == fake_child_pid)
     monkeypatch.setattr("veles.cli._ensure_api_key", lambda provider, project=None: True)
 
-    rc = daemon_cmd._cmd_daemon_start(_start_args())
+    try:
+        rc = daemon_cmd._cmd_daemon_start(_start_args(port=port))
+    finally:
+        listener.close()
     assert rc == 0
     assert web_run_calls == []  # parent didn't run the server
     out = capsys.readouterr().out

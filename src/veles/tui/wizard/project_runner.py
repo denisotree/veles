@@ -50,6 +50,7 @@ def run_project_wizard_tui(
 
 
 def _autostart_daemon(project: Project, daemon: dict) -> None:
+    from veles.daemon.paths import daemon_log_path
     from veles.daemon.spawn import spawn_daemon
 
     host = str(daemon.get("host") or "127.0.0.1")
@@ -57,7 +58,9 @@ def _autostart_daemon(project: Project, daemon: dict) -> None:
         port = int(daemon.get("port") or 8765)
     except (TypeError, ValueError):
         port = 8765
-    proc = spawn_daemon(project_root=project.root, host=host, port=port)
+    proc = spawn_daemon(
+        project_root=project.root, host=host, port=port, log_path=daemon_log_path(project.name)
+    )
     if proc is None:
         print(
             f"warning: failed to spawn `veles daemon start` for {project.name}",

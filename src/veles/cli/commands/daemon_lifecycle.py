@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import signal
+import socket
 import sys
 import time
 
@@ -161,16 +162,27 @@ def _cleanup_daemon_exit(
     jobs_store.close()
 
 
-def _detach_and_report(args: argparse.Namespace, project, *, name: str | None = None) -> int:
+def _detach_and_report(
+    args: argparse.Namespace, project, *, name: str | None = None, timeout: float = 5.0
+) -> int:
     """M113: spawn `veles daemon start --foreground` detached, then
-    poll the pid file until the child has fully bootstrapped (or
-    failed). Parent prints a summary and returns to the shell.
+    poll until the child has fully bootstrapped (or failed). Parent
+    prints a summary and returns to the shell.
+
+    "Bootstrapped" means TWO things (live 2026-07-09): the child wrote its
+    pid file AND it actually LISTENS on the bind port. The pid file alone is
+    not proof of life — a child used to appear (pid written), get reported
+    as "daemon started", then die one second later on `web.run_app` (port
+    still held by a dying predecessor), leaving a registry entry pointing
+    at a corpse. The child's stdout/stderr are routed into the daemon log
+    via `spawn_daemon(log_path=…)` so that crash is visible in the tail we
+    print on failure.
 
     The polling loop is needed because `subprocess.Popen` returns
     immediately, but the child still has to import veles, resolve the
     project, set up logging, build the aiohttp app, write the pid
-    file, and call `web.run_app`. 5 seconds is generous — typical
-    startup is ~300-500 ms.
+    file, and call `web.run_app`. `timeout` (5s default) is generous —
+    typical startup is ~300-500 ms.
 
     For a named session the parent watches the per-instance pid path and
     re-execs the child with `--name <name>` so both agree on that path.
@@ -191,13 +203,19 @@ def _detach_and_report(args: argparse.Namespace, project, *, name: str | None = 
             )
             return 1
 
-    proc = spawn_daemon(project_root=project.root, host=args.host, port=args.port, name=name)
+    proc = spawn_daemon(
+        project_root=project.root,
+        host=args.host,
+        port=args.port,
+        name=name,
+        log_path=daemon_log_path(log_slug),
+    )
     if proc is None:
         print("error: failed to spawn `veles daemon start --foreground`.", file=sys.stderr)
         return 1
 
-    # Poll until the child writes its pid file AND the pid is alive.
-    deadline = time.time() + 5.0
+    # Phase 1: poll until the child writes its pid file AND the pid is alive.
+    deadline = time.time() + timeout
     child_pid: int | None = None
     while time.time() < deadline:
         if pid_path.is_file():
@@ -215,15 +233,42 @@ def _detach_and_report(args: argparse.Namespace, project, *, name: str | None = 
 
     if child_pid is None:
         print(
-            "error: daemon did not start within 5s. Recent log:",
+            f"error: daemon did not start within {timeout:g}s. Recent log:",
             file=sys.stderr,
         )
+        _print_log_tail(log_slug)
+        return 1
+
+    # Phase 2: the pid file is necessary but not sufficient — wait until the
+    # child actually accepts connections on the bind port before declaring
+    # success. A child that dies here (bind conflict, crash in run_app) is a
+    # loud failure with the log tail, not a phantom "daemon started".
+    connect_host = "127.0.0.1" if args.host in ("0.0.0.0", "::", "") else args.host
+    serving = False
+    while time.time() < deadline:
+        # `proc.poll()` reaps our direct child (a dead-but-unreaped zombie still
+        # passes the kill(pid, 0) probe); `_process_alive` covers a pid-file pid
+        # that isn't our Popen child.
+        if proc.poll() is not None or not _process_alive(child_pid):
+            print(
+                f"error: daemon (pid {child_pid}) died while starting up. Recent log:",
+                file=sys.stderr,
+            )
+            _print_log_tail(log_slug)
+            return 1
         try:
-            log_text = daemon_log_path(log_slug).read_text(encoding="utf-8")
-            tail = "\n".join(log_text.splitlines()[-20:])
-            print(tail, file=sys.stderr)
+            with socket.create_connection((connect_host, int(args.port)), timeout=0.2):
+                serving = True
+                break
         except OSError:
-            print("  (no log file written yet)", file=sys.stderr)
+            time.sleep(0.1)
+    if not serving:
+        print(
+            f"error: daemon (pid {child_pid}) is up but not serving on "
+            f"{connect_host}:{args.port} after {timeout:g}s. Recent log:",
+            file=sys.stderr,
+        )
+        _print_log_tail(log_slug)
         return 1
 
     host = args.host
@@ -238,6 +283,14 @@ def _detach_and_report(args: argparse.Namespace, project, *, name: str | None = 
     print(f"daemon started (pid {child_pid}) on http://{host}:{port}/")
     print(f"log: {log_path}")
     return 0
+
+
+def _print_log_tail(log_slug: str, *, lines: int = 20) -> None:
+    try:
+        log_text = daemon_log_path(log_slug).read_text(encoding="utf-8")
+        print("\n".join(log_text.splitlines()[-lines:]), file=sys.stderr)
+    except OSError:
+        print("  (no log file written yet)", file=sys.stderr)
 
 
 def _stop_status_paths(args: argparse.Namespace):
@@ -279,7 +332,13 @@ def _restart_named_session(args: argparse.Namespace, name: str) -> int:
     block = get_daemon_session_config(load_project_config(project), name)
     host = str(block.get("host") or "127.0.0.1")
     port = int(block.get("port") or 8765)
-    proc = spawn_daemon(project_root=project.root, host=host, port=port, name=name)
+    proc = spawn_daemon(
+        project_root=project.root,
+        host=host,
+        port=port,
+        name=name,
+        log_path=daemon_log_path(_instance_log_slug(project, name)),
+    )
     if proc is None:
         print("error: failed to respawn named daemon session.", file=sys.stderr)
         return 1
