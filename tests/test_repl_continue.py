@@ -25,6 +25,9 @@ def _fresh_engine_cache():
 def _args(**over) -> argparse.Namespace:
     base = dict(
         provider="ollama",  # local, keyless
+        _provider_explicit=True,  # as if --provider ollama was passed (else the
+        # resolver falls back to the config default and CI, with no
+        # OPENROUTER_API_KEY, fails the key gate)
         model="m",
         resume=None,
         continue_last=False,

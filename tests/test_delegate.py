@@ -176,6 +176,9 @@ def test_repl_runtime_subagent_factory_scopes_tools(tmp_path, monkeypatch) -> No
     try:
         args = argparse.Namespace(
             provider="ollama",  # local, keyless — no network at construction
+            _provider_explicit=True,  # as if --provider ollama was passed (else the
+            # resolver falls back to the config default and CI, with no
+            # OPENROUTER_API_KEY, fails the key gate)
             model="m",
             resume=None,
             max_iterations=30,
