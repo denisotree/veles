@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.2] — 2026-07-10
+
+### Fixed
+
+- **Scheduled reminders can no longer be silently undeliverable.** A live
+  "remind me tomorrow at 11:00" produced a task with `deliver_to="chat"`
+  (not a valid delivery target) scheduled for a date in the *previous
+  year* — the model had no clock in its context and computed "tomorrow"
+  from training priors. The reminder then failed delivery on every
+  60-second sweep, forever, and the user never saw it. Four fixes:
+  - `task_add`/`task_snooze` validate an explicit `deliver_to` against the
+    delivery-target grammar at write time and reject it loudly, so the
+    model corrects itself in the same turn; the `origin` keyword now
+    resolves to the concrete originating chat immediately.
+  - Due/snooze times in the past are rejected with an error that echoes
+    the current UTC time, so the model recomputes the intended date.
+  - The reminder sweep distinguishes permanent failures (malformed target
+    — disabled with one ERROR log) from transient ones (channel not up —
+    still retried).
+  - The agent's system prompt now carries a volatile `<runtime-context>`
+    clock block (weekday + UTC date/time) after the prompt-cache
+    breakpoint, anchoring every relative-date computation.
+
+### Docs
+
+- README (all 15 languages) and the reference docs (all 14 locales)
+  brought back in line with the shipped CLI: real REPL editor keybinding
+  (`Ctrl+X Ctrl+E`), `--max-iterations` default `1000`, `veles organize` /
+  `veles layout sync` / `veles add --recursive/--glob` documented, removed
+  `wiki/sources`, `VELES_HOME`, and `VELES_CONFIG_FILENAME` leftovers.
+
 ## [0.21.1] — 2026-07-09
 
 ### Fixed
