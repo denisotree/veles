@@ -76,6 +76,19 @@ class ReminderRunner:
                 text += f"\n\n{task.body}"
             try:
                 await self._delivery.deliver(task.deliver_to, text)
+            except ValueError as exc:
+                # Malformed target (fails the router grammar) — permanent; a
+                # retry can never succeed, so disable the reminder instead of
+                # failing every tick forever. Task tools validate targets at
+                # write time (M208); this catches pre-validation rows.
+                logger.error(
+                    "reminder %s has an invalid delivery target %r; disabling it: %s",
+                    task.id,
+                    task.deliver_to,
+                    exc,
+                )
+                self._store.mark_reminded(task.id, now=now)
+                continue
             except Exception as exc:
                 # Channel may not be up yet (no deliverer registered). Leave the
                 # task unmarked so the next tick retries instead of dropping it.

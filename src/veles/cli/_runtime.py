@@ -157,6 +157,19 @@ def _sanitize_paths(text: str, project: Project) -> str:
     return sanitize(text, project=project)
 
 
+def _runtime_clock_block() -> str:
+    import datetime as _dt
+
+    now = _dt.datetime.now(tz=_dt.UTC)
+    return (
+        "<runtime-context>\n"
+        f"Current date and time: {now.strftime('%A, %Y-%m-%d %H:%M')} UTC.\n"
+        "Resolve relative dates ('tomorrow', 'on Friday', 'in an hour') "
+        "against this clock.\n"
+        "</runtime-context>"
+    )
+
+
 def build_run_system_prompt(
     project: Project,
     *,
@@ -210,7 +223,11 @@ def build_run_system_prompt(
         if workspace:
             stable_parts.append(workspace)
         stable_parts.append(_RUN_WIKI_RAG_BLOCK)
-    volatile_parts: list[str] = []
+    # M208: anchor the model's clock. Without it "tomorrow at 11:00" gets
+    # computed from training-data priors (a reminder landed in the previous
+    # year). Volatile — sits after the cache breakpoint, so the per-minute
+    # churn never fragments the stable prefix.
+    volatile_parts: list[str] = [_runtime_clock_block()]
     recall = _recall_block(project, prompt or "")
     if recall:
         volatile_parts.append(recall)
