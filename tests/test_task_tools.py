@@ -105,3 +105,44 @@ def test_task_snooze(project):
     task_add("x", due_at="+1h")
     tid = _tasks(project)[0].id
     assert "snoozed" in task_snooze(tid, "+1d")
+
+
+# ---- M208: input validation (the open_claw reminder incident) ----
+
+
+def test_task_add_rejects_malformed_deliver_to(project):
+    out = task_add("x", due_at="+1h", deliver_to="chat")
+    assert "<error" in out
+    assert "deliver_to" in out
+    assert _tasks(project) == []  # nothing persisted
+
+
+def test_task_add_accepts_valid_explicit_targets(project):
+    assert "added task" in task_add("a", deliver_to="telegram:111")
+    assert "added task" in task_add("b", deliver_to="local")
+
+
+def test_task_add_resolves_origin_keyword_to_concrete_origin(project):
+    token = set_origin("telegram:999")
+    try:
+        assert "added task" in task_add("c", due_at="+1h", deliver_to="origin")
+    finally:
+        reset_origin(token)
+    assert _tasks(project)[0].deliver_to == "telegram:999"
+
+
+def test_task_add_rejects_past_due(project):
+    out = task_add("x", due_at="2020-01-09T11:00:00Z")
+    assert "<error" in out
+    assert "in the past" in out
+    assert "current time" in out  # tells the model what "now" is so it recomputes
+    assert _tasks(project) == []
+
+
+def test_task_snooze_rejects_past_until(project):
+    task_add("x", due_at="+1h")
+    t = _tasks(project)[0]
+    out = task_snooze(t.id, "2020-01-09T11:00:00Z")
+    assert "<error" in out
+    assert "in the past" in out
+    assert _tasks(project)[0].due_at == t.due_at  # unchanged

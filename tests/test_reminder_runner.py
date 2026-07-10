@@ -73,6 +73,19 @@ async def test_failed_delivery_retries_next_tick():
     store.close()
 
 
+async def test_malformed_target_is_disabled_not_retried_forever():
+    """M208: a grammar-invalid target (e.g. 'chat') can never deliver — the
+    runner must disable the reminder instead of retrying every tick forever."""
+    from veles.channels.delivery import DeliveryRouter
+
+    store = TasksStore(":memory:")
+    store.add_task(title="x", due_at=50, deliver_to="chat", now=10)
+    runner = ReminderRunner(store=store, delivery_router=DeliveryRouter())
+    assert await runner.tick(100) == 0
+    assert store.due_reminders(200) == []  # excluded from future sweeps
+    store.close()
+
+
 async def test_no_router_is_noop():
     store = TasksStore(":memory:")
     store.add_task(title="x", due_at=50, deliver_to="telegram:1", now=10)

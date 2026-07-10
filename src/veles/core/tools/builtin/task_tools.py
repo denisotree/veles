@@ -14,11 +14,16 @@ task added in a one-shot `veles run` is recorded but nothing sweeps it.
 from __future__ import annotations
 
 import datetime as _dt
+import time
 
 from veles.core.context import current_origin, current_project
 from veles.core.risk import RiskClass
 from veles.core.tasks_store import TasksStore
 from veles.core.tools.registry import tool
+
+# Models routinely miscompute "tomorrow" (wrong year/month) — a due time this
+# far in the past is a calendar error, not a deliberately-immediate reminder.
+_PAST_GRACE_SECONDS = 120.0
 
 
 def _fmt(ts: float | None) -> str:
@@ -33,6 +38,40 @@ def _parse_when(raw: str) -> float:
     from veles.core.autopilot import parse_until
 
     return parse_until(raw)
+
+
+def _past_error(raw: str, due_ts: float) -> str | None:
+    """Error text if `due_ts` is in the past, echoing the current time so the
+    model can recompute; None if the time is fine."""
+    now = time.time()
+    if due_ts < now - _PAST_GRACE_SECONDS:
+        return (
+            f"<error: {raw!r} resolves to {_fmt(due_ts)}, which is in the past — "
+            f"the current time is {_fmt(now)}; recompute the intended date>"
+        )
+    return None
+
+
+def _resolve_target(spec: str) -> tuple[str | None, str | None]:
+    """Resolve an explicit `deliver_to` into a stored target.
+
+    Returns `(target, error)`. `origin` is resolved to the concrete originating
+    chat at write time (the sweep loop has no request context to resolve it
+    later). Anything failing the router grammar is rejected loudly so the
+    model corrects itself now, not silently at delivery time."""
+    from veles.channels.delivery import DeliveryTarget
+
+    try:
+        parsed = DeliveryTarget.parse(spec)
+    except ValueError:
+        return None, (
+            f"<error: deliver_to {spec!r} is not a valid delivery target; use "
+            "'<platform>:<chat_id>' (e.g. 'telegram:42'), 'origin', or 'local' — "
+            "or leave it empty to deliver to the chat this request came from>"
+        )
+    if parsed.kind == "origin":
+        return current_origin(), None
+    return spec, None
 
 
 @tool(risk_class=RiskClass.WRITE_LOCAL_PROJECT, side_effects=["filesystem"])
@@ -60,8 +99,15 @@ def task_add(title: str, due_at: str = "", body: str = "", deliver_to: str = "")
             due_ts = _parse_when(due_at.strip())
         except ValueError:
             return f"<error: due_at {due_at!r} not understood; use +2h / +1d / ISO timestamp>"
+        if err := _past_error(due_at.strip(), due_ts):
+            return err
 
-    target = deliver_to.strip() or current_origin()
+    if deliver_to.strip():
+        target, err = _resolve_target(deliver_to.strip())
+        if err:
+            return err
+    else:
+        target = current_origin()
     store = TasksStore(project.memory_db_path)
     try:
         rec = store.add_task(
@@ -131,6 +177,8 @@ def task_snooze(task_id: str, until: str) -> str:
         due_ts = _parse_when(until.strip())
     except ValueError:
         return f"<error: until {until!r} not understood; use +2h / +1d / ISO timestamp>"
+    if err := _past_error(until.strip(), due_ts):
+        return err
     store = TasksStore(project.memory_db_path)
     try:
         ok = store.snooze(task_id.strip(), due_at=due_ts)
