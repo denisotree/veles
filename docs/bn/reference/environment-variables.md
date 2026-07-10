@@ -44,11 +44,9 @@ API-কী লুকআপ ক্যাসকেড: OS keychain (project scope)
 | ভ্যারিয়েবল | ডিফল্ট | উদ্দেশ্য |
 |---|---|---|
 | `VELES_USER_HOME` | `~` | যে home `~/.veles/` ধারণ করে তা ওভাররাইড করে (state, cache, keychain index) |
-| `VELES_HOME` | — | `VELES_USER_HOME`-এর লেগ্যাসি অ্যালিয়াস |
 | `VELES_REGISTRY_PATH` | `~/.veles/…` | মাল্টি-প্রজেক্ট রেজিস্ট্রি পাথ ওভাররাইড করে |
 | `VELES_LOCALE` | `[user] language` or `en` | একটি রানের জন্য সক্রিয় UI locale ওভাররাইড করে |
 | `VELES_LOG_LEVEL` | `INFO` | ডিমন/লগ ভার্বোসিটি (`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
-| `VELES_CONFIG_FILENAME` | `config.toml` | কনফিগ ফাইলনেম ওভাররাইড করে (টেস্টিং) |
 
 ## আচরণ ও ফিচার ফ্ল্যাগ
 

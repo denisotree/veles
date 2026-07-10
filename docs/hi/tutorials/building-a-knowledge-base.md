@@ -36,7 +36,7 @@ veles add ./notes/meeting-2026-06-01.md
 जो लिखा गया उसे देखें:
 
 ```bash
-ls wiki/concepts wiki/entities wiki/sources
+ls wiki/concepts wiki/entities
 ```
 
 Pages एक-दूसरे को cross-reference करते हैं। on-demand `wiki/INDEX.md` catalog एक map

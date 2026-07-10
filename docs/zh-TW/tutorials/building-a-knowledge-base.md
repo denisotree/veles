@@ -31,7 +31,7 @@ veles add ./notes/meeting-2026-06-01.md
 看看寫出了什麼：
 
 ```bash
-ls wiki/concepts wiki/entities wiki/sources
+ls wiki/concepts wiki/entities
 ```
 
 頁面彼此交叉參照。隨選載入的 `wiki/INDEX.md` 目錄維護著一份地圖，agent 在需要時才載入（而非一次傾倒整個 context）。

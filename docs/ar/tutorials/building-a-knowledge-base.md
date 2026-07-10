@@ -36,7 +36,7 @@ veles add ./notes/meeting-2026-06-01.md
 انظر إلى ما كُتِب:
 
 ```bash
-ls wiki/concepts wiki/entities wiki/sources
+ls wiki/concepts wiki/entities
 ```
 
 تتقاطع الصفحات في الإشارة إلى بعضها. ويحتفظ فهرس `wiki/INDEX.md` العامل عند الطلب

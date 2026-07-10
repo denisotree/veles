@@ -37,7 +37,7 @@ veles add ./notes/meeting-2026-06-01.md
 Посмотрите, что было записано:
 
 ```bash
-ls wiki/concepts wiki/entities wiki/sources
+ls wiki/concepts wiki/entities
 ```
 
 Страницы перекрёстно ссылаются друг на друга. Подгружаемый по требованию каталог

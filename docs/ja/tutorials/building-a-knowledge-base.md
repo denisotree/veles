@@ -31,7 +31,7 @@ veles add ./notes/meeting-2026-06-01.md
 何が書き込まれたかを見てみましょう:
 
 ```bash
-ls wiki/concepts wiki/entities wiki/sources
+ls wiki/concepts wiki/entities
 ```
 
 ページは互いに相互参照します。オンデマンドの `wiki/INDEX.md` カタログは、エージェントが必要なときに読み込むマップを保持します（モノリシックなコンテキストの一括投入ではありません）。

@@ -35,7 +35,7 @@ veles add ./notes/meeting-2026-06-01.md
 看看写出了什么：
 
 ```bash
-ls wiki/concepts wiki/entities wiki/sources
+ls wiki/concepts wiki/entities
 ```
 
 页面之间相互交叉引用。按需的 `wiki/INDEX.md` 目录维护着一张

@@ -57,6 +57,12 @@ without an active project.
 error — a typo like `whitlist` for `whitelist` silently disables an access
 control, so it fails loud here.
 
+### `veles layout {sync}`
+Re-apply the active layout pack's scaffold to an existing project. `veles init`
+runs the scaffold once; when the pack later gains new categories or
+directories, `sync` materialises them (idempotent — prints what it created, or
+that the layout is already in sync).
+
 ### `veles export {full,template} <path>`
 Pack the project into a `.tar.gz` bundle. See [Back up and share](../how-to/backup-and-share.md).
 
@@ -116,8 +122,26 @@ There is no `veles tui` or `veles repl` subcommand — the inline REPL is invoke
 as bare `veles`.
 
 ### `veles add <source>`
-Read a source (a local file or `http(s)://` URL) and synthesise it into a wiki
-page. Accepts the shared agent-loop flags.
+Read a source (a local file, a directory, or an `http(s)://` URL) and
+synthesise it into a wiki page.
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `--recursive`, `-r` | off | When `source` is a directory, ingest matching files under it (one page each) |
+| `--glob <pattern>` | `*` | With `--recursive`, only ingest files matching this glob |
+
+Plus the shared agent-loop flags.
+
+### `veles organize [scope]`
+Reorganize project content per the active layout pack. Proposes a move/rename
+plan first; nothing changes without `--apply`.
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `scope` (positional) | whole project | Restrict the reorganization to a subtree |
+| `--apply` | off | Execute the plan (move/rename/relink); default is propose-only |
+
+Plus the shared agent-loop flags.
 
 ### `veles curate`
 Run one curator pass: compact unprocessed sessions into `wiki/sessions/` pages.
@@ -384,7 +408,7 @@ start`:
 | `--model <id>` | resolved from project `[engine]` model → user `default_model` (no hardcoded default) | Model ID |
 | `--provider <name>` | `openrouter` | Provider (see below) |
 | `--max-tokens-total <n>` | `100000` | Cumulative token budget; `0` disables |
-| `--max-iterations <n>` | `30` | Max tool-calling iterations per turn |
+| `--max-iterations <n>` | `1000` | Max tool-calling iterations per turn (a runaway backstop; the stall guard is the real stop) |
 | `--stream` | off | Stream the response token-by-token |
 | `--verbose` / `-v` | off | Per-turn progress to stderr |
 | `--project-root <path>` | discover from cwd | Operate on a project elsewhere |

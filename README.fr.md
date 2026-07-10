@@ -51,7 +51,7 @@ veles        # interactive REPL (just run `veles` with no subcommand)
 
 **Local-first et bac à sable** — Pas de télémétrie, pas de synchronisation cloud. L'agent ne voit que le répertoire du projet actif. L'échelle de confiance demande l'autorisation à chaque appel d'outil sensible ; pré-accordez-la pour la CI.
 
-**Modulaire, pas monolithique** — Un noyau minimal (mémoire, boucle d'agent, protocole de fournisseur, registre d'outils). Tout le reste — TUI, démon, passerelle Telegram, recherche approfondie, planificateur de tâches — est un module optionnel et chargeable.
+**Modulaire, pas monolithique** — Un noyau minimal (mémoire, boucle d'agent, protocole de fournisseur, registre d'outils). Tout le reste — démon, passerelle Telegram, recherche approfondie, planificateur de tâches — est un module optionnel et chargeable.
 
 ---
 
@@ -237,7 +237,7 @@ Les commandes en slash exposent tout en direct — `/status`, `/tokens`, `/conte
 | `Shift+Enter` | Nouvelle ligne dans le composeur |
 | `Ctrl+I` | Basculer l'inspecteur d'activité des outils |
 | `Ctrl+R` | Superposition du sélecteur de sessions |
-| `Ctrl+G` | Ouvrir `$EDITOR` sur le brouillon courant |
+| `Ctrl+X Ctrl+E` | Ouvrir `$EDITOR` sur le brouillon courant |
 | `Tab` | Autocomplétion des commandes en slash |
 | `Ctrl+D` | Quitter |
 

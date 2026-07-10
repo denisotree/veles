@@ -45,11 +45,9 @@ SO (escopo default) → variável de ambiente.
 | Variável | Padrão | Finalidade |
 |---|---|---|
 | `VELES_USER_HOME` | `~` | Sobrescreve o home que contém `~/.veles/` (estado, cache, índice do chaveiro) |
-| `VELES_HOME` | — | Alias legado de `VELES_USER_HOME` |
 | `VELES_REGISTRY_PATH` | `~/.veles/…` | Sobrescreve o caminho do registry multiprojeto |
 | `VELES_LOCALE` | `[user] language` ou `en` | Sobrescreve o locale ativo da UI em uma única execução |
 | `VELES_LOG_LEVEL` | `INFO` | Verbosidade de log/daemon (`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
-| `VELES_CONFIG_FILENAME` | `config.toml` | Sobrescreve o nome do arquivo de config (testes) |
 
 ## Flags de comportamento e funcionalidades
 

@@ -379,7 +379,7 @@ Acceptées par `run`, `add`, `tui`, `curate`, `research`, `job tick`, et `daemon
 | `--model <id>` | résolu depuis le modèle `[engine]` du projet → `default_model` utilisateur (aucun défaut codé en dur) | ID du modèle |
 | `--provider <name>` | `openrouter` | Fournisseur (voir ci-dessous) |
 | `--max-tokens-total <n>` | `100000` | Budget cumulé de tokens ; `0` le désactive |
-| `--max-iterations <n>` | `30` | Nombre max d'itérations d'appel d'outils par tour |
+| `--max-iterations <n>` | `1000` | Nombre max d'itérations d'appel d'outils par tour |
 | `--stream` | désactivé | Diffuse la réponse token par token |
 | `--verbose` / `-v` | désactivé | Progression par tour vers stderr |
 | `--project-root <path>` | détection depuis le cwd | Opère sur un projet situé ailleurs |

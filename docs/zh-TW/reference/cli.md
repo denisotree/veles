@@ -346,7 +346,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `--model <id>` | 由專案 `[engine]` model → 使用者 `default_model` 解析（無硬寫死的預設） | 模型 ID |
 | `--provider <name>` | `openrouter` | 供應商（見下方） |
 | `--max-tokens-total <n>` | `100000` | 累積 token 預算；`0` 表停用 |
-| `--max-iterations <n>` | `30` | 每輪最多的工具呼叫迭代數 |
+| `--max-iterations <n>` | `1000` | 每輪最多的工具呼叫迭代數 |
 | `--stream` | 關閉 | 逐 token 串流回應 |
 | `--verbose` / `-v` | 關閉 | 將逐輪進度輸出到 stderr |
 | `--project-root <path>` | 從 cwd 探索 | 對其他位置的專案進行操作 |

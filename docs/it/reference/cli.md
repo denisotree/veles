@@ -387,7 +387,7 @@ start`:
 | `--model <id>` | risolto dal modello `[engine]` del progetto → `default_model` utente (nessun default hardcoded) | ID del modello |
 | `--provider <name>` | `openrouter` | Provider (vedi sotto) |
 | `--max-tokens-total <n>` | `100000` | Budget cumulativo di token; `0` lo disabilita |
-| `--max-iterations <n>` | `30` | Numero massimo di iterazioni di chiamata-tool per turno |
+| `--max-iterations <n>` | `1000` | Numero massimo di iterazioni di chiamata-tool per turno |
 | `--stream` | off | Trasmette la risposta token per token |
 | `--verbose` / `-v` | off | Avanzamento per turno su stderr |
 | `--project-root <path>` | scoperto dalla cwd | Opera su un progetto altrove |

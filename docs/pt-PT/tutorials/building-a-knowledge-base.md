@@ -36,7 +36,7 @@ Cada `add` produz uma página em `wiki/` e liga-a ao grafo da wiki.
 Observa o que foi escrito:
 
 ```bash
-ls wiki/concepts wiki/entities wiki/sources
+ls wiki/concepts wiki/entities
 ```
 
 As páginas referenciam-se umas às outras. O catálogo `wiki/INDEX.md`, carregado a

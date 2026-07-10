@@ -51,7 +51,7 @@ veles        # interactive REPL (bare `veles` with no subcommand)
 
 **Local-first + sandboxed** — कोई telemetry नहीं, कोई cloud sync नहीं। एजेंट केवल सक्रिय project डायरेक्टरी को ही देखता है। Trust ladder हर संवेदनशील tool call के लिए पूछता है; CI के लिए पहले से grant करें।
 
-**Modular, monolithic नहीं** — मिनिमल core (memory, agent loop, provider protocol, tool registry)। बाकी सब कुछ — TUI, daemon, Telegram gateway, deep research, job scheduler — एक वैकल्पिक, loadable module है।
+**Modular, monolithic नहीं** — मिनिमल core (memory, agent loop, provider protocol, tool registry)। बाकी सब कुछ — daemon, Telegram gateway, deep research, job scheduler — एक वैकल्पिक, loadable module है।
 
 ---
 
@@ -236,7 +236,7 @@ Slash commands सब कुछ live दिखाते हैं — `/status`,
 | `Shift+Enter` | composer में नई लाइन |
 | `Ctrl+I` | tool-activity inspector toggle करें |
 | `Ctrl+R` | session picker overlay |
-| `Ctrl+G` | वर्तमान draft पर `$EDITOR` खोलें |
+| `Ctrl+X Ctrl+E` | वर्तमान draft पर `$EDITOR` खोलें |
 | `Tab` | Slash-command autocomplete |
 | `Ctrl+D` | बाहर निकलें |
 

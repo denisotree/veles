@@ -51,7 +51,7 @@ veles        # interactive REPL (just run `veles` with no subcommand)
 
 **Local-first + sandboxed** — No telemetry, no cloud sync. The agent sees only the active project directory. Trust ladder prompts for every sensitive tool call; pre-grant for CI.
 
-**Modular, not monolithic** — Minimal core (memory, agent loop, provider protocol, tool registry). Everything else — TUI, daemon, Telegram gateway, deep research, job scheduler — is an optional, loadable module.
+**Modular, not monolithic** — Minimal core (memory, agent loop, provider protocol, tool registry). Everything else — daemon, Telegram gateway, deep research, job scheduler — is an optional, loadable module.
 
 ---
 
@@ -237,7 +237,7 @@ Slash commands surface everything live — `/status`, `/tokens`, `/context`, `/m
 | `Shift+Enter` | Newline in composer |
 | `Ctrl+I` | Toggle tool-activity inspector |
 | `Ctrl+R` | Session picker overlay |
-| `Ctrl+G` | Open `$EDITOR` on current draft |
+| `Ctrl+X Ctrl+E` | Open `$EDITOR` on current draft |
 | `Tab` | Slash-command autocomplete |
 | `Ctrl+D` | Quit |
 

@@ -45,11 +45,9 @@ trousseau du système (portée par défaut) → variable d'environnement.
 | Variable | Valeur par défaut | Rôle |
 |---|---|---|
 | `VELES_USER_HOME` | `~` | Surcharge le home qui contient `~/.veles/` (état, cache, index du trousseau) |
-| `VELES_HOME` | — | Ancien alias de `VELES_USER_HOME` |
 | `VELES_REGISTRY_PATH` | `~/.veles/…` | Surcharge le chemin du registre multi-projets |
 | `VELES_LOCALE` | `[user] language` ou `en` | Surcharge la locale active de l'interface pour une exécution |
 | `VELES_LOG_LEVEL` | `INFO` | Verbosité du daemon/des logs (`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
-| `VELES_CONFIG_FILENAME` | `config.toml` | Surcharge le nom du fichier de config (tests) |
 
 ## Comportement & feature flags
 

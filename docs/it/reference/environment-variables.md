@@ -46,11 +46,9 @@ variabile d'ambiente.
 | Variabile | Default | Scopo |
 |---|---|---|
 | `VELES_USER_HOME` | `~` | Sovrascrive la home che contiene `~/.veles/` (stato, cache, indice del keychain) |
-| `VELES_HOME` | — | Alias legacy di `VELES_USER_HOME` |
 | `VELES_REGISTRY_PATH` | `~/.veles/…` | Sovrascrive il percorso del registro multi-progetto |
 | `VELES_LOCALE` | `[user] language` o `en` | Sovrascrive la locale dell'interfaccia attiva per una singola esecuzione |
 | `VELES_LOG_LEVEL` | `INFO` | Verbosità di daemon/log (`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
-| `VELES_CONFIG_FILENAME` | `config.toml` | Sovrascrive il nome del file di config (test) |
 
 ## Comportamento e feature flag
 

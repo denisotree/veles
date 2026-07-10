@@ -46,11 +46,9 @@ variável de ambiente.
 | Variável | Predefinição | Finalidade |
 |---|---|---|
 | `VELES_USER_HOME` | `~` | Sobrepõe a home que contém `~/.veles/` (estado, cache, índice do chaveiro) |
-| `VELES_HOME` | — | Alias legado para `VELES_USER_HOME` |
 | `VELES_REGISTRY_PATH` | `~/.veles/…` | Sobrepõe o caminho do registo multi-projecto |
 | `VELES_LOCALE` | `[user] language` ou `en` | Sobrepõe o locale activo da UI numa execução |
 | `VELES_LOG_LEVEL` | `INFO` | Verbosidade de daemon/log (`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
-| `VELES_CONFIG_FILENAME` | `config.toml` | Sobrepõe o nome do ficheiro de configuração (testes) |
 
 ## Comportamento e feature flags
 

@@ -45,11 +45,9 @@ hệ điều hành (phạm vi default) → biến môi trường.
 | Biến | Mặc định | Mục đích |
 |---|---|---|
 | `VELES_USER_HOME` | `~` | Ghi đè thư mục home chứa `~/.veles/` (trạng thái, cache, chỉ mục keychain) |
-| `VELES_HOME` | — | Bí danh cũ cho `VELES_USER_HOME` |
 | `VELES_REGISTRY_PATH` | `~/.veles/…` | Ghi đè đường dẫn registry đa dự án |
 | `VELES_LOCALE` | `[user] language` hoặc `en` | Ghi đè locale UI đang hoạt động cho một lần chạy |
 | `VELES_LOG_LEVEL` | `INFO` | Mức chi tiết log/daemon (`DEBUG`/`INFO`/`WARNING`/`ERROR`) |
-| `VELES_CONFIG_FILENAME` | `config.toml` | Ghi đè tên file config (kiểm thử) |
 
 ## Cờ hành vi & tính năng
 

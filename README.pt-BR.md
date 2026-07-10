@@ -51,7 +51,7 @@ veles        # interactive REPL (bare `veles` with no subcommand)
 
 **Local em primeiro lugar + isolado em sandbox** — Sem telemetria, sem sincronização com a nuvem. O agente enxerga apenas o diretório do projeto ativo. A escada de confiança pede aprovação a cada chamada de ferramenta sensível; pré-conceda para CI.
 
-**Modular, não monolítico** — Núcleo minimalista (memória, loop do agente, protocolo de provedor, registro de ferramentas). Todo o resto — TUI, daemon, gateway do Telegram, pesquisa profunda, agendador de tarefas — é um módulo opcional e carregável.
+**Modular, não monolítico** — Núcleo minimalista (memória, loop do agente, protocolo de provedor, registro de ferramentas). Todo o resto — daemon, gateway do Telegram, pesquisa profunda, agendador de tarefas — é um módulo opcional e carregável.
 
 ---
 
@@ -236,7 +236,7 @@ Os comandos de barra expõem tudo ao vivo — `/status`, `/tokens`, `/context`, 
 | `Shift+Enter` | Nova linha no compositor |
 | `Ctrl+I` | Alternar o inspetor de atividade de ferramentas |
 | `Ctrl+R` | Overlay do seletor de sessões |
-| `Ctrl+G` | Abrir o `$EDITOR` no rascunho atual |
+| `Ctrl+X Ctrl+E` | Abrir o `$EDITOR` no rascunho atual |
 | `Tab` | Autocompletar comandos de barra |
 | `Ctrl+D` | Sair |
 
