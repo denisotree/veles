@@ -9,10 +9,16 @@ API — the foundation for [channels](connect-telegram.md) (Telegram, …), sche
 ## Start and stop
 
 ```bash
-veles daemon start              # detaches by default; binds 127.0.0.1:8765
-veles daemon status             # is it running?
+veles daemon start              # detaches by default; binds 127.0.0.1:8765 (or the next free port)
+veles daemon status             # is this project's daemon running?
 veles daemon stop               # SIGTERM via the pid file
 ```
+
+Each project runs its own daemon: starting one in a second project picks the
+next free port automatically instead of refusing with "already running" —
+pin a port per project with `[daemon] port` in the config if you need a
+stable address. `stop`/`status` address the daemon of the project you are
+in; `veles daemon list` shows all of them.
 
 `start` detaches and returns your shell. For a foreground process (systemd
 `Type=simple`, Docker, debugging) pass `--foreground`. Override the bind:

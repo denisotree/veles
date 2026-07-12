@@ -146,9 +146,10 @@ def test_resolve_instance_paths_named_vs_default(tmp_path, monkeypatch):
     assert pid_named.name == "daemon-myproj-api.pid"
     assert info_named.name == "daemon-myproj-api.info.json"
 
+    # M209: the unnamed daemon is per-project too — slug-keyed paths.
     pid_def, info_def = _resolve_instance_paths(project, None)
-    assert pid_def.name == "daemon.pid"
-    assert info_def.name == "daemon.info.json"
+    assert pid_def.name == "daemon-myproj.pid"
+    assert info_def.name == "daemon-myproj.info.json"
 
 
 def test_instance_log_slug_matches_instance_log_path(tmp_path, monkeypatch):
