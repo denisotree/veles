@@ -76,7 +76,39 @@ def _bootstrap_daemon(project, *, name: str | None = None) -> None:
         project.root,
         os.getcwd(),
     )
+    _install_daemon_critical_confirmer()
     print(f"daemon log: {log_path}", file=sys.stderr)
+
+
+def _install_daemon_critical_confirmer() -> None:
+    """M212: the daemon must never block on stdin. `confirm_critical`'s default
+    confirmer prompts interactively whenever stdin looks like a TTY — and a
+    detached child used to inherit the launcher's terminal (spawn passed no
+    stdin), so a critical gate (e.g. the M198 exfiltration confirm) printed its
+    prompt into the log and then froze the WHOLE event loop in `input()` (live
+    2026-07-13: daemon hung mid-turn, Telegram stuck on '…'). `spawn_daemon`
+    now passes stdin=DEVNULL; this confirmer is the second belt — it also
+    covers `--foreground` runs in a real terminal, where a blocking `input()`
+    on the shared asyncio loop would stall every channel at once. Fail closed
+    with a logged denial: the deny Decision flows back to the model as a tool
+    error, so the agent can tell the user what was blocked and why."""
+    import logging
+
+    from veles.core.critical_ops import set_critical_confirmer
+
+    log = logging.getLogger("veles.daemon")
+
+    def _refuse(op: str, summary: str) -> bool:
+        log.warning(
+            "critical confirmation for %r auto-denied — the daemon has no "
+            "interactive stdin. %s Run the operation from the REPL/CLI to "
+            "confirm it interactively.",
+            op,
+            summary,
+        )
+        return False
+
+    set_critical_confirmer(_refuse)
 
 
 def _write_pid_and_info(state, args, project, *, pid_path, info_path) -> int:
@@ -157,6 +189,11 @@ def _cleanup_daemon_exit(
     info_path.unlink(missing_ok=True)
     if name is not None:
         _mark_session_stopped(project, name)
+    # Undo the M212 daemon confirmer (matters for in-process reuse — tests,
+    # embedded runs; a real daemon process exits right after anyway).
+    from veles.core.critical_ops import set_critical_confirmer
+
+    set_critical_confirmer(None)
     store.close()
     jobs_store.close()
 

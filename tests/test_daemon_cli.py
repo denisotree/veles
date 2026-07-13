@@ -449,6 +449,42 @@ def test_daemon_delete_unknown_returns_error(isolated_user_home: Path, capsys) -
     assert "no daemon named 'ghost'" in capsys.readouterr().err
 
 
+# ---- M212: daemon critical-ops confirmer ----
+
+
+def test_daemon_critical_confirmer_fails_closed(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """M212: inside the daemon, `confirm_critical` must refuse WITHOUT
+    prompting — even when stdin looks like a TTY — and log why. The default
+    confirmer's input() froze the whole event loop when the detached child
+    inherited the launcher's terminal."""
+    import logging
+    import sys as _sys
+
+    from veles.cli.commands.daemon_lifecycle import _install_daemon_critical_confirmer
+    from veles.core import critical_ops
+
+    try:
+        _install_daemon_critical_confirmer()
+        monkeypatch.setattr(_sys.stdin, "isatty", lambda: True)
+
+        def _boom(*_a: object) -> str:
+            raise AssertionError("input() must not be called in the daemon")
+
+        monkeypatch.setattr("builtins.input", _boom)
+        with caplog.at_level(logging.WARNING, logger="veles.daemon"):
+            ok = critical_ops.confirm_critical(
+                "dispatch fetch_url", "possible prompt-injection exfiltration"
+            )
+        assert ok is False
+        denials = [r for r in caplog.records if "auto-denied" in r.getMessage()]
+        assert len(denials) == 1
+        assert "possible prompt-injection exfiltration" in denials[0].getMessage()
+    finally:
+        critical_ops.set_critical_confirmer(None)
+
+
 # ---- _graceful_stop helper ----
 
 
