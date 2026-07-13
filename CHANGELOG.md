@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.2] — 2026-07-13
+
+### Fixed
+
+- **The daemon could freeze mid-turn on a security confirmation.** When a
+  critical-ops gate fired inside a daemon turn (e.g. the
+  prompt-injection exfiltration guard on `fetch_url`), the daemon
+  printed the interactive `Type 'yes'` prompt into its log and then
+  blocked the whole event loop waiting for terminal input that could
+  never arrive — the channel chat hung on "…" forever. The detached
+  daemon inherited the launcher's terminal as stdin, which made it look
+  interactive. Now the spawned daemon's stdin is detached, and the
+  daemon installs a fail-closed confirmer: such operations are
+  auto-denied with a WARNING in the daemon log, and the agent reports in
+  the chat what was blocked and why. To approve a blocked operation, run
+  it interactively from the REPL/CLI.
+
 ## [0.22.1] — 2026-07-13
 
 ### Fixed
