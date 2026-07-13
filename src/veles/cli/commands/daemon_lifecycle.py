@@ -91,7 +91,13 @@ def _install_daemon_critical_confirmer() -> None:
     covers `--foreground` runs in a real terminal, where a blocking `input()`
     on the shared asyncio loop would stall every channel at once. Fail closed
     with a logged denial: the deny Decision flows back to the model as a tool
-    error, so the agent can tell the user what was blocked and why."""
+    error, so the agent can tell the user what was blocked and why.
+
+    M213: channel-originated runs override this per turn —
+    `run_agent_in_background` installs `make_critical_confirmer`, which asks
+    the user via the channel's inline keyboard and falls back to deny on
+    timeout. This process-level refuser remains the floor for anything that
+    runs outside a channel turn."""
     import logging
 
     from veles.core.critical_ops import set_critical_confirmer

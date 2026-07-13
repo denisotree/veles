@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 from veles.core.permission.prompt import PromptAnswer, PromptRequest
-from veles.daemon.channel_prompter import make_unified_prompter
+from veles.daemon.channel_prompter import make_critical_confirmer, make_unified_prompter
 from veles.daemon.runner import RunHandle
 
 
@@ -192,3 +192,63 @@ async def test_unknown_kind_denies_without_event() -> None:
     answer = await asyncio.to_thread(prompter, req)
     assert answer == PromptAnswer("deny")
     assert handle.events == []
+
+
+# ---- M213: critical-ops confirm routed to the channel ----
+
+
+@pytest.mark.asyncio
+async def test_critical_confirmer_emits_event_and_returns_true_on_yes() -> None:
+    """M213: `confirm_critical` routed to the channel — the event carries
+    op/summary (the Confirmer contract) and only a literal "yes" allows."""
+    handle = _new_handle()
+    loop = asyncio.get_running_loop()
+    confirmer = make_critical_confirmer(handle, loop, timeout=5.0)
+
+    task = asyncio.create_task(
+        asyncio.to_thread(confirmer, "dispatch fetch_url", "possible exfiltration")
+    )
+    for _ in range(50):
+        if handle.events:
+            break
+        await asyncio.sleep(0.01)
+    assert handle.events, "critical_prompt event never emitted"
+    event = handle.events[0]
+    assert event["type"] == "critical_prompt"
+    assert event["op"] == "dispatch fetch_url"
+    assert event["summary"] == "possible exfiltration"
+    assert {opt["key"] for opt in event["options"]} == {"yes", "no"}
+    pending = handle.pending_prompts[event["prompt_id"]]
+    assert pending.kind == "critical"
+    pending.future.set_result("yes")
+    assert await task is True
+
+
+@pytest.mark.asyncio
+async def test_critical_confirmer_no_returns_false() -> None:
+    handle = _new_handle()
+    loop = asyncio.get_running_loop()
+    confirmer = make_critical_confirmer(handle, loop, timeout=5.0)
+    task = asyncio.create_task(asyncio.to_thread(confirmer, "dispatch fetch_url", ""))
+    for _ in range(50):
+        if handle.pending_prompts:
+            break
+        await asyncio.sleep(0.01)
+    pid = next(iter(handle.pending_prompts))
+    handle.pending_prompts[pid].future.set_result("no")
+    assert await task is False
+
+
+def test_critical_confirmer_timeout_denies_and_cleans_up() -> None:
+    """Timeout is the fail-closed floor — deny, drop the pending entry."""
+    handle = _new_handle()
+    loop = asyncio.new_event_loop()
+    try:
+        confirmer = make_critical_confirmer(handle, loop, timeout=0.05)
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            fut = pool.submit(confirmer, "dispatch web_search", "summary")
+            allowed = fut.result(timeout=2.0)
+        assert allowed is False
+        assert handle.pending_prompts == {}
+    finally:
+        loop.close()

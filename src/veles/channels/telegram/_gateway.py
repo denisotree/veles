@@ -554,14 +554,16 @@ class TelegramGateway:
         options = event.get("options") or []
         if not isinstance(prompt_id, str) or not isinstance(options, list):
             return
-        # M116c: third recognised kind. trust_prompt → "trust",
-        # approval_prompt → "approval", clarification_prompt →
-        # "clarification" (manager-emitted question with arbitrary
-        # options + a freeform fallback).
+        # trust_prompt → "trust", approval_prompt → "approval",
+        # clarification_prompt → "clarification" (M116c, manager-emitted
+        # question), critical_prompt → "critical" (M213, always-confirm /
+        # exfiltration gate — the channel mirror of the REPL's hard-confirm).
         if kind_raw == "trust_prompt":
             kind = "trust"
         elif kind_raw == "clarification_prompt":
             kind = "clarification"
+        elif kind_raw == "critical_prompt":
+            kind = "critical"
         else:
             kind = "approval"
         short_codes, buttons, short_to_key = _build_buttons(prompt_id, kind, options)

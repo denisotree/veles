@@ -32,6 +32,7 @@ import secrets
 from concurrent.futures import TimeoutError as _FuturesTimeout
 from typing import Any
 
+from veles.core.critical_ops import Confirmer
 from veles.core.permission.prompt import (
     PromptAnswer,
     PromptRequest,
@@ -56,6 +57,11 @@ _TRUST_OPTIONS_TELEGRAM: tuple[dict[str, str], ...] = (
 _APPROVAL_OPTIONS_TELEGRAM: tuple[dict[str, str], ...] = (
     {"key": "yes", "label": "✅ Allow"},
     {"key": "no", "label": "❌ Deny"},
+)
+
+_CRITICAL_OPTIONS_TELEGRAM: tuple[dict[str, str], ...] = (
+    {"key": "yes", "label": "⚠️ Allow"},
+    {"key": "no", "label": "🚫 Cancel"},
 )
 
 
@@ -228,7 +234,68 @@ def make_unified_prompter(
     return prompter
 
 
+def make_critical_confirmer(
+    handle: RunHandle,
+    loop: asyncio.AbstractEventLoop,
+    *,
+    timeout: float = DEFAULT_PROMPT_TIMEOUT_SECONDS,
+) -> Confirmer:
+    """M213: route `confirm_critical` (M39 always-confirm + the M198
+    exfiltration gate) to the channel as an inline-keyboard prompt — the
+    channel-side mirror of the REPL's in-app yes/no picker.
+
+    Same mechanics as `_dispatch_approval` (PendingPrompt + Future +
+    `critical_prompt` event); the payload carries `op`/`summary` instead of
+    tool/arguments because that's the `Confirmer` contract. Deny on
+    timeout / cancel / anything but a literal `"yes"` — critical ops stay
+    fail-closed. Installed per run by `run_agent_in_background`, overriding
+    the daemon's M212 auto-deny confirmer for the turn."""
+
+    def confirmer(op: str, summary: str) -> bool:
+        prompt_id = _make_prompt_id()
+        valid_keys = tuple(opt["key"] for opt in _CRITICAL_OPTIONS_TELEGRAM)
+        pending = PendingPrompt(
+            kind="critical",
+            tool=op,
+            valid_choices=valid_keys,
+        )
+        handle.pending_prompts[prompt_id] = pending
+        loop.call_soon_threadsafe(
+            handle.append_event,
+            {
+                "type": "critical_prompt",
+                "prompt_id": prompt_id,
+                "op": op,
+                "summary": summary,
+                "options": list(_CRITICAL_OPTIONS_TELEGRAM),
+            },
+        )
+        try:
+            answer = pending.future.result(timeout=timeout)
+        except _FuturesTimeout:
+            logger.info(
+                "critical prompt %s for %r timed out after %.0fs → deny",
+                prompt_id,
+                op,
+                timeout,
+            )
+            handle.pending_prompts.pop(prompt_id, None)
+            loop.call_soon_threadsafe(
+                handle.append_event,
+                {
+                    "type": "prompt_resolved",
+                    "prompt_id": prompt_id,
+                    "reason": "timeout",
+                },
+            )
+            return False
+        return answer == "yes"
+
+    return confirmer
+
+
 __all__ = [
     "DEFAULT_PROMPT_TIMEOUT_SECONDS",
+    "make_critical_confirmer",
     "make_unified_prompter",
 ]

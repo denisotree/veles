@@ -1,8 +1,11 @@
-"""Prompt rendering (trust / approval / clarification) for Telegram.
+"""Prompt rendering (trust / approval / critical / clarification) for Telegram.
 
-Three flavours of daemon prompt land here:
+Four flavours of daemon prompt land here:
 - `trust_prompt` — once / always_project / always_global / refuse
 - `approval_prompt` — yes / no
+- `critical_prompt` (M213) — yes / no hard-confirm for critical ops
+  (M39 always-confirm policy + the M198 exfiltration gate), the channel
+  mirror of the REPL's "type literal yes" prompt.
 - `clarification_prompt` (M116c) — manager-emitted free-form question
   with arbitrary options plus an optional "type your own" entry.
 
@@ -46,6 +49,8 @@ _TRUST_SHORT_BY_KEY: dict[str, str] = {
     "refuse": "r",
 }
 _APPROVAL_SHORT_BY_KEY: dict[str, str] = {"yes": "y", "no": "n"}
+# Critical prompts (M213) answer the same yes/no pair.
+_CRITICAL_SHORT_BY_KEY: dict[str, str] = {"yes": "y", "no": "n"}
 
 
 def _build_buttons(
@@ -71,6 +76,8 @@ def _build_buttons(
         short_table = _TRUST_SHORT_BY_KEY
     elif kind == "approval":
         short_table = _APPROVAL_SHORT_BY_KEY
+    elif kind == "critical":
+        short_table = _CRITICAL_SHORT_BY_KEY
     else:
         short_table = None  # clarification → index shorts
     for idx, opt in enumerate(options):
@@ -107,6 +114,20 @@ def _format_prompt_body(kind: str, event: dict[str, Any]) -> str:
             f"{escape_html(sanitize(question))}\n\n"
             f"Tap an option below, or reply with a free-form answer."
         )
+    if kind == "critical":
+        # M213: critical ops carry `op` + `summary` (the Confirmer contract),
+        # not tool/arguments. Deliberately alarming — this is the channel
+        # mirror of the REPL's "type literal yes" hard-confirm.
+        op = str(event.get("op") or event.get("tool") or "?")
+        summary = str(event.get("summary") or "")
+        body = (
+            f"⚠️ <b>Critical operation — explicit confirmation required</b>\n"
+            f"🔧 <code>{escape_html(op)}</code>"
+        )
+        if summary:
+            body += f"\n📝 {escape_html(sanitize(summary))}"
+        body += "\n\nThis bypasses trust grants — allow only if you initiated it."
+        return body
     # trust + approval share the same body shape (M124-perm-unify): both
     # show the tool, the reason, and the rendered arguments so the user
     # can see what the agent is about to do before granting consent.
