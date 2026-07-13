@@ -12,6 +12,11 @@ from veles.channels.display import DisplayTier, truncate_for_tier
 
 _TELEGRAM_API = "https://api.telegram.org"
 _LONG_POLL_TIMEOUT = 30
+# M210: getUpdates retry backoff — 2s doubling to a 60s ceiling. Before this
+# the loop retried on a fixed 2s sleep, spamming one WARNING per poll for the
+# whole outage (a real offline hour = ~1800 identical lines).
+_POLL_RETRY_INITIAL = 2.0
+_POLL_RETRY_MAX = 60.0
 _PLACEHOLDER_TEXT = "..."
 _TELEGRAM_TIER = DisplayTier.HIGH
 

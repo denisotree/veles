@@ -320,19 +320,18 @@ def _print_log_tail(log_slug: str, *, lines: int = 20) -> None:
 
 
 def _stop_status_paths(args: argparse.Namespace):
-    """Resolve (pid_path, info_path) for stop/status. With `--name` the paths
-    are per-instance (project resolved from cwd); else the legacy globals.
-    Returns None on a `--name` request outside a project."""
-    name = getattr(args, "name", None)
-    if not name:
-        return (_pid_path(), _info_path())
+    """Resolve (pid_path, info_path) for stop/status from the cwd project:
+    per-(slug, name) instance paths with `--name`, else the project's
+    unnamed-daemon paths (per-slug since M209 — stop/status address THIS
+    project's daemon; other projects' daemons are managed via `veles
+    daemon list/restart/delete`). Returns None outside a project."""
     from veles.cli import _resolve_active_project
 
     project = _resolve_active_project(args)
     if project is None:
         print("error: no Veles project found here.", file=sys.stderr)
         return None
-    return _resolve_instance_paths(project, name)
+    return _resolve_instance_paths(project, getattr(args, "name", None) or None)
 
 
 def _restart_named_session(args: argparse.Namespace, name: str) -> int:
@@ -422,14 +421,14 @@ def _process_alive(pid: int) -> bool:
 
 def _resolve_instance_paths(project, name: str | None):
     """Return ``(pid_path, info_path)``: per-(project, name) instance paths
-    when ``name`` is set, else the legacy single-daemon global paths. Keeps
-    the unnamed daemon path byte-for-byte identical."""
+    when ``name`` is set, else the project's unnamed-daemon paths — per-slug
+    since M209, so one unnamed daemon per *project*, not per machine."""
     if name:
         return (
             _instance_pid_path(project.name, name),
             _instance_info_path(project.name, name),
         )
-    return (_pid_path(), _info_path())
+    return (_pid_path(project.name), _info_path(project.name))
 
 
 def _instance_log_slug(project, name: str | None) -> str:

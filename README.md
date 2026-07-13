@@ -254,7 +254,7 @@ Run Veles as a persistent daemon with an HTTP/WebSocket API. In a fresh project 
 </p>
 
 ```bash
-veles daemon start                        # wizard (fresh dir) → starts on 127.0.0.1:8765
+veles daemon start                        # wizard (fresh dir) → starts on 127.0.0.1:8765 (next free port if taken)
 veles daemon status                       # is it running?
 veles daemon list                         # daemons across all projects
 ```

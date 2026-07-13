@@ -151,16 +151,47 @@ def test_daemon_token_remove_missing(isolated_user_home: Path, capsys) -> None:
     assert "no token named" in capsys.readouterr().err
 
 
-def test_daemon_status_reports_not_running(isolated_user_home: Path, capsys) -> None:
+def _project_here(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str = "p"):
+    """Init a project and pin `_resolve_active_project` to it — stop/status
+    address the cwd project's daemon since M209 (per-slug pid/info paths)."""
+    import veles.cli as cli_mod
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path, name=name)
+    monkeypatch.setattr(cli_mod, "_resolve_active_project", lambda args: project)
+    return project
+
+
+def test_daemon_status_reports_not_running(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
+) -> None:
+    _project_here(monkeypatch, tmp_path)
     args = _ns(daemon_command="status")
     rc = daemon_cmd.cmd_daemon(args)
     assert rc == 1
     assert "not running" in capsys.readouterr().out
 
 
-def test_daemon_status_reports_running_with_info(isolated_user_home: Path, capsys) -> None:
-    pid_path = isolated_user_home / "daemon.pid"
-    info_path = isolated_user_home / "daemon.info.json"
+def test_daemon_status_outside_project_errors(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """M209: stop/status are project-scoped; outside a project there is no
+    daemon to address — point the user at the cross-project verbs instead."""
+    import veles.cli as cli_mod
+
+    monkeypatch.setattr(cli_mod, "_resolve_active_project", lambda args: None)
+    args = _ns(daemon_command="status")
+    rc = daemon_cmd.cmd_daemon(args)
+    assert rc == 2
+    assert "no Veles project" in capsys.readouterr().err
+
+
+def test_daemon_status_reports_running_with_info(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
+) -> None:
+    _project_here(monkeypatch, tmp_path)
+    pid_path = isolated_user_home / "daemon-p.pid"
+    info_path = isolated_user_home / "daemon-p.info.json"
     pid_path.write_text(f"{os.getpid()}\n", encoding="utf-8")
     info_path.write_text(
         '{"host":"127.0.0.1","port":8765,"project_name":"demo",'
@@ -176,8 +207,11 @@ def test_daemon_status_reports_running_with_info(isolated_user_home: Path, capsy
     assert "demo" in out
 
 
-def test_daemon_status_cleans_up_stale_pid_marker(isolated_user_home: Path, capsys) -> None:
-    pid_path = isolated_user_home / "daemon.pid"
+def test_daemon_status_cleans_up_stale_pid_marker(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
+) -> None:
+    _project_here(monkeypatch, tmp_path)
+    pid_path = isolated_user_home / "daemon-p.pid"
     # Pick a definitely-dead pid (negative or improbable). Use pid 1 substitute:
     # the stable approach is to pick a very high pid we know isn't running.
     pid_path.write_text("999999\n", encoding="utf-8")
@@ -187,16 +221,22 @@ def test_daemon_status_cleans_up_stale_pid_marker(isolated_user_home: Path, caps
     assert "stale" in capsys.readouterr().out
 
 
-def test_daemon_stop_no_pid_file(isolated_user_home: Path, capsys) -> None:
+def test_daemon_stop_no_pid_file(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
+) -> None:
+    _project_here(monkeypatch, tmp_path)
     args = _ns(daemon_command="stop")
     rc = daemon_cmd.cmd_daemon(args)
     assert rc == 1
     assert "no veles daemon pid file" in capsys.readouterr().err
 
 
-def test_daemon_stop_stale_pid_cleans_up(isolated_user_home: Path, capsys) -> None:
-    pid_path = isolated_user_home / "daemon.pid"
-    info_path = isolated_user_home / "daemon.info.json"
+def test_daemon_stop_stale_pid_cleans_up(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
+) -> None:
+    _project_here(monkeypatch, tmp_path)
+    pid_path = isolated_user_home / "daemon-p.pid"
+    info_path = isolated_user_home / "daemon-p.info.json"
     pid_path.write_text("999999\n", encoding="utf-8")
     info_path.write_text("{}", encoding="utf-8")
     args = _ns(daemon_command="stop")
@@ -204,6 +244,83 @@ def test_daemon_stop_stale_pid_cleans_up(isolated_user_home: Path, capsys) -> No
     assert rc == 0
     assert not pid_path.exists()
     assert not info_path.exists()
+
+
+# ---------------- M209: per-project unnamed daemons ----------------
+
+
+def test_unnamed_daemon_paths_are_per_project(tmp_path: Path, monkeypatch) -> None:
+    """Two different projects must not share a pid lock — the second
+    project's `daemon start` used to die on the first's global pid file."""
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path))
+    from veles.cli.commands.daemon import _resolve_instance_paths
+
+    proj_a = type("P", (), {"name": "alpha"})()
+    proj_b = type("P", (), {"name": "beta"})()
+    pid_a, info_a = _resolve_instance_paths(proj_a, None)
+    pid_b, info_b = _resolve_instance_paths(proj_b, None)
+    assert pid_a != pid_b
+    assert info_a != info_b
+    assert pid_a.name == "daemon-alpha.pid"
+    assert pid_b.name == "daemon-beta.pid"
+
+
+def test_second_project_start_not_blocked_by_first(isolated_user_home: Path, capsys) -> None:
+    """`_write_pid_and_info` with a LIVE pid in project A's lock must not
+    block project B (distinct slug), but must still block A itself."""
+    from veles.cli.commands.daemon import _resolve_instance_paths, _write_pid_and_info
+
+    proj_a = type("P", (), {"name": "alpha", "root": Path("/a")})()
+    proj_b = type("P", (), {"name": "beta", "root": Path("/b")})()
+    state = _ns(started_at=1.0)
+    args = _ns(host="127.0.0.1", port=8765)
+
+    pid_a, info_a = _resolve_instance_paths(proj_a, None)
+    pid_a.write_text(f"{os.getpid()}\n", encoding="utf-8")  # A is "running"
+
+    pid_b, info_b = _resolve_instance_paths(proj_b, None)
+    assert _write_pid_and_info(state, args, proj_b, pid_path=pid_b, info_path=info_b) == 0
+
+    capsys.readouterr()
+    rc = _write_pid_and_info(state, args, proj_a, pid_path=pid_a, info_path=info_a)
+    assert rc == 1
+    assert "already running" in capsys.readouterr().err
+
+
+def test_resolve_daemon_bind_picks_next_free_port(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """M209: with no configured port, a busy 8765 rolls over to 8766 instead
+    of colliding with another project's daemon."""
+    import argparse
+
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path, name="p")
+    monkeypatch.setattr(daemon_cmd, "_port_is_free", lambda host, port: port != 8765)
+    args = argparse.Namespace(host=None, port=None)
+    daemon_cmd._resolve_daemon_bind(args, project, None)
+    assert args.port == 8766
+
+
+def test_resolve_daemon_bind_config_port_is_pinned(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A config-pinned port is used verbatim even when busy — the loud
+    detach health-probe failure beats silently drifting off the pin."""
+    import argparse
+
+    from veles.core.project import init_project
+    from veles.core.project_config import load_project_config, save_project_config
+
+    project = init_project(tmp_path, name="p")
+    cfg = load_project_config(project)
+    cfg.setdefault("daemon", {})["port"] = 8799
+    save_project_config(project, cfg)
+    monkeypatch.setattr(daemon_cmd, "_port_is_free", lambda host, port: False)
+    args = argparse.Namespace(host=None, port=None)
+    daemon_cmd._resolve_daemon_bind(args, project, None)
+    assert args.port == 8799
 
 
 # ---- delete confirmation + --yes (C) ----

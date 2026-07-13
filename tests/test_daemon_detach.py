@@ -100,8 +100,8 @@ def test_detach_path_default_calls_spawn(
     web_run_calls: list[Any] = []
     monkeypatch.setattr("aiohttp.web.run_app", lambda *a, **k: web_run_calls.append((a, k)))
 
-    pid_file = isolated_user_home / "daemon.pid"
-    info_file = isolated_user_home / "daemon.info.json"
+    pid_file = isolated_user_home / "daemon-detach-tests.pid"
+    info_file = isolated_user_home / "daemon-detach-tests.info.json"
     fake_child_pid = 99_999_111  # very unlikely to clash with real pid
 
     # The success gate now requires the child to serve /v1/health with its
@@ -199,8 +199,8 @@ def test_detach_path_pid_never_appears_reports_log_tail(
 def test_detach_path_already_running_refuses(
     project, isolated_user_home: Path, monkeypatch, capsys
 ) -> None:
-    """Existing pid file + live pid → reject the start."""
-    pid_file = isolated_user_home / "daemon.pid"
+    """Existing pid file + live pid → reject the start (same project)."""
+    pid_file = isolated_user_home / "daemon-detach-tests.pid"
     pid_file.write_text(f"{os.getpid()}\n", encoding="utf-8")
     monkeypatch.setattr("veles.cli._ensure_api_key", lambda provider, project=None: True)
 

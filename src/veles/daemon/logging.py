@@ -2,11 +2,15 @@
 
 `setup_daemon_logging(slug, ...)` wires a RotatingFileHandler into the
 `veles.daemon`, `veles.channels`, `veles.cli.commands.daemon`, and
-`veles.core.agent` loggers so per-run lifecycle events, tool calls,
-file ops, Telegram inbound updates, and unexpected errors land in
-`~/.veles/logs/daemon-<slug>.log`. The handler is named
-(`veles-daemon-<slug>`) so repeated calls (tests, hot-reloads) don't
-pile up duplicate handlers.
+`veles.core` loggers so per-run lifecycle events, tool calls, file ops,
+Telegram inbound updates, background-runner failures, and unexpected
+errors land in `~/.veles/logs/daemon-<slug>.log`. `veles.core` is wired
+as a whole (M210): it used to be just `veles.core.agent` +
+`veles.core.tools`, which left `reminder_runner`/`job_runner` warnings
+to Python's lastResort stderr handler — they reached the same log file
+via the spawn fd redirect but as bare, timestamp-less lines. The
+handler is named (`veles-daemon-<slug>`) so repeated calls (tests,
+hot-reloads) don't pile up duplicate handlers.
 
 Level, rotation size, and backup count are configurable via the
 `[daemon.logging]` section in `<project>/.veles/project.toml`. Env
@@ -31,8 +35,10 @@ _LOGGER_NAMES = (
     "veles.daemon",
     "veles.channels",
     "veles.cli.commands.daemon",
-    "veles.core.agent",
-    "veles.core.tools",
+    # The whole core subtree — NOT individual `veles.core.*` children: a
+    # handler on both a child and its ancestor would double-log every record
+    # (propagation visits each handler once per logger in the chain).
+    "veles.core",
 )
 
 DEFAULT_MAX_BYTES = 10 * 1024 * 1024  # 10 MiB

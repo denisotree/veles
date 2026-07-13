@@ -16,14 +16,20 @@ from pathlib import Path
 from veles.core.user_paths import user_home, user_logs_dir
 
 
-def pid_path() -> Path:
-    """`~/.veles/daemon.pid` — single-instance lock."""
-    return user_home() / "daemon.pid"
+def pid_path(slug: str) -> Path:
+    """`~/.veles/daemon-<slug>.pid` — per-project single-instance lock (M209).
+
+    Slug-keyed like `daemon_log_path`, so daemons for different projects
+    no longer lock each other out; two projects sharing a name still
+    collide — the same pre-existing limitation as the registry and the
+    log files."""
+    return user_home() / f"daemon-{slug}.pid"
 
 
-def info_path() -> Path:
-    """`~/.veles/daemon.info.json` — sidecar metadata for `daemon status`."""
-    return user_home() / "daemon.info.json"
+def info_path(slug: str) -> Path:
+    """`~/.veles/daemon-<slug>.info.json` — sidecar metadata for
+    `daemon status`, companion to `pid_path`."""
+    return user_home() / f"daemon-{slug}.info.json"
 
 
 def daemon_log_path(slug: str) -> Path:
@@ -36,10 +42,9 @@ def daemon_log_path(slug: str) -> Path:
 def instance_pid_path(slug: str, name: str) -> Path:
     """Per-(project, named-session) pid lock (M134/M135).
 
-    The legacy `pid_path()` is a single global lock that allows only one
-    daemon per machine. To run several named daemon sessions per project,
-    each instance gets its own lock keyed by `(slug, name)`; `name`
-    defaults to `default` for the unnamed legacy daemon."""
+    `pid_path(slug)` locks the project's unnamed daemon; named daemon
+    sessions each get their own lock keyed by `(slug, name)` so several
+    can run inside one project."""
     return user_home() / f"daemon-{slug}-{name}.pid"
 
 

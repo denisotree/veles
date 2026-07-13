@@ -163,7 +163,7 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
         # `veles daemon start` dead-ended on an uninitialised dir while a
         # bare `veles` ran the wizard — a confusing asymmetry. Suppress the
         # wizard's own daemon-autostart: we own the daemon lifecycle here,
-        # and the global single-instance pid would otherwise race a
+        # and the project's single-instance pid would otherwise race a
         # double-start.
         from veles.cli.project_wizard import maybe_run_project_wizard
 
@@ -335,10 +335,17 @@ def _run_app_logged(app, *, host, port) -> None:
         raise
 
 
+_DEFAULT_PORT = 8765
+
+
 def _resolve_daemon_bind(args: argparse.Namespace, project, name: str | None) -> None:
     """Apply the host/port cascade in place on `args` (M173): an explicit
     `--host`/`--port` wins; else the project's `[daemon]` (unnamed) or
-    `[daemon.<name>]` (named session) config block; else 127.0.0.1:8765.
+    `[daemon.<name>]` (named session) config block; else 127.0.0.1 and the
+    first free port from 8765 upward (M209 — daemons of different projects
+    no longer contend for one hardcoded port; each daemon's effective port
+    is persisted in its registry entry / info sidecar, which is where the
+    picker and `daemon restart` read it back).
 
     Argparse defaults host/port to None so "not given" is distinguishable from
     a value that equals the hardcoded default — mirroring the model/provider
@@ -358,7 +365,34 @@ def _resolve_daemon_bind(args: argparse.Namespace, project, name: str | None) ->
         args.host = str(block.get("host") or "127.0.0.1")
     if args.port is None:
         cfg_port = block.get("port")
-        args.port = int(cfg_port) if cfg_port is not None else 8765
+        args.port = int(cfg_port) if cfg_port is not None else _find_free_port(args.host)
+
+
+def _port_is_free(host: str, port: int) -> bool:
+    """Can we bind `host:port` right now? Strict probe (no SO_REUSEADDR) so a
+    listener — or a lingering TIME_WAIT socket — reads as busy, the same view
+    `web.run_app` will get a moment later."""
+    import socket
+
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    try:
+        with socket.socket(family, socket.SOCK_STREAM) as sock:
+            sock.bind((host, port))
+    except OSError:
+        return False
+    return True
+
+
+def _find_free_port(host: str, *, start: int = _DEFAULT_PORT, tries: int = 100) -> int:
+    """First bindable port in [start, start+tries) — the M209 multi-project
+    default. Racy by nature (another process can grab the port between probe
+    and bind), which is fine: the detach health-probe reports a lost race
+    loudly. Falls back to `start` when the whole window is busy — same loud
+    failure path."""
+    for port in range(start, start + tries):
+        if _port_is_free(host, port):
+            return port
+    return start
 
 
 def _maybe_run_start_wizard(args: argparse.Namespace, project, *, session: str | None) -> None:

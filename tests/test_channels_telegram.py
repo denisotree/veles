@@ -1096,3 +1096,104 @@ async def test_buffer_caps_at_five_messages_flushes_immediately(
     prompt, _sid = gateway.daemon_client.calls[0]
     for i in range(5):
         assert f"Post {i}" in prompt
+
+
+# ---- M210: getUpdates backoff + log suppression ----
+
+
+async def test_poll_loop_backs_off_and_suppresses_repeat_warnings(
+    session_map: SessionMap, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """An offline machine fails every poll with the same error: one WARNING
+    (not one per ~2s retry — a real offline hour used to log ~1800 identical
+    lines) and exponentially growing sleeps capped at 60s."""
+    import logging
+
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(_FakeDaemonClient(), session_map, sends)
+
+    async def _net_down(method: str, payload: dict[str, Any]) -> dict[str, Any]:
+        raise RuntimeError("Cannot connect to host api.telegram.org:443")
+
+    gateway._telegram_send = _net_down
+    gateway._running = True
+    delays: list[float] = []
+
+    async def _instant_sleep(seconds: float) -> None:
+        delays.append(seconds)
+        if len(delays) >= 6:
+            gateway._running = False
+
+    monkeypatch.setattr(asyncio, "sleep", _instant_sleep)
+    with caplog.at_level(logging.INFO, logger="veles.channels.telegram._gateway"):
+        await gateway._poll_loop()
+
+    assert delays == [2, 4, 8, 16, 32, 60]
+    warnings = [r for r in caplog.records if "getUpdates failed" in r.getMessage()]
+    assert len(warnings) == 1
+
+
+async def test_poll_loop_logs_recovery_and_resets_backoff(
+    session_map: SessionMap, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    import logging
+
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(_FakeDaemonClient(), session_map, sends)
+    calls = {"n": 0}
+
+    async def _flaky(method: str, payload: dict[str, Any]) -> dict[str, Any]:
+        calls["n"] += 1
+        if calls["n"] <= 2:
+            raise RuntimeError("boom")
+        gateway._running = False  # one successful poll, then stop
+        return {"raw": []}
+
+    gateway._telegram_send = _flaky
+    gateway._running = True
+    delays: list[float] = []
+
+    async def _instant_sleep(seconds: float) -> None:
+        delays.append(seconds)
+
+    monkeypatch.setattr(asyncio, "sleep", _instant_sleep)
+    with caplog.at_level(logging.INFO, logger="veles.channels.telegram._gateway"):
+        await gateway._poll_loop()
+
+    assert delays == [2, 4]
+    recoveries = [r for r in caplog.records if "recovered after 2 failed polls" in r.getMessage()]
+    assert len(recoveries) == 1
+
+
+async def test_poll_loop_formats_bare_timeouts_and_logs_error_changes(
+    session_map: SessionMap, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A bare `TimeoutError` has an empty str() — the log line used to end at
+    `getUpdates failed:` with no reason. Fall back to repr; a *change* of
+    error text is logged even mid-suppression, a repeat is not."""
+    import logging
+
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(_FakeDaemonClient(), session_map, sends)
+    errors: list[Exception] = [RuntimeError("dns down"), TimeoutError(), TimeoutError()]
+
+    async def _mixed(method: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if errors:
+            raise errors.pop(0)
+        gateway._running = False
+        return {"raw": []}
+
+    gateway._telegram_send = _mixed
+    gateway._running = True
+
+    async def _instant_sleep(seconds: float) -> None:
+        pass
+
+    monkeypatch.setattr(asyncio, "sleep", _instant_sleep)
+    with caplog.at_level(logging.INFO, logger="veles.channels.telegram._gateway"):
+        await gateway._poll_loop()
+
+    warnings = [r.getMessage() for r in caplog.records if "getUpdates failed" in r.getMessage()]
+    assert len(warnings) == 2  # "dns down", then the changed text; repeat suppressed
+    assert "dns down" in warnings[0]
+    assert "TimeoutError()" in warnings[1]
