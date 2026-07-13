@@ -303,24 +303,72 @@ def test_resolve_daemon_bind_picks_next_free_port(
     assert args.port == 8766
 
 
-def test_resolve_daemon_bind_config_port_is_pinned(
-    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    """A config-pinned port is used verbatim even when busy — the loud
-    detach health-probe failure beats silently drifting off the pin."""
-    import argparse
-
+def _pinned_project(tmp_path: Path, port: int = 8799):
     from veles.core.project import init_project
     from veles.core.project_config import load_project_config, save_project_config
 
     project = init_project(tmp_path, name="p")
     cfg = load_project_config(project)
-    cfg.setdefault("daemon", {})["port"] = 8799
+    cfg.setdefault("daemon", {})["port"] = port
     save_project_config(project, cfg)
+    return project
+
+
+def test_resolve_daemon_bind_config_port_pinned_when_occupant_unknown(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A config-pinned port busy with something that is NOT a veles daemon
+    (foreign service, dying predecessor) is used verbatim — the loud detach
+    health-probe failure beats silently drifting off the pin."""
+    import argparse
+
+    project = _pinned_project(tmp_path)
     monkeypatch.setattr(daemon_cmd, "_port_is_free", lambda host, port: False)
+    monkeypatch.setattr(daemon_cmd, "_veles_daemon_on_port", lambda host, port: None)
     args = argparse.Namespace(host=None, port=None)
     daemon_cmd._resolve_daemon_bind(args, project, None)
     assert args.port == 8799
+
+
+def test_resolve_daemon_bind_config_port_rolls_off_other_projects_daemon(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
+) -> None:
+    """M211: the project wizard writes its default port (8765) into every
+    project's config, so two wizard-made projects 'pin' the same port without
+    the user choosing one. When the pinned port is held by ANOTHER project's
+    veles daemon, roll to the next free port with a warning instead of
+    crashing on bind."""
+    import argparse
+
+    project = _pinned_project(tmp_path)
+    monkeypatch.setattr(daemon_cmd, "_port_is_free", lambda host, port: port != 8799)
+    monkeypatch.setattr(
+        daemon_cmd, "_veles_daemon_on_port", lambda host, port: ("other", "/somewhere/else")
+    )
+    args = argparse.Namespace(host=None, port=None)
+    daemon_cmd._resolve_daemon_bind(args, project, None)
+    assert args.port == 8800
+    err = capsys.readouterr().err
+    assert "already used by the daemon of project 'other'" in err
+    assert "starting on 8800" in err
+
+
+def test_resolve_daemon_bind_config_port_pinned_for_same_project(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
+) -> None:
+    """Our own daemon holding the pinned port is not a collision to roll away
+    from — the pid-file check owns the 'already running' message."""
+    import argparse
+
+    project = _pinned_project(tmp_path)
+    monkeypatch.setattr(daemon_cmd, "_port_is_free", lambda host, port: False)
+    monkeypatch.setattr(
+        daemon_cmd, "_veles_daemon_on_port", lambda host, port: ("p", str(project.root))
+    )
+    args = argparse.Namespace(host=None, port=None)
+    daemon_cmd._resolve_daemon_bind(args, project, None)
+    assert args.port == 8799
+    assert "starting on" not in capsys.readouterr().err
 
 
 # ---- delete confirmation + --yes (C) ----
@@ -594,13 +642,16 @@ def test_daemon_start_explicit_port_beats_config(
 
 
 def test_resolve_daemon_bind_defaults_when_no_config(
-    isolated_user_home: Path, tmp_path: Path
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     import argparse
 
     from veles.core.project import init_project
 
     project = init_project(tmp_path, name="p")
+    # Pin the probe: the real 8765 may be busy on a dev machine running an
+    # actual daemon, which would flake this into asserting 8766.
+    monkeypatch.setattr(daemon_cmd, "_port_is_free", lambda host, port: True)
     args = argparse.Namespace(host=None, port=None)
     daemon_cmd._resolve_daemon_bind(args, project, None)
     assert args.host == "127.0.0.1"

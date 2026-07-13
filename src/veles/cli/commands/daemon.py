@@ -365,7 +365,60 @@ def _resolve_daemon_bind(args: argparse.Namespace, project, name: str | None) ->
         args.host = str(block.get("host") or "127.0.0.1")
     if args.port is None:
         cfg_port = block.get("port")
-        args.port = int(cfg_port) if cfg_port is not None else _find_free_port(args.host)
+        if cfg_port is None:
+            args.port = _find_free_port(args.host)
+        else:
+            args.port = _resolve_config_port(int(cfg_port), args.host, project)
+
+
+def _resolve_config_port(port: int, host: str, project) -> int:
+    """M211: a `[daemon] port` from config is normally used verbatim — but the
+    project wizard writes its default (8765) into every project it creates, so
+    two wizard-made projects "pin" the same port without the user ever choosing
+    one (live 2026-07-13: the second project's daemon crashed on bind with
+    `address already in use`). When the configured port is busy AND its
+    occupant identifies as the veles daemon of a *different* project, treat it
+    as that default collision: roll to the next free port with a loud warning.
+    Any other occupant (foreign service, dying predecessor, same project —
+    the pid-file check owns that message) keeps the pin, and the detach
+    health-probe reports the bind failure loudly rather than silently drifting
+    off a port the user may have wired into a proxy or firewall rule."""
+    if _port_is_free(host, port):
+        return port
+    occupant = _veles_daemon_on_port(host, port)
+    if occupant is None:
+        return port
+    other_name, other_root = occupant
+    if other_name == project.name or other_root == str(project.root):
+        return port
+    free = _find_free_port(host, start=port + 1)
+    print(
+        f"warning: [daemon] port {port} is already used by the daemon of project "
+        f"{other_name!r} ({other_root}); starting on {free} instead. Give each "
+        "project a unique `[daemon] port` in .veles/config.toml to silence this.",
+        file=sys.stderr,
+    )
+    return free
+
+
+def _veles_daemon_on_port(host: str, port: int) -> tuple[str, str] | None:
+    """`(project_name, project_root)` of the veles daemon serving `host:port`,
+    or None when the occupant isn't identifiable as one. Sync + short timeout
+    on purpose — this runs in the CLI parent, mirroring `_health_pid`."""
+    import urllib.request
+
+    connect_host = "127.0.0.1" if host in ("0.0.0.0", "::", "") else host
+    url = f"http://{connect_host}:{int(port)}/v1/health"
+    try:
+        with urllib.request.urlopen(url, timeout=0.5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        name = data.get("project")
+        root = data.get("project_root")
+        if not name and not root:
+            return None
+        return (str(name or ""), str(root or ""))
+    except Exception:
+        return None
 
 
 def _port_is_free(host: str, port: int) -> bool:
