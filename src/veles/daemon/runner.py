@@ -46,9 +46,9 @@ class PendingPrompt:
 
     The worker thread blocks on `future.result(timeout)`; the HTTP
     endpoint `POST /v1/runs/{id}/prompts/{pid}` resolves the future
-    when the channel reports the user's choice. `kind` is
-    `"trust"` or `"approval"`; `valid_choices` is the whitelist the
-    endpoint validates against."""
+    when the channel reports the user's choice. `kind` is `"trust"`,
+    `"approval"`, or `"critical"` (M213); `valid_choices` is the
+    whitelist the endpoint validates against."""
 
     kind: str
     tool: str
@@ -179,6 +179,17 @@ async def run_agent_in_background(
     # The unified prompter carries `arguments` and `reason` to the
     # Telegram trust-prompt render and serves both trust and approval.
     unified_token = set_unified_prompter(make_unified_prompter(handle, loop))
+    # M213: critical-ops confirms (M39 always-confirm + the M198 exfiltration
+    # gate) get the same channel round-trip as approval — an inline keyboard
+    # instead of the daemon's M212 auto-deny. Deny on timeout stays the
+    # fail-closed floor.
+    from veles.core.critical_ops import (
+        reset_critical_confirmer,
+        set_critical_confirmer,
+    )
+    from veles.daemon.channel_prompter import make_critical_confirmer
+
+    critical_token = set_critical_confirmer(make_critical_confirmer(handle, loop))
     # M148: ask_user must not reach the default stdin prompter on the daemon /
     # channel path — a foreground `veles channel run` has a TTY and would block
     # on the *operator's* stdin instead of asking the channel user. Skip for
@@ -244,6 +255,7 @@ async def run_agent_in_background(
         if subagent_token is not None:
             reset_subagent_factory(subagent_token)
         reset_unified_prompter(unified_token)
+        reset_critical_confirmer(critical_token)
         reset_question_prompter(question_token)
         # Any prompt still pending at this point is orphaned (the agent
         # finished before the user answered). Cancel the futures so any

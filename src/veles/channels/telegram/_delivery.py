@@ -66,12 +66,12 @@ class TelegramDelivery:
         session id + any error.
 
         New event types (M-channel-prompts):
-          - `trust_prompt` / `approval_prompt` — daemon paused the agent
-            and is waiting for the user's permission decision. We POST
-            a message with an inline keyboard and keep streaming; the
-            user's button tap arrives separately as a Telegram
-            `callback_query` and is routed to the daemon via
-            `submit_prompt_answer`.
+          - `trust_prompt` / `approval_prompt` / `critical_prompt` (M213)
+            — daemon paused the agent and is waiting for the user's
+            permission decision. We POST a message with an inline
+            keyboard and keep streaming; the user's button tap arrives
+            separately as a Telegram `callback_query` and is routed to
+            the daemon via `submit_prompt_answer`.
           - `prompt_resolved` — daemon got the answer (from us or via
             timeout) and is moving on. Clear our pending entry and
             strip the buttons on the original prompt message."""
@@ -97,7 +97,7 @@ class TelegramDelivery:
                 elif kind == "error":
                     err = event.get("error")
                     error = str(err) if err else "unknown error"
-                elif kind in ("trust_prompt", "approval_prompt"):
+                elif kind in ("trust_prompt", "approval_prompt", "critical_prompt"):
                     await gw._post_prompt(chat_id, run_id, event)
                 elif kind == "prompt_resolved":
                     await gw._finalise_prompt_message(event)

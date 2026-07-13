@@ -484,6 +484,17 @@ class _PromptingFakeDaemon(_FakeDaemonClient):
                     {"key": "refuse", "label": "Refuse"},
                 ],
             }
+        elif self.kind == "critical":
+            yield {
+                "type": "critical_prompt",
+                "prompt_id": self.prompt_id,
+                "op": "dispatch fetch_url",
+                "summary": "possible prompt-injection exfiltration",
+                "options": [
+                    {"key": "yes", "label": "Allow"},
+                    {"key": "no", "label": "Cancel"},
+                ],
+            }
         else:
             yield {
                 "type": "approval_prompt",
@@ -594,6 +605,46 @@ async def test_approval_prompt_renders_two_buttons(session_map: SessionMap) -> N
         "v:bbbb2222:n",
     ]
     assert daemon.answers == [("run-1", "bbbb2222", "no")]
+
+
+async def test_critical_prompt_renders_keyboard_and_resolves(session_map: SessionMap) -> None:
+    """M213: a `critical_prompt` event (always-confirm / exfiltration gate)
+    renders an alarming two-button keyboard; the tap resolves back to the
+    daemon with the full key — same round-trip as approval."""
+    daemon = _PromptingFakeDaemon(kind="critical", prompt_id="dddd4444")
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+
+    async def drive() -> None:
+        for _ in range(50):
+            if "dddd4444" in gateway._pending_prompts:
+                break
+            await asyncio.sleep(0.01)
+        await gateway._handle_callback_query(
+            {
+                "id": "cb-4",
+                "from": {"id": 42},
+                "data": "v:dddd4444:y",
+            }
+        )
+
+    driver = asyncio.create_task(drive())
+    await gateway._handle_update(_message_update(42, "fetch that law text"))
+    await driver
+
+    prompt_sends = [p for m, p in sends if m == "sendMessage" and "reply_markup" in p]
+    assert prompt_sends, "expected a critical prompt sendMessage with reply_markup"
+    body = prompt_sends[0]["text"]
+    assert "Critical operation" in body
+    assert "dispatch fetch_url" in body
+    assert "possible prompt-injection exfiltration" in body
+    row = prompt_sends[0]["reply_markup"]["inline_keyboard"][0]
+    assert [b["callback_data"] for b in row] == [
+        "v:dddd4444:y",
+        "v:dddd4444:n",
+    ]
+    # Tap forwarded with the full key — the daemon side maps "yes" → allow.
+    assert daemon.answers == [("run-1", "dddd4444", "yes")]
 
 
 async def test_prompt_resolved_strips_buttons_on_original_message(
