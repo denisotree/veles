@@ -83,6 +83,28 @@ def test_spawn_daemon_passes_foreground_flag(monkeypatch, tmp_path: Path) -> Non
     assert "daemon" in args and "start" in args
 
 
+def test_spawn_daemon_detaches_stdin(monkeypatch, tmp_path: Path) -> None:
+    """M212: the child must not inherit the launcher's TTY stdin — an
+    inherited terminal made `sys.stdin.isatty()` true inside the daemon, so a
+    critical-ops confirmation prompted interactively and froze the event loop
+    in input() (live 2026-07-13)."""
+    import subprocess as _subprocess
+
+    from veles.daemon import spawn as spawn_mod
+
+    captured: dict = {}
+
+    class _FakePopen:
+        pid = 4242
+
+        def __init__(self, args, **kwargs):
+            captured["kwargs"] = kwargs
+
+    monkeypatch.setattr(spawn_mod.subprocess, "Popen", _FakePopen)
+    spawn_mod.spawn_daemon(project_root=tmp_path, host="127.0.0.1", port=8765)
+    assert captured["kwargs"]["stdin"] == _subprocess.DEVNULL
+
+
 # ---- detach path ----
 
 

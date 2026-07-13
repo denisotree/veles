@@ -65,6 +65,13 @@ def spawn_daemon(
         return subprocess.Popen(
             cmd,
             cwd=str(project_root),
+            # stdin MUST be detached from the launcher's terminal (M212): a
+            # child that inherits a TTY stdin makes `sys.stdin.isatty()` true
+            # inside the daemon, so anything that prompts interactively (the
+            # critical-ops confirmer) blocks in input() from a background
+            # session — SIGTTIN froze the whole event loop mid-turn (live
+            # 2026-07-13).
+            stdin=subprocess.DEVNULL,
             stdout=log_file if log_file is not None else subprocess.DEVNULL,
             stderr=subprocess.STDOUT if log_file is not None else subprocess.DEVNULL,
             start_new_session=True,
