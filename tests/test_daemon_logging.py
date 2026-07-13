@@ -27,8 +27,7 @@ def _isolate_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[P
         "veles.daemon",
         "veles.channels",
         "veles.cli.commands.daemon",
-        "veles.core.agent",
-        "veles.core.tools",
+        "veles.core",
     ):
         log = logging.getLogger(name)
         for h in list(log.handlers):
@@ -108,6 +107,19 @@ def test_truncate_for_log_caps_long_payloads() -> None:
     # Short input passes through untouched.
     assert truncate_for_log("hi", cap=100) == "hi"
     assert truncate_for_log(None) == ""
+
+
+def test_core_runner_warning_lands_formatted(tmp_path: Path) -> None:
+    """M210: reminder/job runner warnings must go through the named handler
+    (timestamp + level + logger prefix) — before, `veles.core.reminder_runner`
+    wasn't wired and its lines reached the log file only via the child's raw
+    stderr redirect, as bare unprefixed text."""
+    log_path = _setup_daemon_logging("alpha")
+    logging.getLogger("veles.core.reminder_runner").warning("reminder task-1 delivery failed: down")
+    for h in logging.getLogger("veles.core").handlers:
+        h.flush()
+    body = log_path.read_text(encoding="utf-8")
+    assert "[WARNING] veles.core.reminder_runner: reminder task-1 delivery failed: down" in body
 
 
 def test_tool_call_lands_in_daemon_log(tmp_path: Path) -> None:

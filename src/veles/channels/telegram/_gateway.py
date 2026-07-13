@@ -74,6 +74,8 @@ from veles.channels.telegram._delivery import TelegramDelivery, _TurnOutcome
 from veles.channels.telegram._forwarded import _has_forward, _render_forwarded
 from veles.channels.telegram._helpers import (
     _LONG_POLL_TIMEOUT,
+    _POLL_RETRY_INITIAL,
+    _POLL_RETRY_MAX,
     _TELEGRAM_API,
     _build_combined_prompt,
 )
@@ -138,7 +140,20 @@ class TelegramGateway:
 
     async def start(self) -> None:
         if self._http is None:
-            self._http = aiohttp.ClientSession()
+            # M210: explicit timeouts. aiohttp's default is a 5-minute *total*
+            # cap and nothing else, so a hung DNS lookup / dead connect stalled
+            # a poll for minutes and then surfaced as a bare `TimeoutError`
+            # whose str() is empty (the `getUpdates failed:` log lines with no
+            # reason). Long-poll reads idle up to `_LONG_POLL_TIMEOUT` between
+            # bytes, so `sock_read` stays comfortably above it.
+            self._http = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(
+                    total=None,
+                    connect=10,
+                    sock_connect=10,
+                    sock_read=_LONG_POLL_TIMEOUT + 15,
+                )
+            )
         self._running = True
         # M116.1: publish the command menu so users see the supported
         # commands in Telegram's `/`-tap interface. Best-effort —
@@ -173,13 +188,30 @@ class TelegramGateway:
     # ---- poll loop ----
 
     async def _poll_loop(self) -> None:
+        # M210: exponential backoff with log suppression. A machine that goes
+        # offline (sleep, no Wi-Fi) fails every poll with the same DNS error;
+        # log the first failure, any *change* of error text, and a periodic
+        # heartbeat — not one WARNING per retry — and say when we recover.
+        delay = _POLL_RETRY_INITIAL
+        failures = 0
+        last_error = ""
         while self._running:
             try:
                 updates = await self._get_updates()
             except Exception as exc:
-                logger.warning("getUpdates failed: %s", exc)
-                await asyncio.sleep(2)
+                failures += 1
+                message = str(exc) or repr(exc)  # bare TimeoutError str() is ""
+                if failures == 1 or message != last_error or failures % 30 == 0:
+                    logger.warning("getUpdates failed (attempt %d): %s", failures, message)
+                last_error = message
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, _POLL_RETRY_MAX)
                 continue
+            if failures:
+                logger.info("getUpdates recovered after %d failed polls", failures)
+                failures = 0
+                last_error = ""
+                delay = _POLL_RETRY_INITIAL
             for update in updates:
                 update_id = update.get("update_id")
                 if isinstance(update_id, int):
