@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.1] — 2026-07-13
+
+### Fixed
+
+- **Second project's daemon crashed on `address already in use` when both
+  projects had `[daemon] port` in their config.** The project wizard
+  writes its default port (8765) into every project it creates, so
+  wizard-made projects all "pin" the same port without the user ever
+  choosing one — and 0.22.0 honoured a pinned port verbatim. Now, when
+  the configured port is busy and its occupant identifies itself as the
+  Veles daemon of a *different* project, the start rolls to the next
+  free port with a warning naming the occupant. A busy port held by
+  anything else (a foreign service, a dying predecessor) or by this
+  project's own daemon still keeps the pin and fails loudly, and an
+  explicit `--port` is always used verbatim.
+
 ## [0.22.0] — 2026-07-13
 
 ### Added
