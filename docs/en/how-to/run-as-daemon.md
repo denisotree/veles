@@ -17,8 +17,11 @@ veles daemon stop               # SIGTERM via the pid file
 Each project runs its own daemon: starting one in a second project picks the
 next free port automatically instead of refusing with "already running" —
 pin a port per project with `[daemon] port` in the config if you need a
-stable address. `stop`/`status` address the daemon of the project you are
-in; `veles daemon list` shows all of them.
+stable address. If a pinned port turns out to be held by *another project's*
+daemon (the wizard writes the same default into every project), the start
+rolls to the next free port with a warning; a port held by anything else
+fails loudly. `stop`/`status` address the daemon of the project you are in;
+`veles daemon list` shows all of them.
 
 `start` detaches and returns your shell. For a foreground process (systemd
 `Type=simple`, Docker, debugging) pass `--foreground`. Override the bind:
