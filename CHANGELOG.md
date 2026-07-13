@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] — 2026-07-13
+
+### Added
+
+- **Critical-operation confirmations now appear as inline keyboards in
+  Telegram.** When a security gate demands explicit consent mid-turn —
+  the always-confirm policy or the prompt-injection exfiltration guard
+  (e.g. the agent fetching a URL that appeared in untrusted content) —
+  the chat now shows a "⚠️ Critical operation" message with **Allow** /
+  **Cancel** buttons, the same interactive flow trust and approval
+  prompts already had. No answer within 5 minutes still means deny, so
+  the fail-closed behaviour of 0.22.2 remains the floor; the daemon log
+  keeps recording every auto-denied confirmation that happens outside a
+  channel turn.
+
 ## [0.22.2] — 2026-07-13
 
 ### Fixed
