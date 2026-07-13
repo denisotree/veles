@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] — 2026-07-13
+
+### Added
+
+- **Per-project daemons.** `veles daemon start` in a second project no
+  longer refuses with "daemon already running" — every project gets its
+  own daemon. The single-instance lock is now per project
+  (`~/.veles/daemon-<slug>.pid` instead of one machine-global pid file),
+  and when no port is configured the daemon binds the first free port
+  from 8765 upward instead of always contending for 8765. A port pinned
+  via `[daemon] port` in the project config is still used verbatim.
+  `veles daemon stop`/`status` now address the daemon of the project you
+  are in (and say so when run outside a project); daemons of other
+  projects are managed via `veles daemon list`/`restart`/`delete`, as
+  before.
+
+### Fixed
+
+- **Telegram polling no longer floods the daemon log when the machine is
+  offline.** `getUpdates` failures now retry with exponential backoff
+  (2s doubling to a 60s ceiling, reset on success) and log one WARNING
+  per outage — on the first failure, when the error text changes, and as
+  an occasional heartbeat — plus an INFO line with the failure count once
+  polling recovers. Previously a fixed 2-second retry logged one
+  identical WARNING per attempt for the entire outage.
+- **`getUpdates failed:` log lines with an empty reason.** The HTTP
+  session had no explicit timeouts, so a hung DNS lookup could stall a
+  poll for minutes and die as a bare `TimeoutError` whose message is
+  empty. The session now sets connect/read timeouts, and the log
+  formatter falls back to the exception's repr when its message is
+  empty.
+- **Reminder and job runner warnings appear in the daemon log without a
+  timestamp or level prefix.** The daemon's file logging now covers the
+  whole `veles.core` subtree, so `reminder … delivery failed` lines carry
+  the standard `[WARNING] veles.core.reminder_runner:` prefix instead of
+  arriving as bare stderr text.
+
 ## [0.21.2] — 2026-07-10
 
 ### Fixed
