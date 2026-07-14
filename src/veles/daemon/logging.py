@@ -155,4 +155,33 @@ class _LoggerWriter:
         return False
 
 
-__all__ = ["DEFAULT_TRUNCATE_CHARS", "_LoggerWriter", "setup_daemon_logging", "truncate_for_log"]
+_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def should_funnel() -> bool:
+    """True when it is safe and useful to redirect the process's
+    stdout/stderr into logging.
+
+    False when `VELES_LOG_NO_FUNNEL` is set (kill-switch) or when either fd 1
+    or fd 2 is a TTY — an interactive `veles daemon start --foreground` in a
+    real terminal must keep printing to the user's console. Uses `os.isatty`
+    on the raw fds, not `sys.stdout.isatty()`, because the sys objects can be
+    `None` or already replaced under detachment.
+    """
+    if os.environ.get("VELES_LOG_NO_FUNNEL", "").strip().lower() in _TRUTHY:
+        return False
+    try:
+        if os.isatty(1) or os.isatty(2):
+            return False
+    except OSError:
+        pass
+    return True
+
+
+__all__ = [
+    "DEFAULT_TRUNCATE_CHARS",
+    "_LoggerWriter",
+    "setup_daemon_logging",
+    "should_funnel",
+    "truncate_for_log",
+]

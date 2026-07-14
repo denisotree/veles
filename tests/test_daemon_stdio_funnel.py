@@ -5,7 +5,9 @@ from __future__ import annotations
 import io
 import logging
 
-from veles.daemon.logging import _LoggerWriter
+import pytest
+
+from veles.daemon.logging import _LoggerWriter, should_funnel
 
 
 class _Capture(logging.Handler):
@@ -118,3 +120,30 @@ def test_reentrant_write_goes_to_fallback_not_logging() -> None:
 def test_isatty_is_false() -> None:
     w = _LoggerWriter(logging.getLogger("test.funnel.tty"), logging.INFO, io.StringIO())
     assert w.isatty() is False
+
+
+def test_should_funnel_true_when_not_tty_and_no_killswitch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("VELES_LOG_NO_FUNNEL", raising=False)
+    monkeypatch.setattr("os.isatty", lambda fd: False)
+    assert should_funnel() is True
+
+
+def test_should_funnel_false_when_killswitch_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("os.isatty", lambda fd: False)
+    for val in ("1", "true", "YES", "on"):
+        monkeypatch.setenv("VELES_LOG_NO_FUNNEL", val)
+        assert should_funnel() is False
+
+
+def test_should_funnel_false_when_stdout_is_tty(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("VELES_LOG_NO_FUNNEL", raising=False)
+    monkeypatch.setattr("os.isatty", lambda fd: fd == 1)
+    assert should_funnel() is False
+
+
+def test_should_funnel_false_when_stderr_is_tty(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("VELES_LOG_NO_FUNNEL", raising=False)
+    monkeypatch.setattr("os.isatty", lambda fd: fd == 2)
+    assert should_funnel() is False
