@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -87,4 +88,71 @@ def setup_daemon_logging(
     return log_path
 
 
-__all__ = ["DEFAULT_TRUNCATE_CHARS", "setup_daemon_logging", "truncate_for_log"]
+class _LoggerWriter:
+    """File-like stand-in for `sys.stdout`/`sys.stderr` that turns raw writes
+    into logging records.
+
+    Line-buffers input and emits one record per complete line so a `print`
+    or a traceback flows through the rotating file handler like any other log
+    message — this is what makes the handler the *sole* writer to the daemon
+    log (see `install_stdio_funnel`). Long lines are clipped so a library
+    dumping a megabyte on one line can't blow up a single record.
+
+    `fallback` is the original stream captured before reassignment. A write
+    that re-enters `write()` on the same thread — the `logging.Handler.
+    handleError` path writes the failing traceback to `sys.stderr`, which is
+    now this object — is routed to `fallback` instead of back into logging,
+    breaking the feedback livelock that would otherwise spin under disk
+    pressure or a rotation failure.
+    """
+
+    def __init__(
+        self,
+        logger: logging.Logger,
+        level: int,
+        fallback: object,
+        *,
+        cap: int = DEFAULT_TRUNCATE_CHARS,
+    ) -> None:
+        self._logger = logger
+        self._level = level
+        self._fallback = fallback
+        self._cap = cap
+        self._buf = ""
+        self._local = threading.local()
+
+    def write(self, s: str) -> int:
+        if getattr(self._local, "active", False):
+            try:
+                writer = getattr(self._fallback, "write", None)
+                if writer is not None:
+                    writer(s)
+            except Exception:
+                pass
+            return len(s)
+        self._local.active = True
+        try:
+            self._buf += s
+            while "\n" in self._buf:
+                line, self._buf = self._buf.split("\n", 1)
+                if line:
+                    self._logger.log(self._level, truncate_for_log(line, self._cap))
+            return len(s)
+        finally:
+            self._local.active = False
+
+    def flush(self) -> None:
+        if not self._buf or getattr(self._local, "active", False):
+            return
+        line, self._buf = self._buf, ""
+        self._local.active = True
+        try:
+            self._logger.log(self._level, truncate_for_log(line, self._cap))
+        finally:
+            self._local.active = False
+
+    def isatty(self) -> bool:
+        return False
+
+
+__all__ = ["DEFAULT_TRUNCATE_CHARS", "_LoggerWriter", "setup_daemon_logging", "truncate_for_log"]
