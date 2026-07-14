@@ -152,6 +152,51 @@ def test_should_funnel_false_when_stderr_is_tty(monkeypatch: pytest.MonkeyPatch)
     assert should_funnel() is False
 
 
+def test_should_funnel_true_when_isatty_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("VELES_LOG_NO_FUNNEL", raising=False)
+
+    def _boom(fd: int) -> bool:
+        raise OSError("bad fd")
+
+    monkeypatch.setattr("os.isatty", _boom)
+    assert should_funnel() is True
+
+
+def test_concurrent_writes_do_not_crash_or_lose_lines() -> None:
+    """Two different threads writing to a single shared `_LoggerWriter` must
+    not corrupt `self._buf`: the reentrancy guard is per-thread
+    (threading.local) so it does nothing to serialize cross-thread access.
+    Without the lock in `write()`, `logger.log()` doing I/O between the
+    newline check and the `.split("\n", 1)` call lets a second thread race
+    the buffer and raise `ValueError: not enough values to unpack`."""
+    import threading
+
+    log, cap = _wire("test.funnel.concurrent")
+    try:
+        w = _LoggerWriter(log, logging.INFO, io.StringIO())
+        n_threads, n_lines = 8, 200
+        barrier = threading.Barrier(n_threads)
+        errors: list[BaseException] = []
+
+        def worker(tid: int) -> None:
+            barrier.wait()
+            try:
+                for i in range(n_lines):
+                    w.write(f"t{tid}-line-{i}\n")
+            except BaseException as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=worker, args=(t,)) for t in range(n_threads)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert errors == []
+        assert len(cap.records) == n_threads * n_lines
+    finally:
+        log.removeHandler(cap)
+
+
 @pytest.fixture
 def _restore_stdio() -> Iterator[None]:
     saved_out, saved_err = sys.stdout, sys.stderr

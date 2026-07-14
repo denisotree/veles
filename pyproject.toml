@@ -137,6 +137,7 @@ files = [
     "src/veles/core/history_repair.py",
     "src/veles/core/plan_artifact.py",
     "src/veles/core/approval_prompter.py",
+    "src/veles/daemon/logging.py",
 ]
 
 # These follow_imports = silent lets each strict module reference legacy

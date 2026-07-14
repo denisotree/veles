@@ -132,10 +132,26 @@ class _LoggerWriter:
         self._cap = cap
         self._buf = ""
         self._local = threading.local()
+        # Guards the read-modify-write of `self._buf` below across threads.
+        # The reentrancy guard above is per-thread (threading.local) and only
+        # protects a thread against re-entering itself; it does nothing for
+        # two *different* threads writing to this shared instance at once.
+        # Without this lock, `self._logger.log()` can release the GIL for I/O
+        # between the `"\n" in self._buf` check and the `.split("\n", 1)`
+        # call, letting a second thread consume the buffer first and turning
+        # the split into a `ValueError: not enough values to unpack`.
+        self._lock = threading.Lock()
 
     def write(self, s: str) -> int:
         if getattr(self._local, "active", False):
             try:
+                # Reentrant same-thread write (e.g. logging.Handler.handleError
+                # writing its traceback to sys.stderr, which is this object).
+                # This is a single, non-looping, non-size-bounded write to the
+                # original stream — acceptable because it only fires on a
+                # failing emit() and any error here is swallowed below. It
+                # never touches `self._buf`/`self._lock`, so it cannot
+                # deadlock against the locked branch below.
                 writer = getattr(self._fallback, "write", None)
                 if writer is not None:
                     writer(s)
@@ -144,24 +160,37 @@ class _LoggerWriter:
             return len(s)
         self._local.active = True
         try:
-            self._buf += s
-            while "\n" in self._buf:
-                line, self._buf = self._buf.split("\n", 1)
-                if line:
-                    self._logger.log(self._level, truncate_for_log(line, self._cap))
+            with self._lock:
+                self._buf += s
+                while "\n" in self._buf:
+                    line, self._buf = self._buf.split("\n", 1)
+                    if line:
+                        self._logger.log(self._level, truncate_for_log(line, self._cap))
             return len(s)
         finally:
             self._local.active = False
 
     def flush(self) -> None:
-        if not self._buf or getattr(self._local, "active", False):
+        if getattr(self._local, "active", False):
+            # A reentrant flush (same thread, inside the write()/logging.log()
+            # call above) is inert: the buffered remainder is intentionally
+            # dropped here rather than emitted, because with
+            # `logging.raiseExceptions = False` the real handleError path
+            # never calls .flush() — this branch exists only as a defensive
+            # guard, not a code path that fires in practice.
             return
-        line, self._buf = self._buf, ""
+        with self._lock:
+            if not self._buf:
+                return
+            line, self._buf = self._buf, ""
         self._local.active = True
         try:
             self._logger.log(self._level, truncate_for_log(line, self._cap))
         finally:
             self._local.active = False
+
+    def close(self) -> None:
+        self.flush()
 
     def isatty(self) -> bool:
         return False
