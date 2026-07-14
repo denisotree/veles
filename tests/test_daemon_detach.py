@@ -250,6 +250,11 @@ def test_foreground_flag_runs_aiohttp_inline(
     web_run_called: list[Any] = []
     monkeypatch.setattr("aiohttp.web.run_app", lambda *a, **k: web_run_called.append((a, k)))
     monkeypatch.setattr("veles.cli._ensure_api_key", lambda provider, project=None: True)
+    # This test drives the real `_bootstrap_daemon` (via `_cmd_daemon_start`)
+    # for its foreground-vs-detach behavior only; suppress the stdio funnel
+    # so it doesn't permanently swap sys.stdout/stderr and leak into later
+    # tests (e.g. test_daemon_stdio_funnel.py).
+    monkeypatch.setattr("veles.daemon.logging.install_stdio_funnel", lambda: False)
 
     rc = daemon_cmd._cmd_daemon_start(_start_args(foreground=True))
     assert rc == 0
