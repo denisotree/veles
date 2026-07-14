@@ -28,18 +28,25 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from veles.core.curator_state import load
+from veles.core.curator_state import load, save_atomic
 from veles.core.dreaming import (
     _DEEP_DEFAULT_IDLE_SEC,
     _DEEP_DEFAULT_INTERVAL_SEC,
     DreamResult,
     dream_cycle,
+    run_proactive_extraction,
 )
 
 if TYPE_CHECKING:
     from veles.core.project import Project
 
 logger = logging.getLogger(__name__)
+
+# M214: proactive extraction runs on its OWN cadence, far shorter than the 6h
+# deep dream — a "remind me at 20:00" mentioned at 19:00 must be materialised
+# well before 20:00. It does not wait for the long idle gate (a user chatting
+# for an hour would otherwise never get near-term events surfaced).
+_PROACTIVE_DEFAULT_INTERVAL_SEC = 15 * 60.0
 
 
 class DreamRunner:
@@ -52,6 +59,7 @@ class DreamRunner:
         check_interval_seconds: float = 120.0,
         idle_threshold_seconds: float = _DEEP_DEFAULT_IDLE_SEC,
         deep_interval_seconds: float = _DEEP_DEFAULT_INTERVAL_SEC,
+        proactive_interval_seconds: float = _PROACTIVE_DEFAULT_INTERVAL_SEC,
         consolidation_model: str | None = None,
         insight_history_loader=None,
         runtime_session_loader=None,
@@ -62,6 +70,7 @@ class DreamRunner:
         self._check_interval = check_interval_seconds
         self._idle_threshold = idle_threshold_seconds
         self._deep_interval = deep_interval_seconds
+        self._proactive_interval = proactive_interval_seconds
         self._consolidation_model = consolidation_model
         self._insight_loader = insight_history_loader
         self._runtime_session_loader = runtime_session_loader
@@ -129,15 +138,59 @@ class DreamRunner:
             except asyncio.CancelledError:
                 break
 
+    def _run_proactive(self, now: float) -> int:
+        """M214: fast-cadence proactive extraction (definite dated events →
+        reminders). Runs off the deep-dream throttle so near-term events are
+        materialised promptly. Best-effort; persists its own throttle cursor."""
+        if self._provider_factory is None or self._insight_loader is None:
+            return 0
+        try:
+            provider = self._provider_factory()
+        except Exception as exc:
+            logger.warning("proactive: provider factory failed: %s", exc)
+            return 0
+        if provider is None:
+            return 0
+        count = 0
+        try:
+            count = run_proactive_extraction(
+                self._project,
+                provider=provider,
+                model=self._consolidation_model or "",
+                history_loader=self._insight_loader,
+                now=now,
+            )
+        except Exception:
+            logger.exception("proactive extraction failed")
+        # Advance the throttle regardless of outcome so a persistent failure
+        # doesn't hammer the provider every check interval.
+        state_path = self._project.state_dir / "curator.state.json"
+        from dataclasses import replace
+
+        with contextlib.suppress(Exception):
+            state = load(state_path)
+            save_atomic(state_path, replace(state, last_proactive_at=now))
+        return count
+
     async def _maybe_run(self) -> None:
         now = time.time()
         if self._inflight is not None and not self._inflight.done():
             return
         if self._state.has_running_run():
             return
+        state = load(self._project.state_dir / "curator.state.json")
+        # M214: proactive extraction first — its own short throttle, and it does
+        # NOT wait for the long idle gate (near-term events surfaced during an
+        # active session too). LLM-gated: only when a provider is available.
+        if (
+            self._provider_factory is not None
+            and self._insight_loader is not None
+            and now - state.last_proactive_at >= self._proactive_interval
+        ):
+            self._inflight = asyncio.create_task(asyncio.to_thread(self._run_proactive, now))
+            return
         if now - self._state.last_activity_at < self._idle_threshold:
             return
-        state = load(self._project.state_dir / "curator.state.json")
         if now - state.last_deep_dream_at < self._deep_interval:
             return
         # Spawn the cycle on a worker thread; dream_cycle is sync.

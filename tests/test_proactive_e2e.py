@@ -13,7 +13,7 @@ from veles.core.dreaming import DreamResult, _step_proactive_events
 from veles.core.proactive.delivery_log import DeliveryLog
 from veles.core.proactive.target_resolver import last_active_target
 from veles.core.project import init_project
-from veles.core.provider import ProviderResponse, TokenUsage
+from veles.core.provider import Message, ProviderResponse, TokenUsage
 from veles.core.reminder_runner import ReminderRunner
 from veles.core.tasks_store import TasksStore
 
@@ -44,11 +44,14 @@ async def test_dream_to_delivery_end_to_end(tmp_path: Path):
     reply = f'[{{"title": "BC GAME live processing", "when": "{when}", "note": "merchant"}}]'
 
     # 1) dream discovers + materialises the definite event (no delivery target yet)
+    def _loader():
+        return [("s1", [Message(role="user", content="turn on BC GAME live tonight at midnight")])]
+
     _step_proactive_events(
         project,
         _FakeProvider(reply),
         "stub",
-        lambda: "user: turn on BC GAME live tonight",
+        _loader,
         DreamResult(),
         now=_NOW,
         dry_run=False,

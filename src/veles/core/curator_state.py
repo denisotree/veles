@@ -24,6 +24,9 @@ class CuratorState:
     last_post_turn_dream_at: float = 0.0
     last_deep_dream_at: float = 0.0
     dream_count: int = 0
+    # M214: throttle for the daemon's proactive-event extraction pass (its own
+    # cadence, faster than the 6h deep dream — near-term events can't wait 6h).
+    last_proactive_at: float = 0.0
     # Poison-pill guard (2026-07-08): per-session consecutive curation failures.
     # A session failing `_CURATE_MAX_ATTEMPTS` times is skipped (cursor advances
     # past it) instead of blocking the whole curator queue forever.
@@ -48,6 +51,7 @@ def load(path: Path) -> CuratorState:
             last_post_turn_dream_at=float(d.get("last_post_turn_dream_at", 0.0)),
             last_deep_dream_at=float(d.get("last_deep_dream_at", 0.0)),
             dream_count=int(d.get("dream_count", 0)),
+            last_proactive_at=float(d.get("last_proactive_at", 0.0)),
             failed_attempts=failed,
         )
     except (ValueError, TypeError) as exc:
@@ -67,6 +71,7 @@ def save_atomic(path: Path, state: CuratorState) -> None:
             "last_post_turn_dream_at": state.last_post_turn_dream_at,
             "last_deep_dream_at": state.last_deep_dream_at,
             "dream_count": state.dream_count,
+            "last_proactive_at": state.last_proactive_at,
             "failed_attempts": state.failed_attempts,
         },
     )

@@ -283,17 +283,19 @@ def dream_cycle(
                 lambda: _step_consolidate(project, provider, model, result, dry_run=dry_run),
                 result,
             )
-        # M214: pull definite dated events out of the same conversation digest
-        # and materialise them as proactive reminders. LLM-gated (needs a
-        # provider), off the per-turn hot path, and idempotent via dedup_key.
-        if include_consolidation and provider is not None:
+        # M214: pull definite dated events out of the recent conversation and
+        # materialise them as proactive reminders. LLM-gated (needs a provider).
+        # The daemon also runs this on a faster dedicated cadence via
+        # `run_proactive_extraction` — near-term events can't wait for the 6h
+        # deep dream; this in-cycle call covers manual `veles dream` and deep.
+        if provider is not None:
             _run_dream_step(
                 "proactive_events",
                 lambda: _step_proactive_events(
                     project,
                     provider,
                     model,
-                    runtime_session_loader,
+                    insight_history_loader,
                     result,
                     now=at,
                     dry_run=dry_run,
@@ -596,26 +598,67 @@ def _step_consolidate(
     append_memory_log(project, op="dream_consolidate", summary=f"-> {page_path}")
 
 
+def _proactive_corpus(history_loader, *, max_chars: int = 8000) -> str:
+    """Build the event-extraction corpus from recent session messages. This is
+    where the user's verbatim dated statements live ("enable BC GAME at 20:00")
+    — the runtime-session digest carries only metadata, so it can't be the
+    source. Keeps the most recent tail under `max_chars`."""
+    parts: list[str] = []
+    try:
+        for _sid, messages in history_loader():
+            for message in messages:
+                role = getattr(message, "role", None)
+                content = getattr(message, "content", None)
+                if role in ("user", "assistant") and content:
+                    parts.append(f"{role}: {content}")
+    except Exception:
+        return ""
+    return "\n".join(parts)[-max_chars:]
+
+
+def run_proactive_extraction(
+    project: Project,
+    *,
+    provider: Provider,
+    model: str,
+    history_loader,
+    now: float | None = None,
+) -> int:
+    """Standalone proactive-event extraction — the daemon's fast-cadence entry
+    point (see `DreamRunner`). Runs only the M214 step, not a full dream cycle.
+    Returns the number of definite events materialised."""
+    result = DreamResult()
+    _step_proactive_events(
+        project,
+        provider,
+        model,
+        history_loader,
+        result,
+        now=now if now is not None else time.time(),
+        dry_run=False,
+    )
+    return result.proactive_events
+
+
 def _step_proactive_events(
     project: Project,
     provider: Provider,
     model: str,
-    runtime_session_loader,
+    history_loader,
     result: DreamResult,
     *,
     now: float,
     dry_run: bool,
 ) -> None:
-    """M214: extract definite dated events from the conversation digest and
+    """M214: extract definite dated events from recent conversation and
     materialise each as a `source='dream'` reminder (idempotent on dedup_key).
     The daemon's `ReminderRunner` resolves the target and delivers at due time.
-    Corpus is the same runtime-session digest the dream already consumes; no
-    corpus, no work."""
-    if runtime_session_loader is None:
+    Corpus is recent session messages; no corpus, no work."""
+    if history_loader is None:
         return
-    corpus = runtime_session_loader() or ""
+    corpus = _proactive_corpus(history_loader)
     if not corpus.strip():
-        result.notes.append("proactive: empty digest, skipped")
+        result.notes.append("proactive: empty corpus, skipped")
         return
 
     from veles.core.proactive.event_extractor import extract_definite_events
@@ -658,4 +701,5 @@ __all__ = [
     "_POST_TURN_DEFAULT_INTERVAL_SEC",
     "DreamResult",
     "dream_cycle",
+    "run_proactive_extraction",
 ]
