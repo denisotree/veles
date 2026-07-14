@@ -23,7 +23,10 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from veles.channels.session_map import SessionMap, channel_session_path
+# NOTE: `veles.channels` is imported lazily inside the functions, not at module
+# top level — `veles.core` must not statically import an upper layer (M194
+# import-isolation invariant). This resolver is core-resident because the
+# ReminderRunner (core) needs it, but it reads channel session maps.
 
 
 def _config_target(project: Any) -> str | None:
@@ -42,6 +45,8 @@ def _config_target(project: Any) -> str | None:
 def last_active_target(channels: Iterable[str], *, base_dir: Path | None = None) -> str | None:
     """The `<platform>:<chat_id>` of the most-recently-active chat across the
     given channels' session maps, or None when none have any entries."""
+    from veles.channels.session_map import SessionMap, channel_session_path
+
     best_key: str | None = None
     best_ts = float("-inf")
     for channel in channels:
