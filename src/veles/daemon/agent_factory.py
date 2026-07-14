@@ -114,12 +114,18 @@ def _attach_background_runners(
     # M166: the reminder sweep shares the SAME delivery_router (the one channels
     # register their deliverers on — a fresh router would never reach Telegram).
     # The runner owns its TasksStore and closes it on stop().
+    # M214: dream-source notices resolve their target (the last active channel)
+    # at delivery time, and every attempt is audited to `proactive_deliveries`.
+    from veles.core.proactive.delivery_log import DeliveryLog
+    from veles.core.proactive.target_resolver import resolve_last_active_target
     from veles.core.reminder_runner import ReminderRunner
     from veles.core.tasks_store import TasksStore
 
     state.reminder_runner = ReminderRunner(
         store=TasksStore(project.memory_db_path),
         delivery_router=delivery_router,
+        target_resolver=lambda: resolve_last_active_target(state),
+        delivery_log=DeliveryLog(project.memory_db_path),
     )
 
     def _provider_for_dream():

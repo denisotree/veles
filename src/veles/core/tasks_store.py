@@ -230,8 +230,7 @@ class TasksStore:
         where = f"WHERE {' AND '.join(clauses)} " if clauses else ""
         params.append(limit)
         rows = self._conn.execute(
-            f"SELECT * FROM tasks {where}"
-            "ORDER BY (due_at IS NULL), due_at, created_at LIMIT ?",
+            f"SELECT * FROM tasks {where}ORDER BY (due_at IS NULL), due_at, created_at LIMIT ?",
             params,
         ).fetchall()
         return [_row_to_record(r) for r in rows]

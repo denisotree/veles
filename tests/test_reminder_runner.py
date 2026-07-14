@@ -108,6 +108,63 @@ async def test_loop_delivers_then_stop_closes_store():
     assert router.sent and router.sent[0][0] == "telegram:1"
 
 
+# ---- M214: proactive (dream-source) reminders ----
+
+
+async def test_dream_reminder_resolves_target_at_delivery():
+    store = TasksStore(":memory:")
+    store.upsert_dream_event(dedup_key="ev1", title="BC GAME live", due_at=50, now=10)
+    router = _RecordingRouter()
+    runner = ReminderRunner(
+        store=store,
+        delivery_router=router,
+        target_resolver=lambda: "telegram:99",
+    )
+    assert await runner.tick(now=100) == 1
+    assert router.sent == [("telegram:99", "⏰ BC GAME live")]
+    store.close()
+
+
+async def test_dream_reminder_cold_start_defers_then_delivers():
+    """No active channel yet → resolver returns None → notice is NOT dropped,
+    NOT marked; a later tick (channel now up) delivers it."""
+    store = TasksStore(":memory:")
+    store.upsert_dream_event(dedup_key="ev1", title="x", due_at=50, now=10)
+    router = _RecordingRouter()
+    target: list[str | None] = [None]  # cold start
+    runner = ReminderRunner(store=store, delivery_router=router, target_resolver=lambda: target[0])
+    assert await runner.tick(now=100) == 0  # deferred, not dropped
+    assert store.due_reminders(100)  # still pending
+    target[0] = "telegram:7"  # a chat became active
+    assert await runner.tick(now=100) == 1
+    assert router.sent == [("telegram:7", "⏰ x")]
+    store.close()
+
+
+async def test_delivery_attempts_are_logged():
+    from veles.core.proactive.delivery_log import DeliveryLog
+
+    store = TasksStore(":memory:")
+    store.upsert_dream_event(dedup_key="ev1", title="x", due_at=50, now=10)
+    log = DeliveryLog(":memory:")
+    target: list[str | None] = [None]
+    runner = ReminderRunner(
+        store=store,
+        delivery_router=_RecordingRouter(),
+        target_resolver=lambda: target[0],
+        delivery_log=log,
+    )
+    await runner.tick(now=100)  # cold start → logged as no_target_yet
+    target[0] = "telegram:7"
+    await runner.tick(now=100)  # delivered → logged ok
+    attempts = log.recent()
+    assert [a.ok for a in attempts] == [True, False]
+    assert attempts[1].reason == "no_target_yet"
+    assert attempts[0].dedup_key == "ev1"
+    store.close()
+    log.close()
+
+
 # ---- daemon wiring ----
 
 
