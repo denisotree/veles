@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -178,9 +179,47 @@ def should_funnel() -> bool:
     return True
 
 
+_funnel_installed = False
+
+
+def install_stdio_funnel() -> bool:
+    """Redirect this process's stdout/stderr into logging so the rotating
+    file handler becomes the single writer to the daemon log.
+
+    No-op (returns False) when already installed or when `should_funnel()`
+    declines (kill-switch / interactive terminal). Sets
+    `logging.raiseExceptions = False` so a failing `emit()` during disk
+    pressure cannot spew a traceback into the now-funneled stderr and
+    livelock. Meant to be called once, in the daemon child, right after
+    `setup_daemon_logging`.
+    """
+    global _funnel_installed
+    if _funnel_installed or not should_funnel():
+        return False
+    orig_out, orig_err = sys.stdout, sys.stderr
+    sys.stdout = _LoggerWriter(logging.getLogger("veles.daemon.stdout"), logging.INFO, orig_out)
+    sys.stderr = _LoggerWriter(logging.getLogger("veles.daemon.stderr"), logging.WARNING, orig_err)
+    logging.raiseExceptions = False
+    _funnel_installed = True
+    return True
+
+
+def _uninstall_stdio_funnel() -> None:
+    """Restore the pre-funnel stdout/stderr — test-only teardown.
+
+    `_fallback` holds the original stream captured at install time.
+    """
+    global _funnel_installed
+    if isinstance(sys.stdout, _LoggerWriter):
+        sys.stdout = sys.stdout._fallback
+    if isinstance(sys.stderr, _LoggerWriter):
+        sys.stderr = sys.stderr._fallback
+    _funnel_installed = False
+
+
 __all__ = [
     "DEFAULT_TRUNCATE_CHARS",
-    "_LoggerWriter",
+    "install_stdio_funnel",
     "setup_daemon_logging",
     "should_funnel",
     "truncate_for_log",

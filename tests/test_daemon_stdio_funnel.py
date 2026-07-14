@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import io
 import logging
+import sys
+from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 
@@ -147,3 +150,74 @@ def test_should_funnel_false_when_stderr_is_tty(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.delenv("VELES_LOG_NO_FUNNEL", raising=False)
     monkeypatch.setattr("os.isatty", lambda fd: fd == 2)
     assert should_funnel() is False
+
+
+@pytest.fixture
+def _restore_stdio() -> Iterator[None]:
+    saved_out, saved_err = sys.stdout, sys.stderr
+    saved_raise = logging.raiseExceptions
+    yield
+    from veles.daemon.logging import _uninstall_stdio_funnel
+
+    _uninstall_stdio_funnel()
+    sys.stdout, sys.stderr = saved_out, saved_err
+    logging.raiseExceptions = saved_raise
+
+
+def test_install_replaces_stdio_and_disables_raise(
+    monkeypatch: pytest.MonkeyPatch, _restore_stdio: None
+) -> None:
+    from veles.daemon.logging import install_stdio_funnel
+
+    monkeypatch.delenv("VELES_LOG_NO_FUNNEL", raising=False)
+    monkeypatch.setattr("os.isatty", lambda fd: False)
+    assert install_stdio_funnel() is True
+    assert type(sys.stdout).__name__ == "_LoggerWriter"
+    assert type(sys.stderr).__name__ == "_LoggerWriter"
+    assert logging.raiseExceptions is False
+
+
+def test_install_is_idempotent(monkeypatch: pytest.MonkeyPatch, _restore_stdio: None) -> None:
+    from veles.daemon.logging import install_stdio_funnel
+
+    monkeypatch.delenv("VELES_LOG_NO_FUNNEL", raising=False)
+    monkeypatch.setattr("os.isatty", lambda fd: False)
+    assert install_stdio_funnel() is True
+    first = sys.stdout
+    assert install_stdio_funnel() is False  # second call is a no-op
+    assert sys.stdout is first
+
+
+def test_install_skips_when_should_funnel_false(
+    monkeypatch: pytest.MonkeyPatch, _restore_stdio: None
+) -> None:
+    from veles.daemon.logging import install_stdio_funnel
+
+    monkeypatch.setenv("VELES_LOG_NO_FUNNEL", "1")
+    before = sys.stdout
+    assert install_stdio_funnel() is False
+    assert sys.stdout is before
+
+
+def test_funneled_stdout_rotates_through_handler(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Integration: writes through the stdout logger flow into the rotating
+    file handler and produce a `.1` backup once the tiny budget overflows —
+    without ever touching the process's real sys.stdout."""
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "veles"))
+    from veles.daemon.logging import _LoggerWriter, setup_daemon_logging
+
+    log_path = setup_daemon_logging("alpha", max_bytes=512, backup_count=2)
+    try:
+        w = _LoggerWriter(logging.getLogger("veles.daemon.stdout"), logging.INFO, io.StringIO())
+        for i in range(200):
+            w.write(f"noisy-line-{i:04d}: {'x' * 80}\n")
+        for h in logging.getLogger("veles.daemon").handlers:
+            h.flush()
+        assert log_path.is_file()
+        assert log_path.with_suffix(".log.1").is_file()
+    finally:
+        for h in list(logging.getLogger("veles.daemon").handlers):
+            if (h.get_name() or "").startswith("veles-daemon-"):
+                logging.getLogger("veles.daemon").removeHandler(h)
