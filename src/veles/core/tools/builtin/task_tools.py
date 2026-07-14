@@ -148,7 +148,51 @@ def task_list(state: str = "open") -> str:
     for t in tasks:
         due = f" — {_fmt(t.due_at)}" if t.due_at else ""
         mark = "x" if t.state == "done" else " "
-        lines.append(f"- [{mark}] `{t.id}` {t.title}{due}")
+        # M214: a 'dream' row is a proactive notice the agent materialised, not
+        # a user-entered todo — flag it so the two never blur together.
+        auto = " 🔔auto" if t.source == "dream" else ""
+        lines.append(f"- [{mark}] `{t.id}` {t.title}{due}{auto}")
+    return "\n".join(lines)
+
+
+@tool(risk_class=RiskClass.READ_ONLY, side_effects=[])
+def proactive_status(limit: int = 15) -> str:
+    """Show the proactive-delivery audit log: recent attempts to push a
+    reminder/notice, whether each succeeded, and why any failed (cold start,
+    channel down, invalid target). Read this to answer "did my reminder go
+    out?" with facts instead of guessing. Also lists dream notices still
+    pending delivery."""
+    project = current_project()
+    if project is None:
+        return "<error: no active project>"
+
+    from veles.core.proactive.delivery_log import DeliveryLog
+
+    log = DeliveryLog(project.memory_db_path)
+    try:
+        attempts = log.recent(limit=max(1, limit))
+    finally:
+        log.close()
+
+    store = TasksStore(project.memory_db_path)
+    try:
+        pending = [t for t in store.due_reminders(time.time()) if t.source == "dream"]
+    finally:
+        store.close()
+
+    lines = ["# Proactive delivery status"]
+    if not attempts:
+        lines.append("\n_No delivery attempts recorded yet._")
+    else:
+        lines.append("\n## Recent attempts (newest first)")
+        for a in attempts:
+            status = "✅ ok" if a.ok else f"❌ {a.reason or 'failed'}"
+            tgt = a.target or "—"
+            lines.append(f"- {_fmt(a.ts)} → `{tgt}` — {status}")
+    if pending:
+        lines.append(f"\n## Pending dream notices: {len(pending)}")
+        for t in pending:
+            lines.append(f"- `{t.id}` {t.title} (due {_fmt(t.due_at)})")
     return "\n".join(lines)
 
 
