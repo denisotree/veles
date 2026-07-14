@@ -221,3 +221,32 @@ def test_funneled_stdout_rotates_through_handler(
         for h in list(logging.getLogger("veles.daemon").handlers):
             if (h.get_name() or "").startswith("veles-daemon-"):
                 logging.getLogger("veles.daemon").removeHandler(h)
+
+
+def test_bootstrap_daemon_installs_funnel(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`_bootstrap_daemon` must call install_stdio_funnel after setting up
+    logging, so a detached daemon's raw output is captured by rotation."""
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "veles"))
+
+    called: list[bool] = []
+    import veles.cli.commands.daemon_lifecycle as lifecycle
+
+    monkeypatch.setattr(lifecycle, "_setup_daemon_logging", lambda *a, **k: tmp_path / "x.log")
+    monkeypatch.setattr(
+        "veles.daemon.logging.install_stdio_funnel", lambda: called.append(True) or True
+    )
+
+    class _Proj:
+        name = "alpha"
+        root = tmp_path
+
+    monkeypatch.setattr("veles.core.context.set_active_project", lambda p: None)
+    monkeypatch.setattr("veles.cli._load_project_modules", lambda p: {})
+    monkeypatch.setattr("veles.core.modules.set_module_registry", lambda r: None)
+    monkeypatch.setattr(lifecycle.os, "chdir", lambda p: None)
+    monkeypatch.setattr("veles.core.project_config.load_project_config", lambda p: {})
+    monkeypatch.setattr("veles.core.project_config.get_section", lambda cfg, *k: {})
+    monkeypatch.setattr(lifecycle, "_install_daemon_critical_confirmer", lambda: None)
+
+    lifecycle._bootstrap_daemon(_Proj(), name=None)
+    assert called == [True]
