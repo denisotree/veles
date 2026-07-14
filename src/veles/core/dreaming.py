@@ -94,6 +94,7 @@ class DreamResult:
     consolidation_path: str | None = None
     reindexed_pages: int = 0
     insight_dedup_clusters: int = 0
+    proactive_events: int = 0
     skipped: bool = False
     notes: list[str] = field(default_factory=list)
 
@@ -110,6 +111,8 @@ class DreamResult:
             parts.append(f"reindex={self.reindexed_pages}")
         if self.insight_dedup_clusters:
             parts.append(f"insight_dedup={self.insight_dedup_clusters}")
+        if self.proactive_events:
+            parts.append(f"proactive={self.proactive_events}")
         if self.consolidated:
             parts.append("consolidated")
         return "dream: " + " ".join(parts)
@@ -278,6 +281,23 @@ def dream_cycle(
             _run_dream_step(
                 "consolidation",
                 lambda: _step_consolidate(project, provider, model, result, dry_run=dry_run),
+                result,
+            )
+        # M214: pull definite dated events out of the same conversation digest
+        # and materialise them as proactive reminders. LLM-gated (needs a
+        # provider), off the per-turn hot path, and idempotent via dedup_key.
+        if include_consolidation and provider is not None:
+            _run_dream_step(
+                "proactive_events",
+                lambda: _step_proactive_events(
+                    project,
+                    provider,
+                    model,
+                    runtime_session_loader,
+                    result,
+                    now=at,
+                    dry_run=dry_run,
+                ),
                 result,
             )
 
@@ -574,6 +594,58 @@ def _step_consolidate(
     result.consolidated = True
     result.consolidation_path = str(page_path)
     append_memory_log(project, op="dream_consolidate", summary=f"-> {page_path}")
+
+
+def _step_proactive_events(
+    project: Project,
+    provider: Provider,
+    model: str,
+    runtime_session_loader,
+    result: DreamResult,
+    *,
+    now: float,
+    dry_run: bool,
+) -> None:
+    """M214: extract definite dated events from the conversation digest and
+    materialise each as a `source='dream'` reminder (idempotent on dedup_key).
+    The daemon's `ReminderRunner` resolves the target and delivers at due time.
+    Corpus is the same runtime-session digest the dream already consumes; no
+    corpus, no work."""
+    if runtime_session_loader is None:
+        return
+    corpus = runtime_session_loader() or ""
+    if not corpus.strip():
+        result.notes.append("proactive: empty digest, skipped")
+        return
+
+    from veles.core.proactive.event_extractor import extract_definite_events
+
+    try:
+        events = extract_definite_events(corpus=corpus, now=now, provider=provider, model=model)
+    except Exception as exc:
+        result.notes.append(f"proactive: extraction failed: {exc}")
+        return
+
+    result.proactive_events = len(events)
+    result.notes.append(f"proactive: {len(events)} definite event(s)")
+    if dry_run or not events:
+        return
+
+    from veles.core.tasks_store import TasksStore
+
+    store = TasksStore(project.memory_db_path)
+    try:
+        for ev in events:
+            store.upsert_dream_event(
+                dedup_key=ev.dedup_key,
+                title=ev.title,
+                body=ev.body,
+                due_at=ev.due_at,
+                now=now,
+            )
+    finally:
+        store.close()
+    append_memory_log(project, op="dream_proactive", summary=f"{len(events)} event(s) materialised")
 
 
 def _now_iso() -> str:
