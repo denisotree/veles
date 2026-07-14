@@ -19,6 +19,17 @@ Level, rotation size, and backup count are configurable via the
 `truncate_for_log(text, cap)` is the project-wide helper for clipping
 long tool args/results so the log file doesn't balloon when an agent
 reads a 10MB file.
+
+`install_stdio_funnel()` reassigns this (detached) process's
+`sys.stdout`/`sys.stderr` to `_LoggerWriter` objects so raw output —
+`print`, uncaught tracebacks, library retry storms — flows through the
+same `RotatingFileHandler`. That makes the handler the *sole* writer to
+the log file: rotation can no longer be defeated by a second, unrotated
+raw-fd writer (the pre-existing `spawn.py` stdout redirect).
+`should_funnel()` disables it in an interactive `--foreground` terminal
+(TTY-guard) or via `VELES_LOG_NO_FUNNEL=1`; `logging.raiseExceptions=False`
+plus a per-thread reentrancy guard stop a failing `emit()` from
+livelocking through the funneled stderr under disk pressure.
 """
 
 from __future__ import annotations
