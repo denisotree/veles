@@ -68,6 +68,13 @@ def _bootstrap_daemon(project, *, name: str | None = None) -> None:
         max_bytes=int(_log_cfg.get("max_bytes") or 10 * 1024 * 1024),
         backup_count=int(_log_cfg.get("backup_count") or 5),
     )
+    # Redirect this (detached) process's stdout/stderr into the rotating
+    # handler so a looping daemon's raw output can't grow the log past
+    # rotation. No-op in an interactive `--foreground` terminal (TTY-guard)
+    # or under VELES_LOG_NO_FUNNEL=1.
+    from veles.daemon.logging import install_stdio_funnel
+
+    install_stdio_funnel()
     import logging as _logging
 
     _logging.getLogger("veles.daemon").info(

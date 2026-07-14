@@ -67,6 +67,11 @@ def test_bootstrap_daemon_chdirs_to_project_root(
 
     from veles.core.modules import set_module_registry
 
+    # This test exercises the real _bootstrap_daemon only for its chdir
+    # side effect; suppress the stdio funnel so it doesn't permanently swap
+    # sys.stdout/stderr and leak into later tests.
+    monkeypatch.setattr("veles.daemon.logging.install_stdio_funnel", lambda: False)
+
     original_cwd = Path.cwd()
     try:
         _bootstrap_daemon(project)

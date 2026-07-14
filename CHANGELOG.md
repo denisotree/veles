@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.1] — 2026-07-14
+
+### Fixed
+
+- **A looping daemon could grow its log file without bound and defeat
+  rotation.** The daemon log had two independent writers — the rotating
+  handler (which caps size and keeps a fixed number of backups) and a raw
+  redirect of the process's stdout/stderr into the same file, which never
+  rotated. When a daemon got stuck in a loop and spewed raw output
+  (tracebacks, library retries, stray prints), that second writer grew the
+  file endlessly; after the handler rotated, the raw stream kept writing to
+  the renamed file, and once it aged past the backup limit the still-open
+  file lingered on disk with no name, quietly eating space. Huge log files
+  became slow to open and dragged on performance. Now the daemon funnels its
+  stdout/stderr through the rotating handler, making it the single writer, so
+  the total on-disk log size stays capped by `[daemon.logging] max_bytes` ×
+  `backup_count`. An interactive `veles daemon start --foreground` in a
+  terminal still prints to the console, and `VELES_LOG_NO_FUNNEL=1` disables
+  the funnel for debugging.
+
 ## [0.23.0] — 2026-07-13
 
 ### Added
