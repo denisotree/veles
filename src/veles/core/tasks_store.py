@@ -14,6 +14,16 @@ time T", not "run this prompt on a schedule".
 Snooze = reschedule (`due_at` bumped, `reminded_at` cleared); done closes it.
 Methods are intentionally small CRUD + a `due_reminders` query; the sweep loop
 lives in `ReminderRunner`, not here.
+
+M214 (proactive delivery): two columns extend the model.
+- `source` (`'user'|'dream'`): a `'dream'` row is a proactive notice the dream
+  loop materialised from a definite dated memory event — not a user-entered
+  todo. `list_tasks(source=...)` lets the `task_list` tool keep the two apart.
+- `dedup_key`: a stable hash of the underlying event, so repeated dream cycles
+  don't create duplicate notices. `upsert_dream_event` is idempotent on it.
+A `'dream'` reminder may carry `deliver_to = NULL`: its target ("the last
+active channel") is resolved by the `ReminderRunner` at delivery time, not
+frozen at creation — so `due_reminders` admits NULL-target dream rows too.
 """
 
 from __future__ import annotations
@@ -35,12 +45,24 @@ CREATE TABLE IF NOT EXISTS tasks (
     reminded_at  REAL,
     created_at   REAL NOT NULL,
     updated_at   REAL NOT NULL,
-    done_at      REAL
+    done_at      REAL,
+    source       TEXT NOT NULL DEFAULT 'user',
+    dedup_key    TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_due
     ON tasks(due_at) WHERE state = 'open' AND reminded_at IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_dedup
+    ON tasks(dedup_key) WHERE dedup_key IS NOT NULL;
 """
+
+# Additive columns for DBs created before M214. CREATE TABLE IF NOT EXISTS won't
+# alter an existing table, so bring older `tasks` tables up to schema in-place.
+_TASKS_ADDED_COLUMNS = {
+    "source": "TEXT NOT NULL DEFAULT 'user'",
+    "dedup_key": "TEXT",
+}
 
 
 @dataclass(slots=True)
@@ -55,6 +77,8 @@ class TaskRecord:
     created_at: float
     updated_at: float
     done_at: float | None
+    source: str = "user"  # 'user' | 'dream'
+    dedup_key: str | None = None
 
 
 def _make_task_id() -> str:
@@ -73,6 +97,8 @@ def _row_to_record(row: sqlite3.Row) -> TaskRecord:
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         done_at=row["done_at"],
+        source=row["source"],
+        dedup_key=row["dedup_key"],
     )
 
 
@@ -95,6 +121,14 @@ class TasksStore:
         if self._path != ":memory:":
             c.execute("PRAGMA journal_mode = WAL")
             c.execute("PRAGMA synchronous = NORMAL")
+        # Bring an older table up to schema BEFORE the CREATE/INDEX script, so
+        # the partial unique index on `dedup_key` can be built on a table that
+        # already has the column.
+        existing = {r["name"] for r in c.execute("PRAGMA table_info(tasks)")}
+        if existing:  # table pre-exists — add any missing M214 columns in place
+            for name, decl in _TASKS_ADDED_COLUMNS.items():
+                if name not in existing:
+                    c.execute(f"ALTER TABLE tasks ADD COLUMN {name} {decl}")
         c.executescript(_TASKS_SCHEMA_SQL)
 
     # ---- CRUD ----
@@ -106,6 +140,8 @@ class TasksStore:
         body: str | None = None,
         due_at: float | None = None,
         deliver_to: str | None = None,
+        source: str = "user",
+        dedup_key: str | None = None,
         now: float | None = None,
     ) -> TaskRecord:
         if not title.strip():
@@ -114,30 +150,90 @@ class TasksStore:
         tid = _make_task_id()
         self._conn.execute(
             "INSERT INTO tasks (id, title, body, due_at, state, deliver_to, "
-            "reminded_at, created_at, updated_at, done_at) "
-            "VALUES (?, ?, ?, ?, 'open', ?, NULL, ?, ?, NULL)",
-            (tid, title, body, due_at, deliver_to, at, at),
+            "reminded_at, created_at, updated_at, done_at, source, dedup_key) "
+            "VALUES (?, ?, ?, ?, 'open', ?, NULL, ?, ?, NULL, ?, ?)",
+            (tid, title, body, due_at, deliver_to, at, at, source, dedup_key),
         )
         record = self.get_task(tid)
         assert record is not None
         return record
 
+    def upsert_dream_event(
+        self,
+        *,
+        dedup_key: str,
+        title: str,
+        body: str | None = None,
+        due_at: float | None = None,
+        now: float | None = None,
+    ) -> TaskRecord:
+        """Idempotently materialise a dream-discovered dated event as a proactive
+        reminder (`source='dream'`, `deliver_to=NULL` — target resolved at
+        delivery). Keyed on `dedup_key` so repeated dream cycles never duplicate
+        the same event. On an existing key the mutable fields are refreshed; if
+        `due_at` moved, the reminder is re-armed (`reminded_at` cleared) so it
+        fires at the new time. An already-delivered notice whose time is
+        unchanged is left delivered — it must not re-fire."""
+        if not dedup_key:
+            raise ValueError("dedup_key must be non-empty")
+        if not title.strip():
+            raise ValueError("task title must be non-empty")
+        at = now if now is not None else time.time()
+        row = self._conn.execute(
+            "SELECT id, due_at FROM tasks WHERE dedup_key = ?", (dedup_key,)
+        ).fetchone()
+        if row is None:
+            return self.add_task(
+                title=title,
+                body=body,
+                due_at=due_at,
+                deliver_to=None,
+                source="dream",
+                dedup_key=dedup_key,
+                now=at,
+            )
+        rearm = row["due_at"] != due_at
+        if rearm:
+            self._conn.execute(
+                "UPDATE tasks SET title = ?, body = ?, due_at = ?, "
+                "reminded_at = NULL, state = 'open', updated_at = ? WHERE id = ?",
+                (title, body, due_at, at, row["id"]),
+            )
+        else:
+            self._conn.execute(
+                "UPDATE tasks SET title = ?, body = ?, updated_at = ? WHERE id = ?",
+                (title, body, at, row["id"]),
+            )
+        rec = self.get_task(row["id"])
+        assert rec is not None
+        return rec
+
     def get_task(self, task_id: str) -> TaskRecord | None:
         row = self._conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
         return _row_to_record(row) if row is not None else None
 
-    def list_tasks(self, *, state: str | None = "open", limit: int = 100) -> list[TaskRecord]:
-        if state is None:
-            rows = self._conn.execute(
-                "SELECT * FROM tasks ORDER BY (due_at IS NULL), due_at, created_at LIMIT ?",
-                (limit,),
-            ).fetchall()
-        else:
-            rows = self._conn.execute(
-                "SELECT * FROM tasks WHERE state = ? "
-                "ORDER BY (due_at IS NULL), due_at, created_at LIMIT ?",
-                (state, limit),
-            ).fetchall()
+    def list_tasks(
+        self,
+        *,
+        state: str | None = "open",
+        source: str | None = None,
+        limit: int = 100,
+    ) -> list[TaskRecord]:
+        clauses: list[str] = []
+        params: list[object] = []
+        if state is not None:
+            clauses.append("state = ?")
+            params.append(state)
+        if source is not None:
+            clauses.append("source = ?")
+            params.append(source)
+        where = f"WHERE {' AND '.join(clauses)} " if clauses else ""
+        params.append(limit)
+        rows = self._conn.execute(
+            f"SELECT * FROM tasks {where}"
+            "ORDER BY (due_at IS NULL), due_at, created_at LIMIT ?",
+            params,
+        ).fetchall()
         return [_row_to_record(r) for r in rows]
 
     def mark_done(self, task_id: str, *, now: float | None = None) -> bool:
@@ -162,12 +258,16 @@ class TasksStore:
     # ---- reminder sweep support ----
 
     def due_reminders(self, now: float) -> list[TaskRecord]:
-        """Open tasks whose reminder is due and not yet delivered, with a
-        target to deliver to. The ReminderRunner pushes each and calls
-        `mark_reminded`."""
+        """Open tasks whose reminder is due and not yet delivered. The
+        ReminderRunner pushes each and calls `mark_reminded`.
+
+        A user reminder needs a concrete `deliver_to`. A `'dream'` notice may
+        have `deliver_to = NULL` — its target is resolved to the last active
+        channel at delivery time — so those are admitted regardless."""
         rows = self._conn.execute(
             "SELECT * FROM tasks WHERE state = 'open' AND reminded_at IS NULL "
-            "AND due_at IS NOT NULL AND due_at <= ? AND deliver_to IS NOT NULL "
+            "AND due_at IS NOT NULL AND due_at <= ? "
+            "AND (deliver_to IS NOT NULL OR source = 'dream') "
             "ORDER BY due_at",
             (now,),
         ).fetchall()
