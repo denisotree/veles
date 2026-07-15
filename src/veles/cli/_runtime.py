@@ -128,6 +128,26 @@ _RUN_WIKI_RAG_BLOCK = (
 )
 
 
+# M214 (B1): the turn-completion contract. The loop ends a turn the moment the
+# model replies without tool calls, so a promise of deferred work ("I'll send
+# the report shortly") is treated as the final answer and the work never
+# happens — the "reply only arrives on the next message" bug. Correct the
+# model's mental model: complete the work in-turn, or schedule it as a concrete
+# reminder that actually fires (task_add).
+_RUN_TURN_CONTRACT_BLOCK = (
+    "Turn-completion contract:\n"
+    "- When your turn ends, no further message is sent on its own. Do NOT end a"
+    " turn with a promise of work you haven't done yet ('I'll send it shortly',"
+    " 'collecting the data now', 'will follow up') — a promise in prose does not"
+    " execute; the turn simply ends and nothing more is delivered.\n"
+    "- If the work can be done now, finish it in this turn and put the actual"
+    " result in your final message — not a description of what you're about to"
+    " do.\n"
+    "- If it genuinely must happen later at a specific time, schedule it with"
+    " task_add (a dated reminder that reliably fires); don't promise it in prose."
+)
+
+
 def _identity_header(project: Project) -> str:
     """Short instruction that pins the assistant to the active project.
 
@@ -187,7 +207,7 @@ def build_run_system_prompt(
     `include_proposals=False` is for daemon/channel runs — there the
     user is talking to one specific subproject and surfacing other
     subprojects' proposals leaks scope (Mind Palace bug)."""
-    stable_parts: list[str] = [_identity_header(project)]
+    stable_parts: list[str] = [_identity_header(project), _RUN_TURN_CONTRACT_BLOCK]
     if include_agents_md:
         agents = load_agents_md(project)
         if agents:

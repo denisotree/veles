@@ -228,8 +228,45 @@ def make_on_op_finished(state):
     return on_op_finished
 
 
+def make_proactive_binder(state):
+    """M214 (A4): bind a delivered proactive notice to the chat's session so a
+    reply continues a conversation that KNOWS the reminder was sent.
+
+    The `ReminderRunner` (core) calls this after a successful push. It records
+    the notice as an assistant turn in the chat's session — creating a session
+    and mapping the chat to it when the chat has none yet ("the agent opened a
+    session itself"). Deterministic: the delivered text is recorded verbatim,
+    no delivery-time LLM (compose-once is preserved). Best-effort — a binding
+    failure never blocks delivery or the reminder's mark-as-sent; the append
+    runs under the per-session lock so it can't interleave a live user turn.
+    """
+
+    async def on_delivered(target: str, text: str) -> None:
+        from veles.core.provider import Message
+        from veles.daemon.server import _channel_session_map
+
+        if ":" not in target or state.store is None:
+            return
+        platform = target.split(":", 1)[0]
+        smap = _channel_session_map(state, platform)
+        session_id = smap.get(target)
+        if session_id is None:
+            # The chat has no conversation yet — open one and map the chat to
+            # it, so the user's reply lands in this same session.
+            session_id = state.store.create_session()
+            smap.set(target, session_id)
+        lock = state.session_lock(session_id)
+        async with lock:
+            await asyncio.to_thread(
+                state.store.append_turn, session_id, Message(role="assistant", content=text)
+            )
+
+    return on_delivered
+
+
 __all__ = [
     "make_ingest_kind_handler",
     "make_on_op_finished",
+    "make_proactive_binder",
     "make_research_kind_handler",
 ]

@@ -14,7 +14,13 @@ from veles.core.context import (
 )
 from veles.core.project import init_project
 from veles.core.tasks_store import TasksStore
-from veles.core.tools.builtin.task_tools import task_add, task_done, task_list, task_snooze
+from veles.core.tools.builtin.task_tools import (
+    proactive_status,
+    task_add,
+    task_done,
+    task_list,
+    task_snooze,
+)
 
 
 @pytest.fixture()
@@ -76,6 +82,47 @@ def test_task_add_bad_due_is_error(project):
     out = task_add("x", due_at="whenever")
     assert "not understood" in out
     assert _tasks(project) == []  # nothing persisted
+
+
+def test_task_list_flags_dream_notices(project):
+    task_add("manual todo")
+    store = TasksStore(project.memory_db_path)
+    try:
+        store.upsert_dream_event(dedup_key="ev1", title="BC GAME live", due_at=2_000_000_000)
+    finally:
+        store.close()
+    out = task_list(state="all")
+    dream_line = next(ln for ln in out.splitlines() if "BC GAME live" in ln)
+    manual_line = next(ln for ln in out.splitlines() if "manual todo" in ln)
+    assert "🔔auto" in dream_line  # dream notice flagged
+    assert "🔔auto" not in manual_line  # user todo is not
+
+
+def test_proactive_status_empty(project):
+    out = proactive_status()
+    assert "No delivery attempts recorded yet" in out
+
+
+def test_proactive_status_reports_attempts_and_pending(project):
+    from veles.core.proactive.delivery_log import DeliveryLog
+
+    log = DeliveryLog(project.memory_db_path)
+    try:
+        log.record(target="telegram:5", dedup_key="ev1", ok=True, now=1_700_000_000)
+        log.record(
+            target=None, dedup_key="ev2", ok=False, reason="no_target_yet", now=1_700_000_100
+        )
+    finally:
+        log.close()
+    store = TasksStore(project.memory_db_path)
+    try:
+        store.upsert_dream_event(dedup_key="ev3", title="pending event", due_at=1.0)
+    finally:
+        store.close()
+    out = proactive_status()
+    assert "✅ ok" in out and "telegram:5" in out
+    assert "no_target_yet" in out
+    assert "Pending dream notices: 1" in out and "pending event" in out
 
 
 def test_task_list(project):

@@ -96,6 +96,13 @@ from veles.core.trace import (
 
 logger = logging.getLogger(__name__)
 
+# M214 (B2): injected when a turn would end with no tool calls AND no text, to
+# force the model to actually answer instead of leaving the turn blank.
+EMPTY_ANSWER_NUDGE = (
+    "Your last response was empty. Reply now with your answer to the user based "
+    "on what you already have. Do not call any tools — just write the answer."
+)
+
 # Fenced mode: how many times per run a zero-calls parse failure is fed back
 # to the model before the garbage round is allowed to end the turn. Bounded so
 # a model stuck emitting broken JSON can't loop to max_iterations on nudges.
@@ -362,6 +369,11 @@ class Agent:
         # silently mid-task. Feed the parse errors back (bounded, so a model
         # stuck on garbage can't loop forever).
         parse_nudges = 0
+        # M214 (B2): a turn that would end with NO tool calls and EMPTY text
+        # (e.g. a tool-only round the model didn't close with an answer) leaves
+        # the channel placeholder stuck at "...". Force ONE tool-free answer
+        # round before giving up, once per turn.
+        empty_retry_used = False
 
         for iteration in range(1, self._max_iterations + 1):
             # Cooperative cancellation checkpoint #1: between iterations,
@@ -519,6 +531,17 @@ class Agent:
                     self._persist(nudge)
                     continue
                 final_text = response.text or ""
+                # M214 (B2): don't finalize an EMPTY answer on the first try —
+                # force one tool-free round so the model actually speaks, rather
+                # than leaving a channel turn blank. Bounded to one retry.
+                if not final_text and not empty_retry_used:
+                    empty_retry_used = True
+                    force_answer = True
+                    self._log("-> empty answer: forcing one tool-free answer round")
+                    nudge = Message(role="user", content=EMPTY_ANSWER_NUDGE)
+                    history.append(nudge)
+                    self._persist(nudge)
+                    continue
                 return self._finalize(
                     RunResult(
                         text=final_text,

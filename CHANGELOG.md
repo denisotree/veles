@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] — 2026-07-15
+
+### Added
+
+- **Proactive reminders that actually reach you.** While the agent is idle it
+  now scans your recent conversation for *definite dated events* — the ones you
+  clearly said would happen at a specific time — and quietly schedules a
+  reminder for each. When the time comes the daemon delivers it to your last
+  active chat on its own, without you asking. It is deliberately conservative:
+  only things that will definitely happen, nothing speculative. Repeated scans
+  never create duplicate reminders, and if an event's time changes the reminder
+  moves with it.
+- **Reminders reply into a real conversation.** A delivered reminder is recorded
+  in the chat's session (opening one if the chat has none yet), so when you
+  reply — "snooze an hour", "what was that about?" — the agent already knows
+  which reminder it just sent and continues coherently instead of starting cold.
+- **A delivery log you (and the agent) can trust.** Every reminder/notice
+  delivery attempt — sent, deferred because no channel was active yet, or failed
+  because the channel was down — is recorded. Ask the agent "did my reminder go
+  out?" and it answers from that log instead of guessing.
+
+### Fixed
+
+- **Reminders no longer silently go missing.** Scheduled notices used a delivery
+  path that could quietly drop a message when there was no originating chat to
+  reply to, so reminders arrived unpredictably — sometimes yes, sometimes not.
+  Delivery now resolves your last active channel dynamically and, if it can't
+  deliver yet (a channel isn't up, or none is active at that instant), it keeps
+  the reminder pending and retries on the next sweep rather than dropping it.
+- **The agent no longer promises to "send it shortly" and then goes quiet.** A
+  turn used to end the moment the model replied without taking an action — so a
+  message like "collecting that now, I'll send it over" was treated as the final
+  answer and the follow-up never came until you sent another message. The agent
+  is now told plainly that a turn is one-shot: it must finish the work and give
+  you the result in the same message, or schedule a real reminder — not promise
+  deferred work in prose. As a safety net, a turn that would end with an empty
+  message is nudged once to actually answer instead of leaving a blank reply.
+
 ## [0.23.1] — 2026-07-14
 
 ### Fixed

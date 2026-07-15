@@ -68,6 +68,59 @@ def test_mark_done_excludes_from_reminders():
     s.close()
 
 
+def test_dream_upsert_is_idempotent_on_dedup_key():
+    s = _store()
+    a = s.upsert_dream_event(dedup_key="ev1", title="BC GAME live", due_at=200, now=10)
+    b = s.upsert_dream_event(dedup_key="ev1", title="BC GAME live", due_at=200, now=20)
+    assert a.id == b.id  # same row — no duplicate notice
+    assert len(s.list_tasks(state=None)) == 1
+    assert b.source == "dream"
+    assert b.deliver_to is None  # target resolved at delivery, not creation
+    s.close()
+
+
+def test_dream_upsert_rearms_on_new_due_at():
+    s = _store()
+    a = s.upsert_dream_event(dedup_key="ev1", title="x", due_at=100, now=10)
+    s.mark_reminded(a.id, now=110)
+    assert s.due_reminders(300) == []  # delivered — dormant
+    # event rescheduled to a later time → re-arm so it fires again
+    s.upsert_dream_event(dedup_key="ev1", title="x", due_at=250, now=120)
+    got = s.get_task(a.id)
+    assert got is not None and got.due_at == 250 and got.reminded_at is None
+    assert len(s.due_reminders(300)) == 1
+    s.close()
+
+
+def test_dream_upsert_unchanged_time_does_not_refire():
+    s = _store()
+    a = s.upsert_dream_event(dedup_key="ev1", title="x", due_at=100, now=10)
+    s.mark_reminded(a.id, now=110)
+    s.upsert_dream_event(dedup_key="ev1", title="x (edited body)", body="note", due_at=100, now=120)
+    got = s.get_task(a.id)
+    assert got is not None and got.reminded_at is not None  # still delivered
+    assert s.due_reminders(300) == []
+    s.close()
+
+
+def test_due_reminders_admits_dream_with_null_target():
+    s = _store()
+    d = s.upsert_dream_event(dedup_key="ev1", title="dream due", due_at=50, now=10)
+    s.add_task(title="user no-target", due_at=50, deliver_to=None, now=10)  # excluded
+    due = s.due_reminders(now=100)
+    assert [t.id for t in due] == [d.id]  # dream admitted despite NULL deliver_to
+    s.close()
+
+
+def test_list_tasks_source_filter():
+    s = _store()
+    s.add_task(title="manual", now=10)
+    s.upsert_dream_event(dedup_key="ev1", title="auto", due_at=200, now=10)
+    assert [t.title for t in s.list_tasks(source="user")] == ["manual"]
+    assert [t.title for t in s.list_tasks(source="dream")] == ["auto"]
+    s.close()
+
+
 def test_list_filters_and_orders_by_due():
     s = _store()
     s.add_task(title="later", due_at=200, now=10)

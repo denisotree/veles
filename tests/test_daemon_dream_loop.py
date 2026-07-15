@@ -91,6 +91,74 @@ async def test_maybe_run_triggers_when_idle_and_due(project: Project) -> None:
     assert runner._last_result is not None
 
 
+# ---- M214: proactive extraction cadence ----
+
+
+class _FakeProvider:
+    supports_tools = False
+
+    def __init__(self, reply: str) -> None:
+        self._reply = reply
+
+    def create_message(self, messages, tools=None, *, model, max_tokens=4096):
+        from veles.core.provider import ProviderResponse, TokenUsage
+
+        return ProviderResponse(text=self._reply, tool_calls=[], usage=TokenUsage())
+
+
+async def test_proactive_runs_without_idle_and_materialises(project: Project) -> None:
+    """The proactive pass fires on its own short throttle and does NOT wait for
+    the long idle gate — an event mentioned mid-session is still surfaced."""
+    import datetime as _dt
+
+    from veles.core.curator_state import load as _load_state
+    from veles.core.provider import Message
+    from veles.core.tasks_store import TasksStore
+
+    now = time.time()
+    when = _dt.datetime.fromtimestamp(now + 3600, tz=_dt.UTC).isoformat()
+    reply = f'[{{"title": "BC GAME live", "when": "{when}"}}]'
+
+    # NOT idle (last_activity_at=now) and no deep dream possible → only the
+    # proactive branch can fire.
+    state = _make_state(project, last_activity_at=now, runs_active=False)
+    runner = DreamRunner(
+        project=project,
+        state=state,
+        provider_factory=lambda: _FakeProvider(reply),
+        consolidation_model="stub",
+        proactive_history_loader=lambda: [("s1", [Message(role="user", content="BC GAME at 1am")])],
+        idle_threshold_seconds=999.0,  # would block a deep dream
+        proactive_interval_seconds=0.0,  # due immediately
+    )
+    await runner._maybe_run()
+    assert runner._inflight is not None
+    await runner._inflight  # drain the proactive task
+
+    store = TasksStore(project.memory_db_path)
+    try:
+        dream_tasks = store.list_tasks(state=None, source="dream")
+    finally:
+        store.close()
+    assert [t.title for t in dream_tasks] == ["BC GAME live"]
+    # throttle advanced so the next tick won't immediately re-run
+    assert _load_state(project.state_dir / "curator.state.json").last_proactive_at >= now
+
+
+async def test_proactive_skipped_without_provider(project: Project) -> None:
+    state = _make_state(project, last_activity_at=time.time(), runs_active=False)
+    runner = DreamRunner(
+        project=project,
+        state=state,
+        provider_factory=None,  # no provider → no proactive pass
+        proactive_history_loader=lambda: [],
+        idle_threshold_seconds=999.0,
+        proactive_interval_seconds=0.0,
+    )
+    await runner._maybe_run()
+    assert runner._inflight is None  # neither proactive nor deep dream fires
+
+
 async def test_status_reports_idle_thresholds(project: Project) -> None:
     state = _make_state(project, last_activity_at=0.0, runs_active=False)
     runner = DreamRunner(
