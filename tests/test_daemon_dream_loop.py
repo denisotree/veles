@@ -127,7 +127,7 @@ async def test_proactive_runs_without_idle_and_materialises(project: Project) ->
         state=state,
         provider_factory=lambda: _FakeProvider(reply),
         consolidation_model="stub",
-        insight_history_loader=lambda: [("s1", [Message(role="user", content="BC GAME at 1am")])],
+        proactive_history_loader=lambda: [("s1", [Message(role="user", content="BC GAME at 1am")])],
         idle_threshold_seconds=999.0,  # would block a deep dream
         proactive_interval_seconds=0.0,  # due immediately
     )
@@ -151,7 +151,7 @@ async def test_proactive_skipped_without_provider(project: Project) -> None:
         project=project,
         state=state,
         provider_factory=None,  # no provider → no proactive pass
-        insight_history_loader=lambda: [],
+        proactive_history_loader=lambda: [],
         idle_threshold_seconds=999.0,
         proactive_interval_seconds=0.0,
     )

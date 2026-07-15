@@ -87,6 +87,41 @@ def test_step_empty_corpus_is_noop(tmp_path: Path):
     assert _dream_tasks(project) == []
 
 
+def test_corpus_is_independent_of_curation_cursor(tmp_path: Path):
+    """Regression: the proactive corpus must NOT come from the curation-cursor
+    loader (`list_sessions_since(last_curated_at)`) — once a session is curated
+    the cursor advances past it and that loader goes empty, silently killing
+    extraction on an active daemon. The proactive loader uses `list_sessions`
+    (recent-activity window), which stays populated regardless of the cursor."""
+    from veles.core.dreaming import _proactive_corpus
+    from veles.core.memory import SessionStore
+    from veles.core.provider import Message as _Msg
+
+    project = init_project(tmp_path, name="p")
+    store = SessionStore(project.memory_db_path)
+    try:
+        sid = store.create_session()
+        store.append_turn(sid, _Msg(role="user", content="enable BC GAME live at 20:00"))
+        sess = store.get_session(sid)
+        assert sess is not None
+
+        # The curation-cursor loader, AFTER curation advanced the cursor past
+        # this session, returns nothing:
+        curated_cursor_loader = lambda: [  # noqa: E731
+            (s.id, store.load_messages(s.id))
+            for s in store.list_sessions_since(sess.last_activity_at)
+        ]
+        assert _proactive_corpus(curated_cursor_loader) == ""  # would kill extraction
+
+        # The proactive (recent-activity) loader still sees it:
+        proactive_loader = lambda: [  # noqa: E731
+            (s.id, store.load_messages(s.id)) for s in reversed(store.list_sessions(limit=20))
+        ]
+        assert "BC GAME live at 20:00" in _proactive_corpus(proactive_loader)
+    finally:
+        store.close()
+
+
 def test_step_dry_run_extracts_but_does_not_write(tmp_path: Path):
     project = init_project(tmp_path, name="p")
     result = DreamResult()

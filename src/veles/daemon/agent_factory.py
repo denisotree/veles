@@ -142,6 +142,19 @@ def _attach_background_runners(
         finally:
             sub.close()
 
+    def _proactive_history_loader():
+        # M214: corpus for proactive event extraction — the most recent sessions
+        # by activity, chronological (oldest→newest so the char-cap keeps the
+        # freshest tail). Deliberately independent of the curation cursor: a
+        # session curated seconds ago must still be visible to proactivity.
+        sub = SessionStore(project.memory_db_path)
+        try:
+            recent = sub.list_sessions(limit=20)  # newest-first
+            for sess in reversed(recent):  # chronological
+                yield sess.id, sub.load_messages(sess.id)
+        finally:
+            sub.close()
+
     def _runtime_session_loader():
         # M135-dream: feed all launched runtime sessions (incl. soft-deleted)
         # into the dream so an active daemon's consolidation is aware of the
@@ -164,6 +177,7 @@ def _attach_background_runners(
         consolidation_model=dream_model,
         insight_history_loader=_history_loader,
         runtime_session_loader=_runtime_session_loader,
+        proactive_history_loader=_proactive_history_loader,
     )
     return jobs_store
 

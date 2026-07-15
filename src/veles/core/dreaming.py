@@ -205,6 +205,7 @@ def dream_cycle(
     consolidation_model: str | None = None,
     insight_history_loader=None,
     runtime_session_loader=None,
+    proactive_history_loader=None,
     now: float | None = None,
 ) -> DreamResult:
     """Run one dream cycle. Returns a `DreamResult` summary.
@@ -285,17 +286,18 @@ def dream_cycle(
             )
         # M214: pull definite dated events out of the recent conversation and
         # materialise them as proactive reminders. LLM-gated (needs a provider).
-        # The daemon also runs this on a faster dedicated cadence via
-        # `run_proactive_extraction` — near-term events can't wait for the 6h
-        # deep dream; this in-cycle call covers manual `veles dream` and deep.
-        if provider is not None:
+        # Uses a DEDICATED history loader (recent-activity window) — NOT the
+        # curation-cursor loader, whose sessions vanish once curated, which
+        # would silently empty the corpus on an active daemon. The daemon also
+        # runs this on a faster dedicated cadence via `run_proactive_extraction`.
+        if provider is not None and proactive_history_loader is not None:
             _run_dream_step(
                 "proactive_events",
                 lambda: _step_proactive_events(
                     project,
                     provider,
                     model,
-                    insight_history_loader,
+                    proactive_history_loader,
                     result,
                     now=at,
                     dry_run=dry_run,

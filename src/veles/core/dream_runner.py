@@ -63,6 +63,7 @@ class DreamRunner:
         consolidation_model: str | None = None,
         insight_history_loader=None,
         runtime_session_loader=None,
+        proactive_history_loader=None,
     ) -> None:
         self._project = project
         self._state = state
@@ -74,6 +75,11 @@ class DreamRunner:
         self._consolidation_model = consolidation_model
         self._insight_loader = insight_history_loader
         self._runtime_session_loader = runtime_session_loader
+        # M214: recent-activity-window corpus loader for proactive extraction —
+        # deliberately NOT the curation-cursor `insight_history_loader`, whose
+        # sessions disappear once curated (would empty the corpus on an active
+        # daemon). Decoupled: curation and proactivity have different retention.
+        self._proactive_loader = proactive_history_loader
         self._loop_task: asyncio.Task | None = None
         self._running = False
         self._inflight: asyncio.Task | None = None
@@ -123,6 +129,7 @@ class DreamRunner:
             consolidation_model=self._consolidation_model,
             insight_history_loader=self._insight_loader,
             runtime_session_loader=self._runtime_session_loader,
+            proactive_history_loader=self._proactive_loader,
         )
         self._last_result = result
         return result
@@ -142,7 +149,7 @@ class DreamRunner:
         """M214: fast-cadence proactive extraction (definite dated events →
         reminders). Runs off the deep-dream throttle so near-term events are
         materialised promptly. Best-effort; persists its own throttle cursor."""
-        if self._provider_factory is None or self._insight_loader is None:
+        if self._provider_factory is None or self._proactive_loader is None:
             return 0
         try:
             provider = self._provider_factory()
@@ -157,7 +164,7 @@ class DreamRunner:
                 self._project,
                 provider=provider,
                 model=self._consolidation_model or "",
-                history_loader=self._insight_loader,
+                history_loader=self._proactive_loader,
                 now=now,
             )
         except Exception:
@@ -184,7 +191,7 @@ class DreamRunner:
         # active session too). LLM-gated: only when a provider is available.
         if (
             self._provider_factory is not None
-            and self._insight_loader is not None
+            and self._proactive_loader is not None
             and now - state.last_proactive_at >= self._proactive_interval
         ):
             self._inflight = asyncio.create_task(asyncio.to_thread(self._run_proactive, now))
