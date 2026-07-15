@@ -191,6 +191,7 @@ def test_attach_wires_reminder_runner_sharing_router(tmp_path: Path):
         # not just constructable. Locks the seam that unit tests can't see.
         assert state.reminder_runner._target_resolver is not None
         assert state.reminder_runner._delivery_log is not None
+        assert state.reminder_runner._on_delivered is not None  # A4 session-binder
         assert state.dream_runner is not None
         assert state.dream_runner._proactive_loader is not None
     finally:

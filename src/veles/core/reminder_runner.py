@@ -29,6 +29,7 @@ import contextlib
 import logging
 import time
 from collections.abc import Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ class ReminderRunner:
         interval_seconds: float = 60.0,
         target_resolver: Callable[[], str | None] | None = None,
         delivery_log=None,
+        on_delivered: Callable[[str, str], Any] | None = None,
     ) -> None:
         self._store = store
         self._delivery = delivery_router
@@ -50,6 +52,11 @@ class ReminderRunner:
         # active channel). None-returning = "not resolvable yet" → retry.
         self._target_resolver = target_resolver
         self._delivery_log = delivery_log
+        # M214 (A4): async hook run after a successful push — the daemon uses it
+        # to bind the notice to the chat's session (record it as an assistant
+        # turn, creating a session if needed) so a reply continues coherently.
+        # Best-effort: its failure never blocks delivery or mark-as-sent.
+        self._on_delivered = on_delivered
         self._loop_task: asyncio.Task | None = None
         self._running = False
 
@@ -149,6 +156,13 @@ class ReminderRunner:
                 self._log(task, target=target, ok=False, reason=f"delivery_failed: {exc}", now=now)
                 continue
             self._log(task, target=target, ok=True, reason=None, now=now)
+            # A4: bind the notice to the chat's session (best-effort — a binding
+            # failure must not un-deliver a sent reminder).
+            if self._on_delivered is not None:
+                try:
+                    await self._on_delivered(target, text)
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.warning("reminder %s post-deliver bind failed: %s", task.id, exc)
             self._store.mark_reminded(task.id, now=now)
             delivered += 1
         return delivered

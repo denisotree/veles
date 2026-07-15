@@ -120,12 +120,14 @@ def _attach_background_runners(
     from veles.core.proactive.target_resolver import resolve_last_active_target
     from veles.core.reminder_runner import ReminderRunner
     from veles.core.tasks_store import TasksStore
+    from veles.daemon.background_ops import make_proactive_binder
 
     state.reminder_runner = ReminderRunner(
         store=TasksStore(project.memory_db_path),
         delivery_router=delivery_router,
         target_resolver=lambda: resolve_last_active_target(state),
         delivery_log=DeliveryLog(project.memory_db_path),
+        on_delivered=make_proactive_binder(state),
     )
 
     def _provider_for_dream():

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import secrets
 import time
 from collections.abc import Callable
@@ -231,6 +232,19 @@ async def run_agent_in_background(
         handle.final_text = result.text
         handle.session_id = result.session_id or handle.session_id
         handle.finished_at = time.time()
+        # M214 (B3): make a blank-turn finalization observable. B2 already forces
+        # one answer round; reaching "empty" means the model stayed mute even
+        # after the nudge — surface it in the daemon log (the channel operators
+        # watch) instead of it vanishing silently, so #2-class regressions are
+        # visible in facts, not guessed at.
+        if result.stopped_reason == "empty":
+            logging.getLogger("veles.daemon").warning(
+                "run %s finished with an EMPTY answer (session=%s, iterations=%d) — "
+                "the model produced no text even after the answer nudge",
+                handle.run_id,
+                handle.session_id,
+                result.iterations,
+            )
         _post(
             {
                 "type": "completed",
