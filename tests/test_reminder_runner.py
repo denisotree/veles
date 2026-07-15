@@ -187,6 +187,12 @@ def test_attach_wires_reminder_runner_sharing_router(tmp_path: Path):
         assert state.reminder_runner is not None
         # MUST be the same instance channels register deliverers on (M165 lesson).
         assert state.reminder_runner._delivery is state.delivery_router
+        # M214: the daemon hand-off itself — proactive plumbing must be wired,
+        # not just constructable. Locks the seam that unit tests can't see.
+        assert state.reminder_runner._target_resolver is not None
+        assert state.reminder_runner._delivery_log is not None
+        assert state.dream_runner is not None
+        assert state.dream_runner._proactive_loader is not None
     finally:
         jobs_store.close()
         state.reminder_runner._store.close()
