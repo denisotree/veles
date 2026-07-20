@@ -25,7 +25,7 @@ class _OriginRecordingAgent:
     def __init__(self, sink):
         self._sink = sink
 
-    def run(self, prompt, on_text_delta=None):
+    def run(self, prompt, on_text_delta=None, event_listener=None):
         # Runs inside the to_thread worker — proves the ContextVar propagated.
         self._sink["origin"] = current_origin()
         return RunResult(text="ok", iterations=1, session_id="s1")

@@ -120,6 +120,10 @@ class TelegramGateway:
     # Per-chat aggregation: forward+comment / document+comment arrive as
     # two separate updates; a debouncer merges them into one turn.
     _buffers: dict[str, _ChatBuffer] = field(default_factory=dict, init=False)
+    # Per-chat serial execution: one turn per chat at a time. A message
+    # arriving while a turn runs waits on the chat's lock (FIFO) and gets
+    # a "queued" ack up front. Different chats stay fully parallel.
+    _chat_locks: dict[str, asyncio.Lock] = field(default_factory=dict, init=False)
     # M155 collaborators. They hold a back-reference to the gateway and
     # call through `self._gw.<method>` so instance/class-level stubs on
     # the gateway keep working.
@@ -411,7 +415,23 @@ class TelegramGateway:
         if not parts and not attachments:
             return
         prompt = _build_combined_prompt(parts, attachments, self.project_root)
-        await self._run_turn(chat_id, chat_key, prompt)
+        await self._run_turn_serial(chat_id, chat_key, prompt)
+
+    async def _run_turn_serial(self, chat_id: int, chat_key: str, prompt: str) -> None:
+        """Run one turn under the chat's serial lock. If a turn is already
+        in flight for this chat, tell the user their message is queued
+        (it will run right after) before waiting on the lock — the daemon
+        also serializes per session, but the lock lets us surface the
+        wait and keep FIFO order at the channel edge."""
+        lock = self._chat_locks.get(chat_key)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._chat_locks[chat_key] = lock
+        if lock.locked():
+            with contextlib.suppress(Exception):
+                await self._send_message(chat_id, t("telegram.ack_queued"))
+        async with lock:
+            await self._run_turn(chat_id, chat_key, prompt)
 
     # ---- media (delegates → TelegramMedia, M155) ----
 
@@ -434,7 +454,7 @@ class TelegramGateway:
         if message_id is None:
             return
         async with self._typing_indicator(chat_id):
-            outcome = await self._drain_stream(run_id, chat_id)
+            outcome = await self._drain_stream(run_id, chat_id, message_id)
         await self._deliver(chat_id, chat_key, message_id, outcome)
 
     async def _submit_or_report(self, chat_id: int, chat_key: str, text: str) -> str | None:
@@ -470,8 +490,10 @@ class TelegramGateway:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
-    async def _drain_stream(self, run_id: str, chat_id: int) -> _TurnOutcome:
-        return await self._delivery.drain_stream(run_id, chat_id)
+    async def _drain_stream(
+        self, run_id: str, chat_id: int, message_id: int | None = None
+    ) -> _TurnOutcome:
+        return await self._delivery.drain_stream(run_id, chat_id, message_id)
 
     async def _deliver(
         self,

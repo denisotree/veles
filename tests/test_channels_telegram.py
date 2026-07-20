@@ -350,6 +350,95 @@ async def test_run_turn_emits_only_one_final_edit(session_map: SessionMap) -> No
     assert edits[0]["text"] == "abcdefghij"
 
 
+async def test_second_message_while_busy_gets_queued_ack(session_map: SessionMap) -> None:
+    """A message arriving while a turn runs for the same chat gets an
+    immediate 'queued' ack, then waits its turn (FIFO)."""
+    daemon = _FakeDaemonClient()
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    # Simulate an in-flight turn by holding the chat's serial lock.
+    lock = asyncio.Lock()
+    gateway._chat_locks["42"] = lock
+    await lock.acquire()
+    task = asyncio.create_task(gateway._run_turn_serial(42, "42", "second"))
+    await asyncio.sleep(0)  # let the coroutine reach the lock
+    assert any(m == "sendMessage" and p.get("text") == t("telegram.ack_queued") for m, p in sends)
+    lock.release()
+    await task
+
+
+async def test_single_message_gets_no_queued_ack(session_map: SessionMap) -> None:
+    daemon = _FakeDaemonClient()
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "hi"))
+    assert not any(p.get("text") == t("telegram.ack_queued") for _m, p in sends)
+
+
+async def test_run_turn_shows_contextual_ack_on_tool_call(session_map: SessionMap) -> None:
+    """When the agent's first action is a tool call, the "..." holder is
+    edited into a contextual ack and the final answer arrives as a NEW
+    message (the spec'd "accepted → final" two-message flow)."""
+    daemon = _FakeDaemonClient(
+        events=[
+            {"type": "started", "run_id": "run-1", "session_id": "ses-A"},
+            {"type": "tool_call", "name": "wiki_search", "tool_call_id": "t1"},
+            {"type": "completed", "text": "the answer", "session_id": "ses-A"},
+        ]
+    )
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "look it up"))
+    edits = [p for m, p in sends if m == "editMessageText"]
+    # One edit only: placeholder → ack. The answer is not an edit.
+    assert len(edits) == 1
+    assert "🔍" in edits[0]["text"]
+    assert "the answer" not in edits[0]["text"]
+    # The final answer arrives as a fresh message beyond the "..." holder.
+    new_msgs = [p for m, p in sends if m == "sendMessage" and p.get("text") != "..."]
+    assert any("the answer" in p["text"] for p in new_msgs)
+
+
+async def test_run_turn_no_ack_when_text_first(session_map: SessionMap) -> None:
+    """A turn that answers directly (no tool call) shows no ack — the
+    placeholder is edited straight into the answer, as before."""
+    daemon = _FakeDaemonClient(
+        events=[
+            {"type": "started", "run_id": "run-1", "session_id": "ses-A"},
+            {"type": "completed", "text": "quick reply", "session_id": "ses-A"},
+        ]
+    )
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "hi"))
+    edits = [p for m, p in sends if m == "editMessageText"]
+    assert len(edits) == 1
+    assert edits[0]["text"] == "quick reply"
+
+
+async def test_run_turn_splits_long_answer_into_chunks(session_map: SessionMap) -> None:
+    """A reply longer than the Telegram limit is split, not truncated:
+    the first chunk edits the placeholder, the rest arrive as new
+    messages and no chunk exceeds the limit."""
+    long_text = "word " * 2000  # ~10000 chars
+    daemon = _FakeDaemonClient(
+        events=[
+            {"type": "started", "run_id": "run-1"},
+            {"type": "completed", "text": long_text, "session_id": "ses-L"},
+        ]
+    )
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "give me a lot"))
+    edits = [p for m, p in sends if m == "editMessageText"]
+    # Extra chunks are new sendMessage calls beyond the "..." placeholder.
+    extra = [p for m, p in sends if m == "sendMessage" and p.get("text") != "..."]
+    assert len(edits) == 1
+    assert len(extra) >= 2
+    for payload in [edits[0], *extra]:
+        assert len(payload["text"]) <= 4096
+
+
 async def test_drain_stream_returns_completed_text_and_session(
     session_map: SessionMap,
 ) -> None:
@@ -376,6 +465,38 @@ async def test_drain_stream_captures_error_event(session_map: SessionMap) -> Non
     outcome = await gateway._drain_stream("run-1", chat_id=42)
     assert outcome.error == "boom"
     assert outcome.session_id is None
+
+
+async def test_drain_stream_adopts_session_id_from_started(session_map: SessionMap) -> None:
+    """When the daemon puts the session id on `started`, the drain keeps
+    it even if the run then errors with no `completed` — so the mapping
+    can be persisted and the chat continues the same session."""
+    daemon = _FakeDaemonClient(
+        events=[
+            {"type": "started", "run_id": "run-1", "session_id": "ses-early"},
+            {"type": "error", "error": "boom", "session_id": "ses-early"},
+        ]
+    )
+    gateway = _make_gateway(daemon, session_map, [])
+    outcome = await gateway._drain_stream("run-1", chat_id=42)
+    assert outcome.error == "boom"
+    assert outcome.session_id == "ses-early"
+
+
+async def test_deliver_persists_session_mapping_on_error(session_map: SessionMap) -> None:
+    """An errored turn must still persist the chat→session mapping: the
+    session existed (user turn stored) before the failure, so the next
+    message continues it instead of starting a fresh, empty session."""
+    daemon = _FakeDaemonClient(
+        events=[
+            {"type": "started", "run_id": "run-1", "session_id": "ses-early"},
+            {"type": "error", "error": "boom", "session_id": "ses-early"},
+        ]
+    )
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "will fail"))
+    assert session_map.get("42") == "ses-early"
 
 
 async def test_typing_indicator_cancelled_after_completion(

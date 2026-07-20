@@ -12,12 +12,12 @@ from veles.daemon.runner import RunHandle, run_agent_in_background
 
 
 class _EmptyAgent:
-    def run(self, prompt, on_text_delta=None):
+    def run(self, prompt, on_text_delta=None, event_listener=None):
         return RunResult(text="", iterations=2, stopped_reason="empty", session_id="s1")
 
 
 class _OkAgent:
-    def run(self, prompt, on_text_delta=None):
+    def run(self, prompt, on_text_delta=None, event_listener=None):
         return RunResult(text="done", iterations=1, stopped_reason="completed", session_id="s1")
 
 

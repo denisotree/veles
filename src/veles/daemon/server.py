@@ -263,6 +263,15 @@ async def _handle_create_run(request: web.Request) -> web.Response:
             status=500,
         )
 
+    # The factory allocates the session eagerly (fresh id for a new chat, or a
+    # re-allocated one when the caller's id was stale), so the real session id
+    # is known BEFORE the run starts. Adopt it on the handle now so `started`
+    # carries it and channels can persist the chat→session mapping even if the
+    # turn later errors — closing the window where an errored/interrupted first
+    # turn left the mapping unset and the next message started fresh (amnesia).
+    effective_session_id = getattr(agent, "session_id", None) or session_id
+    handle.session_id = effective_session_id
+
     task = asyncio.create_task(
         run_agent_in_background(
             handle,
@@ -275,7 +284,7 @@ async def _handle_create_run(request: web.Request) -> web.Response:
             # M204: sub-agent factory (delegate/wiki_add under the daemon) +
             # per-session serialization against background-op resume turns.
             subagent_factory=state.subagent_factory,
-            turn_lock=state.session_lock(session_id) if session_id else None,
+            turn_lock=(state.session_lock(effective_session_id) if effective_session_id else None),
         )
     )
     state.run_tasks.add(task)

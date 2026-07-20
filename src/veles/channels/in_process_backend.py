@@ -67,6 +67,13 @@ class InProcessRunBackend:
             task.add_done_callback(self._state.run_tasks.discard)
             return {"run_id": handle.run_id, "session_id": handle.session_id}
         agent = self._state.agent_factory(session_id, prompt=prompt)
+        # The factory allocates the session eagerly, so the real id is known
+        # before the run starts. Adopt it on the handle now so `started` carries
+        # it and the gateway can persist the chat→session mapping even if the
+        # turn errors — otherwise an errored/interrupted turn left the mapping
+        # unset and the next message started a fresh, empty session (amnesia).
+        effective_session_id = getattr(agent, "session_id", None) or session_id
+        handle.session_id = effective_session_id
         task = asyncio.create_task(
             run_agent_in_background(
                 handle,
@@ -78,7 +85,9 @@ class InProcessRunBackend:
                 # M204: sub-agent factory (delegate/wiki_add under channels) +
                 # per-session serialization against background-op resume turns.
                 subagent_factory=getattr(self._state, "subagent_factory", None),
-                turn_lock=self._state.session_lock(session_id) if session_id else None,
+                turn_lock=(
+                    self._state.session_lock(effective_session_id) if effective_session_id else None
+                ),
             )
         )
         self._state.run_tasks.add(task)

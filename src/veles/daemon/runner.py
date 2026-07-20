@@ -132,6 +132,20 @@ async def run_agent_in_background(
     def _on_text_delta(delta: str) -> None:
         _post({"type": "text_delta", "delta": delta})
 
+    def _on_event(ev: Any) -> None:
+        # Forward the first-action signal so channels can show a contextual
+        # "on it" ack (tool call → "searching…" etc.) instead of a bare "...".
+        # Only tool_call is forwarded — the rest of the event stream stays as
+        # text_delta/completed/error to keep WS consumers unchanged.
+        if getattr(ev, "type", None) == "tool_call":
+            _post(
+                {
+                    "type": "tool_call",
+                    "name": getattr(ev, "name", ""),
+                    "tool_call_id": getattr(ev, "tool_call_id", ""),
+                }
+            )
+
     handle.state = "running"
     handle.session_id = handle.session_id  # placeholder; filled by run if missing
     _post(
@@ -200,7 +214,7 @@ async def run_agent_in_background(
     turn_token = begin_trust_turn()
 
     def _worker() -> RunResult:
-        return agent.run(prompt, on_text_delta=_on_text_delta)
+        return agent.run(prompt, on_text_delta=_on_text_delta, event_listener=_on_event)
 
     try:
         try:
@@ -209,7 +223,11 @@ async def run_agent_in_background(
             handle.state = "failed"
             handle.error = f"{type(exc).__name__}: {exc}"
             handle.finished_at = time.time()
-            _post({"type": "error", "error": handle.error})
+            # Carry the session id on the error too: the session was already
+            # allocated (and the user turn persisted) before the failure, so
+            # the channel should keep the chat→session mapping and continue
+            # the same session on the next message rather than starting fresh.
+            _post({"type": "error", "error": handle.error, "session_id": handle.session_id})
             handle.done.set()
             # Wake any waiting subscribers one last time.
             handle.event_added.set()

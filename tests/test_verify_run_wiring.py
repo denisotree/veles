@@ -165,7 +165,7 @@ def test_build_escalator_runs_on_advisor_route_and_returns_result(monkeypatch):
     captured = {}
 
     class _StubAgent:
-        def run(self, prompt, on_text_delta=None):
+        def run(self, prompt, on_text_delta=None, event_listener=None):
             captured["prompt"] = prompt
             return stub_result
 
@@ -194,7 +194,7 @@ def test_build_escalator_tool_aware_false_for_direct_provider(monkeypatch):
     captured = {}
 
     class _StubAgent:
-        def run(self, prompt, on_text_delta=None):
+        def run(self, prompt, on_text_delta=None, event_listener=None):
             return _FakeResult("x")
 
     def fake_build(args, project, **kw):
@@ -227,7 +227,7 @@ def test_emit_output_false_suppresses_print(capsys):
     from veles.cli import _run_agent_streaming_aware
 
     class _StubAgent:
-        def run(self, prompt, on_text_delta=None):
+        def run(self, prompt, on_text_delta=None, event_listener=None):
             return _FakeResult("HELLO")
 
     args = argparse.Namespace(stream=False, max_tokens_total=0, provider="ollama")

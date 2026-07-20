@@ -24,8 +24,8 @@ from veles.channels.daemon_client import DaemonClientError
 from veles.channels.telegram._helpers import _PLACEHOLDER_TEXT
 from veles.channels.telegram_format import (
     escape_html,
-    html_safe_truncate,
     markdown_to_telegram_html,
+    split_telegram_html,
 )
 
 if TYPE_CHECKING:
@@ -40,11 +40,16 @@ class _TurnOutcome:
 
     `text` is None when the stream ended without producing anything
     (network drop before first delta). `error` is set when the run
-    failed; in that case `_deliver` formats it visibly for the user."""
+    failed; in that case `_deliver` formats it visibly for the user.
+    `acked` is True when the placeholder was already edited into a
+    contextual "on it" ack (the agent's first action was a tool call),
+    so `deliver` sends the final answer as a NEW message instead of
+    overwriting the ack."""
 
     text: str | None
     session_id: str | None
     error: str | None
+    acked: bool = False
 
 
 class TelegramDelivery:
@@ -60,10 +65,19 @@ class TelegramDelivery:
         mid = placeholder.get("message_id")
         return mid if isinstance(mid, int) else None
 
-    async def drain_stream(self, run_id: str, chat_id: int) -> _TurnOutcome:
+    async def drain_stream(
+        self, run_id: str, chat_id: int, message_id: int | None = None
+    ) -> _TurnOutcome:
         """Walk the daemon's event stream, ignoring intermediate text
         deltas (M108 — no live typing), and harvest the final text +
         session id + any error.
+
+        When the agent's FIRST action is a tool call (search, write,
+        build…), edit the `...` placeholder (identified by `message_id`)
+        into a contextual "on it" ack once — a single edit, not the M108
+        per-delta stream — so the user sees work started instead of a
+        bare `...`. A text-first turn shows no ack and edits straight to
+        the answer.
 
         New event types (M-channel-prompts):
           - `trust_prompt` / `approval_prompt` / `critical_prompt` (M213)
@@ -80,20 +94,30 @@ class TelegramDelivery:
         completed_session: str | None = None
         completed_text: str | None = None
         error: str | None = None
+        acked = False
         try:
             async for event in gw.daemon_client.stream_events(run_id):
                 kind = event.get("type")
+                # Adopt the session id from the FIRST event that carries one
+                # (the daemon now puts it on `started`, so a mid-run error or
+                # stream drop still leaves us a mapping to persist — the chat
+                # keeps its session instead of restarting empty next turn).
+                sid = event.get("session_id")
+                if isinstance(sid, str) and sid:
+                    completed_session = sid
                 if kind == "text_delta":
                     delta = event.get("delta") or ""
                     if isinstance(delta, str) and delta:
                         buffer += delta
+                elif kind == "tool_call":
+                    # First tool call before any answer text → the turn needs
+                    # work; show a contextual ack in place of the "..." holder.
+                    if not acked and not buffer and message_id is not None:
+                        acked = await self._show_ack(chat_id, message_id, event.get("name"))
                 elif kind == "completed":
                     text_out = event.get("text")
                     if isinstance(text_out, str):
                         completed_text = text_out
-                    sid = event.get("session_id")
-                    if isinstance(sid, str):
-                        completed_session = sid
                 elif kind == "error":
                     err = event.get("error")
                     error = str(err) if err else "unknown error"
@@ -113,7 +137,22 @@ class TelegramDelivery:
             text=completed_text or buffer or None,
             session_id=completed_session,
             error=error,
+            acked=acked,
         )
+
+    async def _show_ack(self, chat_id: int, message_id: int, tool_name: Any) -> bool:
+        """Edit the placeholder into the contextual "on it" ack for the
+        agent's first tool call. Best-effort — a failed edit must not
+        break the turn, so a failure just leaves the "..." in place and
+        reports no ack (the final answer then overwrites it)."""
+        from veles.channels.telegram._helpers import ack_key_for_tool
+        from veles.core.i18n import t
+
+        try:
+            await self._gw._edit_message(chat_id, message_id, t(ack_key_for_tool(str(tool_name))))
+            return True
+        except Exception:
+            return False
 
     async def deliver(
         self,
@@ -133,8 +172,25 @@ class TelegramDelivery:
             final_html = markdown_to_telegram_html(outcome.text)
         else:
             final_html = escape_html(_PLACEHOLDER_TEXT)
-        await gw._edit_message(chat_id, message_id, html_safe_truncate(final_html))
-        if outcome.session_id and not outcome.error:
+        # Long answers are split into ≤-limit chunks rather than truncated:
+        # each chunk is independently valid (tags reopened across the split).
+        chunks = split_telegram_html(final_html)
+        if outcome.acked:
+            # The placeholder already shows the "on it" ack — keep it as the
+            # progress line and deliver the answer as fresh message(s), so the
+            # user gets the spec'd "accepted → final" two-message experience.
+            for chunk in chunks:
+                await gw._send_message(chat_id, chunk)
+        else:
+            # No ack shown: the "..." holder becomes the answer's first chunk.
+            await gw._edit_message(chat_id, message_id, chunks[0])
+            for extra in chunks[1:]:
+                await gw._send_message(chat_id, extra)
+        # Persist the chat→session mapping whenever we learned a session id —
+        # including on error. The session was already created and the user
+        # turn stored before any failure, so the next message must continue
+        # that same session, not open a fresh (empty) one.
+        if outcome.session_id:
             gw.session_map.set(chat_key, outcome.session_id)
 
     async def typing_loop(self, chat_id: int) -> None:

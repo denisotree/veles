@@ -6,7 +6,22 @@ from veles.channels.telegram_format import (
     escape_html,
     html_safe_truncate,
     markdown_to_telegram_html,
+    split_telegram_html,
 )
+
+
+def _entities_intact(chunk: str) -> bool:
+    """Every `&` in the chunk begins a complete `&...;` entity."""
+    i = 0
+    while True:
+        i = chunk.find("&", i)
+        if i < 0:
+            return True
+        semi = chunk.find(";", i, i + 12)
+        if semi < 0:
+            return False
+        i = semi + 1
+
 
 # ---- escape_html ----
 
@@ -160,3 +175,53 @@ def test_truncate_handles_nested_tags() -> None:
     out = html_safe_truncate(s, limit=20)
     # Close in reverse order: …</i></b>
     assert out.endswith("</i></b>")
+
+
+# ---- split_telegram_html ----
+
+
+def test_split_noop_below_limit() -> None:
+    s = "short enough to send in one message"
+    assert split_telegram_html(s, limit=4096) == [s]
+
+
+def test_split_each_chunk_within_limit() -> None:
+    s = "word " * 2000  # 10000 chars of plain text
+    chunks = split_telegram_html(s, limit=4000)
+    assert len(chunks) >= 3
+    assert all(len(c) <= 4000 for c in chunks)
+
+
+def test_split_preserves_all_text() -> None:
+    """No characters lost across the split (plain text, no tags)."""
+    s = "".join(f"line{i} " for i in range(2000))
+    chunks = split_telegram_html(s, limit=4000)
+    assert "".join(chunks).replace(" ", "") == s.replace(" ", "")
+
+
+def test_split_closes_and_reopens_tags() -> None:
+    """A `<b>` spanning the boundary is closed at the end of one chunk
+    and reopened at the start of the next, so each chunk is valid on its
+    own and the bold formatting continues visually."""
+    s = "<b>" + "x" * 6000 + "</b>"
+    chunks = split_telegram_html(s, limit=4000)
+    assert len(chunks) >= 2
+    assert all(len(c) <= 4000 for c in chunks)
+    assert chunks[0].startswith("<b>") and chunks[0].endswith("</b>")
+    assert chunks[1].startswith("<b>")
+    total_x = sum(c.count("x") for c in chunks)
+    assert total_x == 6000
+
+
+def test_split_never_breaks_entity() -> None:
+    s = "&amp; " * 1200  # ~7200 chars, entities dense near boundaries
+    chunks = split_telegram_html(s, limit=4000)
+    assert len(chunks) >= 2
+    assert all(_entities_intact(c) for c in chunks)
+
+
+def test_split_nested_tags_reopen_in_order() -> None:
+    s = "<b><i>" + "z" * 6000 + "</i></b>"
+    chunks = split_telegram_html(s, limit=4000)
+    assert chunks[0].endswith("</i></b>")
+    assert chunks[1].startswith("<b><i>")

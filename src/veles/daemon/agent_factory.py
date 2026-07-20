@@ -385,9 +385,14 @@ def _build_agent_for_turn(
     if session_id is not None and not store.session_exists(session_id):
         import logging as _logging
 
+        # Log project path + the id we probed so an operator can tell a
+        # one-time orphan (a single re-alloc, then continuity) from a
+        # fresh-every-turn loop (id changes every message → unstable
+        # project/session resolution) when diagnosing lost history.
         _logging.getLogger("veles.daemon").warning(
-            "stale session_id %s not in store; allocating fresh session",
+            "stale session_id %s not in store (project=%s); allocating fresh session",
             session_id,
+            project.root,
         )
         session_id = None
     sid = session_id if session_id is not None else store.create_session()
