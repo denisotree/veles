@@ -118,6 +118,127 @@ def html_safe_truncate(html: str, limit: int = _TELEGRAM_LIMIT) -> str:
     return kept + suffix
 
 
+def _atomize(html: str) -> list[tuple[str, str]]:
+    """Break `html` into atomic units the splitter must not cut through.
+
+    Yields `(kind, text)` where kind ∈ {"tag", "entity", "text"}. Tags
+    (`<...>`) and entities (`&...;`) are indivisible; text runs carry no
+    `<`/`&` and may be split anywhere."""
+    units: list[tuple[str, str]] = []
+    i, n = 0, len(html)
+    while i < n:
+        c = html[i]
+        if c == "<":
+            end = html.find(">", i)
+            if end < 0:
+                units.append(("text", html[i:]))
+                break
+            units.append(("tag", html[i : end + 1]))
+            i = end + 1
+        elif c == "&":
+            end = html.find(";", i, i + 12)
+            if end >= 0:
+                units.append(("entity", html[i : end + 1]))
+                i = end + 1
+            else:
+                units.append(("text", "&"))
+                i += 1
+        else:
+            j = i
+            while j < n and html[j] not in "<&":
+                j += 1
+            units.append(("text", html[i:j]))
+            i = j
+    return units
+
+
+def _tag_effect(tag: str) -> tuple[str, str | None]:
+    """Classify a `<...>` unit. Returns `(kind, name)` where kind ∈
+    {"open","close","self"}; name is the tag name (None for self-close)."""
+    body = tag[1:-1].strip()
+    if body.startswith("/"):
+        return "close", body[1:].split()[0] if body[1:].split() else ""
+    if body.endswith("/"):
+        return "self", None
+    return "open", (body.split()[0] if body.split() else "")
+
+
+def split_telegram_html(html: str, limit: int = _TELEGRAM_LIMIT) -> list[str]:
+    """Split rendered Telegram-HTML into chunks each ≤ `limit` chars,
+    every chunk independently valid. Tags open at a chunk boundary are
+    closed at its end and reopened at the start of the next chunk, so
+    formatting (bold, nested styles) continues across messages. Entities
+    are never cut; long text runs split at whitespace when possible."""
+    if len(html) <= limit:
+        return [html]
+
+    chunks: list[str] = []
+    openers: list[str] = []  # full opener strings, e.g. '<a href="x">'
+    names: list[str] = []  # parallel tag names, for closing
+    cur: list[str] = []
+    cur_len = 0
+    prefix_len = 0  # length of the reopener prefix at this chunk's start
+
+    def closers_str() -> str:
+        return "".join(f"</{name}>" for name in reversed(names))
+
+    def start_chunk() -> None:
+        nonlocal cur, cur_len, prefix_len
+        pre = "".join(openers)
+        cur = [pre] if pre else []
+        cur_len = len(pre)
+        prefix_len = len(pre)
+
+    def flush() -> None:
+        # Only emit if there's real content beyond the reopener prefix.
+        if cur_len <= prefix_len:
+            return
+        chunks.append("".join(cur) + closers_str())
+        start_chunk()
+
+    for kind, text in _atomize(html):
+        if kind == "text":
+            remaining = text
+            while remaining:
+                room = limit - cur_len - len(closers_str())
+                if room <= 0:
+                    flush()
+                    room = limit - cur_len - len(closers_str())
+                if len(remaining) <= room:
+                    cur.append(remaining)
+                    cur_len += len(remaining)
+                    remaining = ""
+                else:
+                    cut = remaining.rfind(" ", prefix_len if not cur else 1, room)
+                    if cut <= 0:
+                        cut = remaining.rfind("\n", 0, room)
+                    if cut <= 0:
+                        cut = room
+                    cur.append(remaining[:cut])
+                    cur_len += cut
+                    remaining = remaining[cut:]
+                    flush()
+            continue
+
+        # tag / entity — atomic. Reserve room to also close open tags.
+        effect, name = ("self", None) if kind == "entity" else _tag_effect(text)
+        extra = len(f"</{name}>") if effect == "open" else 0
+        if cur_len + len(text) + len(closers_str()) + extra > limit:
+            flush()
+        cur.append(text)
+        cur_len += len(text)
+        if effect == "open" and name:
+            openers.append(text)
+            names.append(name)
+        elif effect == "close" and names and names[-1] == name:
+            openers.pop()
+            names.pop()
+
+    if cur_len > prefix_len:
+        chunks.append("".join(cur) + closers_str())
+    return chunks
+
+
 # ---- renderer ----
 
 
@@ -338,4 +459,5 @@ __all__ = [
     "escape_html",
     "html_safe_truncate",
     "markdown_to_telegram_html",
+    "split_telegram_html",
 ]

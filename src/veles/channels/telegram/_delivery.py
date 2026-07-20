@@ -24,8 +24,8 @@ from veles.channels.daemon_client import DaemonClientError
 from veles.channels.telegram._helpers import _PLACEHOLDER_TEXT
 from veles.channels.telegram_format import (
     escape_html,
-    html_safe_truncate,
     markdown_to_telegram_html,
+    split_telegram_html,
 )
 
 if TYPE_CHECKING:
@@ -133,7 +133,13 @@ class TelegramDelivery:
             final_html = markdown_to_telegram_html(outcome.text)
         else:
             final_html = escape_html(_PLACEHOLDER_TEXT)
-        await gw._edit_message(chat_id, message_id, html_safe_truncate(final_html))
+        # Long answers are split into ≤-limit chunks rather than truncated:
+        # the first edits the placeholder, the rest arrive as new messages
+        # (each chunk is independently valid — tags reopened across the split).
+        chunks = split_telegram_html(final_html)
+        await gw._edit_message(chat_id, message_id, chunks[0])
+        for extra in chunks[1:]:
+            await gw._send_message(chat_id, extra)
         if outcome.session_id and not outcome.error:
             gw.session_map.set(chat_key, outcome.session_id)
 

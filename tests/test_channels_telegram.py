@@ -350,6 +350,29 @@ async def test_run_turn_emits_only_one_final_edit(session_map: SessionMap) -> No
     assert edits[0]["text"] == "abcdefghij"
 
 
+async def test_run_turn_splits_long_answer_into_chunks(session_map: SessionMap) -> None:
+    """A reply longer than the Telegram limit is split, not truncated:
+    the first chunk edits the placeholder, the rest arrive as new
+    messages and no chunk exceeds the limit."""
+    long_text = "word " * 2000  # ~10000 chars
+    daemon = _FakeDaemonClient(
+        events=[
+            {"type": "started", "run_id": "run-1"},
+            {"type": "completed", "text": long_text, "session_id": "ses-L"},
+        ]
+    )
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "give me a lot"))
+    edits = [p for m, p in sends if m == "editMessageText"]
+    # Extra chunks are new sendMessage calls beyond the "..." placeholder.
+    extra = [p for m, p in sends if m == "sendMessage" and p.get("text") != "..."]
+    assert len(edits) == 1
+    assert len(extra) >= 2
+    for payload in [edits[0], *extra]:
+        assert len(payload["text"]) <= 4096
+
+
 async def test_drain_stream_returns_completed_text_and_session(
     session_map: SessionMap,
 ) -> None:
