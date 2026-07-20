@@ -350,6 +350,31 @@ async def test_run_turn_emits_only_one_final_edit(session_map: SessionMap) -> No
     assert edits[0]["text"] == "abcdefghij"
 
 
+async def test_second_message_while_busy_gets_queued_ack(session_map: SessionMap) -> None:
+    """A message arriving while a turn runs for the same chat gets an
+    immediate 'queued' ack, then waits its turn (FIFO)."""
+    daemon = _FakeDaemonClient()
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    # Simulate an in-flight turn by holding the chat's serial lock.
+    lock = asyncio.Lock()
+    gateway._chat_locks["42"] = lock
+    await lock.acquire()
+    task = asyncio.create_task(gateway._run_turn_serial(42, "42", "second"))
+    await asyncio.sleep(0)  # let the coroutine reach the lock
+    assert any(m == "sendMessage" and p.get("text") == t("telegram.ack_queued") for m, p in sends)
+    lock.release()
+    await task
+
+
+async def test_single_message_gets_no_queued_ack(session_map: SessionMap) -> None:
+    daemon = _FakeDaemonClient()
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "hi"))
+    assert not any(p.get("text") == t("telegram.ack_queued") for _m, p in sends)
+
+
 async def test_run_turn_shows_contextual_ack_on_tool_call(session_map: SessionMap) -> None:
     """When the agent's first action is a tool call, the "..." holder is
     edited into a contextual ack and the final answer arrives as a NEW
