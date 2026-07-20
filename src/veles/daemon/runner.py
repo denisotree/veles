@@ -209,7 +209,11 @@ async def run_agent_in_background(
             handle.state = "failed"
             handle.error = f"{type(exc).__name__}: {exc}"
             handle.finished_at = time.time()
-            _post({"type": "error", "error": handle.error})
+            # Carry the session id on the error too: the session was already
+            # allocated (and the user turn persisted) before the failure, so
+            # the channel should keep the chat→session mapping and continue
+            # the same session on the next message rather than starting fresh.
+            _post({"type": "error", "error": handle.error, "session_id": handle.session_id})
             handle.done.set()
             # Wake any waiting subscribers one last time.
             handle.event_added.set()

@@ -83,6 +83,13 @@ class TelegramDelivery:
         try:
             async for event in gw.daemon_client.stream_events(run_id):
                 kind = event.get("type")
+                # Adopt the session id from the FIRST event that carries one
+                # (the daemon now puts it on `started`, so a mid-run error or
+                # stream drop still leaves us a mapping to persist — the chat
+                # keeps its session instead of restarting empty next turn).
+                sid = event.get("session_id")
+                if isinstance(sid, str) and sid:
+                    completed_session = sid
                 if kind == "text_delta":
                     delta = event.get("delta") or ""
                     if isinstance(delta, str) and delta:
@@ -91,9 +98,6 @@ class TelegramDelivery:
                     text_out = event.get("text")
                     if isinstance(text_out, str):
                         completed_text = text_out
-                    sid = event.get("session_id")
-                    if isinstance(sid, str):
-                        completed_session = sid
                 elif kind == "error":
                     err = event.get("error")
                     error = str(err) if err else "unknown error"
@@ -140,7 +144,11 @@ class TelegramDelivery:
         await gw._edit_message(chat_id, message_id, chunks[0])
         for extra in chunks[1:]:
             await gw._send_message(chat_id, extra)
-        if outcome.session_id and not outcome.error:
+        # Persist the chat→session mapping whenever we learned a session id —
+        # including on error. The session was already created and the user
+        # turn stored before any failure, so the next message must continue
+        # that same session, not open a fresh (empty) one.
+        if outcome.session_id:
             gw.session_map.set(chat_key, outcome.session_id)
 
     async def typing_loop(self, chat_id: int) -> None:

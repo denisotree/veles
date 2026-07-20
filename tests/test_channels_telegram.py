@@ -401,6 +401,38 @@ async def test_drain_stream_captures_error_event(session_map: SessionMap) -> Non
     assert outcome.session_id is None
 
 
+async def test_drain_stream_adopts_session_id_from_started(session_map: SessionMap) -> None:
+    """When the daemon puts the session id on `started`, the drain keeps
+    it even if the run then errors with no `completed` — so the mapping
+    can be persisted and the chat continues the same session."""
+    daemon = _FakeDaemonClient(
+        events=[
+            {"type": "started", "run_id": "run-1", "session_id": "ses-early"},
+            {"type": "error", "error": "boom", "session_id": "ses-early"},
+        ]
+    )
+    gateway = _make_gateway(daemon, session_map, [])
+    outcome = await gateway._drain_stream("run-1", chat_id=42)
+    assert outcome.error == "boom"
+    assert outcome.session_id == "ses-early"
+
+
+async def test_deliver_persists_session_mapping_on_error(session_map: SessionMap) -> None:
+    """An errored turn must still persist the chat→session mapping: the
+    session existed (user turn stored) before the failure, so the next
+    message continues it instead of starting a fresh, empty session."""
+    daemon = _FakeDaemonClient(
+        events=[
+            {"type": "started", "run_id": "run-1", "session_id": "ses-early"},
+            {"type": "error", "error": "boom", "session_id": "ses-early"},
+        ]
+    )
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "will fail"))
+    assert session_map.get("42") == "ses-early"
+
+
 async def test_typing_indicator_cancelled_after_completion(
     session_map: SessionMap,
 ) -> None:
