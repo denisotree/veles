@@ -207,7 +207,7 @@ def test_mapped_session_resumes_and_delivers_final_text(tmp_path: Path) -> None:
     seen: dict = {}
 
     class _ResumeAgent:
-        def run(self, prompt, on_text_delta=None):
+        def run(self, prompt, on_text_delta=None, event_listener=None):
             seen["prompt"] = prompt
             seen["resume_depth"] = current_resume_depth()
 
