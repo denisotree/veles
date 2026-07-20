@@ -95,7 +95,7 @@ def test_run_agent_in_background_installs_subagent_factory() -> None:
     seen: dict = {}
 
     class _Agent:
-        def run(self, prompt, on_text_delta=None):
+        def run(self, prompt, on_text_delta=None, event_listener=None):
             from veles.core.orchestration.delegation import current_subagent_factory
 
             seen["factory"] = current_subagent_factory()
@@ -131,7 +131,7 @@ def test_turn_lock_serializes_turns_on_one_session() -> None:
         def __init__(self, tag: str, delay: float) -> None:
             self.tag, self.delay = tag, delay
 
-        def run(self, prompt, on_text_delta=None):
+        def run(self, prompt, on_text_delta=None, event_listener=None):
             import time as _t
 
             order.append(f"{self.tag}:start")

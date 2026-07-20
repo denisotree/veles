@@ -434,7 +434,7 @@ class TelegramGateway:
         if message_id is None:
             return
         async with self._typing_indicator(chat_id):
-            outcome = await self._drain_stream(run_id, chat_id)
+            outcome = await self._drain_stream(run_id, chat_id, message_id)
         await self._deliver(chat_id, chat_key, message_id, outcome)
 
     async def _submit_or_report(self, chat_id: int, chat_key: str, text: str) -> str | None:
@@ -470,8 +470,10 @@ class TelegramGateway:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
-    async def _drain_stream(self, run_id: str, chat_id: int) -> _TurnOutcome:
-        return await self._delivery.drain_stream(run_id, chat_id)
+    async def _drain_stream(
+        self, run_id: str, chat_id: int, message_id: int | None = None
+    ) -> _TurnOutcome:
+        return await self._delivery.drain_stream(run_id, chat_id, message_id)
 
     async def _deliver(
         self,

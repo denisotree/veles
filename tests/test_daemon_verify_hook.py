@@ -23,7 +23,7 @@ class _StubAgent:
     def __init__(self, result):
         self._r = result
 
-    def run(self, prompt, on_text_delta=None):
+    def run(self, prompt, on_text_delta=None, event_listener=None):
         return self._r
 
 

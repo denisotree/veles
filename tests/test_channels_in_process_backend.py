@@ -21,7 +21,7 @@ class _StubAgent:
         self._final = final_text
         self._sid = session_id
 
-    def run(self, prompt: str, *, on_text_delta):
+    def run(self, prompt: str, *, on_text_delta, event_listener=None):
         for d in self._deltas:
             on_text_delta(d)
         from veles.core.agent import RunResult

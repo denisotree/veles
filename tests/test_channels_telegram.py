@@ -350,6 +350,47 @@ async def test_run_turn_emits_only_one_final_edit(session_map: SessionMap) -> No
     assert edits[0]["text"] == "abcdefghij"
 
 
+async def test_run_turn_shows_contextual_ack_on_tool_call(session_map: SessionMap) -> None:
+    """When the agent's first action is a tool call, the "..." holder is
+    edited into a contextual ack and the final answer arrives as a NEW
+    message (the spec'd "accepted → final" two-message flow)."""
+    daemon = _FakeDaemonClient(
+        events=[
+            {"type": "started", "run_id": "run-1", "session_id": "ses-A"},
+            {"type": "tool_call", "name": "wiki_search", "tool_call_id": "t1"},
+            {"type": "completed", "text": "the answer", "session_id": "ses-A"},
+        ]
+    )
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "look it up"))
+    edits = [p for m, p in sends if m == "editMessageText"]
+    # One edit only: placeholder → ack. The answer is not an edit.
+    assert len(edits) == 1
+    assert "🔍" in edits[0]["text"]
+    assert "the answer" not in edits[0]["text"]
+    # The final answer arrives as a fresh message beyond the "..." holder.
+    new_msgs = [p for m, p in sends if m == "sendMessage" and p.get("text") != "..."]
+    assert any("the answer" in p["text"] for p in new_msgs)
+
+
+async def test_run_turn_no_ack_when_text_first(session_map: SessionMap) -> None:
+    """A turn that answers directly (no tool call) shows no ack — the
+    placeholder is edited straight into the answer, as before."""
+    daemon = _FakeDaemonClient(
+        events=[
+            {"type": "started", "run_id": "run-1", "session_id": "ses-A"},
+            {"type": "completed", "text": "quick reply", "session_id": "ses-A"},
+        ]
+    )
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "hi"))
+    edits = [p for m, p in sends if m == "editMessageText"]
+    assert len(edits) == 1
+    assert edits[0]["text"] == "quick reply"
+
+
 async def test_run_turn_splits_long_answer_into_chunks(session_map: SessionMap) -> None:
     """A reply longer than the Telegram limit is split, not truncated:
     the first chunk edits the placeholder, the rest arrive as new

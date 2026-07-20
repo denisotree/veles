@@ -25,6 +25,28 @@ def _truncate(text: str) -> str:
     return truncate_for_tier(text, _TELEGRAM_TIER)
 
 
+# Tool-name substring → i18n ack key. The first match wins, so order by
+# specificity. Everything unmatched falls back to the generic "working".
+_ACK_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("web_search", "web_fetch", "browse", "http"), "telegram.ack_web"),
+    (("wiki_add", "ingest", "write_page", "append", "curate"), "telegram.ack_writing_note"),
+    (("search", "recall", "query", "grep", "find"), "telegram.ack_searching"),
+    (("tool_", "skill_", "author", "install", "delegate", "spawn"), "telegram.ack_building"),
+    (("read_file", "read", "open", "cat"), "telegram.ack_reading"),
+)
+
+
+def ack_key_for_tool(tool_name: str) -> str:
+    """Map a tool name to the i18n key of the contextual "on it" ack the
+    channel shows when the agent's first action is a tool call (rather
+    than an immediate text answer)."""
+    name = (tool_name or "").lower()
+    for needles, key in _ACK_RULES:
+        if any(n in name for n in needles):
+            return key
+    return "telegram.ack_working"
+
+
 def _build_combined_prompt(
     parts: list[str],
     attachments: list[Path],
