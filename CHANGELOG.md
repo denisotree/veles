@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] — 2026-07-20
+
+### Added
+
+- **The bot tells you it's on it — in context, not a bare "...".** When your
+  message needs real work (searching your knowledge base, writing a page, or
+  building a tool), the reply is now a short "on it — searching the knowledge
+  base…" the moment the agent actually starts that work, and the finished
+  answer arrives as its own message right after. A question it can answer
+  outright still comes back immediately, with no placeholder in between.
+- **One message at a time per chat, and you're told when you're queued.** If you
+  send a follow-up while the bot is still working on the previous message, it
+  now replies "queued — I'll get to it right after this one" and runs your
+  messages strictly in order instead of overlapping them. Different chats still
+  run in parallel.
+
+### Fixed
+
+- **Long answers are no longer cut off.** A reply longer than one Telegram
+  message used to be truncated with an ellipsis, silently dropping the tail.
+  It's now split into several messages, each self-contained (formatting like
+  bold/italic is closed and reopened across the split), so you get the whole
+  thing.
+- **The bot no longer forgets the conversation you're in.** The link between a
+  chat and its session was saved only when a turn finished cleanly, so a turn
+  that errored or was interrupted could leave the chat unlinked — and the next
+  message started a fresh, empty session that had lost the thread. The link is
+  now established before the turn can fail and preserved even on error, so the
+  chat keeps its history instead of restarting cold.
+
 ## [0.24.0] — 2026-07-15
 
 ### Added
