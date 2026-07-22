@@ -61,12 +61,18 @@ class TelegramApi:
         *,
         reply_markup: dict[str, Any] | None = None,
         parse_mode: str | None = "HTML",
+        link_preview_options: dict[str, Any] | None = None,
+        reply_parameters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {"chat_id": chat_id, "text": _truncate(text)}
         if reply_markup is not None:
             payload["reply_markup"] = reply_markup
         if parse_mode is not None:
             payload["parse_mode"] = parse_mode
+        if link_preview_options is not None:
+            payload["link_preview_options"] = link_preview_options
+        if reply_parameters is not None:
+            payload["reply_parameters"] = reply_parameters
         try:
             return await self._gw._call("sendMessage", payload)
         except RuntimeError as exc:
@@ -90,6 +96,7 @@ class TelegramApi:
         *,
         reply_markup: dict[str, Any] | None = None,
         parse_mode: str | None = "HTML",
+        link_preview_options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "chat_id": chat_id,
@@ -100,6 +107,8 @@ class TelegramApi:
             payload["reply_markup"] = reply_markup
         if parse_mode is not None:
             payload["parse_mode"] = parse_mode
+        if link_preview_options is not None:
+            payload["link_preview_options"] = link_preview_options
         try:
             return await self._gw._call("editMessageText", payload)
         except RuntimeError as exc:

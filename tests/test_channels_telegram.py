@@ -253,6 +253,18 @@ async def test_final_edit_carries_complete_text(session_map: SessionMap) -> None
     assert edits[-1]["text"] == "hello world"
 
 
+async def test_answer_disables_link_preview(session_map: SessionMap) -> None:
+    """Agent answers set link_preview_options.is_disabled so incidental
+    links don't render as large preview cards."""
+    daemon = _FakeDaemonClient()
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "got a link?"))
+    edits = [p for m, p in sends if m == "editMessageText"]
+    assert edits, "expected the answer edit"
+    assert edits[-1]["link_preview_options"] == {"is_disabled": True}
+
+
 async def test_error_event_surfaces_to_user(session_map: SessionMap) -> None:
     daemon = _FakeDaemonClient(
         events=[

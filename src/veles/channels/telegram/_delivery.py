@@ -33,6 +33,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Agent answers are prose-first; incidental links shouldn't render as
+# large preview cards that flood the chat. Disable previews on answers.
+_NO_LINK_PREVIEW = {"is_disabled": True}
+
 
 @dataclass(frozen=True, slots=True)
 class _TurnOutcome:
@@ -180,12 +184,14 @@ class TelegramDelivery:
             # progress line and deliver the answer as fresh message(s), so the
             # user gets the spec'd "accepted → final" two-message experience.
             for chunk in chunks:
-                await gw._send_message(chat_id, chunk)
+                await gw._send_message(chat_id, chunk, link_preview_options=_NO_LINK_PREVIEW)
         else:
             # No ack shown: the "..." holder becomes the answer's first chunk.
-            await gw._edit_message(chat_id, message_id, chunks[0])
+            await gw._edit_message(
+                chat_id, message_id, chunks[0], link_preview_options=_NO_LINK_PREVIEW
+            )
             for extra in chunks[1:]:
-                await gw._send_message(chat_id, extra)
+                await gw._send_message(chat_id, extra, link_preview_options=_NO_LINK_PREVIEW)
         # Persist the chat→session mapping whenever we learned a session id —
         # including on error. The session was already created and the user
         # turn stored before any failure, so the next message must continue

@@ -519,9 +519,16 @@ class TelegramGateway:
         *,
         reply_markup: dict[str, Any] | None = None,
         parse_mode: str | None = "HTML",
+        link_preview_options: dict[str, Any] | None = None,
+        reply_parameters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return await self._api.send_message(
-            chat_id, text, reply_markup=reply_markup, parse_mode=parse_mode
+            chat_id,
+            text,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode,
+            link_preview_options=link_preview_options,
+            reply_parameters=reply_parameters,
         )
 
     async def _edit_message(
@@ -532,9 +539,15 @@ class TelegramGateway:
         *,
         reply_markup: dict[str, Any] | None = None,
         parse_mode: str | None = "HTML",
+        link_preview_options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return await self._api.edit_message(
-            chat_id, message_id, text, reply_markup=reply_markup, parse_mode=parse_mode
+            chat_id,
+            message_id,
+            text,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode,
+            link_preview_options=link_preview_options,
         )
 
     async def _answer_callback_query(self, callback_id: str, *, text: str | None = None) -> None:
@@ -558,7 +571,9 @@ class TelegramGateway:
 
         del thread_id  # forum topics unsupported for direct delivery (M165)
         for chunk in split_telegram_html(markdown_to_telegram_html(text or "")):
-            await self._send_message(int(chat_id), chunk)
+            await self._send_message(
+                int(chat_id), chunk, link_preview_options={"is_disabled": True}
+            )
 
     # M127: `_refresh_daemon_health` / `_get_daemon_provider` /
     # `_get_active_model_for` were removed with the Telegram `/model`
