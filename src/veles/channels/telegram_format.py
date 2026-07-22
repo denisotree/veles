@@ -26,10 +26,16 @@ Three public functions:
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
+
+# ponytail: naive ||…|| → spoiler. Applied only to escaped `text` tokens,
+# so inline code / fences (other handlers) are untouched. False-positives
+# need two `||` on one text run (e.g. "a || b || c") — rare in prose.
+_SPOILER_RE = re.compile(r"\|\|(.+?)\|\|")
 
 _TELEGRAM_LIMIT = 4000  # Telegram's hard cap is 4096; leave headroom.
 
@@ -356,7 +362,7 @@ class _TelegramRenderer:
                     header_rows = len(rows)
             elif ttype in ("th_open", "td_open"):
                 nxt = tokens[i + 1] if i + 1 < len(tokens) else None
-                row.append((nxt.content.strip() if nxt is not None and nxt.type == "inline" else ""))
+                row.append(nxt.content.strip() if nxt is not None and nxt.type == "inline" else "")
             i += 1
         self._emit_table(rows, header_rows)
         return i
@@ -386,7 +392,8 @@ class _TelegramRenderer:
             if handler is not None:
                 handler(self, child)
             elif child.type == "text":
-                self._out.append(escape_html(child.content))
+                escaped = escape_html(child.content)
+                self._out.append(_SPOILER_RE.sub(r"<tg-spoiler>\1</tg-spoiler>", escaped))
 
 
 def _open(tag: str):

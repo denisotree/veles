@@ -54,6 +54,18 @@ def test_md_inline_code() -> None:
     assert "<code>foo()</code>" in out
 
 
+def test_md_spoiler() -> None:
+    out = markdown_to_telegram_html("the answer is ||42|| ok")
+    assert "<tg-spoiler>42</tg-spoiler>" in out
+
+
+def test_md_spoiler_not_applied_in_inline_code() -> None:
+    """`||` inside inline code is a code token, not text — no spoiler."""
+    out = markdown_to_telegram_html("run `a || b` now")
+    assert "<code>a || b</code>" in out
+    assert "tg-spoiler" not in out
+
+
 def test_md_strikethrough() -> None:
     """`~~x~~` must reach Telegram as <s> — the commonmark preset leaves
     the rule off, so it's enabled explicitly on the parser."""
