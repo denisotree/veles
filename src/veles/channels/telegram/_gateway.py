@@ -415,23 +415,38 @@ class TelegramGateway:
         if not parts and not attachments:
             return
         prompt = _build_combined_prompt(parts, attachments, self.project_root)
-        await self._run_turn_serial(chat_id, chat_key, prompt)
+        # Anchor UX on the most recent buffered message.
+        trigger_id = messages[-1].get("message_id")
+        await self._run_turn_serial(chat_id, chat_key, prompt, trigger_id=trigger_id)
 
-    async def _run_turn_serial(self, chat_id: int, chat_key: str, prompt: str) -> None:
+    async def _run_turn_serial(
+        self, chat_id: int, chat_key: str, prompt: str, *, trigger_id: int | None = None
+    ) -> None:
         """Run one turn under the chat's serial lock. If a turn is already
-        in flight for this chat, tell the user their message is queued
-        (it will run right after) before waiting on the lock — the daemon
-        also serializes per session, but the lock lets us surface the
-        wait and keep FIFO order at the channel edge."""
+        in flight for this chat, acknowledge the wait (a 👀 reaction on the
+        message, or a queued text if the message can't be reacted to)
+        before waiting on the lock — the daemon also serializes per
+        session, but the lock lets us surface the wait and keep FIFO order
+        at the channel edge."""
+        # In group chats (negative chat_id) thread the answer to the
+        # triggering message so it's clear which one it answers; in 1:1
+        # chats threading is just visual noise.
+        reply_to = trigger_id if chat_id < 0 else None
         lock = self._chat_locks.get(chat_key)
         if lock is None:
             lock = asyncio.Lock()
             self._chat_locks[chat_key] = lock
         if lock.locked():
-            with contextlib.suppress(Exception):
-                await self._send_message(chat_id, t("telegram.ack_queued"))
+            # A 👀 reaction keeps a busy chat quiet instead of piling up
+            # "queued" messages; fall back to text when there's no message
+            # to react to.
+            if trigger_id is not None:
+                await self._set_reaction(chat_id, trigger_id, "👀")
+            else:
+                with contextlib.suppress(Exception):
+                    await self._send_message(chat_id, t("telegram.ack_queued"))
         async with lock:
-            await self._run_turn(chat_id, chat_key, prompt)
+            await self._run_turn(chat_id, chat_key, prompt, reply_to=reply_to)
 
     # ---- media (delegates → TelegramMedia, M155) ----
 
@@ -441,7 +456,9 @@ class TelegramGateway:
     async def _describe_photo(self, chat_id: int, photo: list[dict[str, Any]]) -> str | None:
         return await self._media.describe_photo(chat_id, photo)
 
-    async def _run_turn(self, chat_id: int, chat_key: str, text: str) -> None:
+    async def _run_turn(
+        self, chat_id: int, chat_key: str, text: str, *, reply_to: int | None = None
+    ) -> None:
         """Pipeline: submit_run → placeholder → drain stream with
         typing indicator → final edit.
 
@@ -450,7 +467,7 @@ class TelegramGateway:
         run_id = await self._submit_or_report(chat_id, chat_key, text)
         if run_id is None:
             return
-        message_id = await self._send_placeholder(chat_id)
+        message_id = await self._send_placeholder(chat_id, reply_to=reply_to)
         if message_id is None:
             return
         async with self._typing_indicator(chat_id):
@@ -474,8 +491,8 @@ class TelegramGateway:
             return None
         return run_id
 
-    async def _send_placeholder(self, chat_id: int) -> int | None:
-        return await self._delivery.send_placeholder(chat_id)
+    async def _send_placeholder(self, chat_id: int, *, reply_to: int | None = None) -> int | None:
+        return await self._delivery.send_placeholder(chat_id, reply_to=reply_to)
 
     @contextlib.asynccontextmanager
     async def _typing_indicator(self, chat_id: int):
@@ -519,9 +536,16 @@ class TelegramGateway:
         *,
         reply_markup: dict[str, Any] | None = None,
         parse_mode: str | None = "HTML",
+        link_preview_options: dict[str, Any] | None = None,
+        reply_parameters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return await self._api.send_message(
-            chat_id, text, reply_markup=reply_markup, parse_mode=parse_mode
+            chat_id,
+            text,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode,
+            link_preview_options=link_preview_options,
+            reply_parameters=reply_parameters,
         )
 
     async def _edit_message(
@@ -532,10 +556,19 @@ class TelegramGateway:
         *,
         reply_markup: dict[str, Any] | None = None,
         parse_mode: str | None = "HTML",
+        link_preview_options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         return await self._api.edit_message(
-            chat_id, message_id, text, reply_markup=reply_markup, parse_mode=parse_mode
+            chat_id,
+            message_id,
+            text,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode,
+            link_preview_options=link_preview_options,
         )
+
+    async def _set_reaction(self, chat_id: int, message_id: int, emoji: str) -> None:
+        await self._api.set_message_reaction(chat_id, message_id, emoji)
 
     async def _answer_callback_query(self, callback_id: str, *, text: str | None = None) -> None:
         await self._api.answer_callback_query(callback_id, text=text)
@@ -552,13 +585,15 @@ class TelegramGateway:
         `thread_id` (forum topics) is accepted to satisfy the
         `PlatformDeliverer` signature but unused for direct chats."""
         from veles.channels.telegram_format import (
-            html_safe_truncate,
             markdown_to_telegram_html,
+            split_telegram_html,
         )
 
         del thread_id  # forum topics unsupported for direct delivery (M165)
-        rendered = html_safe_truncate(markdown_to_telegram_html(text or ""))
-        await self._send_message(int(chat_id), rendered)
+        for chunk in split_telegram_html(markdown_to_telegram_html(text or "")):
+            await self._send_message(
+                int(chat_id), chunk, link_preview_options={"is_disabled": True}
+            )
 
     # M127: `_refresh_daemon_health` / `_get_daemon_provider` /
     # `_get_active_model_for` were removed with the Telegram `/model`

@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] — 2026-07-22
+
+### Added
+
+- **Richer, cleaner replies in Telegram.** Answers now use more of Telegram's
+  formatting: crossed-out text (`~~like this~~`), hidden spoilers (`||like
+  this||` — tap to reveal), and long quotes that collapse into an expandable
+  block instead of flooding the chat. Tables line up in neat columns instead of
+  drifting out of alignment.
+- **A one-tap Copy button for commands.** When a reply is a single short code
+  block — the classic "run this:" answer — it comes with a 📋 Copy button so you
+  can grab the command without selecting text by hand.
+- **Answers in group chats reply to your message.** In a group, the bot's answer
+  is now attached as a reply to the message that asked, so with several people
+  talking it's always clear what it's answering. One-on-one chats stay as they
+  were.
+- **A quiet 👀 instead of a "queued" message.** When you send a follow-up while
+  the bot is still busy, it now reacts with 👀 on your message rather than
+  posting a separate "queued" line — less clutter in a busy chat. (It still
+  falls back to a text note where a reaction isn't possible.)
+
+### Changed
+
+- **Links in replies no longer blow up into big preview cards.** Agent answers
+  are mostly text; incidental links used to render large link-preview cards that
+  crowded the chat. Previews are now off by default on answers.
+
 ## [0.25.0] — 2026-07-20
 
 ### Added

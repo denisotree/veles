@@ -7,30 +7,43 @@ strict subset Telegram does parse predictably — only `<`, `>`, `&` need
 escaping, and a fixed whitelist of tags is allowed.
 
 This module converts CommonMark (via `markdown-it-py`) into the
-Telegram-allowed subset:
+Telegram-allowed subset. Tags actually emitted:
 
-    <b> <strong>   <i> <em>   <u>  <s> <strike> <del>
-    <code>  <pre>  <a href="…">  <blockquote>  <tg-spoiler>
+    <b>  <i>  <s>  <code>  <a href="…">  <tg-spoiler>
+    <pre>  <pre><code class="language-…">
+    <blockquote>  <blockquote expandable>
 
-Anything Telegram doesn't render is collapsed to a sensible visual
-substitute (headings → bold, lists → bullets, tables → `<pre>` aligned).
+Strikethrough (`~~x~~`) and spoiler (`||x||`) are enabled explicitly on
+the parser below. Anything Telegram doesn't render is collapsed to a
+sensible visual substitute (headings → bold, lists → bullets, tables →
+a column-aligned `<pre>` grid, long quotes → expandable blockquote).
 
 Three public functions:
 - `escape_html(text)` — entity-encode the three special chars.
 - `markdown_to_telegram_html(md)` — full pipeline.
-- `html_safe_truncate(html, limit)` — chop without orphaning open tags.
+- `split_telegram_html(html, limit)` — split into ≤-limit valid chunks.
 """
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
+# ponytail: naive ||…|| → spoiler. Applied only to escaped `text` tokens,
+# so inline code / fences (other handlers) are untouched. False-positives
+# need two `||` on one text run (e.g. "a || b || c") — rare in prose.
+_SPOILER_RE = re.compile(r"\|\|(.+?)\|\|")
+
 _TELEGRAM_LIMIT = 4000  # Telegram's hard cap is 4096; leave headroom.
 
-_md = MarkdownIt("commonmark", {"breaks": True, "linkify": True}).enable("table")
+_md = (
+    MarkdownIt("commonmark", {"breaks": True, "linkify": True})
+    .enable("table")
+    .enable("strikethrough")
+)
 
 
 def escape_html(text: str) -> str:
@@ -72,52 +85,6 @@ def markdown_to_telegram_html(md: str) -> str:
     return renderer.render(tokens).strip()
 
 
-def html_safe_truncate(html: str, limit: int = _TELEGRAM_LIMIT) -> str:
-    """Cut `html` to at most `limit` characters without leaving open
-    tags or half-formed entities. Open tags found in the kept prefix
-    are closed in reverse order; a trailing partial entity (`&am`) is
-    dropped before truncation."""
-    if len(html) <= limit:
-        return html
-    kept = html[:limit]
-    # Drop a trailing partial entity so the truncated text doesn't end
-    # mid-`&amp;`. Entities are `&...;`, at most ~6 chars.
-    amp = kept.rfind("&")
-    if amp >= 0 and ";" not in kept[amp:]:
-        kept = kept[:amp]
-    # Track open tags. We assume tags well-formed because we generated
-    # them — `<tag>` opens, `</tag>` closes, `<tag/>` self-closes.
-    open_stack: list[str] = []
-    i = 0
-    while i < len(kept):
-        if kept[i] != "<":
-            i += 1
-            continue
-        end = kept.find(">", i)
-        if end < 0:
-            # An open `<` at the cut boundary — drop it.
-            kept = kept[:i]
-            break
-        tag_body = kept[i + 1 : end]
-        if tag_body.endswith("/"):
-            pass  # self-closing
-        elif tag_body.startswith("/"):
-            name = tag_body[1:].split()[0]
-            if open_stack and open_stack[-1] == name:
-                open_stack.pop()
-        else:
-            name = tag_body.split()[0]
-            open_stack.append(name)
-        i = end + 1
-    closers = "".join(f"</{tag}>" for tag in reversed(open_stack))
-    suffix = "…" + closers
-    # If adding the suffix overflows the limit, trim the kept prefix
-    # further. Bounded by `limit` so loop is finite.
-    while len(kept) + len(suffix) > limit and kept:
-        kept = kept[:-1]
-    return kept + suffix
-
-
 def _atomize(html: str) -> list[tuple[str, str]]:
     """Break `html` into atomic units the splitter must not cut through.
 
@@ -157,10 +124,12 @@ def _tag_effect(tag: str) -> tuple[str, str | None]:
     {"open","close","self"}; name is the tag name (None for self-close)."""
     body = tag[1:-1].strip()
     if body.startswith("/"):
-        return "close", body[1:].split()[0] if body[1:].split() else ""
+        parts = body[1:].split()
+        return "close", parts[0] if parts else ""
     if body.endswith("/"):
         return "self", None
-    return "open", (body.split()[0] if body.split() else "")
+    parts = body.split()
+    return "open", parts[0] if parts else ""
 
 
 def split_telegram_html(html: str, limit: int = _TELEGRAM_LIMIT) -> list[str]:
@@ -245,17 +214,28 @@ def split_telegram_html(html: str, limit: int = _TELEGRAM_LIMIT) -> list[str]:
 class _TelegramRenderer:
     """Walks markdown-it tokens, emits Telegram-allowed HTML."""
 
-    __slots__ = ("_list_stack", "_out")
+    __slots__ = ("_bq_stack", "_list_stack", "_out")
+
+    # A blockquote longer than this (chars OR lines) is emitted collapsed
+    # (`<blockquote expandable>`) so a long quote doesn't flood the chat.
+    _BQ_EXPAND_CHARS = 300
+    _BQ_EXPAND_LINES = 4
 
     def __init__(self) -> None:
         self._out: list[str] = []
         # Stack of (kind, counter) for nested lists; kind ∈ {"ul","ol"}.
         self._list_stack: list[tuple[str, int]] = []
+        # Indices into `_out` of open `<blockquote>` placeholders, so
+        # `close_blockquote` can upgrade a long one to `expandable`.
+        self._bq_stack: list[int] = []
 
     def render(self, tokens: list[Token]) -> str:
-        i = 0
-        while i < len(tokens):
+        i, n = 0, len(tokens)
+        while i < n:
             tok = tokens[i]
+            if tok.type == "table_open":
+                i = self._render_table(tokens, i) + 1  # skip past table_close
+                continue
             handler = _BLOCK_HANDLERS.get(tok.type)
             if handler is not None:
                 handler(self, tok)
@@ -282,9 +262,21 @@ class _TelegramRenderer:
         self._out.append("\n\n" if not self._inside_list_item() else "\n")
 
     def open_blockquote(self, tok: Token) -> None:
+        # Telegram forbids nested blockquotes — only the outermost level
+        # emits a tag; inner quotes just flow as text.
+        if self._bq_stack:
+            self._bq_stack.append(-1)
+            return
+        self._bq_stack.append(len(self._out))
         self._out.append("<blockquote>")
 
     def close_blockquote(self, tok: Token) -> None:
+        idx = self._bq_stack.pop() if self._bq_stack else -1
+        if idx < 0:
+            return  # inner (nested) quote — emitted no tag
+        content = "".join(self._out[idx + 1 :])
+        if len(content) > self._BQ_EXPAND_CHARS or content.count("\n") >= self._BQ_EXPAND_LINES:
+            self._out[idx] = "<blockquote expandable>"
         self._out.append("</blockquote>\n")
 
     def fence(self, tok: Token) -> None:
@@ -341,11 +333,53 @@ class _TelegramRenderer:
         if self._out and self._out[-1].endswith("\n\n"):
             self._out[-1] = self._out[-1][:-1]
 
-    # ---- tables — flatten into a monospaced <pre> grid ----
+    # ---- tables — flatten into a column-aligned monospaced <pre> grid ----
 
-    def table(self, tokens: list[Token], idx: int) -> int:
-        """Handled out-of-band — see `_render_table`. Returns new index."""
-        return idx
+    def _render_table(self, tokens: list[Token], start: int) -> int:
+        """Collect the table `tokens[start:table_close]` into rows, then
+        emit a `<pre>` grid with columns padded to equal width. Returns
+        the index of the `table_close` token.
+
+        Cell text is the raw source of the cell's `inline` token —
+        inline formatting is dropped because `<pre>` is monospace and
+        renders no nested tags anyway."""
+        rows: list[list[str]] = []
+        row: list[str] = []
+        header_rows = 0
+        in_thead = False
+        i = start + 1
+        while i < len(tokens) and tokens[i].type != "table_close":
+            ttype = tokens[i].type
+            if ttype == "thead_open":
+                in_thead = True
+            elif ttype == "thead_close":
+                in_thead = False
+            elif ttype == "tr_open":
+                row = []
+            elif ttype == "tr_close":
+                rows.append(row)
+                if in_thead:
+                    header_rows = len(rows)
+            elif ttype in ("th_open", "td_open"):
+                nxt = tokens[i + 1] if i + 1 < len(tokens) else None
+                row.append(nxt.content.strip() if nxt is not None and nxt.type == "inline" else "")
+            i += 1
+        self._emit_table(rows, header_rows)
+        return i
+
+    def _emit_table(self, rows: list[list[str]], header_rows: int) -> None:
+        if not rows:
+            return
+        cols = max(len(r) for r in rows)
+        for r in rows:
+            r.extend([""] * (cols - len(r)))  # pad ragged rows
+        widths = [max(len(r[c]) for r in rows) for c in range(cols)]
+        lines: list[str] = []
+        for idx, r in enumerate(rows):
+            lines.append(" | ".join(escape_html(cell.ljust(widths[c])) for c, cell in enumerate(r)))
+            if header_rows and idx == header_rows - 1:
+                lines.append("─┼─".join("─" * w for w in widths))
+        self._out.append("<pre>" + "\n".join(lines) + "</pre>\n")
 
     def _inside_list_item(self) -> bool:
         return bool(self._list_stack)
@@ -358,7 +392,8 @@ class _TelegramRenderer:
             if handler is not None:
                 handler(self, child)
             elif child.type == "text":
-                self._out.append(escape_html(child.content))
+                escaped = escape_html(child.content)
+                self._out.append(_SPOILER_RE.sub(r"<tg-spoiler>\1</tg-spoiler>", escaped))
 
 
 def _open(tag: str):
@@ -424,19 +459,7 @@ _BLOCK_HANDLERS: dict[str, Any] = {
     "ordered_list_close": _TelegramRenderer.close_ordered_list,
     "list_item_open": _TelegramRenderer.open_list_item,
     "list_item_close": _TelegramRenderer.close_list_item,
-    # Tables collapse to a paragraph with a pre-block computed inline.
-    "table_open": lambda self, tok: self._out.append("<pre>"),
-    "table_close": lambda self, tok: self._out.append("</pre>\n"),
-    "thead_open": lambda self, tok: None,
-    "thead_close": lambda self, tok: self._out.append("─" * 4 + "\n"),
-    "tbody_open": lambda self, tok: None,
-    "tbody_close": lambda self, tok: None,
-    "tr_open": lambda self, tok: None,
-    "tr_close": lambda self, tok: self._out.append("\n"),
-    "th_open": lambda self, tok: self._out.append(""),
-    "th_close": lambda self, tok: self._out.append("\t"),
-    "td_open": lambda self, tok: self._out.append(""),
-    "td_close": lambda self, tok: self._out.append("\t"),
+    # Tables are handled out-of-band in render() → _render_table (aligned).
 }
 
 _INLINE_HANDLERS: dict[str, Any] = {
@@ -457,7 +480,6 @@ _INLINE_HANDLERS: dict[str, Any] = {
 
 __all__ = [
     "escape_html",
-    "html_safe_truncate",
     "markdown_to_telegram_html",
     "split_telegram_html",
 ]

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from veles.channels.telegram_format import (
     escape_html,
-    html_safe_truncate,
     markdown_to_telegram_html,
     split_telegram_html,
 )
@@ -53,6 +52,25 @@ def test_md_bold_and_italic() -> None:
 def test_md_inline_code() -> None:
     out = markdown_to_telegram_html("call `foo()` to start")
     assert "<code>foo()</code>" in out
+
+
+def test_md_spoiler() -> None:
+    out = markdown_to_telegram_html("the answer is ||42|| ok")
+    assert "<tg-spoiler>42</tg-spoiler>" in out
+
+
+def test_md_spoiler_not_applied_in_inline_code() -> None:
+    """`||` inside inline code is a code token, not text — no spoiler."""
+    out = markdown_to_telegram_html("run `a || b` now")
+    assert "<code>a || b</code>" in out
+    assert "tg-spoiler" not in out
+
+
+def test_md_strikethrough() -> None:
+    """`~~x~~` must reach Telegram as <s> — the commonmark preset leaves
+    the rule off, so it's enabled explicitly on the parser."""
+    out = markdown_to_telegram_html("this is ~~gone~~ now")
+    assert "<s>gone</s>" in out
 
 
 def test_md_headings_become_bold() -> None:
@@ -107,14 +125,41 @@ def test_md_blockquote() -> None:
     assert "<blockquote>" in out
     assert "quoted line" in out
     assert "</blockquote>" in out
+    assert "expandable" not in out  # short quote stays plain
 
 
-def test_md_table_collapses_to_pre_block() -> None:
-    md = "| a | b |\n|---|---|\n| 1 | 2 |"
+def test_md_blockquote_expandable_when_long() -> None:
+    """A long quote collapses to `<blockquote expandable>` so it doesn't
+    flood the chat."""
+    md = "> " + "\n> ".join(f"line {n}" for n in range(8))
+    out = markdown_to_telegram_html(md)
+    assert "<blockquote expandable>" in out
+    assert out.count("<blockquote") == 1  # not nested
+
+
+def test_md_blockquote_nested_emits_single_tag() -> None:
+    """Telegram forbids nested blockquotes — only the outer level emits
+    a tag, inner content flows as plain text."""
+    out = markdown_to_telegram_html("> outer\n> > inner")
+    assert out.count("<blockquote") == 1
+    assert out.count("</blockquote>") == 1
+    assert "inner" in out
+
+
+def test_md_table_aligned_pre_block() -> None:
+    md = "| name | v |\n|---|---|\n| abc | 1 |\n| d | 22 |"
     out = markdown_to_telegram_html(md)
     assert "<pre>" in out and "</pre>" in out
-    # Cell values present in the pre-block.
-    assert "a" in out and "b" in out and "1" in out and "2" in out
+    assert "\t" not in out  # tabs never aligned in Telegram <pre>
+    # Column 1 padded to the widest cell ("name" = 4): "d" → "d   ".
+    assert "d    | 22" in out
+    assert "abc  | 1" in out
+
+
+def test_md_table_escapes_cell_html() -> None:
+    out = markdown_to_telegram_html("| x |\n|---|\n| <b> |")
+    assert "&lt;b&gt;" in out
+    assert "<b>" not in out
 
 
 def test_md_text_with_angle_brackets_is_escaped() -> None:
@@ -140,41 +185,6 @@ def test_md_empty_input() -> None:
 def test_md_hr_renders_visible_separator() -> None:
     out = markdown_to_telegram_html("above\n\n---\n\nbelow")
     assert "──────────" in out
-
-
-# ---- html_safe_truncate ----
-
-
-def test_truncate_noop_below_limit() -> None:
-    s = "short"
-    assert html_safe_truncate(s, limit=100) == s
-
-
-def test_truncate_closes_open_bold() -> None:
-    """Cut inside `<b>...</b>` must close the tag — leaving it open
-    breaks the entire message in Telegram's parser."""
-    s = "prefix <b>" + "x" * 100 + "</b> tail"
-    out = html_safe_truncate(s, limit=30)
-    assert out.endswith("</b>")
-    assert out.startswith("prefix <b>")
-    assert len(out) <= 30
-
-
-def test_truncate_drops_partial_entity() -> None:
-    """When the cut lands inside an entity (`&am|p;`), we want to drop
-    the unfinished `&am` rather than emit it as literal characters."""
-    s = "abcde&amp;extra-tail-to-overflow-the-limit"
-    out = html_safe_truncate(s, limit=8)
-    # The `&am` at the cut boundary is dropped before truncation runs.
-    assert "&am" not in out
-    assert out.startswith("abcde")
-
-
-def test_truncate_handles_nested_tags() -> None:
-    s = "<b><i>" + "y" * 100 + "</i></b>"
-    out = html_safe_truncate(s, limit=20)
-    # Close in reverse order: …</i></b>
-    assert out.endswith("</i></b>")
 
 
 # ---- split_telegram_html ----

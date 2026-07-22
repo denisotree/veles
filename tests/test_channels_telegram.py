@@ -253,6 +253,65 @@ async def test_final_edit_carries_complete_text(session_map: SessionMap) -> None
     assert edits[-1]["text"] == "hello world"
 
 
+async def test_answer_disables_link_preview(session_map: SessionMap) -> None:
+    """Agent answers set link_preview_options.is_disabled so incidental
+    links don't render as large preview cards."""
+    daemon = _FakeDaemonClient()
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "got a link?"))
+    edits = [p for m, p in sends if m == "editMessageText"]
+    assert edits, "expected the answer edit"
+    assert edits[-1]["link_preview_options"] == {"is_disabled": True}
+
+
+async def test_short_code_answer_gets_copy_button(session_map: SessionMap) -> None:
+    daemon = _FakeDaemonClient(
+        events=[
+            {"type": "started", "run_id": "run-1"},
+            {"type": "completed", "text": "run this:\n```sh\nls -la\n```", "session_id": "s1"},
+        ]
+    )
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "how to list files?"))
+    edit = [p for m, p in sends if m == "editMessageText"][-1]
+    button = edit["reply_markup"]["inline_keyboard"][0][0]
+    assert button["copy_text"]["text"] == "ls -la"
+
+
+async def test_group_turn_threads_reply_to_trigger(session_map: SessionMap) -> None:
+    """In a group (negative chat_id) the placeholder replies to the
+    triggering message, with allow_sending_without_reply so a deleted
+    trigger doesn't drop the turn."""
+    daemon = _FakeDaemonClient()
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    update = {
+        "update_id": 1,
+        "message": {
+            "message_id": 555,
+            "chat": {"id": -100200, "type": "supergroup"},
+            "text": "hey bot",
+        },
+    }
+    await gateway._handle_update(update)
+    placeholder = next(p for m, p in sends if m == "sendMessage")
+    assert placeholder["reply_parameters"] == {
+        "message_id": 555,
+        "allow_sending_without_reply": True,
+    }
+
+
+async def test_private_turn_has_no_reply_parameters(session_map: SessionMap) -> None:
+    daemon = _FakeDaemonClient()
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "hi"))
+    placeholder = next(p for m, p in sends if m == "sendMessage")
+    assert "reply_parameters" not in placeholder
+
+
 async def test_error_event_surfaces_to_user(session_map: SessionMap) -> None:
     daemon = _FakeDaemonClient(
         events=[
@@ -363,6 +422,27 @@ async def test_second_message_while_busy_gets_queued_ack(session_map: SessionMap
     task = asyncio.create_task(gateway._run_turn_serial(42, "42", "second"))
     await asyncio.sleep(0)  # let the coroutine reach the lock
     assert any(m == "sendMessage" and p.get("text") == t("telegram.ack_queued") for m, p in sends)
+    lock.release()
+    await task
+
+
+async def test_queued_turn_with_trigger_reacts_instead_of_texting(
+    session_map: SessionMap,
+) -> None:
+    """When the queued message can be reacted to, a 👀 reaction replaces
+    the noisier 'queued' text."""
+    daemon = _FakeDaemonClient()
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    lock = asyncio.Lock()
+    gateway._chat_locks["42"] = lock
+    await lock.acquire()
+    task = asyncio.create_task(gateway._run_turn_serial(42, "42", "second", trigger_id=77))
+    await asyncio.sleep(0)
+    reactions = [p for m, p in sends if m == "setMessageReaction"]
+    assert reactions and reactions[0]["message_id"] == 77
+    assert reactions[0]["reaction"][0]["emoji"] == "👀"
+    assert not any(p.get("text") == t("telegram.ack_queued") for _m, p in sends)
     lock.release()
     await task
 

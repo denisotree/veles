@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from veles.channels.daemon_client import DaemonClientError
-from veles.channels.telegram._helpers import _PLACEHOLDER_TEXT
+from veles.channels.telegram._helpers import _PLACEHOLDER_TEXT, copy_button_markup
 from veles.channels.telegram_format import (
     escape_html,
     markdown_to_telegram_html,
@@ -32,6 +32,10 @@ if TYPE_CHECKING:
     from veles.channels.telegram._gateway import TelegramGateway
 
 logger = logging.getLogger(__name__)
+
+# Agent answers are prose-first; incidental links shouldn't render as
+# large preview cards that flood the chat. Disable previews on answers.
+_NO_LINK_PREVIEW = {"is_disabled": True}
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,10 +62,21 @@ class TelegramDelivery:
     def __init__(self, gateway: TelegramGateway) -> None:
         self._gw = gateway
 
-    async def send_placeholder(self, chat_id: int) -> int | None:
+    async def send_placeholder(self, chat_id: int, *, reply_to: int | None = None) -> int | None:
         """Post the "..." holder we'll edit on completion. Returns the
-        message_id, or None when Telegram refused the send."""
-        placeholder = await self._gw._send_message(chat_id, _PLACEHOLDER_TEXT)
+        message_id, or None when Telegram refused the send.
+
+        `reply_to` (group chats) threads the whole turn under the user's
+        message. `allow_sending_without_reply` keeps the turn alive if
+        that message was deleted before we replied."""
+        reply_parameters = (
+            {"message_id": reply_to, "allow_sending_without_reply": True}
+            if reply_to is not None
+            else None
+        )
+        placeholder = await self._gw._send_message(
+            chat_id, _PLACEHOLDER_TEXT, reply_parameters=reply_parameters
+        )
         mid = placeholder.get("message_id")
         return mid if isinstance(mid, int) else None
 
@@ -175,17 +190,32 @@ class TelegramDelivery:
         # Long answers are split into ≤-limit chunks rather than truncated:
         # each chunk is independently valid (tags reopened across the split).
         chunks = split_telegram_html(final_html)
+        # A one-tap "📋 Copy" button when the answer is a single short code
+        # block. Only for single-chunk answers — a multi-chunk split makes
+        # "which message holds the code" ambiguous.
+        copy_markup = (
+            None if outcome.error or len(chunks) != 1 else copy_button_markup(outcome.text)
+        )
         if outcome.acked:
             # The placeholder already shows the "on it" ack — keep it as the
             # progress line and deliver the answer as fresh message(s), so the
             # user gets the spec'd "accepted → final" two-message experience.
-            for chunk in chunks:
-                await gw._send_message(chat_id, chunk)
+            await gw._send_message(
+                chat_id, chunks[0], link_preview_options=_NO_LINK_PREVIEW, reply_markup=copy_markup
+            )
+            for chunk in chunks[1:]:
+                await gw._send_message(chat_id, chunk, link_preview_options=_NO_LINK_PREVIEW)
         else:
             # No ack shown: the "..." holder becomes the answer's first chunk.
-            await gw._edit_message(chat_id, message_id, chunks[0])
+            await gw._edit_message(
+                chat_id,
+                message_id,
+                chunks[0],
+                link_preview_options=_NO_LINK_PREVIEW,
+                reply_markup=copy_markup,
+            )
             for extra in chunks[1:]:
-                await gw._send_message(chat_id, extra)
+                await gw._send_message(chat_id, extra, link_preview_options=_NO_LINK_PREVIEW)
         # Persist the chat→session mapping whenever we learned a session id —
         # including on error. The session was already created and the user
         # turn stored before any failure, so the next message must continue
