@@ -91,6 +91,87 @@ def test_search_insights_empty_query(tmp_path: Path) -> None:
         store.close()
 
 
+# ---- M218: confidence / provenance ----
+
+
+def _insert_with_confidence(
+    store: SessionStore, *, title: str, body: str, confidence: float
+) -> int:
+    cur = store._conn.execute(
+        "INSERT INTO insights(title, body, category, created_at, confidence) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (title, body, "recovery-trigger", time.time(), confidence),
+    )
+    store._conn.commit()
+    return int(cur.lastrowid or 0)
+
+
+def test_search_insights_carries_confidence(tmp_path: Path) -> None:
+    store = SessionStore(tmp_path / "m.db")
+    try:
+        _insert_with_confidence(
+            store, title="hedge", body="speculative caching guess", confidence=0.2
+        )
+        hit = store.search_insights("speculative caching", limit=1)[0]
+    finally:
+        store.close()
+    assert hit.confidence == 0.2
+
+
+def test_existing_insights_default_to_full_confidence(tmp_path: Path) -> None:
+    """The additive column defaults to 1.0 so pre-M218 rows are never pruned."""
+    store = SessionStore(tmp_path / "m.db")
+    try:
+        _insert_insight(store, title="legacy", body="pre-confidence insight row")
+        hit = store.search_insights("pre-confidence", limit=1)[0]
+    finally:
+        store.close()
+    assert hit.confidence == 1.0
+
+
+def test_save_insight_row_persists_confidence(tmp_path: Path) -> None:
+    from veles.core.tools.builtin.memory_save import save_insight_row
+
+    project = init_project(tmp_path / "p", name="p")
+    rid = save_insight_row(
+        title="inferred",
+        body="tentative recovery note",
+        category="recovery-trigger",
+        project=project,
+        confidence=0.6,
+    )
+    store = SessionStore(project.memory_db_path)
+    try:
+        got = store._conn.execute("SELECT confidence FROM insights WHERE id=?", (rid,)).fetchone()[
+            0
+        ]
+    finally:
+        store.close()
+    assert got == 0.6
+
+
+def test_recall_filters_low_confidence_insight(tmp_path: Path) -> None:
+    """A sub-floor insight is pruned from recall before it reaches the prompt;
+    a trusted one still surfaces."""
+    from veles.core.memory.router import MemoryRouter
+
+    project = init_project(tmp_path / "p", name="p")
+    store = SessionStore(project.memory_db_path)
+    try:
+        _insert_with_confidence(
+            store, title="trusted", body="nginx worker_connections 4096 solid fix", confidence=1.0
+        )
+        _insert_with_confidence(
+            store, title="shaky", body="nginx worker_connections 8192 wild guess", confidence=0.1
+        )
+        hits = MemoryRouter(project, store=store).recall("nginx worker_connections", limit=5)
+    finally:
+        store.close()
+    titles = [h.title for h in hits]
+    assert "trusted" in titles
+    assert "shaky" not in titles
+
+
 # ---- touch_insights ----
 
 

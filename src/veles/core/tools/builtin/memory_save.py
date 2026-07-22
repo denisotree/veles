@@ -49,6 +49,7 @@ def save_insight_row(
     category: str,
     file_path: str = "",
     project: Project | None = None,
+    confidence: float = 1.0,
 ) -> int:
     """Canonical insight writer — used by the @tool wrapper, the insight
     extractor, the TUI `/save`, and worker mini-reports.
@@ -66,9 +67,9 @@ def save_insight_row(
         return 0
     try:
         cur = store._conn.execute(
-            "INSERT INTO insights(title, body, category, file_path, created_at)"
-            " VALUES (?, ?, ?, ?, ?)",
-            (title, body, category, file_path or None, time.time()),
+            "INSERT INTO insights(title, body, category, file_path, created_at, confidence)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (title, body, category, file_path or None, time.time(), confidence),
         )
         rid = int(cur.lastrowid or 0)
         if rid and not file_path:

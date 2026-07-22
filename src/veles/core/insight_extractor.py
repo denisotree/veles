@@ -331,7 +331,9 @@ def make_insight_extractor(
             return None
         return _parse_extractor_output(result.text or "")
 
-    def _persist_one(*, prompt: str, snippet: str, slug_id: str, trigger_label: str) -> int:
+    def _persist_one(
+        *, prompt: str, snippet: str, slug_id: str, trigger_label: str, confidence: float
+    ) -> int:
         """Run one extractor pass and persist the result. Returns 1 on success, 0 otherwise."""
         parsed = _extract_one(prompt, snippet)
         if parsed is None:
@@ -340,7 +342,9 @@ def make_insight_extractor(
         title = slug.replace("-", " ").title()
         # SQL row is canonical — a db failure means the insight is NOT
         # persisted (no orphaned markdown that recall can't see).
-        rid = save_insight_row(title=title, body=body, category=trigger_label, project=project)
+        rid = save_insight_row(
+            title=title, body=body, category=trigger_label, project=project, confidence=confidence
+        )
         if rid == 0:
             return 0
         with contextlib.suppress(Exception):
@@ -373,6 +377,8 @@ def make_insight_extractor(
                 snippet=_render_window(history, window_start, window_end),
                 slug_id=slug_id,
                 trigger_label="remember-trigger",
+                # User explicitly asked to remember this → user-asserted.
+                confidence=1.0,
             )
 
         for rtrig in triggers_recovery:
@@ -381,6 +387,8 @@ def make_insight_extractor(
                 snippet=_render_window(history, rtrig.window_start, rtrig.window_end),
                 slug_id=slug_id,
                 trigger_label="recovery-trigger",
+                # Heuristically inferred from a tool-error window → lower trust.
+                confidence=0.6,
             )
 
         return written

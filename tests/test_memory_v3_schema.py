@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from veles.core.memory import SessionStore
+from veles.core.memory import _SCHEMA_VERSION, SessionStore
 
 
 @pytest.fixture()
@@ -35,7 +35,7 @@ def _cols(store: SessionStore, table: str) -> set[str]:
 
 def test_v3_user_version_bumped(store: SessionStore) -> None:
     v = store._conn.execute("PRAGMA user_version").fetchone()[0]
-    assert v == 3
+    assert v == _SCHEMA_VERSION
 
 
 def test_v3_tables_present(store: SessionStore) -> None:
@@ -207,7 +207,7 @@ def test_reopening_store_does_not_re_migrate(tmp_path: Path) -> None:
     store1._conn.close()
     store2 = SessionStore(db)
     v2 = store2._conn.execute("PRAGMA user_version").fetchone()[0]
-    assert v1 == v2 == 3
+    assert v1 == v2 == _SCHEMA_VERSION
     # Tables are still here.
     tables = _tables(store2)
     assert {"tools", "skills", "rules", "insights"} <= tables
@@ -249,7 +249,7 @@ def test_legacy_v2_database_upgrades_to_v3(tmp_path: Path) -> None:
     # Open through SessionStore — migration runs.
     store = SessionStore(db)
     v = store._conn.execute("PRAGMA user_version").fetchone()[0]
-    assert v == 3
+    assert v == _SCHEMA_VERSION
     tables = _tables(store)
     assert "tools" in tables
     # Legacy row survived.

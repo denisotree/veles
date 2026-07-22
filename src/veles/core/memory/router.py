@@ -41,6 +41,10 @@ from veles.core.subproject import load_subprojects, resolve_subproject_path
 
 _TURN_SUMMARY_CAP = 200
 _TURN_RECENCY_WINDOW_SEC = 30 * 86_400  # only recall turns from the last 30 days
+# M218: recall drops insights below this provenance confidence. Conservative —
+# curated (1.0) and heuristic-recovery (0.6) insights survive; only genuinely
+# low-trust future writers (speculative auto-insights) get pruned.
+_INSIGHT_CONFIDENCE_FLOOR = 0.3
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,6 +194,10 @@ class MemoryRouter:
                 if vh.id not in seen:
                     seen.add(vh.id)
                     hits.append(vh)
+        # M218: prune sub-floor insights (heuristic guesses that scored low
+        # provenance confidence) before they reach the prompt — cheaper context,
+        # less noise. Pre-M218 rows default to 1.0 and are never touched.
+        hits = [h for h in hits if h.confidence >= _INSIGHT_CONFIDENCE_FLOOR]
         if hits:
             self._store.touch_insights([h.id for h in hits], time.time())
         return [_insight_hit_to_recall(h) for h in hits]
