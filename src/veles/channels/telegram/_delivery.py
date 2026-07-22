@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from veles.channels.daemon_client import DaemonClientError
-from veles.channels.telegram._helpers import _PLACEHOLDER_TEXT
+from veles.channels.telegram._helpers import _PLACEHOLDER_TEXT, copy_button_markup
 from veles.channels.telegram_format import (
     escape_html,
     markdown_to_telegram_html,
@@ -190,16 +190,29 @@ class TelegramDelivery:
         # Long answers are split into ≤-limit chunks rather than truncated:
         # each chunk is independently valid (tags reopened across the split).
         chunks = split_telegram_html(final_html)
+        # A one-tap "📋 Copy" button when the answer is a single short code
+        # block. Only for single-chunk answers — a multi-chunk split makes
+        # "which message holds the code" ambiguous.
+        copy_markup = (
+            None if outcome.error or len(chunks) != 1 else copy_button_markup(outcome.text)
+        )
         if outcome.acked:
             # The placeholder already shows the "on it" ack — keep it as the
             # progress line and deliver the answer as fresh message(s), so the
             # user gets the spec'd "accepted → final" two-message experience.
-            for chunk in chunks:
+            await gw._send_message(
+                chat_id, chunks[0], link_preview_options=_NO_LINK_PREVIEW, reply_markup=copy_markup
+            )
+            for chunk in chunks[1:]:
                 await gw._send_message(chat_id, chunk, link_preview_options=_NO_LINK_PREVIEW)
         else:
             # No ack shown: the "..." holder becomes the answer's first chunk.
             await gw._edit_message(
-                chat_id, message_id, chunks[0], link_preview_options=_NO_LINK_PREVIEW
+                chat_id,
+                message_id,
+                chunks[0],
+                link_preview_options=_NO_LINK_PREVIEW,
+                reply_markup=copy_markup,
             )
             for extra in chunks[1:]:
                 await gw._send_message(chat_id, extra, link_preview_options=_NO_LINK_PREVIEW)

@@ -47,6 +47,26 @@ def ack_key_for_tool(tool_name: str) -> str:
     return "telegram.ack_working"
 
 
+# Telegram's copy_text button caps the payload at 256 chars.
+_COPY_TEXT_MAX = 256
+_FENCE_RE = _re.compile(r"```[^\n]*\n(.*?)```", _re.DOTALL)
+
+
+def copy_button_markup(answer_md: str | None) -> dict | None:
+    """Inline `📋 Copy` button when the raw answer is a single fenced
+    code block that fits copy_text's 256-char cap — a one-tap copy for
+    the common "here's the command" reply. Returns None otherwise."""
+    if not answer_md:
+        return None
+    blocks = _FENCE_RE.findall(answer_md)
+    if len(blocks) != 1:
+        return None
+    code = blocks[0].strip()
+    if not code or len(code) > _COPY_TEXT_MAX:
+        return None
+    return {"inline_keyboard": [[{"text": "📋 Copy", "copy_text": {"text": code}}]]}
+
+
 def _build_combined_prompt(
     parts: list[str],
     attachments: list[Path],

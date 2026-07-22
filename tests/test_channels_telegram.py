@@ -265,6 +265,21 @@ async def test_answer_disables_link_preview(session_map: SessionMap) -> None:
     assert edits[-1]["link_preview_options"] == {"is_disabled": True}
 
 
+async def test_short_code_answer_gets_copy_button(session_map: SessionMap) -> None:
+    daemon = _FakeDaemonClient(
+        events=[
+            {"type": "started", "run_id": "run-1"},
+            {"type": "completed", "text": "run this:\n```sh\nls -la\n```", "session_id": "s1"},
+        ]
+    )
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "how to list files?"))
+    edit = [p for m, p in sends if m == "editMessageText"][-1]
+    button = edit["reply_markup"]["inline_keyboard"][0][0]
+    assert button["copy_text"]["text"] == "ls -la"
+
+
 async def test_group_turn_threads_reply_to_trigger(session_map: SessionMap) -> None:
     """In a group (negative chat_id) the placeholder replies to the
     triggering message, with allow_sending_without_reply so a deleted
