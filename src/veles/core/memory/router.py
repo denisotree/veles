@@ -55,6 +55,9 @@ class RecallHit:
     score: float = 0.0
     # M141 rerank input: `ts` is the recency signal (None → neutral).
     ts: float | None = None
+    # M221 rerank input: provenance confidence in [0,1] (insights carry a real
+    # one since M218; every other source is a neutral 1.0).
+    confidence: float = 1.0
 
 
 class MemoryRouter:
@@ -312,6 +315,7 @@ def _load_rerank_config(project: Project) -> tuple[RerankWeights, float]:
         weights = RerankWeights(
             relevance=float(sec.get("relevance", DEFAULT_WEIGHTS.relevance)),
             recency=float(sec.get("recency", DEFAULT_WEIGHTS.recency)),
+            confidence=float(sec.get("confidence", DEFAULT_WEIGHTS.confidence)),
         )
         half_life = float(sec.get("half_life_days", DEFAULT_HALF_LIFE_SEC / 86_400.0)) * 86_400.0
     except (TypeError, ValueError):
@@ -354,6 +358,7 @@ def _insight_hit_to_recall(hit: InsightHit) -> RecallHit:
         summary=summary or "(empty insight)",
         score=hit.rank,
         ts=hit.ts,
+        confidence=hit.confidence,
     )
 
 

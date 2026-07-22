@@ -12,8 +12,10 @@ from veles.core.memory.rerank import (
 from veles.core.memory.router import RecallHit
 
 
-def _hit(rel_path: str, *, ts: float | None = None) -> RecallHit:
-    return RecallHit(rel_path=rel_path, title=rel_path, summary=rel_path, ts=ts)
+def _hit(rel_path: str, *, ts: float | None = None, confidence: float = 1.0) -> RecallHit:
+    return RecallHit(
+        rel_path=rel_path, title=rel_path, summary=rel_path, ts=ts, confidence=confidence
+    )
 
 
 # ---- recency_score ----
@@ -89,6 +91,26 @@ def test_rerank_respects_limit() -> None:
     hits = [_hit(f"turn:{i}", ts=now) for i in range(10)]
     out = rerank([hits], now=now, limit=3)
     assert len(out) == 3
+
+
+def test_rerank_confidence_breaks_a_tie() -> None:
+    """M221: two equally-relevant, equally-fresh hits — the higher-confidence
+    one wins even though the other has earlier stream order."""
+    now = 1_000_000.0
+    low = _hit("insight:lo", ts=now, confidence=0.4)  # stream 0 (would win tie pre-M221)
+    high = _hit("insight:hi", ts=now, confidence=1.0)  # stream 1
+    out = rerank([[low], [high]], now=now, limit=5)
+    assert out[0].rel_path == "insight:hi"
+
+
+def test_rerank_relevance_dominates_confidence() -> None:
+    """A real relevance gap always beats the confidence nudge — a highly
+    relevant low-confidence hit still outranks a trusted but less-relevant one."""
+    now = 1_000_000.0
+    relevant = _hit("insight:relevant", ts=now, confidence=0.4)  # pos 0 → relevance 1.0
+    trusted = _hit("insight:trusted", ts=now, confidence=1.0)  # pos 1 → relevance 0.5
+    out = rerank([[relevant, trusted]], now=now, limit=5)
+    assert out[0].rel_path == "insight:relevant"
 
 
 def test_rerank_custom_weights_zero_recency_keeps_relevance_order() -> None:
