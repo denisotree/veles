@@ -21,12 +21,24 @@ _PROPOSALS_MAX_CHARS = 1500
 
 
 def build_memory_context_block(
-    hits: list[RecallHit], query: str, *, max_chars: int = 4000
+    hits: list[RecallHit], query: str, *, max_chars: int = 4000, _total: int | None = None
 ) -> str | None:
     if not hits:
         return None
+    # M219: `_total` carries the ORIGINAL hit count across the drop-to-fit
+    # recursion so the header can announce "showing N of M" — a silently
+    # shortened list otherwise reads as "nothing else matched" (graphify's
+    # truncation-notice lesson: silence must never read as absence).
+    total = len(hits) if _total is None else _total
     header_query = query.strip().replace("\n", " ")[:_QUERY_HEADER_CAP]
-    lines = [_BLOCK_OPEN, f'Top {len(hits)} matches for "{header_query}":']
+    if len(hits) < total:
+        header = (
+            f'Showing {len(hits)} of {total} matches for "{header_query}" '
+            "(truncated to fit context — refine the query for the rest):"
+        )
+    else:
+        header = f'Top {len(hits)} matches for "{header_query}":'
+    lines = [_BLOCK_OPEN, header]
     for h in hits:
         summary = h.summary.strip() or "(no summary)"
         lines.append(f"- {h.rel_path} — {h.title}: {summary}")
@@ -35,8 +47,8 @@ def build_memory_context_block(
     if len(block) <= max_chars:
         return block
     if len(hits) > 1:
-        return build_memory_context_block(hits[:-1], query, max_chars=max_chars)
-    suffix = "...\n" + _BLOCK_CLOSE
+        return build_memory_context_block(hits[:-1], query, max_chars=max_chars, _total=total)
+    suffix = "…(truncated to fit context)\n" + _BLOCK_CLOSE
     cut = max_chars - len(suffix)
     if cut <= 0:
         return _BLOCK_OPEN + "\n" + _BLOCK_CLOSE

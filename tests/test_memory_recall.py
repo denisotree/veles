@@ -123,6 +123,27 @@ def test_injector_caps_to_max_chars() -> None:
     assert block.rstrip().endswith("</memory-context>")
 
 
+def test_injector_announces_truncation_when_hits_dropped() -> None:
+    """M219: when the budget forces dropping hits, the header names how many of
+    how many are shown + a refine hint, so silence never reads as absence."""
+    big_summary = "x" * 1000
+    hits = [
+        RecallHit(rel_path=f"wiki/p-{i}.md", title=f"P{i}", summary=big_summary) for i in range(10)
+    ]
+    block = build_memory_context_block(hits, "q", max_chars=2000)
+    assert block is not None
+    assert "of 10 matches" in block  # "Showing N of 10 matches …"
+    assert "refine" in block.lower()
+
+
+def test_injector_no_truncation_notice_when_all_fit() -> None:
+    hits = [RecallHit(rel_path="wiki/x.md", title="X", summary="short")]
+    block = build_memory_context_block(hits, "q")
+    assert block is not None
+    assert "Top 1 matches" in block
+    assert "of 1 matches" not in block
+
+
 def test_injector_handles_missing_summary() -> None:
     hits = [RecallHit(rel_path="wiki/x.md", title="X", summary="")]
     block = build_memory_context_block(hits, "q")
