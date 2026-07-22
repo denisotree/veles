@@ -415,9 +415,16 @@ class TelegramGateway:
         if not parts and not attachments:
             return
         prompt = _build_combined_prompt(parts, attachments, self.project_root)
-        await self._run_turn_serial(chat_id, chat_key, prompt)
+        # In group chats (negative chat_id) thread the answer to the
+        # triggering message so it's clear which message it answers; in
+        # 1:1 chats threading is just visual noise. Anchor on the most
+        # recent buffered message.
+        reply_to = messages[-1].get("message_id") if chat_id < 0 else None
+        await self._run_turn_serial(chat_id, chat_key, prompt, reply_to=reply_to)
 
-    async def _run_turn_serial(self, chat_id: int, chat_key: str, prompt: str) -> None:
+    async def _run_turn_serial(
+        self, chat_id: int, chat_key: str, prompt: str, *, reply_to: int | None = None
+    ) -> None:
         """Run one turn under the chat's serial lock. If a turn is already
         in flight for this chat, tell the user their message is queued
         (it will run right after) before waiting on the lock — the daemon
@@ -431,7 +438,7 @@ class TelegramGateway:
             with contextlib.suppress(Exception):
                 await self._send_message(chat_id, t("telegram.ack_queued"))
         async with lock:
-            await self._run_turn(chat_id, chat_key, prompt)
+            await self._run_turn(chat_id, chat_key, prompt, reply_to=reply_to)
 
     # ---- media (delegates → TelegramMedia, M155) ----
 
@@ -441,7 +448,9 @@ class TelegramGateway:
     async def _describe_photo(self, chat_id: int, photo: list[dict[str, Any]]) -> str | None:
         return await self._media.describe_photo(chat_id, photo)
 
-    async def _run_turn(self, chat_id: int, chat_key: str, text: str) -> None:
+    async def _run_turn(
+        self, chat_id: int, chat_key: str, text: str, *, reply_to: int | None = None
+    ) -> None:
         """Pipeline: submit_run → placeholder → drain stream with
         typing indicator → final edit.
 
@@ -450,7 +459,7 @@ class TelegramGateway:
         run_id = await self._submit_or_report(chat_id, chat_key, text)
         if run_id is None:
             return
-        message_id = await self._send_placeholder(chat_id)
+        message_id = await self._send_placeholder(chat_id, reply_to=reply_to)
         if message_id is None:
             return
         async with self._typing_indicator(chat_id):
@@ -474,8 +483,8 @@ class TelegramGateway:
             return None
         return run_id
 
-    async def _send_placeholder(self, chat_id: int) -> int | None:
-        return await self._delivery.send_placeholder(chat_id)
+    async def _send_placeholder(self, chat_id: int, *, reply_to: int | None = None) -> int | None:
+        return await self._delivery.send_placeholder(chat_id, reply_to=reply_to)
 
     @contextlib.asynccontextmanager
     async def _typing_indicator(self, chat_id: int):

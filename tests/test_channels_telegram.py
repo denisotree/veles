@@ -265,6 +265,38 @@ async def test_answer_disables_link_preview(session_map: SessionMap) -> None:
     assert edits[-1]["link_preview_options"] == {"is_disabled": True}
 
 
+async def test_group_turn_threads_reply_to_trigger(session_map: SessionMap) -> None:
+    """In a group (negative chat_id) the placeholder replies to the
+    triggering message, with allow_sending_without_reply so a deleted
+    trigger doesn't drop the turn."""
+    daemon = _FakeDaemonClient()
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    update = {
+        "update_id": 1,
+        "message": {
+            "message_id": 555,
+            "chat": {"id": -100200, "type": "supergroup"},
+            "text": "hey bot",
+        },
+    }
+    await gateway._handle_update(update)
+    placeholder = next(p for m, p in sends if m == "sendMessage")
+    assert placeholder["reply_parameters"] == {
+        "message_id": 555,
+        "allow_sending_without_reply": True,
+    }
+
+
+async def test_private_turn_has_no_reply_parameters(session_map: SessionMap) -> None:
+    daemon = _FakeDaemonClient()
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await gateway._handle_update(_message_update(42, "hi"))
+    placeholder = next(p for m, p in sends if m == "sendMessage")
+    assert "reply_parameters" not in placeholder
+
+
 async def test_error_event_surfaces_to_user(session_map: SessionMap) -> None:
     daemon = _FakeDaemonClient(
         events=[

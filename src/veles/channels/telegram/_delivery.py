@@ -62,10 +62,21 @@ class TelegramDelivery:
     def __init__(self, gateway: TelegramGateway) -> None:
         self._gw = gateway
 
-    async def send_placeholder(self, chat_id: int) -> int | None:
+    async def send_placeholder(self, chat_id: int, *, reply_to: int | None = None) -> int | None:
         """Post the "..." holder we'll edit on completion. Returns the
-        message_id, or None when Telegram refused the send."""
-        placeholder = await self._gw._send_message(chat_id, _PLACEHOLDER_TEXT)
+        message_id, or None when Telegram refused the send.
+
+        `reply_to` (group chats) threads the whole turn under the user's
+        message. `allow_sending_without_reply` keeps the turn alive if
+        that message was deleted before we replied."""
+        reply_parameters = (
+            {"message_id": reply_to, "allow_sending_without_reply": True}
+            if reply_to is not None
+            else None
+        )
+        placeholder = await self._gw._send_message(
+            chat_id, _PLACEHOLDER_TEXT, reply_parameters=reply_parameters
+        )
         mid = placeholder.get("message_id")
         return mid if isinstance(mid, int) else None
 
