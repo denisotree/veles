@@ -12,8 +12,8 @@ from veles.core.memory.rerank import (
 from veles.core.memory.router import RecallHit
 
 
-def _hit(rel_path: str, *, ts: float | None = None, decay: float = 1.0) -> RecallHit:
-    return RecallHit(rel_path=rel_path, title=rel_path, summary=rel_path, ts=ts, decay=decay)
+def _hit(rel_path: str, *, ts: float | None = None) -> RecallHit:
+    return RecallHit(rel_path=rel_path, title=rel_path, summary=rel_path, ts=ts)
 
 
 # ---- recency_score ----
@@ -93,7 +93,7 @@ def test_rerank_respects_limit() -> None:
 
 def test_rerank_custom_weights_zero_recency_keeps_relevance_order() -> None:
     now = 1_000_000.0
-    w = RerankWeights(relevance=1.0, recency=0.0, decay=0.0)
+    w = RerankWeights(relevance=1.0, recency=0.0)
     fresh_second = _hit("a", ts=now)
     stale_first = _hit("b", ts=now - 10 * DEFAULT_HALF_LIFE_SEC)
     # one stream, stale_first at position 0 → with no recency weight it stays first

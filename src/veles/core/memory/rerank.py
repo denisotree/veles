@@ -7,7 +7,7 @@ retrieval-side half of the article's "memory rot" thesis.
 
 Score per hit:
 
-    score = w_rel · relevance + w_recency · recency + w_decay · decay
+    score = w_rel · relevance + w_recency · recency
 
 - **relevance** is *position-based* per source: `1/(1+pos)`. FTS BM25 ranks
   aren't comparable across tables (wiki vs turns vs insights), so we use each
@@ -22,12 +22,13 @@ Score per hit:
   first stream) — preserving the M55 "curated knowledge leads" intent — while
   *stale* turns still sink and a fresh turn still beats a lower-relevance wiki
   page.
-- **decay** is the hit's `decay` field — a forward-looking multiplier, always
-  1.0 until a future milestone adds a genuine decay-*writer* (no schema bloat
-  now; see the M141 plan Task 0 reversal).
+
+(M215: dropped the always-1.0 `decay` term — a constant offset that never moved
+the sort order. Re-add a `w_decay · decay` term here when a real decay-*writer*
+lands.)
 
 Pure functions, no DB, no router import (router imports this) — hits are
-duck-typed on `.ts` / `.decay`.
+duck-typed on `.ts`.
 """
 
 from __future__ import annotations
@@ -42,7 +43,6 @@ DEFAULT_HALF_LIFE_SEC = 14 * 86_400.0  # 14 days
 class RerankWeights:
     relevance: float = 1.0
     recency: float = 0.6
-    decay: float = 0.2
 
 
 DEFAULT_WEIGHTS = RerankWeights()
@@ -77,8 +77,7 @@ def rerank[H](
         for pos, hit in enumerate(stream):
             rel = 1.0 / (1.0 + pos)
             rec = recency_score(getattr(hit, "ts", None), now, half_life_sec)
-            decay = float(getattr(hit, "decay", 1.0))
-            score = weights.relevance * rel + weights.recency * rec + weights.decay * decay
+            score = weights.relevance * rel + weights.recency * rec
             scored.append((score, len(scored), hit))
     scored.sort(key=lambda t: (-t[0], t[1]))
     return [hit for _, _, hit in scored[:limit]]

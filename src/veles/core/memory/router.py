@@ -49,10 +49,8 @@ class RecallHit:
     title: str
     summary: str
     score: float = 0.0
-    # M141 rerank inputs. `ts` is the recency signal (None → neutral); `decay`
-    # is a forward-looking multiplier (always 1.0 until a decay-writer exists).
+    # M141 rerank input: `ts` is the recency signal (None → neutral).
     ts: float | None = None
-    decay: float = 1.0
 
 
 class MemoryRouter:
@@ -306,7 +304,6 @@ def _load_rerank_config(project: Project) -> tuple[RerankWeights, float]:
         weights = RerankWeights(
             relevance=float(sec.get("relevance", DEFAULT_WEIGHTS.relevance)),
             recency=float(sec.get("recency", DEFAULT_WEIGHTS.recency)),
-            decay=float(sec.get("decay", DEFAULT_WEIGHTS.decay)),
         )
         half_life = float(sec.get("half_life_days", DEFAULT_HALF_LIFE_SEC / 86_400.0)) * 86_400.0
     except (TypeError, ValueError):
