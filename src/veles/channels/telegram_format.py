@@ -224,9 +224,12 @@ class _TelegramRenderer:
         self._bq_stack: list[int] = []
 
     def render(self, tokens: list[Token]) -> str:
-        i = 0
-        while i < len(tokens):
+        i, n = 0, len(tokens)
+        while i < n:
             tok = tokens[i]
+            if tok.type == "table_open":
+                i = self._render_table(tokens, i) + 1  # skip past table_close
+                continue
             handler = _BLOCK_HANDLERS.get(tok.type)
             if handler is not None:
                 handler(self, tok)
@@ -324,11 +327,53 @@ class _TelegramRenderer:
         if self._out and self._out[-1].endswith("\n\n"):
             self._out[-1] = self._out[-1][:-1]
 
-    # ---- tables — flatten into a monospaced <pre> grid ----
+    # ---- tables — flatten into a column-aligned monospaced <pre> grid ----
 
-    def table(self, tokens: list[Token], idx: int) -> int:
-        """Handled out-of-band — see `_render_table`. Returns new index."""
-        return idx
+    def _render_table(self, tokens: list[Token], start: int) -> int:
+        """Collect the table `tokens[start:table_close]` into rows, then
+        emit a `<pre>` grid with columns padded to equal width. Returns
+        the index of the `table_close` token.
+
+        Cell text is the raw source of the cell's `inline` token —
+        inline formatting is dropped because `<pre>` is monospace and
+        renders no nested tags anyway."""
+        rows: list[list[str]] = []
+        row: list[str] = []
+        header_rows = 0
+        in_thead = False
+        i = start + 1
+        while i < len(tokens) and tokens[i].type != "table_close":
+            ttype = tokens[i].type
+            if ttype == "thead_open":
+                in_thead = True
+            elif ttype == "thead_close":
+                in_thead = False
+            elif ttype == "tr_open":
+                row = []
+            elif ttype == "tr_close":
+                rows.append(row)
+                if in_thead:
+                    header_rows = len(rows)
+            elif ttype in ("th_open", "td_open"):
+                nxt = tokens[i + 1] if i + 1 < len(tokens) else None
+                row.append((nxt.content.strip() if nxt is not None and nxt.type == "inline" else ""))
+            i += 1
+        self._emit_table(rows, header_rows)
+        return i
+
+    def _emit_table(self, rows: list[list[str]], header_rows: int) -> None:
+        if not rows:
+            return
+        cols = max(len(r) for r in rows)
+        for r in rows:
+            r.extend([""] * (cols - len(r)))  # pad ragged rows
+        widths = [max(len(r[c]) for r in rows) for c in range(cols)]
+        lines: list[str] = []
+        for idx, r in enumerate(rows):
+            lines.append(" | ".join(escape_html(cell.ljust(widths[c])) for c, cell in enumerate(r)))
+            if header_rows and idx == header_rows - 1:
+                lines.append("─┼─".join("─" * w for w in widths))
+        self._out.append("<pre>" + "\n".join(lines) + "</pre>\n")
 
     def _inside_list_item(self) -> bool:
         return bool(self._list_stack)
@@ -407,19 +452,7 @@ _BLOCK_HANDLERS: dict[str, Any] = {
     "ordered_list_close": _TelegramRenderer.close_ordered_list,
     "list_item_open": _TelegramRenderer.open_list_item,
     "list_item_close": _TelegramRenderer.close_list_item,
-    # Tables collapse to a paragraph with a pre-block computed inline.
-    "table_open": lambda self, tok: self._out.append("<pre>"),
-    "table_close": lambda self, tok: self._out.append("</pre>\n"),
-    "thead_open": lambda self, tok: None,
-    "thead_close": lambda self, tok: self._out.append("─" * 4 + "\n"),
-    "tbody_open": lambda self, tok: None,
-    "tbody_close": lambda self, tok: None,
-    "tr_open": lambda self, tok: None,
-    "tr_close": lambda self, tok: self._out.append("\n"),
-    "th_open": lambda self, tok: self._out.append(""),
-    "th_close": lambda self, tok: self._out.append("\t"),
-    "td_open": lambda self, tok: self._out.append(""),
-    "td_close": lambda self, tok: self._out.append("\t"),
+    # Tables are handled out-of-band in render() → _render_table (aligned).
 }
 
 _INLINE_HANDLERS: dict[str, Any] = {

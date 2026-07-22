@@ -134,12 +134,20 @@ def test_md_blockquote_nested_emits_single_tag() -> None:
     assert "inner" in out
 
 
-def test_md_table_collapses_to_pre_block() -> None:
-    md = "| a | b |\n|---|---|\n| 1 | 2 |"
+def test_md_table_aligned_pre_block() -> None:
+    md = "| name | v |\n|---|---|\n| abc | 1 |\n| d | 22 |"
     out = markdown_to_telegram_html(md)
     assert "<pre>" in out and "</pre>" in out
-    # Cell values present in the pre-block.
-    assert "a" in out and "b" in out and "1" in out and "2" in out
+    assert "\t" not in out  # tabs never aligned in Telegram <pre>
+    # Column 1 padded to the widest cell ("name" = 4): "d" → "d   ".
+    assert "d    | 22" in out
+    assert "abc  | 1" in out
+
+
+def test_md_table_escapes_cell_html() -> None:
+    out = markdown_to_telegram_html("| x |\n|---|\n| <b> |")
+    assert "&lt;b&gt;" in out
+    assert "<b>" not in out
 
 
 def test_md_text_with_angle_brackets_is_escaped() -> None:
