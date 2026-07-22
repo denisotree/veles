@@ -21,6 +21,7 @@ quirk (those reject `max_tokens` and require `max_completion_tokens`)."""
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterator
 from typing import Any
 
@@ -48,6 +49,20 @@ from veles.core.tool_args import decode_tool_args
 # is checked first.
 _TRANSLATED_OPENAI_ERRORS = (APITimeoutError, APIConnectionError, APIStatusError)
 _ERROR_BODY_LIMIT = 500
+
+logger = logging.getLogger(__name__)
+
+
+def _is_cache_control_error(exc: Exception) -> bool:
+    """True for an upstream 400 that rejected our `cache_control` hint — the
+    signal to self-heal by dropping the M220 tool-tail breakpoint and retrying.
+    Matches on the error body so it fires only for the cache-hint rejection,
+    not any other 400."""
+    if not isinstance(exc, APIStatusError):
+        return False
+    if getattr(exc, "status_code", None) != 400:
+        return False
+    return "cache_control" in str(exc).lower()
 
 
 def to_openai_message(m: Message) -> dict[str, Any]:
@@ -179,6 +194,30 @@ class OpenAICompatibleProvider:
         page = self._client.models.list()
         return [m.id for m in page]
 
+    def _call_create(self, kwargs: dict[str, Any], messages: list[Message], model: str) -> Any:
+        """Run `chat.completions.create` with the M220 cache self-heal: if the
+        wire rejects our `cache_control` tool-tail hint (400), drop the tool-tail
+        breakpoint process-wide, re-prepare the messages, and retry once. The
+        cache is a bonus — a rejection must never break an agentic turn."""
+        try:
+            return self._client.chat.completions.create(**kwargs)
+        except _TRANSLATED_OPENAI_ERRORS as exc:
+            from veles.core.cache_hints import disable_tool_tail, tool_tail_enabled
+
+            if tool_tail_enabled() and _is_cache_control_error(exc):
+                disable_tool_tail()
+                logger.warning(
+                    "cache_control rejected on the tool tail; disabled tool-tail "
+                    "caching and retrying without it (self-healed, %s)",
+                    getattr(self, "name", "provider"),
+                )
+                retry = {**kwargs, "messages": self._prepare_messages(messages, model)}
+                try:
+                    return self._client.chat.completions.create(**retry)
+                except _TRANSLATED_OPENAI_ERRORS as exc2:
+                    raise self._translate_openai_error(exc2) from exc2
+            raise self._translate_openai_error(exc) from exc
+
     def create_message(
         self,
         messages: list[Message],
@@ -195,10 +234,7 @@ class OpenAICompatibleProvider:
         if tools and self.supports_tools:
             kwargs["tools"] = tools
             kwargs["tool_choice"] = "auto"
-        try:
-            completion = self._client.chat.completions.create(**kwargs)
-        except _TRANSLATED_OPENAI_ERRORS as exc:
-            raise self._translate_openai_error(exc) from exc
+        completion = self._call_create(kwargs, messages, model)
         choice = completion.choices[0]
         msg = choice.message
         tool_calls = _decode_tool_calls(msg.tool_calls or [])
@@ -238,11 +274,10 @@ class OpenAICompatibleProvider:
         # request or mid-stream (the SDK applies the read timeout per
         # chunk); translate either into a typed veles error with an
         # actionable hint so the agent + UI label it distinctly
-        # (M132 timeout, M132b unavailable/server-error).
-        try:
-            stream = self._client.chat.completions.create(**kwargs)
-        except _TRANSLATED_OPENAI_ERRORS as exc:
-            raise self._translate_openai_error(exc) from exc
+        # (M132 timeout, M132b unavailable/server-error). The initial call
+        # also carries the M220 cache self-heal (a cache_control 400 is a
+        # request-validation error, so it can only surface here, not mid-stream).
+        stream = self._call_create(kwargs, messages, model)
 
         def _chunks() -> Iterator[Any]:
             try:
