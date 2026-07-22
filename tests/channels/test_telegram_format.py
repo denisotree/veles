@@ -54,6 +54,13 @@ def test_md_inline_code() -> None:
     assert "<code>foo()</code>" in out
 
 
+def test_md_strikethrough() -> None:
+    """`~~x~~` must reach Telegram as <s> — the commonmark preset leaves
+    the rule off, so it's enabled explicitly on the parser."""
+    out = markdown_to_telegram_html("this is ~~gone~~ now")
+    assert "<s>gone</s>" in out
+
+
 def test_md_headings_become_bold() -> None:
     """Telegram has no <h1>/<h2>; collapse to bold so the section
     label stays visible without showing a literal `#`."""

@@ -7,13 +7,16 @@ strict subset Telegram does parse predictably — only `<`, `>`, `&` need
 escaping, and a fixed whitelist of tags is allowed.
 
 This module converts CommonMark (via `markdown-it-py`) into the
-Telegram-allowed subset:
+Telegram-allowed subset. Tags actually emitted:
 
-    <b> <strong>   <i> <em>   <u>  <s> <strike> <del>
-    <code>  <pre>  <a href="…">  <blockquote>  <tg-spoiler>
+    <b>  <i>  <s>  <code>  <a href="…">  <tg-spoiler>
+    <pre>  <pre><code class="language-…">
+    <blockquote>  <blockquote expandable>
 
-Anything Telegram doesn't render is collapsed to a sensible visual
-substitute (headings → bold, lists → bullets, tables → `<pre>` aligned).
+Strikethrough (`~~x~~`) and spoiler (`||x||`) are enabled explicitly on
+the parser below. Anything Telegram doesn't render is collapsed to a
+sensible visual substitute (headings → bold, lists → bullets, tables →
+a column-aligned `<pre>` grid, long quotes → expandable blockquote).
 
 Three public functions:
 - `escape_html(text)` — entity-encode the three special chars.
@@ -30,7 +33,11 @@ from markdown_it.token import Token
 
 _TELEGRAM_LIMIT = 4000  # Telegram's hard cap is 4096; leave headroom.
 
-_md = MarkdownIt("commonmark", {"breaks": True, "linkify": True}).enable("table")
+_md = (
+    MarkdownIt("commonmark", {"breaks": True, "linkify": True})
+    .enable("table")
+    .enable("strikethrough")
+)
 
 
 def escape_html(text: str) -> str:
