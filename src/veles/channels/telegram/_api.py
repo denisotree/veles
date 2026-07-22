@@ -140,6 +140,19 @@ class TelegramApi:
         with contextlib.suppress(RuntimeError):
             await self._gw._call("sendChatAction", {"chat_id": chat_id, "action": action})
 
+    async def set_message_reaction(self, chat_id: int, message_id: int, emoji: str) -> None:
+        """Best-effort emoji reaction on a user's message (a light-weight
+        ack). Swallows errors — the message may be unreactable or gone."""
+        with contextlib.suppress(RuntimeError):
+            await self._gw._call(
+                "setMessageReaction",
+                {
+                    "chat_id": chat_id,
+                    "message_id": message_id,
+                    "reaction": [{"type": "emoji", "emoji": emoji}],
+                },
+            )
+
     async def download_telegram_file(self, file_id: str, expected_size: int) -> bytes:
         """`getFile` resolves the bot-specific download URL, then GET it
         as a stream. We cap at 5 MB during the stream too, because

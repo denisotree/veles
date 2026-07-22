@@ -426,6 +426,27 @@ async def test_second_message_while_busy_gets_queued_ack(session_map: SessionMap
     await task
 
 
+async def test_queued_turn_with_trigger_reacts_instead_of_texting(
+    session_map: SessionMap,
+) -> None:
+    """When the queued message can be reacted to, a 👀 reaction replaces
+    the noisier 'queued' text."""
+    daemon = _FakeDaemonClient()
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    lock = asyncio.Lock()
+    gateway._chat_locks["42"] = lock
+    await lock.acquire()
+    task = asyncio.create_task(gateway._run_turn_serial(42, "42", "second", trigger_id=77))
+    await asyncio.sleep(0)
+    reactions = [p for m, p in sends if m == "setMessageReaction"]
+    assert reactions and reactions[0]["message_id"] == 77
+    assert reactions[0]["reaction"][0]["emoji"] == "👀"
+    assert not any(p.get("text") == t("telegram.ack_queued") for _m, p in sends)
+    lock.release()
+    await task
+
+
 async def test_single_message_gets_no_queued_ack(session_map: SessionMap) -> None:
     daemon = _FakeDaemonClient()
     sends: list[tuple[str, dict[str, Any]]] = []

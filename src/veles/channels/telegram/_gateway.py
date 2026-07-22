@@ -415,28 +415,36 @@ class TelegramGateway:
         if not parts and not attachments:
             return
         prompt = _build_combined_prompt(parts, attachments, self.project_root)
-        # In group chats (negative chat_id) thread the answer to the
-        # triggering message so it's clear which message it answers; in
-        # 1:1 chats threading is just visual noise. Anchor on the most
-        # recent buffered message.
-        reply_to = messages[-1].get("message_id") if chat_id < 0 else None
-        await self._run_turn_serial(chat_id, chat_key, prompt, reply_to=reply_to)
+        # Anchor UX on the most recent buffered message.
+        trigger_id = messages[-1].get("message_id")
+        await self._run_turn_serial(chat_id, chat_key, prompt, trigger_id=trigger_id)
 
     async def _run_turn_serial(
-        self, chat_id: int, chat_key: str, prompt: str, *, reply_to: int | None = None
+        self, chat_id: int, chat_key: str, prompt: str, *, trigger_id: int | None = None
     ) -> None:
         """Run one turn under the chat's serial lock. If a turn is already
-        in flight for this chat, tell the user their message is queued
-        (it will run right after) before waiting on the lock — the daemon
-        also serializes per session, but the lock lets us surface the
-        wait and keep FIFO order at the channel edge."""
+        in flight for this chat, acknowledge the wait (a 👀 reaction on the
+        message, or a queued text if the message can't be reacted to)
+        before waiting on the lock — the daemon also serializes per
+        session, but the lock lets us surface the wait and keep FIFO order
+        at the channel edge."""
+        # In group chats (negative chat_id) thread the answer to the
+        # triggering message so it's clear which one it answers; in 1:1
+        # chats threading is just visual noise.
+        reply_to = trigger_id if chat_id < 0 else None
         lock = self._chat_locks.get(chat_key)
         if lock is None:
             lock = asyncio.Lock()
             self._chat_locks[chat_key] = lock
         if lock.locked():
-            with contextlib.suppress(Exception):
-                await self._send_message(chat_id, t("telegram.ack_queued"))
+            # A 👀 reaction keeps a busy chat quiet instead of piling up
+            # "queued" messages; fall back to text when there's no message
+            # to react to.
+            if trigger_id is not None:
+                await self._set_reaction(chat_id, trigger_id, "👀")
+            else:
+                with contextlib.suppress(Exception):
+                    await self._send_message(chat_id, t("telegram.ack_queued"))
         async with lock:
             await self._run_turn(chat_id, chat_key, prompt, reply_to=reply_to)
 
@@ -558,6 +566,9 @@ class TelegramGateway:
             parse_mode=parse_mode,
             link_preview_options=link_preview_options,
         )
+
+    async def _set_reaction(self, chat_id: int, message_id: int, emoji: str) -> None:
+        await self._api.set_message_reaction(chat_id, message_id, emoji)
 
     async def _answer_callback_query(self, callback_id: str, *, text: str | None = None) -> None:
         await self._api.answer_callback_query(callback_id, text=text)
