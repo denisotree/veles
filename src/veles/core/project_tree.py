@@ -27,6 +27,7 @@ local makes future M119 schema-v3 migration self-contained.
 from __future__ import annotations
 
 import fnmatch
+import json
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -77,6 +78,18 @@ CREATE INDEX IF NOT EXISTS idx_project_tree_tag
 
 CREATE INDEX IF NOT EXISTS idx_project_tree_parent
     ON project_tree(parent_path);
+
+-- M216: per-entry embedding cache. `relevant_semantic` used to re-embed
+-- every project_tree entry on every turn; this caches the vector against
+-- the entry's text signature so an unchanged path is embedded once.
+-- Namespaced by `model` (the adapter's name) so switching embedders never
+-- mixes vectors from different spaces.
+CREATE TABLE IF NOT EXISTS path_embedding_cache (
+    model    TEXT NOT NULL,
+    sig      TEXT NOT NULL,
+    vec_json TEXT NOT NULL,
+    PRIMARY KEY (model, sig)
+);
 """
 
 
@@ -402,19 +415,77 @@ def relevant_semantic(conn: sqlite3.Connection, query: str, *, limit: int = 10) 
         for r in rows
     ]
     signatures = [_entry_signature(e) for e in entries]
+    model = str(getattr(adapter, "name", "default"))
+    cached = _load_cached_embeddings(conn, model, signatures)
+    misses = [s for s in dict.fromkeys(signatures) if s not in cached]
 
     try:
         query_vec = adapter.embed([query])[0]
-        entry_vecs = adapter.embed(signatures)
+        if misses:
+            new_vecs = adapter.embed(misses)
+            _store_cached_embeddings(conn, model, misses, new_vecs)
+            cached.update(zip(misses, new_vecs, strict=True))
     except EmbeddingError:
         # Network / model failure → fall back transparently.
         return relevant(conn, query, limit=limit)
 
+    _prune_cached_embeddings(conn, model, signatures)
     scored = [
-        (_cosine(query_vec, vec), entry) for vec, entry in zip(entry_vecs, entries, strict=True)
+        (_cosine(query_vec, cached[sig]), entry)
+        for sig, entry in zip(signatures, entries, strict=True)
     ]
     scored.sort(key=lambda x: (-x[0], x[1].rel_path))
     return [e for _, e in scored[:limit]]
+
+
+# ---------- M216: per-entry embedding cache ----------
+
+
+def _load_cached_embeddings(
+    conn: sqlite3.Connection, model: str, signatures: list[str]
+) -> dict[str, list[float]]:
+    """Cached vectors for `signatures` under `model`. Chunked to stay under
+    SQLite's bound-parameter limit on very large trees."""
+    out: dict[str, list[float]] = {}
+    uniq = list(dict.fromkeys(signatures))
+    chunk = 500
+    for i in range(0, len(uniq), chunk):
+        batch = uniq[i : i + chunk]
+        placeholders = ",".join("?" * len(batch))
+        rows = conn.execute(
+            "SELECT sig, vec_json FROM path_embedding_cache "
+            f"WHERE model = ? AND sig IN ({placeholders})",
+            (model, *batch),
+        ).fetchall()
+        for r in rows:
+            out[r["sig"]] = json.loads(r["vec_json"])
+    return out
+
+
+def _store_cached_embeddings(
+    conn: sqlite3.Connection, model: str, sigs: list[str], vecs: list[list[float]]
+) -> None:
+    conn.executemany(
+        "INSERT OR REPLACE INTO path_embedding_cache(model, sig, vec_json) VALUES (?, ?, ?)",
+        [(model, s, json.dumps(v)) for s, v in zip(sigs, vecs, strict=True)],
+    )
+    conn.commit()
+
+
+def _prune_cached_embeddings(conn: sqlite3.Connection, model: str, current_sigs: list[str]) -> None:
+    """Drop cached vectors for signatures no longer in the tree (renamed /
+    deleted files) so the cache can't grow unbounded over a project's life."""
+    keep = set(current_sigs)
+    stale = [
+        (model, r["sig"])
+        for r in conn.execute(
+            "SELECT sig FROM path_embedding_cache WHERE model = ?", (model,)
+        ).fetchall()
+        if r["sig"] not in keep
+    ]
+    if stale:
+        conn.executemany("DELETE FROM path_embedding_cache WHERE model = ? AND sig = ?", stale)
+        conn.commit()
 
 
 def _entry_signature(entry: TreeEntry) -> str:
