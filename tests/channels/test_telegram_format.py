@@ -113,6 +113,25 @@ def test_md_blockquote() -> None:
     assert "<blockquote>" in out
     assert "quoted line" in out
     assert "</blockquote>" in out
+    assert "expandable" not in out  # short quote stays plain
+
+
+def test_md_blockquote_expandable_when_long() -> None:
+    """A long quote collapses to `<blockquote expandable>` so it doesn't
+    flood the chat."""
+    md = "> " + "\n> ".join(f"line {n}" for n in range(8))
+    out = markdown_to_telegram_html(md)
+    assert "<blockquote expandable>" in out
+    assert out.count("<blockquote") == 1  # not nested
+
+
+def test_md_blockquote_nested_emits_single_tag() -> None:
+    """Telegram forbids nested blockquotes — only the outer level emits
+    a tag, inner content flows as plain text."""
+    out = markdown_to_telegram_html("> outer\n> > inner")
+    assert out.count("<blockquote") == 1
+    assert out.count("</blockquote>") == 1
+    assert "inner" in out
 
 
 def test_md_table_collapses_to_pre_block() -> None:

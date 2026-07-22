@@ -208,12 +208,20 @@ def split_telegram_html(html: str, limit: int = _TELEGRAM_LIMIT) -> list[str]:
 class _TelegramRenderer:
     """Walks markdown-it tokens, emits Telegram-allowed HTML."""
 
-    __slots__ = ("_list_stack", "_out")
+    __slots__ = ("_bq_stack", "_list_stack", "_out")
+
+    # A blockquote longer than this (chars OR lines) is emitted collapsed
+    # (`<blockquote expandable>`) so a long quote doesn't flood the chat.
+    _BQ_EXPAND_CHARS = 300
+    _BQ_EXPAND_LINES = 4
 
     def __init__(self) -> None:
         self._out: list[str] = []
         # Stack of (kind, counter) for nested lists; kind ∈ {"ul","ol"}.
         self._list_stack: list[tuple[str, int]] = []
+        # Indices into `_out` of open `<blockquote>` placeholders, so
+        # `close_blockquote` can upgrade a long one to `expandable`.
+        self._bq_stack: list[int] = []
 
     def render(self, tokens: list[Token]) -> str:
         i = 0
@@ -245,9 +253,21 @@ class _TelegramRenderer:
         self._out.append("\n\n" if not self._inside_list_item() else "\n")
 
     def open_blockquote(self, tok: Token) -> None:
+        # Telegram forbids nested blockquotes — only the outermost level
+        # emits a tag; inner quotes just flow as text.
+        if self._bq_stack:
+            self._bq_stack.append(-1)
+            return
+        self._bq_stack.append(len(self._out))
         self._out.append("<blockquote>")
 
     def close_blockquote(self, tok: Token) -> None:
+        idx = self._bq_stack.pop() if self._bq_stack else -1
+        if idx < 0:
+            return  # inner (nested) quote — emitted no tag
+        content = "".join(self._out[idx + 1 :])
+        if len(content) > self._BQ_EXPAND_CHARS or content.count("\n") >= self._BQ_EXPAND_LINES:
+            self._out[idx] = "<blockquote expandable>"
         self._out.append("</blockquote>\n")
 
     def fence(self, tok: Token) -> None:
