@@ -552,13 +552,13 @@ class TelegramGateway:
         `thread_id` (forum topics) is accepted to satisfy the
         `PlatformDeliverer` signature but unused for direct chats."""
         from veles.channels.telegram_format import (
-            html_safe_truncate,
             markdown_to_telegram_html,
+            split_telegram_html,
         )
 
         del thread_id  # forum topics unsupported for direct delivery (M165)
-        rendered = html_safe_truncate(markdown_to_telegram_html(text or ""))
-        await self._send_message(int(chat_id), rendered)
+        for chunk in split_telegram_html(markdown_to_telegram_html(text or "")):
+            await self._send_message(int(chat_id), chunk)
 
     # M127: `_refresh_daemon_health` / `_get_daemon_provider` /
     # `_get_active_model_for` were removed with the Telegram `/model`

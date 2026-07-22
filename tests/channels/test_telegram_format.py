@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from veles.channels.telegram_format import (
     escape_html,
-    html_safe_truncate,
     markdown_to_telegram_html,
     split_telegram_html,
 )
@@ -140,41 +139,6 @@ def test_md_empty_input() -> None:
 def test_md_hr_renders_visible_separator() -> None:
     out = markdown_to_telegram_html("above\n\n---\n\nbelow")
     assert "──────────" in out
-
-
-# ---- html_safe_truncate ----
-
-
-def test_truncate_noop_below_limit() -> None:
-    s = "short"
-    assert html_safe_truncate(s, limit=100) == s
-
-
-def test_truncate_closes_open_bold() -> None:
-    """Cut inside `<b>...</b>` must close the tag — leaving it open
-    breaks the entire message in Telegram's parser."""
-    s = "prefix <b>" + "x" * 100 + "</b> tail"
-    out = html_safe_truncate(s, limit=30)
-    assert out.endswith("</b>")
-    assert out.startswith("prefix <b>")
-    assert len(out) <= 30
-
-
-def test_truncate_drops_partial_entity() -> None:
-    """When the cut lands inside an entity (`&am|p;`), we want to drop
-    the unfinished `&am` rather than emit it as literal characters."""
-    s = "abcde&amp;extra-tail-to-overflow-the-limit"
-    out = html_safe_truncate(s, limit=8)
-    # The `&am` at the cut boundary is dropped before truncation runs.
-    assert "&am" not in out
-    assert out.startswith("abcde")
-
-
-def test_truncate_handles_nested_tags() -> None:
-    s = "<b><i>" + "y" * 100 + "</i></b>"
-    out = html_safe_truncate(s, limit=20)
-    # Close in reverse order: …</i></b>
-    assert out.endswith("</i></b>")
 
 
 # ---- split_telegram_html ----

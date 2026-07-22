@@ -18,7 +18,7 @@ substitute (headings → bold, lists → bullets, tables → `<pre>` aligned).
 Three public functions:
 - `escape_html(text)` — entity-encode the three special chars.
 - `markdown_to_telegram_html(md)` — full pipeline.
-- `html_safe_truncate(html, limit)` — chop without orphaning open tags.
+- `split_telegram_html(html, limit)` — split into ≤-limit valid chunks.
 """
 
 from __future__ import annotations
@@ -72,52 +72,6 @@ def markdown_to_telegram_html(md: str) -> str:
     return renderer.render(tokens).strip()
 
 
-def html_safe_truncate(html: str, limit: int = _TELEGRAM_LIMIT) -> str:
-    """Cut `html` to at most `limit` characters without leaving open
-    tags or half-formed entities. Open tags found in the kept prefix
-    are closed in reverse order; a trailing partial entity (`&am`) is
-    dropped before truncation."""
-    if len(html) <= limit:
-        return html
-    kept = html[:limit]
-    # Drop a trailing partial entity so the truncated text doesn't end
-    # mid-`&amp;`. Entities are `&...;`, at most ~6 chars.
-    amp = kept.rfind("&")
-    if amp >= 0 and ";" not in kept[amp:]:
-        kept = kept[:amp]
-    # Track open tags. We assume tags well-formed because we generated
-    # them — `<tag>` opens, `</tag>` closes, `<tag/>` self-closes.
-    open_stack: list[str] = []
-    i = 0
-    while i < len(kept):
-        if kept[i] != "<":
-            i += 1
-            continue
-        end = kept.find(">", i)
-        if end < 0:
-            # An open `<` at the cut boundary — drop it.
-            kept = kept[:i]
-            break
-        tag_body = kept[i + 1 : end]
-        if tag_body.endswith("/"):
-            pass  # self-closing
-        elif tag_body.startswith("/"):
-            name = tag_body[1:].split()[0]
-            if open_stack and open_stack[-1] == name:
-                open_stack.pop()
-        else:
-            name = tag_body.split()[0]
-            open_stack.append(name)
-        i = end + 1
-    closers = "".join(f"</{tag}>" for tag in reversed(open_stack))
-    suffix = "…" + closers
-    # If adding the suffix overflows the limit, trim the kept prefix
-    # further. Bounded by `limit` so loop is finite.
-    while len(kept) + len(suffix) > limit and kept:
-        kept = kept[:-1]
-    return kept + suffix
-
-
 def _atomize(html: str) -> list[tuple[str, str]]:
     """Break `html` into atomic units the splitter must not cut through.
 
@@ -157,10 +111,12 @@ def _tag_effect(tag: str) -> tuple[str, str | None]:
     {"open","close","self"}; name is the tag name (None for self-close)."""
     body = tag[1:-1].strip()
     if body.startswith("/"):
-        return "close", body[1:].split()[0] if body[1:].split() else ""
+        parts = body[1:].split()
+        return "close", parts[0] if parts else ""
     if body.endswith("/"):
         return "self", None
-    return "open", (body.split()[0] if body.split() else "")
+    parts = body.split()
+    return "open", parts[0] if parts else ""
 
 
 def split_telegram_html(html: str, limit: int = _TELEGRAM_LIMIT) -> list[str]:
@@ -457,7 +413,6 @@ _INLINE_HANDLERS: dict[str, Any] = {
 
 __all__ = [
     "escape_html",
-    "html_safe_truncate",
     "markdown_to_telegram_html",
     "split_telegram_html",
 ]
