@@ -61,7 +61,6 @@ variável de ambiente.
 | `VELES_TRUST_AUTO_ALLOW` | desligado | Contorna a escada de confiança (CI / autopilot / subagentes pré-autorizados) |
 | `VELES_SANDBOX_ROOTS` | projecto + `~/.veles` | Sobreposição separada por `:` das raízes de sandbox de leitura/escrita |
 | `VELES_FETCH_ALLOW_PRIVATE` | desligado | Permite às ferramentas obter endereços RFC-1918 / privados |
-| `VELES_MEMORY_RERANK` | ligado | Rerank vectorial da recuperação de memória (`0`/`false` desactiva) |
 | `VELES_WEB_SEARCH_BACKEND` | auto | Backend de pesquisa web para `research` e `web_search` |
 
 ## Registos

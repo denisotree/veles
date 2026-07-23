@@ -59,7 +59,6 @@ API-key lookup cascade: OS keychain (project scope) → OS keychain (default sco
 | `VELES_TRUST_AUTO_ALLOW` | off | trust ladder को bypass करें (CI / autopilot / pre-authorised sub-agents) |
 | `VELES_SANDBOX_ROOTS` | project + `~/.veles` | read/write sandbox roots का `:`-separated override |
 | `VELES_FETCH_ALLOW_PRIVATE` | off | tools को RFC-1918 / private addresses fetch करने दें |
-| `VELES_MEMORY_RERANK` | on | memory recall का vector reranking (`0`/`false` अक्षम करता है) |
 | `VELES_WEB_SEARCH_BACKEND` | auto | `research` और `web_search` के लिए web search backend |
 
 ## Registries

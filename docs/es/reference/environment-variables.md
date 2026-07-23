@@ -60,7 +60,6 @@ Cascada de búsqueda de la clave de API: llavero del SO (ámbito de proyecto) �
 | `VELES_TRUST_AUTO_ALLOW` | desactivado | Omite la escala de confianza (CI / autopilot / subagentes preautorizados) |
 | `VELES_SANDBOX_ROOTS` | proyecto + `~/.veles` | Anulación separada por `:` de las raíces del sandbox de lectura/escritura |
 | `VELES_FETCH_ALLOW_PRIVATE` | desactivado | Permite a las herramientas acceder a direcciones RFC-1918 / privadas |
-| `VELES_MEMORY_RERANK` | activado | Reordenamiento vectorial del recall de memoria (`0`/`false` lo desactiva) |
 | `VELES_WEB_SEARCH_BACKEND` | auto | Backend de búsqueda web para `research` y `web_search` |
 
 ## Registros

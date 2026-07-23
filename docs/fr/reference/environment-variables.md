@@ -60,7 +60,6 @@ trousseau du système (portée par défaut) → variable d'environnement.
 | `VELES_TRUST_AUTO_ALLOW` | désactivé | Contourne l'échelle de confiance (CI / autopilot / sous-agents pré-autorisés) |
 | `VELES_SANDBOX_ROOTS` | projet + `~/.veles` | Surcharge (séparée par `:`) des racines lecture/écriture du bac à sable |
 | `VELES_FETCH_ALLOW_PRIVATE` | désactivé | Autorise les outils à atteindre des adresses RFC-1918 / privées |
-| `VELES_MEMORY_RERANK` | activé | Reclassement vectoriel du rappel mémoire (`0`/`false` désactive) |
 | `VELES_WEB_SEARCH_BACKEND` | auto | Backend de recherche web pour `research` et `web_search` |
 
 ## Registres

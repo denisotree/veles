@@ -57,7 +57,6 @@ API 金鑰的查詢串接順序：OS 鑰匙圈（專案範圍）→ OS 鑰匙圈
 | `VELES_TRUST_AUTO_ALLOW` | 關閉 | 繞過信任階梯（CI／autopilot／已預先授權的子代理） |
 | `VELES_SANDBOX_ROOTS` | 專案 ＋ `~/.veles` | 以 `:` 分隔的讀寫沙箱根目錄覆寫 |
 | `VELES_FETCH_ALLOW_PRIVATE` | 關閉 | 允許工具抓取 RFC-1918／私有位址 |
-| `VELES_MEMORY_RERANK` | 開啟 | 對記憶召回做向量重排序（`0`/`false` 停用） |
 | `VELES_WEB_SEARCH_BACKEND` | 自動 | `research` 與 `web_search` 的網路搜尋後端 |
 
 ## 登錄庫

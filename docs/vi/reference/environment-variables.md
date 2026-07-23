@@ -60,7 +60,6 @@ hệ điều hành (phạm vi default) → biến môi trường.
 | `VELES_TRUST_AUTO_ALLOW` | tắt | Bỏ qua trust ladder (CI / autopilot / các sub-agent đã được cấp quyền trước) |
 | `VELES_SANDBOX_ROOTS` | dự án + `~/.veles` | Ghi đè (phân tách bằng `:`) các thư mục gốc đọc/ghi của sandbox |
 | `VELES_FETCH_ALLOW_PRIVATE` | tắt | Cho phép tool truy cập các địa chỉ RFC-1918 / riêng tư |
-| `VELES_MEMORY_RERANK` | bật | Rerank vector cho việc recall bộ nhớ (`0`/`false` để tắt) |
 | `VELES_WEB_SEARCH_BACKEND` | auto | Backend tìm kiếm web cho `research` và `web_search` |
 
 ## Registry
