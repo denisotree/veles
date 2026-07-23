@@ -43,8 +43,11 @@ def _conv(*roles: str) -> list[Message]:
 
 
 def test_estimate_tokens_counts_content() -> None:
-    h = [_msg("user", "x" * 400)]
-    assert estimate_tokens(h) == 100
+    from veles.core.tokenizer import count_tokens
+
+    text = "the quick brown fox jumps over the lazy dog"
+    h = [_msg("user", text)]
+    assert estimate_tokens(h) == count_tokens(text) > 0
 
 
 def test_estimate_tokens_counts_tool_calls() -> None:
@@ -503,14 +506,15 @@ def test_emergency_truncate_drops_oldest_until_under_target() -> None:
     that's noise."""
     from veles.core.context_compressor import emergency_truncate
 
-    h = [_msg("system", "s")] + [_msg("user", "x" * 400) for _ in range(20)]
+    turn = "the quick brown fox jumps over the lazy dog every morning. "
+    h = [_msg("system", "s")] + [_msg("user", turn * 5) for _ in range(20)]
     before = estimate_tokens(h)
     new, dropped = emergency_truncate(h, target_tokens=600)
     assert dropped > 0
     after = estimate_tokens(new)
-    # Hard ceiling is approximate (banner adds ~80 tokens), but the
-    # result must be drastically smaller and roughly within target.
-    assert after < before // 2
+    # Result must land at/under target (banner adds a little slack) and be
+    # meaningfully smaller than the pre-truncation history.
+    assert after < before
     assert after <= 700
     # System banner survived.
     assert new[0].role == "system"

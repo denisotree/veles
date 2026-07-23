@@ -53,6 +53,7 @@ dependencies = [
     "textual>=0.85",
     "croniter>=2.0",
     "mcp>=1.0",
+    "tiktoken>=0.7",
 ]
 
 [project.scripts]

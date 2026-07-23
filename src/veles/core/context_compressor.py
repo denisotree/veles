@@ -41,6 +41,7 @@ from typing import TYPE_CHECKING
 
 from veles.core.provider import Message
 from veles.core.slug import now_timestamp_slug
+from veles.core.tokenizer import count_tokens
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -48,13 +49,6 @@ if TYPE_CHECKING:
     from veles.core.project import Project
     from veles.core.provider import Provider
 
-
-# Estimate over UTF-8 BYTES, not characters: ASCII is 1 byte/char (~4/token, as
-# before) but Cyrillic/CJK are 2-3 bytes/char and tokenise close to that. Counting
-# chars/4 undercut a Cyrillic session ~2x, so a "150k-token" summariser middle was
-# really ~267k and overflowed the model window. Bytes/4 is accurate for ASCII and
-# conservative (slightly high) for non-ASCII — exactly the safe direction.
-_BYTES_PER_TOKEN = 4
 
 logger = logging.getLogger(__name__)
 
@@ -84,22 +78,23 @@ HistoryCompressor = Callable[[list[Message], "str | None"], list[Message]]
 
 
 def estimate_tokens(history: list[Message]) -> int:
-    """Approximate token count via 4-chars-per-token heuristic.
+    """Token count for the history via the real tokenizer (M222), with a
+    bytes/4 fallback (`core/tokenizer.py`).
 
-    Cheap enough to call before every provider request. We'd rather
-    compress slightly early than miss a context-limit hit, so the
-    threshold is set conservatively below the real model limit.
+    Called before every provider request to size the compression window. The
+    real count fires compression near the actual threshold instead of the old
+    bytes/4 heuristic's premature (conservative-high) trigger.
     """
     n = 0
     for m in history:
         if m.content:
-            n += len(m.content.encode("utf-8"))
+            n += count_tokens(m.content)
         for tc in m.tool_calls:
-            n += len(json.dumps(tc.arguments, separators=(",", ":")).encode("utf-8"))
-            n += len(tc.name.encode("utf-8"))
+            n += count_tokens(json.dumps(tc.arguments, separators=(",", ":")))
+            n += count_tokens(tc.name)
         if m.tool_call_id:
-            n += len(m.tool_call_id.encode("utf-8"))
-    return n // _BYTES_PER_TOKEN
+            n += count_tokens(m.tool_call_id)
+    return n
 
 
 def needs_compression(history: list[Message], cfg: CompressionConfig) -> bool:
@@ -328,13 +323,13 @@ def make_default_compressor(
         # the same provider, and the run dies with the same "prompt is
         # too long" error the compressor was meant to prevent.
         rendered = render_middle_for_summary(middle)
-        rendered_tokens = len(rendered.encode("utf-8")) // _BYTES_PER_TOKEN
+        rendered_tokens = count_tokens(rendered)
         if rendered_tokens > cfg.max_summariser_input_tokens:
             original_len = len(middle)
             while middle and rendered_tokens > cfg.max_summariser_input_tokens:
                 middle = middle[1:]
                 rendered = render_middle_for_summary(middle)
-                rendered_tokens = len(rendered.encode("utf-8")) // _BYTES_PER_TOKEN
+                rendered_tokens = count_tokens(rendered)
             logger.info(
                 "compressor summariser-input-truncated session=%s "
                 "dropped_from_front=%d kept_middle=%d input_tokens=%d "
