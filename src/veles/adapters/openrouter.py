@@ -68,5 +68,20 @@ class OpenRouterProvider(OpenAICompatibleProvider):
     def _prepare_messages(self, messages: list[Message], model: str) -> list[dict[str, Any]]:
         return apply_cache_hints([to_openai_message(m) for m in messages], model)
 
+    def _request_options(self, model: str) -> dict[str, Any]:
+        """M224: forward the running turn's memory session id as OpenRouter's
+        `session_id` sticky-routing key, so every request in a conversation pins
+        one provider and the prompt cache (M42b/M178/M220) actually hits instead
+        of scattering across backends. Uses OpenRouter's own routing — no
+        hardcoded provider pin — so availability/fallback are preserved. None
+        outside a persisted run → OpenRouter falls back to hashing the opening
+        messages (still sticky, just not from message one)."""
+        from veles.core.context import current_session_id
+
+        sid = current_session_id()
+        if not sid:
+            return {}
+        return {"extra_body": {"session_id": sid[:256]}}
+
     def _extract_usage(self, usage_obj: Any) -> TokenUsage:
         return extract_usage_with_cache(usage_obj)

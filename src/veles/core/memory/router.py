@@ -24,7 +24,6 @@ versa. Recency / BM25-weighted merging is a future refinement.
 from __future__ import annotations
 
 import datetime as _dt
-import os
 import time
 from dataclasses import dataclass, replace
 
@@ -84,20 +83,17 @@ class MemoryRouter:
         turn_hits = self._collect_turns(query, limit=limit)
         extra_hits = self._collect_extra(query, limit=limit)
         streams = [about_hits, wiki_hits, insight_hits, turn_hits, extra_hits]
-        # M141: scored rerank by default; `VELES_MEMORY_RERANK=0` falls back to
-        # the round-robin merge. (M161 made insights SQL-only, so the old
-        # wiki↔insight title dedupe is gone — the streams no longer overlap.)
-        if _rerank_enabled():
-            weights, half_life = _load_rerank_config(self._project)
-            merged = rerank(
-                streams,
-                now=time.time(),
-                limit=limit,
-                weights=weights,
-                half_life_sec=half_life,
-            )
-        else:
-            merged = _interleave_many(streams, limit)
+        # M141 scored rerank (relevance + recency + M221 confidence). M223 dropped
+        # the `VELES_MEMORY_RERANK=0` round-robin fallback — a kill switch for a
+        # default that has led since M141 and only got richer since.
+        weights, half_life = _load_rerank_config(self._project)
+        merged = rerank(
+            streams,
+            now=time.time(),
+            limit=limit,
+            weights=weights,
+            half_life_sec=half_life,
+        )
         final = merged[:limit]
         # M145: scrub recall summaries before they enter the prompt — the one
         # memory surface that bypasses `scan_for_injection`. See
@@ -264,40 +260,6 @@ def _subproject_wiki_enabled(sub_root) -> bool:
         return wiki_enabled(load_project(sub_root))
     except Exception:
         return False
-
-
-def _interleave_many(streams: list[list[RecallHit]], limit: int) -> list[RecallHit]:
-    """Round-robin merge across N streams, capped at `limit`.
-
-    Order matters: earlier streams are sampled first within each cycle, so
-    the leading stream's #1 hit always lands before any other source's #1.
-    Wiki being first preserves the M55 design intent (curated knowledge
-    leads, raw turns next, external plugins after).
-    """
-    out: list[RecallHit] = []
-    indices = [0] * len(streams)
-    progressed = True
-    while progressed and len(out) < limit:
-        progressed = False
-        for s, stream in enumerate(streams):
-            if indices[s] < len(stream):
-                out.append(stream[indices[s]])
-                indices[s] += 1
-                progressed = True
-                if len(out) >= limit:
-                    break
-    return out
-
-
-def _rerank_enabled() -> bool:
-    """M141: rerank is on unless `VELES_MEMORY_RERANK` is a falsy string."""
-    return os.environ.get("VELES_MEMORY_RERANK", "1").strip().lower() not in (
-        "0",
-        "false",
-        "no",
-        "off",
-        "",
-    )
 
 
 def _load_rerank_config(project: Project) -> tuple[RerankWeights, float]:

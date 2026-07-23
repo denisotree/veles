@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] — 2026-07-23
+
+### Changed
+
+- **Much lower cost on long and repeated conversations — prompt caching now
+  actually kicks in.** Veles marks the stable part of each prompt for caching,
+  but through OpenRouter a conversation's requests could scatter across
+  different backends, so the cache rarely hit. Veles now passes a per-session
+  routing key so every request in a conversation sticks to the same provider —
+  measured at **~90 % cheaper input** on the repeated part of a session (e.g.
+  large context re-sent every step in an agentic loop). It uses OpenRouter's own
+  provider selection with a sticky hint — no provider is hard-pinned, so
+  availability and fallback are unchanged. (Caching also depends on the model's
+  minimum-prefix rule — e.g. Claude Sonnet caches from ~1 k tokens, Haiku from
+  ~4 k.)
+- **More accurate context-window management.** Veles now counts tokens with a
+  real tokenizer instead of a bytes-based estimate, so it summarises older turns
+  closer to the true limit instead of prematurely — fewer unnecessary
+  summarization passes, and non-English (e.g. Cyrillic) sessions are no longer
+  over-counted ~2×.
+
 ## [0.27.0] — 2026-07-23
 
 ### Changed

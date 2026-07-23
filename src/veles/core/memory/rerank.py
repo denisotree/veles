@@ -1,9 +1,10 @@
-"""M141: scored reranking of recall hits, replacing the round-robin merge.
+"""M141: scored reranking of recall hits (M223 made it the sole merge — the old
+round-robin fallback is gone).
 
-The round-robin `_interleave_many` samples sources in a fixed cycle — it can't
-let a fresh, on-point turn outrank a stale wiki page. This module scores every
-hit and sorts, so recency and (future) decay actually move results. It's the
-retrieval-side half of the article's "memory rot" thesis.
+A fixed round-robin cycle across sources can't let a fresh, on-point turn outrank
+a stale wiki page. This module scores every hit and sorts, so recency and
+confidence actually move results. It's the retrieval-side half of the article's
+"memory rot" thesis.
 
 Score per hit:
 

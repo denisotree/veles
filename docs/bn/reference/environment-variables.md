@@ -59,7 +59,6 @@ API-কী লুকআপ ক্যাসকেড: OS keychain (project scope)
 | `VELES_TRUST_AUTO_ALLOW` | off | trust ladder বাইপাস করে (CI / autopilot / প্রি-অথরাইজড সাব-এজেন্ট) |
 | `VELES_SANDBOX_ROOTS` | project + `~/.veles` | read/write স্যান্ডবক্স রুটের `:`-সেপারেটেড ওভাররাইড |
 | `VELES_FETCH_ALLOW_PRIVATE` | off | tools-কে RFC-1918 / প্রাইভেট ঠিকানা ফেচ করতে দেয় |
-| `VELES_MEMORY_RERANK` | on | মেমরি রিকলের ভেক্টর রির‍্যাঙ্কিং (`0`/`false` নিষ্ক্রিয় করে) |
 | `VELES_WEB_SEARCH_BACKEND` | auto | `research` এবং `web_search`-এর জন্য ওয়েব সার্চ ব্যাকএন্ড |
 
 ## রেজিস্ট্রি

@@ -139,6 +139,13 @@ class OpenAICompatibleProvider:
 
         return strip_cache_sentinel([to_openai_message(m) for m in messages])
 
+    def _request_options(self, model: str) -> dict[str, Any]:
+        """Extra kwargs merged into the `chat.completions.create` call. Empty by
+        default; OpenRouter overrides to forward a sticky-routing `session_id`
+        (M224) so a conversation's requests pin one provider and prompt caching
+        actually hits."""
+        return {}
+
     def _extract_usage(self, usage_obj: Any) -> TokenUsage:
         """Default: prompt/completion/total only. Cloud adapters override
         to also grab `prompt_tokens_details.cached_tokens`."""
@@ -234,6 +241,7 @@ class OpenAICompatibleProvider:
         if tools and self.supports_tools:
             kwargs["tools"] = tools
             kwargs["tool_choice"] = "auto"
+        kwargs.update(self._request_options(model))
         completion = self._call_create(kwargs, messages, model)
         choice = completion.choices[0]
         msg = choice.message
@@ -263,6 +271,7 @@ class OpenAICompatibleProvider:
         if tools and self.supports_tools:
             kwargs["tools"] = tools
             kwargs["tool_choice"] = "auto"
+        kwargs.update(self._request_options(model))
 
         text_buffer = ""
         tool_calls_acc: dict[int, dict[str, Any]] = {}

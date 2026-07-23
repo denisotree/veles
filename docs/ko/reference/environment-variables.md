@@ -57,7 +57,6 @@ API 키 조회 순서: OS 키체인(프로젝트 범위) → OS 키체인(기본
 | `VELES_TRUST_AUTO_ALLOW` | off | 신뢰 사다리 우회(CI / 오토파일럿 / 사전 승인된 서브 에이전트) |
 | `VELES_SANDBOX_ROOTS` | 프로젝트 + `~/.veles` | 읽기/쓰기 샌드박스 루트의 `:`로 구분된 재정의 |
 | `VELES_FETCH_ALLOW_PRIVATE` | off | 도구가 RFC-1918 / 사설 주소를 가져오도록 허용 |
-| `VELES_MEMORY_RERANK` | on | 메모리 리콜의 벡터 재정렬(`0`/`false`이면 비활성화) |
 | `VELES_WEB_SEARCH_BACKEND` | auto | `research`와 `web_search`의 웹 검색 백엔드 |
 
 ## 레지스트리

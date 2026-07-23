@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from veles.core.memory.router import MemoryRouter, RecallHit, _interleave_many
+from veles.core.memory.router import MemoryRouter, RecallHit
 from veles.core.project import Project
 
 
@@ -35,28 +35,6 @@ def _project(tmp_path: Path) -> Project:
     state.mkdir(parents=True, exist_ok=True)
     (tmp_path / "wiki").mkdir(exist_ok=True)
     return Project(root=tmp_path, name="t", created_at=0.0)
-
-
-# ---------- _interleave_many ----------
-
-
-def test_interleave_many_round_robins() -> None:
-    a = [RecallHit("a1", "A1", ""), RecallHit("a2", "A2", "")]
-    b = [RecallHit("b1", "B1", "")]
-    c = [RecallHit("c1", "C1", ""), RecallHit("c2", "C2", "")]
-    out = _interleave_many([a, b, c], limit=10)
-    # Cycle 1: a1, b1, c1; cycle 2: a2, c2.
-    assert [h.title for h in out] == ["A1", "B1", "C1", "A2", "C2"]
-
-
-def test_interleave_many_respects_limit() -> None:
-    a = [RecallHit(f"a{i}", f"A{i}", "") for i in range(5)]
-    out = _interleave_many([a], limit=2)
-    assert len(out) == 2
-
-
-def test_interleave_many_empty_streams_safe() -> None:
-    assert _interleave_many([[], []], limit=5) == []
 
 
 # ---------- MemoryRouter extra_providers ----------

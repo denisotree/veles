@@ -61,7 +61,6 @@ variabile d'ambiente.
 | `VELES_TRUST_AUTO_ALLOW` | off | Bypassa la scala di fiducia (CI / autopilot / sub-agenti pre-autorizzati) |
 | `VELES_SANDBOX_ROOTS` | progetto + `~/.veles` | Override separato da `:` delle radici della sandbox di lettura/scrittura |
 | `VELES_FETCH_ALLOW_PRIVATE` | off | Consente ai tool di raggiungere indirizzi RFC-1918 / privati |
-| `VELES_MEMORY_RERANK` | on | Re-ranking vettoriale del recall della memoria (`0`/`false` lo disabilita) |
 | `VELES_WEB_SEARCH_BACKEND` | auto | Backend di ricerca web per `research` e `web_search` |
 
 ## Registri
