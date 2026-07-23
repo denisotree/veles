@@ -32,6 +32,7 @@ Two surfaces:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from collections.abc import Callable
@@ -42,6 +43,8 @@ from veles.core.provider import Message
 from veles.core.slug import now_timestamp_slug
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from veles.core.project import Project
     from veles.core.provider import Provider
 
@@ -221,6 +224,47 @@ def apply_compression(
     return head + list(history[tail_start:])
 
 
+# ---------- M217: summariser output cache across --resume ----------
+
+
+def _summary_cache_path(project: Project) -> Path:
+    return project.memory_dir / "sessions" / ".summary_cache.json"
+
+
+def _summary_fingerprint(model: str, prompt: str, rendered: str) -> str:
+    """Content key over everything that would change the summary. Including
+    the full `prompt` means a prompt upgrade self-invalidates (no stale
+    replay); including `model` namespaces the cache per summariser."""
+    h = hashlib.sha256()
+    for part in (model, prompt, rendered):
+        h.update(part.encode("utf-8"))
+        h.update(b"\x00")
+    return h.hexdigest()
+
+
+def _load_summary_cache(project: Project) -> dict[str, str]:
+    try:
+        body = _summary_cache_path(project).read_text(encoding="utf-8")
+    except (FileNotFoundError, OSError):
+        return {}
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _save_summary_cache(project: Project, cache: dict[str, str]) -> None:
+    path = _summary_cache_path(project)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(cache), encoding="utf-8")
+
+
+def _summary_is_cacheable(summary: str) -> bool:
+    """Only store genuine summaries — failures/empties must retry next run."""
+    return not summary.startswith("(summary failed") and summary != "_(empty summary)_"
+
+
 def make_default_compressor(
     *,
     provider: Provider,
@@ -313,35 +357,48 @@ def make_default_compressor(
             "context: list user goals, tool calls + outcomes, decisions made, "
             "and unresolved questions. Drop pleasantries. Keep ≤500 words."
         )
-        sub_agent = Agent(
-            provider=provider,
-            registry=Registry(),
-            model=model,
-            max_iterations=1,
-            system_prompt=sub_prompt,
-            max_tokens=cfg.max_summary_tokens,
-        )
-        # If the summariser blows up (rate-limit, network, an unforeseen
-        # context-limit), don't let it take down the main run — fall
-        # back to a placeholder summary and still drop the middle from
-        # the live history. The main provider getting a small history
-        # is strictly better than crashing.
-        try:
-            result = sub_agent.run(rendered)
-            summary = (result.text or "").strip() or "_(empty summary)_"
-            if getattr(result, "stopped_reason", None) == "budget_exhausted":
-                logger.info(
-                    "compressor summariser-budget-exhausted session=%s — using partial summary",
-                    sid,
-                )
-        except Exception as exc:
-            logger.warning(
-                "compressor summariser-failed session=%s exc=%s: %s",
-                sid,
-                type(exc).__name__,
-                exc,
+        # M217: reuse a prior summary of the identical middle instead of billing
+        # another summariser round-trip. Hot on --resume, which reloads full
+        # history and re-compresses the same range every time.
+        fingerprint = _summary_fingerprint(model, sub_prompt, rendered)
+        cache = _load_summary_cache(project)
+        cached_summary = cache.get(fingerprint)
+        if cached_summary is not None:
+            logger.info("compressor summary-cache-hit session=%s", sid)
+            summary = cached_summary
+        else:
+            sub_agent = Agent(
+                provider=provider,
+                registry=Registry(),
+                model=model,
+                max_iterations=1,
+                system_prompt=sub_prompt,
+                max_tokens=cfg.max_summary_tokens,
             )
-            summary = f"(summary failed: {type(exc).__name__}; see daemon log)"
+            # If the summariser blows up (rate-limit, network, an unforeseen
+            # context-limit), don't let it take down the main run — fall
+            # back to a placeholder summary and still drop the middle from
+            # the live history. The main provider getting a small history
+            # is strictly better than crashing.
+            try:
+                result = sub_agent.run(rendered)
+                summary = (result.text or "").strip() or "_(empty summary)_"
+                if getattr(result, "stopped_reason", None) == "budget_exhausted":
+                    logger.info(
+                        "compressor summariser-budget-exhausted session=%s — using partial summary",
+                        sid,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "compressor summariser-failed session=%s exc=%s: %s",
+                    sid,
+                    type(exc).__name__,
+                    exc,
+                )
+                summary = f"(summary failed: {type(exc).__name__}; see daemon log)"
+            if _summary_is_cacheable(summary):
+                cache[fingerprint] = summary
+                _save_summary_cache(project, cache)
         slug_id = sid
         slug = f"{slug_id}-c-{now_timestamp_slug()}"
         title = f"Compressed segment of session {slug_id}"

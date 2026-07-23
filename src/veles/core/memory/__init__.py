@@ -64,6 +64,7 @@ class InsightHit:
     body: str
     rank: float
     ts: float
+    confidence: float = 1.0  # M218: provenance confidence in [0,1]
 
 
 @dataclass(slots=True, frozen=True)
@@ -226,7 +227,11 @@ CREATE TABLE IF NOT EXISTS insights (
     category           TEXT,
     file_path          TEXT,
     created_at         REAL NOT NULL,
-    last_referenced_at REAL
+    last_referenced_at REAL,
+    -- M218: provenance confidence in [0,1]. 1.0 = user-asserted / curated;
+    -- lower = heuristically inferred (e.g. a tool-error recovery guess).
+    -- Recall prunes sub-floor rows before they reach the prompt.
+    confidence         REAL NOT NULL DEFAULT 1.0
 );
 
 CREATE INDEX IF NOT EXISTS idx_insights_category ON insights(category);
@@ -277,7 +282,7 @@ CREATE TRIGGER IF NOT EXISTS insights_au AFTER UPDATE ON insights BEGIN
 END;
 """
 
-_SCHEMA_VERSION = 3
+_SCHEMA_VERSION = 4
 
 
 def _make_session_id() -> str:
@@ -324,6 +329,8 @@ class SessionStore:
             self._migrate_to_v2(c)
         if current < 3:
             self._migrate_to_v3(c)
+        if current < 4:
+            self._migrate_to_v4(c)
         if current < _SCHEMA_VERSION:
             c.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
@@ -359,6 +366,14 @@ class SessionStore:
         schema bump never blocks startup on a stock Python.
         """
         c.executescript(_SCHEMA_V3_SQL)
+
+    def _migrate_to_v4(self, c: sqlite3.Connection) -> None:
+        """v3 → v4: add `insights.confidence` (M218). Additive; existing rows
+        default to 1.0 (full confidence), so recall behaviour is unchanged
+        until a writer starts assigning lower values."""
+        cols = {r[1] for r in c.execute("PRAGMA table_info(insights)").fetchall()}
+        if "confidence" not in cols:
+            c.execute("ALTER TABLE insights ADD COLUMN confidence REAL NOT NULL DEFAULT 1.0")
 
     def create_session(
         self, *, parent_session_id: str | None = None, title: str | None = None
@@ -596,7 +611,7 @@ class SessionStore:
         try:
             rows = self._conn.execute(
                 "SELECT i.id, i.title, i.body, insights_fts.rank AS rank,"
-                " COALESCE(i.last_referenced_at, i.created_at) AS ts"
+                " COALESCE(i.last_referenced_at, i.created_at) AS ts, i.confidence AS confidence"
                 " FROM insights_fts JOIN insights i ON insights_fts.rowid = i.id"
                 " WHERE insights_fts MATCH ?"
                 # M142: skip insights superseded by dream dedup (kept on disk
@@ -618,6 +633,7 @@ class SessionStore:
                 body=r["body"] or "",
                 rank=float(r["rank"]),
                 ts=float(r["ts"]),
+                confidence=float(r["confidence"]),
             )
             for r in rows
         ]
@@ -669,7 +685,7 @@ class SessionStore:
         ids = [h.ref_id for h in neighbours]
         placeholders = ",".join("?" * len(ids))
         rows = self._conn.execute(
-            "SELECT id, title, body, COALESCE(last_referenced_at, created_at) AS ts"
+            "SELECT id, title, body, COALESCE(last_referenced_at, created_at) AS ts, confidence"
             f" FROM insights WHERE id IN ({placeholders})"
             " AND id NOT IN (SELECT from_insight_id FROM insight_refs)",
             ids,
@@ -687,6 +703,7 @@ class SessionStore:
                     body=r["body"] or "",
                     rank=float(n.distance),
                     ts=float(r["ts"]),
+                    confidence=float(r["confidence"]),
                 )
             )
             if len(out) >= limit:

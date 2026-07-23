@@ -440,6 +440,59 @@ def test_compressor_logs_applied_summary(tmp_path, caplog) -> None:
     assert len(result) < len(h)
 
 
+# ---- M217: summary cache across --resume ----
+
+
+def _compressible_history() -> list[Message]:
+    return (
+        [_msg("system", "sys")]
+        + [_msg("user" if i % 2 == 0 else "assistant", f"turn-{i}-" + ("x" * 80)) for i in range(6)]
+        + [_msg("user", "u-final")]
+    )
+
+
+def test_summary_reused_across_resume(tmp_path) -> None:
+    """A --resume reloads full history and re-runs the compressor over the
+    same middle. The expensive summariser call must be served from cache the
+    second time instead of billing another LLM round-trip."""
+    project = _project(tmp_path)
+    cfg = CompressionConfig(threshold_tokens=10, head_keep=1, tail_keep=1)
+    h = _compressible_history()
+
+    p1 = _CapturingProvider(responses=[_ok("SUMMARY-A")])
+    compress1 = _make_compressor(project, cfg, sub_provider=p1)
+    out1 = compress1(list(h), "sess-resume")
+    assert len(p1.seen_histories) == 1  # summariser ran once (cold cache)
+    assert len(out1) < len(h)
+
+    # --resume: fresh compressor + fresh provider, identical history + model.
+    p2 = _CapturingProvider(responses=[_ok("SUMMARY-B")])
+    compress2 = _make_compressor(project, cfg, sub_provider=p2)
+    out2 = compress2(list(h), "sess-resume")
+    assert p2.seen_histories == []  # cache hit → summariser NOT re-run
+    assert len(out2) < len(h)  # still compressed
+
+
+def test_summary_cache_misses_on_different_model(tmp_path) -> None:
+    """The cache is namespaced by model — a different summariser model must
+    not replay a vector from another space."""
+    from veles.core.context_compressor import make_default_compressor
+
+    project = _project(tmp_path)
+    cfg = CompressionConfig(threshold_tokens=10, head_keep=1, tail_keep=1)
+    h = _compressible_history()
+
+    compress1 = _make_compressor(
+        project, cfg, sub_provider=_CapturingProvider(responses=[_ok("A")])
+    )
+    compress1(list(h), "sess-model")
+
+    p2 = _CapturingProvider(responses=[_ok("B")])
+    compress2 = make_default_compressor(provider=p2, model="other-model", cfg=cfg, project=project)
+    compress2(list(h), "sess-model")
+    assert len(p2.seen_histories) == 1  # different model → cache miss, summariser runs
+
+
 # ---- emergency truncation ----
 
 

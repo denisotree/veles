@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from veles.core.memory import SessionStore
+from veles.core.memory import _SCHEMA_VERSION, SessionStore
 from veles.core.provider import Message
 
 
@@ -175,9 +175,9 @@ def test_migration_from_v1_backfills_existing_rows(tmp_path: Path) -> None:
     # Step 3: reopen with the M58 store — migration should backfill the row.
     s2 = SessionStore(db)
     user_version = s2._conn.execute("PRAGMA user_version").fetchone()[0]
-    # M119 bumped schema to 3; the v1 → v2 FTS backfill still runs first
-    # as part of the chained migration, this test verifies both steps land.
-    assert user_version == 3
+    # Schema chains all migrations forward; the v1 → v2 FTS backfill still runs
+    # first as part of the chained migration — this test verifies steps land.
+    assert user_version == _SCHEMA_VERSION
     hits = s2.search_turns("legacy-needle")
     assert len(hits) == 1
     s2.close()

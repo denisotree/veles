@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0] — 2026-07-23
+
+### Changed
+
+- **Lower latency and token cost on repeat, resumed, and tool-heavy runs.**
+  Three hot paths that used to redo work every time are now cached: the
+  relevance ranking of your project's files (embedded once per file, reused
+  until the file changes), the summary of older conversation turns (reused when
+  you resume a session instead of being regenerated), and — the big one — the
+  tool results in an agentic loop, which used to be re-sent uncached on every
+  step and are now covered by the rolling prompt cache. Long, resumed, and
+  tool-driven sessions do noticeably less redundant work. The tool-result
+  caching self-heals: if a provider ever rejects it, the turn silently proceeds
+  without it (and you can force it off with `VELES_CACHE_TOOL_TAIL=0`).
+- **Better memory recall.** Saved insights now carry a confidence signal — facts
+  you explicitly asked to remember rank fully, ones the agent merely inferred
+  from an error-recovery moment carry less weight, and the lowest-trust ones are
+  kept out of the prompt entirely. When recall has more matches than fit, it now
+  says so ("showing N of M — refine the query for the rest") instead of silently
+  trimming the list.
+
+### Removed
+
+- Dropped an unused vector-search backend that was, in practice, slower than the
+  default — nearest-neighbour memory search is now simpler and no slower.
+
 ## [0.26.0] — 2026-07-22
 
 ### Added

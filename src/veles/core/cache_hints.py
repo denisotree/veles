@@ -21,9 +21,45 @@ LLM rarely emits ZWSP, and humans never see it.
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 CACHE_BREAKPOINT_SENTINEL: str = "​[VELES_CACHE_BREAKPOINT]​"
+
+
+# M220: the rolling cache breakpoint may sit on a trailing `tool` message, not
+# just the last `user` turn — in a tool-heavy agentic loop the tool results
+# since the last user turn are re-billed uncached every iteration, and that is
+# the dominant remaining token cost. Marking the tool tail caches them too.
+#
+# Wire-acceptance of `cache_control` on a `tool`-role content array via
+# OpenRouter was unverified when M178 shipped, so this is a *bonus* path with a
+# self-heal: `VELES_CACHE_TOOL_TAIL=0` disables it up front, and the provider
+# disables it at runtime (via `disable_tool_tail`) the first time a request 400s
+# on `cache_control`, then retries — a rejection can never break an agentic turn.
+_TOOL_TAIL_ENABLED: bool = os.environ.get("VELES_CACHE_TOOL_TAIL", "1").strip().lower() not in (
+    "0",
+    "false",
+    "no",
+    "off",
+)
+
+
+def tool_tail_enabled() -> bool:
+    return _TOOL_TAIL_ENABLED
+
+
+def disable_tool_tail() -> None:
+    """Self-heal hook: stop marking the tool tail for the rest of the process
+    after the wire rejected `cache_control` on a tool message once."""
+    global _TOOL_TAIL_ENABLED
+    _TOOL_TAIL_ENABLED = False
+
+
+def _reset_tool_tail(enabled: bool = True) -> None:
+    """Test helper — restore the process toggle between cases."""
+    global _TOOL_TAIL_ENABLED
+    _TOOL_TAIL_ENABLED = enabled
 
 
 def is_anthropic_model(model: str) -> bool:
@@ -128,27 +164,22 @@ def strip_cache_sentinel(openai_messages: list[dict[str, Any]]) -> list[dict[str
 
 
 def _mark_message_tail(openai_messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Add an ephemeral `cache_control` breakpoint to the most-recent user turn.
+    """Add an ephemeral `cache_control` breakpoint to the most-recent cacheable
+    turn (the "rolling" breakpoint that keeps the growing conversation prefix
+    cached — M178).
 
-    M178: caching the stable system prefix alone leaves the growing
-    conversation history uncached — in an agentic loop that history dominates
-    token cost and is re-sent in full every turn. Marking the last `user`
-    message's content makes each turn read the prior conversation from cache
-    (a "rolling" breakpoint that leapfrogs forward — turn N's prefix reads the
-    entry turn N-1 wrote at *its* last user message, even without re-marking
-    it). Combined with the system breakpoint that's ≤2 of Anthropic's 4.
-
-    Scoped to `user` messages on purpose: a content-block array with
-    `cache_control` on a user message is the documented OpenRouter/Anthropic
-    shape (and matches the system-message arrays Veles already ships). Marking
-    `tool`-role tails would cache the per-iteration tool results too, but its
-    wire-acceptance via OpenRouter is unverified — left as a follow-up so a
-    rejection can't 400 every agentic turn. Assistant turns carrying
-    `tool_calls` have null/array content and are never eligible.
+    Eligible roles: `user` always, and `tool` when the M220 tool-tail toggle is
+    on (`tool_tail_enabled()`). Whichever eligible message is *latest* is marked
+    — one breakpoint at the furthest-forward stable point, so a tool-heavy loop
+    caches its tool results too instead of re-billing them every iteration.
+    Assistant turns carrying `tool_calls` have null/array content and are never
+    eligible. Combined with the system breakpoint that's ≤2 of Anthropic's 4.
     """
+    allow_tool = tool_tail_enabled()
     for i in range(len(openai_messages) - 1, -1, -1):
         msg = openai_messages[i]
-        if msg.get("role") != "user":
+        role = msg.get("role")
+        if role != "user" and not (role == "tool" and allow_tool):
             continue
         content = msg.get("content")
         if not isinstance(content, str) or not content:

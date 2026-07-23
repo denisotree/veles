@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "veles-ai"
-version = "0.26.0"
+version = "0.27.0"
 description = "Veles — a minimalist agent framework: clean, decomposed code, compounding per-project memory, and a modular core with optional pluggable modules."
 requires-python = ">=3.13"
 readme = "README.md"
@@ -74,11 +74,10 @@ dev-dependencies = [
     "pytest-asyncio>=0.24",
     "pytest-aiohttp>=1.0",
     "mypy>=1.10",
-    # Optional vector-search accelerators — runtime-optional (3-tier graceful
-    # degradation in core/memory/vector.py), but installed in dev/CI so the
-    # numpy + sqlite-vec backend smoke tests actually run instead of skipping.
+    # Optional vector-search accelerator — runtime-optional (numpy→python
+    # graceful degradation in core/memory/vector.py), but installed in dev/CI
+    # so the numpy backend smoke test actually runs instead of skipping.
     "numpy>=2.0",
-    "sqlite-vec>=0.1",
 ]
 
 [tool.ruff]

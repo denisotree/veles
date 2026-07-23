@@ -1,29 +1,23 @@
 """M119b: embeddings storage and k-NN search over memory.db.
 
-Three layers, picked in priority order at runtime:
+Two layers, picked in priority order at runtime:
 
-1. **sqlite-vec** loaded as a SQLite extension — fastest, C brute
-   force, k-NN via `vec0` virtual table. Optional dependency
-   (`pip install sqlite-vec`). The wheel is published per platform
-   so install is one-line; we still gate the load behind a try/except
-   because not every Python build exposes `enable_load_extension`
-   and not every platform has a wheel.
+1. **numpy cosine** — if numpy is installed, build the candidate matrix
+   in Python and do `argpartition`-style top-k. Fast enough for 10k–50k
+   vectors; slower above.
 
-2. **numpy cosine** — if numpy is installed but sqlite-vec isn't,
-   we build the candidate matrix in Python and do `argpartition`-style
-   top-k. Fast enough for 10k–50k vectors; slower above.
+2. **Pure-Python cosine** — last resort, works anywhere stdlib does.
+   O(n) per query with `math.fsum` for stability. Adequate for <5k
+   vectors; flag a warning when the catalogue grows past that.
 
-3. **Pure-Python cosine** — last resort, works anywhere stdlib
-   does. O(n) per query with `math.fsum` for stability. Adequate for
-   <5k vectors; flag a warning when the catalogue grows past that.
+Both paths share the same on-disk shape: an `embeddings_blob` table
+with `ref_kind`/`ref_id`/`vec_json` columns. Vectors are stored as JSON
+arrays of floats — portable across platforms.
 
-All three paths share the same on-disk shape: an `embeddings_blob`
-table with `ref_kind`/`ref_id`/`vec_json` columns. Vectors are stored
-as JSON arrays of floats — portable across platforms and survives a
-sqlite-vec install/uninstall without re-encoding. When sqlite-vec is
-available we *additionally* materialise the same rows into the
-`embeddings_vec0` virtual table; a trigger keeps the two in sync.
-The blob table is the source of truth.
+(M215: the former sqlite-vec tier was removed — it never built the
+promised `vec0` index and brute-forced `vec_distance_cosine` per row via
+a SQL round-trip, i.e. slower than numpy. Add a real `vec0` mirror if
+brute-force ever becomes the bottleneck.)
 """
 
 from __future__ import annotations
@@ -71,19 +65,11 @@ _BACKEND: str | None = None  # populated lazily by `available_backend`
 
 
 def available_backend() -> str:
-    """Return one of `"sqlite-vec"`, `"numpy"`, `"python"`. Result is
-    cached after the first call so each subsequent connection skips
-    the import-probe."""
+    """Return one of `"numpy"`, `"python"`. Result is cached after the
+    first call so each subsequent connection skips the import-probe."""
     global _BACKEND
     if _BACKEND is not None:
         return _BACKEND
-    try:
-        import sqlite_vec  # noqa: F401
-
-        _BACKEND = "sqlite-vec"
-        return _BACKEND
-    except ImportError:
-        pass
     try:
         import numpy  # noqa: F401
 
@@ -111,30 +97,6 @@ def ensure_embeddings_table(conn: sqlite3.Connection) -> None:
     schema bootstrap (`_init_schema`) doesn't, because the blob table
     is opt-in: not every install needs embeddings."""
     conn.executescript(_SCHEMA_BLOB_SQL)
-
-
-def _try_load_sqlite_vec(conn: sqlite3.Connection) -> bool:
-    """Best-effort load of the sqlite-vec extension into `conn`.
-    Returns True iff the extension is now active. Failures (extension
-    library missing, `enable_load_extension` unavailable in the Python
-    build, OS lacks a prebuilt wheel) are caught and logged."""
-    if available_backend() != "sqlite-vec":
-        return False
-    try:
-        import sqlite_vec
-    except ImportError:
-        return False
-    try:
-        conn.enable_load_extension(True)
-        sqlite_vec.load(conn)
-        conn.enable_load_extension(False)
-    except (sqlite3.OperationalError, AttributeError) as exc:
-        logger.info(
-            "sqlite-vec load failed: %s; falling back to pure-Python cosine",
-            exc,
-        )
-        return False
-    return True
 
 
 # ---------- writes ----------
@@ -212,72 +174,16 @@ def knn(
     distance. `ref_kind` filters to one source ("skill", "tool",
     "insight", etc.) — None scans the whole catalogue.
 
-    Backend selection at runtime: sqlite-vec if available, then numpy,
-    then pure-Python. The result shape is identical across backends.
+    Backend selection at runtime: numpy if available, then pure-Python.
+    The result shape is identical across backends.
     """
     ensure_embeddings_table(conn)
     query_list = [float(x) for x in query]
     if not query_list:
         return []
-    backend = available_backend()
-    if backend == "sqlite-vec":
-        return _knn_sqlite_vec(conn, query_list, ref_kind, limit)
-    if backend == "numpy":
+    if available_backend() == "numpy":
         return _knn_numpy(conn, query_list, ref_kind, limit)
     return _knn_python(conn, query_list, ref_kind, limit)
-
-
-def _knn_sqlite_vec(
-    conn: sqlite3.Connection,
-    query: list[float],
-    ref_kind: str | None,
-    limit: int,
-) -> list[EmbeddingHit]:
-    """sqlite-vec path. If load fails at runtime (e.g. the extension
-    library was uninstalled between Python startup and now), we fall
-    through to numpy/python so a partial degradation never raises."""
-    if not _try_load_sqlite_vec(conn):
-        return _knn_numpy(conn, query, ref_kind, limit)
-    # The vec0 table is keyed by rowid; we materialise rows from the
-    # blob table on demand. Skip vec0 in this MVP because keeping two
-    # tables in sync is the more complex part; the brute-force vec_*
-    # function approach below works without a separate virtual table.
-    rows = conn.execute(
-        "SELECT ref_kind, ref_id, vec_json FROM embeddings_blob"
-        + (" WHERE ref_kind = ?" if ref_kind else ""),
-        (ref_kind,) if ref_kind else (),
-    ).fetchall()
-    if not rows:
-        return []
-    # sqlite-vec exposes `vec_distance_cosine` once loaded — use it on
-    # JSON-decoded vectors batched in Python because building a true
-    # vec0 mirror is M119b polish, not MVP.
-    import struct
-
-    def pack(v: list[float]) -> bytes:
-        return struct.pack(f"{len(v)}f", *v)
-
-    qbytes = pack(query)
-    candidates: list[tuple[float, sqlite3.Row]] = []
-    for row in rows:
-        cand = json.loads(row["vec_json"])
-        if len(cand) != len(query):
-            continue
-        try:
-            dist = conn.execute(
-                "SELECT vec_distance_cosine(?, ?) AS d",
-                (qbytes, pack(cand)),
-            ).fetchone()
-        except sqlite3.OperationalError:
-            # Function unavailable — fall back per-row to python cosine.
-            dist = {"d": _cosine_distance(query, cand)}
-        d = float(dist["d"]) if dist["d"] is not None else 2.0
-        candidates.append((d, row))
-    candidates.sort(key=lambda x: x[0])
-    return [
-        EmbeddingHit(ref_kind=row["ref_kind"], ref_id=int(row["ref_id"]), distance=d)
-        for d, row in candidates[:limit]
-    ]
 
 
 def _knn_numpy(
@@ -380,61 +286,6 @@ def _cosine_distance(a: list[float], b: list[float]) -> float:
     return 1.0 - (dot / (na * nb))
 
 
-# ---------- migration from M61 skill_embeddings.json ----------
-
-
-def migrate_legacy_skill_embeddings(
-    conn: sqlite3.Connection,
-    *,
-    legacy_path,
-    skill_id_by_hash: dict[str, int],
-    now: float | None = None,
-) -> int:
-    """Move embeddings from `<project>/.veles/skill_embeddings.json`
-    (M61 format: `{sha256: [vec]}`) into `embeddings_blob` under
-    `ref_kind = "skill"`. `skill_id_by_hash` maps the cache key to the
-    catalogue's skill id — callers compute this from the current
-    SKILL.md set. Unknown hashes are skipped (the skill was removed
-    since the cache was written).
-
-    Returns the count of migrated rows. The legacy file is left in
-    place; the caller can delete it after a successful migration if
-    desired.
-    """
-    import time as _time
-
-    wall = _time.time() if now is None else now
-    legacy_path = legacy_path
-    try:
-        body = legacy_path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return 0
-    try:
-        cache = json.loads(body) if body.strip() else {}
-    except json.JSONDecodeError:
-        logger.warning("skill_embeddings.json is not valid JSON; skipping migration")
-        return 0
-    if not isinstance(cache, dict):
-        return 0
-    ensure_embeddings_table(conn)
-    migrated = 0
-    for sha, vec in cache.items():
-        if not isinstance(vec, list):
-            continue
-        skill_id = skill_id_by_hash.get(sha)
-        if skill_id is None:
-            continue
-        upsert_embedding(
-            conn,
-            ref_kind="skill",
-            ref_id=skill_id,
-            vec=vec,
-            now=wall,
-        )
-        migrated += 1
-    return migrated
-
-
 __all__ = [
     "EmbeddingHit",
     "available_backend",
@@ -442,6 +293,5 @@ __all__ = [
     "ensure_embeddings_table",
     "get_embedding",
     "knn",
-    "migrate_legacy_skill_embeddings",
     "upsert_embedding",
 ]

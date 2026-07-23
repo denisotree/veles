@@ -7,15 +7,30 @@ two-block content array with `cache_control` for Anthropic targets.
 
 from __future__ import annotations
 
+import pytest
+
 from veles.core.cache_hints import (
     CACHE_BREAKPOINT_SENTINEL,
+    _reset_tool_tail,
     apply_cache_hints,
     build_anthropic_system_blocks,
+    disable_tool_tail,
     inject_breakpoint,
     is_anthropic_model,
     split_at_breakpoint,
     strip_cache_sentinel,
+    tool_tail_enabled,
 )
+
+
+@pytest.fixture(autouse=True)
+def _reset_tool_tail_toggle():
+    """M220: the tool-tail toggle is process-global (self-heal flips it off).
+    Restore it around every test so a `disable_tool_tail()` can't leak."""
+    _reset_tool_tail(True)
+    yield
+    _reset_tool_tail(True)
+
 
 # ---- is_anthropic_model ----
 
@@ -127,23 +142,41 @@ def test_apply_marks_last_user_message_tail() -> None:
     assert tail[0]["cache_control"] == {"type": "ephemeral"}
 
 
-def test_apply_tail_marks_user_only_not_tool_or_assistant() -> None:
-    """The tail breakpoint is scoped to `user` messages (documented-safe
-    OpenRouter shape). Trailing tool / assistant-tool-call messages are left
-    as-is; the last user message is the one marked."""
+def test_apply_tail_marks_trailing_tool_when_enabled() -> None:
+    """M220: with the tool-tail toggle on (default), the latest `tool` message
+    is the rolling breakpoint — its results are cached instead of re-billed
+    every agentic iteration. The earlier user turn is not double-marked; the
+    assistant-tool-call message (null content) is never eligible."""
+    msgs = [
+        _sys_msg("system"),
+        {"role": "user", "content": "do it"},
+        {"role": "assistant", "content": None, "tool_calls": [{"id": "t2"}]},
+        {"role": "tool", "content": "tool output", "tool_call_id": "t1"},
+    ]
+    out = apply_cache_hints(msgs, "anthropic/claude-sonnet-4.6")
+    assert out[1] == msgs[1]  # earlier user turn not marked (tool tail is later)
+    assert out[2] == msgs[2]  # assistant tool-call untouched
+    tail = out[3]["content"]
+    assert isinstance(tail, list)
+    assert tail[0]["text"] == "tool output"
+    assert tail[0]["cache_control"] == {"type": "ephemeral"}
+
+
+def test_apply_tail_falls_back_to_user_when_tool_tail_disabled() -> None:
+    """When tool-tail caching is off (self-healed or VELES_CACHE_TOOL_TAIL=0),
+    a trailing tool message is left alone and the last user turn is marked."""
+    disable_tool_tail()
+    assert tool_tail_enabled() is False
     msgs = [
         _sys_msg("system"),
         {"role": "user", "content": "do it"},
         {"role": "tool", "content": "tool output", "tool_call_id": "t1"},
-        {"role": "assistant", "content": None, "tool_calls": [{"id": "t2"}]},
     ]
     out = apply_cache_hints(msgs, "anthropic/claude-sonnet-4.6")
-    assert out[3] == msgs[3]  # assistant tool-call untouched
-    assert out[2] == msgs[2]  # tool message stays a plain string (not marked)
+    assert out[2] == msgs[2]  # tool message untouched
     tail = out[1]["content"]
     assert isinstance(tail, list)
     assert tail[0]["text"] == "do it"
-    assert tail[0]["cache_control"] == {"type": "ephemeral"}
 
 
 def test_apply_at_most_two_breakpoints() -> None:

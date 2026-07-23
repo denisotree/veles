@@ -178,6 +178,55 @@ def test_adapter_failure_falls_back_to_token(conn: sqlite3.Connection, tmp_path:
     assert isinstance(hits, list)
 
 
+# ---- M216: per-entry embedding cache ----
+
+
+def _sig_batches(adapter: _KeywordEmbedding) -> list[list[str]]:
+    """The embed calls that carried entry signatures (not the bare query).
+    An entry signature contains a '/'-free path token like 'auth.py'."""
+    return [batch for batch in adapter.calls if any(".py" in t or ".md" in t for t in batch)]
+
+
+def test_semantic_caches_entry_embeddings(conn: sqlite3.Connection, tmp_path: Path) -> None:
+    """Second query on an unchanged tree re-embeds zero entry signatures —
+    only the (uncacheable) user query is embedded again. This is the M216
+    hot-path fix: relevant_semantic used to embed the whole tree every turn."""
+    adapter = _KeywordEmbedding()
+    register_embedding_adapter(adapter)
+    root = _make_project(tmp_path / "proj")
+    Scanner(root, conn).scan()
+
+    relevant_semantic(conn, "auth", limit=10)
+    batches_after_first = len(_sig_batches(adapter))
+    assert batches_after_first == 1  # cold cache: all signatures embedded once
+
+    relevant_semantic(conn, "billing", limit=10)
+    # No new signature batch — every entry served from cache.
+    assert len(_sig_batches(adapter)) == batches_after_first
+
+
+def test_semantic_embeds_only_new_entries_after_change(
+    conn: sqlite3.Connection, tmp_path: Path
+) -> None:
+    """Adding a file re-embeds only its signature, not the whole tree."""
+    adapter = _KeywordEmbedding()
+    register_embedding_adapter(adapter)
+    root = _make_project(tmp_path / "proj")
+    Scanner(root, conn).scan()
+    relevant_semantic(conn, "auth", limit=10)
+
+    (root / "src" / "payments.py").write_text("print(3)\n")
+    Scanner(root, conn).scan()
+    adapter.calls.clear()
+    relevant_semantic(conn, "auth", limit=10)
+
+    sig_batches = _sig_batches(adapter)
+    assert len(sig_batches) == 1
+    embedded = sig_batches[0]
+    assert any("payments.py" in s for s in embedded)  # the new file
+    assert not any("billing.py" in s for s in embedded)  # unchanged → cached
+
+
 def test_returns_typed_entries(conn: sqlite3.Connection, tmp_path: Path) -> None:
     from veles.core.project_tree import TreeEntry
 

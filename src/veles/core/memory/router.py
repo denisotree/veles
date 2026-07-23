@@ -41,6 +41,10 @@ from veles.core.subproject import load_subprojects, resolve_subproject_path
 
 _TURN_SUMMARY_CAP = 200
 _TURN_RECENCY_WINDOW_SEC = 30 * 86_400  # only recall turns from the last 30 days
+# M218: recall drops insights below this provenance confidence. Conservative —
+# curated (1.0) and heuristic-recovery (0.6) insights survive; only genuinely
+# low-trust future writers (speculative auto-insights) get pruned.
+_INSIGHT_CONFIDENCE_FLOOR = 0.3
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,10 +53,11 @@ class RecallHit:
     title: str
     summary: str
     score: float = 0.0
-    # M141 rerank inputs. `ts` is the recency signal (None → neutral); `decay`
-    # is a forward-looking multiplier (always 1.0 until a decay-writer exists).
+    # M141 rerank input: `ts` is the recency signal (None → neutral).
     ts: float | None = None
-    decay: float = 1.0
+    # M221 rerank input: provenance confidence in [0,1] (insights carry a real
+    # one since M218; every other source is a neutral 1.0).
+    confidence: float = 1.0
 
 
 class MemoryRouter:
@@ -192,6 +197,10 @@ class MemoryRouter:
                 if vh.id not in seen:
                     seen.add(vh.id)
                     hits.append(vh)
+        # M218: prune sub-floor insights (heuristic guesses that scored low
+        # provenance confidence) before they reach the prompt — cheaper context,
+        # less noise. Pre-M218 rows default to 1.0 and are never touched.
+        hits = [h for h in hits if h.confidence >= _INSIGHT_CONFIDENCE_FLOOR]
         if hits:
             self._store.touch_insights([h.id for h in hits], time.time())
         return [_insight_hit_to_recall(h) for h in hits]
@@ -306,7 +315,7 @@ def _load_rerank_config(project: Project) -> tuple[RerankWeights, float]:
         weights = RerankWeights(
             relevance=float(sec.get("relevance", DEFAULT_WEIGHTS.relevance)),
             recency=float(sec.get("recency", DEFAULT_WEIGHTS.recency)),
-            decay=float(sec.get("decay", DEFAULT_WEIGHTS.decay)),
+            confidence=float(sec.get("confidence", DEFAULT_WEIGHTS.confidence)),
         )
         half_life = float(sec.get("half_life_days", DEFAULT_HALF_LIFE_SEC / 86_400.0)) * 86_400.0
     except (TypeError, ValueError):
@@ -349,6 +358,7 @@ def _insight_hit_to_recall(hit: InsightHit) -> RecallHit:
         summary=summary or "(empty insight)",
         score=hit.rank,
         ts=hit.ts,
+        confidence=hit.confidence,
     )
 
 

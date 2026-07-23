@@ -7,7 +7,7 @@ retrieval-side half of the article's "memory rot" thesis.
 
 Score per hit:
 
-    score = w_rel · relevance + w_recency · recency + w_decay · decay
+    score = w_rel · relevance + w_recency · recency + w_conf · confidence
 
 - **relevance** is *position-based* per source: `1/(1+pos)`. FTS BM25 ranks
   aren't comparable across tables (wiki vs turns vs insights), so we use each
@@ -22,12 +22,16 @@ Score per hit:
   first stream) — preserving the M55 "curated knowledge leads" intent — while
   *stale* turns still sink and a fresh turn still beats a lower-relevance wiki
   page.
-- **decay** is the hit's `decay` field — a forward-looking multiplier, always
-  1.0 until a future milestone adds a genuine decay-*writer* (no schema bloat
-  now; see the M141 plan Task 0 reversal).
+- **confidence** is the hit's provenance confidence in [0,1] (M218 gives
+  insights a real one: 1.0 user-asserted, 0.6 inferred-from-recovery; every
+  other source is a neutral 1.0). The weight is small on purpose — it breaks
+  ties and gently sinks low-trust insights, but a real relevance gap always
+  wins. This is the M215 "re-add a term when a real writer lands" moment: the
+  dead always-1.0 `decay` term is gone, and `confidence` is the genuine signal
+  that replaces it.
 
 Pure functions, no DB, no router import (router imports this) — hits are
-duck-typed on `.ts` / `.decay`.
+duck-typed on `.ts` / `.confidence`.
 """
 
 from __future__ import annotations
@@ -42,7 +46,7 @@ DEFAULT_HALF_LIFE_SEC = 14 * 86_400.0  # 14 days
 class RerankWeights:
     relevance: float = 1.0
     recency: float = 0.6
-    decay: float = 0.2
+    confidence: float = 0.25
 
 
 DEFAULT_WEIGHTS = RerankWeights()
@@ -77,8 +81,8 @@ def rerank[H](
         for pos, hit in enumerate(stream):
             rel = 1.0 / (1.0 + pos)
             rec = recency_score(getattr(hit, "ts", None), now, half_life_sec)
-            decay = float(getattr(hit, "decay", 1.0))
-            score = weights.relevance * rel + weights.recency * rec + weights.decay * decay
+            conf = float(getattr(hit, "confidence", 1.0))
+            score = weights.relevance * rel + weights.recency * rec + weights.confidence * conf
             scored.append((score, len(scored), hit))
     scored.sort(key=lambda t: (-t[0], t[1]))
     return [hit for _, _, hit in scored[:limit]]

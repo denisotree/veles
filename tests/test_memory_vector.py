@@ -1,10 +1,10 @@
 """M119b: embeddings storage + k-NN.
 
-Tests exercise the pure-Python fallback path explicitly; the
-sqlite-vec and numpy paths are smoke-tested only when those packages
-are importable (skipif decorators). Backend selection is reset
-between tests via the private `_reset_backend_cache` helper so a
-monkey-patch of importlib doesn't bleed across.
+Tests exercise the pure-Python fallback path explicitly; the numpy
+path is smoke-tested only when numpy is importable (skipif decorator).
+Backend selection is reset between tests via the private
+`_reset_backend_cache` helper so a monkey-patch of importlib doesn't
+bleed across.
 """
 
 from __future__ import annotations
@@ -22,7 +22,6 @@ from veles.core.memory.vector import (
     ensure_embeddings_table,
     get_embedding,
     knn,
-    migrate_legacy_skill_embeddings,
     upsert_embedding,
 )
 
@@ -172,57 +171,6 @@ def test_knn_empty_query_returns_empty(conn) -> None:
     assert knn(conn, [], limit=5) == []
 
 
-# ---- legacy migration ----
-
-
-def test_migrate_legacy_moves_known_hashes(conn, tmp_path: Path) -> None:
-    """A skill_embeddings.json with sha→vec mapping migrates rows for
-    hashes the caller resolved to current skill ids."""
-    import json
-
-    legacy = tmp_path / "skill_embeddings.json"
-    legacy.write_text(
-        json.dumps(
-            {
-                "abc123": [0.1, 0.2, 0.3],
-                "def456": [0.4, 0.5, 0.6],
-                "ghost": [0.7, 0.8, 0.9],  # unknown hash, skipped
-            }
-        ),
-        encoding="utf-8",
-    )
-    migrated = migrate_legacy_skill_embeddings(
-        conn,
-        legacy_path=legacy,
-        skill_id_by_hash={"abc123": 1, "def456": 2},
-    )
-    assert migrated == 2
-    assert get_embedding(conn, ref_kind="skill", ref_id=1) == [0.1, 0.2, 0.3]
-    assert get_embedding(conn, ref_kind="skill", ref_id=2) == [0.4, 0.5, 0.6]
-    # Unknown hash was silently skipped
-    assert get_embedding(conn, ref_kind="skill", ref_id=99) is None
-
-
-def test_migrate_missing_file_returns_zero(conn, tmp_path: Path) -> None:
-    migrated = migrate_legacy_skill_embeddings(
-        conn,
-        legacy_path=tmp_path / "nope.json",
-        skill_id_by_hash={},
-    )
-    assert migrated == 0
-
-
-def test_migrate_invalid_json_returns_zero(conn, tmp_path: Path) -> None:
-    legacy = tmp_path / "broken.json"
-    legacy.write_text("not json {{{", encoding="utf-8")
-    migrated = migrate_legacy_skill_embeddings(
-        conn,
-        legacy_path=legacy,
-        skill_id_by_hash={"abc": 1},
-    )
-    assert migrated == 0
-
-
 # ---- backend smoke (skip when not installed) ----
 
 
@@ -256,17 +204,6 @@ def test_numpy_backend_smoke(conn, monkeypatch) -> None:
     import veles.core.memory.vector as mv
 
     monkeypatch.setattr(mv, "_BACKEND", "numpy")
-    upsert_embedding(conn, ref_kind="skill", ref_id=1, vec=[1.0, 0.0])
-    upsert_embedding(conn, ref_kind="skill", ref_id=2, vec=[0.0, 1.0])
-    hits = mv.knn(conn, [1.0, 0.0], limit=2)
-    assert hits[0].ref_id == 1
-
-
-@pytest.mark.skipif(not _has_module("sqlite_vec"), reason="sqlite_vec not installed")
-def test_sqlite_vec_backend_smoke(conn, monkeypatch) -> None:
-    import veles.core.memory.vector as mv
-
-    monkeypatch.setattr(mv, "_BACKEND", "sqlite-vec")
     upsert_embedding(conn, ref_kind="skill", ref_id=1, vec=[1.0, 0.0])
     upsert_embedding(conn, ref_kind="skill", ref_id=2, vec=[0.0, 1.0])
     hits = mv.knn(conn, [1.0, 0.0], limit=2)
