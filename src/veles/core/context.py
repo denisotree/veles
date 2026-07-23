@@ -47,6 +47,26 @@ def reset_origin(token: Token) -> None:
     _current_origin.reset(token)
 
 
+# ---- current session id (M224: OpenRouter sticky-routing key) ----
+# The memory session id of the running turn. The OpenRouter adapter forwards it
+# as OpenRouter's `session_id` so subsequent requests in the same conversation
+# stick to one provider — which is what makes prompt caching (M42b/M178/M220)
+# actually hit instead of scattering across backends. None for stateless runs.
+_current_session_id: ContextVar[str | None] = ContextVar("veles_current_session_id", default=None)
+
+
+def current_session_id() -> str | None:
+    return _current_session_id.get()
+
+
+def set_current_session_id(session_id: str | None) -> Token:
+    return _current_session_id.set(session_id)
+
+
+def reset_current_session_id(token: Token) -> None:
+    _current_session_id.reset(token)
+
+
 # ---- background-op resume depth (M204 auto-resume loop guard) ----
 # When a background op (structured job) completes, the daemon resumes the
 # origin session with a follow-up turn. That turn runs with resume depth =

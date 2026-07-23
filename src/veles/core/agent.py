@@ -30,7 +30,12 @@ from veles.core.agent_state import (
     set_state,
 )
 from veles.core.cancel import TurnCancelled, current_cancel_token, run_cancellable
-from veles.core.context import current_budget, current_project
+from veles.core.context import (
+    current_budget,
+    current_project,
+    reset_current_session_id,
+    set_current_session_id,
+)
 from veles.core.context_scrubber import scrub_text
 from veles.core.events import (
     AssistantMessage as AssistantMessageEvent,
@@ -273,6 +278,10 @@ class Agent:
         # S1: publish this run's scoped toolset so `delegate` can't grant a
         # worker more than the running agent itself holds.
         toolset_token = set_current_toolset(frozenset(self._registry.list_names()))
+        # M224: expose the session id so the OpenRouter adapter can forward it as
+        # a sticky-routing key. Seeded here (may be None on a fresh persisted run)
+        # and refreshed in `_build_history` once the session is created.
+        session_token = set_current_session_id(self._session_id)
         self._event_listener = event_listener
         try:
             return self._run_inner(user_msg, on_text_delta=on_text_delta)
@@ -314,6 +323,7 @@ class Agent:
             reset_invoked_tools(invoked_token)
             reset_untrusted(untrusted_token)
             reset_current_toolset(toolset_token)
+            reset_current_session_id(session_token)
             reset_state(state_token)
 
     def _run_inner(
@@ -800,6 +810,9 @@ class Agent:
         # Fresh path with persistence: create a session and persist system prompt.
         if self._store is not None and self._session_id is None:
             self._session_id = self._store.create_session()
+            # M224: refresh the sticky-routing key now that the id exists, so the
+            # very first provider call of a fresh session already pins a provider.
+            set_current_session_id(self._session_id)
 
         history: list[Message] = []
         if self._system_prompt:
