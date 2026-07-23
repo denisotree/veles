@@ -94,6 +94,18 @@ def _message_update(chat_id: int, text: str) -> dict[str, Any]:
     }
 
 
+async def _deliver(gateway: Any, update: dict[str, Any]) -> None:
+    """Feed one update, then flush the debounce buffer so the turn runs.
+    The gateway no longer fast-paths a lone text — every message waits out
+    the aggregation window so bursts coalesce — so a test expecting a turn
+    from a single message must drive the flush explicitly."""
+    await gateway._handle_update(update)
+    chat = (update.get("message") or {}).get("chat") or {}
+    chat_id = chat.get("id")
+    if chat_id is not None:
+        await gateway._flush_buffer(str(chat_id))
+
+
 # ---- tests ----
 
 
@@ -217,7 +229,7 @@ async def test_message_creates_session_mapping(session_map: SessionMap) -> None:
     daemon = _FakeDaemonClient()
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "tell me a joke"))
+    await _deliver(gateway, _message_update(42, "tell me a joke"))
 
     # First daemon submit had no session_id (cold start)
     assert daemon.submitted == [("tell me a joke", None)]
@@ -239,7 +251,7 @@ async def test_second_message_reuses_existing_session(session_map: SessionMap) -
     daemon = _FakeDaemonClient()
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "follow-up"))
+    await _deliver(gateway, _message_update(42, "follow-up"))
     assert daemon.submitted == [("follow-up", "ses-existing")]
 
 
@@ -247,7 +259,7 @@ async def test_final_edit_carries_complete_text(session_map: SessionMap) -> None
     daemon = _FakeDaemonClient()
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "hi"))
+    await _deliver(gateway, _message_update(42, "hi"))
     edits = [p for m, p in sends if m == "editMessageText"]
     assert edits, "expected at least one edit"
     assert edits[-1]["text"] == "hello world"
@@ -259,7 +271,7 @@ async def test_answer_disables_link_preview(session_map: SessionMap) -> None:
     daemon = _FakeDaemonClient()
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "got a link?"))
+    await _deliver(gateway, _message_update(42, "got a link?"))
     edits = [p for m, p in sends if m == "editMessageText"]
     assert edits, "expected the answer edit"
     assert edits[-1]["link_preview_options"] == {"is_disabled": True}
@@ -274,7 +286,7 @@ async def test_short_code_answer_gets_copy_button(session_map: SessionMap) -> No
     )
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "how to list files?"))
+    await _deliver(gateway, _message_update(42, "how to list files?"))
     edit = [p for m, p in sends if m == "editMessageText"][-1]
     button = edit["reply_markup"]["inline_keyboard"][0][0]
     assert button["copy_text"]["text"] == "ls -la"
@@ -295,7 +307,7 @@ async def test_group_turn_threads_reply_to_trigger(session_map: SessionMap) -> N
             "text": "hey bot",
         },
     }
-    await gateway._handle_update(update)
+    await _deliver(gateway, update)
     placeholder = next(p for m, p in sends if m == "sendMessage")
     assert placeholder["reply_parameters"] == {
         "message_id": 555,
@@ -307,7 +319,7 @@ async def test_private_turn_has_no_reply_parameters(session_map: SessionMap) -> 
     daemon = _FakeDaemonClient()
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "hi"))
+    await _deliver(gateway, _message_update(42, "hi"))
     placeholder = next(p for m, p in sends if m == "sendMessage")
     assert "reply_parameters" not in placeholder
 
@@ -321,7 +333,7 @@ async def test_error_event_surfaces_to_user(session_map: SessionMap) -> None:
     )
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "hi"))
+    await _deliver(gateway, _message_update(42, "hi"))
     edits = [p for m, p in sends if m == "editMessageText"]
     assert "provider blew up" in edits[-1]["text"]
     # Failed run must NOT persist a session mapping
@@ -334,7 +346,7 @@ async def test_daemon_unavailable_responds_with_error(
     daemon = _FakeDaemonClient(submit_error=DaemonClientError("daemon down", status=502))
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "hi"))
+    await _deliver(gateway, _message_update(42, "hi"))
     # No placeholder was sent because we returned before sendMessage:
     sent = [p for m, p in sends if m == "sendMessage"]
     assert sent
@@ -364,7 +376,7 @@ async def test_long_response_truncated_to_telegram_cap(
     )
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "hi"))
+    await _deliver(gateway, _message_update(42, "hi"))
     edits = [p for m, p in sends if m == "editMessageText"]
     final = edits[-1]["text"]
     assert len(final) <= 4000
@@ -383,7 +395,7 @@ async def test_text_deltas_aggregate_in_final_edit(session_map: SessionMap) -> N
     )
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "stream me"))
+    await _deliver(gateway, _message_update(42, "stream me"))
     edits = [p for m, p in sends if m == "editMessageText"]
     assert edits[-1]["text"] == "abcdefghij"
 
@@ -403,7 +415,7 @@ async def test_run_turn_emits_only_one_final_edit(session_map: SessionMap) -> No
     )
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "stream me"))
+    await _deliver(gateway, _message_update(42, "stream me"))
     edits = [p for m, p in sends if m == "editMessageText"]
     assert len(edits) == 1
     assert edits[0]["text"] == "abcdefghij"
@@ -451,7 +463,7 @@ async def test_single_message_gets_no_queued_ack(session_map: SessionMap) -> Non
     daemon = _FakeDaemonClient()
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "hi"))
+    await _deliver(gateway, _message_update(42, "hi"))
     assert not any(p.get("text") == t("telegram.ack_queued") for _m, p in sends)
 
 
@@ -468,7 +480,7 @@ async def test_run_turn_shows_contextual_ack_on_tool_call(session_map: SessionMa
     )
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "look it up"))
+    await _deliver(gateway, _message_update(42, "look it up"))
     edits = [p for m, p in sends if m == "editMessageText"]
     # One edit only: placeholder → ack. The answer is not an edit.
     assert len(edits) == 1
@@ -490,7 +502,7 @@ async def test_run_turn_no_ack_when_text_first(session_map: SessionMap) -> None:
     )
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "hi"))
+    await _deliver(gateway, _message_update(42, "hi"))
     edits = [p for m, p in sends if m == "editMessageText"]
     assert len(edits) == 1
     assert edits[0]["text"] == "quick reply"
@@ -509,7 +521,7 @@ async def test_run_turn_splits_long_answer_into_chunks(session_map: SessionMap) 
     )
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "give me a lot"))
+    await _deliver(gateway, _message_update(42, "give me a lot"))
     edits = [p for m, p in sends if m == "editMessageText"]
     # Extra chunks are new sendMessage calls beyond the "..." placeholder.
     extra = [p for m, p in sends if m == "sendMessage" and p.get("text") != "..."]
@@ -575,7 +587,7 @@ async def test_deliver_persists_session_mapping_on_error(session_map: SessionMap
     )
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "will fail"))
+    await _deliver(gateway, _message_update(42, "will fail"))
     assert session_map.get("42") == "ses-early"
 
 
@@ -587,7 +599,7 @@ async def test_typing_indicator_cancelled_after_completion(
     daemon = _FakeDaemonClient()
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "hi"))
+    await _deliver(gateway, _message_update(42, "hi"))
     # After _handle_update returns the typing loop is already cancelled,
     # so no further sendChatAction calls fire after the final edit.
     methods_order = [m for m, _ in sends]
@@ -630,7 +642,7 @@ async def test_whitelist_allows_numeric_match(session_map: SessionMap) -> None:
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
     gateway.whitelist = ("12345",)
-    await gateway._handle_update(_message_with_sender(42, "hi", user_id=12345, username="anyname"))
+    await _deliver(gateway, _message_with_sender(42, "hi", user_id=12345, username="anyname"))
     assert daemon.submitted == [("hi", None)]
 
 
@@ -639,7 +651,7 @@ async def test_whitelist_allows_username_case_insensitive(session_map: SessionMa
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
     gateway.whitelist = ("@AllowedUser",)
-    await gateway._handle_update(_message_with_sender(42, "hi", user_id=1, username="alloweduser"))
+    await _deliver(gateway, _message_with_sender(42, "hi", user_id=1, username="alloweduser"))
     assert daemon.submitted == [("hi", None)]
 
 
@@ -647,7 +659,7 @@ async def test_empty_whitelist_allows_everyone(session_map: SessionMap) -> None:
     daemon = _FakeDaemonClient()
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_with_sender(42, "hi", user_id=7, username="random"))
+    await _deliver(gateway, _message_with_sender(42, "hi", user_id=7, username="random"))
     assert daemon.submitted == [("hi", None)]
 
 
@@ -751,7 +763,7 @@ async def test_trust_prompt_renders_inline_keyboard(session_map: SessionMap) -> 
         )
 
     driver = asyncio.create_task(drive())
-    await gateway._handle_update(_message_update(42, "run a shell command"))
+    await _deliver(gateway, _message_update(42, "run a shell command"))
     await driver
 
     # Three buttons in the inline keyboard.
@@ -795,7 +807,7 @@ async def test_approval_prompt_renders_two_buttons(session_map: SessionMap) -> N
         )
 
     driver = asyncio.create_task(drive())
-    await gateway._handle_update(_message_update(42, "do dangerous thing"))
+    await _deliver(gateway, _message_update(42, "do dangerous thing"))
     await driver
 
     prompt_sends = [p for m, p in sends if m == "sendMessage" and "reply_markup" in p]
@@ -830,7 +842,7 @@ async def test_critical_prompt_renders_keyboard_and_resolves(session_map: Sessio
         )
 
     driver = asyncio.create_task(drive())
-    await gateway._handle_update(_message_update(42, "fetch that law text"))
+    await _deliver(gateway, _message_update(42, "fetch that law text"))
     await driver
 
     prompt_sends = [p for m, p in sends if m == "sendMessage" and "reply_markup" in p]
@@ -863,7 +875,7 @@ async def test_prompt_resolved_strips_buttons_on_original_message(
         await gateway._handle_callback_query({"id": "cb-3", "from": {}, "data": "v:cccc3333:p"})
 
     driver = asyncio.create_task(drive())
-    await gateway._handle_update(_message_update(42, "hi"))
+    await _deliver(gateway, _message_update(42, "hi"))
     await driver
 
     # After prompt_resolved arrives, the gateway edits the prompt
@@ -898,7 +910,7 @@ async def test_payload_carries_parse_mode_html(session_map: SessionMap) -> None:
     daemon = _FakeDaemonClient()
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "hi"))
+    await _deliver(gateway, _message_update(42, "hi"))
     edits = [p for m, p in sends if m == "editMessageText"]
     sent = [p for m, p in sends if m == "sendMessage"]
     assert sent and sent[0].get("parse_mode") == "HTML"
@@ -920,7 +932,7 @@ async def test_markdown_response_renders_as_html(session_map: SessionMap) -> Non
     )
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    await gateway._handle_update(_message_update(42, "hi"))
+    await _deliver(gateway, _message_update(42, "hi"))
     final = [p for m, p in sends if m == "editMessageText"][-1]["text"]
     assert "<code>read_file</code>" in final
     assert "<b>safe</b>" in final
@@ -959,7 +971,7 @@ async def test_parse_error_falls_back_to_plain_text(
         session_map=session_map,
     )
     gateway._telegram_send = stub_send
-    await gateway._handle_update(_message_update(42, "hi"))
+    await _deliver(gateway, _message_update(42, "hi"))
     edits = [p for m, p in sends if m == "editMessageText"]
     assert len(edits) == 2, "expected one rejected edit + one retry"
     assert edits[0].get("parse_mode") == "HTML"
@@ -1172,17 +1184,75 @@ def _gateway_with_attachments(
     return gateway
 
 
-async def test_plain_text_dispatched_immediately(session_map: SessionMap, tmp_path: Path) -> None:
-    """Single text message with empty buffer — submit_run runs at once,
-    no debounce delay (instant interactive feel)."""
+async def test_plain_text_buffers_until_window(session_map: SessionMap, tmp_path: Path) -> None:
+    """A lone text message buffers for the debounce window instead of
+    firing instantly — so a burst of messages sent in quick succession
+    (comment + forwards) coalesces into one turn. It flushes when the
+    timer fires or `_flush_buffer` is driven manually."""
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _gateway_with_attachments(session_map, tmp_path, sends)
     await gateway._handle_update(_message_update(42, "hello"))
-    # No buffer left behind for the chat.
+    # Buffered, not dispatched yet.
+    assert "42" in gateway._buffers
+    assert gateway.daemon_client.calls == []
+    await gateway._flush_buffer("42")
     assert gateway._buffers == {}
-    assert gateway.daemon_client.calls
+    assert len(gateway.daemon_client.calls) == 1
     prompt, _sid = gateway.daemon_client.calls[0]
     assert prompt == "hello"
+
+
+async def test_debounce_timer_auto_flushes_burst(
+    session_map: SessionMap, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The load-bearing path: no manual flush. Two messages land in the
+    window and the debounce timer (not the hard cap) fires the single
+    coalesced turn on its own."""
+    from veles.channels.telegram import _gateway as gw_mod
+
+    monkeypatch.setattr(gw_mod, "_DEBOUNCE_SECONDS", 0.02)
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _gateway_with_attachments(session_map, tmp_path, sends)
+    await gateway._handle_update(_message_update(42, "part one"))
+    await gateway._handle_update(_message_update(42, "part two"))
+    assert gateway.daemon_client.calls == [], "must wait for the timer, not fire eagerly"
+    await asyncio.sleep(0.1)  # let call_later fire
+    assert len(gateway.daemon_client.calls) == 1
+    prompt, _sid = gateway.daemon_client.calls[0]
+    assert "part one" in prompt and "part two" in prompt
+
+
+async def test_comment_then_forwards_merged_into_one_turn(
+    session_map: SessionMap, tmp_path: Path
+) -> None:
+    """Denis's reported case: the user's own comment lands first, then a
+    couple of forwarded messages from someone else within the same
+    window. The whole burst is one request → one submit_run, not a
+    premature turn on the lone comment (which used to fire instantly and
+    ask a confused clarifying question)."""
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _gateway_with_attachments(session_map, tmp_path, sends)
+    # 1. User's own comment — the fast-path trigger (plain text, empty buffer).
+    await gateway._handle_update(_message_update(42, "remind me about this in 4h"))
+    assert gateway.daemon_client.calls == [], "lone comment must not fire on its own"
+    # 2. Two forwarded messages arrive right after.
+    for i, body in enumerate(("limits: cap deposits at 5k", "month-end deposits incoming")):
+        await gateway._handle_update(
+            {
+                "update_id": 10 + i,
+                "message": {
+                    "chat": {"id": 42, "type": "private"},
+                    "forward_sender_name": "Edgar",
+                    "text": body,
+                },
+            }
+        )
+    await gateway._flush_buffer("42")
+    assert len(gateway.daemon_client.calls) == 1
+    prompt, _sid = gateway.daemon_client.calls[0]
+    assert "remind me about this in 4h" in prompt
+    assert "limits: cap deposits at 5k" in prompt
+    assert "month-end deposits incoming" in prompt
 
 
 async def test_forward_then_comment_merged_into_one_turn(

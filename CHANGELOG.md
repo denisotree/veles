@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.1] — 2026-07-23
+
+### Fixed
+
+- **Telegram: a burst of messages sent in quick succession is now handled as one
+  request.** When you sent several messages back-to-back — a comment plus a few
+  forwarded messages, or a multi-message paste — the bot used to fire a
+  premature reply on the first one (often a confused "which task do you mean?")
+  before the rest had arrived, and treat the remainder as separate turns.
+  Everything that lands within a short window now coalesces into a single turn.
+  (Trade-off: a lone message now waits ~1.5 s before the agent starts, so a
+  burst has a chance to be gathered.)
+
 ## [0.28.0] — 2026-07-23
 
 ### Changed

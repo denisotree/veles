@@ -312,23 +312,19 @@ class TelegramGateway:
             len(message.get("caption") or ""),
             text[:80] or (message.get("caption") or "")[:80],
         )
-        await self._enqueue(chat_key, chat_id, message, kind)
+        await self._enqueue(chat_key, chat_id, message)
 
     # ---- aggregation pipeline (DOC-4 / DOC-5) ----
 
-    async def _enqueue(
-        self, chat_key: str, chat_id: int, message: dict[str, Any], kind: _Kind
-    ) -> None:
-        """Place an incoming message into the per-chat buffer. A plain
-        text message with an empty buffer flushes immediately for
-        snappy interactive feel; anything else (or a non-empty buffer)
-        defers for `_DEBOUNCE_SECONDS` to give forward+comment pairs a
-        chance to land together. Buffer hits `_BUFFER_HARD_CAP` → flush
-        right away so the user doesn't wait forever during a flood."""
+    async def _enqueue(self, chat_key: str, chat_id: int, message: dict[str, Any]) -> None:
+        """Place an incoming message into the per-chat buffer, deferred
+        for `_DEBOUNCE_SECONDS`. Every message waits out the window —
+        including a lone text — so a burst sent in quick succession
+        (a comment + forwarded messages, a multi-message paste) coalesces
+        into one turn instead of firing a premature reply on the first
+        piece. Buffer hits `_BUFFER_HARD_CAP` → flush right away so the
+        user doesn't wait forever during a flood."""
         buf = self._buffers.get(chat_key)
-        if buf is None and kind is _Kind.TEXT:
-            await self._dispatch_messages(chat_id, chat_key, [message])
-            return
         if buf is None:
             buf = _ChatBuffer(chat_id=chat_id, chat_key=chat_key)
             self._buffers[chat_key] = buf
