@@ -171,6 +171,38 @@ veles job list
 
 ---
 
+## Memory
+
+Veles' memory is a **structured, self-contained artefact** — separate from your content, versioned per project under `.veles/`. It is a complete retrieval system on its own: **no external graph database, vector service, or plugin is required** — everything below ships in the core.
+
+```
+.veles/
+├── memory.db                 SQLite: the source of truth
+│   ├── insights              distilled facts, each with a confidence score
+│   ├── rules                 behavioural rules the agent follows (do/don't/format/preference)
+│   ├── sessions / turns      full conversation history (FTS-indexed)
+│   ├── project_tree          cached file/dir map + semantic tags (for "which files to read")
+│   ├── tools / skills        registries + per-use telemetry (success rate, latency)
+│   └── embeddings_blob       vectors for semantic recall
+└── memory/
+    ├── LOG.md                append-only ops journal
+    ├── insights/<slug>.md    human-readable views (regenerable from the DB)
+    ├── sessions/<id>.md      compaction summaries
+    └── proposals/<slug>.md   subproject suggestions
+```
+
+**How recall works.** On every turn Veles pulls the few most relevant items into context — no dump, no manual search:
+
+1. **Full-text search** (SQLite FTS5, BM25) over insights, turns, and the wiki.
+2. **Semantic search** — a 3-tier embedding backend (numpy → pure-Python, auto-detected) surfaces items that mean the same thing without sharing keywords. This is why a knowledge graph adds nothing here: *semantic relatedness is already covered by the vectors.*
+3. **Reranking** blends **relevance + recency + confidence** so curated knowledge leads, fresh facts beat stale ones, and low-trust inferences sink (the lowest are dropped before they reach the prompt).
+
+**Why no graph plugin.** A code/knowledge graph indexes *content structure*; Veles memory stores *learned experience* (insights, decisions, telemetry) with confidence and recency built in. The recall block is small and bounded, and semantic links are handled by embeddings — so the full learning-loop works out of the box. (You can still register an external graph as an [external MCP server](docs/en/how-to/external-mcp-servers.md) if you want structural code queries, but nothing in the memory loop depends on it.)
+
+Memory works under **any** content layout — wiki, notes, or bare.
+
+---
+
 ## Model Routing (Ensembles)
 
 Route different task types to different models — set it once and forget it.
