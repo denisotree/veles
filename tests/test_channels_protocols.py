@@ -42,7 +42,4 @@ def test_runtime_checkable_isinstance() -> None:
         async def submit_prompt_answer(self, run_id, prompt_id, choice):
             return {"accepted": True}
 
-        async def cancel_run(self, run_id):
-            return True
-
     assert isinstance(Stub(), RunBackend)

@@ -54,9 +54,6 @@ class _TurnOutcome:
     session_id: str | None
     error: str | None
     acked: bool = False
-    cancelled: bool = False
-    """The turn was superseded (M225) — a follow-up message cancelled it.
-    Nothing to render: the replacement turn answers for both."""
 
 
 class TelegramDelivery:
@@ -113,7 +110,6 @@ class TelegramDelivery:
         completed_text: str | None = None
         error: str | None = None
         acked = False
-        cancelled = False
         try:
             async for event in gw.daemon_client.stream_events(run_id):
                 kind = event.get("type")
@@ -137,7 +133,6 @@ class TelegramDelivery:
                     text_out = event.get("text")
                     if isinstance(text_out, str):
                         completed_text = text_out
-                    cancelled = event.get("stopped_reason") == "cancelled"
                 elif kind == "error":
                     err = event.get("error")
                     error = str(err) if err else "unknown error"
@@ -158,7 +153,6 @@ class TelegramDelivery:
             session_id=completed_session,
             error=error,
             acked=acked,
-            cancelled=cancelled,
         )
 
     async def _show_ack(self, chat_id: int, message_id: int, tool_name: Any) -> bool:
@@ -187,16 +181,6 @@ class TelegramDelivery:
         model's answer is treated as Markdown and rendered through the
         Telegram-allowed HTML subset (`markdown_to_telegram_html`)."""
         gw = self._gw
-        if outcome.cancelled:
-            # Superseded by a follow-up (M225): drop our "..." holder so the
-            # chat shows one placeholder for the turn that will answer. The
-            # session mapping is still worth keeping — the cancelled turn's
-            # user message lives in that session.
-            with contextlib.suppress(Exception):
-                await gw._call("deleteMessage", {"chat_id": chat_id, "message_id": message_id})
-            if outcome.session_id:
-                gw.session_map.set(chat_key, outcome.session_id)
-            return
         if outcome.error:
             final_html = f"<b>⚠️ error:</b> {escape_html(outcome.error)}"
         elif outcome.text:

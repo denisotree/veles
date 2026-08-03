@@ -126,12 +126,6 @@ class TelegramGateway:
     # arriving while a turn runs waits on the chat's lock (FIFO) and gets
     # a "queued" ack up front. Different chats stay fully parallel.
     _chat_locks: dict[str, asyncio.Lock] = field(default_factory=dict, init=False)
-    # chat_key → run_id of the turn currently in flight, so a follow-up
-    # message can supersede it (M225).
-    _active_runs: dict[str, str] = field(default_factory=dict, init=False)
-    # chat_key → prompts of the turn waiting on the lock. Later messages
-    # fold in here rather than opening yet another turn (M225).
-    _waiting_prompts: dict[str, list[str]] = field(default_factory=dict, init=False)
     # M155 collaborators. They hold a back-reference to the gateway and
     # call through `self._gw.<method>` so instance/class-level stubs on
     # the gateway keep working.
@@ -428,22 +422,12 @@ class TelegramGateway:
     async def _run_turn_serial(
         self, chat_id: int, chat_key: str, prompt: str, *, trigger_id: int | None = None
     ) -> None:
-        """Run one turn under the chat's serial lock.
-
-        A message arriving while a turn is in flight is treated as the
-        user still adding to the same thought (comment first, forwarded
-        post a few seconds later — the case the debounce window is too
-        short for). We cancel the running turn (M225) and let this one
-        answer: the superseded turn's user message is already in session
-        history, so the model sees both and replies once. When the cancel
-        doesn't land (backend without cancel support, turn already
-        finishing) we fall back to the old behaviour — acknowledge the
-        wait with a 👀 reaction, or a queued text when there's no message
-        to react to, and queue behind the lock.
-
-        Anything arriving while a replacement turn is *waiting* on the
-        lock is folded into that turn's prompt instead of opening a third
-        one — a three-message burst still ends in exactly one answer."""
+        """Run one turn under the chat's serial lock. If a turn is already
+        in flight for this chat, acknowledge the wait (a 👀 reaction on the
+        message, or a queued text if the message can't be reacted to)
+        before waiting on the lock — the daemon also serializes per
+        session, but the lock lets us surface the wait and keep FIFO order
+        at the channel edge."""
         # In group chats (negative chat_id) thread the answer to the
         # triggering message so it's clear which one it answers; in 1:1
         # chats threading is just visual noise.
@@ -453,26 +437,16 @@ class TelegramGateway:
             lock = asyncio.Lock()
             self._chat_locks[chat_key] = lock
         if lock.locked():
-            waiting = self._waiting_prompts.get(chat_key)
-            if waiting is not None:
-                # Someone is already queued for this chat: hand them the text
-                # and let their turn answer for both.
-                waiting.append(prompt)
-                return
-            if not await self._supersede_active_run(chat_key):
-                # A 👀 reaction keeps a busy chat quiet instead of piling up
-                # "queued" messages; fall back to text when there's no message
-                # to react to.
-                if trigger_id is not None:
-                    await self._set_reaction(chat_id, trigger_id, "👀")
-                else:
-                    with contextlib.suppress(Exception):
-                        await self._send_message(chat_id, t("telegram.ack_queued"))
-            self._waiting_prompts[chat_key] = [prompt]
+            # A 👀 reaction keeps a busy chat quiet instead of piling up
+            # "queued" messages; fall back to text when there's no message
+            # to react to.
+            if trigger_id is not None:
+                await self._set_reaction(chat_id, trigger_id, "👀")
+            else:
+                with contextlib.suppress(Exception):
+                    await self._send_message(chat_id, t("telegram.ack_queued"))
         async with lock:
-            folded = self._waiting_prompts.pop(chat_key, None)
-            text = "\n\n".join(folded) if folded else prompt
-            await self._run_turn(chat_id, chat_key, text, reply_to=reply_to)
+            await self._run_turn(chat_id, chat_key, prompt, reply_to=reply_to)
 
     # ---- media (delegates → TelegramMedia, M155) ----
 
@@ -493,36 +467,12 @@ class TelegramGateway:
         run_id = await self._submit_or_report(chat_id, chat_key, text)
         if run_id is None:
             return
-        # Publish the run so a follow-up message can supersede it (M225).
-        self._active_runs[chat_key] = run_id
-        try:
-            message_id = await self._send_placeholder(chat_id, reply_to=reply_to)
-            if message_id is None:
-                return
-            async with self._typing_indicator(chat_id):
-                outcome = await self._drain_stream(run_id, chat_id, message_id)
-            await self._deliver(chat_id, chat_key, message_id, outcome)
-        finally:
-            if self._active_runs.get(chat_key) == run_id:
-                del self._active_runs[chat_key]
-
-    async def _supersede_active_run(self, chat_key: str) -> bool:
-        """Cancel the turn currently in flight for `chat_key` so the new
-        message answers for both. False when there's nothing to cancel or
-        the backend can't (pre-M225 backend, run already finishing) — the
-        caller then queues the message as before."""
-        run_id = self._active_runs.get(chat_key)
-        if run_id is None:
-            return False
-        try:
-            cancelled = bool(await self.daemon_client.cancel_run(run_id))
-        except Exception as exc:
-            # Includes AttributeError from a backend that predates M225.
-            logger.warning("telegram: cancel of run %s failed: %s", run_id, exc)
-            return False
-        if cancelled:
-            logger.info("telegram: chat=%s superseded run %s by a follow-up", chat_key, run_id)
-        return cancelled
+        message_id = await self._send_placeholder(chat_id, reply_to=reply_to)
+        if message_id is None:
+            return
+        async with self._typing_indicator(chat_id):
+            outcome = await self._drain_stream(run_id, chat_id, message_id)
+        await self._deliver(chat_id, chat_key, message_id, outcome)
 
     async def _submit_or_report(self, chat_id: int, chat_key: str, text: str) -> str | None:
         """Submit the user's text to the daemon and return the run_id,

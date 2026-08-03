@@ -89,14 +89,6 @@ class DaemonClient:
         async with self.session.get(f"{self._base}/v1/runs/{run_id}", headers=self._auth) as resp:
             return await _read_json(resp)
 
-    async def cancel_run(self, run_id: str) -> bool:
-        """Ask the daemon to stop an in-flight turn (M225). False when
-        the run had already finished; raises on transport errors."""
-        async with self.session.post(
-            f"{self._base}/v1/runs/{run_id}/cancel", json={}, headers=self._auth
-        ) as resp:
-            return bool((await _read_json(resp)).get("cancelled"))
-
     async def submit_prompt_answer(
         self, run_id: str, prompt_id: str, choice: str
     ) -> dict[str, Any]:
