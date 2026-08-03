@@ -136,6 +136,15 @@ def _cmd_channel_run(args: argparse.Namespace) -> int:
         )
         return 2
 
+    # M226: standalone gateway (talking to a remote daemon over HTTP) still
+    # describes incoming images locally, using this project's vision route.
+    from veles.core.context import current_project
+    from veles.core.vision import install_vision_adapter
+
+    project = current_project()
+    if project is not None:
+        install_vision_adapter(project)
+
     return asyncio.run(_run_gateway(entry.factory, channel, bot_token, daemon_url, daemon_token))
 
 

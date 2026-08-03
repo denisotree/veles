@@ -249,7 +249,11 @@ async def test_voice_too_large_skipped(session_map: SessionMap) -> None:
 # ---- photo path ----
 
 
-async def test_photo_without_adapter_sends_notice(session_map: SessionMap) -> None:
+async def test_photo_with_neither_adapter_nor_storage_sends_notice(
+    session_map: SessionMap,
+) -> None:
+    """Vision `off` AND no attachment dir: nothing can be done with the
+    image, so say so rather than dropping it."""
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway, client = _make_gateway(session_map, sends)
 
@@ -264,7 +268,7 @@ async def test_photo_without_adapter_sends_notice(session_map: SessionMap) -> No
     notices = [
         p["text"]
         for m, p in sends
-        if m == "sendMessage" and "no vision adapter" in p.get("text", "")
+        if m == "sendMessage" and "neither describe nor" in p.get("text", "")
     ]
     assert notices
     assert client.submitted == []  # type: ignore[attr-defined]
@@ -347,6 +351,31 @@ async def test_photo_attachment_path_is_consumable_by_image_describe(
         assert image_describe(emitted.group(1)) == "a screenshot of a chart"
     finally:
         reset_active_project(token)
+
+
+async def test_adapter_description_and_saved_path_both_reach_the_prompt(
+    session_map: SessionMap, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """M226: the first turn already knows what the image shows, and the
+    file stays around so the agent can ask a follow-up question about it
+    with a targeted `image_describe(path, prompt=…)`."""
+    register_vision_adapter(_StubVision(fixed="a bar chart"))
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway, client = _make_gateway(session_map, sends)
+    gateway.attachment_dir = tmp_path / ".veles" / "tmp"
+    gateway.project_root = tmp_path
+
+    async def fake_download(self, *_a, **_kw):
+        return b"\xff\xd8\xffjpeg"
+
+    monkeypatch.setattr(TelegramGateway, "_download_telegram_file", fake_download)
+    await gateway._dispatch_messages(
+        chat_id=42, chat_key="42", messages=[{"photo": [{"file_id": "l", "file_size": 9000}]}]
+    )
+    prompt, _ = client.submitted[0]  # type: ignore[attr-defined]
+    saved = next(iter((tmp_path / ".veles" / "tmp").glob("*-photo.jpg")))
+    assert "a bar chart" in prompt
+    assert str(saved.relative_to(tmp_path)) in prompt
 
 
 async def test_photo_picks_largest_variant(

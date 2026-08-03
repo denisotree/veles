@@ -96,15 +96,14 @@ class TelegramMedia:
         Telegram's size-variants array; we pick the largest so the model
         sees the most detail.
 
-        Two paths. A registered Vision adapter describes the image
-        inline (same shape as `transcribe_voice`). With no adapter — the
-        stock case, since core ships none — the photo is saved under
-        `attachment_dir` and the prompt points the agent at the builtin
-        `image_describe` / `image_ocr` tools, which already route through
-        `route("vision", project)` and therefore reach whatever
-        multimodal model the project is configured with. The
-        "not configured" notice is only for the case where neither path
-        exists (no adapter *and* no attachment dir)."""
+        Two layers, both usually on. The photo is saved under
+        `attachment_dir` so the agent can come back to it with a targeted
+        `image_describe(path, prompt=…)`; and the registered Vision
+        adapter (M226 installs one from `[vision]` + the project's
+        routing at daemon startup) describes it inline so the very first
+        turn already knows what the image shows. With neither — vision
+        turned `off` and no attachment dir — the user gets a notice
+        instead of a silently dropped message."""
         from veles.modules.vision import VisionError, get_vision_adapter
 
         gw = self._gw
@@ -112,10 +111,10 @@ class TelegramMedia:
         if adapter is None and gw.attachment_dir is None:
             await gw._send_message(
                 chat_id,
-                "<i>photo received but attachments are not configured and "
-                "no vision adapter is installed.</i> Point the channel at a "
-                "project (attachment dir) or install an adapter via "
-                "<code>register_vision_adapter(...)</code>.",
+                "<i>photo received but this channel can neither describe nor "
+                "store it.</i> Set <code>[vision] mode</code> to something "
+                "other than <code>off</code>, or point the channel at a "
+                "project so the file can be saved.",
             )
             return None
         # Telegram delivers photo as variants; the last entry is the
@@ -143,24 +142,40 @@ class TelegramMedia:
         except Exception as exc:
             logger.warning("photo download failed: %s", exc)
             return None
-        if adapter is None:
-            saved = self.persist_attachment("photo.jpg", image_bytes)
+        saved = (
+            self.persist_attachment("photo.jpg", image_bytes)
+            if gw.attachment_dir is not None
+            else None
+        )
+        description = ""
+        if adapter is not None:
+            try:
+                description = await asyncio.to_thread(
+                    adapter.describe_image, image_bytes, "image/jpeg"
+                )
+            except VisionError as exc:
+                # Say why — the agent's own `image_describe` would hit the
+                # same wall, so a silent fallback would just look broken.
+                await gw._send_message(
+                    chat_id, f"<i>couldn't describe photo: {escape_html(str(exc))}</i>"
+                )
+            except Exception as exc:
+                logger.warning("Vision adapter raised %s: %s", type(exc).__name__, exc)
+        description = (description or "").strip()
+        if saved is None:
+            return f"[photo description] {description}" if description else None
+        path = self._prompt_path(saved)
+        if description:
             return (
-                f"[photo attached: {self._prompt_path(saved)}] "
-                "Look at it with image_describe(path) — or image_ocr(path) "
-                "when it's mostly text — before answering."
+                f"[photo description] {description}\n"
+                f"(the image itself is at {path} — image_describe(path, prompt=…) "
+                "answers follow-up questions about it)"
             )
-        try:
-            description = await asyncio.to_thread(adapter.describe_image, image_bytes, "image/jpeg")
-        except VisionError as exc:
-            await gw._send_message(
-                chat_id, f"<i>couldn't describe photo: {escape_html(str(exc))}</i>"
-            )
-            return None
-        except Exception as exc:
-            logger.warning("Vision adapter raised %s: %s", type(exc).__name__, exc)
-            return None
-        return f"[photo description] {description.strip()}"
+        return (
+            f"[photo attached: {path}] "
+            "Look at it with image_describe(path) — or image_ocr(path) "
+            "when it's mostly text — before answering."
+        )
 
     def persist_attachment(self, name: str, data: bytes) -> Path:
         """Write into `<project>/.veles/tmp/<uuid8>-<safe_name>`. The

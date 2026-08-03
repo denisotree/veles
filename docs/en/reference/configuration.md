@@ -83,9 +83,16 @@ host = "127.0.0.1"
 port = 8801
 mode = "auto"
 
+[vision]                         # how images sent to a channel are read
+mode = "model"                   # model (default) | ocr | ocr+model | off
+model = "openrouter:z-ai/glm-4.6v"   # optional pin; omit to use [routing.tasks].vision → [engine]
+ocr_lang = "rus+eng"             # Tesseract language packs, for the ocr modes
+
 [channels.telegram]              # global channels (served by the unnamed daemon)
 enabled = true
 whitelist = ["@alice", "123456789"]
+debounce_seconds = 3.0           # how long a burst of messages coalesces into one turn
+forward_debounce_seconds = 12.0  # wider window once a forward / album lands
 
 [daemon.api.channels.telegram]   # channels bound to a named daemon session
 enabled = true
@@ -105,6 +112,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[engine]` | Base provider (`provider` = provider name) + model (`model` = model id) for the main agent and the routing cascade |
 | `[routing.tasks]` | Per-task `provider:model` overrides — see [per-task routing](../how-to/per-task-routing.md) |
 | `[permissions]` | Per-tool permission policy (project scope) |
+| `[vision]` | How incoming images are read: the routed model, Tesseract OCR, both, or nothing |
 | `[daemon]` | The unnamed/"default" daemon's bind + autostart |
 | `[daemon.<name>]` | A named daemon session (own model/provider/host/port/mode) |
 | `[channels.<type>]` | A channel served by the unnamed daemon (e.g. `telegram`) |
@@ -117,6 +125,23 @@ Task types for `[routing.tasks]`: `default`, `curator`, `compressor`, `insights`
 > Natural-language routing hints in `AGENTS.md` are parsed into an auto-generated
 > `routing.nl.toml`; explicit `[routing.tasks]` entries always win. Run
 > `veles route refresh` to re-parse. See [per-task routing](../how-to/per-task-routing.md).
+
+### Images
+
+A photo sent to a channel is described before the turn starts, using the model
+`[routing.tasks].vision` points at — which, with no explicit route, is your
+`[engine]` model. A multimodal engine therefore needs no configuration at all.
+
+`[vision] mode` picks the pipeline:
+
+- `model` (default) — the vision model describes the image.
+- `ocr` — Tesseract only. Local, free, no LLM call; good for scans of text.
+- `ocr+model` — verbatim text first, then the model's description.
+- `off` — nothing is read; the file is still saved and the agent can call
+  `image_describe` / `image_ocr` itself if it wants to.
+
+Set `[vision] model` when the engine is text-only. Any vision-capable provider
+works, including a local server: `ollama:llava`, `llamacpp:…`, `openai-compat:…`.
 
 ### `project.toml`
 
