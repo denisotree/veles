@@ -129,6 +129,9 @@ class TelegramGateway:
     # chat_key → run_id of the turn currently in flight, so a follow-up
     # message can supersede it (M225).
     _active_runs: dict[str, str] = field(default_factory=dict, init=False)
+    # chat_key → prompts of the turn waiting on the lock. Later messages
+    # fold in here rather than opening yet another turn (M225).
+    _waiting_prompts: dict[str, list[str]] = field(default_factory=dict, init=False)
     # M155 collaborators. They hold a back-reference to the gateway and
     # call through `self._gw.<method>` so instance/class-level stubs on
     # the gateway keep working.
@@ -436,7 +439,11 @@ class TelegramGateway:
         doesn't land (backend without cancel support, turn already
         finishing) we fall back to the old behaviour — acknowledge the
         wait with a 👀 reaction, or a queued text when there's no message
-        to react to, and queue behind the lock."""
+        to react to, and queue behind the lock.
+
+        Anything arriving while a replacement turn is *waiting* on the
+        lock is folded into that turn's prompt instead of opening a third
+        one — a three-message burst still ends in exactly one answer."""
         # In group chats (negative chat_id) thread the answer to the
         # triggering message so it's clear which one it answers; in 1:1
         # chats threading is just visual noise.
@@ -445,17 +452,27 @@ class TelegramGateway:
         if lock is None:
             lock = asyncio.Lock()
             self._chat_locks[chat_key] = lock
-        if lock.locked() and not await self._supersede_active_run(chat_key):
-            # A 👀 reaction keeps a busy chat quiet instead of piling up
-            # "queued" messages; fall back to text when there's no message
-            # to react to.
-            if trigger_id is not None:
-                await self._set_reaction(chat_id, trigger_id, "👀")
-            else:
-                with contextlib.suppress(Exception):
-                    await self._send_message(chat_id, t("telegram.ack_queued"))
+        if lock.locked():
+            waiting = self._waiting_prompts.get(chat_key)
+            if waiting is not None:
+                # Someone is already queued for this chat: hand them the text
+                # and let their turn answer for both.
+                waiting.append(prompt)
+                return
+            if not await self._supersede_active_run(chat_key):
+                # A 👀 reaction keeps a busy chat quiet instead of piling up
+                # "queued" messages; fall back to text when there's no message
+                # to react to.
+                if trigger_id is not None:
+                    await self._set_reaction(chat_id, trigger_id, "👀")
+                else:
+                    with contextlib.suppress(Exception):
+                        await self._send_message(chat_id, t("telegram.ack_queued"))
+            self._waiting_prompts[chat_key] = [prompt]
         async with lock:
-            await self._run_turn(chat_id, chat_key, prompt, reply_to=reply_to)
+            folded = self._waiting_prompts.pop(chat_key, None)
+            text = "\n\n".join(folded) if folded else prompt
+            await self._run_turn(chat_id, chat_key, text, reply_to=reply_to)
 
     # ---- media (delegates → TelegramMedia, M155) ----
 

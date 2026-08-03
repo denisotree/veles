@@ -107,6 +107,29 @@ async def test_falls_back_to_queued_ack_when_cancel_refused(session_map: Session
     await task
 
 
+async def test_third_message_folds_into_the_waiting_turn(session_map: SessionMap) -> None:
+    """Comment, forward, second forward. The replacement turn is still
+    waiting on the lock when the third message lands — it must join that
+    prompt, not open a third turn."""
+    backend = _Backend()
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(session_map, sends, backend)
+    lock = asyncio.Lock()
+    await lock.acquire()
+    gateway._chat_locks["42"] = lock
+    gateway._active_runs["42"] = "run-in-flight"
+
+    second = asyncio.create_task(gateway._run_turn_serial(42, "42", "forward one", trigger_id=7))
+    await asyncio.sleep(0)  # second is now waiting on the lock
+    await gateway._run_turn_serial(42, "42", "forward two", trigger_id=8)
+    assert backend.submitted == []  # the third message opened no turn of its own
+    lock.release()
+    await second
+    assert backend.submitted == ["forward one\n\nforward two"]
+    assert backend.cancelled == ["run-in-flight"]  # cancelled once, not twice
+    assert "42" not in gateway._waiting_prompts
+
+
 async def test_no_cancel_without_an_active_run(session_map: SessionMap) -> None:
     backend = _Backend()
     sends: list[tuple[str, dict[str, Any]]] = []
