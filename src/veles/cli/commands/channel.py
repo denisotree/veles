@@ -136,13 +136,25 @@ def _cmd_channel_run(args: argparse.Namespace) -> int:
         )
         return 2
 
-    # M226: standalone gateway (talking to a remote daemon over HTTP) still
+    # M226: a standalone gateway (talking to a remote daemon over HTTP) still
     # describes incoming images locally, using this project's vision route.
-    from veles.core.context import current_project
+    # `channel` is dispatched before the CLI's own `set_active_project`, so
+    # resolve it here — the keychain lookup behind the vision call is
+    # project-scoped and needs the ContextVar set.
+    from veles.cli._project import _resolve_active_project
+    from veles.core.context import set_active_project
     from veles.core.vision import install_vision_adapter
 
-    project = current_project()
-    if project is not None:
+    project = _resolve_active_project(args)
+    if project is None:
+        print(
+            "warning: no Veles project found from this directory — images "
+            "sent to this channel won't be described. Run the gateway from "
+            "inside a project.",
+            file=sys.stderr,
+        )
+    else:
+        set_active_project(project)
         install_vision_adapter(project)
 
     return asyncio.run(_run_gateway(entry.factory, channel, bot_token, daemon_url, daemon_token))
