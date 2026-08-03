@@ -61,6 +61,7 @@ def make_app(state: DaemonState) -> web.Application:
     app.router.add_get("/v1/runs", _handle_list_runs)
     app.router.add_get("/v1/runs/{run_id}", _handle_get_run)
     app.router.add_get("/v1/runs/{run_id}/events", _handle_run_events_ws)
+    app.router.add_post("/v1/runs/{run_id}/cancel", _handle_cancel_run)
     app.router.add_post("/v1/runs/{run_id}/prompts/{prompt_id}", _handle_resolve_prompt)
     app.router.add_get("/v1/sessions", _handle_list_sessions)
     app.router.add_get("/v1/sessions/{session_id}", _handle_get_session)
@@ -321,6 +322,22 @@ async def _handle_get_run(request: web.Request) -> web.Response:
     if handle is None:
         return web.json_response({"error": f"run {run_id!r} not found"}, status=404)
     return web.json_response(handle.to_summary())
+
+
+async def _handle_cancel_run(request: web.Request) -> web.Response:
+    """Stop an in-flight turn (M225).
+
+    Cooperative: the agent notices at its next checkpoint and finishes
+    with `stopped_reason="cancelled"`, so subscribers still get a clean
+    terminal event. `{"cancelled": false}` means the run had already
+    finished — the caller decides whether that matters."""
+    state: DaemonState = request.app["state"]
+    run_id = request.match_info["run_id"]
+    handle = state.get_run(run_id)
+    if handle is None:
+        return web.json_response({"error": f"run {run_id!r} not found"}, status=404)
+    cancelled = handle.request_cancel()
+    return web.json_response({"run_id": run_id, "cancelled": cancelled, "state": handle.state})
 
 
 async def _handle_resolve_prompt(request: web.Request) -> web.Response:

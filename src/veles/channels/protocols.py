@@ -38,6 +38,13 @@ class RunBackend(Protocol):
         breaking forward-compat."""
         ...
 
+    async def cancel_run(self, run_id: str) -> bool:
+        """Stop an in-flight run; False when it already finished (M225).
+
+        Channels call this to supersede a turn the user has kept typing
+        past."""
+        ...
+
     async def submit_prompt_answer(
         self, run_id: str, prompt_id: str, choice: str
     ) -> dict[str, Any]:

@@ -117,6 +117,14 @@ class InProcessRunBackend:
                 continue
             await handle.event_added.wait()
 
+    async def cancel_run(self, run_id: str) -> bool:
+        """Stop an in-flight turn (M225). False when the run is unknown
+        or already finished — the caller keeps its own fallback."""
+        handle = self._state.get_run(run_id)
+        if handle is None:
+            return False
+        return handle.request_cancel()
+
     async def get_session(self, session_id: str) -> dict[str, Any]:
         """In-process equivalent of `DaemonClient.get_session`. Returns
         `{"session_id", "overrides"}` so the gateway can resolve the

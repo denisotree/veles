@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from veles.core.agent import Agent, RunResult
+from veles.core.cancel import CancelToken, reset_cancel_token, set_cancel_token
 
 if TYPE_CHECKING:
     from veles.core.provider import Message
@@ -77,6 +78,20 @@ class RunHandle:
     event_added: asyncio.Event = field(default_factory=asyncio.Event)
     done: asyncio.Event = field(default_factory=asyncio.Event)
     pending_prompts: dict[str, PendingPrompt] = field(default_factory=dict)
+    cancel_token: CancelToken = field(default_factory=CancelToken)
+
+    def request_cancel(self) -> bool:
+        """Ask the turn to stop at its next cooperative checkpoint (M225).
+
+        `Agent.run` is on a worker thread, which can't be killed — the
+        agent polls this token between iterations and streamed events and
+        unwinds into a `stopped_reason="cancelled"` result, so the run
+        still completes its event stream normally. False = nothing to
+        cancel (the run already finished)."""
+        if self.done.is_set() or self.state in ("completed", "failed"):
+            return False
+        self.cancel_token.cancel()
+        return True
 
     def to_summary(self) -> dict[str, Any]:
         return {
@@ -211,6 +226,10 @@ async def run_agent_in_background(
     # now (→ "proceed on best assumption"); routing the question to the channel
     # is M148b.
     question_token = set_question_prompter(lambda _q, _opts=None: None)
+    # M225: the handle's cancel token reaches the worker thread through the
+    # copied context, so `POST /v1/runs/{id}/cancel` (and the channel's
+    # supersede path) can stop a turn that's already generating.
+    cancel_ctx_token = set_cancel_token(handle.cancel_token)
     turn_token = begin_trust_turn()
 
     def _worker() -> RunResult:
@@ -283,6 +302,7 @@ async def run_agent_in_background(
                 await asyncio.to_thread(post_turn_hook, result)
     finally:
         end_trust_turn(turn_token)
+        reset_cancel_token(cancel_ctx_token)
         reset_origin(origin_token)
         if subagent_token is not None:
             reset_subagent_factory(subagent_token)
