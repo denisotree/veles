@@ -51,6 +51,13 @@ def _bootstrap_daemon(project, *, name: str | None = None) -> None:
     set_active_project(project)
     set_module_registry(_load_project_modules(project))
 
+    # M226: images arriving on a channel are described by the project's own
+    # vision route (`[vision]` in config.toml). Installed here so every
+    # channel the daemon hosts sees the same adapter.
+    from veles.core.vision import install_vision_adapter
+
+    install_vision_adapter(project)
+
     # Any relative path a tool resolves at runtime (`pwd`, `cat foo`,
     # skill scripts) should land inside the project. Without this chdir
     # the daemon would inherit the CWD of whoever spawned it — typically

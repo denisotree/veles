@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.0] — 2026-08-03
+
+### Added
+
+- **Photos you send to the bot are actually looked at.** An image arriving in a
+  chat is now described before the agent starts answering, using the model your
+  project already uses — a multimodal model needs no setup at all. Previously
+  every photo came back with "no vision adapter is configured", because Veles
+  shipped no such adapter for the setting to point at.
+- **A new `[vision]` section for how images are read.** `mode = "model"` (the
+  default) describes them with the vision model; `"ocr"` runs Tesseract only —
+  local, free, no model call, good for scans of text; `"ocr+model"` does both,
+  verbatim text first; `"off"` skips reading entirely and just keeps the file.
+  Set `[vision] model = "<provider>:<model>"` when your main model is text-only
+  — any vision-capable provider works, including a local one
+  (`ollama:llava`, `llamacpp:…`, `openai-compat:…`). Changes take effect on the
+  next photo, no daemon restart. See
+  [configuration](docs/en/reference/configuration.md).
+- **The image itself stays available.** Alongside the description, the file is
+  kept, so a follow-up question about the same picture is answered from the
+  image rather than from the first description.
+
+### Changed
+
+- **Forwarded posts and albums are gathered into one request together with your
+  comment.** Telegram marks a message as forwarded (or as part of an album), and
+  Veles now uses that: once such a message arrives, the bot waits longer (12 s by
+  default, up to 12 messages) so the rest of the forwards *and* the comment you
+  type after them arrive first, and answers once. Ordinary typed messages keep
+  the short 3 s window. Both are configurable —
+  `[channels.telegram] debounce_seconds` and `forward_debounce_seconds`.
+  (Trade-off: a lone forwarded post with no comment now waits out the wider
+  window before the bot replies; lower `forward_debounce_seconds` if that feels
+  slow.)
+- **The window for a burst of typed messages went from 1.5 s to 3 s** — 1.5 s
+  only caught messages sent almost simultaneously.
+
+### Fixed
+
+- **A forwarded photo, document or voice message no longer reads as your own.**
+  The "Forwarded from …" attribution was rendered for forwarded *text* only, so
+  the agent could answer as if you had taken the photo yourself.
+- **Image descriptions no longer fail with an authentication error when routed
+  through OpenRouter.** The vision call ignored the stored credentials and fell
+  back to whatever `OPENAI_API_KEY` happened to be set, so it authenticated
+  against the wrong service.
+
 ## [0.28.1] — 2026-07-23
 
 ### Fixed

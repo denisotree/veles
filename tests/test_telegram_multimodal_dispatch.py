@@ -249,7 +249,11 @@ async def test_voice_too_large_skipped(session_map: SessionMap) -> None:
 # ---- photo path ----
 
 
-async def test_photo_without_adapter_sends_notice(session_map: SessionMap) -> None:
+async def test_photo_with_neither_adapter_nor_storage_sends_notice(
+    session_map: SessionMap,
+) -> None:
+    """Vision `off` AND no attachment dir: nothing can be done with the
+    image, so say so rather than dropping it."""
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway, client = _make_gateway(session_map, sends)
 
@@ -264,10 +268,114 @@ async def test_photo_without_adapter_sends_notice(session_map: SessionMap) -> No
     notices = [
         p["text"]
         for m, p in sends
-        if m == "sendMessage" and "no vision adapter" in p.get("text", "")
+        if m == "sendMessage" and "neither describe nor" in p.get("text", "")
     ]
     assert notices
     assert client.submitted == []  # type: ignore[attr-defined]
+
+
+async def test_photo_without_adapter_falls_back_to_attachment(
+    session_map: SessionMap, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No vision adapter but a project to save into: the photo is
+    persisted and the agent is pointed at `image_describe`, which routes
+    to the project's own (multimodal) model — no adapter needed."""
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway, client = _make_gateway(session_map, sends)
+    gateway.attachment_dir = tmp_path / ".veles" / "tmp"
+    gateway.project_root = tmp_path
+
+    async def fake_download(self, *_a, **_kw):
+        return b"\xff\xd8\xffjpeg-bytes"
+
+    monkeypatch.setattr(TelegramGateway, "_download_telegram_file", fake_download)
+
+    msg = {"photo": [{"file_id": "large", "file_size": 200_000}]}
+    await gateway._dispatch_messages(chat_id=42, chat_key="42", messages=[msg])
+
+    saved = list((tmp_path / ".veles" / "tmp").glob("*-photo.jpg"))
+    assert len(saved) == 1
+    assert saved[0].read_bytes() == b"\xff\xd8\xffjpeg-bytes"
+    prompt, _ = client.submitted[0]  # type: ignore[attr-defined]
+    assert "image_describe" in prompt
+    assert str(saved[0].relative_to(tmp_path)) in prompt
+    assert not [p for m, p in sends if "no vision adapter" in p.get("text", "")]
+
+
+async def test_photo_attachment_path_is_consumable_by_image_describe(
+    session_map: SessionMap, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The handoff, end to end: whatever path the channel puts in the
+    prompt must survive `resolve_safe` and reach the vision model. The
+    daemon chdirs to the project root (`_bootstrap_daemon`), so the
+    relative form the prompt carries resolves there."""
+    import re
+    import sys
+    from unittest.mock import MagicMock
+
+    from veles.core.context import reset_active_project, set_active_project
+    from veles.core.project import init_project
+    from veles.core.routing import set_project_route
+    from veles.core.tools.builtin.image import image_describe
+
+    project = init_project(tmp_path / "proj", name="proj")
+    token = set_active_project(project)
+    monkeypatch.chdir(project.root)
+    set_project_route(project, "vision", "openrouter:moonshotai/kimi-k2.5")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
+    try:
+        sends: list[tuple[str, dict[str, Any]]] = []
+        gateway, client = _make_gateway(session_map, sends)
+        gateway.attachment_dir = project.tmp_dir
+        gateway.project_root = project.root
+
+        async def fake_download(self, *_a, **_kw):
+            return b"\xff\xd8\xffjpeg-bytes"
+
+        monkeypatch.setattr(TelegramGateway, "_download_telegram_file", fake_download)
+        await gateway._dispatch_messages(
+            chat_id=42, chat_key="42", messages=[{"photo": [{"file_id": "l", "file_size": 9000}]}]
+        )
+        prompt, _ = client.submitted[0]  # type: ignore[attr-defined]
+        emitted = re.search(r"\[photo attached: (\S+)\]", prompt)
+        assert emitted, prompt
+
+        fake_client = MagicMock()
+        fake_client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content="a screenshot of a chart"))]
+        )
+        fake_openai = MagicMock()
+        fake_openai.OpenAI.return_value = fake_client
+        monkeypatch.setitem(sys.modules, "openai", fake_openai)
+
+        assert image_describe(emitted.group(1)) == "a screenshot of a chart"
+    finally:
+        reset_active_project(token)
+
+
+async def test_adapter_description_and_saved_path_both_reach_the_prompt(
+    session_map: SessionMap, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """M226: the first turn already knows what the image shows, and the
+    file stays around so the agent can ask a follow-up question about it
+    with a targeted `image_describe(path, prompt=…)`."""
+    register_vision_adapter(_StubVision(fixed="a bar chart"))
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway, client = _make_gateway(session_map, sends)
+    gateway.attachment_dir = tmp_path / ".veles" / "tmp"
+    gateway.project_root = tmp_path
+
+    async def fake_download(self, *_a, **_kw):
+        return b"\xff\xd8\xffjpeg"
+
+    monkeypatch.setattr(TelegramGateway, "_download_telegram_file", fake_download)
+    await gateway._dispatch_messages(
+        chat_id=42, chat_key="42", messages=[{"photo": [{"file_id": "l", "file_size": 9000}]}]
+    )
+    prompt, _ = client.submitted[0]  # type: ignore[attr-defined]
+    saved = next(iter((tmp_path / ".veles" / "tmp").glob("*-photo.jpg")))
+    assert "a bar chart" in prompt
+    assert str(saved.relative_to(tmp_path)) in prompt
 
 
 async def test_photo_picks_largest_variant(

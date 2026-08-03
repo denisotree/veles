@@ -16,11 +16,11 @@ from veles.core.project import init_project
 from veles.core.tools.builtin.image import (
     _DEFAULT_DESCRIBE_PROMPT,
     _VISION_OUTPUT_CAP,
-    _detect_mime,
     _truncate,
     image_describe,
     image_ocr,
 )
+from veles.core.vision.backends import detect_mime as _detect_mime
 
 # ---------- harness ----------
 

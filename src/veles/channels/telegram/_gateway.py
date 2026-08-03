@@ -66,12 +66,19 @@ from veles.channels.telegram._api import TelegramApi
 from veles.channels.telegram._buffer import (
     _BUFFER_HARD_CAP,
     _DEBOUNCE_SECONDS,
+    _FORWARD_BUFFER_HARD_CAP,
+    _FORWARD_DEBOUNCE_SECONDS,
     _ChatBuffer,
     _classify,
+    _is_relayed,
     _Kind,
 )
 from veles.channels.telegram._delivery import TelegramDelivery, _TurnOutcome
-from veles.channels.telegram._forwarded import _has_forward, _render_forwarded
+from veles.channels.telegram._forwarded import (
+    _forward_header,
+    _has_forward,
+    _render_forwarded,
+)
 from veles.channels.telegram._helpers import (
     _LONG_POLL_TIMEOUT,
     _POLL_RETRY_INITIAL,
@@ -105,6 +112,11 @@ class TelegramGateway:
     # Project root for building `read_file(...)` paths inside the prompt.
     # When None we fall back to attachment basenames.
     project_root: Path | None = None
+    # Aggregation window; None = the `_DEBOUNCE_SECONDS` default.
+    debounce_seconds: float | None = None
+    # Wider window used once the buffer holds a forward / album item;
+    # None = the `_FORWARD_DEBOUNCE_SECONDS` default.
+    forward_debounce_seconds: float | None = None
     _running: bool = field(default=False, init=False)
     _http: aiohttp.ClientSession | None = field(default=None, init=False)
     _telegram_send: Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]] | None = field(
@@ -318,26 +330,44 @@ class TelegramGateway:
 
     async def _enqueue(self, chat_key: str, chat_id: int, message: dict[str, Any]) -> None:
         """Place an incoming message into the per-chat buffer, deferred
-        for `_DEBOUNCE_SECONDS`. Every message waits out the window —
-        including a lone text — so a burst sent in quick succession
-        (a comment + forwarded messages, a multi-message paste) coalesces
-        into one turn instead of firing a premature reply on the first
-        piece. Buffer hits `_BUFFER_HARD_CAP` → flush right away so the
-        user doesn't wait forever during a flood."""
+        for the debounce window. Every message waits it out — including a
+        lone text — so a burst sent in quick succession (a comment +
+        forwarded messages, a multi-message paste) coalesces into one
+        turn instead of firing a premature reply on the first piece.
+        Buffer hits the hard cap → flush right away so the user doesn't
+        wait forever during a flood.
+
+        Relayed content (a forward, an album item — see `_is_relayed`)
+        widens both: Telegram itself tells us the user is relaying
+        something from elsewhere, and the comment that frames it lands
+        seconds after the last forward, well past the base window."""
         buf = self._buffers.get(chat_key)
         if buf is None:
             buf = _ChatBuffer(chat_id=chat_id, chat_key=chat_key)
             self._buffers[chat_key] = buf
         buf.cancel_timer()
         buf.messages.append(message)
-        if len(buf.messages) >= _BUFFER_HARD_CAP:
+        # Sticky: once anything relayed lands, the whole burst gets the wide
+        # treatment — including the plain-text comment that closes it.
+        buf.relayed = buf.relayed or _is_relayed(message)
+        cap = _FORWARD_BUFFER_HARD_CAP if buf.relayed else _BUFFER_HARD_CAP
+        if len(buf.messages) >= cap:
             await self._flush_buffer(chat_key)
             return
         loop = asyncio.get_running_loop()
         buf.timer = loop.call_later(
-            _DEBOUNCE_SECONDS,
+            self._window_for(buf),
             lambda: self._spawn(self._flush_buffer(chat_key)),
         )
+
+    def _window_for(self, buf: _ChatBuffer) -> float:
+        if buf.relayed:
+            return (
+                self.forward_debounce_seconds
+                if self.forward_debounce_seconds is not None
+                else _FORWARD_DEBOUNCE_SECONDS
+            )
+        return self.debounce_seconds if self.debounce_seconds is not None else _DEBOUNCE_SECONDS
 
     def _spawn(self, coro) -> None:
         """Fire-and-forget for callbacks that can't await. The task is
@@ -368,17 +398,25 @@ class TelegramGateway:
         adapter is registered, the file is fetched, transcribed /
         described, and the resulting text is folded into the prompt
         (with a `[voice: …]` / `[photo: …]` marker so the agent knows
-        the origin). When no adapter is registered, the channel sends
-        a one-line `multimodal not configured` notice instead of
-        silently dropping the input.
+        the origin). Without an adapter voice gets a one-line "not
+        configured" notice, while a photo is saved to `attachment_dir`
+        and the prompt points the agent at `image_describe` — no vision
+        adapter needed when the project's model can already see.
         """
         parts: list[str] = []
         attachments: list[Path] = []
         for message in messages:
+            # Forwarded media takes the branch of its kind below, so the
+            # `↪️ Forwarded from …` attribution the text path renders has to
+            # be added here — otherwise a relayed photo reads as the user's
+            # own, and the agent answers as if they took it.
+            head = _forward_header(message)
             doc = message.get("document")
             if isinstance(doc, dict):
                 saved = await self._save_telegram_document(chat_id, doc)
                 if saved is not None:
+                    if head:
+                        parts.append(head)
                     attachments.append(saved)
                 caption = (message.get("caption") or "").strip()
                 if caption:
@@ -388,6 +426,8 @@ class TelegramGateway:
             if isinstance(voice, dict):
                 transcript = await self._transcribe_voice(chat_id, voice)
                 if transcript is not None:
+                    if head:
+                        parts.append(head)
                     parts.append(transcript)
                 caption = (message.get("caption") or "").strip()
                 if caption:
@@ -397,6 +437,8 @@ class TelegramGateway:
             if isinstance(photo, list) and photo:
                 description = await self._describe_photo(chat_id, photo)
                 if description is not None:
+                    if head:
+                        parts.append(head)
                     parts.append(description)
                 caption = (message.get("caption") or "").strip()
                 if caption:

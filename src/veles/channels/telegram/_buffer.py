@@ -13,8 +13,20 @@ from typing import Any
 
 from veles.channels.telegram._forwarded import _has_forward
 
-_DEBOUNCE_SECONDS = 1.5
+# Debounce window. 1.5s covered only near-simultaneous updates (a forward
+# burst); a human who types a comment, switches chats and forwards a post
+# needs a few seconds more, so the default is 3s. Override per install with
+# `[channels.telegram] debounce_seconds` in `.veles/config.toml`.
+_DEBOUNCE_SECONDS = 3.0
 _BUFFER_HARD_CAP = 5
+# A forward (or an album) is rarely the whole thought: the user is still
+# picking posts to send, and the comment that frames them lands seconds
+# later. Telegram marks both cases for us — `forward_origin`/`forward_*`
+# and `media_group_id` — so once the buffer holds one, the window widens
+# and the cap rises to fit a full 10-item album plus its comment.
+# `[channels.telegram] forward_debounce_seconds` overrides.
+_FORWARD_DEBOUNCE_SECONDS = 12.0
+_FORWARD_BUFFER_HARD_CAP = 12
 
 
 @dataclass(slots=True)
@@ -29,11 +41,23 @@ class _ChatBuffer:
     chat_key: str
     messages: list[dict[str, Any]] = field(default_factory=list)
     timer: asyncio.TimerHandle | None = None
+    relayed: bool = False
+    """Sticky: set once any buffered message is forwarded / part of an
+    album, and it widens the window for the rest of the burst — the
+    trailing comment is plain text but belongs to the same thought."""
 
     def cancel_timer(self) -> None:
         if self.timer is not None:
             self.timer.cancel()
             self.timer = None
+
+
+def _is_relayed(message: dict[str, Any]) -> bool:
+    """True when Telegram marks the message as coming from elsewhere —
+    forwarded from a user / channel / group, or one item of an album
+    (`media_group_id`). Both mean more updates for the same thought are
+    probably still on the way."""
+    return _has_forward(message) or bool(message.get("media_group_id"))
 
 
 class _Kind(Enum):
@@ -49,9 +73,10 @@ def _classify(message: dict[str, Any]) -> _Kind:
     """Decide what flavour of update this is. Priority order:
     document > voice/photo (multimodal) > forward > text.
     Voice/photo are recognised here; the actual transcription /
-    description happens later via `veles.modules.{stt,vision}` —
-    when no adapter is registered the channel surfaces a polite
-    "multimodal not configured" notice rather than silently dropping."""
+    description happens later in `TelegramMedia` — voice needs an STT
+    adapter (no adapter → a polite "not configured" notice), photo
+    falls back to saving the file and letting the agent call
+    `image_describe`."""
     if isinstance(message.get("document"), dict):
         return _Kind.DOCUMENT
     if isinstance(message.get("voice"), dict) or isinstance(message.get("audio"), dict):
