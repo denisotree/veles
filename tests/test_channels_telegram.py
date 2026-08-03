@@ -1396,12 +1396,32 @@ async def test_document_non_textual_rejected(
 async def test_buffer_caps_at_five_messages_flushes_immediately(
     session_map: SessionMap, tmp_path: Path
 ) -> None:
-    """A flood of 5+ forwards in one window flushes early — the user
-    doesn't wait 10+ seconds if their finger gets stuck on the share
-    button."""
+    """A flood of 5+ typed messages in one window flushes early — the
+    user doesn't wait out the window on top of a long burst."""
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _gateway_with_attachments(session_map, tmp_path, sends)
     for i in range(5):
+        await gateway._handle_update(
+            {
+                "update_id": 100 + i,
+                "message": {"chat": {"id": 42, "type": "private"}, "text": f"Line {i}"},
+            }
+        )
+    # Hard cap reached → flush without waiting.
+    assert "42" not in gateway._buffers
+    assert len(gateway.daemon_client.calls) == 1
+    prompt, _sid = gateway.daemon_client.calls[0]
+    for i in range(5):
+        assert f"Line {i}" in prompt
+
+
+async def test_forward_burst_gets_the_wider_cap(session_map: SessionMap, tmp_path: Path) -> None:
+    """Forwards are relayed content: the comment framing them is still
+    coming, so a share-button burst keeps buffering past the plain cap
+    (up to a full 10-item album plus its comment)."""
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _gateway_with_attachments(session_map, tmp_path, sends)
+    for i in range(6):
         await gateway._handle_update(
             {
                 "update_id": 100 + i,
@@ -1412,12 +1432,20 @@ async def test_buffer_caps_at_five_messages_flushes_immediately(
                 },
             }
         )
-    # Hard cap reached → flush without waiting.
-    assert "42" not in gateway._buffers
-    assert len(gateway.daemon_client.calls) == 1
+    assert gateway.daemon_client.calls == []  # still waiting for the comment
+    assert gateway._buffers["42"].relayed is True
+    # The trailing comment joins the same turn.
+    await gateway._handle_update(
+        {
+            "update_id": 200,
+            "message": {"chat": {"id": 42, "type": "private"}, "text": "save these"},
+        }
+    )
+    await gateway._flush_buffer("42")
     prompt, _sid = gateway.daemon_client.calls[0]
-    for i in range(5):
+    for i in range(6):
         assert f"Post {i}" in prompt
+    assert "save these" in prompt
 
 
 # ---- M210: getUpdates backoff + log suppression ----

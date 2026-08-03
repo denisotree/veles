@@ -19,6 +19,14 @@ from veles.channels.telegram._forwarded import _has_forward
 # `[channels.telegram] debounce_seconds` in `.veles/config.toml`.
 _DEBOUNCE_SECONDS = 3.0
 _BUFFER_HARD_CAP = 5
+# A forward (or an album) is rarely the whole thought: the user is still
+# picking posts to send, and the comment that frames them lands seconds
+# later. Telegram marks both cases for us — `forward_origin`/`forward_*`
+# and `media_group_id` — so once the buffer holds one, the window widens
+# and the cap rises to fit a full 10-item album plus its comment.
+# `[channels.telegram] forward_debounce_seconds` overrides.
+_FORWARD_DEBOUNCE_SECONDS = 12.0
+_FORWARD_BUFFER_HARD_CAP = 12
 
 
 @dataclass(slots=True)
@@ -33,11 +41,23 @@ class _ChatBuffer:
     chat_key: str
     messages: list[dict[str, Any]] = field(default_factory=list)
     timer: asyncio.TimerHandle | None = None
+    relayed: bool = False
+    """Sticky: set once any buffered message is forwarded / part of an
+    album, and it widens the window for the rest of the burst — the
+    trailing comment is plain text but belongs to the same thought."""
 
     def cancel_timer(self) -> None:
         if self.timer is not None:
             self.timer.cancel()
             self.timer = None
+
+
+def _is_relayed(message: dict[str, Any]) -> bool:
+    """True when Telegram marks the message as coming from elsewhere —
+    forwarded from a user / channel / group, or one item of an album
+    (`media_group_id`). Both mean more updates for the same thought are
+    probably still on the way."""
+    return _has_forward(message) or bool(message.get("media_group_id"))
 
 
 class _Kind(Enum):

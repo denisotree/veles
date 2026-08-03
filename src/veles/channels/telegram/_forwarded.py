@@ -46,12 +46,20 @@ def _forward_source(message: dict[str, Any]) -> str:
     return ""
 
 
+def _forward_header(message: dict[str, Any]) -> str:
+    """`↪️ Forwarded from <src>:` — the attribution line. Empty string
+    when the message wasn't forwarded, so call sites can `if head:`."""
+    if not _has_forward(message):
+        return ""
+    src = _forward_source(message)
+    return f"↪️ Forwarded from {src}:" if src else "↪️ Forwarded message:"
+
+
 def _render_forwarded(message: dict[str, Any]) -> str:
     """Turn a forwarded message into a quote block prefixed with `↪️
     Forwarded from <src>:`. The body is indented with `> ` so the
     agent can't mistake the quote for the user's own request."""
-    src = _forward_source(message)
     body = (message.get("text") or message.get("caption") or "").strip() or "(empty)"
-    head = f"↪️ Forwarded from {src}:" if src else "↪️ Forwarded message:"
+    head = _forward_header(message) or "↪️ Forwarded message:"
     quoted = "\n".join(f"> {line}" for line in body.splitlines())
     return f"{head}\n{quoted}"

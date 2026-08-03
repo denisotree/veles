@@ -777,6 +777,19 @@ def _channel_session_map(state: DaemonState, platform: str):
     return SessionMap.load(channel_session_path(key))
 
 
+def _float_setting(cfg: dict, key: str) -> float | None:
+    """Read an optional numeric channel setting. A typo warns and falls
+    back to the code default rather than crashing daemon startup."""
+    raw = cfg.get(key)
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        logger.warning("[channels.telegram] %s=%r is not a number — using the default", key, raw)
+        return None
+
+
 def _build_channel_gateway(platform: str, channel_cfg: dict, *, backend, state: DaemonState):
     """Resolve creds + build one gateway via the platform registry. Returns
     None (and warns) when the platform is unregistered or its token is
@@ -808,12 +821,6 @@ def _build_channel_gateway(platform: str, channel_cfg: dict, *, backend, state: 
         legacy_chat_id = channel_cfg.get("chat_id")
         if legacy_chat_id and not whitelist:
             whitelist = (str(legacy_chat_id),)
-        raw_debounce = channel_cfg.get("debounce_seconds")
-        try:
-            debounce = float(raw_debounce) if raw_debounce is not None else None
-        except (TypeError, ValueError):
-            logger.warning("[channels.telegram] debounce_seconds=%r is not a number", raw_debounce)
-            debounce = None
         gateway = entry.factory(
             bot_token=str(token),
             daemon_client=backend,
@@ -821,7 +828,8 @@ def _build_channel_gateway(platform: str, channel_cfg: dict, *, backend, state: 
             whitelist=whitelist,
             attachment_dir=state.project.tmp_dir,
             project_root=state.project.root,
-            debounce_seconds=debounce,
+            debounce_seconds=_float_setting(channel_cfg, "debounce_seconds"),
+            forward_debounce_seconds=_float_setting(channel_cfg, "forward_debounce_seconds"),
         )
         logger.info("telegram channel started (whitelist: %d entries)", len(whitelist))
         return gateway
