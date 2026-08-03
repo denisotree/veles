@@ -9,11 +9,15 @@ adapter packages and register at daemon startup.
 The channel call site (Telegram on photo upload, future web on file
 drop) consults `get_vision_adapter()`: if registered, the photo
 bytes are described into prose and the description joins the agent
-prompt as text. If `None`, the user gets a "multimodal not
-configured" notice instead of a silent drop.
+prompt as text.
 
 No concrete adapter ships in core — stock Veles never bundles a
-cloud vision dependency.
+cloud vision dependency, so `None` is the normal case. The adapter
+is an *override*, not the only path: the channel then saves the
+image and lets the agent call the builtin `image_describe` /
+`image_ocr` tools, which route through `route("vision", project)`.
+Register an adapter only to describe images without spending an
+agent turn on a tool call.
 """
 
 from __future__ import annotations

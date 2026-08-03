@@ -9,10 +9,11 @@ Two complementary tools, agent picks based on task class:
 
 - `image_describe(path, prompt=...)` — vision-capable LLM call.
   Semantic. Best for diagrams, architecture pictures, photos of
-  scenes. Routed via `route("vision", project)` (default
-  `anthropic:claude-sonnet-4.6`); user can switch to
-  `claude-opus-4-7` or any other vision-capable model via
-  `veles route set vision <provider>:<model>`. Per-provider wire
+  scenes. Routed via `route("vision", project)`, which with no
+  explicit route falls back to the project's `[engine]` model — a
+  multimodal engine therefore needs no configuration at all. Pin a
+  different one with `veles route set vision <provider>:<model>`
+  (needed when the engine is a text-only or local model). Per-provider wire
   formats (Anthropic / OpenAI / OpenRouter / Gemini) handled
   inline rather than going through `Provider.create_message`,
   since that abstraction is text-only today.

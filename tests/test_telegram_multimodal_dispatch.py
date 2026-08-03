@@ -298,6 +298,57 @@ async def test_photo_without_adapter_falls_back_to_attachment(
     assert not [p for m, p in sends if "no vision adapter" in p.get("text", "")]
 
 
+async def test_photo_attachment_path_is_consumable_by_image_describe(
+    session_map: SessionMap, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The handoff, end to end: whatever path the channel puts in the
+    prompt must survive `resolve_safe` and reach the vision model. The
+    daemon chdirs to the project root (`_bootstrap_daemon`), so the
+    relative form the prompt carries resolves there."""
+    import re
+    import sys
+    from unittest.mock import MagicMock
+
+    from veles.core.context import reset_active_project, set_active_project
+    from veles.core.project import init_project
+    from veles.core.routing import set_project_route
+    from veles.core.tools.builtin.image import image_describe
+
+    project = init_project(tmp_path / "proj", name="proj")
+    token = set_active_project(project)
+    monkeypatch.chdir(project.root)
+    set_project_route(project, "vision", "openrouter:moonshotai/kimi-k2.5")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
+    try:
+        sends: list[tuple[str, dict[str, Any]]] = []
+        gateway, client = _make_gateway(session_map, sends)
+        gateway.attachment_dir = project.tmp_dir
+        gateway.project_root = project.root
+
+        async def fake_download(self, *_a, **_kw):
+            return b"\xff\xd8\xffjpeg-bytes"
+
+        monkeypatch.setattr(TelegramGateway, "_download_telegram_file", fake_download)
+        await gateway._dispatch_messages(
+            chat_id=42, chat_key="42", messages=[{"photo": [{"file_id": "l", "file_size": 9000}]}]
+        )
+        prompt, _ = client.submitted[0]  # type: ignore[attr-defined]
+        emitted = re.search(r"\[photo attached: (\S+)\]", prompt)
+        assert emitted, prompt
+
+        fake_client = MagicMock()
+        fake_client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content="a screenshot of a chart"))]
+        )
+        fake_openai = MagicMock()
+        fake_openai.OpenAI.return_value = fake_client
+        monkeypatch.setitem(sys.modules, "openai", fake_openai)
+
+        assert image_describe(emitted.group(1)) == "a screenshot of a chart"
+    finally:
+        reset_active_project(token)
+
+
 async def test_photo_picks_largest_variant(
     session_map: SessionMap, monkeypatch: pytest.MonkeyPatch
 ) -> None:

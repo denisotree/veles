@@ -371,9 +371,10 @@ class TelegramGateway:
         adapter is registered, the file is fetched, transcribed /
         described, and the resulting text is folded into the prompt
         (with a `[voice: …]` / `[photo: …]` marker so the agent knows
-        the origin). When no adapter is registered, the channel sends
-        a one-line `multimodal not configured` notice instead of
-        silently dropping the input.
+        the origin). Without an adapter voice gets a one-line "not
+        configured" notice, while a photo is saved to `attachment_dir`
+        and the prompt points the agent at `image_describe` — no vision
+        adapter needed when the project's model can already see.
         """
         parts: list[str] = []
         attachments: list[Path] = []

@@ -53,9 +53,10 @@ def _classify(message: dict[str, Any]) -> _Kind:
     """Decide what flavour of update this is. Priority order:
     document > voice/photo (multimodal) > forward > text.
     Voice/photo are recognised here; the actual transcription /
-    description happens later via `veles.modules.{stt,vision}` —
-    when no adapter is registered the channel surfaces a polite
-    "multimodal not configured" notice rather than silently dropping."""
+    description happens later in `TelegramMedia` — voice needs an STT
+    adapter (no adapter → a polite "not configured" notice), photo
+    falls back to saving the file and letting the agent call
+    `image_describe`."""
     if isinstance(message.get("document"), dict):
         return _Kind.DOCUMENT
     if isinstance(message.get("voice"), dict) or isinstance(message.get("audio"), dict):
