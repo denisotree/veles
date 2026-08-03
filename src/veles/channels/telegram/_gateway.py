@@ -105,6 +105,8 @@ class TelegramGateway:
     # Project root for building `read_file(...)` paths inside the prompt.
     # When None we fall back to attachment basenames.
     project_root: Path | None = None
+    # Aggregation window; None = the `_DEBOUNCE_SECONDS` default.
+    debounce_seconds: float | None = None
     _running: bool = field(default=False, init=False)
     _http: aiohttp.ClientSession | None = field(default=None, init=False)
     _telegram_send: Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]] | None = field(
@@ -334,8 +336,9 @@ class TelegramGateway:
             await self._flush_buffer(chat_key)
             return
         loop = asyncio.get_running_loop()
+        window = self.debounce_seconds if self.debounce_seconds is not None else _DEBOUNCE_SECONDS
         buf.timer = loop.call_later(
-            _DEBOUNCE_SECONDS,
+            window,
             lambda: self._spawn(self._flush_buffer(chat_key)),
         )
 

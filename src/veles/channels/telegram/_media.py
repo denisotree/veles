@@ -92,20 +92,30 @@ class TelegramMedia:
         return f"[voice transcript] {text.strip()}"
 
     async def describe_photo(self, chat_id: int, photo: list[dict[str, Any]]) -> str | None:
-        """Same shape as `transcribe_voice` but via the Vision
-        adapter. `photo` is Telegram's size-variants array; we pick
-        the largest so the vision model sees the most detail."""
+        """Turn an incoming photo into a prompt chunk. `photo` is
+        Telegram's size-variants array; we pick the largest so the model
+        sees the most detail.
+
+        Two paths. A registered Vision adapter describes the image
+        inline (same shape as `transcribe_voice`). With no adapter — the
+        stock case, since core ships none — the photo is saved under
+        `attachment_dir` and the prompt points the agent at the builtin
+        `image_describe` / `image_ocr` tools, which already route through
+        `route("vision", project)` and therefore reach whatever
+        multimodal model the project is configured with. The
+        "not configured" notice is only for the case where neither path
+        exists (no adapter *and* no attachment dir)."""
         from veles.modules.vision import VisionError, get_vision_adapter
 
         gw = self._gw
         adapter = get_vision_adapter()
-        if adapter is None:
+        if adapter is None and gw.attachment_dir is None:
             await gw._send_message(
                 chat_id,
-                "<i>photo received but no vision adapter is "
-                "configured.</i> Install one via "
-                "<code>register_vision_adapter(...)</code> at daemon "
-                "startup, or describe the image in text.",
+                "<i>photo received but attachments are not configured and "
+                "no vision adapter is installed.</i> Point the channel at a "
+                "project (attachment dir) or install an adapter via "
+                "<code>register_vision_adapter(...)</code>.",
             )
             return None
         # Telegram delivers photo as variants; the last entry is the
@@ -133,6 +143,13 @@ class TelegramMedia:
         except Exception as exc:
             logger.warning("photo download failed: %s", exc)
             return None
+        if adapter is None:
+            saved = self.persist_attachment("photo.jpg", image_bytes)
+            return (
+                f"[photo attached: {self._prompt_path(saved)}] "
+                "Look at it with image_describe(path) — or image_ocr(path) "
+                "when it's mostly text — before answering."
+            )
         try:
             description = await asyncio.to_thread(adapter.describe_image, image_bytes, "image/jpeg")
         except VisionError as exc:
@@ -156,6 +173,14 @@ class TelegramMedia:
         target = gw.attachment_dir / fname
         target.write_bytes(data)
         return target
+
+    def _prompt_path(self, target: Path) -> str:
+        """Project-relative path when we know the root — that's the form
+        the sandboxed file tools (`resolve_safe`) expect."""
+        root = self._gw.project_root
+        if root is not None and target.is_relative_to(root):
+            return str(target.relative_to(root))
+        return str(target)
 
     async def save_telegram_document(self, chat_id: int, document: dict[str, Any]) -> Path | None:
         """Validate → ack → download → persist for one document. Returns

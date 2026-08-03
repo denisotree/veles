@@ -270,6 +270,34 @@ async def test_photo_without_adapter_sends_notice(session_map: SessionMap) -> No
     assert client.submitted == []  # type: ignore[attr-defined]
 
 
+async def test_photo_without_adapter_falls_back_to_attachment(
+    session_map: SessionMap, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No vision adapter but a project to save into: the photo is
+    persisted and the agent is pointed at `image_describe`, which routes
+    to the project's own (multimodal) model — no adapter needed."""
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway, client = _make_gateway(session_map, sends)
+    gateway.attachment_dir = tmp_path / ".veles" / "tmp"
+    gateway.project_root = tmp_path
+
+    async def fake_download(self, *_a, **_kw):
+        return b"\xff\xd8\xffjpeg-bytes"
+
+    monkeypatch.setattr(TelegramGateway, "_download_telegram_file", fake_download)
+
+    msg = {"photo": [{"file_id": "large", "file_size": 200_000}]}
+    await gateway._dispatch_messages(chat_id=42, chat_key="42", messages=[msg])
+
+    saved = list((tmp_path / ".veles" / "tmp").glob("*-photo.jpg"))
+    assert len(saved) == 1
+    assert saved[0].read_bytes() == b"\xff\xd8\xffjpeg-bytes"
+    prompt, _ = client.submitted[0]  # type: ignore[attr-defined]
+    assert "image_describe" in prompt
+    assert str(saved[0].relative_to(tmp_path)) in prompt
+    assert not [p for m, p in sends if "no vision adapter" in p.get("text", "")]
+
+
 async def test_photo_picks_largest_variant(
     session_map: SessionMap, monkeypatch: pytest.MonkeyPatch
 ) -> None:

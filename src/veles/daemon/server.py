@@ -808,6 +808,12 @@ def _build_channel_gateway(platform: str, channel_cfg: dict, *, backend, state: 
         legacy_chat_id = channel_cfg.get("chat_id")
         if legacy_chat_id and not whitelist:
             whitelist = (str(legacy_chat_id),)
+        raw_debounce = channel_cfg.get("debounce_seconds")
+        try:
+            debounce = float(raw_debounce) if raw_debounce is not None else None
+        except (TypeError, ValueError):
+            logger.warning("[channels.telegram] debounce_seconds=%r is not a number", raw_debounce)
+            debounce = None
         gateway = entry.factory(
             bot_token=str(token),
             daemon_client=backend,
@@ -815,6 +821,7 @@ def _build_channel_gateway(platform: str, channel_cfg: dict, *, backend, state: 
             whitelist=whitelist,
             attachment_dir=state.project.tmp_dir,
             project_root=state.project.root,
+            debounce_seconds=debounce,
         )
         logger.info("telegram channel started (whitelist: %d entries)", len(whitelist))
         return gateway

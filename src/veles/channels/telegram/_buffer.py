@@ -13,7 +13,11 @@ from typing import Any
 
 from veles.channels.telegram._forwarded import _has_forward
 
-_DEBOUNCE_SECONDS = 1.5
+# Debounce window. 1.5s covered only near-simultaneous updates (a forward
+# burst); a human who types a comment, switches chats and forwards a post
+# needs a few seconds more, so the default is 3s. Override per install with
+# `[channels.telegram] debounce_seconds` in `.veles/config.toml`.
+_DEBOUNCE_SECONDS = 3.0
 _BUFFER_HARD_CAP = 5
 
 
