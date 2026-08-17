@@ -148,13 +148,14 @@ web_search = "always_confirm"
 Each run is its own session, and everything is written to `memory.db`
 unconditionally. What varies is whether the *next* run can find it.
 
-**The prompt is the recall query, verbatim.** Full-text search ANDs every token,
-so a long prompt — a pasted JSON payload, a wall of log lines — must have *all*
-of its tokens present in a stored row to match. Volatile tokens (timestamps,
-metric values, ids) guarantee that it never does, and the failure is silent: no
-`<memory-context>` block appears, and nothing is printed.
+**The prompt is the recall query, verbatim.** Short queries are ANDed — good for
+a keyword lookup. Longer ones are ORed and ranked by relevance, because demanding
+that one stored row contain *every* token of a paragraph matches nothing once
+timestamps, ids and metric values are in the mix. Before v0.30 long queries were
+ANDed too, and retrieved nothing at all, silently.
 
-So keep the prompt short and stable, and pass bulk data by file:
+Ranked overlap is still weaker than a precise query, so keep the prompt short and
+stable and pass bulk data by file:
 
 ```python
 (project_dir / ".veles/tmp/input.json").write_text(json.dumps(payload))
@@ -218,8 +219,8 @@ Worth knowing:
 
 Semantic recall of insights additionally needs a **local** embedding backend
 (Ollama with `nomic-embed-text`); a cloud API key does not enable it, by design —
-project text is never sent to a cloud embedder. Without one, recall is
-keyword-only, silently.
+project text is never sent to a cloud embedder. Without one, recall stays
+keyword-only. `veles doctor` reports which backend is active.
 
 ## Concurrency
 
