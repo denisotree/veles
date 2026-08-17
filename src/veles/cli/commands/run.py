@@ -11,6 +11,28 @@ from veles.core.memory import SessionStore
 from veles.core.project import Project
 from veles.core.provider import ProviderError
 
+# M228: one exit code per `stopped_reason`, so a parent process can pick a retry
+# policy from `returncode` alone instead of regexing the `--verbose` stderr line.
+# Everything stays below 125 (126/127/128+n are shell-reserved).
+#
+#   0 completed            done
+#   1 ProviderError, or an unrecognised non-completion   retry
+#   2 config / API key / session not found (see below)   do not retry, fix setup
+#   3 max_iterations       re-scope the task
+#   4 budget_exhausted     raise --max-tokens-total
+#   5 empty                the model produced no final text
+#   6 cancelled            interrupted
+#
+# `.get(..., 1)` is deliberate: a `stopped_reason` added later degrades to
+# "generic failure" and can never be mistaken for success.
+EXIT_BY_REASON = {
+    "completed": 0,
+    "max_iterations": 3,
+    "budget_exhausted": 4,
+    "empty": 5,
+    "cancelled": 6,
+}
+
 
 def _verify_enabled(args: argparse.Namespace) -> bool:
     """M170 opt-in: `--verify` flag or `VELES_VERIFY_MODE=1`. Default off."""
@@ -292,7 +314,7 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
             print(result.text)
         print(f"<session={result.session_id}>", file=sys.stderr)
         _print_run_summary(args, result, budget)
-        rc = 0 if result.stopped_reason == "completed" else 1
+        rc = EXIT_BY_REASON.get(result.stopped_reason, 1)
     finally:
         store.close()
     _maybe_run_insight_extractor(args, project, result.history, result.session_id)

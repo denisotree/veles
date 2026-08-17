@@ -664,11 +664,18 @@ def _load_skills(
             logger.warning("project tool %s failed to load: %s", name, scope)
         if report.unapproved:
             names = ", ".join(sorted(p.stem for p in report.unapproved))
-            logger.warning(
-                "%d self-authored tool file(s) not loaded (unapproved): %s — "
-                "review and run `veles tool approve <name>` (or --all) to enable them",
-                len(report.unapproved),
-                names,
+            # Printed, not logged (M229). An unapproved tool vanishes from the
+            # toolset silently: the model never sees the tool *or* a refusal, so
+            # the agent can answer confidently having never reached its data
+            # source — and still exit 0. That has to be visible even when an
+            # embedder has configured logging (relying on logging's lastResort
+            # stderr handler makes it accidental), and greppable like the rest
+            # of the CLI's `warning:` lines.
+            print(
+                f"warning: {len(report.unapproved)} self-authored tool file(s) not loaded "
+                f"(unapproved): {names} — review and run `veles tool approve <name>` "
+                f"(or --all) to enable them",
+                file=sys.stderr,
             )
     except Exception as exc:
         logger.warning("project tools unavailable: %s", exc)
