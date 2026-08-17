@@ -190,8 +190,12 @@ def add_interactive_flags(parser: argparse.ArgumentParser) -> None:
     selection/copy) is what bare `veles` launches — there is no separate `repl`
     or `tui` subcommand. Putting the flags at the top level lets `veles`,
     `veles -c`, `veles --provider X` all start it without a subcommand."""
-    add_common_run_flags(parser)
-    parser.set_defaults(model=None)  # None → persisted/default resolved at runtime
+    # `defaults=True`: this is the ONE parser that owns the real default values.
+    # Every subparser copy uses argparse.SUPPRESS so it cannot clobber them (M227).
+    # The old `set_defaults(model=None)` is gone — `resolve_effective_model` treats
+    # None and DEFAULT_MODEL ("") identically, and keeping it would have leaked
+    # None into every verb once the subparser stopped supplying its own default.
+    add_common_run_flags(parser, defaults=True)
     parser.add_argument("--resume", metavar="ID", default=None, help="Resume an existing session.")
     parser.add_argument(
         "-c",
