@@ -29,6 +29,7 @@ If you have never run Veles, do the two tutorials in order:
 - [Configure providers (cloud & local)](how-to/configure-providers.md)
 - [Route different tasks to different models](how-to/per-task-routing.md)
 - [Run Veles as a daemon](how-to/run-as-daemon.md)
+- [Embed `veles run` in another program](how-to/embed-veles-run.md)
 - [Connect a Telegram channel](how-to/connect-telegram.md)
 - [Manage skills, tools, and modules](how-to/manage-skills-and-tools.md)
 - [Work with multiple projects and subprojects](how-to/multi-project-and-subprojects.md)

@@ -105,6 +105,14 @@ triggers. Accepts all [shared agent-loop flags](#shared-agent-loop-flags) plus:
 | `--compressor-model <id>` | routed | Override the compression model |
 | `--compress-threshold-tokens <n>` | `50000` | History size that triggers compression |
 
+**Exit codes:** `0` completed · `1` provider error or unrecognised
+non-completion · `2` configuration, API key, or unknown `--resume` id · `3`
+`max_iterations` · `4` `budget_exhausted` · `5` `empty` · `6` `cancelled`.
+
+Calling `run` from another program? stdout carries the answer and nothing else,
+every diagnostic goes to stderr, and both are contract-tested — see
+[Embed `veles run` in another program](../how-to/embed-veles-run.md).
+
 ### `veles` (no subcommand)
 Bare `veles` (no subcommand) opens the interactive inline REPL — the default
 surface. See [TUI reference](tui.md). Its flags live on the top-level parser, so
