@@ -105,6 +105,41 @@ def test_long_query_matching_nothing_still_returns_empty(store: SessionStore) ->
     assert store.search_turns("quaternion interpolation for skeletal animation blending") == []
 
 
+def test_shared_function_words_do_not_manufacture_matches(store: SessionStore) -> None:
+    """The failure mode OR introduces, if the stopword list is too thin.
+
+    Empty and noisy are NOT equivalent outcomes: an absent `<memory-context>`
+    block says nothing, while an injected one reads to the model as relevant.
+    Every seeded turn here opens with an interrogative, so a topically unrelated
+    question would match all of them on "how"/"what"/"when" alone.
+    """
+    for content in (
+        "how do I rotate the API key for this project",
+        "how does the curator decide what to keep",
+        "what happens when the deploy pipeline rejects unsigned artifacts",
+        "when should I use a subproject instead of a new project",
+    ):
+        _seed(store, content)
+
+    unrelated = "how do I configure quaternion interpolation for skeletal animation blending"
+    assert store.search_turns(unrelated) == []
+
+    # ...while a query that shares real topic words still hits.
+    assert store.search_turns("how does the curator decide which sessions to keep in memory")
+
+
+def test_wiki_search_shares_the_same_escaper(store: SessionStore) -> None:
+    """Wiki is one of the five recall streams — it must not stay on plain AND.
+
+    Otherwise a long prompt retrieves turns and insights but zero wiki pages.
+    """
+    from veles.core.fts import escape_query
+    from veles.modules.wiki.wiki import _fts_escape
+
+    assert _fts_escape is escape_query
+    assert _fts_escape_query is escape_query
+
+
 def test_insight_search_gets_the_same_treatment(store: SessionStore) -> None:
     store._conn.execute(
         "INSERT INTO insights(title, body, category, created_at, confidence) VALUES (?,?,?,?,?)",

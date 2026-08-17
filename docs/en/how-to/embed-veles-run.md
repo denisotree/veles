@@ -151,7 +151,7 @@ unconditionally. What varies is whether the *next* run can find it.
 **The prompt is the recall query, verbatim.** Short queries are ANDed — good for
 a keyword lookup. Longer ones are ORed and ranked by relevance, because demanding
 that one stored row contain *every* token of a paragraph matches nothing once
-timestamps, ids and metric values are in the mix. Before v0.30 long queries were
+timestamps, ids and metric values are in the mix. Before v0.31 long queries were
 ANDed too, and retrieved nothing at all, silently.
 
 Ranked overlap is still weaker than a precise query, so keep the prompt short and

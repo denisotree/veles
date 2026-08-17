@@ -34,6 +34,7 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
+from veles.core.fts import escape_query
 from veles.core.safety import scan_for_injection
 from veles.core.slug import normalize_slug as _normalize_slug
 
@@ -532,7 +533,7 @@ class Wiki:
         return [pages_by_rel[r["rel_path"]] for r in rows if r["rel_path"] in pages_by_rel]
 
 
-def _fts_escape(query: str) -> str:
-    """Wrap each whitespace-separated token in double quotes for FTS5 MATCH safety."""
-    tokens = query.split()
-    return " ".join('"' + t.replace('"', '""') + '"' for t in tokens)
+# M230: shared with `core/memory` via `core/fts.py`. Wiki search is one of the
+# five recall streams, so leaving it on the old AND-everything escape would have
+# meant a long prompt retrieving turns and insights but zero wiki pages.
+_fts_escape = escape_query

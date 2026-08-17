@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import secrets
 import sqlite3
 import time
@@ -31,6 +30,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from veles.core.fts import escape_query
 from veles.core.provider import Message, ToolCall
 
 logger = logging.getLogger(__name__)
@@ -757,87 +757,10 @@ class SessionStore:
             raise
 
 
-# M230. Above this many indexable words a query is prose, not a keyword lookup,
-# and strict AND stops being the right semantics (see `_fts_escape_query`).
-_FTS_AND_MAX_WORDS = 4
-# Cap on the OR fan-out, so a pasted wall of text can't turn into a 500-term MATCH.
-_FTS_MAX_OR_TERMS = 8
-_FTS_MIN_WORD_LEN = 3
-# Words carrying no retrieval signal. Deliberately tiny: this only has to thin a
-# long query enough to fit `_FTS_MAX_OR_TERMS`, not to be a real stopword list.
-# Both languages the project is used in — a Russian prompt would otherwise spend
-# its OR budget on "что"/"когда"/"только". (RUF001 flags the Cyrillic letters that
-# look like Latin ones; here that is the point.)
-_FTS_STOPWORDS_EN = (
-    "a an the this that these those is are was were be been being do does did "
-    "of for to in on at by with from and or not no if then than as it its"
-)
-# Bilingual site — targeted noqa per line, per the convention in pyproject's
-# `allowed-confusables` note. Without these a Russian prompt spends its OR budget
-# on "что" / "когда" / "только".
-_FTS_STOPWORDS_RU = (
-    "и в во не что он на я с со как а то все она так его но да ты к у же вы за бы "  # noqa: RUF001
-    "по только ее мне было вот от меня еще нет о из ему теперь когда даже ну вдруг "  # noqa: RUF001
-    "ли если или быть был него до вас нибудь опять уж вам"
-)
-_FTS_STOPWORDS = frozenset(_FTS_STOPWORDS_EN.split()) | frozenset(_FTS_STOPWORDS_RU.split())
-_FTS_WORD_RE = re.compile(r"\w+", re.UNICODE)
-
-
-def _fts_escape_query(query: str) -> str:
-    """Build an FTS5 MATCH expression from free text.
-
-    Every term is wrapped in double quotes (with `"` doubled per FTS5 grammar),
-    matching `modules/wiki/wiki.py::_fts_escape`, so user input can never break
-    the query parser. Empty / whitespace-only input returns ''.
-
-    **Short queries keep strict AND** — FTS5's implicit operator between phrases.
-    That is the right semantics for a keyword lookup and is exactly today's
-    behaviour, so nothing about existing recall changes.
-
-    **Long queries switch to OR, ranked by bm25.** Recall is keyed on the raw
-    prompt, and ANDing every token of a paragraph (or a pasted JSON payload)
-    demands that one stored row contain *all* of them — volatile tokens like
-    timestamps, ids and metric values guarantee it never does. The result was a
-    silent, total retrieval failure for exactly the queries that needed memory
-    most. Pruning noise alone does not fix it: even after dropping numbers and
-    stopwords the remaining content words are rarely all present in one row.
-    Since the AND path returns *nothing* for these queries, switching them to a
-    bm25-ranked OR cannot regress relevance — there is nothing to regress from —
-    and callers already cap results with `limit` plus the recall rerank.
-    """
-    tokens = query.split()
-    if not tokens:
-        return ""
-
-    def _quote(term: str) -> str:
-        return '"' + term.replace('"', '""') + '"'
-
-    # Count what FTS will actually index, not whitespace runs: a compact JSON
-    # blob is one whitespace token but a dozen indexed words.
-    words = _FTS_WORD_RE.findall(query)
-    if len(words) <= _FTS_AND_MAX_WORDS:
-        return " ".join(_quote(t) for t in tokens)
-
-    seen: set[str] = set()
-    distinctive: list[str] = []
-    for word in words:
-        lowered = word.lower()
-        if lowered in seen or lowered in _FTS_STOPWORDS:
-            continue
-        if len(word) < _FTS_MIN_WORD_LEN:
-            continue
-        # Mostly-digits tokens are ids, metric values and timestamp fragments
-        # ("87", "17T10", "00Z") — they never recur across runs, so they would
-        # spend the OR budget on terms that cannot match anything.
-        if sum(c.isdigit() for c in word) * 2 >= len(word):
-            continue
-        seen.add(lowered)
-        distinctive.append(word)
-    # Longer words are the cheap proxy for "more distinctive" without corpus stats.
-    distinctive.sort(key=len, reverse=True)
-    terms = distinctive[:_FTS_MAX_OR_TERMS] or words[:_FTS_MAX_OR_TERMS]
-    return " OR ".join(_quote(t) for t in terms)
+# M230: the FTS5 MATCH expression builder lives in `core/fts.py` so the optional
+# wiki engine can share it without importing the memory subsystem. Re-exported
+# under the historical private name — call sites and tests below use it directly.
+_fts_escape_query = escape_query
 
 
 def _row_to_session_info(row: sqlite3.Row) -> SessionInfo:
