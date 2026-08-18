@@ -50,49 +50,77 @@ class _ExplicitProviderAction(argparse.Action):
         namespace._provider_explicit = True
 
 
-def add_project_root_flag(p: argparse.ArgumentParser) -> None:
+def _default(value: object, *, defaults: bool) -> object:
+    """Pick the argparse `default=` for a flag defined on both parser levels (M227).
+
+    These flags live on the top-level parser (bare `veles` is the REPL) *and* on
+    every agent-loop subparser. `argparse._SubParsersAction` copies the whole
+    sub-namespace onto the parent one, so a subparser default silently OVERWRITES
+    a value the root parser already parsed — `veles --provider anthropic run "x"`
+    ran on openrouter, and `veles --verbose run "x"` lost `--verbose` entirely.
+
+    Only the root parser declares real defaults (`defaults=True`); the subparser
+    copies use `argparse.SUPPRESS`, so they set an attribute only when the flag is
+    actually present on the command line and the root value survives otherwise.
+    """
+    return value if defaults else argparse.SUPPRESS
+
+
+def add_project_root_flag(p: argparse.ArgumentParser, *, defaults: bool = False) -> None:
     p.add_argument(
         "--project-root",
-        default=None,
+        default=_default(None, defaults=defaults),
         metavar="PATH",
         help="Override project discovery (use this dir as the project root).",
     )
 
 
-def add_common_run_flags(p: argparse.ArgumentParser) -> None:
+def add_common_run_flags(p: argparse.ArgumentParser, *, defaults: bool = False) -> None:
+    """Attach the shared agent-loop flags to `p`.
+
+    `defaults=True` is for the ONE top-level parser; every subparser keeps the
+    default `False` so it does not clobber root-parsed values. See `_default`.
+    """
     p.add_argument(
         "--model",
-        default=DEFAULT_MODEL,
+        default=_default(DEFAULT_MODEL, defaults=defaults),
         help="Model id (default: resolved from project [engine] model or user "
         "default_model; required if neither is configured).",
     )
     p.add_argument(
         "--max-iterations",
         type=int,
-        default=DEFAULT_MAX_ITERATIONS,
+        default=_default(DEFAULT_MAX_ITERATIONS, defaults=defaults),
         help=f"Max tool-calling iterations (default: {DEFAULT_MAX_ITERATIONS}).",
     )
     p.add_argument(
         "--provider",
         choices=PROVIDER_CHOICES,
-        default=DEFAULT_PROVIDER,
+        default=_default(DEFAULT_PROVIDER, defaults=defaults),
         action=_ExplicitProviderAction,
         help=f"LLM provider (default: {DEFAULT_PROVIDER}).",
     )
     p.add_argument(
         "--max-tokens-total",
         type=int,
-        default=DEFAULT_MAX_TOKENS_TOTAL,
+        default=_default(DEFAULT_MAX_TOKENS_TOTAL, defaults=defaults),
         metavar="N",
         help=(
             f"Cumulative token budget across all nested calls in this run "
             f"(default: {DEFAULT_MAX_TOKENS_TOTAL}; pass 0 to disable)."
         ),
     )
-    p.add_argument("--verbose", "-v", action="store_true", help="Per-turn progress to stderr.")
+    p.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        default=_default(False, defaults=defaults),
+        help="Per-turn progress to stderr.",
+    )
     p.add_argument(
         "--stream",
         action="store_true",
+        default=_default(False, defaults=defaults),
         help="Stream the response token-by-token to stdout.",
     )
-    add_project_root_flag(p)
+    add_project_root_flag(p, defaults=defaults)
