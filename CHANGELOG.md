@@ -1035,9 +1035,35 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v0.30.0...HEAD
+[0.30.0]: https://github.com/denisotree/veles/compare/v0.29.0...v0.30.0
+[0.29.0]: https://github.com/denisotree/veles/compare/v0.28.1...v0.29.0
+[0.28.1]: https://github.com/denisotree/veles/compare/v0.28.0...v0.28.1
+[0.28.0]: https://github.com/denisotree/veles/compare/v0.27.0...v0.28.0
+[0.27.0]: https://github.com/denisotree/veles/compare/v0.26.0...v0.27.0
+[0.26.0]: https://github.com/denisotree/veles/compare/v0.25.0...v0.26.0
+[0.25.0]: https://github.com/denisotree/veles/compare/v0.24.0...v0.25.0
+[0.24.0]: https://github.com/denisotree/veles/compare/v0.23.1...v0.24.0
+[0.23.1]: https://github.com/denisotree/veles/compare/v0.23.0...v0.23.1
+[0.23.0]: https://github.com/denisotree/veles/compare/v0.22.2...v0.23.0
+[0.22.2]: https://github.com/denisotree/veles/compare/v0.22.1...v0.22.2
+[0.22.1]: https://github.com/denisotree/veles/compare/v0.22.0...v0.22.1
+[0.22.0]: https://github.com/denisotree/veles/compare/v0.21.2...v0.22.0
+[0.21.2]: https://github.com/denisotree/veles/compare/v0.21.1...v0.21.2
+[0.21.1]: https://github.com/denisotree/veles/compare/v0.21.0...v0.21.1
+[0.21.0]: https://github.com/denisotree/veles/compare/v0.9.0...v0.21.0
+[0.9.0]: https://github.com/denisotree/veles/compare/v0.8.3...v0.9.0
+[0.8.3]: https://github.com/denisotree/veles/compare/v0.8.2...v0.8.3
+[0.8.2]: https://github.com/denisotree/veles/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/denisotree/veles/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/denisotree/veles/compare/v0.7.2...v0.8.0
+[0.7.2]: https://github.com/denisotree/veles/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/denisotree/veles/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/denisotree/veles/compare/v0.6.7...v0.7.0
+[0.6.5]: https://github.com/denisotree/veles/compare/v0.6.4...v0.6.5
+[0.6.4]: https://github.com/denisotree/veles/compare/v0.6.3...v0.6.4
+[0.6.3]: https://github.com/denisotree/veles/compare/v0.6.2...v0.6.3
+[0.6.2]: https://github.com/denisotree/veles/compare/v0.3.2...v0.6.2
 [0.3.2]: https://github.com/denisotree/veles/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/denisotree/veles/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/denisotree/veles/compare/v0.2.0...v0.3.0
