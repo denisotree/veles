@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from veles.core.fts import escape_query
 from veles.core.provider import Message, ToolCall
 
 logger = logging.getLogger(__name__)
@@ -756,16 +757,10 @@ class SessionStore:
             raise
 
 
-def _fts_escape_query(query: str) -> str:
-    """Wrap each whitespace-separated token in double quotes for FTS5 MATCH safety.
-
-    Matches the convention used by `modules/wiki/wiki.py::_fts_escape`. Empty
-    queries (or whitespace-only) return ''. Embedded double quotes are
-    escaped as '""' per FTS5 grammar so user input never breaks the
-    query parser.
-    """
-    tokens = query.split()
-    return " ".join('"' + t.replace('"', '""') + '"' for t in tokens)
+# M230: the FTS5 MATCH expression builder lives in `core/fts.py` so the optional
+# wiki engine can share it without importing the memory subsystem. Re-exported
+# under the historical private name — call sites and tests below use it directly.
+_fts_escape_query = escape_query
 
 
 def _row_to_session_info(row: sqlite3.Row) -> SessionInfo:

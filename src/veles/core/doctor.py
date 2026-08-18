@@ -178,6 +178,54 @@ def _check_provider_keys() -> CheckResult:
     )
 
 
+def _check_embedding_backend() -> CheckResult:
+    """M231: report whether semantic recall of insights is actually on.
+
+    M192 routes both the recall query and the insight backfill through
+    `get_local_embedding_adapter()`, which accepts an **on-device** adapter only
+    — project text must never reach a cloud embedder. Autodetect, however, falls
+    back to a cloud adapter whenever `OPENROUTER_API_KEY`/`OPENAI_API_KEY` is
+    set, and that adapter fails the local gate. So the common setup (an API key,
+    no Ollama) silently gets keyword-only insight recall and never embeds
+    anything, while the existing setup hint stays quiet because *an* adapter was
+    detected. This check is the only place that difference is visible.
+    """
+    from veles.modules.embedding import get_local_embedding_adapter
+    from veles.modules.embedding_autodetect import autodetect_embedding_adapter
+
+    local = get_local_embedding_adapter()
+    if local is not None:
+        return CheckResult(
+            name="embedding_backend",
+            status="ok",
+            message=f"semantic recall active via local embedder ({local.name})",
+            details={"adapter": local.name, "local": True},
+        )
+    detected = autodetect_embedding_adapter()
+    hint = (
+        "run a local embedder — install Ollama and `ollama pull nomic-embed-text` "
+        "(override the model with VELES_OLLAMA_EMBED_MODEL)"
+    )
+    if detected is not None:
+        return CheckResult(
+            name="embedding_backend",
+            status="warn",
+            message=(
+                f"only a cloud embedder is available ({detected.name}); insight recall is "
+                "keyword-only and no insight embeddings are written"
+            ),
+            fix_hint=hint,
+            details={"adapter": detected.name, "local": False},
+        )
+    return CheckResult(
+        name="embedding_backend",
+        status="warn",
+        message="no embedding backend detected; insight recall is keyword-only",
+        fix_hint=hint,
+        details={"local": False},
+    )
+
+
 def _check_memory_fts(project: Project | None) -> CheckResult:
     """M193: verify the project's recall FTS index is queryable. A broken index
     makes memory recall silently empty (the failure this milestone targets)."""
@@ -527,6 +575,7 @@ def run_all(project: Project | None) -> DoctorReport:
         _check_user_home,
         _check_user_config,
         _check_provider_keys,
+        _check_embedding_backend,
     ]
     project_aware: list[Callable[[Project | None], CheckResult]] = [
         _check_active_project,

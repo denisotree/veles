@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -14,6 +16,7 @@ from veles.core.doctor import (
     _check_agents_md,
     _check_agents_md_identity,
     _check_approval_audit,
+    _check_embedding_backend,
     _check_events_health,
     _check_provider_keys,
     _check_python_version,
@@ -391,3 +394,83 @@ def test_registry_paths_ok_when_all_exist(tmp_path: Path, monkeypatch: pytest.Mo
     )
     monkeypatch.setenv("VELES_REGISTRY_PATH", str(reg))
     assert _check_registry_paths(None).status == "ok"
+
+
+# ---- M231: is semantic insight recall actually on? ---------------------------
+#
+# M192 routes the recall query and the insight backfill through a **local**
+# embedder only — project text must never reach a cloud one. Autodetect still
+# falls back to a cloud adapter whenever an API key is set, and that adapter
+# fails the local gate. So the common setup (API key, no Ollama) got keyword-only
+# recall with no signal anywhere. These three states are that signal.
+
+
+class _FakeAdapter:
+    """Minimal stand-in for the EmbeddingAdapter protocol."""
+
+    dim = 8
+
+    def __init__(self, name: str, *, is_local: bool) -> None:
+        self.name = name
+        self.is_local = is_local
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        return [[0.0] * self.dim for _ in texts]
+
+
+@pytest.fixture(autouse=True)
+def _offline_embedding_autodetect(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Keep every doctor test hermetic and deterministic.
+
+    `run_all` now includes the embedding check, and autodetect probes
+    `localhost:11434` — a real HTTP call whose answer depends on whether the
+    developer happens to be running Ollama. Patched on
+    `embedding_autodetect`, not on the defining modules: autodetect binds both
+    names with a module-level `from ... import`, so patching the origin would
+    not affect the already-bound reference.
+    """
+    from veles.modules.embedding import reset_embedding_adapter
+
+    monkeypatch.setattr("veles.modules.embedding_autodetect.probe_ollama", lambda *_a, **_k: False)
+    monkeypatch.setattr("veles.modules.embedding_autodetect.build_from_env", lambda *_a: None)
+    reset_embedding_adapter()
+    yield
+    reset_embedding_adapter()
+
+
+def test_embedding_backend_ok_with_a_local_adapter() -> None:
+    from veles.modules.embedding import register_embedding_adapter
+
+    register_embedding_adapter(cast(Any, _FakeAdapter("ollama:nomic-embed-text", is_local=True)))
+    result = _check_embedding_backend()
+    assert result.status == "ok"
+    assert result.details["local"] is True
+
+
+def test_embedding_backend_warns_when_only_a_cloud_adapter_exists() -> None:
+    """The regression this check exists for: an API key is NOT enough.
+
+    M192 accepts an on-device embedder only, so a cloud adapter leaves insight
+    recall keyword-only — while being present enough to look configured.
+    """
+    from veles.modules.embedding import register_embedding_adapter
+
+    register_embedding_adapter(
+        cast(Any, _FakeAdapter("openai:text-embedding-3-small", is_local=False))
+    )
+    result = _check_embedding_backend()
+    assert result.status == "warn"
+    assert result.details["local"] is False
+    assert "cloud" in result.message
+    assert "ollama" in result.fix_hint.lower()
+
+
+def test_embedding_backend_warns_when_nothing_is_detected() -> None:
+    result = _check_embedding_backend()
+    assert result.status == "warn"
+    assert result.details["local"] is False
+
+
+def test_embedding_backend_check_runs_in_the_full_report() -> None:
+    names = {r.name for r in run_all(None).results}
+    assert "embedding_backend" in names

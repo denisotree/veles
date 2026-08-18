@@ -1,4 +1,4 @@
-"""One-time setup-hint notice for missing embedding backend.
+"""One-time setup-hint notice when semantic insight recall is unavailable.
 
 VISION §5.1 / §7 contract: Veles never crashes on a missing optional
 capability — it falls back gracefully and tells the user **once**
@@ -6,16 +6,21 @@ how to upgrade. This module owns that contract for the embedding
 backend specifically.
 
 The hint surfaces as a single `insights` row with category
-`setup-hint` and title `Embedding backend not configured`. The TUI
-insights panel, `/save` slash, and Telegram `/status` already read
-this table, so the user discovers the hint through whichever
-surface they happen to look at. After it's surfaced once, the
-dedup check (same title + category) prevents it from re-appearing
-on every curator pass.
+`setup-hint`. The TUI insights panel, `/save` slash, and Telegram
+`/status` already read this table, so the user discovers the hint
+through whichever surface they happen to look at. After it's surfaced
+once, the dedup check (same title + category) prevents it from
+re-appearing on every curator pass.
 
-Call site: `cli/_runtime.py` runs `maybe_surface_embedding_setup_hint`
-after `autodetect_embedding_adapter` returns None. Safe to call
+Call site: `cli/_curator.py` runs `maybe_surface_embedding_setup_hint`
+when `get_local_embedding_adapter()` returns None. Safe to call
 repeatedly — idempotent on the insights row.
+
+M231: the gate is the **local** adapter, not "any adapter". M192 sends
+neither the recall query nor insight bodies to a cloud embedder, so a
+cloud adapter leaves insight recall keyword-only — and it used to
+silence this hint in exactly that setup. The body says so explicitly
+rather than offering an API key as a fix that would not fix it.
 """
 
 from __future__ import annotations
@@ -31,30 +36,35 @@ logger = logging.getLogger(__name__)
 
 
 SETUP_HINT_CATEGORY = "setup-hint"
-SETUP_HINT_TITLE = "Embedding backend not configured"
+SETUP_HINT_TITLE = "Semantic recall needs a local embedder"
 
 _BODY = """\
-Veles is running with **token-based ranking** for paths and skill
-patterns. That works, but embeddings give noticeably better recall
-on larger projects (50+ files, 100+ sessions). Three ways to
-enable, easiest first:
+Insight recall is running **keyword-only**, and no insight embeddings
+are being written. Both go through an **on-device** embedder by
+design: the recall query and your insight bodies must never be sent
+to a cloud embedding service, so an API key does not enable them.
 
-1. **Install Ollama and pull a small embedding model.**
-   - macOS: `brew install ollama && ollama serve`
-   - Linux: `curl -fsSL https://ollama.com/install.sh | sh`
-   - Then: `ollama pull nomic-embed-text` (274 MB, 768-dim,
-     multilingual). Veles auto-detects Ollama on next start.
+**To turn semantic recall on — install Ollama and pull a small model:**
+  - macOS: `brew install ollama && ollama serve`
+  - Linux: `curl -fsSL https://ollama.com/install.sh | sh`
+  - Then: `ollama pull nomic-embed-text` (274 MB, 768-dim,
+    multilingual). Veles auto-detects it on next start.
+  - Override the model with `VELES_OLLAMA_EMBED_MODEL`.
 
-2. **Set `OPENROUTER_API_KEY` (or `OPENAI_API_KEY`).** The same
-   key Veles uses for chat completions also powers embeddings via
-   `text-embedding-3-small` (~$0.02 per million tokens — essentially
-   free for personal use).
+Existing insights are embedded by `veles dream --include-consolidation`
+(the flag matters — backfill and dedup run only under it).
 
-3. **Stay on token-based ranking.** It's the default and works for
-   small / medium projects. Re-visit when ranking quality matters.
+A cloud key (`OPENROUTER_API_KEY` / `OPENAI_API_KEY`) is still used
+for the ranking that does not involve your project's text — file-path
+relevance and skill-pattern clustering — so it is worth having either
+way; it just does not cover insight recall.
 
-This notice surfaces once per project; dismiss it from the insights
-panel after you've decided.
+Staying keyword-only is a fine choice for a small project. Recall
+still works; it just needs the query to share literal words with what
+was stored.
+
+`veles doctor` reports which backend is active. This notice surfaces
+once per project; dismiss it from the insights panel once you've decided.
 """
 
 

@@ -288,16 +288,22 @@ def _maybe_surface_skill_suggestions(project: Project) -> None:
                 summary=f"{type(exc).__name__}: {exc}",
             )
 
-    # Embedding setup-hint: when no embedding backend is configured,
-    # write a one-time setup hint into `insights` so the user
-    # discovers the upgrade path via the regular insights surface.
-    # `maybe_surface_embedding_setup_hint` is idempotent — only
-    # writes the row when it doesn't already exist.
+    # Embedding setup-hint: when semantic recall is not actually available,
+    # write a one-time setup hint into `insights` so the user discovers the
+    # upgrade path via the regular insights surface.
+    # `maybe_surface_embedding_setup_hint` is idempotent — only writes the row
+    # when it doesn't already exist.
+    #
+    # M231: gate on the **local** adapter, not on "any adapter detected". M192
+    # accepts an on-device embedder only (project text must never reach a cloud
+    # one), so an API key alone leaves recall keyword-only — while autodetect
+    # happily returns a cloud adapter, which used to silence this hint in
+    # exactly the setup that needed it.
     try:
         from veles.core.embedding_notice import maybe_surface_embedding_setup_hint
-        from veles.modules import autodetect_embedding_adapter
+        from veles.modules.embedding import get_local_embedding_adapter
 
-        if autodetect_embedding_adapter() is None:
+        if get_local_embedding_adapter() is None:
             maybe_surface_embedding_setup_hint(project)
     except Exception:
         pass
