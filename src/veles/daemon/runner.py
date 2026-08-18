@@ -30,7 +30,7 @@ import contextlib
 import logging
 import secrets
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -71,6 +71,13 @@ class RunHandle:
     finished_at: float | None = None
     error: str | None = None
     final_text: str | None = None
+    # M234: set when a `deliver_to` delivery was attempted and failed. Best-effort
+    # telemetry, deliberately NOT part of the run's success/failure — a chat that
+    # can't be reached says nothing about whether the agent did its work. Note the
+    # inherent race: `state` becomes "completed" before the delivery is attempted,
+    # so a poller that stops at "completed" may read this while a send is still in
+    # flight. Same contract as `job_runner`'s `delivery_err`.
+    delivery_error: str | None = None
     iterations: int = 0
     stopped_reason: str | None = None
     events: list[dict[str, Any]] = field(default_factory=list)
@@ -97,6 +104,39 @@ class RunHandle:
         self.event_added.clear()
 
 
+# M234. Bounded so a hung send cannot outlive the shutdown drain, which waits
+# `wait_for(handle.done.wait(), timeout=10.0)` per handle (`server.py`). A larger
+# budget would be cancelled by that drain mid-send — the message is lost AND
+# `delivery_error` stays empty, because a cancellation is not an exception we
+# catch. Keep this comfortably under the drain's 10s.
+_DELIVER_TIMEOUT_SEC = 8.0
+
+
+async def _run_deliver_hook(
+    handle: RunHandle,
+    deliver_hook: Callable[[str], Awaitable[None]] | None,
+) -> None:
+    """Push the finished answer to the caller's `deliver_to` target. Best-effort.
+
+    Called on the success path only, between the `completed` event and
+    `done.set()`: before `done` so the shutdown drain covers the send, and only on
+    success so the failure branches need no guard of their own.
+
+    The empty-text guard is load-bearing — `stopped_reason == "empty"` reaches this
+    same branch with `result.text == ""`, and Telegram rejects an empty message, so
+    without it a run that legitimately said nothing would record a delivery failure.
+    """
+    if deliver_hook is None or not handle.final_text:
+        return
+    try:
+        await asyncio.wait_for(deliver_hook(handle.final_text), timeout=_DELIVER_TIMEOUT_SEC)
+    except Exception as exc:
+        # Deliberately not `contextlib.suppress` (the idiom used elsewhere in this
+        # file): the exception text is exactly what the caller needs to see.
+        handle.delivery_error = f"delivery failed: {type(exc).__name__}: {exc}"
+        logging.getLogger("veles.daemon").warning("run %s delivery failed: %s", handle.run_id, exc)
+
+
 async def run_agent_in_background(
     handle: RunHandle,
     *,
@@ -108,6 +148,7 @@ async def run_agent_in_background(
     origin: str | None = None,
     subagent_factory: Callable[..., Any] | None = None,
     turn_lock: asyncio.Lock | None = None,
+    deliver_hook: Callable[[str], Awaitable[None]] | None = None,
 ) -> None:
     """Drive `agent.run(prompt)` to completion, mirroring events into `handle`.
 
@@ -272,6 +313,7 @@ async def run_agent_in_background(
                 "session_id": handle.session_id,
             }
         )
+        await _run_deliver_hook(handle, deliver_hook)
         handle.done.set()
         handle.event_added.set()
         if on_finished is not None:
@@ -313,6 +355,7 @@ async def run_manager_in_background(
     verify_hook: Callable[[str, RunResult], RunResult] | None = None,
     origin: str | None = None,
     store: Any | None = None,
+    deliver_hook: Callable[[str], Awaitable[None]] | None = None,
 ) -> None:
     """M124: drive `decompose_and_run(prompt)` to completion, mirroring
     plan/step events into `handle`.
@@ -448,6 +491,7 @@ async def run_manager_in_background(
                 "session_id": handle.session_id,
             }
         )
+        await _run_deliver_hook(handle, deliver_hook)
         handle.done.set()
         handle.event_added.set()
         if on_finished is not None:

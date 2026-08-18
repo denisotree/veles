@@ -4,8 +4,10 @@ aiohttp app exposing six endpoints under `/v1/`:
 
     GET  /v1/health                           → unauth, status probe
     POST /v1/runs                             → submit a prompt → run_id
-    GET  /v1/runs                             → list run summaries
-    GET  /v1/runs/{run_id}                    → single run summary
+                                                (optional `deliver_to` pushes the
+                                                 answer to a DeliveryRouter target)
+    GET  /v1/runs                             → list run summaries (no answer text)
+    GET  /v1/runs/{run_id}                    → single run + `final_text`
     WS   /v1/runs/{run_id}/events             → stream events
     GET  /v1/sessions                         → list sessions
     GET  /v1/sessions/{id}                    → session detail (history)
@@ -29,6 +31,7 @@ import json
 import logging
 import os
 import time
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from aiohttp import WSMsgType, web
@@ -196,6 +199,43 @@ async def _handle_list_channels(request: web.Request) -> web.Response:
     return web.json_response({"channels": out})
 
 
+# M234. Mirrors the wording of `core/tools/builtin/task_tools.py::_resolve_target`,
+# which rejects a bad target at write time so the caller fixes it now rather than
+# discovering it at delivery time.
+_BAD_TARGET = (
+    "{field!r} is not a valid delivery target; use '<platform>:<chat_id>' "
+    "(e.g. 'telegram:42') or 'local'"
+)
+
+
+def _resolve_deliver_to(raw: Any, origin: str | None) -> tuple[str | None, str | None]:
+    """Validate an incoming `deliver_to`, returning `(target, error)`.
+
+    `"origin"` is **resolved** against the request's own `origin` rather than
+    rejected: it keeps this endpoint's vocabulary identical to `task_add`/`job_add`,
+    and means the router never sees `kind="origin"` — which matters because no
+    `origin_handler` is wired in production, so such a target would raise at
+    delivery time. `task_tools._resolve_target` can't be reused for this: it reads
+    the `current_origin()` ContextVar, which is unset inside an HTTP handler.
+    """
+    from veles.channels.delivery import DeliveryTarget
+
+    if raw is None:
+        return None, None
+    if not isinstance(raw, str) or not raw.strip():
+        return None, "'deliver_to' must be a non-empty string"
+    spec = raw.strip()
+    if spec == "origin":
+        if not origin:
+            return None, "'deliver_to' of \"origin\" requires an 'origin' in the same request"
+        spec = origin
+    try:
+        DeliveryTarget.parse(spec)
+    except ValueError:
+        return None, _BAD_TARGET.format(field="deliver_to")
+    return spec, None
+
+
 async def _handle_create_run(request: web.Request) -> web.Response:
     state: DaemonState = request.app["state"]
     try:
@@ -213,6 +253,28 @@ async def _handle_create_run(request: web.Request) -> web.Response:
     origin = body.get("origin")  # M166: originating chat as a delivery target
     if origin is not None and not isinstance(origin, str):
         return web.json_response({"error": "'origin' must be a string"}, status=400)
+    # M234: `origin` is consumed AS a delivery target — `task_add`/`job_add` default
+    # their `deliver_to` to it — so it has to satisfy the same grammar. Unvalidated,
+    # an HTTP caller could plant a malformed origin that only blows up later, inside
+    # an agent tool call. The one production producer already conforms
+    # (`telegram:{chat_id}`), so this rejects nothing that works today.
+    if origin:
+        from veles.channels.delivery import DeliveryTarget
+
+        try:
+            DeliveryTarget.parse(origin)
+        except ValueError:
+            return web.json_response({"error": _BAD_TARGET.format(field="origin")}, status=400)
+
+    deliver_to, err = _resolve_deliver_to(body.get("deliver_to"), origin)
+    if err is not None:
+        return web.json_response({"error": err}, status=400)
+    if deliver_to is not None and state.delivery_router is None:
+        # Fail loudly rather than accept a delivery contract this daemon cannot
+        # honour: no channel is running, so nothing would ever be sent.
+        return web.json_response(
+            {"error": "no delivery channel is running on this daemon"}, status=503
+        )
 
     handle = new_run_handle(session_id=session_id)
     state.add_run(handle)
@@ -225,6 +287,18 @@ async def _handle_create_run(request: web.Request) -> web.Response:
 
     def _on_finished(_: Any) -> None:
         state.touch_activity()
+
+    # Built here rather than handing the router to the runner: `daemon/runner.py`
+    # stays ignorant of DeliveryRouter, the same way it takes `verify_hook` /
+    # `post_turn_hook` instead of the machinery behind them.
+    deliver_hook: Callable[[str], Awaitable[None]] | None = None
+    if deliver_to is not None:
+        router, target = state.delivery_router, deliver_to
+
+        async def _deliver(text: str) -> None:
+            await router.deliver(target, text)
+
+        deliver_hook = _deliver
 
     # M124: route long / research-keyword prompts through the manager-
     # spawn orchestrator. Worker factory is per-daemon (built in
@@ -240,6 +314,7 @@ async def _handle_create_run(request: web.Request) -> web.Response:
                 verify_hook=state.verify_hook,
                 origin=origin,
                 store=state.store,
+                deliver_hook=deliver_hook,
             )
         )
         state.run_tasks.add(task)
@@ -285,6 +360,7 @@ async def _handle_create_run(request: web.Request) -> web.Response:
             # per-session serialization against background-op resume turns.
             subagent_factory=state.subagent_factory,
             turn_lock=(state.session_lock(effective_session_id) if effective_session_id else None),
+            deliver_hook=deliver_hook,
         )
     )
     state.run_tasks.add(task)
@@ -320,7 +396,15 @@ async def _handle_get_run(request: web.Request) -> web.Response:
     handle = state.get_run(run_id)
     if handle is None:
         return web.json_response({"error": f"run {run_id!r} not found"}, status=404)
-    return web.json_response(handle.to_summary())
+    # M234: the answer text is served here and ONLY here. Until now it existed
+    # solely in the WS `completed` event, so a caller that didn't want to hold a
+    # WebSocket had no way to read its own result. It stays off the LIST endpoint
+    # deliberately: `state.runs` is never pruned, so putting text in `to_summary`
+    # would grow `GET /v1/runs` by every answer for the daemon's whole lifetime.
+    return web.json_response(
+        handle.to_summary()
+        | {"final_text": handle.final_text, "delivery_error": handle.delivery_error}
+    )
 
 
 async def _handle_resolve_prompt(request: web.Request) -> web.Response:

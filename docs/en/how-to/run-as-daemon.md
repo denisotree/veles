@@ -50,6 +50,49 @@ veles daemon token list               # list (masked)
 veles daemon token remove tui-client
 ```
 
+## Running a prompt over HTTP
+
+Submit a prompt and get a run id back:
+
+```bash
+curl -s localhost:8765/v1/runs \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"prompt": "summarise today", "deliver_to": "telegram:-100123"}'
+```
+
+The response is `202` with a run id — the run is still going. Three ways to get
+the answer:
+
+| | |
+|---|---|
+| `GET /v1/runs/{id}` | poll until `state` is `completed`, then read `final_text` |
+| `WS /v1/runs/{id}/events` | stream `text_delta` events live; the final `completed` event carries the full text |
+| `deliver_to` | the daemon pushes the finished answer to a chat itself |
+
+`GET /v1/runs` (the list) reports state only — the answer text is on the
+single-run endpoint, so listing a long-lived daemon's runs stays cheap.
+
+Optional fields on `POST /v1/runs`:
+
+- **`session_id`** — continue an existing session instead of starting a new one.
+- **`origin`** — the chat this request came from. Reminders and jobs the agent
+  creates during the run default to delivering there.
+- **`deliver_to`** — where to send the finished answer: `telegram:<chat_id>`,
+  `<platform>:<chat_id>:<thread_id>`, `local`, or `origin` to reuse the field
+  above. A malformed target is rejected immediately with `400`; asking for
+  delivery on a daemon with no channel running gives `503`.
+
+Delivery is best-effort and never changes the run's outcome — a chat that can't
+be reached says nothing about whether the agent did its work. If a send fails,
+the run still reports `completed` and `delivery_error` on the single-run
+endpoint explains why. Note the two are set a moment apart, so a client that
+stops polling the instant it sees `completed` may read `delivery_error` before
+the send has finished; treat it as telemetry, not as a receipt.
+
+**Any valid token can do all of this**, including delivering to any chat the bot
+can reach — tokens carry no scopes. Treat a daemon token as full access to the
+project, and keep the daemon on `127.0.0.1` unless you have a reason not to.
+
 ## The daemon picker (TUI)
 
 Run `veles daemon` with no subcommand to open the control panel — a tree of your

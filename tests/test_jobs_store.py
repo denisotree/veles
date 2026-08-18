@@ -122,3 +122,30 @@ def test_list_runs_orders_newest_first(store: JobsStore):
     r2 = store.mark_run_started(job_id=rec.id, started_at=2000.0)
     runs = store.list_runs(rec.id)
     assert [r.run_id for r in runs] == [r2, r1]
+
+
+# ---- M234: deliver_to is validated at write time ----
+#
+# The store is where all four writers converge — POST /v1/jobs, PATCH
+# /v1/jobs/{id}, `veles job add`, and the `job_add` tool, which validated
+# nothing at all before this (unlike its sibling `task_add`).
+
+
+@pytest.mark.parametrize("target", [None, "", "telegram:42", "local", "origin", "slack:c1:t9"])
+def test_add_job_accepts_valid_deliver_to(store: JobsStore, target):
+    rec = store.add_job(name="t", prompt="x", schedule_expr="1h", deliver_to=target)
+    assert rec.deliver_to == target
+
+
+@pytest.mark.parametrize("target", ["telegram", "nonsense", " ", ":", "telegram:"])
+def test_add_job_rejects_malformed_deliver_to(store: JobsStore, target):
+    with pytest.raises(ValueError, match="not a valid delivery target"):
+        store.add_job(name="t", prompt="x", schedule_expr="1h", deliver_to=target)
+
+
+def test_update_job_validates_deliver_to_but_allows_clearing(store: JobsStore):
+    rec = store.add_job(name="t", prompt="x", schedule_expr="1h", deliver_to="telegram:42")
+    with pytest.raises(ValueError, match="not a valid delivery target"):
+        store.update_job(rec.id, deliver_to="nonsense")
+    assert store.update_job(rec.id, deliver_to=None) is True
+    assert store.get_job(rec.id).deliver_to is None
