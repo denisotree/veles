@@ -133,6 +133,39 @@ async def test_post_jobs_rejects_bad_schedule(aiohttp_client, app, good_token: s
     assert resp.status == 400
 
 
+async def test_post_jobs_rejects_bad_deliver_to(aiohttp_client, app, good_token: str) -> None:
+    """M234: `deliver_to` reached the DB completely unvalidated, so a malformed
+    target only surfaced at delivery time, on the scheduler's tick, long after
+    the caller could do anything about it."""
+    client = await aiohttp_client(app)
+    resp = await client.post(
+        "/v1/jobs",
+        json={"name": "t", "prompt": "x", "schedule": "30m", "deliver_to": "nonsense"},
+        headers={"Authorization": f"Bearer {good_token}"},
+    )
+    assert resp.status == 400
+    assert "deliver_to" in (await resp.json())["error"]
+
+
+async def test_patch_job_rejects_bad_deliver_to(aiohttp_client, app, good_token: str) -> None:
+    client = await aiohttp_client(app)
+    hdr = {"Authorization": f"Bearer {good_token}"}
+    created = await (
+        await client.post(
+            "/v1/jobs", json={"name": "t", "prompt": "x", "schedule": "30m"}, headers=hdr
+        )
+    ).json()
+
+    resp = await client.patch(
+        f"/v1/jobs/{created['id']}", json={"deliver_to": "nonsense"}, headers=hdr
+    )
+    assert resp.status == 400
+
+    # Clearing the target stays legal.
+    resp = await client.patch(f"/v1/jobs/{created['id']}", json={"deliver_to": None}, headers=hdr)
+    assert resp.status == 200
+
+
 async def test_get_jobs_lists(aiohttp_client, app, good_token: str) -> None:
     client = await aiohttp_client(app)
     await client.post(

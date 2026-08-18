@@ -120,6 +120,31 @@ def _make_run_id() -> str:
     return f"jrun-{int(time.time()):010d}-{secrets.token_hex(4)}"
 
 
+def _validate_deliver_to(spec: str | None) -> None:
+    """Reject a malformed `deliver_to` at write time (M234).
+
+    Placed in the store rather than in the HTTP handlers because this is where all
+    four writers converge — `POST /v1/jobs`, `PATCH /v1/jobs/{id}`, `veles job add`,
+    and the `job_add` tool. `job_add` validated nothing at all before this, unlike
+    its sibling `task_add`. `ValueError` is already mapped to 400 by both HTTP
+    handlers and to a model-readable error by the tool.
+
+    Only a truthy value is checked: `deliver_to` is optional, and `None`/`""` are
+    the legitimate "no delivery" / "clear the target" cases.
+    """
+    if not spec:
+        return
+    from veles.channels.delivery import DeliveryTarget
+
+    try:
+        DeliveryTarget.parse(spec)
+    except ValueError as exc:
+        raise ValueError(
+            f"deliver_to {spec!r} is not a valid delivery target; use "
+            "'<platform>:<chat_id>' (e.g. 'telegram:42'), 'origin', or 'local'"
+        ) from exc
+
+
 class JobsStore:
     """CRUD + lifecycle ops over the jobs / job_runs tables."""
 
@@ -179,6 +204,7 @@ class JobsStore:
         # prompt — only classic prompt jobs require one.
         if kind == "prompt" and not prompt.strip():
             raise ValueError("job prompt must be non-empty")
+        _validate_deliver_to(deliver_to)
         sched = parse_schedule(schedule_expr)
         at = now if now is not None else time.time()
         # M167: calendar schedules (daily@09:00 …) fire in `tz` (the project's
@@ -265,6 +291,11 @@ class JobsStore:
         bad = set(fields) - allowed
         if bad:
             raise ValueError(f"update_job: unknown columns {sorted(bad)}")
+        if "deliver_to" in fields:
+            # Only when the key is actually present: passing None/"" here is the
+            # legitimate way to clear an existing target.
+            value = fields["deliver_to"]
+            _validate_deliver_to(value if isinstance(value, str) else None)
         # Coerce booleans for `enabled`.
         if "enabled" in fields:
             fields["enabled"] = 1 if fields["enabled"] else 0
