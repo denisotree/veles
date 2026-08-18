@@ -1,15 +1,15 @@
 """Tiny stdio MCP server used by the M157 integration tests.
 
-Exposes one `echo` tool via the official SDK's FastMCP server API.
+Exposes one `echo` tool via the official SDK's `MCPServer` API.
 Spawned as a child process by `tests/test_mcp_client_integration.py`
 (and by the CLI tests that need a real connectable server).
 """
 
 from __future__ import annotations
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
-server = FastMCP("fake-veles-test-server")
+server = MCPServer("fake-veles-test-server")
 
 
 @server.tool()

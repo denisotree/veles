@@ -13,6 +13,10 @@ from pathlib import Path
 
 import pytest
 
+# Mirrors what the fixture server imports: an SDK rename here must fail the
+# suite loudly instead of hiding behind `_connect_or_skip` below.
+from mcp.server.mcpserver import MCPServer  # noqa: F401
+
 from veles.mcp.client import McpClientManager, McpServerUnavailable
 from veles.mcp.config import McpServerConfig
 from veles.mcp.registry_adapter import result_to_text

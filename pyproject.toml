@@ -52,7 +52,7 @@ dependencies = [
     "keyring>=24",
     "textual>=0.85",
     "croniter>=2.0",
-    "mcp>=1.0",
+    "mcp>=2.0",
     "tiktoken>=0.7",
 ]
 

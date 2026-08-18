@@ -213,11 +213,12 @@ class McpClientManager:
             read, write = await stack.enter_async_context(stdio_client(params))
             return read, write
         if cfg.transport == "http":
-            from mcp.client.streamable_http import streamablehttp_client
+            from mcp.client.streamable_http import streamable_http_client
 
-            read, write, _get_session_id = await stack.enter_async_context(
-                streamablehttp_client(cfg.url or "", timeout=cfg.connect_timeout_s)
-            )
+            # No `timeout=` in the SDK 2.x signature (it takes a prebuilt
+            # httpx client instead) — connect and call budgets are already
+            # enforced sync-side by `connect_all` / `call_tool`.
+            read, write = await stack.enter_async_context(streamable_http_client(cfg.url or ""))
             return read, write
         if cfg.transport == "sse":
             from mcp.client.sse import sse_client
