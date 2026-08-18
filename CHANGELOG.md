@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] — 2026-08-18
+
+Calling the daemon over HTTP used to be a one-way trip: you could start a run,
+but the answer only ever appeared on the WebSocket stream, so a script that
+didn't want to hold a socket open had no way to read the result it had just
+asked for. That's fixed, and the daemon can now deliver the answer to a chat
+for you.
+
+### Added
+
+- **Read a run's answer without a WebSocket.** `GET /v1/runs/{id}` now includes
+  the finished text. The listing endpoint deliberately doesn't — it would grow
+  by every answer the daemon has ever produced.
+- **Let the daemon deliver the answer for you.** Pass `deliver_to` when you
+  start a run — `telegram:<chat_id>`, or `origin` to reuse the chat the request
+  came from — and the finished answer is sent there. A target that isn't valid
+  is refused immediately rather than failing quietly later, and asking for
+  delivery on a daemon with no channel running tells you so. Delivery never
+  changes the run's own outcome: if the chat can't be reached the run still
+  succeeds and reports why the send failed.
+- **The daemon's HTTP API is documented** — how to submit a prompt, the three
+  ways to get the answer back, and what the optional fields do. See
+  [run as a daemon](docs/en/how-to/run-as-daemon.md).
+
+### Fixed
+
+- **A scheduled job with a bad delivery target is now rejected when you create
+  it.** It used to be stored as-is and only fail much later, on the tick that
+  tried to send — where nobody was watching. The check now covers every way a
+  job gets written, including the agent's own `job_add`, which validated
+  nothing at all (its sibling `task_add` always did).
+
 ## [0.30.0] — 2026-08-18
 
 Four things Veles was getting wrong without telling you: flags it quietly
@@ -1035,7 +1067,8 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v0.30.0...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v0.31.0...HEAD
+[0.31.0]: https://github.com/denisotree/veles/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/denisotree/veles/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/denisotree/veles/compare/v0.28.1...v0.29.0
 [0.28.1]: https://github.com/denisotree/veles/compare/v0.28.0...v0.28.1
