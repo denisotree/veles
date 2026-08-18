@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.0] — 2026-08-18
+
+Four things Veles was getting wrong without telling you: flags it quietly
+ignored, memory that came back empty, a tool that vanished from the toolset, and
+an exit code that lumped every failure together. Mostly relevant if you drive
+`veles run` from a script — but the memory fix applies to anyone who types a
+whole paragraph into the chat.
+
+### Added
+
+- **`veles run` now says *why* it stopped through its exit code.** `0` finished,
+  `1` the provider failed, `2` something is misconfigured (no model, no API key,
+  unknown session), `3` it ran out of turns, `4` it ran out of token budget, `5`
+  the model returned nothing, `6` it was interrupted. Previously anything that
+  wasn't a clean finish came back as `1`, so a calling script couldn't tell "retry
+  this" from "raise the budget" from "fix your config and stop retrying".
+- **`veles doctor` reports whether semantic recall is actually working.** It
+  tells you which embedding backend is in use, and warns — with the fix — when
+  insight recall has silently fallen back to keyword-only matching.
+- **A guide to calling `veles run` from another program**, covering the pieces
+  you would otherwise discover in production: which stream carries what, why
+  `stdin` must be redirected, that Veles has no wall-clock timeout of its own,
+  and how to make knowledge accumulate between separate runs. See
+  [embedding `veles run`](docs/en/how-to/embed-veles-run.md).
+
+### Fixed
+
+- **Flags written before the command name were silently ignored.** `veles
+  --verbose run "…"` ran without `--verbose`; the same for `--model`,
+  `--stream`, `--max-tokens-total` and `--project-root`. Worst of all,
+  `veles --provider anthropic run "…"` ran on OpenRouter *and* overrode the
+  provider configured for the project — passing a value you never typed off as a
+  deliberate choice. Both positions work correctly now.
+- **A long question came back with no memory at all.** Search required every
+  single word of your question to appear in one stored note, so anything longer
+  than a few words — a paragraph, a pasted log line, a stack trace — matched
+  nothing, and no memory was attached to the answer. Nothing indicated this had
+  happened. Longer questions are now matched on the words that carry meaning and
+  ranked by relevance; short keyword lookups behave exactly as before. The same
+  fix applies to wiki search, which had the identical problem.
+- **Recall of past insights was silently keyword-only if you had an API key but
+  no local embedding model.** Embeddings for your own notes are computed
+  on-device on purpose — your project's text is never sent to a cloud embedding
+  service — so an API key alone never enabled them, and the setup notice stayed
+  quiet because it counted a cloud backend as "configured". You now get the
+  notice, and `veles doctor` says so plainly.
+- **A tool file you hadn't approved disappeared without a word.** Approval is
+  keyed to the file's contents, so *editing* an approved tool un-approves it —
+  and the agent then simply never saw that tool, no error, no refusal. It could
+  work around the gap and answer confidently with the tool's data source never
+  consulted. The skipped file is now reported on stderr.
+
+### Changed
+
+- **The embedding setup notice explains the actual requirement.** It used to
+  offer "set an API key" as one of three equal options for better recall. For
+  recall of your own insights that has never worked; the notice now says a local
+  model is what enables it, and that an API key improves the other rankings
+  (file relevance, skill patterns) instead.
+
 ## [0.29.0] — 2026-08-03
 
 ### Added
