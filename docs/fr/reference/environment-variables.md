@@ -31,6 +31,15 @@ trousseau du système (portée par défaut) → variable d'environnement.
 | `OPENAI_COMPAT_BASE_URL` | — (requis) | Point de terminaison du fournisseur `openai-compat` |
 | `VELES_LOCAL_TOOLS` | désactivé | Active l'appel d'outils sur les fournisseurs locaux (`1`/`true`) |
 | `VELES_OLLAMA_EMBED_MODEL` | défaut du fournisseur | Surcharge le modèle d'embedding Ollama |
+| `VELES_LOCAL_JSON_MODE` | activé | Envoie `response_format: json_object` sur les appels locaux qui doivent renvoyer un objet JSON (`0` pour désactiver) |
+
+`VELES_LOCAL_JSON_MODE` ne concerne que les appels dont Veles sait qu'ils attendent du JSON
+strict : aujourd'hui l'advisor (utilisé par `advisor_review`, la passe verify et la phase
+CHECK du mode goal). Les tours d'agent ordinaires ne le reçoivent jamais : le chemin
+fenced-tools a besoin de prose autour de ses blocs, ce que la contrainte d'objet JSON
+interdirait. Le mécanisme s'auto-répare : un backend qui rejette le paramètre le désactive
+pour le reste du processus et la requête est relancée sans lui, donc ce commutateur est
+rarement nécessaire.
 
 ## Canaux & daemon
 

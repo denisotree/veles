@@ -30,6 +30,15 @@ API-key lookup cascade: OS keychain (project scope) → OS keychain (default sco
 | `OPENAI_COMPAT_BASE_URL` | — (required) | Endpoint for the `openai-compat` provider |
 | `VELES_LOCAL_TOOLS` | off | Enable tool calling on local providers (`1`/`true`) |
 | `VELES_OLLAMA_EMBED_MODEL` | provider default | Override the Ollama embedding model |
+| `VELES_LOCAL_JSON_MODE` | on | Send `response_format: json_object` on local calls that must return a JSON object (`0` to disable) |
+
+`VELES_LOCAL_JSON_MODE` covers only the calls Veles knows expect strict JSON —
+today that is the advisor (used by `advisor_review`, the verify pass, and goal
+mode's CHECK phase). Ordinary agent turns never get it: the fenced-tools path
+needs prose around its blocks, which a JSON-object constraint would forbid. It
+also self-heals — a backend that rejects the parameter disables it for the rest
+of the process and the request is retried without it, so you should not normally
+need the switch.
 
 ## Channels & daemon
 

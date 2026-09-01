@@ -30,6 +30,14 @@ API-কী লুকআপ ক্যাসকেড: OS keychain (project scope)
 | `OPENAI_COMPAT_BASE_URL` | — (required) | `openai-compat` প্রোভাইডারের জন্য এন্ডপয়েন্ট |
 | `VELES_LOCAL_TOOLS` | off | লোকাল প্রোভাইডারে টুল কলিং সক্রিয় করে (`1`/`true`) |
 | `VELES_OLLAMA_EMBED_MODEL` | provider default | Ollama embedding মডেল ওভাররাইড করে |
+| `VELES_LOCAL_JSON_MODE` | on | যেসব local call-কে JSON object ফেরত দিতেই হবে, সেগুলোতে `response_format: json_object` পাঠায় (`0` দিলে বন্ধ) |
+
+`VELES_LOCAL_JSON_MODE` কেবল সেইসব call-এ প্রযোজ্য যেগুলো strict JSON চায় বলে Veles জানে — এখন
+সেটি হলো advisor (`advisor_review`, verify ধাপ, এবং goal মোডের CHECK ফেজ এটি ব্যবহার করে)।
+সাধারণ agent turn কখনও এটি পায় না: fenced-tools পথের ব্লকগুলোর চারপাশে prose দরকার, আর JSON
+object constraint সেটিকে নিষিদ্ধ করবে। এটি self-heal-ও করে — যে backend প্যারামিটারটি প্রত্যাখ্যান
+করে, সেখানে বাকি process-এর জন্য এটি বন্ধ হয়ে যায় এবং অনুরোধ সেটি ছাড়াই আবার পাঠানো হয়, তাই
+সাধারণত এই সুইচের দরকার হয় না।
 
 ## চ্যানেল ও ডিমন
 

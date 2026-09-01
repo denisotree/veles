@@ -28,6 +28,12 @@ API key 的查找级联：操作系统钥匙串（项目作用域）→ 操作�
 | `OPENAI_COMPAT_BASE_URL` | —（必填） | `openai-compat` 提供方的端点 |
 | `VELES_LOCAL_TOOLS` | 关闭 | 在本地提供方上启用 tool 调用（`1`/`true`） |
 | `VELES_OLLAMA_EMBED_MODEL` | 提供方默认值 | 覆盖 Ollama 的 embedding 模型 |
+| `VELES_LOCAL_JSON_MODE` | 开启 | 对必须返回 JSON 对象的本地调用发送 `response_format: json_object`（`0` 关闭） |
+
+`VELES_LOCAL_JSON_MODE` 只作用于 Veles 明确知道需要严格 JSON 的调用：目前是 advisor（由
+`advisor_review`、verify 流程和 goal 模式的 CHECK 阶段使用）。普通的 agent 轮次不会启用它：
+fenced-tools 路径需要在代码块周围保留散文，而 JSON 对象约束会禁止这一点。它还能自愈——拒绝
+该参数的后端会在本进程内关闭它并重试，因此通常不需要手动切换。
 
 ## Channels 与 daemon
 

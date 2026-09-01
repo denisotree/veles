@@ -32,6 +32,14 @@ variável de ambiente.
 | `OPENAI_COMPAT_BASE_URL` | — (obrigatória) | Endpoint para o fornecedor `openai-compat` |
 | `VELES_LOCAL_TOOLS` | desligado | Activa a chamada a ferramentas nos fornecedores locais (`1`/`true`) |
 | `VELES_OLLAMA_EMBED_MODEL` | predefinição do fornecedor | Sobrepõe o modelo de embeddings do Ollama |
+| `VELES_LOCAL_JSON_MODE` | ligado | Envia `response_format: json_object` nas chamadas locais que têm de devolver um objeto JSON (`0` desativa) |
+
+`VELES_LOCAL_JSON_MODE` abrange apenas as chamadas que o Veles sabe esperarem JSON estrito:
+hoje é o advisor (usado por `advisor_review`, pelo passo de verify e pela fase CHECK do modo
+goal). Os turnos normais do agente nunca o recebem: o caminho fenced-tools precisa de prosa à
+volta dos seus blocos, e a restrição de objeto JSON proibi-la-ia. Também se auto-repara — um
+backend que rejeite o parâmetro desativa-o para o resto do processo e o pedido é repetido sem
+ele, pelo que normalmente não é preciso mexer neste interruptor.
 
 ## Canais e daemon
 

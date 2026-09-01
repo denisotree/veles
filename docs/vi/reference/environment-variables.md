@@ -31,6 +31,14 @@ hệ điều hành (phạm vi default) → biến môi trường.
 | `OPENAI_COMPAT_BASE_URL` | — (bắt buộc) | Endpoint cho nhà cung cấp `openai-compat` |
 | `VELES_LOCAL_TOOLS` | tắt | Bật gọi tool trên các nhà cung cấp cục bộ (`1`/`true`) |
 | `VELES_OLLAMA_EMBED_MODEL` | mặc định của nhà cung cấp | Ghi đè model embedding của Ollama |
+| `VELES_LOCAL_JSON_MODE` | bật | Gửi `response_format: json_object` cho các lệnh gọi cục bộ buộc phải trả về một object JSON (`0` để tắt) |
+
+`VELES_LOCAL_JSON_MODE` chỉ áp dụng cho những lệnh gọi mà Veles biết là cần JSON nghiêm ngặt:
+hiện tại là advisor (được `advisor_review`, bước verify và pha CHECK của chế độ goal sử dụng).
+Các lượt agent thông thường không bao giờ nhận nó: đường fenced-tools cần văn xuôi bao quanh
+các khối của nó, còn ràng buộc object JSON sẽ cấm điều đó. Cơ chế này cũng tự phục hồi — một
+backend từ chối tham số sẽ tắt nó trong phần còn lại của tiến trình và yêu cầu được thử lại mà
+không có nó, nên thường bạn không cần đụng tới công tắc này.
 
 ## Channels & daemon
 

@@ -28,6 +28,12 @@ API 金鑰的查詢串接順序：OS 鑰匙圈（專案範圍）→ OS 鑰匙圈
 | `OPENAI_COMPAT_BASE_URL` | —（必填） | `openai-compat` 供應商的端點 |
 | `VELES_LOCAL_TOOLS` | 關閉 | 在本機供應商上啟用工具呼叫（`1`/`true`） |
 | `VELES_OLLAMA_EMBED_MODEL` | 供應商預設 | 覆寫 Ollama 的 embedding 模型 |
+| `VELES_LOCAL_JSON_MODE` | 開啟 | 對必須回傳 JSON 物件的本地呼叫送出 `response_format: json_object`（`0` 關閉） |
+
+`VELES_LOCAL_JSON_MODE` 只作用於 Veles 明確知道需要嚴格 JSON 的呼叫：目前是 advisor（由
+`advisor_review`、verify 流程與 goal 模式的 CHECK 階段使用）。一般的 agent 回合不會啟用它：
+fenced-tools 路徑需要在區塊周圍保留敘述文字，而 JSON 物件約束會禁止這件事。它也會自我修復
+——拒絕該參數的後端會在本行程內關閉它並重試，因此通常不需要手動切換。
 
 ## Channel 與 daemon
 

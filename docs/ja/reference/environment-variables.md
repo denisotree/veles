@@ -28,6 +28,14 @@ API キーの参照カスケード: OS キーチェーン（プロジェクト�
 | `OPENAI_COMPAT_BASE_URL` | — (required) | `openai-compat` プロバイダーのエンドポイント |
 | `VELES_LOCAL_TOOLS` | off | ローカルプロバイダーでツール呼び出しを有効にする（`1`/`true`） |
 | `VELES_OLLAMA_EMBED_MODEL` | プロバイダーのデフォルト | Ollama の埋め込みモデルを上書きする |
+| `VELES_LOCAL_JSON_MODE` | on | JSON オブジェクトを返す必要があるローカル呼び出しに `response_format: json_object` を送る（`0` で無効化） |
+
+`VELES_LOCAL_JSON_MODE` が影響するのは、厳密な JSON を期待すると Veles が把握している呼び出し
+だけです。現時点では advisor（`advisor_review`、verify パス、goal モードの CHECK フェーズで使用）
+がそれにあたります。通常のエージェントのターンには適用されません。fenced-tools 経路はブロックの
+周囲に文章を必要とし、JSON オブジェクト制約はそれを禁じてしまうためです。自己修復もします
+——このパラメータを拒否したバックエンドではプロセスの残りの間だけ無効化され、リクエストは
+それなしで再試行されるので、通常このスイッチを触る必要はありません。
 
 ## チャンネルとデーモン
 

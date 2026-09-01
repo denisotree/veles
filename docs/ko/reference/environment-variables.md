@@ -28,6 +28,13 @@ API 키 조회 순서: OS 키체인(프로젝트 범위) → OS 키체인(기본
 | `OPENAI_COMPAT_BASE_URL` | — (필수) | `openai-compat` 프로바이더의 엔드포인트 |
 | `VELES_LOCAL_TOOLS` | off | 로컬 프로바이더에서 도구 호출 활성화(`1`/`true`) |
 | `VELES_OLLAMA_EMBED_MODEL` | 프로바이더 기본값 | Ollama 임베딩 모델 재정의 |
+| `VELES_LOCAL_JSON_MODE` | 켜짐 | JSON 객체를 반환해야 하는 로컬 호출에 `response_format: json_object` 전송 (`0`이면 비활성화) |
+
+`VELES_LOCAL_JSON_MODE`는 Veles가 엄격한 JSON을 기대한다고 아는 호출에만 적용됩니다. 현재는
+advisor(`advisor_review`, verify 단계, goal 모드의 CHECK 단계에서 사용)가 그렇습니다. 일반적인
+에이전트 턴에는 적용되지 않습니다. fenced-tools 경로는 블록 주위에 산문이 필요한데 JSON 객체
+제약이 이를 금지하기 때문입니다. 자가 복구도 됩니다 — 파라미터를 거부하는 백엔드에서는 프로세스가
+끝날 때까지 비활성화되고 요청은 그것 없이 재시도되므로, 보통은 이 스위치가 필요하지 않습니다.
 
 ## 채널 & 데몬
 

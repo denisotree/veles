@@ -31,6 +31,14 @@ Cascada de búsqueda de la clave de API: llavero del SO (ámbito de proyecto) �
 | `OPENAI_COMPAT_BASE_URL` | — (requerido) | Endpoint del proveedor `openai-compat` |
 | `VELES_LOCAL_TOOLS` | desactivado | Habilita la llamada a herramientas en proveedores locales (`1`/`true`) |
 | `VELES_OLLAMA_EMBED_MODEL` | valor por defecto del proveedor | Anula el modelo de embeddings de Ollama |
+| `VELES_LOCAL_JSON_MODE` | activado | Envía `response_format: json_object` en las llamadas locales que deben devolver un objeto JSON (`0` para desactivar) |
+
+`VELES_LOCAL_JSON_MODE` solo cubre las llamadas que Veles sabe que esperan JSON estricto:
+hoy es el advisor (usado por `advisor_review`, el paso de verify y la fase CHECK del modo
+goal). Los turnos normales del agente nunca lo reciben: la ruta fenced-tools necesita prosa
+alrededor de sus bloques, y la restricción de objeto JSON la prohibiría. Además se
+autorrepara: un backend que rechace el parámetro lo desactiva para el resto del proceso y la
+petición se reintenta sin él, así que normalmente no hace falta tocar este interruptor.
 
 ## Canales y daemon
 
