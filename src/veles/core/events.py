@@ -187,7 +187,16 @@ class RoundUsage:
     Emitted by the agent loop after every provider response. This is what
     lets a live HUD show a real `≈N tok` for a tool-call-heavy turn — such a
     turn streams no answer text, so a chars/4 estimate over text deltas reads
-    0 while the model is actually burning tokens on tool-call JSON."""
+    0 while the model is actually burning tokens on tool-call JSON.
+
+    Cache fields (M236): the prompt grows every turn, but `core/cache_hints.py`
+    puts an Anthropic prompt-cache breakpoint right where the stable prefix
+    ends, so most of that growth should be billed as a cache read. That claim
+    was previously unverifiable after the fact — `TokenUsage` carries the
+    numbers (`provider.py:58-59`) and the HUD reads them (`repl/turn.py:339`),
+    but the event log dropped them, so no project could measure whether the
+    cache actually works. Defaults are 0 because `read_events` yields plain
+    dicts and pre-M236 lines simply lack the keys."""
 
     ts: str
     session_id: str | None
@@ -196,6 +205,8 @@ class RoundUsage:
     total_tokens: int
     cumulative_completion: int
     cumulative_total: int
+    cache_read_tokens: int = 0
+    cache_creation_tokens: int = 0
     type: str = "round_usage"
 
 

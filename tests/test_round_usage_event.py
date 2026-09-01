@@ -71,6 +71,52 @@ def test_agent_emits_round_usage_after_every_provider_round() -> None:
     assert usage_events[1].cumulative_completion == 20
 
 
+def test_round_usage_carries_cache_tokens() -> None:
+    """M236: cache effectiveness is only auditable after the fact if the event log
+    carries it. `TokenUsage` has had the fields all along; `RoundUsage` dropped
+    them, so no project could measure whether `cache_hints.py` actually pays off.
+    """
+
+    @dataclass
+    class _CachedProvider:
+        name: str = "stub"
+        supports_tools: bool = False
+        supports_streaming: bool = False
+
+        def create_message(self, messages, tools=None, *, model, max_tokens=4096):
+            del messages, tools, model, max_tokens
+            return ProviderResponse(
+                text="done",
+                tool_calls=[],
+                usage=TokenUsage(
+                    prompt_tokens=9000,
+                    completion_tokens=10,
+                    total_tokens=9010,
+                    cache_read_tokens=8000,
+                    cache_creation_tokens=500,
+                ),
+                finish_reason="stop",
+            )
+
+    events: list = []
+    Agent(_CachedProvider(), Registry(), model="m").run("go", event_listener=events.append)
+
+    usage = next(e for e in events if getattr(e, "type", "") == "round_usage")
+    assert usage.cache_read_tokens == 8000
+    assert usage.cache_creation_tokens == 500
+
+
+def test_round_usage_cache_fields_default_to_zero() -> None:
+    """A provider whose usage object lacks the cache fields must not raise —
+    local backends (ollama/llamacpp) report no cache at all."""
+    events: list = []
+    Agent(_ToolThenAnswerProvider(), _registry(), model="m").run("go", event_listener=events.append)
+
+    usage = next(e for e in events if getattr(e, "type", "") == "round_usage")
+    assert usage.cache_read_tokens == 0
+    assert usage.cache_creation_tokens == 0
+
+
 def test_turn_callbacks_map_round_usage_to_meta() -> None:
     from types import SimpleNamespace
 

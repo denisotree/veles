@@ -65,6 +65,17 @@ def _is_cache_control_error(exc: Exception) -> bool:
     return "cache_control" in str(exc).lower()
 
 
+def _is_response_format_error(exc: Exception) -> bool:
+    """True for an upstream 400 that rejected our M239 `response_format` hint.
+    Matches on the error body so it fires only for that rejection, not any
+    other 400 — a llama.cpp build without JSON-schema support, say."""
+    if not isinstance(exc, APIStatusError):
+        return False
+    if getattr(exc, "status_code", None) != 400:
+        return False
+    return "response_format" in str(exc).lower()
+
+
 def to_openai_message(m: Message) -> dict[str, Any]:
     """Convert one Veles Message to its OpenAI Chat Completions wire form."""
     if m.role == "tool":
@@ -205,12 +216,30 @@ class OpenAICompatibleProvider:
         """Run `chat.completions.create` with the M220 cache self-heal: if the
         wire rejects our `cache_control` tool-tail hint (400), drop the tool-tail
         breakpoint process-wide, re-prepare the messages, and retry once. The
-        cache is a bonus — a rejection must never break an agentic turn."""
+        cache is a bonus — a rejection must never break an agentic turn.
+
+        M239 adds the same treatment for `response_format`: a local backend that
+        doesn't accept it disables JSON mode process-wide and the request is
+        retried without it, rather than failing the turn."""
         try:
             return self._client.chat.completions.create(**kwargs)
         except _TRANSLATED_OPENAI_ERRORS as exc:
             from veles.core.cache_hints import disable_tool_tail, tool_tail_enabled
 
+            if "response_format" in kwargs and _is_response_format_error(exc):
+                from veles.adapters.local._base import disable_json_mode
+
+                disable_json_mode()
+                logger.warning(
+                    "response_format rejected; disabled local JSON mode and "
+                    "retrying without it (self-healed, %s)",
+                    getattr(self, "name", "provider"),
+                )
+                retry = {k: v for k, v in kwargs.items() if k != "response_format"}
+                try:
+                    return self._client.chat.completions.create(**retry)
+                except _TRANSLATED_OPENAI_ERRORS as exc2:
+                    raise self._translate_openai_error(exc2) from exc2
             if tool_tail_enabled() and _is_cache_control_error(exc):
                 disable_tool_tail()
                 logger.warning(

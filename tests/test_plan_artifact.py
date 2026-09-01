@@ -10,7 +10,6 @@ from veles.core.plan_artifact import (
     PLANS_ACTIVE_SUBDIR,
     PLANS_COMPLETED_SUBDIR,
     PLANS_DIRNAME,
-    PlanArtifact,
     active_dir,
     collect_active_refs,
     completed_dir,
@@ -22,7 +21,6 @@ from veles.core.plan_artifact import (
     plan_ref,
     plans_dir,
     read_plan,
-    render_system_block,
     update_status,
 )
 
@@ -158,38 +156,6 @@ def test_mark_done_moves_to_completed_dir(tmp_path: Path) -> None:
 def test_mark_done_missing_raises(tmp_path: Path) -> None:
     with pytest.raises(KeyError):
         mark_done(tmp_path, "no-such-plan")
-
-
-# ---------- system-prompt block ----------
-
-
-def test_render_block_minimal() -> None:
-    plan = PlanArtifact(id="abc", objective="Do thing.")
-    block = render_system_block(plan)
-    assert block.startswith('<active-plan id="abc"')
-    assert "Do thing." in block
-    assert block.endswith("</active-plan>")
-
-
-def test_render_block_with_steps_and_approval() -> None:
-    plan = PlanArtifact(
-        id="abc",
-        objective="Migrate",
-        done_condition="tests green",
-        steps=["one", "two"],
-        approval_points=["before push"],
-    )
-    block = render_system_block(plan)
-    assert "Done when: tests green" in block
-    assert "  1. one" in block
-    assert "  2. two" in block
-    assert "Approval points: before push" in block
-
-
-def test_render_block_contains_plan_ref() -> None:
-    plan = PlanArtifact(id="xyz", objective="o")
-    block = render_system_block(plan)
-    assert 'ref="artifact://veles/plans/xyz"' in block
 
 
 # ---------- collect_active_refs (compactor-side helper) ----------

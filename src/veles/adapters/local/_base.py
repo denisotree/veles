@@ -28,6 +28,7 @@ from typing import ClassVar
 import httpx
 from openai import OpenAI
 
+from veles.core.context import expects_strict_json
 from veles.core.openai_wire import (
     OpenAICompatibleProvider,
     to_openai_message,
@@ -35,6 +36,30 @@ from veles.core.openai_wire import (
 
 # Re-export for tests that import the function from this module.
 _to_openai_message = to_openai_message
+
+# M239 self-heal, mirroring `cache_hints.disable_tool_tail`: `response_format`
+# is a bonus, so a backend that rejects it must degrade instead of failing the
+# turn. `VELES_LOCAL_JSON_MODE=0` disables it up front; the first 400 naming the
+# parameter disables it for the rest of the process and the request is retried.
+_JSON_MODE_ENABLED: bool = os.environ.get("VELES_LOCAL_JSON_MODE", "1").strip().lower() not in (
+    "0",
+    "false",
+    "no",
+)
+
+
+def json_mode_enabled() -> bool:
+    return _JSON_MODE_ENABLED
+
+
+def disable_json_mode() -> None:
+    global _JSON_MODE_ENABLED
+    _JSON_MODE_ENABLED = False
+
+
+def _reset_json_mode_for_tests() -> None:
+    global _JSON_MODE_ENABLED
+    _JSON_MODE_ENABLED = True
 
 
 class _OpenAICompatibleBase(OpenAICompatibleProvider):
@@ -108,3 +133,23 @@ class _OpenAICompatibleBase(OpenAICompatibleProvider):
         # Local backends don't have the OpenAI reasoning-model quirk;
         # always use `max_tokens` regardless of model id.
         return "max_tokens"
+
+    # ---- structured output (M239) ----
+
+    def _request_options(self, model: str) -> dict[str, object]:
+        """Ask for a JSON object when the caller declared it needs one.
+
+        Small open-weight models fail structured output far more often than they
+        fail the reasoning behind it, and Veles' only defence was re-prompting
+        (`_PARSE_NUDGE_LIMIT`) — a wasted round trip each time. ollama and
+        llama.cpp's server both honour OpenAI's `response_format`, and both
+        constrain decoding rather than merely asking nicely.
+
+        Deliberately NOT applied to every call: the fenced-tools path has the
+        model emit ```veles-tool blocks inside prose, which `json_object` would
+        forbid outright. Only `strict_json_mode()` callers opt in.
+        """
+        del model
+        if not json_mode_enabled() or not expects_strict_json():
+            return {}
+        return {"response_format": {"type": "json_object"}}

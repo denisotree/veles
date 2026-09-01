@@ -7,6 +7,8 @@ on shared state.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 
@@ -143,3 +145,46 @@ def set_budget(b: TokenBudget | None) -> Token:
 
 def reset_budget(token: Token) -> None:
     _token_budget.reset(token)
+
+
+# ---- strict-JSON expectation (M239) ----
+#
+# Several sub-agents ask the model for a bare JSON object and parse it:
+# `call_advisor` / `parse_verdict`, `verify._parse_judge`, the insight extractor,
+# the proactive event extractor. Each of them tolerates a parse failure by
+# degrading to a neutral verdict, so a model that can't hold the format silently
+# costs a round — and on the fenced path costs up to three (`_PARSE_NUDGE_LIMIT`).
+#
+# SKILL.state (arXiv 2608.26263) measured where that lands on a small open-weight
+# model: 20% of failures were schema/type-coercion and 12% raw JSON syntax, i.e.
+# a third of all failures came from "structured output adherence rather than
+# reasoning capacity" — the class of error constrained decoding removes outright.
+#
+# This flag is how a caller says "this call must return a JSON object". Only the
+# local adapters act on it (ollama / llama.cpp / openai-compat all accept
+# `response_format`); cloud adapters ignore it, so setting it is always safe.
+# A ContextVar rather than a parameter because `Provider.create_message` is a
+# protocol shared by every adapter and the sub-agents build their own providers.
+_strict_json: ContextVar[bool] = ContextVar("veles_strict_json", default=False)
+
+
+def expects_strict_json() -> bool:
+    return _strict_json.get()
+
+
+def set_strict_json(on: bool) -> Token:
+    return _strict_json.set(on)
+
+
+def reset_strict_json(token: Token) -> None:
+    _strict_json.reset(token)
+
+
+@contextmanager
+def strict_json_mode() -> Iterator[None]:
+    """Mark the enclosed provider calls as expecting a bare JSON object."""
+    token = _strict_json.set(True)
+    try:
+        yield
+    finally:
+        _strict_json.reset(token)

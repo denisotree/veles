@@ -16,9 +16,18 @@ draft itself.
 Why this matters for M70: the existing `xfail` eval
 `test_compaction_preserves_active_plan` requires *some* canonical
 representation of an active plan that the compactor can preserve across
-turn boundaries. This module provides it; M71 hooks the artifact into
-the system prompt; the compactor reattaches the artifact reference on
-rehydration. After this milestone the eval flips to a real pass.
+turn boundaries. This module provides it; the compactor reattaches the
+artifact reference on rehydration (`collect_active_refs`, consumed by
+`context_compressor.py`). After this milestone the eval flips to a real pass.
+
+M236 correction: an earlier version of this docstring claimed "M71 hooks the
+artifact into the system prompt". It never did. System-prompt assembly lives in
+`core/context_builder.py::assemble_system_prompt` and knows nothing about plans;
+the `render_system_block` helper written for that promise had zero production
+callers for its whole life and was removed rather than left as a standing lie.
+GoalMode, the one plausible consumer, renders its own plan summary inline in
+`_EXECUTE_SYSTEM_TEMPLATE` (`core/modes/goal.py`). What crosses the compaction
+boundary is the *reference*, not the body.
 """
 
 from __future__ import annotations
@@ -194,29 +203,6 @@ def mark_done(
         active_path.unlink()
     _write(state_dir, plan, completed=True)
     return plan
-
-
-def render_system_block(plan: PlanArtifact) -> str:
-    """Render `<active-plan>...</active-plan>` for system-prompt injection.
-
-    Kept compact — the model sees objective, done_condition, current step
-    list (numbered), and approval points. Full scope / risks / rollback
-    stay in the artifact body so the prompt doesn't bloat per turn.
-    """
-    lines = [
-        f'<active-plan id="{plan.id}" status="{plan.status}" ref="{plan_ref(plan.id)}">',
-        f"Objective: {plan.objective}",
-    ]
-    if plan.done_condition:
-        lines.append(f"Done when: {plan.done_condition}")
-    if plan.steps:
-        lines.append("Steps:")
-        for i, s in enumerate(plan.steps, 1):
-            lines.append(f"  {i}. {s}")
-    if plan.approval_points:
-        lines.append("Approval points: " + ", ".join(plan.approval_points))
-    lines.append("</active-plan>")
-    return "\n".join(lines)
 
 
 # ---------- markdown serialization ----------
@@ -401,6 +387,5 @@ __all__ = [
     "plan_ref",
     "plans_dir",
     "read_plan",
-    "render_system_block",
     "update_status",
 ]

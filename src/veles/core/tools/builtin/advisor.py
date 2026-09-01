@@ -69,7 +69,7 @@ def call_advisor(input_text: str, *, system_prompt: str | None = None) -> str:
     it (treat as off-track, abort the FSM, etc.).
     """
     from veles.core.agent import Agent
-    from veles.core.context import current_project
+    from veles.core.context import current_project, strict_json_mode
     from veles.core.provider_factory import has_api_key, make_provider
     from veles.core.routing import route
     from veles.core.tools.registry import Registry
@@ -97,8 +97,15 @@ def call_advisor(input_text: str, *, system_prompt: str | None = None) -> str:
         max_iterations=1,
         system_prompt=system_prompt or _ADVISOR_SYSTEM_PROMPT,
     )
+    # M239: every caller of this function parses the reply as a JSON object —
+    # `parse_verdict` here, `verify._parse_judge`, GoalMode's
+    # `parse_check_verdict` — and all three degrade to a neutral verdict on a
+    # parse failure, so a model that can't hold the format costs a silent round.
+    # On a local backend `strict_json_mode` turns that into constrained decoding;
+    # cloud adapters ignore the flag.
     try:
-        result = sub_agent.run(input_text)
+        with strict_json_mode():
+            result = sub_agent.run(input_text)
     except Exception as exc:
         return f"<advisor failed: {type(exc).__name__}: {exc}>"
     return result.text or ""

@@ -61,7 +61,13 @@ from veles.core.fenced_tools import (
     render_parse_errors,
     render_tools_prompt,
 )
-from veles.core.history_repair import repair_tool_pairing
+from veles.core.history_repair import (
+    call_key,
+    repair_tool_pairing,
+    supersede_fenced,
+    supersede_loaded_history,
+    supersede_native,
+)
 from veles.core.memory import SessionStore
 from veles.core.modules import fire_hook
 from veles.core.provider import (
@@ -502,6 +508,8 @@ class Agent:
                     total_tokens=getattr(response.usage, "total_tokens", 0),
                     cumulative_completion=usage_acc.completion_tokens,
                     cumulative_total=usage_acc.total_tokens,
+                    cache_read_tokens=getattr(response.usage, "cache_read_tokens", 0),
+                    cache_creation_tokens=getattr(response.usage, "cache_creation_tokens", 0),
                 )
             )
 
@@ -707,6 +715,11 @@ class Agent:
                 artifact_dir=artifact_dir,
                 approval_dir=approval_dir,
             )
+            # M238: blank the earlier result of an identical deterministic read
+            # before appending the fresh one, so the stale copy stops competing
+            # with it for attention. In-session only — see the note in
+            # `_dispatch_fenced_calls`.
+            supersede_native(history, call.name, call.arguments)
             history.append(tool_message)
             self._persist(tool_message)
 
@@ -764,7 +777,18 @@ class Agent:
                 artifact_dir=artifact_dir,
                 approval_dir=approval_dir,
             )
-            chunks.append(f"[{call.name}]\n{tool_message.content or ''}")
+            # M238: the tag makes this chunk findable later — fenced mode keeps
+            # no arguments in the history, so without it a repeated identical
+            # read cannot be matched to the chunk it supersedes.
+            #
+            # ponytail: supersession is in-memory only. `_persist` has already
+            # written the full earlier result to the SessionStore, which is
+            # append-only, so `--resume` rehydrates the stale copy. Fixing that
+            # needs an update path on the store; the win here is the live turn's
+            # context, which is where the contradiction actually bites.
+            tag = call_key(call.name, call.arguments)
+            supersede_fenced(history, call.name, tag, FENCED_RESULT_HEADER)
+            chunks.append(f"[{call.name} {tag}]\n{tool_message.content or ''}")
         if parse_errors:
             chunks.append(render_parse_errors(parse_errors))
         combined = Message(
@@ -799,6 +823,11 @@ class Agent:
         # the original context back verbatim.
         if self._session_id is not None and self._store is not None:
             history = self._store.load_messages(self._session_id)
+            # M245: the store is a complete archive (curator/insights mine it),
+            # so duplicate reads come back verbatim and re-introduce exactly the
+            # contradictions M238 removed at dispatch time. Prune the view, not
+            # the record.
+            supersede_loaded_history(history, FENCED_RESULT_HEADER)
             if self._system_prompt:
                 fresh = Message(role="system", content=self._system_prompt)
                 if history and history[0].role == "system":
