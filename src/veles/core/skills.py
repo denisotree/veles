@@ -20,6 +20,7 @@ M6 can swap to pyyaml if real YAML is required.
 
 from __future__ import annotations
 
+import contextlib
 import datetime as _dt
 import json
 import logging
@@ -29,7 +30,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from veles.core.file_lock import file_lock
 from veles.core.tools.registry import Registry, ToolEntry
 
 logger = logging.getLogger(__name__)
@@ -315,7 +315,46 @@ def _discover_skills_uncached(
 
         by_name = {s.name: s for s in merged}
         merged = [resolve_inheritance(s, by_name) for s in merged]
+    _apply_db_telemetry(project, merged)
     return merged
+
+
+def _apply_db_telemetry(project: Project, skills: list[Skill]) -> None:
+    """Overlay `skill_uses` aggregates onto freshly-loaded Skill objects.
+
+    M244: telemetry moved out of SKILL.md frontmatter into memory.db, so the
+    counters have to be re-attached on load. Doing it here keeps every reader
+    (`skill_promotion`, `skill_dedup`, `veles skill list`) unchanged — they
+    still read `skill.use_count`, the value just no longer comes from a file
+    the package ships.
+
+    Silent no-op on any failure: telemetry is ranking metadata, and a missing
+    or locked database must never stop skills from loading.
+    """
+    try:
+        from veles.core.memory import SessionStore
+        from veles.core.skills_persistence import skill_telemetry
+
+        db_path = project.memory_db_path
+        if not db_path.exists():
+            return
+        store = SessionStore(db_path)
+        try:
+            for skill in skills:
+                t = skill_telemetry(store._conn, skill.name)
+                if t.use_count == 0:
+                    continue
+                skill.use_count = t.use_count
+                skill.success_count = t.success_count
+                skill.error_count = t.error_count
+                if t.last_used_at:
+                    skill.last_used = _dt.datetime.fromtimestamp(
+                        float(t.last_used_at), tz=_dt.UTC
+                    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+        finally:
+            store.close()
+    except Exception:  # pragma: no cover - never block skill discovery
+        logger.debug("skill telemetry overlay failed", exc_info=True)
 
 
 def mount_layout_skills(project: Project) -> list[Skill]:
@@ -428,6 +467,48 @@ def _load_skill(skill_path: Path, *, scope: str = "project") -> Skill | None:
 # ---------- telemetry write-back ----------
 
 
+def _record_skill_use_in_db(skill: Skill, *, success: bool) -> None:
+    """Append one `skill_uses` row for `skill` in the active project's memory.db.
+
+    Best-effort by design: telemetry must never break a skill invocation, and
+    there is no project at all in some contexts (a bare sub-agent, a unit test).
+    `upsert_skill` runs first because `record_skill_use` is a silent no-op when
+    the skill has no catalogue row — which is every skill today, since nothing
+    ever populated the `skills` table.
+    """
+    try:
+        from veles.core.context import current_project
+
+        project = current_project()
+        if project is None:
+            return
+        from veles.core.memory import SessionStore
+        from veles.core.skills_persistence import record_skill_use, upsert_skill
+
+        store = SessionStore(project.memory_db_path)
+        try:
+            conn = store._conn
+            # `record_skill_use` is a no-op (returns 0) when the skill has no
+            # catalogue row, so cataloguing is the slow path taken once per
+            # skill rather than on every invocation.
+            #
+            # The retry matters under concurrency: `upsert_skill` does
+            # SELECT-then-INSERT, so two threads can both miss and race, and the
+            # loser hits the UNIQUE(name) constraint. Without a second attempt
+            # its use would be silently dropped — measured as 39 of 40 recorded
+            # in the concurrency test.
+            if record_skill_use(conn, skill_name=skill.name, ok=success) == 0:
+                # Losing the race is fine — the winner's row is what we need.
+                with contextlib.suppress(Exception):
+                    upsert_skill(conn, skill)
+                record_skill_use(conn, skill_name=skill.name, ok=success)
+            conn.commit()
+        finally:
+            store.close()
+    except Exception:  # pragma: no cover - telemetry is never load-bearing
+        logger.debug("skill telemetry write failed for %s", skill.name, exc_info=True)
+
+
 def bump_telemetry(skill: Skill, *, success: bool) -> None:
     """Atomically bump use_count + outcome counter in SKILL.md.
 
@@ -441,31 +522,32 @@ def bump_telemetry(skill: Skill, *, success: bool) -> None:
     `<SKILL.md>.lock` serialises every bumper across threads and
     processes (M30).
     """
-    lock_path = skill.path.with_suffix(skill.path.suffix + ".lock")
-    with file_lock(lock_path):
-        raw = skill.path.read_text(encoding="utf-8", errors="replace")
-        fm, body = parse_frontmatter(raw)
-        if not fm:
-            return  # malformed file — leave alone
-        now_iso = _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-        new_use = int(fm.get("use_count", 0) or 0) + 1
-        fm["use_count"] = new_use
-        fm["last_used"] = now_iso
-        if success:
-            fm["success_count"] = int(fm.get("success_count", 0) or 0) + 1
-        else:
-            fm["error_count"] = int(fm.get("error_count", 0) or 0) + 1
-            fm["last_error_at"] = now_iso
-        text = render_frontmatter(fm, body)
-        tmp = skill.path.with_suffix(skill.path.suffix + ".tmp")
-        tmp.write_text(text, encoding="utf-8")
-        tmp.replace(skill.path)
-    skill.use_count = new_use
-    skill.last_used = fm["last_used"]
-    skill.success_count = int(fm.get("success_count", 0) or 0)
-    skill.error_count = int(fm.get("error_count", 0) or 0)
-    last_err = fm.get("last_error_at")
-    skill.last_error_at = last_err if isinstance(last_err, str) else skill.last_error_at
+    # M244: telemetry is runtime state and belongs in the project's memory.db,
+    # not in the skill's own source file.
+    #
+    # `builtin` and layout-pack skills live INSIDE the installed package, so the
+    # frontmatter rewrite below was mutating the distribution itself: a pip
+    # install writes `use_count:` into site-packages, a git checkout gets a
+    # dirty tree, and a read-only install cannot record anything at all.
+    # Observed live 2026-09-01 — a run in a `~/.tmp` sandbox modified two
+    # SKILL.md files inside the veles repo and left `.lock` files behind.
+    #
+    # `skill_uses` + `skill_telemetry()` (M121) already model this correctly as
+    # append-only rows with aggregate reads; they were written and never wired
+    # up, so the file counters were a duplicate of a better mechanism.
+    _record_skill_use_in_db(skill, success=success)
+
+    # In-memory counters stay correct for the caller that just invoked the
+    # skill, without touching the file. `discover_skills` refreshes them from
+    # the database on the next load.
+    now_iso = _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    skill.use_count += 1
+    skill.last_used = now_iso
+    if success:
+        skill.success_count += 1
+    else:
+        skill.error_count += 1
+        skill.last_error_at = now_iso
 
 
 # ---------- tool factory ----------

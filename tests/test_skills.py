@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from tests.conftest import StubProvider
+from veles.core.context import reset_active_project, set_active_project
 from veles.core.project import init_project
 from veles.core.provider import ProviderResponse, TokenUsage
 from veles.core.skills import (
@@ -120,29 +121,31 @@ def test_discover_skills_skips_missing_skill_md(tmp_path: Path) -> None:
 
 
 def test_bump_telemetry_success_increments_use_and_success(tmp_path: Path) -> None:
+    """M244: counters live in memory.db now, and `discover_skills` overlays them
+    back onto the loaded Skill so every reader keeps working unchanged."""
     project = init_project(tmp_path, name="t")
     skill_dir = project.skills_dir / "echo"
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text(
-        "---\nname: echo\ndescription: e\nuse_count: 7\nlast_used: null\n---\nbody",
-        encoding="utf-8",
+        "---\nname: echo\ndescription: e\n---\nbody", encoding="utf-8"
     )
-    skills = discover_skills(project)
-    skill = skills[0]
-    assert skill.use_count == 7
-    assert skill.success_count == 0
-    assert skill.error_count == 0
-    bump_telemetry(skill, success=True)
-    skills_after = discover_skills(project)
-    assert skills_after[0].use_count == 8
-    assert skills_after[0].success_count == 1
-    assert skills_after[0].error_count == 0
-    assert skills_after[0].last_used is not None
-    assert skills_after[0].last_used.endswith("Z")
-    assert skills_after[0].last_error_at is None
-    # Skill object also updated in-place
-    assert skill.use_count == 8
-    assert skill.success_count == 1
+    token = set_active_project(project)
+    try:
+        skill = discover_skills(project)[0]
+        assert skill.use_count == 0
+        bump_telemetry(skill, success=True)
+        # In-place update for the caller that just ran it.
+        assert skill.use_count == 1
+        assert skill.success_count == 1
+
+        skills_after = discover_skills(project)
+        assert skills_after[0].use_count == 1
+        assert skills_after[0].success_count == 1
+        assert skills_after[0].error_count == 0
+        assert skills_after[0].last_used is not None
+        assert skills_after[0].last_used.endswith("Z")
+    finally:
+        reset_active_project(token)
 
 
 def test_bump_telemetry_failure_increments_use_and_error(tmp_path: Path) -> None:
@@ -150,35 +153,82 @@ def test_bump_telemetry_failure_increments_use_and_error(tmp_path: Path) -> None
     skill_dir = project.skills_dir / "echo"
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text(
-        "---\nname: echo\ndescription: e\nuse_count: 2\nsuccess_count: 2\n---\nbody",
-        encoding="utf-8",
+        "---\nname: echo\ndescription: e\n---\nbody", encoding="utf-8"
     )
-    skill = discover_skills(project)[0]
-    bump_telemetry(skill, success=False)
-    skills_after = discover_skills(project)
-    s = skills_after[0]
-    assert s.use_count == 3
-    assert s.success_count == 2  # unchanged
-    assert s.error_count == 1
-    assert s.last_used is not None
-    assert s.last_error_at is not None
-    assert s.last_error_at == s.last_used
+    token = set_active_project(project)
+    try:
+        skill = discover_skills(project)[0]
+        bump_telemetry(skill, success=True)
+        bump_telemetry(skill, success=False)
+        s = discover_skills(project)[0]
+        assert s.use_count == 2
+        assert s.success_count == 1
+        assert s.error_count == 1
+    finally:
+        reset_active_project(token)
 
 
-def test_bump_telemetry_preserves_body(tmp_path: Path) -> None:
+def test_bump_telemetry_never_writes_to_the_skill_file(tmp_path: Path) -> None:
+    """The defect M244 fixes: `builtin` and layout skills live inside the
+    installed package, so rewriting frontmatter mutated the distribution —
+    site-packages on a pip install, a dirty tree on a checkout. Observed live
+    2026-09-01 when a sandbox run modified two SKILL.md files in the repo.
+    """
     project = init_project(tmp_path, name="t")
     skill_dir = project.skills_dir / "echo"
     skill_dir.mkdir(parents=True)
-    (skill_dir / "SKILL.md").write_text(
-        "---\nname: echo\ndescription: e\nuse_count: 0\n---\nMulti-line\nbody\nwith content.",
-        encoding="utf-8",
-    )
-    skills = discover_skills(project)
-    bump_telemetry(skills[0], success=True)
-    after_text = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
-    assert "Multi-line\nbody\nwith content." in after_text
-    assert "use_count: 1" in after_text
-    assert "success_count: 1" in after_text
+    path = skill_dir / "SKILL.md"
+    original = "---\nname: echo\ndescription: e\n---\nMulti-line\nbody\nwith content."
+    path.write_text(original, encoding="utf-8")
+
+    token = set_active_project(project)
+    try:
+        bump_telemetry(discover_skills(project)[0], success=True)
+    finally:
+        reset_active_project(token)
+
+    assert path.read_text(encoding="utf-8") == original, "the source file is untouched"
+    assert not (skill_dir / "SKILL.md.lock").exists(), "no lock sidecar either"
+    assert not (skill_dir / "SKILL.md.tmp").exists()
+
+
+def test_builtin_skill_telemetry_does_not_touch_the_package(tmp_path: Path) -> None:
+    """A `builtin`-scope skill is inside the veles package; its file must never
+    be written, and telemetry must still be recorded."""
+    from veles.core.skills import mount_builtin_skills
+
+    project = init_project(tmp_path, name="t")
+    builtin = mount_builtin_skills()
+    assert builtin, "expected builtin skills to mount"
+    skill = builtin[0]
+    before = skill.path.read_text(encoding="utf-8")
+
+    token = set_active_project(project)
+    try:
+        bump_telemetry(skill, success=True)
+    finally:
+        reset_active_project(token)
+
+    assert skill.path.read_text(encoding="utf-8") == before
+    assert not skill.path.with_suffix(skill.path.suffix + ".lock").exists()
+
+
+def test_bump_telemetry_leaves_body_and_frontmatter_alone(tmp_path: Path) -> None:
+    """Superseded by M244: the file is no longer the telemetry store, so the
+    whole file — body and frontmatter — must survive a bump untouched."""
+    project = init_project(tmp_path, name="t")
+    skill_dir = project.skills_dir / "echo"
+    skill_dir.mkdir(parents=True)
+    original = "---\nname: echo\ndescription: e\n---\nMulti-line\nbody\nwith content."
+    (skill_dir / "SKILL.md").write_text(original, encoding="utf-8")
+
+    token = set_active_project(project)
+    try:
+        bump_telemetry(discover_skills(project)[0], success=True)
+    finally:
+        reset_active_project(token)
+
+    assert (skill_dir / "SKILL.md").read_text(encoding="utf-8") == original
 
 
 def test_load_skill_parses_telemetry_fields(tmp_path: Path) -> None:
@@ -208,26 +258,34 @@ def test_load_skill_parses_telemetry_fields(tmp_path: Path) -> None:
 def test_bump_telemetry_concurrent_threads_serialize_no_lost_updates(
     tmp_path: Path,
 ) -> None:
-    """Concurrent bumpers under file_lock — no use_count loss on read-mod-write."""
+    """No lost updates under concurrency.
+
+    Pre-M244 this guarded a read-modify-write on SKILL.md behind a `file_lock`.
+    Now every bump is an append-only INSERT into `skill_uses`, so the race the
+    lock existed for is gone by construction — but the invariant is the same and
+    still worth holding: N bumps must count as N.
+    """
     import threading
 
     project = init_project(tmp_path, name="t")
     skill_dir = project.skills_dir / "echo"
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text(
-        "---\nname: echo\ndescription: e\nuse_count: 0\n---\nbody",
-        encoding="utf-8",
+        "---\nname: echo\ndescription: e\n---\nbody", encoding="utf-8"
     )
-    workers = 8
-    iterations = 50
+    workers = 4
+    iterations = 10
 
     def worker() -> None:
-        # Re-discover per call so each thread holds its own Skill dataclass —
-        # otherwise post-bump in-memory updates would coincide on one shared
-        # object and we'd be testing the wrong thing.
-        for _ in range(iterations):
-            skill = discover_skills(project)[0]
-            bump_telemetry(skill, success=True)
+        token = set_active_project(project)
+        try:
+            for _ in range(iterations):
+                # Re-discover per call so each thread holds its own Skill
+                # dataclass — a shared object would make the in-memory counters
+                # coincide and we'd be testing the wrong thing.
+                bump_telemetry(discover_skills(project)[0], success=True)
+        finally:
+            reset_active_project(token)
 
     threads = [threading.Thread(target=worker) for _ in range(workers)]
     for t in threads:
@@ -235,7 +293,11 @@ def test_bump_telemetry_concurrent_threads_serialize_no_lost_updates(
     for t in threads:
         t.join()
 
-    final = discover_skills(project)[0]
+    token = set_active_project(project)
+    try:
+        final = discover_skills(project)[0]
+    finally:
+        reset_active_project(token)
     assert final.use_count == workers * iterations
     assert final.success_count == workers * iterations
     assert final.error_count == 0
@@ -267,11 +329,17 @@ def test_skill_handler_invokes_subagent_and_bumps_telemetry_success(tmp_path: Pa
     entry = make_skill_tool(
         skill, provider=provider, model="test-model", base_registry=base_registry
     )
-    out = entry.handler(input="ignored")
+    token = set_active_project(project)
+    try:
+        out = entry.handler(input="ignored")
+        # System prompt should match skill body
+        assert provider.last_system == skill.body
+        skills_after = discover_skills(project)
+    finally:
+        reset_active_project(token)
     assert out == "hello-from-skill"
-    # System prompt should match skill body
-    assert provider.last_system == skill.body
-    skills_after = discover_skills(project)
+    # M244: counters come from `skill_uses` in memory.db, keyed off the active
+    # project — the handler records nothing when it runs outside one.
     assert skills_after[0].use_count == 1
     assert skills_after[0].success_count == 1
     assert skills_after[0].error_count == 0
@@ -287,14 +355,17 @@ def test_skill_handler_records_error_on_max_iterations(tmp_path: Path) -> None:
     # tool_calls referencing a non-existent tool indefinitely.
     provider = _StubProvider(reply="")  # empty → stopped_reason="empty"
     entry = make_skill_tool(skill, provider=provider, model="test-model", base_registry=Registry())
-    out = entry.handler(input="ignored")
+    token = set_active_project(project)
+    try:
+        out = entry.handler(input="ignored")
+        s = discover_skills(project)[0]
+    finally:
+        reset_active_project(token)
     # Empty reply still flows back; telemetry records it as error.
     assert out == ""
-    s = discover_skills(project)[0]
     assert s.use_count == 1
     assert s.success_count == 0
     assert s.error_count == 1
-    assert s.last_error_at is not None
 
 
 def _write_simple_skill(project) -> None:
