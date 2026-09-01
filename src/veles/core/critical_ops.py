@@ -27,6 +27,23 @@ Out of M39 scope:
   ladder. Re-prompting on every fetch would defeat any agent loop that
   uses public docs.
 
+  **But M198 later added a second, narrower path to this gate that this
+  paragraph does not cover**, and reading it as "fetch_url never reaches
+  confirm_critical" is wrong. `permission/engine.py::_untrusted_args_rule`
+  routes an *egress* tool here when its destination host also appears in
+  untrusted content read earlier in the same run. It runs before the policy
+  gate, so neither the `allow` override in `BUILTIN_TOOL_POLICY_OVERRIDES` nor
+  `VELES_TRUST_AUTO_ALLOW=1` can reach it — by design, that is the
+  prompt-injection exfiltration signal.
+
+  Consequence, observed live 2026-09-01: `web_search` records its results as
+  untrusted, so fetching any URL those results contain escalates. "Search, then
+  open what you found" is the whole of research, which means research is
+  effectively TTY-only — in a daemon, a channel, or a non-TTY `veles run` the
+  model retries against a fail-closed deny until its iterations run out.
+  Interactive surfaces install a picker via `set_critical_confirmer`; headless
+  callers currently have no equivalent.
+
 Tests inject a fake confirmer via `set_critical_confirmer`.
 """
 

@@ -153,10 +153,20 @@ def _untrusted_egress_host(args: dict[str, Any]) -> str | None:
     or None. High-signal, low-false-positive: matches attacker-*named*
     destinations and verbatim host forwarding — not paraphrased/re-encoded
     exfil (a known gap; the model's own discretion + the boundary reminder
-    remain the backstop there)."""
-    from veles.core.agent_state import untrusted_corpus
+    remain the backstop there).
 
-    corpus = untrusted_corpus()
+    M242: consults only FETCHED PAGE content, not `web_search` result listings.
+    A search result is a set of addresses the engine returned for the agent's
+    own query — following one exfiltrates nothing, because the URL is the
+    destination rather than a payload. Page bodies are the opposite: they are
+    attacker-authorable, and a host planted in one is the actual injection
+    vector. Treating both alike made "search, then open what you found" — all
+    of research — escalate, and `confirm_critical` fail-closed denies without a
+    TTY, so headless research could never work at all.
+    """
+    from veles.core.agent_state import untrusted_page_corpus
+
+    corpus = untrusted_page_corpus()
     if not corpus:
         return None
     corpus_l = "\n".join(corpus).lower()

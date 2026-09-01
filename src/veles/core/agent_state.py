@@ -97,26 +97,62 @@ def clear_invoked_tools() -> Token[frozenset[str]]:
 # at run start, reset at run end, inherited across the REPL executor boundary.
 # Per-run scope means the within-run attack (fetch → read → exfil) is caught;
 # cross-turn taint (fetched turn 1, exfil turn 3) is not.
-_untrusted_corpus: ContextVar[tuple[str, ...]] = ContextVar("veles_untrusted_corpus", default=())
+_untrusted_corpus: ContextVar[tuple[tuple[str, str], ...]] = ContextVar(
+    "veles_untrusted_corpus", default=()
+)
 
 
 def untrusted_corpus() -> tuple[str, ...]:
-    """Untrusted-content blocks recorded in the current run."""
+    """Untrusted-content blocks recorded in the current run (bodies only)."""
+    return tuple(body for body, _source in _untrusted_corpus.get())
+
+
+# M242: the corpus records WHERE each block came from, because the two sources
+# carry very different risk and the M198 egress rule was treating them alike.
+#
+# A `web_search` result is a list of addresses the search engine returned for
+# the agent's own query. Following one exfiltrates nothing — the URL is the
+# destination, not a payload. A `fetch_url` body is the opposite: it is
+# attacker-authorable text, and a host planted inside it is the classic
+# prompt-injection exfiltration vector.
+#
+# Lumping them together made "search, then open what you found" — i.e. all of
+# research — escalate to `confirm_critical`, which fail-closed denies in any
+# non-TTY context. Observed live 2026-09-01: a research goal in a headless run
+# retried against that wall until its iterations ran out.
+_SEARCH_SOURCE_PREFIX = "web_search:"
+
+
+def untrusted_corpus_items() -> tuple[tuple[str, str], ...]:
+    """`(body, source)` pairs for the current run, newest last."""
     return _untrusted_corpus.get()
 
 
-def record_untrusted(text: str) -> Token[tuple[str, ...]]:
+def untrusted_page_corpus() -> tuple[str, ...]:
+    """Only blocks that came from FETCHED PAGE CONTENT, not from search results.
+
+    This is the corpus the egress gate should consult: a host appearing here was
+    written by whoever controls the page.
+    """
+    return tuple(
+        body
+        for body, source in _untrusted_corpus.get()
+        if not source.startswith(_SEARCH_SOURCE_PREFIX)
+    )
+
+
+def record_untrusted(text: str, source: str = "") -> Token[tuple[tuple[str, str], ...]]:
     """Append one untrusted-content block to the run corpus. Rebinds an
     immutable tuple (never mutates in place) so the value can't silently
     vanish on a reset — mirrors `record_invocation`."""
-    return _untrusted_corpus.set((*_untrusted_corpus.get(), text))
+    return _untrusted_corpus.set((*_untrusted_corpus.get(), (text, source)))
 
 
-def reset_untrusted(token: Token[tuple[str, ...]]) -> None:
+def reset_untrusted(token: Token[tuple[tuple[str, str], ...]]) -> None:
     _untrusted_corpus.reset(token)
 
 
-def clear_untrusted() -> Token[tuple[str, ...]]:
+def clear_untrusted() -> Token[tuple[tuple[str, str], ...]]:
     """Wipe the corpus at the start of a run; returns the reset token."""
     return _untrusted_corpus.set(())
 

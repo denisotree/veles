@@ -144,7 +144,10 @@ def wrap_untrusted(
     try:
         from veles.core.agent_state import record_untrusted
 
-        record_untrusted(body)
+        # M242: pass `source` through — the egress gate treats a host found in
+        # a search-result listing differently from one planted in fetched page
+        # content. See `agent_state.untrusted_page_corpus`.
+        record_untrusted(body, source)
     except Exception:
         pass
     fetched = fetched or _now_iso()
