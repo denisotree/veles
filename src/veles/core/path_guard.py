@@ -120,6 +120,21 @@ def resolve_safe(path: str | Path) -> Path:
         raise SandboxViolation(
             f"path {sanitize(raw)!r} contains '..' segment; sandbox refuses traversal"
         )
+    # M243: a relative path is resolved against the SANDBOX root, not the
+    # process cwd. `Path.resolve()` uses `os.getcwd()`, which is only the
+    # project root when the user happened to launch from there — a daemon, a
+    # job runner, a channel gateway or `veles run --project-root` all run from
+    # somewhere else, and `write_file("notes.md")` then landed outside the
+    # sandbox and was refused. `run_shell` never had this problem because it
+    # already pins cwd to `sandbox_cwd()`; this makes every other tool agree
+    # with it, so "relative means relative to the project" holds everywhere.
+    #
+    # Observed live 2026-09-01: the model tried `guimaraes.md`, then
+    # `/guimaraes/guimaraes.md`, then `<guimaraes>/guimaraes.md` — copying the
+    # sanitized placeholder out of the error message as if it were a real path,
+    # because nothing in the refusal told it where the project actually was.
+    if not p.is_absolute():
+        p = sandbox_cwd() / p
     try:
         resolved = p.resolve(strict=False)
     except OSError as exc:

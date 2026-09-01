@@ -40,6 +40,53 @@ def _clear_leaked_active_project():
     reset_active_project(token)
 
 
+# ---- M243: relative paths resolve against the sandbox root, not the cwd ----
+
+
+def test_relative_path_resolves_against_project_not_cwd(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The failure this fixes: a daemon / job runner / channel gateway runs from
+    somewhere that is not the project root, so `write_file("notes.md")` used to
+    resolve under the process cwd and get refused as outside the sandbox.
+    """
+    project_root = tmp_path / "proj"
+    project_root.mkdir()
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    _set_env_roots(monkeypatch, project_root)
+    monkeypatch.chdir(elsewhere)
+
+    assert resolve_safe("notes.md") == (project_root / "notes.md").resolve()
+    assert resolve_safe("./notes.md") == (project_root / "notes.md").resolve()
+    assert resolve_safe("sub/notes.md") == (project_root / "sub" / "notes.md").resolve()
+
+
+def test_relative_resolution_agrees_with_run_shell_cwd(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`run_shell` already pinned cwd to `sandbox_cwd()`; the file tools now
+    agree, so "relative" means the same thing for every tool."""
+    project_root = tmp_path / "proj"
+    project_root.mkdir()
+    _set_env_roots(monkeypatch, project_root)
+    monkeypatch.chdir(tmp_path)
+
+    assert resolve_safe("x.md").parent == sandbox_cwd()
+
+
+def test_absolute_paths_are_unaffected(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    project_root = tmp_path / "proj"
+    project_root.mkdir()
+    _set_env_roots(monkeypatch, project_root)
+    monkeypatch.chdir(tmp_path)
+
+    inside = project_root / "a.md"
+    assert resolve_safe(str(inside)) == inside.resolve()
+    with pytest.raises(SandboxViolation):
+        resolve_safe(str(tmp_path / "outside.md"))
+
+
 # ---- _get_sandbox_roots ----
 
 
