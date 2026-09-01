@@ -256,7 +256,16 @@ def test_goal_interview_to_confirm_surfaces_confirm_instruction(project, state) 
     )
 
 
-def test_goal_interview_uses_writing_registry_and_interview_prompt(project, state) -> None:
+def test_goal_interview_uses_readonly_registry_and_interview_prompt(project, state) -> None:
+    """M241: INTERVIEW runs on the *planning* registry.
+
+    It used to get `"writing"` — the full run toolset, `write_file`/`run_shell`/
+    `delete_file` included — while its prompt asked for one clarifying question
+    per turn. Live 2026-09-01: the model did the entire research task inside
+    INTERVIEW instead of asking anything, never emitted `<ready>`, and the FSM
+    never left the phase. A prompt asking for restraint loses to a toolbox that
+    permits the work.
+    """
     token = set_active_project(project)
     try:
         goal = create_goal(project.state_dir, objective="x", done_condition="")
@@ -271,8 +280,24 @@ def test_goal_interview_uses_writing_registry_and_interview_prompt(project, stat
         reset_active_project(token)
 
     kwargs = rec.factory_calls[0]
-    assert kwargs.get("mode_override") == "writing"
+    assert kwargs.get("mode_override") == "planning"
     assert "INTERVIEW" in (kwargs.get("extra_system") or "")
+    # M241b: planning-only was still not enough — the model used the read tools
+    # to do the research anyway (39 fetch_url + 20 stat_file, plus `create_plan`
+    # from the next phase) and never emitted `<ready>`. INTERVIEW asks the user
+    # a question; it gets no tools at all.
+    assert kwargs.get("toolless") is True
+
+
+def test_repl_factory_honours_toolless() -> None:
+    """The flag has to reach a real registry, not just the mode's call site."""
+    import inspect
+
+    from veles.cli.repl import runtime
+
+    src = inspect.getsource(runtime)
+    assert "toolless=False" in src, "factory must accept the kwarg"
+    assert "Registry() if toolless else" in src, "toolless must yield an empty registry"
 
 
 # --- confirm phase ---
@@ -536,6 +561,179 @@ def test_goal_execute_via_manager_when_manager_mode_on(project, state, monkeypat
 
 def _txt(msg) -> str:
     return getattr(msg, "text", "") or ""
+
+
+# --- M235: the step checkpoint carries what happened, not what was asked ---
+
+
+def _run_one_execute_step(project, state, result: RunResult):
+    """Drive a single EXECUTE turn and return the goal re-read from disk."""
+    token = set_active_project(project)
+    try:
+        goal = create_goal(project.state_dir, objective="x", done_condition="")
+        plan = create_plan(project.state_dir, objective="obj", steps=["do the thing", "and more"])
+        state.active_goal_id = goal.id
+        update_fsm(project.state_dir, goal.id, phase="execute", plan_id=plan.id)
+        rec = _Recorder(state=state, project=project, next_result=result)
+        GoalMode().run_turn("continue", rec.make_ctx())
+    finally:
+        reset_active_project(token)
+    return read_goal(project.state_dir, goal.id)
+
+
+def test_execute_checkpoint_records_outcome_not_just_intent(project, state) -> None:
+    goal_after = _run_one_execute_step(
+        project,
+        state,
+        RunResult(
+            text="patched three files",
+            iterations=4,
+            session_id="s1",
+            invoked_tools=frozenset({"read_file", "edit_file"}),
+        ),
+    )
+    cp = goal_after.progress[-1]
+    assert cp.metrics["outcome"] == "patched three files"
+    assert cp.metrics["tools"] == ["edit_file", "read_file"]  # sorted, deterministic
+    assert cp.metrics["stopped_reason"] == "completed"
+    assert cp.metrics["iterations"] == 4
+    assert cp.metrics["via"] == "agent"
+
+
+def test_execute_checkpoint_keeps_tools_when_text_is_empty(project, state) -> None:
+    """A thinking model finishes with empty text after doing all the work via
+    tools. Without the tool list that is indistinguishable from a failed step."""
+    goal_after = _run_one_execute_step(
+        project,
+        state,
+        RunResult(text="", iterations=3, session_id="s1", invoked_tools=frozenset({"run_shell"})),
+    )
+    cp = goal_after.progress[-1]
+    assert cp.metrics["outcome"] == ""
+    assert cp.metrics["tools"] == ["run_shell"]
+
+
+def test_execute_checkpoint_truncates_a_long_outcome(project, state) -> None:
+    from veles.core.modes.goal import _OUTCOME_MAX_CHARS
+
+    goal_after = _run_one_execute_step(
+        project, state, RunResult(text="x" * 9000, iterations=1, session_id="s1")
+    )
+    assert len(goal_after.progress[-1].metrics["outcome"]) == _OUTCOME_MAX_CHARS
+
+
+def test_manager_path_records_its_provenance(project, state, monkeypatch) -> None:
+    monkeypatch.setenv("VELES_MANAGER_MODE", "1")
+    goal_after = _run_one_execute_step(
+        project, state, RunResult(text="worker output", iterations=1, session_id="s1")
+    )
+    assert goal_after.progress[-1].metrics["via"] == "manager"
+
+
+def test_check_feeds_the_step_outcome_to_the_advisor(project, state) -> None:
+    """The advisor is tool-less and history-less: `check_input` is everything it
+    knows. Before M235 it only saw the step's own wording."""
+    token = set_active_project(project)
+    seen: list[str] = []
+    try:
+        goal = create_goal(project.state_dir, objective="x", done_condition="dc")
+        plan = create_plan(project.state_dir, objective="obj", steps=["a", "b"])
+        state.active_goal_id = goal.id
+        update_fsm(project.state_dir, goal.id, phase="execute", plan_id=plan.id)
+        rec = _Recorder(
+            state=state,
+            project=project,
+            next_result=RunResult(
+                text="tests are red: 3 failures",
+                iterations=2,
+                session_id="s1",
+                invoked_tools=frozenset({"run_shell"}),
+            ),
+        )
+        GoalMode().run_turn("continue", rec.make_ctx())  # EXECUTE
+
+        rec.next_result = RunResult(text="", iterations=0, stopped_reason="synthetic")
+        with patch(
+            "veles.core.tools.builtin.advisor.call_advisor",
+            side_effect=lambda body, **_kw: (
+                seen.append(body) or '{"verdict": "step_off_track", "reason": "tests red"}'
+            ),
+        ):
+            GoalMode().run_turn("continue", rec.make_ctx())  # CHECK
+    finally:
+        reset_active_project(token)
+
+    assert seen, "advisor was never called"
+    assert "tests are red: 3 failures" in seen[0]
+    assert "run_shell" in seen[0]
+
+
+def test_check_ignores_an_interleaved_manual_checkpoint(project, state) -> None:
+    """`veles goal checkpoint` can append a note between EXECUTE and CHECK;
+    `progress[-1]` would then shadow the step actually under review."""
+    from veles.core.goal import append_checkpoint
+
+    token = set_active_project(project)
+    seen: list[str] = []
+    try:
+        goal = create_goal(project.state_dir, objective="x", done_condition="dc")
+        plan = create_plan(project.state_dir, objective="obj", steps=["a", "b"])
+        state.active_goal_id = goal.id
+        update_fsm(project.state_dir, goal.id, phase="execute", plan_id=plan.id)
+        rec = _Recorder(
+            state=state,
+            project=project,
+            next_result=RunResult(text="the real outcome", iterations=1, session_id="s1"),
+        )
+        GoalMode().run_turn("continue", rec.make_ctx())  # EXECUTE
+        append_checkpoint(project.state_dir, goal.id, "a human note", advance_step=False)
+
+        rec.next_result = RunResult(text="", iterations=0, stopped_reason="synthetic")
+        with patch(
+            "veles.core.tools.builtin.advisor.call_advisor",
+            side_effect=lambda body, **_kw: (
+                seen.append(body) or '{"verdict": "step_ok_continue", "reason": "ok"}'
+            ),
+        ):
+            GoalMode().run_turn("continue", rec.make_ctx())  # CHECK
+    finally:
+        reset_active_project(token)
+
+    assert "the real outcome" in seen[0]
+    assert "a human note" not in seen[0]
+
+
+def test_check_degrades_cleanly_on_a_pre_m235_goal(project, state) -> None:
+    """A goal whose checkpoints predate `metrics["outcome"]` must still run
+    CHECK — with the old description-only prompt, not a crash."""
+    from veles.core.goal import append_checkpoint
+
+    token = set_active_project(project)
+    seen: list[str] = []
+    try:
+        goal = create_goal(project.state_dir, objective="x", done_condition="dc")
+        plan = create_plan(project.state_dir, objective="obj", steps=["a", "b"])
+        state.active_goal_id = goal.id
+        append_checkpoint(project.state_dir, goal.id, "step 1/2: a")
+        update_fsm(project.state_dir, goal.id, phase="check", plan_id=plan.id)
+        rec = _Recorder(
+            state=state,
+            project=project,
+            next_result=RunResult(text="", iterations=0, stopped_reason="synthetic"),
+        )
+        with patch(
+            "veles.core.tools.builtin.advisor.call_advisor",
+            side_effect=lambda body, **_kw: (
+                seen.append(body) or '{"verdict": "step_ok_continue", "reason": "ok"}'
+            ),
+        ):
+            GoalMode().run_turn("continue", rec.make_ctx())
+    finally:
+        reset_active_project(token)
+
+    assert seen, "advisor was never called"
+    assert "Outcome reported by the step" not in seen[0]
+    assert read_goal(project.state_dir, goal.id).current_phase == "execute"
 
 
 # --- check phase ---

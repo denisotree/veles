@@ -40,7 +40,7 @@ from __future__ import annotations
 import contextlib
 import json
 import re
-from typing import Literal
+from typing import Any, Literal
 
 from veles.core.agent_events import SystemLine, TurnDone
 from veles.core.modes.base import Mode, ModeContext
@@ -104,6 +104,11 @@ do not start the next step. The orchestrator will route to a CHECK
 phase after this turn, then back here for the next step.
 </mode>
 """
+
+# M235: cap on the step outcome copied into the goal artifact. The artifact is
+# a JSON file re-read and re-written on every checkpoint, so an uncapped
+# transcript of a long goal would bloat both the file and the CHECK prompt.
+_OUTCOME_MAX_CHARS = 2000
 
 _CHECK_SYSTEM = """\
 You are reviewing a single step that was just executed against a
@@ -207,6 +212,44 @@ _CONFIRM_YES_PREFIXES: tuple[str, ...] = (
     "согласен",
 )
 _CONFIRM_YES_EXACT: frozenset[str] = frozenset({"y", "yes!", "go", "go!", "+"})
+
+
+def _last_execute_checkpoint(goal) -> Any | None:
+    """The most recent EXECUTE checkpoint, identified by its `metrics`.
+
+    Not `progress[-1]`: CHECK appends its own verdict checkpoint, and
+    `veles goal checkpoint` (cli/commands/goal.py) lets a user interleave an
+    arbitrary note. Both would shadow the step we actually want to judge.
+    Pre-M235 goals have no `outcome` key, so they degrade to the old
+    description-only behaviour instead of raising.
+    """
+    for entry in reversed(goal.progress):
+        if "outcome" in (entry.metrics or {}):
+            return entry
+    return None
+
+
+def _render_step_outcome(entry) -> str:
+    """Format the EXECUTE checkpoint's facts for the CHECK advisor prompt.
+
+    Empty string when there is nothing recorded — the advisor then sees exactly
+    what it saw before M235 rather than a misleading "Outcome: (none)".
+    """
+    if entry is None:
+        return ""
+    metrics = entry.metrics or {}
+    lines = []
+    outcome = str(metrics.get("outcome") or "").strip()
+    lines.append(f"Outcome reported by the step: {outcome or '(no text returned)'}")
+    tools = metrics.get("tools") or []
+    if tools:
+        lines.append(f"Tools the step used: {', '.join(str(t) for t in tools)}")
+    else:
+        lines.append("Tools the step used: none")
+    reason = str(metrics.get("stopped_reason") or "").strip()
+    if reason and reason != "completed":
+        lines.append(f"Step stopped early: {reason}")
+    return "\n".join(lines) + "\n"
 
 
 def _classify_confirm_reply(prompt: str) -> Literal["yes", "no", "cancel"]:
@@ -325,9 +368,29 @@ class GoalMode:
         # The model gets the INTERVIEW system prompt as an extra_system;
         # the factory bakes it into the constructor prompt for fresh
         # sessions, otherwise we inject via the mode-switch wrapper.
+        #
+        # M241: `mode_override="planning"`, not `"writing"`. INTERVIEW asks the
+        # user one clarifying question per turn — it has no business writing
+        # files — but `"writing"` handed it the full run toolset, `write_file`,
+        # `run_shell` and `delete_file` included. Observed live 2026-09-01 on a
+        # research goal: instead of asking anything, the model went and did the
+        # entire task inside INTERVIEW ("I have solid, citable data across every
+        # requested dimension. Writing the report now."), never emitted
+        # `<ready>`, and the FSM never left the phase — three runs in a row, on
+        # a brief that explicitly said not to ask questions. A prompt asking for
+        # restraint loses to a toolbox that permits the work.
+        #
+        # M241b: narrowing to the planning registry was not enough — the model
+        # then made 39 `fetch_url` + 20 `stat_file` calls and invoked
+        # `create_plan`, the PLAN phase's own tool, still without ever emitting
+        # `<ready>`. INTERVIEW is a conversation with the user; it needs no
+        # tools whatsoever, so it gets none. `mode_override` stays "planning"
+        # so `plan_mode=True` keeps the mutation guard on for any surface whose
+        # factory ignores `toolless`.
         agent = ctx.factory(
             ctx.state,
-            mode_override="writing",
+            mode_override="planning",
+            toolless=True,
             extra_system=_INTERVIEW_SYSTEM,
         )
         result = agent.run(prompt, on_text_delta=ctx.on_text, event_listener=ctx.on_event)
@@ -509,7 +572,9 @@ class GoalMode:
         # unchanged.
         from veles.core.orchestration.integration import should_use_manager
 
+        via = "agent"
         if should_use_manager(step_text, use_heuristic_default=False):
+            via = "manager"
             result = self._execute_step_via_manager(step_text, plan_summary, ctx)
         else:
             sys_block = _EXECUTE_SYSTEM_TEMPLATE.format(
@@ -526,11 +591,28 @@ class GoalMode:
         if ctx.state.session_id is None and result.session_id is not None:
             ctx.state.session_id = result.session_id
 
+        # M235: the checkpoint carries what the step DID, not a restatement of
+        # what it was asked to do. `description` stays the human-readable label;
+        # the facts go into `metrics`, which CHECK then feeds to the advisor.
+        # Without this the advisor judges a step by its own wording — see
+        # `_run_check`.
+        #
+        # `tools` is not decorative: a thinking model routinely ends a turn with
+        # empty `text` after doing all the work through tools (the reason
+        # `RunResult.invoked_tools` exists at all, agent.py). Without the tool
+        # list an empty `outcome` is indistinguishable from a failed step.
         append_checkpoint(
             ctx.project.state_dir,
             goal.id,
             description=f"step {step_idx + 1}/{len(plan.steps)}: {step_text}",
             evidence_ref=None,
+            metrics={
+                "outcome": (result.text or "")[:_OUTCOME_MAX_CHARS],
+                "tools": sorted(result.invoked_tools),
+                "stopped_reason": result.stopped_reason,
+                "iterations": result.iterations,
+                "via": via,
+            },
         )
         update_fsm(ctx.project.state_dir, goal.id, phase="check")
         ctx.post(SystemLine(text=f"[goal: step {step_idx + 1} done → check]"))
@@ -600,12 +682,20 @@ class GoalMode:
 
         plan = read_plan(ctx.project.state_dir, goal.plan_id or "")
         plan_body = plan.objective if plan else "(plan missing)"
-        last_step = goal.progress[-1].description if goal.progress else "(no progress yet)"
+        # M235: the advisor is a tool-less, history-less, single-iteration
+        # sub-agent (`call_advisor`, tools/builtin/advisor.py) — `check_input`
+        # is literally everything it knows. Before M235 the only fact about the
+        # step was `progress[-1].description`, i.e. the step's own wording, so
+        # the advisor could not tell a completed step from a failed one while
+        # its verdict drove the FSM (complete / re-plan / continue).
+        step_cp = _last_execute_checkpoint(goal)
+        last_step = step_cp.description if step_cp else "(no progress yet)"
         check_input = (
             f"Goal objective: {goal.objective}\n"
             f"Done condition: {goal.done_condition}\n"
             f"Plan: {plan_body}\n"
             f"Last executed step: {last_step}\n"
+            f"{_render_step_outcome(step_cp)}"
             f"Steps completed: {goal.steps_done}\n"
         )
         raw = call_advisor(check_input, system_prompt=_CHECK_SYSTEM)

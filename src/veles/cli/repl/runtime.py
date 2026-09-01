@@ -14,6 +14,7 @@ import sys
 
 from veles.cli.repl.turn import _repl_turn_system_prompt
 from veles.core.project import Project
+from veles.core.tools.registry import Registry
 
 
 def _build_runtime(args: argparse.Namespace, project: Project):
@@ -71,7 +72,7 @@ def _build_runtime(args: argparse.Namespace, project: Project):
     }
     store = SessionStore(project.memory_db_path)
 
-    def factory(state, *, mode_override=None, extra_system=None, query=None):
+    def factory(state, *, mode_override=None, extra_system=None, query=None, toolless=False):
         active = mode_override or state.mode
         mode = get_mode(active)
         is_planning = active == "planning"
@@ -88,9 +89,18 @@ def _build_runtime(args: argparse.Namespace, project: Project):
         system_prompt = _repl_turn_system_prompt(
             args, project, mode=mode, query=query, extra_system=extra_system
         )
+        # M241b: `toolless` hands the turn an EMPTY registry. GoalMode's
+        # INTERVIEW phase asks the user one clarifying question per turn and
+        # needs no tools at all — but with any toolbox in reach the model does
+        # the task instead of asking. Live 2026-09-01: with the full run set it
+        # researched and wrote the report inside INTERVIEW; narrowed to the
+        # planning set (M241) it still made 39 `fetch_url` + 20 `stat_file`
+        # calls and even invoked `create_plan`, the PLAN phase's own tool. It
+        # never emitted `<ready>`, so the FSM never advanced — five runs.
+        # A prompt asking for restraint cannot outvote an available tool.
         return Agent(
             provider=provider,
-            registry=registries[registry_key],
+            registry=Registry() if toolless else registries[registry_key],
             model=state.model,
             max_iterations=args.max_iterations,
             system_prompt=system_prompt,
