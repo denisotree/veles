@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from veles.core.risk import RiskClass, is_sensitive_class
+from veles.core.tool_args import undecodable_args_error
 from veles.core.tool_result import (
     DEFAULT_MAX_RESULT_CHARS,
     ToolResult,
@@ -126,12 +127,7 @@ class Registry:
         # TypeError on every tool. Return a readable error the model can
         # react to (re-issue the call with valid JSON).
         if "_raw" in arguments:
-            snippet = str(arguments["_raw"])[:200]
-            return (
-                f"<error: the arguments for {name} were not valid JSON — "
-                f"re-issue the call with a single well-formed JSON object. "
-                f"Received: {snippet!r}>"
-            )
+            return undecodable_args_error(name, arguments["_raw"])
         if entry.is_async:
             raw = asyncio.run(entry.handler(**arguments))
         else:
