@@ -69,6 +69,7 @@ from veles.core.history_repair import (
     supersede_native,
 )
 from veles.core.memory import SessionStore
+from veles.core.model_budgets import default_max_tokens_for
 from veles.core.modules import fire_hook
 from veles.core.provider import (
     Message,
@@ -182,7 +183,13 @@ class Agent:
         # Runaway backstop, not a task budget — the StallGuard is the real stop.
         max_iterations: int = 1000,
         system_prompt: str | None = None,
-        max_tokens: int = 4096,
+        # M247: `None` resolves per model instead of a flat 4096. A reasoning
+        # model spends the completion budget on a hidden thinking channel first,
+        # so 4096 can be consumed entirely before it writes one visible
+        # character — measured on glm-5.3-flash, which returned
+        # `completion == max_tokens` with empty content. Callers that pass an
+        # explicit number still win.
+        max_tokens: int | None = None,
         verbose: bool = False,
         store: SessionStore | None = None,
         session_id: str | None = None,
@@ -205,7 +212,7 @@ class Agent:
         self._role = role
         self._max_iterations = max_iterations
         self._system_prompt = system_prompt
-        self._max_tokens = max_tokens
+        self._max_tokens = max_tokens if max_tokens is not None else default_max_tokens_for(model)
         self._verbose = verbose
         self._store = store
         self._session_id = session_id

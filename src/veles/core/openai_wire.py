@@ -25,6 +25,7 @@ import logging
 from collections.abc import Iterator
 from typing import Any
 
+import httpx
 from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
 
 from veles.core.provider import (
@@ -47,7 +48,22 @@ from veles.core.tool_args import decode_tool_args
 # a tuple membership test — the actual dispatch is by isinstance in
 # `_translate_openai_error`, where APITimeoutError (⊂ APIConnectionError)
 # is checked first.
-_TRANSLATED_OPENAI_ERRORS = (APITimeoutError, APIConnectionError, APIStatusError)
+#
+# M246: the raw `httpx` exceptions belong here too. The SDK wraps them on the
+# initial request, but a STREAMED response is consumed by iterating the
+# generator *after* `create()` returned, and the per-chunk read timeout fires
+# inside that loop — where nothing had wrapped it. `httpx.ReadTimeout` is not a
+# subclass of any SDK error, so it sailed through `_chunks()`'s except clause,
+# past `ProviderTimeout`, and killed the whole turn with an untyped error and no
+# retry. Cost a 2.7-hour research run to a 120s timeout on a slow reasoning
+# model, with nothing in the message saying "timeout".
+_TRANSLATED_OPENAI_ERRORS = (
+    APITimeoutError,
+    APIConnectionError,
+    APIStatusError,
+    httpx.TimeoutException,
+    httpx.TransportError,
+)
 _ERROR_BODY_LIMIT = 500
 
 logger = logging.getLogger(__name__)
@@ -190,8 +206,14 @@ class OpenAICompatibleProvider:
         APIConnectionError, so it must be tested first."""
         name = getattr(self, "name", "provider")
         base = str(getattr(self._client, "base_url", "") or "").rstrip("/")
-        if isinstance(exc, APITimeoutError):
+        if isinstance(exc, APITimeoutError | httpx.TimeoutException):
             return ProviderTimeout(str(exc) or f"{name} request timed out")
+        if isinstance(exc, httpx.TransportError):
+            # Non-timeout transport failure surfacing raw from a stream
+            # iteration (M246). Same shape as APIConnectionError below.
+            hint = self._connection_error_hint()
+            msg = f"cannot reach {name} at {base or '<unknown>'}"
+            return ProviderUnavailable(f"{msg} — {hint}" if hint else msg)
         if isinstance(exc, APIConnectionError):
             hint = self._connection_error_hint()
             msg = f"cannot reach {name} at {base or '<unknown>'}"

@@ -129,6 +129,57 @@ def test_planning_allows_search_compute_draft() -> None:
         assert d.kind == "allow", f"{rc} should be allowed in planning mode"
 
 
+def test_planning_allows_web_search_and_fetch_url() -> None:
+    """M248: PLAN must be able to research before it plans.
+
+    `NETWORK_OPEN_WORLD` covers reading the web and POSTing to it alike, so
+    these were denied — even though the comment on `_MUTATION_CLASSES` promises
+    the agent can "inspect, search, reason, and draft" while planning,
+    `TOOLSETS["planning"]` deliberately includes both, and
+    `BUILTIN_TOOL_POLICY_OVERRIDES` marks them `allow` as "not mutation".
+    Observed live 2026-09-02: a research goal planned blind and wrote "planning
+    mode refused web_search" into its own risk list.
+    """
+    for name in ("web_search", "fetch_url"):
+        entry = ToolEntry(
+            name=name,
+            description="",
+            parameter_schema={"type": "object"},
+            handler=lambda **_: "",
+            is_async=False,
+            sensitive=False,
+            risk_class=RiskClass.NETWORK_OPEN_WORLD,
+        )
+        tok = set_state(AgentState.PLANNING)
+        try:
+            d = evaluate_permission(entry, {})
+        finally:
+            reset_state(tok)
+        assert d.rule != "planning_mode", f"{name} must not be blocked while planning"
+        assert d.kind == "allow", f"{name} should be allowed in planning mode"
+
+
+def test_planning_still_blocks_an_ungranted_network_tool() -> None:
+    """The class is not opened wholesale: a network tool left on the default
+    `approval_required` floor keeps being denied."""
+    entry = ToolEntry(
+        name="post_to_random_api",
+        description="",
+        parameter_schema={"type": "object"},
+        handler=lambda **_: "",
+        is_async=False,
+        sensitive=False,
+        risk_class=RiskClass.NETWORK_OPEN_WORLD,
+    )
+    tok = set_state(AgentState.PLANNING)
+    try:
+        d = evaluate_permission(entry, {})
+    finally:
+        reset_state(tok)
+    assert d.kind == "deny"
+    assert d.rule == "planning_mode"
+
+
 def test_idle_state_does_not_trigger_planning_rule() -> None:
     """When state is anything other than PLANNING, the rule is a no-op."""
     # State defaults to IDLE; mutation tools fall through to trust_ladder

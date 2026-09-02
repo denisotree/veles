@@ -101,6 +101,25 @@ def _planning_mode_rule(entry: ToolEntry) -> Decision | None:
         return None
     if not is_planning():
         return None
+    # M248: an explicit `allow` policy means the deployment has already decided
+    # this tool is not a commit, and planning must honour that.
+    #
+    # `NETWORK_OPEN_WORLD` covers both reading the web and POSTing to it, so
+    # `web_search`/`fetch_url` were denied here — even though the comment on
+    # `_MUTATION_CLASSES` promises the agent can "inspect, search, reason, and
+    # draft" while planning, `TOOLSETS["planning"]` deliberately includes both,
+    # and `BUILTIN_TOOL_POLICY_OVERRIDES` marks them `allow` as "semantically
+    # search/lookup, not mutation". Three places said yes, this one said no, and
+    # it ran first, so PLAN could never research before planning. Observed live
+    # 2026-09-02: a research goal planned blind and recorded "planning mode
+    # refused web_search" in its own risk list. The refusal text made it worse —
+    # "exit planning to commit changes" for a read.
+    #
+    # Anything still on the default `approval_required` floor keeps being
+    # denied, so this does not open the class; it defers to a decision already
+    # made per tool, which a project can tighten again in `[permissions]`.
+    if effective_policy(entry) == "allow":
+        return None
     return Decision(
         kind="deny",
         rule="planning_mode",
