@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.0] — 2026-09-02
+
+Goal mode had never actually been run. It was covered by unit tests with fake
+agents, but nothing had ever driven the whole interview → plan → execute → check
+cycle against a real model on a real task — and the first time anyone did, it
+could not get past the interview. This release is what that run turned up,
+plus the same treatment applied to a second run on a different model family and
+a live knowledge base.
+
+### Fixed
+
+- **Goal mode now finishes.** Its interview phase was handed every tool in the
+  box, including file writes and shell, while being asked to do nothing but ask
+  you one clarifying question. Models did the obvious thing: they went and did
+  the whole task instead of asking, never signalled that the interview was
+  over, and the goal never advanced. The interview now gets no tools at all.
+  Narrowing the set was tried first and wasn't enough — a prompt asking for
+  restraint doesn't outvote an available tool.
+- **A goal step now records what it did, not what it was asked to do.** The
+  checkpoint used to save a copy of the step's own wording, and that was the
+  only thing the reviewer saw when deciding whether to continue, re-plan, or
+  call the goal finished. It had no way to tell a completed step from a failed
+  one. Checkpoints now carry the outcome, which tools ran, and how the step
+  ended.
+- **"Your arguments weren't valid JSON" no longer sends models in circles.**
+  When a long tool call gets cut off by the response limit, the leftover looks
+  like malformed JSON, and the advice to re-send it was advice to fail exactly
+  the same way — as one model did, three times, before giving up. A cut-off
+  payload is now recognised as cut off, and the fix offered is to split it.
+- **Research works without a terminal.** Following a link from your own web
+  search was treated as a possible data-exfiltration attempt and required a
+  confirmation nobody could give in a daemon, a channel, or a scripted run —
+  so research simply couldn't run there. Search results and fetched page
+  content are now told apart: a page can still not lure the agent to a new host,
+  but a result you searched for is fair to open.
+- **Planning mode can search again.** It refused web search as if it were a
+  file write, so the plan phase had to plan blind — even though the planning
+  toolset ships search on purpose.
+- **Relative paths mean the same thing everywhere.** `write_file("notes.md")`
+  resolved against whatever directory the process happened to start in, so the
+  daemon, scheduled jobs and channels wrote outside the project and got
+  refused. Shell commands already ran in the project; the file tools now agree.
+- **A slow model no longer loses the whole run.** A timeout partway through a
+  streamed response escaped as an untyped error with no retry and nothing
+  saying "timeout" — two and a half hours of research, discarded because a
+  reply took longer than two minutes.
+- **Using a built-in skill stops modifying Veles' own files.** Usage counters
+  were written back into the skill's source file, which for shipped skills
+  lives inside the installed package — dirtying a checkout, or writing into
+  site-packages. Telemetry now lives in the project database.
+
+### Added
+
+- **Response budgets adapt to the model.** A reasoning model spends its budget
+  thinking before it writes anything, and 4096 tokens could be gone before a
+  single visible character — the reply came back empty, which reads as the
+  model failing rather than being cut off. Timeouts and token limits are now
+  per-model. The economics differ too: a strong reasoning model thinks long and
+  lands it in one pass, while a weaker one burns more tokens overall by
+  iterating on a mediocre answer, so one flat budget penalised the model that
+  was cheaper per finished task.
+- **Wiki links are checked when you write a page.** Writing a page now reports
+  which of its `[[links]]` point at nothing, and the linter flags broken links
+  across the wiki. This exists because an agent wrote fifteen pages, logged that
+  it had audited the cross-links and found none broken, and was wrong about a
+  hundred of them — nothing in Veles could contradict it, because outbound
+  links had never been checked at all.
+- **Repeated reads stop piling up.** Reading the same file twice left both
+  copies in the conversation, the stale one competing with the fresh one.
+  Earlier identical reads are now collapsed, in a resumed session too.
+- **Cache effectiveness is visible.** Token events now record how much of each
+  prompt was served from cache, so it can be measured instead of assumed.
+
 ## [0.31.0] — 2026-08-18
 
 Calling the daemon over HTTP used to be a one-way trip: you could start a run,

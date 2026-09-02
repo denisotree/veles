@@ -13,13 +13,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from veles.modules.wiki.linter import find_broken_links
 from veles.modules.wiki.links import (
     normalize_link,
     parse_links,
     render_link_warning,
     unresolved_links,
 )
+from veles.modules.wiki.linter import find_broken_links
 from veles.modules.wiki.wiki import Wiki
 
 # ---------- parsing ----------
