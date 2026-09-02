@@ -78,11 +78,19 @@ def wiki_write_page(category: str, slug: str, title: str, content: str) -> str:
     it with `wiki_add_category`. `content` is the markdown body (H1 added if
     missing). INDEX.md is rewritten after the write.
     """
+    wiki = _default_wiki()
     try:
-        rel = _default_wiki().write_page(category=category, slug=slug, title=title, content=content)
+        rel = wiki.write_page(category=category, slug=slug, title=title, content=content)
     except ValueError as exc:
         return f"<error: {exc}>"
-    return f"wrote {rel}"
+    # M249: report link resolution as a fact in the tool result. A model cannot
+    # audit its own links credibly — one wrote "all resolve … NONE unresolved"
+    # into LOG.md while 102 of 159 were broken, and the CHECK advisor believed
+    # it. Checked AFTER the write so a page may legitimately link to itself.
+    from veles.modules.wiki.links import render_link_warning
+
+    unresolved, total = wiki.check_links(content)
+    return f"wrote {rel}" + render_link_warning(unresolved, total=total)
 
 
 @tool(risk_class=RiskClass.WRITE_LOCAL_PROJECT, sensitive=True, side_effects=["filesystem"])

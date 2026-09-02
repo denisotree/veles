@@ -67,10 +67,11 @@ class LintReport:
     orphans: list[LintFinding] = field(default_factory=list)
     stale: list[LintFinding] = field(default_factory=list)
     duplicates: list[LintFinding] = field(default_factory=list)
+    broken_links: list[LintFinding] = field(default_factory=list)
 
     @property
     def all_findings(self) -> list[LintFinding]:
-        return [*self.orphans, *self.stale, *self.duplicates]
+        return [*self.orphans, *self.stale, *self.duplicates, *self.broken_links]
 
 
 def _title_tokens(s: str) -> set[str]:
@@ -139,6 +140,44 @@ def find_orphans(wiki: Wiki) -> list[LintFinding]:
                 pages=[cand.rel_path],
                 description=(
                     f"{cand.rel_path} has no inbound links from INDEX.md or any other wiki page."
+                ),
+            )
+        )
+    return out
+
+
+def find_broken_links(wiki: Wiki) -> list[LintFinding]:
+    """Pages whose `[[wiki-links]]` point at no existing page (M249).
+
+    The complement of `find_orphans`, which only ever asked whether a page has
+    inbound references and matched on `rel_path` substrings — it never parsed
+    `[[...]]`, so an outbound link to a page that does not exist was invisible
+    to every check Veles had. That blind spot let an agent report a passing
+    cross-link audit while 102 of its 159 links were broken.
+    """
+    from veles.modules.wiki.links import unresolved_links
+
+    pages = wiki.list_pages()
+    known = {p.rel_path.rsplit("/", 1)[-1].removesuffix(".md") for p in pages}
+    out: list[LintFinding] = []
+    for page in pages:
+        try:
+            body = wiki.read_page(page.rel_path)
+        except (OSError, UnicodeDecodeError):
+            continue
+        missing = unresolved_links(body, known)
+        if not missing:
+            continue
+        shown = ", ".join(repr(t) for t in missing[:5])
+        more = f" (+{len(missing) - 5} more)" if len(missing) > 5 else ""
+        out.append(
+            LintFinding(
+                severity="medium",
+                kind="broken_link",
+                pages=[page.rel_path],
+                description=(
+                    f"{page.rel_path} links to {len(missing)} page(s) that do not "
+                    f"exist: {shown}{more}."
                 ),
             )
         )
@@ -246,6 +285,7 @@ def run_lint(
         orphans=find_orphans(wiki),
         stale=find_stale(wiki, max_age_days=max_age_days, now=now),
         duplicates=find_duplicates(wiki, similarity_threshold=duplicate_threshold),
+        broken_links=find_broken_links(wiki),
     )
 
 
@@ -266,6 +306,7 @@ def render_report(report: LintReport, *, now: _dt.datetime | None = None) -> str
         ("Orphans", report.orphans),
         ("Stale", report.stale),
         ("Duplicates", report.duplicates),
+        ("Broken links", report.broken_links),
     ]
     for label, findings in sections:
         if not findings:

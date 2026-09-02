@@ -295,6 +295,18 @@ class Wiki:
         self._fts_upsert(rel_path, title, body)
         return rel_path
 
+    def check_links(self, content: str) -> tuple[list[str], int]:
+        """M249: `(unresolved_targets, total_links)` for `content`.
+
+        Deterministic — reads the page list off disk and compares. This exists
+        because a model's own claim that its links resolve is unverifiable, and
+        one such claim ("NONE unresolved") was wrong about 102 of 159 links.
+        """
+        from veles.modules.wiki.links import parse_links, unresolved_links
+
+        known = {info.rel_path.rsplit("/", 1)[-1].removesuffix(".md") for info in self.list_pages()}
+        return unresolved_links(content, known), len(parse_links(content))
+
     def read_page(self, rel_path: str) -> str:
         p = self._resolve_under_root(rel_path)
         raw = p.read_text(encoding="utf-8", errors="replace")
