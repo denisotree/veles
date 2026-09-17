@@ -86,6 +86,78 @@ def test_section_is_invisible_to_another_provider(project_with) -> None:
     assert request_body_overrides("llamacpp") == {}
 
 
+def test_unknown_provider_section_raises(project_with) -> None:
+    """M255: config is written by hand, so it is sometimes wrong. Every other
+    mistake here fails loudly at the upstream — a misspelt provider was the one
+    that didn't, silently running the measurement unpinned."""
+    from veles.core.config_schema import ConfigError
+
+    project_with("openrotuer")
+    with pytest.raises(ConfigError) as exc:
+        request_body_overrides("openrouter")
+    message = str(exc.value)
+    assert "openrotuer" in message
+    assert "config.toml" in message  # points at the file to edit
+    assert "openrouter" in message  # and lists what was meant
+
+
+def test_unknown_provider_section_raises_through_the_request_path(project_with) -> None:
+    """Not just the reader: the error reaches the caller through the same hook
+    that builds the request, so a bad pin cannot start a run."""
+    from veles.core.config_schema import ConfigError
+
+    project_with("openrotuer")
+    with pytest.raises(ConfigError):
+        _openrouter()._request_options("z-ai/glm-5.3-flash")
+
+
+def test_known_provider_other_than_the_active_one_is_not_an_error(project_with) -> None:
+    """The counterpart guard: keeping llama.cpp's knobs next to OpenRouter's in
+    one file is the POINT of provider-scoping, not a mistake."""
+    project_with("llamacpp")
+    assert request_body_overrides("openrouter") == {}
+
+
+def test_validator_reports_both_typo_shapes(tmp_path, monkeypatch) -> None:
+    """`veles doctor` / `daemon start` see the wrong-provider case AND the one
+    the reader cannot detect — a typo in the section path itself, which leaves
+    `[engine.request]` simply absent."""
+    from veles.core.config_schema import validate_config
+
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    project = init_project(tmp_path / "proj", name="proj")
+    (project.state_dir / "config.toml").write_text(
+        '[engine]\nprovider = "openrouter"\n\n'
+        "[engine.request.openrotuer.provider]\n"
+        'order = ["GMICloud"]\n\n'
+        "[engine.reqest.openrouter.provider]\n"
+        'order = ["GMICloud"]\n',
+        encoding="utf-8",
+    )
+    from veles.core.project_config import load_project_config
+
+    found = {(f.section, f.key) for f in validate_config(load_project_config(project))}
+    assert ("engine.request", "openrotuer") in found
+    assert ("engine", "reqest") in found
+
+
+def test_validator_accepts_a_correct_engine_section(tmp_path, monkeypatch) -> None:
+    """The failure mode worse than a silent fallback is erroring on a config
+    that works — `provider`/`model`/`request` must all pass."""
+    from veles.core.config_schema import validate_config
+    from veles.core.project_config import load_project_config
+
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    project = init_project(tmp_path / "proj", name="proj")
+    (project.state_dir / "config.toml").write_text(
+        '[engine]\nprovider = "openrouter"\nmodel = "z-ai/glm-5.3-flash"\n\n'
+        "[engine.request.openrouter.provider]\n"
+        'order = ["GMICloud"]\n',
+        encoding="utf-8",
+    )
+    assert validate_config(load_project_config(project)) == []
+
+
 def test_hand_written_toml_round_trips(tmp_path, monkeypatch) -> None:
     """The shape a user actually types, parsed by tomllib — not a dict handed to
     `save_project_config`. The section is four levels deep and carries a bool

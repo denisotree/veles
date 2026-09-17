@@ -157,18 +157,42 @@ def request_body_overrides(provider_name: str) -> dict[str, Any]:
     next to a multi-second request is noise. Reading fresh also means an edit
     to config.toml takes effect on the next call, which is what you want while
     tuning a measurement run.
+
+    M255: raises `ConfigError` when `[engine.request]` names a provider that
+    doesn't exist. This section is written by hand, so it is sometimes wrong,
+    and every other way of getting it wrong already fails loudly — OpenRouter
+    rejects both a bad value (404, "No endpoints found …") and a bad key
+    (400, 'Unrecognized key'). A misspelt *provider* was the one shape that
+    didn't: the pin silently never reached the wire and the run proceeded
+    unpinned, quietly invalidating the measurement the pin was for. An explicit
+    error beats an implicit fallback.
+
+    Scope of that check: only providers speaking this wire format call in here,
+    so a typo on an Anthropic/Gemini project surfaces through
+    `validate_config` (`veles doctor`, `daemon start`) rather than here. And a
+    typo one level up — `[engine.reqest.…]` — means `[engine.request]` does not
+    exist at all, which this function cannot distinguish from "no section
+    declared"; `validate_config` reports that one as an unknown `[engine]` key.
     """
+    from veles.core.config_schema import ConfigError, unknown_request_providers
     from veles.core.context import current_project
-    from veles.core.project_config import get_section, load_project_config
+    from veles.core.project_config import get_section, load_project_config, project_config_path
 
     project = current_project()
     if project is None:
         return {}
-    try:
-        overrides = get_section(load_project_config(project), "engine", "request", provider_name)
-    except Exception:  # pragma: no cover - load_project_config already never raises
-        return {}
-    return dict(overrides)
+    cfg = load_project_config(project)
+    unknown = unknown_request_providers(cfg)
+    if unknown:
+        from veles.core.providers import PROVIDER_VALUES
+
+        raise ConfigError(
+            f"[engine.request] names unknown provider(s): {', '.join(repr(u) for u in unknown)}. "
+            f"Known providers: {', '.join(PROVIDER_VALUES)}. "
+            "A section under an unknown provider is never sent — fix the name or remove it.",
+            path=project_config_path(project),
+        )
+    return dict(get_section(cfg, "engine", "request", provider_name))
 
 
 def _extra_field(obj: Any, name: str) -> Any:
