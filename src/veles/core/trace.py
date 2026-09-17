@@ -51,6 +51,27 @@ class TraceRecord:
     tool_calls_count: int = 0
     permission_decisions: list[dict[str, Any]] = field(default_factory=list)
     final_status: str = "ok"  # ok | error | approval_pending | budget_exceeded | denied
+    # M250: the share of `output_tokens` the model spent thinking, when the
+    # backend reports it. Separates "answered briefly" from "spent the whole
+    # budget reasoning and got truncated".
+    reasoning_tokens: int = 0
+    # M250: which backend actually served this call, per the relay's own
+    # `provider` field — the FACT, next to `request_extra` below, which is the
+    # INTENT. A measurement run compares them; a pin that silently did nothing
+    # shows up as a mismatch instead of as unexplained variance.
+    #
+    # One record is one call. To check a whole run stayed on one backend:
+    #   jq -r 'select(.session_id=="<sid>") | .upstream_provider' \
+    #       .veles/traces.jsonl | sort -u
+    # One line out means the pin held; more than one means the measurement
+    # mixed backends.
+    upstream_provider: str | None = None
+    # M250: the effective `[engine.request.<provider>]` passthrough for this
+    # call. Recorded rather than validated: `config_schema.py` deliberately
+    # leaves `[engine]` free-form, so a mistyped key is silently dropped — and
+    # the honest fix for a reproducibility knob is to record what was actually
+    # sent, not to spell-check what was written.
+    request_extra: dict[str, Any] = field(default_factory=dict)
 
 
 def hash_text(text: str | None) -> str:

@@ -898,6 +898,19 @@ class Agent:
         the per-run listener (if any) installed by `run()`."""
         _emit(self._event_writer, event, self._event_listener)
 
+    def _request_extra(self) -> dict:
+        """The `[engine.request.<provider>]` passthrough in force for this call
+        (M250), for the trace. Best-effort: a provider that doesn't speak the
+        OpenAI wire format has no such section, and tracing must never break a
+        run."""
+        try:
+            from veles.core.openai_wire import request_body_overrides
+
+            name = getattr(self._provider, "name", "")
+            return request_body_overrides(name) if name else {}
+        except Exception:  # pragma: no cover - trace enrichment is never load-bearing
+            return {}
+
     def _emit_trace(
         self,
         *,
@@ -923,10 +936,15 @@ class Agent:
             output_tokens=usage.completion_tokens,
             ttft_ms=ttft_ms,
             total_latency_ms=total_latency_ms,
-            est_cost_usd=0.0,
+            # M250: the upstream's own billed cost when it reports one
+            # (OpenRouter's `usage.cost`); still 0.0 for backends that don't.
+            est_cost_usd=usage.cost_usd,
             tool_calls_count=len(response.tool_calls),
             permission_decisions=[],
             final_status="ok",
+            reasoning_tokens=usage.reasoning_tokens,
+            upstream_provider=response.upstream_provider,
+            request_extra=self._request_extra(),
         )
         try:
             self._trace_writer.write(record)

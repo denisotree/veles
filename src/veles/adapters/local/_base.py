@@ -23,7 +23,7 @@ adapters:
 from __future__ import annotations
 
 import os
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import httpx
 from openai import OpenAI
@@ -136,7 +136,7 @@ class _OpenAICompatibleBase(OpenAICompatibleProvider):
 
     # ---- structured output (M239) ----
 
-    def _request_options(self, model: str) -> dict[str, object]:
+    def _request_options(self, model: str) -> dict[str, Any]:
         """Ask for a JSON object when the caller declared it needs one.
 
         Small open-weight models fail structured output far more often than they
@@ -148,8 +148,13 @@ class _OpenAICompatibleBase(OpenAICompatibleProvider):
         Deliberately NOT applied to every call: the fenced-tools path has the
         model emit ```veles-tool blocks inside prose, which `json_object` would
         forbid outright. Only `strict_json_mode()` callers opt in.
+
+        M250: layered on top of the base hook, which carries any
+        `[engine.request.<name>]` passthrough. `response_format` is a top-level
+        request key, not an `extra_body` one, so the two never collide.
         """
-        del model
+        options = super()._request_options(model)
         if not json_mode_enabled() or not expects_strict_json():
-            return {}
-        return {"response_format": {"type": "json_object"}}
+            return options
+        options["response_format"] = {"type": "json_object"}
+        return options

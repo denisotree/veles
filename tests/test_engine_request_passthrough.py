@@ -1,0 +1,297 @@
+"""M250: `[engine.request.<provider>]` is forwarded into the request body verbatim,
+and the response's real backend / reasoning split comes back in the trace.
+
+Two invariants carry the milestone:
+
+1. The passthrough and OpenRouter's M224 sticky-routing `session_id` travel in
+   the SAME `extra_body` object. Before M250 the OpenRouter override *replaced*
+   whatever the base returned, so a naive merge would silently drop the pin (or
+   the session id) — hence the explicit both-present assertions below.
+2. The section is keyed by `Provider.name`. One project config outlives a
+   backend switch, and an OpenRouter `provider` block sent to llama.cpp is a
+   400 — so a section written for one backend must be invisible to the other.
+"""
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import pytest
+
+from veles.core.context import (
+    reset_active_project,
+    reset_current_session_id,
+    set_active_project,
+    set_current_session_id,
+)
+from veles.core.openai_wire import request_body_overrides, upstream_provider_of
+from veles.core.project import init_project
+from veles.core.project_config import save_project_config
+from veles.core.provider import Message
+
+PIN = {
+    "provider": {"quantizations": ["bf16"], "order": ["AkashML"], "allow_fallbacks": False},
+    "reasoning": {"enabled": False},
+}
+
+
+@pytest.fixture(autouse=True)
+def _clear_session():
+    tok = set_current_session_id(None)
+    yield
+    reset_current_session_id(tok)
+
+
+@pytest.fixture()
+def project_with(tmp_path, monkeypatch):
+    """Activate a project whose config declares `[engine.request.<section>]`."""
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    tokens: list = []
+
+    def _make(section: str | None, body: dict | None = None):
+        project = init_project(tmp_path / "proj", name="proj")
+        if section is not None:
+            save_project_config(project, {"engine": {"request": {section: body or PIN}}})
+        tokens.append(set_active_project(project))
+        return project
+
+    yield _make
+    for tok in reversed(tokens):
+        reset_active_project(tok)
+
+
+def _openrouter():
+    from veles.adapters.openrouter import OpenRouterProvider
+
+    return OpenRouterProvider(api_key="sk-test")  # offline: no network at construction
+
+
+# ---- reading the section ----
+
+
+def test_no_active_project_means_no_overrides() -> None:
+    assert request_body_overrides("openrouter") == {}
+
+
+def test_section_is_read_for_the_matching_provider(project_with) -> None:
+    project_with("openrouter")
+    assert request_body_overrides("openrouter") == PIN
+
+
+def test_section_is_invisible_to_another_provider(project_with) -> None:
+    """The reason the section is provider-keyed: the paused llama.cpp migration
+    reuses this same config file, and OpenRouter's `provider` block is a 400
+    there."""
+    project_with("openrouter")
+    assert request_body_overrides("llamacpp") == {}
+
+
+def test_hand_written_toml_round_trips(tmp_path, monkeypatch) -> None:
+    """The shape a user actually types, parsed by tomllib — not a dict handed to
+    `save_project_config`. The section is four levels deep and carries a bool
+    (`allow_fallbacks = false`) in the innermost table, which is exactly where a
+    round-trip would quietly drop something."""
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    project = init_project(tmp_path / "proj", name="proj")
+    (project.state_dir / "config.toml").write_text(
+        "[engine]\n"
+        'provider = "openrouter"\n'
+        'model = "z-ai/glm-5.3-flash"\n'
+        "\n"
+        "[engine.request.openrouter.provider]\n"
+        'order = ["GMICloud"]\n'
+        "allow_fallbacks = false\n"
+        "\n"
+        "[engine.request.openrouter.reasoning]\n"
+        "enabled = false\n",
+        encoding="utf-8",
+    )
+    tok = set_active_project(project)
+    try:
+        assert request_body_overrides("openrouter") == {
+            "provider": {"order": ["GMICloud"], "allow_fallbacks": False},
+            "reasoning": {"enabled": False},
+        }
+        assert request_body_overrides("llamacpp") == {}
+    finally:
+        reset_active_project(tok)
+
+
+def test_absent_section_changes_nothing(project_with) -> None:
+    project_with(None)
+    assert request_body_overrides("openrouter") == {}
+    assert _openrouter()._request_options("z-ai/glm-5.3-flash") == {}
+
+
+# ---- merging with sticky routing ----
+
+
+def test_pin_and_session_id_share_one_extra_body(project_with) -> None:
+    project_with("openrouter")
+    tok = set_current_session_id("sess-abc")
+    try:
+        opts = _openrouter()._request_options("z-ai/glm-5.3-flash")
+    finally:
+        reset_current_session_id(tok)
+    assert opts["extra_body"] == {**PIN, "session_id": "sess-abc"}
+
+
+def test_pin_survives_without_a_session(project_with) -> None:
+    project_with("openrouter")
+    assert _openrouter()._request_options("z-ai/glm-5.3-flash") == {"extra_body": PIN}
+
+
+def test_explicit_session_id_in_config_wins(project_with) -> None:
+    """The section is a verbatim passthrough — an explicitly configured key is
+    the user's intent and beats the runtime default."""
+    project_with("openrouter", {"session_id": "pinned-by-hand"})
+    tok = set_current_session_id("sess-abc")
+    try:
+        opts = _openrouter()._request_options("z-ai/glm-5.3-flash")
+    finally:
+        reset_current_session_id(tok)
+    assert opts["extra_body"]["session_id"] == "pinned-by-hand"
+
+
+def test_local_json_mode_and_pin_coexist(project_with) -> None:
+    """`response_format` is a top-level key, the pin lives in `extra_body` —
+    the local adapter's M239 override must keep both."""
+    from veles.adapters.local.llamacpp import LlamaCppProvider
+    from veles.core.context import set_strict_json
+
+    project_with("llamacpp", {"cache_prompt": True})
+    provider = LlamaCppProvider(client=SimpleNamespace())
+    tok = set_strict_json(True)
+    try:
+        opts = provider._request_options("qwen3.8-27b")
+    finally:
+        from veles.core.context import reset_strict_json
+
+        reset_strict_json(tok)
+    assert opts["extra_body"] == {"cache_prompt": True}
+    assert opts["response_format"] == {"type": "json_object"}
+
+
+def test_create_message_puts_the_pin_on_the_wire(project_with) -> None:
+    project_with("openrouter")
+    captured: dict = {}
+
+    class _FakeCompletions:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content="ok", tool_calls=[]),
+                        finish_reason="stop",
+                    )
+                ],
+                usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+                provider="AkashML",
+            )
+
+    provider = _openrouter()
+    provider._client = SimpleNamespace(chat=SimpleNamespace(completions=_FakeCompletions()))
+    response = provider.create_message([Message(role="user", content="hi")], model="m")
+    assert captured["extra_body"] == PIN
+    assert response.upstream_provider == "AkashML"
+
+
+# ---- reading the response back ----
+
+
+def test_upstream_provider_from_a_plain_attribute() -> None:
+    assert upstream_provider_of(SimpleNamespace(provider="Relace")) == "Relace"
+
+
+def test_upstream_provider_from_model_extra() -> None:
+    """Pydantic keeps unknown fields in `model_extra`; don't rely on attribute
+    access alone."""
+    obj = SimpleNamespace(model_extra={"provider": "AkashML"})
+    assert upstream_provider_of(obj) == "AkashML"
+
+
+def test_upstream_provider_absent_is_none() -> None:
+    assert upstream_provider_of(SimpleNamespace()) is None
+
+
+def test_stream_captures_provider_and_reasoning_tokens() -> None:
+    """Verified live against OpenRouter: `provider` rides on every chunk, and
+    `usage.completion_tokens_details.reasoning_tokens` reports the thinking
+    split. Both reach `StreamEnd`."""
+    from veles.core.provider import StreamEnd
+
+    def _chunk(*, content=None, usage=None, finish=None):
+        delta = SimpleNamespace(content=content, tool_calls=[], reasoning=None)
+        return SimpleNamespace(
+            provider="Relace",
+            usage=usage,
+            choices=[SimpleNamespace(delta=delta, finish_reason=finish)],
+        )
+
+    usage = SimpleNamespace(
+        prompt_tokens=13,
+        completion_tokens=100,
+        total_tokens=113,
+        cost=0.00000147,
+        completion_tokens_details=SimpleNamespace(reasoning_tokens=97),
+        prompt_tokens_details=SimpleNamespace(cached_tokens=0),
+    )
+
+    class _FakeCompletions:
+        def create(self, **kwargs):
+            return iter(
+                [_chunk(content="hi"), _chunk(finish="length", usage=usage)],
+            )
+
+    provider = _openrouter()
+    provider._client = SimpleNamespace(chat=SimpleNamespace(completions=_FakeCompletions()))
+    events = list(provider.stream_message([Message(role="user", content="q")], model="m"))
+    end = next(e for e in events if isinstance(e, StreamEnd))
+    assert end.response.upstream_provider == "Relace"
+    assert end.response.finish_reason == "length"
+    assert end.response.usage.reasoning_tokens == 97
+    assert end.response.usage.cost_usd == pytest.approx(0.00000147)
+
+
+def test_trace_records_intent_and_fact(tmp_path, project_with) -> None:
+    """The trace carries both what we asked for (`request_extra`) and what
+    answered (`upstream_provider`) — a pin that silently did nothing shows up as
+    a mismatch instead of as unexplained variance."""
+    import json
+
+    from veles.core.agent import Agent
+    from veles.core.provider import ProviderResponse, TokenUsage
+    from veles.core.tools.registry import Registry
+    from veles.core.trace import TraceWriter
+
+    project_with("openrouter")
+
+    class _Provider:
+        name = "openrouter"
+        supports_tools = False
+        supports_streaming = False
+
+        def create_message(self, messages, tools=None, *, model, max_tokens=4096):
+            return ProviderResponse(
+                text="done",
+                tool_calls=[],
+                usage=TokenUsage(completion_tokens=100, reasoning_tokens=97, cost_usd=0.0002),
+                finish_reason="stop",
+                upstream_provider="AkashML",
+            )
+
+    trace_path = tmp_path / "traces.jsonl"
+    agent = Agent(
+        provider=_Provider(),
+        registry=Registry(),
+        model="z-ai/glm-5.3-flash",
+        trace_writer=TraceWriter(trace_path),
+    )
+    agent.run("hello")
+
+    record = json.loads(trace_path.read_text().splitlines()[0])
+    assert record["upstream_provider"] == "AkashML"
+    assert record["request_extra"] == PIN
+    assert record["reasoning_tokens"] == 97
+    assert record["est_cost_usd"] == pytest.approx(0.0002)
