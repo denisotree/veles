@@ -104,24 +104,25 @@ def _check_channels(prefix: str, channels: dict[str, Any]) -> list[ConfigFinding
     return out
 
 
-def unknown_request_providers(cfg: dict[str, Any]) -> list[str]:
-    """Keys under `[engine.request]` that name no provider Veles can build.
+def validate_engine(cfg: dict[str, Any]) -> list[ConfigFinding]:
+    """Unknown keys in `[engine]` and `[engine.request]` — the two typo shapes
+    that both end in an unpinned run, reported together so one raise covers both.
 
-    A pin filed under an unknown provider never reaches the wire — the reader
-    looks the section up by `Provider.name` and finds nothing — so this is the
-    one shape of mistake here that produces no error anywhere else."""
-    from veles.core.providers import PROVIDER_VALUES
+        [engine.request.openrotuer.provider]   # wrong provider: section exists,
+                                               # name matches no Provider.name
+        [engine.reqest.openrouter.provider]    # wrong path: `[engine.request]`
+                                               # is then simply absent
 
-    return sorted(k for k in get_section(cfg, "engine", "request") if k not in PROVIDER_VALUES)
-
-
-def _check_engine(cfg: dict[str, Any]) -> list[ConfigFinding]:
+    The second is invisible to the reader — "no `[engine.request]`" is also the
+    normal state of every project without a pin — so it can only be caught here,
+    one level up, as an unknown key under `[engine]`."""
     from veles.core.providers import PROVIDER_VALUES
 
     findings = _check("engine", get_section(cfg, "engine"), _ENGINE_KNOWN)
     findings += [
         ConfigFinding(section="engine.request", key=key, known=PROVIDER_VALUES)
-        for key in unknown_request_providers(cfg)
+        for key in sorted(get_section(cfg, "engine", "request"))
+        if key not in PROVIDER_VALUES
     ]
     return findings
 
@@ -131,7 +132,7 @@ def validate_config(cfg: dict[str, Any]) -> list[ConfigFinding]:
     Empty list means every key in those sections is recognised."""
     findings: list[ConfigFinding] = []
 
-    findings += _check_engine(cfg)
+    findings += validate_engine(cfg)
     findings += _check_channels("channels.", get_section(cfg, "channels"))
 
     daemon = get_section(cfg, "daemon")

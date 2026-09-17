@@ -158,23 +158,21 @@ def request_body_overrides(provider_name: str) -> dict[str, Any]:
     to config.toml takes effect on the next call, which is what you want while
     tuning a measurement run.
 
-    M255: raises `ConfigError` when `[engine.request]` names a provider that
-    doesn't exist. This section is written by hand, so it is sometimes wrong,
-    and every other way of getting it wrong already fails loudly — OpenRouter
-    rejects both a bad value (404, "No endpoints found …") and a bad key
-    (400, 'Unrecognized key'). A misspelt *provider* was the one shape that
-    didn't: the pin silently never reached the wire and the run proceeded
-    unpinned, quietly invalidating the measurement the pin was for. An explicit
-    error beats an implicit fallback.
+    M255: raises `ConfigError` on any unknown key in `[engine]` or
+    `[engine.request]`. This section is written by hand, so it is sometimes
+    wrong, and every other way of getting it wrong already fails loudly —
+    OpenRouter rejects both a bad value (404, "No endpoints found …") and a bad
+    key (400, 'Unrecognized key'). Only a Veles-side misspelling stayed quiet:
+    the pin never reached the wire and the run proceeded unpinned, invalidating
+    the measurement the pin existed for. An explicit error beats an implicit
+    fallback — so both typo shapes raise, including `[engine.reqest.…]`, which
+    is only visible one level up as an unknown key under `[engine]`.
 
-    Scope of that check: only providers speaking this wire format call in here,
-    so a typo on an Anthropic/Gemini project surfaces through
-    `validate_config` (`veles doctor`, `daemon start`) rather than here. And a
-    typo one level up — `[engine.reqest.…]` — means `[engine.request]` does not
-    exist at all, which this function cannot distinguish from "no section
-    declared"; `validate_config` reports that one as an unknown `[engine]` key.
+    Scope: only providers speaking this wire format call in here, so the same
+    typo on an Anthropic/Gemini project surfaces through `validate_config`
+    (`veles doctor`, `daemon start`) instead of raising.
     """
-    from veles.core.config_schema import ConfigError, unknown_request_providers
+    from veles.core.config_schema import ConfigError, validate_engine
     from veles.core.context import current_project
     from veles.core.project_config import get_section, load_project_config, project_config_path
 
@@ -182,14 +180,15 @@ def request_body_overrides(provider_name: str) -> dict[str, Any]:
     if project is None:
         return {}
     cfg = load_project_config(project)
-    unknown = unknown_request_providers(cfg)
-    if unknown:
-        from veles.core.providers import PROVIDER_VALUES
-
+    findings = validate_engine(cfg)
+    if findings:
+        detail = "; ".join(
+            f"[{f.section}] has unknown key {f.key!r} (known: {', '.join(f.known)})"
+            for f in findings
+        )
         raise ConfigError(
-            f"[engine.request] names unknown provider(s): {', '.join(repr(u) for u in unknown)}. "
-            f"Known providers: {', '.join(PROVIDER_VALUES)}. "
-            "A section under an unknown provider is never sent — fix the name or remove it.",
+            f"{detail}. Unknown keys here are silently ignored, which would run "
+            "unpinned — fix or remove them.",
             path=project_config_path(project),
         )
     return dict(get_section(cfg, "engine", "request", provider_name))

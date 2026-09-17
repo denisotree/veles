@@ -118,10 +118,33 @@ def test_known_provider_other_than_the_active_one_is_not_an_error(project_with) 
     assert request_body_overrides("openrouter") == {}
 
 
+def test_path_typo_raises_too(tmp_path, monkeypatch) -> None:
+    """`[engine.reqest.…]` leaves `[engine.request]` absent, which is also the
+    normal state of a project with no pin — so it is only visible one level up,
+    as an unknown key under `[engine]`. It raises all the same: a pin that never
+    reaches the wire is exactly the silent fallback M255 exists to remove."""
+    from veles.core.config_schema import ConfigError
+
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    project = init_project(tmp_path / "proj", name="proj")
+    (project.state_dir / "config.toml").write_text(
+        '[engine]\nprovider = "openrouter"\n\n'
+        "[engine.reqest.openrouter.provider]\n"
+        'order = ["GMICloud"]\n',
+        encoding="utf-8",
+    )
+    tok = set_active_project(project)
+    try:
+        with pytest.raises(ConfigError) as exc:
+            request_body_overrides("openrouter")
+    finally:
+        reset_active_project(tok)
+    assert "reqest" in str(exc.value)
+
+
 def test_validator_reports_both_typo_shapes(tmp_path, monkeypatch) -> None:
-    """`veles doctor` / `daemon start` see the wrong-provider case AND the one
-    the reader cannot detect — a typo in the section path itself, which leaves
-    `[engine.request]` simply absent."""
+    """`veles doctor` / `daemon start` see both shapes without running a turn —
+    the same findings the reader raises on, for providers that never call it."""
     from veles.core.config_schema import validate_config
 
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
