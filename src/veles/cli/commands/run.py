@@ -22,6 +22,8 @@ from veles.core.provider import ProviderError
 #   4 budget_exhausted     raise --max-tokens-total
 #   5 empty                the model produced no final text
 #   6 cancelled            interrupted
+#   7 truncated            the answer hit the token cap (M254) — raise the cap,
+#                          do not retry as-is: the same budget truncates again
 #
 # `.get(..., 1)` is deliberate: a `stopped_reason` added later degrades to
 # "generic failure" and can never be mistaken for success.
@@ -31,6 +33,7 @@ EXIT_BY_REASON = {
     "budget_exhausted": 4,
     "empty": 5,
     "cancelled": 6,
+    "truncated": 7,
 }
 
 

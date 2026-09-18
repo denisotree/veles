@@ -61,6 +61,7 @@ class HudMixin:
                 "empty": " ✓ done",
                 "cancelled": " ⏹ stopped",
                 "max_iterations": " ⚠ hit step limit — incomplete",
+                "truncated": " ⚠ answer hit the token cap — raise it",
                 "budget_exhausted": " ⚠ token budget hit — incomplete",
                 "error": " ✗ error",
             }.get(getattr(self, "last_stopped_reason", "completed"), " ✓ done")

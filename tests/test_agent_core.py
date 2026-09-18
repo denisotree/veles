@@ -68,15 +68,19 @@ def _echo_registry() -> Registry:
 
 def test_empty_response_returns_empty_stopped_reason() -> None:
     """A reply with no text and no tool_calls ends the run with
-    stopped_reason='empty', not 'completed'. M214 (B2): the loop first forces
-    ONE tool-free answer round; only if the model stays mute does it finalize
-    'empty' (so a genuinely blank turn is bounded, not immediate)."""
-    provider = _StubProvider(responses=[_final(""), _final("")])
-    agent = Agent(provider, Registry(), model="m", max_iterations=5)
+    stopped_reason='empty', not 'completed'. M214 (B2) forces a tool-free answer
+    round first; M254 raised that from a fixed one retry to
+    `_EMPTY_ANSWER_NUDGE_LIMIT`, because one was not enough for a model that
+    finishes and says nothing. Only after the limit does it finalize 'empty'."""
+    from veles.core.agent import _EMPTY_ANSWER_NUDGE_LIMIT
+
+    rounds = _EMPTY_ANSWER_NUDGE_LIMIT + 1
+    provider = _StubProvider(responses=[_final("")] * rounds)
+    agent = Agent(provider, Registry(), model="m", max_iterations=rounds + 1)
     result = agent.run("hi")
     assert result.text == ""
     assert result.stopped_reason == "empty"
-    assert result.iterations == 2  # empty → one forced retry → still empty
+    assert result.iterations == rounds
 
 
 def test_max_iterations_cutoff_returns_last_text() -> None:
@@ -100,11 +104,15 @@ def test_run_result_carries_invoked_tool_names() -> None:
     "did the persist tool actually run", not by non-empty final prose (a
     thinking local model routinely ends with empty content after doing all
     the tool work — seen live 2026-07-08, ollama qwen3.5:9b). M214 (B2): an
-    empty round is nudged once for a closing answer; if it stays empty the run
-    finalizes 'empty' with the tool work still recorded."""
+    empty round is nudged for a closing answer (M254: up to
+    `_EMPTY_ANSWER_NUDGE_LIMIT` times); if it stays empty the run finalizes
+    'empty' with the tool work still recorded."""
+    from veles.core.agent import _EMPTY_ANSWER_NUDGE_LIMIT
+
     reg = _echo_registry()
-    provider = _StubProvider(responses=[_tool_call("echo"), _final(""), _final("")])
-    agent = Agent(provider, reg, model="m", max_iterations=5)
+    empties = [_final("")] * (_EMPTY_ANSWER_NUDGE_LIMIT + 1)
+    provider = _StubProvider(responses=[_tool_call("echo"), *empties])
+    agent = Agent(provider, reg, model="m", max_iterations=len(empties) + 2)
     result = agent.run("go")
     assert result.stopped_reason == "empty"
     assert result.invoked_tools == frozenset({"echo"})
