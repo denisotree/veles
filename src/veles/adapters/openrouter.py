@@ -75,13 +75,24 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         of scattering across backends. Uses OpenRouter's own routing — no
         hardcoded provider pin — so availability/fallback are preserved. None
         outside a persisted run → OpenRouter falls back to hashing the opening
-        messages (still sticky, just not from message one)."""
+        messages (still sticky, just not from message one).
+
+        M250: merged on top of whatever `[engine.request.openrouter]` declares,
+        via `setdefault` — an explicitly configured key wins, because that
+        section is a verbatim passthrough and the user's intent is the point of
+        it. Sticky routing and a hard pin are complementary: the pin narrows
+        which backends are eligible, `session_id` keeps one turn on whichever
+        of them answered first."""
         from veles.core.context import current_session_id
 
+        options = super()._request_options(model)
         sid = current_session_id()
         if not sid:
-            return {}
-        return {"extra_body": {"session_id": sid[:256]}}
+            return options
+        extra = dict(options.get("extra_body") or {})
+        extra.setdefault("session_id", sid[:256])
+        options["extra_body"] = extra
+        return options
 
     def _extract_usage(self, usage_obj: Any) -> TokenUsage:
         return extract_usage_with_cache(usage_obj)

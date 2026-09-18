@@ -62,6 +62,10 @@ args = ["-m", "my_mcp_server"]
 provider = "openrouter"                              # provider name for the main agent + routing base
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
 
+[engine.request.openrouter.provider]   # forwarded into the request body as-is
+order = ["GMICloud"]                   # pin one backend (see "Pinning a backend" below)
+allow_fallbacks = false
+
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
 compressor = "openrouter:anthropic/claude-haiku-4.5"
@@ -110,6 +114,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | Section | Purpose |
 |---|---|
 | `[engine]` | Base provider (`provider` = provider name) + model (`model` = model id) for the main agent and the routing cascade |
+| `[engine.request.<provider>]` | Extra keys sent verbatim in that provider's request body — backend pinning, reasoning controls |
 | `[routing.tasks]` | Per-task `provider:model` overrides — see [per-task routing](../how-to/per-task-routing.md) |
 | `[permissions]` | Per-tool permission policy (project scope) |
 | `[vision]` | How incoming images are read: the routed model, Tesseract OCR, both, or nothing |
@@ -125,6 +130,69 @@ Task types for `[routing.tasks]`: `default`, `curator`, `compressor`, `insights`
 > Natural-language routing hints in `AGENTS.md` are parsed into an auto-generated
 > `routing.nl.toml`; explicit `[routing.tasks]` entries always win. Run
 > `veles route refresh` to re-parse. See [per-task routing](../how-to/per-task-routing.md).
+
+### Pinning a backend, and other request-body keys
+
+`[engine.request.<provider>]` is forwarded into that provider's request body
+**verbatim**. Veles does not model the upstream's schema, so anything the
+provider accepts works without waiting for Veles to learn about it:
+
+```toml
+[engine.request.openrouter.provider]
+order = ["GMICloud"]
+allow_fallbacks = false
+
+[engine.request.openrouter.reasoning]
+enabled = false
+```
+
+The section is keyed by **provider name** (`openrouter`, `anthropic`, `openai`,
+`gemini`, `ollama`, `llamacpp`, `openai-compat`) so one project config survives a
+backend switch: an OpenRouter `provider` block sent to llama.cpp would be a 400,
+so each backend reads only its own subsection. With no section declared, requests
+are byte-for-byte what they were before.
+
+**When you need this: reproducible measurement runs.** A relay like OpenRouter
+fans one model out across many backends at different quantizations, so two runs
+of the same input can differ for reasons that have nothing to do with the input.
+`session_id` sticky routing keeps a single conversation on one backend, but says
+nothing about *which*.
+
+Pin by `order`, not by `quantizations`. As of 2026-09-18 `z-ai/glm-5.3-flash` has
+29 endpoints: 16 at `fp8`, 3 at `fp4`, one at `nvfp4`, **9 that declare no
+quantization at all**, and none at `bf16`. So `quantizations = ["fp8"]` still
+leaves 16 candidates with context windows from 262144 to 1310720 tokens, while a
+single-element `order` plus `allow_fallbacks = false` determines the backend
+outright. List a model's endpoints with:
+
+```bash
+curl -s https://openrouter.ai/api/v1/models/<author>/<slug>/endpoints \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" | jq '.data.endpoints[]
+  | {provider_name, quantization, context_length}'
+```
+
+Keep the pin in the measurement project only — production wants sticky routing,
+which preserves availability and fallback.
+
+**Verifying it held.** Each model call records both the intent and the outcome in
+`.veles/traces.jsonl`: `request_extra` is what was sent, `upstream_provider` is
+the backend that answered. One line per run tells you whether the pin survived:
+
+```bash
+jq -r 'select(.session_id=="<sid>") | .upstream_provider' .veles/traces.jsonl | sort -u
+```
+
+More than one line means the run mixed backends. The same records carry
+`reasoning_tokens` (how much of the completion budget went to thinking) and
+`est_cost_usd` (the upstream's own billed cost, when it reports one).
+
+**Mistakes are loud, on purpose.** A misspelt provider name or a typo in the
+section path (`[engine.reqest.…]`) aborts the run with a `ConfigError` naming the
+file and the known providers — a pin that silently never reached the wire would
+invalidate the measurement it was written for. Keys *inside* a provider's
+subsection are not checked by Veles, because the upstream checks them: OpenRouter
+answers `400 provider: Unrecognized key: "quantization"` for a bad key and
+`404 No endpoints found …` for a value nothing matches.
 
 ### Images
 

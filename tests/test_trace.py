@@ -158,6 +158,10 @@ def test_record_serializes_to_expected_keys(tmp_path: Path) -> None:
         "tool_calls_count",
         "permission_decisions",
         "final_status",
+        # M250 — the fields a measurement run groups by.
+        "reasoning_tokens",
+        "upstream_provider",
+        "request_extra",
     }
     assert set(row.keys()) == expected
 

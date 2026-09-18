@@ -134,6 +134,87 @@ def max_tokens_kwarg_for(model: str) -> str:
     return "max_tokens"
 
 
+def request_body_overrides(provider_name: str) -> dict[str, Any]:
+    """Body keys the active project declares for `provider_name` (M250).
+
+    Read from `[engine.request.<provider_name>]` in the project's config.toml
+    and merged into `extra_body` verbatim — Veles does not model the upstream's
+    schema, so it cannot fall behind when the upstream grows a new knob:
+
+        [engine.request.openrouter.provider]
+        quantizations = ["bf16"]
+        order = ["AkashML"]
+        allow_fallbacks = false
+
+        [engine.request.openrouter.reasoning]
+        enabled = false
+
+    The section is keyed by `Provider.name` on purpose. One project config
+    outlives a backend switch — a pin written for OpenRouter would be a 400 at
+    llama.cpp — so each backend reads only its own subsection.
+
+    No caching: this runs once per model call (not per token), and a TOML parse
+    next to a multi-second request is noise. Reading fresh also means an edit
+    to config.toml takes effect on the next call, which is what you want while
+    tuning a measurement run.
+
+    M255: raises `ConfigError` on any unknown key in `[engine]` or
+    `[engine.request]`. This section is written by hand, so it is sometimes
+    wrong, and every other way of getting it wrong already fails loudly —
+    OpenRouter rejects both a bad value (404, "No endpoints found …") and a bad
+    key (400, 'Unrecognized key'). Only a Veles-side misspelling stayed quiet:
+    the pin never reached the wire and the run proceeded unpinned, invalidating
+    the measurement the pin existed for. An explicit error beats an implicit
+    fallback — so both typo shapes raise, including `[engine.reqest.…]`, which
+    is only visible one level up as an unknown key under `[engine]`.
+
+    Scope: only providers speaking this wire format call in here, so the same
+    typo on an Anthropic/Gemini project surfaces through `validate_config`
+    (`veles doctor`, `daemon start`) instead of raising.
+    """
+    from veles.core.config_schema import ConfigError, validate_engine
+    from veles.core.context import current_project
+    from veles.core.project_config import get_section, load_project_config, project_config_path
+
+    project = current_project()
+    if project is None:
+        return {}
+    cfg = load_project_config(project)
+    findings = validate_engine(cfg)
+    if findings:
+        detail = "; ".join(
+            f"[{f.section}] has unknown key {f.key!r} (known: {', '.join(f.known)})"
+            for f in findings
+        )
+        raise ConfigError(
+            f"{detail}. Unknown keys here are silently ignored, which would run "
+            "unpinned — fix or remove them.",
+            path=project_config_path(project),
+        )
+    return dict(get_section(cfg, "engine", "request", provider_name))
+
+
+def _extra_field(obj: Any, name: str) -> Any:
+    """Read a non-standard field off an SDK response object.
+
+    The OpenAI SDK's pydantic models allow extra fields, so a relay's additions
+    (OpenRouter's `provider` and `usage.cost`) usually surface as plain
+    attributes — but fall back to `model_extra` rather than trusting that."""
+    value = getattr(obj, name, None)
+    if value is None:
+        extra = getattr(obj, "model_extra", None)
+        if isinstance(extra, dict):
+            value = extra.get(name)
+    return value
+
+
+def upstream_provider_of(obj: Any) -> str | None:
+    """The backend that served this completion/chunk, per the relay (M250).
+    None when the response carries no such field (every direct provider)."""
+    value = _extra_field(obj, "provider")
+    return value if isinstance(value, str) and value else None
+
+
 class OpenAICompatibleProvider:
     """Base for any Provider that talks the OpenAI Chat Completions wire format.
 
@@ -167,22 +248,22 @@ class OpenAICompatibleProvider:
         return strip_cache_sentinel([to_openai_message(m) for m in messages])
 
     def _request_options(self, model: str) -> dict[str, Any]:
-        """Extra kwargs merged into the `chat.completions.create` call. Empty by
-        default; OpenRouter overrides to forward a sticky-routing `session_id`
-        (M224) so a conversation's requests pin one provider and prompt caching
-        actually hits."""
-        return {}
+        """Extra kwargs merged into the `chat.completions.create` call.
+
+        M250: the base now forwards whatever `[engine.request.<self.name>]`
+        declares, verbatim, as `extra_body`. Subclasses that add their own keys
+        must call `super()` and merge INTO the returned `extra_body` rather than
+        replacing it — OpenRouter's sticky-routing `session_id` (M224) and a
+        config-declared provider pin have to travel in the same object."""
+        extra = request_body_overrides(self.name)
+        return {"extra_body": extra} if extra else {}
 
     def _extract_usage(self, usage_obj: Any) -> TokenUsage:
-        """Default: prompt/completion/total only. Cloud adapters override
-        to also grab `prompt_tokens_details.cached_tokens`."""
+        """Default: prompt/completion/total plus the M250 detail fields. Cloud
+        adapters override to also grab `prompt_tokens_details.cached_tokens`."""
         if usage_obj is None:
             return TokenUsage()
-        return TokenUsage(
-            prompt_tokens=usage_obj.prompt_tokens or 0,
-            completion_tokens=usage_obj.completion_tokens or 0,
-            total_tokens=usage_obj.total_tokens or 0,
-        )
+        return _base_usage(usage_obj)
 
     def _connection_error_hint(self) -> str:
         """Actionable hint appended to a `ProviderUnavailable` message.
@@ -303,6 +384,7 @@ class OpenAICompatibleProvider:
             usage=self._extract_usage(completion.usage),
             finish_reason=choice.finish_reason,
             raw=completion,
+            upstream_provider=upstream_provider_of(completion),
         )
 
     def stream_message(
@@ -329,6 +411,10 @@ class OpenAICompatibleProvider:
         tool_call_ids: dict[str, int] = {}  # id → bucket, for index-less deltas
         finish_reason: str | None = None
         usage = TokenUsage()
+        # M250: verified live against OpenRouter — `provider` rides on EVERY
+        # chunk, not just the first or last, so the last one seen is the one
+        # that served the call.
+        upstream: str | None = None
 
         # A connection failure / 5xx / timeout can fire on the initial
         # request or mid-stream (the SDK applies the read timeout per
@@ -346,6 +432,7 @@ class OpenAICompatibleProvider:
                 raise self._translate_openai_error(exc) from exc
 
         for chunk in _chunks():
+            upstream = upstream_provider_of(chunk) or upstream
             chunk_usage = getattr(chunk, "usage", None)
             if chunk_usage is not None:
                 usage = self._extract_usage(chunk_usage)
@@ -406,6 +493,7 @@ class OpenAICompatibleProvider:
             usage=usage,
             finish_reason=finish_reason,
             raw=None,
+            upstream_provider=upstream,
         )
         yield StreamEnd(response=response)
 
@@ -419,6 +507,23 @@ def _decode_tool_calls(raw_calls: list[Any]) -> list[ToolCall]:
     return out
 
 
+def _base_usage(usage_obj: Any) -> TokenUsage:
+    """Fields every OpenAI-compatible backend can report, including the M250
+    additions: `completion_tokens_details.reasoning_tokens` (how much of the
+    completion budget went to thinking) and the relay's own `usage.cost`.
+    Both default to 0 when the backend stays silent about them."""
+    details = getattr(usage_obj, "completion_tokens_details", None)
+    reasoning = (getattr(details, "reasoning_tokens", 0) or 0) if details else 0
+    cost = _extra_field(usage_obj, "cost") or 0.0
+    return TokenUsage(
+        prompt_tokens=usage_obj.prompt_tokens or 0,
+        completion_tokens=usage_obj.completion_tokens or 0,
+        total_tokens=usage_obj.total_tokens or 0,
+        reasoning_tokens=int(reasoning),
+        cost_usd=float(cost),
+    )
+
+
 def extract_usage_with_cache(usage_obj: Any) -> TokenUsage:
     """Cloud-flavoured usage extractor — also harvests `cached_tokens`
     from `prompt_tokens_details`. Both openrouter and openai_direct use
@@ -426,10 +531,6 @@ def extract_usage_with_cache(usage_obj: Any) -> TokenUsage:
     if usage_obj is None:
         return TokenUsage()
     details = getattr(usage_obj, "prompt_tokens_details", None)
-    cache_read = getattr(details, "cached_tokens", 0) or 0 if details else 0
-    return TokenUsage(
-        prompt_tokens=usage_obj.prompt_tokens or 0,
-        completion_tokens=usage_obj.completion_tokens or 0,
-        total_tokens=usage_obj.total_tokens or 0,
-        cache_read_tokens=cache_read,
-    )
+    usage = _base_usage(usage_obj)
+    usage.cache_read_tokens = getattr(details, "cached_tokens", 0) or 0 if details else 0
+    return usage

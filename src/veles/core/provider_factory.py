@@ -16,11 +16,20 @@ chat-only sub-agents.
 Local-model providers (`ollama`, `llamacpp`, `openai-compat`) introduced
 in M78 don't need any credentials; `has_api_key` returns True for them
 unconditionally so the agent loop doesn't gate them behind a key check.
-Tool calling is **auto-detected** from the model's advertised capabilities
-(ollama `/api/show` reports `capabilities: ["tools", ...]`): pass the model
-to `make_provider(name, model=...)` and tools turn on iff the model speaks
-the OpenAI tool-call format. `VELES_LOCAL_TOOLS=1|0` remains an explicit
-override (force on/off) when set; unset means auto-detect.
+Tool calling is **auto-detected** from what the backend advertises, by two
+different questions because the two backends are shaped differently:
+
+- ollama holds many models, so the question is per-model — `/api/show`
+  reports a `capabilities` array (M78).
+- llama.cpp holds one model, given at startup, so the question is about
+  the server — `/props` reports `chat_template_caps` for the loaded GGUF's
+  chat template (M256). `openai-compat` inherits this and degrades to
+  "no tools" against a backend that doesn't serve `/props`.
+
+Pass the model to `make_provider(name, model=...)`; tools turn on iff the
+backend says it speaks the OpenAI tool-call format. `VELES_LOCAL_TOOLS=1|0`
+remains an explicit override (force on/off) when set; unset means
+auto-detect.
 """
 
 from __future__ import annotations
@@ -55,19 +64,25 @@ def _apply_local_tool_policy(provider: Provider, model: str | None) -> None:
     """Set `provider.supports_tools` for a freshly-built local provider.
 
     An explicit `VELES_LOCAL_TOOLS` value wins (force on/off). Otherwise
-    auto-detect: when the provider can probe a model's capabilities (ollama
-    exposes `model_supports_tools` via `/api/show`) and the model is known,
-    enable tools iff the model advertises them. When the capability can't be
-    determined (no probe, no model, or probe error) default to off — a
-    tool-blind model that's handed tool schemas can stall the agent loop."""
+    auto-detect through the provider's `model_supports_tools` probe — ollama's
+    `/api/show` per model, llama.cpp's `/props` per server. When the capability
+    can't be determined (no probe, or probe error) default to off: a tool-blind
+    model handed tool schemas can stall the agent loop.
+
+    M256: a missing `model` no longer short-circuits to off. That was right when
+    ollama was the only probe — its question is "does THIS model support tools",
+    unanswerable without a name — but llama.cpp serves one model chosen at
+    startup and answers for itself, so refusing to ask left `llamacpp` tool-blind
+    even against a server that advertises support. Probes that need the name and
+    don't get one still return False on their own."""
     override = _local_tools_override()
     if override is not None:
         provider.supports_tools = override
         return
     detect = getattr(provider, "model_supports_tools", None)
-    if callable(detect) and model:
+    if callable(detect):
         try:
-            provider.supports_tools = bool(detect(model))
+            provider.supports_tools = bool(detect(model or ""))
         except Exception:
             provider.supports_tools = False
     else:

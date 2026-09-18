@@ -59,6 +59,16 @@ class TokenUsage:
     total_tokens: int = 0
     cache_read_tokens: int = 0
     cache_creation_tokens: int = 0
+    # M250: the slice of `completion_tokens` the model spent thinking, when the
+    # upstream reports it (`completion_tokens_details.reasoning_tokens`). A
+    # reasoning model's visible answer is the tail of its completion budget, so
+    # "empty answer" and "budget exhausted by thinking" are only separable with
+    # this number. 0 means "not reported", not "no thinking".
+    reasoning_tokens: int = 0
+    # M250: real cost of this call as billed upstream, when reported
+    # (OpenRouter's `usage.cost`). 0.0 means "not reported" — the trace's
+    # `est_cost_usd` was a hardcoded 0.0 before this.
+    cost_usd: float = 0.0
 
 
 @dataclass(slots=True)
@@ -70,6 +80,13 @@ class ProviderResponse:
     usage: TokenUsage
     finish_reason: str | None = None
     raw: Any = None  # provider-native object kept for debugging
+    # M250: the backend that actually served this call, as reported by a relay
+    # that fans out across providers (OpenRouter puts `provider` on the
+    # completion AND on every stream chunk). Recorded in the trace so a
+    # measurement run can state which backend answered instead of assuming the
+    # pin held — including the case where a mistyped pin silently did nothing.
+    # None for direct providers, which are their own backend.
+    upstream_provider: str | None = None
 
 
 @dataclass(slots=True)

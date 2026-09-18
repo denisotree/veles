@@ -56,12 +56,19 @@ def test_make_provider_ollama_autodetects_tool_capability(monkeypatch: pytest.Mo
 
 
 def test_make_provider_ollama_no_model_defaults_off(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Without a model the capability can't be probed — default off, never probe."""
+    """Without a model ollama cannot answer, and says so itself.
+
+    M256 moved that decision out of the factory and into the probe. The factory
+    used to refuse to ask when it had no model name — correct while ollama was
+    the only backend, since its question is "does THIS model support tools". But
+    llama.cpp serves one model chosen at startup and answers for itself, so the
+    blanket refusal left it tool-blind. Ollama's own `not model` guard keeps this
+    case off, and does it without a request."""
     monkeypatch.delenv("VELES_LOCAL_TOOLS", raising=False)
-    probe = MagicMock(return_value=True)
-    monkeypatch.setattr(_PROBE, probe)
+    calls: list[str] = []
+    monkeypatch.setattr("httpx.post", lambda *a, **kw: calls.append("posted"))
     assert make_provider("ollama").supports_tools is False
-    probe.assert_not_called()
+    assert calls == []  # guarded before any HTTP
 
 
 def test_make_provider_local_tools_env_override_wins(monkeypatch: pytest.MonkeyPatch) -> None:

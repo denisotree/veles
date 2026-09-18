@@ -104,7 +104,6 @@ def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) 
         _ensure_api_key,
         _print_run_summary,
         _run_agent_streaming_aware,
-        _warn_if_agents_md_invalid,
         build_command_agent,
     )
 
@@ -123,7 +122,6 @@ def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) 
 
     if args.provider in _PROVIDER_API_KEY_ENVS and not _ensure_api_key(args.provider):
         return 2
-    _warn_if_agents_md_invalid(project)
     Wiki(project.wiki_root).ensure_layout()
     # M152: shared construction spine. The key was already gated above
     # (before the AGENTS.md warning / wiki-layout side effects), so the

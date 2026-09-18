@@ -23,7 +23,7 @@ adapters:
 from __future__ import annotations
 
 import os
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import httpx
 from openai import OpenAI
@@ -134,9 +134,63 @@ class _OpenAICompatibleBase(OpenAICompatibleProvider):
         # always use `max_tokens` regardless of model id.
         return "max_tokens"
 
+    # ---- tool-call auto-detection (M256) ----
+
+    def model_supports_tools(self, model: str) -> bool:
+        """Whether this server's loaded model speaks OpenAI tool calls.
+
+        Asks llama.cpp's `GET /props`, whose `chat_template_caps` object reports
+        what the loaded GGUF's chat template can do. Verified live against
+        llama.cpp b10809 with Qwen3.8-27B (2026-09-18):
+
+            "chat_template_caps": { … "supports_tools": true,
+                                        "supports_tool_calls": true … }
+
+        **`model` is ignored, deliberately.** For ollama the question is about a
+        model — `/api/show` reports a per-model `capabilities` array, and the
+        server holds many. A llama.cpp server holds exactly one, given at
+        startup, and since b~10000 `--jinja` is on by default, so the answer is a
+        property of the *server's* loaded template, not of any name the caller
+        passes. The parameter exists to satisfy the `_apply_local_tool_policy`
+        probe signature.
+
+        Both flags are required: `supports_tools` means the template can accept
+        tool definitions, `supports_tool_calls` that it can render the model's
+        calls back out. The agent loop needs both halves.
+
+        Conservative on anything unexpected — an unreachable server, a non-llama
+        backend that 404s `/props` (`openai-compat` pointed elsewhere), or a
+        build old enough to predate `chat_template_caps` all return False, which
+        is exactly the pre-M256 behaviour. `VELES_LOCAL_TOOLS=1` still forces
+        tools on for those.
+
+        **2s, not the 10s ollama's probe uses.** This runs on every provider
+        construction, which is on the startup path of a run, the curator and each
+        skill sub-agent. `openai-compat` inherits this probe and may well point
+        at something that is not llama.cpp and will never answer — the bound on
+        that mistake should be short. A local server that cannot return its own
+        metadata within 2s is not ready to serve a turn either.
+
+        **Deliberately not cached.** The obvious next move — memoise per base_url
+        — is wrong for the daemon, which outlives the llama.cpp server it talks
+        to: restart that server on a different model and a cached "no tools"
+        would stick for the daemon's whole life.
+        """
+        del model
+        base = str(self._client.base_url).rstrip("/")
+        if base.endswith("/v1"):
+            base = base[:-3].rstrip("/")
+        try:
+            resp = httpx.get(f"{base}/props", timeout=2.0)
+            resp.raise_for_status()
+            caps = resp.json().get("chat_template_caps") or {}
+        except Exception:
+            return False
+        return bool(caps.get("supports_tools")) and bool(caps.get("supports_tool_calls"))
+
     # ---- structured output (M239) ----
 
-    def _request_options(self, model: str) -> dict[str, object]:
+    def _request_options(self, model: str) -> dict[str, Any]:
         """Ask for a JSON object when the caller declared it needs one.
 
         Small open-weight models fail structured output far more often than they
@@ -148,8 +202,13 @@ class _OpenAICompatibleBase(OpenAICompatibleProvider):
         Deliberately NOT applied to every call: the fenced-tools path has the
         model emit ```veles-tool blocks inside prose, which `json_object` would
         forbid outright. Only `strict_json_mode()` callers opt in.
+
+        M250: layered on top of the base hook, which carries any
+        `[engine.request.<name>]` passthrough. `response_format` is a top-level
+        request key, not an `extra_body` one, so the two never collide.
         """
-        del model
+        options = super()._request_options(model)
         if not json_mode_enabled() or not expects_strict_json():
-            return {}
-        return {"response_format": {"type": "json_object"}}
+            return options
+        options["response_format"] = {"type": "json_object"}
+        return options

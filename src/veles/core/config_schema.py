@@ -7,14 +7,28 @@ whitelist means "allow every chat". This module declares the known keys for the
 sections that gate access and reports unknown ones so `veles doctor` (and the
 channel-run path) can fail loud instead of failing open.
 
-Scope is deliberately the access-gating sections — channels, daemon sessions,
-and MCP servers. Content sections (`[engine]`, `[routing]`, wiki, …) are left
-free-form; a typo there is a functional bug, not a silent security hole.
+Scope was originally the access-gating sections — channels, daemon sessions,
+and MCP servers — on the argument that a typo elsewhere is "a functional bug,
+not a silent security hole".
+
+**M255 extends that to `[engine]`**, because M250 put a *reproducibility* knob
+there and the argument inverts: a mistyped `[engine.request.openrotuer]` is
+dropped silently, the run proceeds unpinned, and the measurement it was meant to
+stabilise is quietly invalid — the failure the knob exists to prevent. Config is
+written by hand, so it is wrong sometimes; an explicit error beats an implicit
+fallback.
+
+Validation stops at the provider-name level. What a provider's own subsection
+contains is a verbatim passthrough that Veles deliberately does not model (see
+`openai_wire.request_body_overrides`), and the upstream rejects its own typos
+anyway — OpenRouter answers `400 provider: Unrecognized key: "quantization"`
+(verified 2026-09-18).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from veles.core.project_config import get_section
@@ -30,6 +44,22 @@ _MCP_SERVER_KNOWN = frozenset(
 # Channel keys common to every platform; per-platform cred fields are added on
 # top (from the platform registry), so new platforms need no change here.
 _CHANNEL_BASE_KEYS = frozenset({"enabled", "chat_id"})
+# Keys valid under `[engine]` (M255). Verified against every consumer:
+# `model_resolver.resolve_effective_provider/model`, `routing/ensemble.py`, and
+# `tui_state.persist_model_choice` read `provider`/`model` and nothing else;
+# `request` is the M250 passthrough table.
+_ENGINE_KNOWN = frozenset({"provider", "model", "request"})
+
+
+class ConfigError(ValueError):
+    """A config mistake that would otherwise be absorbed silently.
+
+    Mirrors `LayoutManifestError`: carries the file path, because the only
+    useful thing to say about a bad config value is which file to edit."""
+
+    def __init__(self, message: str, *, path: Path) -> None:
+        super().__init__(f"{path}: {message}")
+        self.path = path
 
 
 @dataclass(slots=True, frozen=True)
@@ -74,11 +104,35 @@ def _check_channels(prefix: str, channels: dict[str, Any]) -> list[ConfigFinding
     return out
 
 
+def validate_engine(cfg: dict[str, Any]) -> list[ConfigFinding]:
+    """Unknown keys in `[engine]` and `[engine.request]` — the two typo shapes
+    that both end in an unpinned run, reported together so one raise covers both.
+
+        [engine.request.openrotuer.provider]   # wrong provider: section exists,
+                                               # name matches no Provider.name
+        [engine.reqest.openrouter.provider]    # wrong path: `[engine.request]`
+                                               # is then simply absent
+
+    The second is invisible to the reader — "no `[engine.request]`" is also the
+    normal state of every project without a pin — so it can only be caught here,
+    one level up, as an unknown key under `[engine]`."""
+    from veles.core.providers import PROVIDER_VALUES
+
+    findings = _check("engine", get_section(cfg, "engine"), _ENGINE_KNOWN)
+    findings += [
+        ConfigFinding(section="engine.request", key=key, known=PROVIDER_VALUES)
+        for key in sorted(get_section(cfg, "engine", "request"))
+        if key not in PROVIDER_VALUES
+    ]
+    return findings
+
+
 def validate_config(cfg: dict[str, Any]) -> list[ConfigFinding]:
-    """Return unknown-key findings across the access-gating config sections.
+    """Return unknown-key findings across the validated config sections.
     Empty list means every key in those sections is recognised."""
     findings: list[ConfigFinding] = []
 
+    findings += validate_engine(cfg)
     findings += _check_channels("channels.", get_section(cfg, "channels"))
 
     daemon = get_section(cfg, "daemon")

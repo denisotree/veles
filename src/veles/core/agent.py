@@ -120,6 +120,13 @@ EMPTY_ANSWER_NUDGE = (
 # a model stuck emitting broken JSON can't loop to max_iterations on nudges.
 _PARSE_NUDGE_LIMIT = 3
 
+# M254: how many tool-free rounds an EMPTY final answer may cost before the run
+# ends blank. Was a hard 1 (M214), which the original report said is not enough
+# for a model that finishes and says nothing. Bounded the same way and for the
+# same reason as `_PARSE_NUDGE_LIMIT` — a model that will never speak must not
+# be able to spend the whole iteration budget being asked to.
+_EMPTY_ANSWER_NUDGE_LIMIT = 3
+
 
 @dataclass(slots=True)
 class UsageSnapshot:
@@ -136,6 +143,10 @@ class UsageSnapshot:
     # for the next turn — so the status chip can show a sane % instead of
     # cumulative run usage.
     last_prompt_tokens: int = 0
+    # M254: the slice of `completion_tokens` spent thinking (M250 harvests it
+    # per call). Run-level, because the question it answers is run-level: when a
+    # turn ends with no text, was the budget eaten by reasoning?
+    reasoning_tokens: int = 0
 
     def add(self, usage) -> None:
         prompt = getattr(usage, "prompt_tokens", 0)
@@ -144,6 +155,7 @@ class UsageSnapshot:
         self.total_tokens += getattr(usage, "total_tokens", 0)
         self.cache_read_tokens += getattr(usage, "cache_read_tokens", 0)
         self.cache_creation_tokens += getattr(usage, "cache_creation_tokens", 0)
+        self.reasoning_tokens += getattr(usage, "reasoning_tokens", 0)
         # Latest request's prompt size = current resident-context estimate.
         if prompt:
             self.last_prompt_tokens = prompt
@@ -396,7 +408,7 @@ class Agent:
         # (e.g. a tool-only round the model didn't close with an answer) leaves
         # the channel placeholder stuck at "...". Force ONE tool-free answer
         # round before giving up, once per turn.
-        empty_retry_used = False
+        empty_nudges = 0
 
         for iteration in range(1, self._max_iterations + 1):
             # Cooperative cancellation checkpoint #1: between iterations,
@@ -557,22 +569,53 @@ class Agent:
                     continue
                 final_text = response.text or ""
                 # M214 (B2): don't finalize an EMPTY answer on the first try —
-                # force one tool-free round so the model actually speaks, rather
-                # than leaving a channel turn blank. Bounded to one retry.
-                if not final_text and not empty_retry_used:
-                    empty_retry_used = True
+                # force a tool-free round so the model actually speaks, rather
+                # than leaving a channel turn blank.
+                #
+                # M254 splits the two causes of an empty answer, which need
+                # opposite handling and used to get the same one:
+                #
+                #   finish_reason="length" — the completion budget ran out. For a
+                #     reasoning model the visible answer is the tail of the
+                #     budget, so it is the part that gets cut. Re-asking with the
+                #     SAME budget is provably useless: the retry hits the same
+                #     wall, and silently burns another full thinking round. Report
+                #     it instead, so the cap is raised rather than guessed at.
+                #   finish_reason="stop" — the model finished and said nothing.
+                #     Here a nudge is the right tool, and one is not always
+                #     enough (the original report), so it is bounded like the
+                #     fenced parse nudge rather than fixed at a single try.
+                truncated = not final_text and response.finish_reason == "length"
+                if not final_text and not truncated and empty_nudges < _EMPTY_ANSWER_NUDGE_LIMIT:
+                    empty_nudges += 1
                     force_answer = True
-                    self._log("-> empty answer: forcing one tool-free answer round")
+                    self._log(
+                        f"-> empty answer: forcing a tool-free answer round "
+                        f"(nudge {empty_nudges}/{_EMPTY_ANSWER_NUDGE_LIMIT})"
+                    )
                     nudge = Message(role="user", content=EMPTY_ANSWER_NUDGE)
                     history.append(nudge)
                     self._persist(nudge)
                     continue
+                if truncated:
+                    self._log(
+                        f"-> empty answer: response hit the token cap "
+                        f"({usage_acc.completion_tokens} completion tokens, "
+                        f"{usage_acc.reasoning_tokens} of them reasoning) — "
+                        "raise --max-tokens or the model's budget"
+                    )
+                if final_text:
+                    reason = "completed"
+                elif truncated:
+                    reason = "truncated"
+                else:
+                    reason = "empty"
                 return self._finalize(
                     RunResult(
                         text=final_text,
                         iterations=iteration,
                         history=history,
-                        stopped_reason="completed" if final_text else "empty",
+                        stopped_reason=reason,
                         session_id=self._session_id,
                         usage=usage_acc,
                         invoked_tools=frozenset(invoked),
@@ -898,6 +941,19 @@ class Agent:
         the per-run listener (if any) installed by `run()`."""
         _emit(self._event_writer, event, self._event_listener)
 
+    def _request_extra(self) -> dict:
+        """The `[engine.request.<provider>]` passthrough in force for this call
+        (M250), for the trace. Best-effort: a provider that doesn't speak the
+        OpenAI wire format has no such section, and tracing must never break a
+        run."""
+        try:
+            from veles.core.openai_wire import request_body_overrides
+
+            name = getattr(self._provider, "name", "")
+            return request_body_overrides(name) if name else {}
+        except Exception:  # pragma: no cover - trace enrichment is never load-bearing
+            return {}
+
     def _emit_trace(
         self,
         *,
@@ -923,10 +979,15 @@ class Agent:
             output_tokens=usage.completion_tokens,
             ttft_ms=ttft_ms,
             total_latency_ms=total_latency_ms,
-            est_cost_usd=0.0,
+            # M250: the upstream's own billed cost when it reports one
+            # (OpenRouter's `usage.cost`); still 0.0 for backends that don't.
+            est_cost_usd=usage.cost_usd,
             tool_calls_count=len(response.tool_calls),
             permission_decisions=[],
             final_status="ok",
+            reasoning_tokens=usage.reasoning_tokens,
+            upstream_provider=response.upstream_provider,
+            request_extra=self._request_extra(),
         )
         try:
             self._trace_writer.write(record)

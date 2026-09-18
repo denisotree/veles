@@ -1,13 +1,26 @@
 """`veles tool {list,show,promote}` command bodies (M120.5).
 
 Each handler takes `(args, project)` and returns an int exit code in
-the conventional pattern. The persistent catalogue (`tools` table in
-`memory.db`) is the source of truth — we don't re-scan disk on every
-invocation, because the daemon / CLI runtime already syncs file-based
-tools at startup via `core/tools/loader.py`.
+the conventional pattern.
+
+**What `list`/`show` report (M251).** The live `Registry` — the same
+builtin + file-based toolset the agent is handed — with telemetry from
+`memory.db` overlaid where it exists. They used to report the `tools`
+table alone, which answered a different question than the one they get
+asked: `tool list` is the first thing you run to check whether the agent
+can see its tools, and it replied `no tools catalogued yet` in exactly the
+state being checked. Two reasons it was empty — builtins are never
+catalogued by design, and `cli/_runtime.py` called `load_into_registry`
+with no `conn`, so file-based tools were not catalogued either, despite
+this docstring having claimed they were since M120.5.
+
+Deliberately NOT covered here, because each would mean paying a real cost
+for a listing: skills (`veles skill list`) and MCP servers, which would
+have to be connected to enumerate (`veles mcp list`).
 
 Side-effects:
-- `list` / `show` are read-only.
+- `list` / `show` are read-only apart from the catalogue sync that
+  `load_into_registry(conn=…)` performs for file-based tools.
 - `promote` moves a `.py` file from `<project>/.veles/tools/` to
   `~/.veles/tools/`. The catalogue row's `scope` is rewritten in-place
   so the next daemon turn or CLI invocation sees the user-level tool
@@ -20,19 +33,82 @@ import argparse
 import datetime as _dt
 import shutil
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 from veles.core.memory import SessionStore
 from veles.core.project import Project
 from veles.core.tools.persistence import (
-    ToolRecord,
     ToolTelemetry,
     get_tool,
-    list_tools,
     telemetry,
     telemetry_batch,
 )
+from veles.core.tools.registry import Registry
 from veles.core.user_paths import user_home
+
+
+@dataclass(frozen=True, slots=True)
+class LiveTool:
+    """One tool as the agent would see it, plus where it came from."""
+
+    name: str
+    scope: str  # builtin | project | user
+    origin: str  # builtin | agent-generated | manual
+    description: str
+
+
+def _live_tools(project: Project, conn) -> tuple[list[LiveTool], tuple[Path, ...]]:
+    """Build the agent's builtin + file-based toolset and report it.
+
+    Mirrors `cli/_runtime.py::_load_skills` for the parts that need no
+    provider: the layout's content engines decide which builtins exist, then
+    file-based project/user tools load on top.
+
+    **The registry handed to the loader must be a copy.** `load_into_registry`
+    mutates it — `loader.py` pops a builtin that a project tool shadows — and
+    the builtin registry is a module-level singleton. Passing it directly would
+    strip builtins from the live process, so `veles tool list` typed inside a
+    REPL session would change the agent's own toolset.
+    """
+    from veles.core.layout.engines import wiki_enabled
+    from veles.core.tools import registry as builtin_registry
+    from veles.core.tools.loader import load_into_registry
+    from veles.core.tools.toolsets import TOOLSETS
+
+    # M163: wiki tools exist only when the layout pack enables the engine —
+    # importing the module is what registers them, so the gate is the import.
+    if wiki_enabled(project):
+        import veles.modules.wiki.tools
+    import veles.modules.agentops.tools  # noqa: F401
+
+    gated: set[str] = set() if wiki_enabled(project) else set(TOOLSETS.get("engine-wiki", ()))
+    live: Registry = builtin_registry.subset(
+        [n for n in builtin_registry.list_names() if n not in gated]
+    )
+    scopes: dict[str, tuple[str, str]] = dict.fromkeys(live.list_names(), ("builtin", "builtin"))
+
+    report = load_into_registry(
+        live,
+        project_tools_dir=project.state_dir / "tools",
+        user_tools_dir=user_home() / "tools",
+        # M251: the sync `cli/_runtime.py` never performed, so a file-based
+        # tool finally gets a catalogue row (and therefore telemetry).
+        conn=conn,
+    )
+    for lt in report.loaded:
+        scopes[lt.entry.name] = (lt.scope, lt.origin)
+
+    tools = [
+        LiveTool(
+            name=name,
+            scope=scopes[name][0],
+            origin=scopes[name][1],
+            description=live.get(name).description,
+        )
+        for name in sorted(live.list_names())
+    ]
+    return tools, report.unapproved
 
 
 def cmd_tool(args: argparse.Namespace, project: Project) -> int:
@@ -113,20 +189,36 @@ def _cmd_approve(args: argparse.Namespace, project: Project) -> int:
 def _cmd_list(args: argparse.Namespace, project: Project) -> int:
     del args
     store = SessionStore(project.memory_db_path)
-    conn = store._conn
-    records = list_tools(conn)
+    try:
+        conn = store._conn
+        records, unapproved = _live_tools(project, conn)
+        conn.commit()
+        tele = telemetry_batch(conn, [r.name for r in records])
+    finally:
+        store.close()
     if not records:
-        print("no tools catalogued yet.")
+        print("no tools available — the builtin registry is empty, which is a bug.")
         return 0
-    names = [r.name for r in records]
-    tele = telemetry_batch(conn, names)
     # `name  scope  origin  uses  success%  last_used` — column widths
     # tuned to the typical 20-char tool name + 9-char scope max.
     print(_format_table(records, tele))
+    print(
+        f"\n{len(records)} tools visible to the agent here. "
+        "Skills: `veles skill list`. MCP servers: `veles mcp list`."
+    )
+    if unapproved:
+        # M199 skips an unapproved file's import entirely, so the agent never
+        # sees the tool OR a refusal. `tool list` is where you come looking.
+        names = ", ".join(sorted(p.stem for p in unapproved))
+        print(
+            f"{len(unapproved)} self-authored tool file(s) NOT loaded (unapproved): {names} — "
+            "run `veles tool approve <name>` (or --all) to enable them.",
+            file=sys.stderr,
+        )
     return 0
 
 
-def _format_table(records: list[ToolRecord], tele: dict[str, ToolTelemetry]) -> str:
+def _format_table(records: list[LiveTool], tele: dict[str, ToolTelemetry]) -> str:
     name_w = max(len("name"), max(len(r.name) for r in records))
     scope_w = max(len("scope"), max(len(r.scope) for r in records))
     origin_w = max(len("origin"), max(len(r.origin) for r in records))
@@ -162,25 +254,37 @@ def _fmt_ts(ts: float) -> str:
 
 
 def _cmd_show(args: argparse.Namespace, project: Project) -> int:
+    """Identity from the live registry, telemetry + inheritance from the
+    catalogue (M251). Looking identity up in the catalogue alone made `show`
+    tell the same lie as `list`: a working builtin has no row there, so
+    `veles tool show read_file` answered "no tool named 'read_file'"."""
     name = args.name
     store = SessionStore(project.memory_db_path)
-    conn = store._conn
-    rec = get_tool(conn, name)
-    if rec is None:
-        print(f"no tool named {name!r} in catalogue.", file=sys.stderr)
-        return 1
-    t = telemetry(conn, name)
-    print(f"name:        {rec.name}")
-    print(f"scope:       {rec.scope}")
-    print(f"origin:      {rec.origin}")
-    if rec.description:
-        print(f"description: {rec.description}")
-    if rec.base_tool_id is not None:
-        base = conn.execute("SELECT name FROM tools WHERE id = ?", (rec.base_tool_id,)).fetchone()
-        if base:
-            print(f"inherits:    {base['name']}")
-    if rec.manifest_json:
-        print(f"manifest:    {rec.manifest_json}")
+    try:
+        conn = store._conn
+        live, _ = _live_tools(project, conn)
+        conn.commit()
+        entry = next((t for t in live if t.name == name), None)
+        if entry is None:
+            print(f"no tool named {name!r} available in this project.", file=sys.stderr)
+            return 1
+        t = telemetry(conn, name)
+        rec = get_tool(conn, name)
+        print(f"name:        {entry.name}")
+        print(f"scope:       {entry.scope}")
+        print(f"origin:      {entry.origin}")
+        if entry.description:
+            print(f"description: {entry.description}")
+        if rec is not None and rec.base_tool_id is not None:
+            base = conn.execute(
+                "SELECT name FROM tools WHERE id = ?", (rec.base_tool_id,)
+            ).fetchone()
+            if base:
+                print(f"inherits:    {base['name']}")
+        if rec is not None and rec.manifest_json:
+            print(f"manifest:    {rec.manifest_json}")
+    finally:
+        store.close()
     print("---")
     print(f"use_count:     {t.use_count}")
     print(f"success_count: {t.success_count}")

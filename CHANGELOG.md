@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.0] — 2026-09-18
+
+Two runs of the same input can disagree, and you cannot tell whether the model
+changed its mind or the relay quietly sent you to a different machine. This
+release is about closing the gaps where Veles knew something and did not say it:
+which backend answered, which tools the agent can actually see, what its tools
+have been doing, and whether an empty answer means "nothing to add" or "cut off
+mid-sentence". Local models get the same treatment — llama.cpp can now be asked
+whether it speaks tool calls instead of being assumed not to.
+
+### Added
+
+- **Pin which backend serves your model.** A relay like OpenRouter fans one
+  model out across dozens of backends at different quantizations, so two runs of
+  the same input can differ for reasons that have nothing to do with the input —
+  and the difference gets blamed on the input. `[engine.request.<provider>]` in
+  the project config is forwarded into the request body verbatim, so any knob the
+  provider accepts works without waiting for Veles to learn about it. The section
+  is keyed by provider name, so one config survives a backend switch. Declaring
+  nothing changes nothing.
+- **Traces now say which backend actually answered.** Alongside `request_extra`
+  (what was asked for), each record carries `upstream_provider` (who replied),
+  `reasoning_tokens` (how much of the completion budget went to thinking), and a
+  real `est_cost_usd` instead of a hardcoded zero. One `jq` line over
+  `traces.jsonl` tells you whether a whole run stayed on one backend — so a pin
+  that quietly did nothing shows up as a fact rather than as unexplained
+  variance.
+
+### Fixed
+
+- **`veles tool list` was telling you the agent had no tools while it was using
+  them.** It reported a database table that builtins are never written to — and
+  that self-authored tools were not being written to either, because the runtime
+  had never passed the catalogue a connection. It is the first command you run to
+  check whether the agent can see its tools, so it lied in exactly the state you
+  were checking. It now reports what the agent is actually handed, with layout
+  gating applied the same way, and names any tool file skipped for want of
+  approval.
+- **Tool telemetry was never recorded.** The code that writes it had no caller:
+  every `uses` / `ok%` column read empty, and so did the detector that offers to
+  turn three repetitions of the same tool sequence into a skill — it had nothing
+  to detect. Every tool call is now recorded.
+- **An empty answer is no longer retried when retrying cannot work.** If the
+  response was cut off by the token cap, asking again with the same cap hits the
+  same wall — and for a thinking model each attempt costs another full round of
+  reasoning. That case is now reported as truncated, with the numbers needed to
+  raise the cap. The other case, where the model simply finished without saying
+  anything, gets up to three nudges instead of one.
+- **`AGENTS.md is missing recommended sections` no longer prints on every run.**
+  A file can only reach that state by being edited on purpose, so the reminder
+  taught nothing and trained you to ignore stderr. `veles doctor` reports it once
+  when you ask.
+- **A typo in `[engine.request]` stops the run instead of being ignored.**
+  Config is written by hand. A misspelt provider name used to mean the pin never
+  reached the wire while the run carried on unpinned — silently invalidating the
+  measurement it was written for.
+- **Local models on llama.cpp can use tools without an env flag.** Only Ollama
+  could be asked whether a model speaks tool calls; llama.cpp and
+  OpenAI-compatible endpoints were assumed not to, and `VELES_LOCAL_TOOLS=1` was
+  the only way in. Since tools are how an agent reaches a file or a URL at all,
+  that made a grounded local answer impossible by default. llama.cpp is now
+  asked directly — it reports what the loaded model's chat template supports.
+
 ## [0.32.0] — 2026-09-02
 
 Goal mode had never actually been run. It was covered by unit tests with fake

@@ -32,7 +32,6 @@ def _build_runtime(args: argparse.Namespace, project: Project):
         _load_skills,
         _make_provider,
         _touch_active_project,
-        _warn_if_agents_md_invalid,
     )
     from veles.core.agent import Agent
     from veles.core.memory import SessionStore
@@ -55,7 +54,6 @@ def _build_runtime(args: argparse.Namespace, project: Project):
     if args.provider in _PROVIDER_API_KEY_ENVS and not _ensure_api_key(args.provider):
         return None
     _touch_active_project(project)
-    _warn_if_agents_md_invalid(project)
 
     # Pass the resolved model so local providers auto-detect native tool-call
     # support (provider_factory._apply_local_tool_policy probes ollama's
