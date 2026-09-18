@@ -474,3 +474,50 @@ def test_embedding_backend_warns_when_nothing_is_detected() -> None:
 def test_embedding_backend_check_runs_in_the_full_report() -> None:
     names = {r.name for r in run_all(None).results}
     assert "embedding_backend" in names
+
+
+# ---- M253: AGENTS.md sections moved off the hot path into doctor ----
+
+
+def test_agents_md_sections_warns_when_missing(tmp_path, monkeypatch) -> None:
+    from veles.core.doctor import _check_agents_md_sections
+    from veles.core.project import init_project
+
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    project = init_project(tmp_path / "proj", name="proj")
+    project.agents_md_path.write_text("# proj\n\nAn investigation playbook.\n", encoding="utf-8")
+
+    result = _check_agents_md_sections(project)
+    assert result.status == "warn"
+    assert "Layout" in result.message
+
+
+def test_agents_md_sections_ok_for_the_scaffold(tmp_path, monkeypatch) -> None:
+    from veles.core.doctor import _check_agents_md_sections
+    from veles.core.project import init_project
+
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    project = init_project(tmp_path / "proj", name="proj")
+
+    assert _check_agents_md_sections(project).status == "ok"
+
+
+def test_no_command_warns_about_sections_on_the_hot_path() -> None:
+    """M253 deleted `_warn_if_agents_md_invalid` rather than leaving it defined
+    and uncalled — an unused helper is how the M252 telemetry gap survived for
+    five months. Asserting on the absence of a stderr string would pass just as
+    well if the message were merely reworded, so assert on the code."""
+    import subprocess
+    import sys
+
+    out = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import veles.cli._project as m; print(hasattr(m, '_warn_if_agents_md_invalid'))",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert out.stdout.strip() == "False"

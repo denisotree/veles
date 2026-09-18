@@ -230,7 +230,6 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
         _print_run_summary,
         _run_agent_streaming_aware,
         _touch_active_project,
-        _warn_if_agents_md_invalid,
         build_command_agent,
     )
     from veles.core.model_resolver import (
@@ -256,7 +255,6 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
 
     project, args.prompt = _maybe_apply_project_slash_prefix(project, args.prompt)
     _touch_active_project(project)
-    _warn_if_agents_md_invalid(project)
 
     # M122f: explicit-opt-in manager-spawn dispatch — `--manager` flag or
     # `VELES_MANAGER_MODE=1`, default off. On success returns the writer's

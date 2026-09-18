@@ -351,6 +351,43 @@ def _check_agents_md(project: Project | None) -> CheckResult:
     )
 
 
+def _check_agents_md_sections(project: Project | None) -> CheckResult:
+    """Report an AGENTS.md missing the recommended H2 sections (M253).
+
+    This ran on every `veles run` / REPL / ingest until M253, printing the same
+    stderr line each turn. By `agents_md_schema`'s own description the check is
+    "a kindness so the user notices when their auto-loaded context is
+    gibberish" — which is a diagnostics concern. A scaffolded AGENTS.md always
+    conforms, so the only way to reach this state is a hand edit; repeating the
+    complaint every run taught nothing, and a deliberately restructured
+    AGENTS.md (an investigation playbook rather than a repo description) had no
+    way to silence it."""
+    from veles.core.agents_md_schema import RECOMMENDED_SECTIONS, validate
+
+    if project is None:
+        return CheckResult(name="agents_md_sections", status="info", message="no active project")
+    p = project.agents_md_path
+    if not p.is_file():
+        return CheckResult(name="agents_md_sections", status="info", message="no AGENTS.md")
+    result = validate(p.read_text(encoding="utf-8", errors="replace"))
+    if result.ok:
+        return CheckResult(
+            name="agents_md_sections",
+            status="ok",
+            message=f"AGENTS.md has all recommended sections ({', '.join(RECOMMENDED_SECTIONS)})",
+        )
+    return CheckResult(
+        name="agents_md_sections",
+        status="warn",
+        message=(
+            f"AGENTS.md is missing recommended sections: {', '.join(result.missing)} "
+            f"(recommended: {', '.join(RECOMMENDED_SECTIONS)})"
+        ),
+        fix_hint="`veles schema edit` adds them — or ignore this if the file is "
+        "deliberately structured another way; nothing enforces the sections at runtime",
+    )
+
+
 def _check_agents_md_identity(project: Project | None) -> CheckResult:
     """Catch a stale/cloned AGENTS.md whose H1 names a different project.
 
@@ -583,6 +620,7 @@ def run_all(project: Project | None) -> DoctorReport:
         _check_memory_fts,
         _check_agents_md,
         _check_agents_md_identity,
+        _check_agents_md_sections,
         _check_registry_paths,
         _check_symlinks,
         _check_wiki_files,

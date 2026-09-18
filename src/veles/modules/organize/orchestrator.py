@@ -66,7 +66,6 @@ def run_organize(args: argparse.Namespace, project: Project) -> int:
         _ensure_api_key,
         _print_run_summary,
         _run_agent_streaming_aware,
-        _warn_if_agents_md_invalid,
         build_command_agent,
     )
 
@@ -92,7 +91,6 @@ def run_organize(args: argparse.Namespace, project: Project) -> int:
     # toolset can resolve it — lazy, exactly like the wiki engine.
     import veles.modules.organize.tools  # noqa: F401
 
-    _warn_if_agents_md_invalid(project)
     if wiki_enabled(project):
         from veles.modules.wiki.wiki import Wiki
 

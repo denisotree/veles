@@ -14,12 +14,6 @@ import argparse
 import sys
 from pathlib import Path
 
-from veles.core.agents_md_schema import (
-    RECOMMENDED_SECTIONS as _AGENTS_RECOMMENDED_SECTIONS,
-)
-from veles.core.agents_md_schema import (
-    validate as _validate_agents_md,
-)
 from veles.core.modules import (
     ModuleLoadError,
     ModuleRegistry,
@@ -96,25 +90,11 @@ def _touch_active_project(project: Project) -> None:
         pass
 
 
-def _warn_if_agents_md_invalid(project: Project) -> None:
-    """Best-effort warn when the auto-loaded AGENTS.md lacks recommended
-    sections. Never blocks; never raises. Called at the start of run /
-    ingest / query / lint so the user notices once per command and can
-    fix it via `veles schema edit`."""
-    p = project.agents_md_path
-    if not p.is_file():
-        return
-    try:
-        text = p.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return
-    result = _validate_agents_md(text)
-    if result.ok:
-        return
-    missing = ", ".join(result.missing)
-    expected = ", ".join(_AGENTS_RECOMMENDED_SECTIONS)
-    print(
-        f"warning: AGENTS.md is missing recommended sections: {missing} "
-        f"(expected: {expected}). Run `veles schema edit` to fix.",
-        file=sys.stderr,
-    )
+# M253: `_warn_if_agents_md_invalid` used to live here and ran on every `run` /
+# REPL / ingest / organize. Deleted rather than made opt-out: by
+# `agents_md_schema`'s own description the check is "a kindness so the user
+# notices when their auto-loaded context is gibberish" — an init/diagnostics
+# concern, not a per-turn one. An AGENTS.md can only become non-conforming by
+# being hand-edited, which is deliberate, so repeating the complaint every run
+# taught nothing and trained the user to ignore stderr. It now lives where
+# checks live: `veles schema validate` and `veles doctor`.

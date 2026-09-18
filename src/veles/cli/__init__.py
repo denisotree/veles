@@ -57,7 +57,6 @@ from veles.cli._project import (
     _register_project,
     _resolve_active_project,
     _touch_active_project,
-    _warn_if_agents_md_invalid,
 )
 from veles.cli._runtime import (
     _INDEX_INJECTION_CAP,
