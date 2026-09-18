@@ -168,7 +168,13 @@ def record_use(
         # otherwise lose the use entirely — the whole failure this milestone
         # exists to remove. Degrade to an unattributed row: the count and the
         # outcome survive, only the grouping is lost.
-        logger.debug(
+        # `warning`, not `debug`: a dangling session id in production means
+        # something is genuinely wrong with how a caller got that id, and a
+        # `debug` line is one nobody will ever read. Note the asymmetry with
+        # M255, which *raises* on a bad config — deliberate, not drift. A
+        # measurement silently routed to the wrong backend is worse than a
+        # failed run; a lost telemetry row is not worth failing a tool call for.
+        logger.warning(
             "tool_uses: session/turn id not in this database, recording %s unattributed",
             tool_name,
         )

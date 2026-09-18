@@ -188,6 +188,12 @@ def _record_tool_use_in_db(
     Agent's store, because `_dispatch` is also reached from the MCP server path,
     where there is no Agent. Best-effort throughout: telemetry must never break a
     tool call.
+
+    **Known cost**: one SQLite open/commit/close per tool call — measured at
+    1.5 ms, which is ~98% of a no-op dispatch but noise beside the multi-second
+    model call that asked for it (20 calls a turn ≈ 30 ms). If that ever stops
+    being true, the Agent already holds `self._store` and could pass it down;
+    the MCP path would still need this fallback.
     """
     try:
         project = current_project()
