@@ -11,27 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Nothing in `memory.db` or `.veles/*.jsonl` had ever been deleted. That is fine
 until it isn't, and the day it isn't is not the day you want to start thinking
-about it. This release gives both a policy — and, because two separate defects
-this week turned out to be code that was written, tested, and never connected to
-anything, it adds checks that fail when that happens again.
+about it. This release gives you a policy to turn on — and, because two separate
+defects this week turned out to be code that was written, tested, and never
+connected to anything, it adds checks that fail when that happens again.
 
-### ⚠️ Changed — conversation history is now deleted after 90 days
+### Added — an optional ceiling on conversation history
 
-Raw conversation turns older than `[memory] turn_retention_days` (default **90**)
-are deleted during `veles dream`. The **insights** and rules extracted from them
-are kept forever — the transcript is raw material, the insights are what it was
-read for.
+**Your history is not touched unless you ask.** `[memory] turn_retention_days`
+defaults to `0`, which keeps everything exactly as before. Set it to a number of
+days and `veles dream` starts deleting raw conversation turns older than that.
+The **insights** and rules extracted from them are kept forever either way — the
+transcript is raw material, the insights are what it was read for.
 
 Two conditions must both hold before anything is removed: the session is older
 than the window, **and** the curator has already processed it. A session the
 curator has not reached is never pruned, whatever its age, because deleting it
 would destroy the transcript before anything had been learned from it.
 
-What you lose: `veles sessions search` only finds text inside the window.
-`veles sessions list` still shows older runs — session rows are kept, only the
-message bodies go.
-
-Set `turn_retention_days = 0` to keep everything, as before.
+What you give up by enabling it: `veles sessions search` only finds text inside
+the window. `veles sessions list` still shows older runs — session rows are kept,
+only the message bodies go.
 
 ### Changed
 

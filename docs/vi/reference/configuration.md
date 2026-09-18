@@ -185,25 +185,28 @@ OpenRouter trả `400 provider: Unrecognized key: "quantization"` cho khoá lạ
 
 ### Bản ghi hội thoại được giữ bao lâu
 
+**Không có gì bị xoá trừ khi bạn yêu cầu.** `turn_retention_days` mặc định là
+`0`, tức giữ mọi lượt hội thoại mãi mãi. Hãy đặt một số ngày nếu muốn giới hạn
+`memory.db`:
+
 ```toml
 [memory]
-turn_retention_days = 90   # 0 giữ mọi thứ mãi mãi
+turn_retention_days = 90   # 0 (mặc định) giữ lại tất cả
 ```
 
-Các lượt hội thoại thô bị xoá sau số ngày này; còn các **insight** và quy tắc rút
-ra từ chúng thì được giữ mãi mãi. Bản ghi là nguyên liệu thô, insight mới là thứ
-người ta đọc nó để có — nhờ vậy `memory.db` thôi phình ra vô hạn trong khi tác tử
-vẫn giữ được những gì đã học.
+Khi bật, các lượt hội thoại thô cũ hơn khoảng đó sẽ bị xoá; còn các **insight** và
+quy tắc rút ra từ chúng vẫn được giữ mãi mãi trong mọi trường hợp. Bản ghi là
+nguyên liệu thô, insight mới là thứ người ta đọc nó để có.
 
 Một bản ghi chỉ bị bỏ khi **cả hai** điều kiện cùng đúng: cũ hơn cửa sổ lưu trữ
 **và** bộ biên tập đã xử lý phiên đó. Phiên mà bộ biên tập chưa chạm tới thì không
 bao giờ bị xoá, dù cũ đến đâu — nếu không, bản ghi sẽ bị huỷ trước khi học được
 điều gì từ nó.
 
-Cái giá thấy rõ: `veles sessions search` chỉ tìm được văn bản trong cửa sổ.
-`veles sessions list` vẫn hiện các lần chạy cũ, vì các dòng phiên (id, tiêu đề,
-mốc thời gian) được giữ lại — chỉ phần thân tin nhắn mất đi. Việc dọn dẹp diễn ra
-trong `veles dream`, sau bước rút trích insight.
+Cái giá của việc bật nó: `veles sessions search` chỉ tìm được văn bản trong cửa
+sổ. `veles sessions list` vẫn hiện các lần chạy cũ, vì các dòng phiên (id, tiêu
+đề, mốc thời gian) được giữ lại — chỉ phần thân tin nhắn mất đi. Việc dọn dẹp diễn
+ra trong `veles dream`, sau bước rút trích insight.
 
 ### Xoay vòng nhật ký
 

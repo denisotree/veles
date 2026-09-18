@@ -190,16 +190,19 @@ provider stesso: OpenRouter risponde
 
 ### Per quanto tempo si conservano le trascrizioni
 
+**Non viene eliminato nulla se non lo chiedi.** `turn_retention_days` vale `0`
+di default, il che conserva per sempre tutti i turni di conversazione. Impostalo
+a un numero di giorni per mettere un tetto a `memory.db`:
+
 ```toml
 [memory]
-turn_retention_days = 90   # 0 conserva tutto per sempre
+turn_retention_days = 90   # 0 (predefinito) conserva tutto
 ```
 
-I turni di conversazione grezzi vengono eliminati dopo questi giorni; gli
-**insight** e le regole che ne sono stati estratti si conservano per sempre. La
-trascrizione è la materia prima, gli insight sono ciò per cui è stata letta:
-`memory.db` smette così di crescere senza limite mentre l'agente conserva quanto
-ha imparato.
+Con l'opzione attiva, i turni grezzi più vecchi di quel periodo vengono
+eliminati; gli **insight** e le regole che ne sono stati estratti si conservano
+per sempre in ogni caso. La trascrizione è la materia prima, gli insight sono ciò
+per cui è stata letta.
 
 Perché una trascrizione venga scartata devono valere **entrambe** le condizioni:
 essere più vecchia della finestra **e** che il curatore abbia già elaborato quella
@@ -207,11 +210,11 @@ sessione. Una sessione che il curatore non ha raggiunto non viene mai eliminata,
 qualunque sia la sua età — altrimenti la trascrizione verrebbe distrutta prima che
 se ne fosse appreso qualcosa.
 
-Il costo visibile: `veles sessions search` trova testo solo dentro la finestra.
-`veles sessions list` continua a mostrare le esecuzioni più vecchie, perché le
-righe di sessione (id, titolo, timestamp) restano: spariscono solo i corpi dei
-messaggi. La pulizia avviene durante `veles dream`, dopo l'estrazione degli
-insight.
+Il costo di attivarlo: `veles sessions search` trova testo solo dentro la
+finestra. `veles sessions list` continua a mostrare le esecuzioni più vecchie,
+perché le righe di sessione (id, titolo, timestamp) restano: spariscono solo i
+corpi dei messaggi. La pulizia avviene durante `veles dream`, dopo l'estrazione
+degli insight.
 
 ### Rotazione dei log
 

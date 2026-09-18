@@ -119,9 +119,13 @@ class DreamResult:
 
 
 # M257: how long raw transcripts survive after the curator has mined them.
-# 90 days keeps a full quarter searchable; insights from those sessions are
-# kept forever regardless. `[memory] turn_retention_days = 0` disables it.
-_DEFAULT_TURN_RETENTION_DAYS = 90
+#
+# **Zero — pruning is opt-in.** A framework must not delete a user's history
+# because they upgraded; nobody agreed to lose it, and the loss is silent and
+# irreversible. Whoever wants the ceiling sets `[memory] turn_retention_days`
+# to a number of days; until then `memory.db` keeps everything, exactly as it
+# did before this existed.
+_DEFAULT_TURN_RETENTION_DAYS = 0
 
 
 def _dream_state_path(project: Project) -> Path:
@@ -365,14 +369,16 @@ def _step_prune_turns(project: Project, result: DreamResult) -> None:
     `memory.db` that grows without bound; insights are the product the
     transcript was read for and are never pruned.
 
-    Two gates, both required. Age (`[memory] turn_retention_days`, default
-    `_DEFAULT_TURN_RETENTION_DAYS`) and — the load-bearing one —
+    **Off unless asked for.** `[memory] turn_retention_days` defaults to 0,
+    which prunes nothing — deleting a user's history because they upgraded is
+    not a decision a framework gets to make on their behalf. Setting it to a
+    number of days turns the ceiling on.
+
+    Once on, two gates are required, not one. Age, and — the load-bearing one —
     `CuratorState.last_curated_at`, so a session the curator has not reached
     survives no matter how old it is. Pruning on age alone would destroy a
-    transcript before anything had been learned from it.
-
-    `turn_retention_days = 0` disables pruning entirely, for a project that
-    wants `veles sessions search` to reach back forever.
+    transcript before anything had been learned from it, losing the raw material
+    *and* never producing the insight.
     """
     from veles.core.project_config import get_section, load_project_config
 
@@ -381,7 +387,7 @@ def _step_prune_turns(project: Project, result: DreamResult) -> None:
     if isinstance(raw, int) and raw >= 0:
         days = raw
     if days == 0:
-        result.notes.append("prune_turns: disabled (turn_retention_days = 0)")
+        result.notes.append("prune_turns: off (set [memory] turn_retention_days to enable)")
         return
 
     state = load(_dream_state_path(project))

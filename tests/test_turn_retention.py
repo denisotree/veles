@@ -154,12 +154,14 @@ def test_the_stricter_of_the_two_cutoffs_wins(tmp_path: Path) -> None:
 
 def test_dream_step_skips_before_the_curator_has_ever_run(tmp_path, monkeypatch) -> None:
     """A fresh project has `last_curated_at = 0`. Nothing has been mined, so
-    nothing may be dropped."""
+    nothing may be dropped — even with pruning explicitly switched on."""
     from veles.core.dreaming import DreamResult, _step_prune_turns
     from veles.core.project import init_project
+    from veles.core.project_config import save_project_config
 
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
     project = init_project(tmp_path / "proj", name="p")
+    save_project_config(project, {"memory": {"turn_retention_days": 90}})
     store = SessionStore(project.memory_db_path)
     try:
         sid = _session(store, age_days=999)
@@ -177,9 +179,38 @@ def test_dream_step_skips_before_the_curator_has_ever_run(tmp_path, monkeypatch)
         store.close()
 
 
-def test_dream_step_honours_retention_zero(tmp_path, monkeypatch) -> None:
-    """`turn_retention_days = 0` is the opt-out for a project that wants
-    `veles sessions search` to reach back forever."""
+def test_pruning_is_off_by_default(tmp_path, monkeypatch) -> None:
+    """The default deletes nothing. A framework does not get to remove a user's
+    history because they upgraded — the loss would be silent and irreversible,
+    and nobody opted into it. Pruning happens only when asked for."""
+    from veles.core.curator_state import CuratorState, save_atomic
+    from veles.core.dreaming import DreamResult, _dream_state_path, _step_prune_turns
+    from veles.core.project import init_project
+
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    project = init_project(tmp_path / "proj", name="p")
+    # Curator has swept everything, so the ONLY thing keeping the transcript
+    # alive is the default being off.
+    save_atomic(_dream_state_path(project), CuratorState(last_curated_at=time.time()))
+    store = SessionStore(project.memory_db_path)
+    try:
+        sid = _session(store, age_days=999)
+    finally:
+        store.close()
+
+    result = DreamResult()
+    _step_prune_turns(project, result)
+
+    assert any("off" in n for n in result.notes)
+    store = SessionStore(project.memory_db_path)
+    try:
+        assert _turn_count(store, sid) == 3
+    finally:
+        store.close()
+
+
+def test_explicit_zero_also_prunes_nothing(tmp_path, monkeypatch) -> None:
+    """Writing the default out explicitly behaves the same as omitting it."""
     from veles.core.curator_state import CuratorState, save_atomic
     from veles.core.dreaming import DreamResult, _dream_state_path, _step_prune_turns
     from veles.core.project import init_project
@@ -198,7 +229,7 @@ def test_dream_step_honours_retention_zero(tmp_path, monkeypatch) -> None:
     result = DreamResult()
     _step_prune_turns(project, result)
 
-    assert any("disabled" in n for n in result.notes)
+    assert any("off" in n for n in result.notes)
     store = SessionStore(project.memory_db_path)
     try:
         assert _turn_count(store, sid) == 3
@@ -211,8 +242,11 @@ def test_dream_step_prunes_and_reports(tmp_path, monkeypatch) -> None:
     from veles.core.dreaming import DreamResult, _dream_state_path, _step_prune_turns
     from veles.core.project import init_project
 
+    from veles.core.project_config import save_project_config
+
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
     project = init_project(tmp_path / "proj", name="p")
+    save_project_config(project, {"memory": {"turn_retention_days": 90}})
     save_atomic(_dream_state_path(project), CuratorState(last_curated_at=time.time()))
     store = SessionStore(project.memory_db_path)
     try:

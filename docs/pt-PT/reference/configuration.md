@@ -185,22 +185,26 @@ chave desconhecida e `404 No endpoints found …` a um valor sem correspondênci
 
 ### Durante quanto tempo as transcrições são guardadas
 
+**Nada é apagado a menos que o peça.** `turn_retention_days` vale `0` por
+predefinição, o que guarda para sempre todos os turnos de conversa. Defina um
+número de dias para pôr um teto em `memory.db`:
+
 ```toml
 [memory]
-turn_retention_days = 90   # 0 guarda tudo para sempre
+turn_retention_days = 90   # 0 (predefinição) guarda tudo
 ```
 
-Os turnos de conversa em bruto são apagados ao fim destes dias; os **insights** e
-as regras deles extraídos são guardados para sempre. A transcrição é a
-matéria-prima e os insights são aquilo para que foi lida, de modo que `memory.db`
-deixa de crescer sem limite enquanto o agente mantém o que aprendeu.
+Com a opção ativa, os turnos em bruto mais antigos do que esse prazo são
+apagados; os **insights** e as regras deles extraídos são guardados para sempre
+em qualquer caso. A transcrição é a matéria-prima e os insights são aquilo para
+que foi lida.
 
 Uma transcrição só é descartada se **ambas** as condições se verificarem: ser mais
 antiga do que a janela **e** o curador já ter processado essa sessão. Uma sessão
 que o curador ainda não alcançou nunca é apagada, seja qual for a sua idade — caso
 contrário a transcrição seria destruída antes de dela se ter aprendido algo.
 
-O custo visível: `veles sessions search` só encontra texto dentro da janela.
+O custo de a ativar: `veles sessions search` só encontra texto dentro da janela.
 `veles sessions list` continua a mostrar execuções antigas, porque as linhas de
 sessão (id, título, marcas temporais) são mantidas: só desaparecem os corpos das
 mensagens. A limpeza ocorre durante `veles dream`, depois da extração de

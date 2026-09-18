@@ -196,24 +196,27 @@ answers `400 provider: Unrecognized key: "quantization"` for a bad key and
 
 ### How long transcripts are kept
 
+**Nothing is deleted unless you ask for it.** `turn_retention_days` defaults to
+`0`, which keeps every conversation turn forever. Set it to a number of days to
+put a ceiling on `memory.db`:
+
 ```toml
 [memory]
-turn_retention_days = 90   # 0 keeps everything forever
+turn_retention_days = 90   # 0 (the default) keeps everything
 ```
 
-Raw conversation turns are deleted after this many days; the **insights** and
-rules extracted from them are kept forever. The transcript is the raw material,
-the insights are what it was read for — so `memory.db` stops growing without
-bound while the agent keeps what it learned.
+With it on, raw conversation turns older than that are deleted; the **insights**
+and rules extracted from them are kept forever regardless. The transcript is the
+raw material, the insights are what it was read for.
 
 Two conditions must both hold before a transcript is dropped: it is older than
 the window, **and** the curator has already swept that session. A session the
 curator has not reached is never pruned, whatever its age — otherwise the
 transcript would be destroyed before anything was learned from it.
 
-The visible cost: `veles sessions search` only finds text inside the window.
-`veles sessions list` still shows older runs, because session rows (id, title,
-timestamps) are kept — only the message bodies go. Pruning runs during
+The cost of turning it on: `veles sessions search` only finds text inside the
+window. `veles sessions list` still shows older runs, because session rows (id,
+title, timestamps) are kept — only the message bodies go. Pruning runs during
 `veles dream`, after insight extraction.
 
 ### Log rotation

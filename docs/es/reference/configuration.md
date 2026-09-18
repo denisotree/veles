@@ -185,16 +185,19 @@ comprueba el propio proveedor: OpenRouter responde
 
 ### Cuánto tiempo se conservan las transcripciones
 
+**No se borra nada a menos que lo pidas.** `turn_retention_days` vale `0` por
+defecto, lo que conserva para siempre todos los turnos de conversación. Ponle un
+número de días para poner un techo a `memory.db`:
+
 ```toml
 [memory]
-turn_retention_days = 90   # 0 conserva todo para siempre
+turn_retention_days = 90   # 0 (por defecto) conserva todo
 ```
 
-Los turnos de conversación en bruto se eliminan pasados esos días; los
-**insights** y las reglas extraídos de ellos se conservan para siempre. La
-transcripción es la materia prima y los insights son aquello para lo que se leyó,
-de modo que `memory.db` deja de crecer sin límite mientras el agente conserva lo
-aprendido.
+Con la opción activada, los turnos en bruto más antiguos que ese plazo se
+eliminan; los **insights** y las reglas extraídos de ellos se conservan para
+siempre en cualquier caso. La transcripción es la materia prima y los insights
+son aquello para lo que se leyó.
 
 Deben cumplirse **dos** condiciones antes de descartar una transcripción: que sea
 más antigua que la ventana **y** que el curador ya haya procesado esa sesión. Una
@@ -202,7 +205,7 @@ sesión que el curador no ha alcanzado nunca se elimina, tenga la edad que tenga
 de lo contrario se destruiría la transcripción antes de haber aprendido nada de
 ella.
 
-El coste visible: `veles sessions search` solo encuentra texto dentro de la
+El coste de activarlo: `veles sessions search` solo encuentra texto dentro de la
 ventana. `veles sessions list` sigue mostrando ejecuciones antiguas, porque las
 filas de sesión (id, título, marcas de tiempo) se conservan: solo se van los
 cuerpos de los mensajes. La limpieza ocurre durante `veles dream`, después de la

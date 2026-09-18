@@ -189,16 +189,19 @@ répond `400 provider: Unrecognized key: "quantization"` pour une clé inconnue 
 
 ### Durée de conservation des transcriptions
 
+**Rien n'est supprimé sans que vous le demandiez.** `turn_retention_days` vaut
+`0` par défaut, ce qui conserve indéfiniment tous les tours de conversation.
+Donnez-lui un nombre de jours pour plafonner `memory.db` :
+
 ```toml
 [memory]
-turn_retention_days = 90   # 0 conserve tout indéfiniment
+turn_retention_days = 90   # 0 (par défaut) conserve tout
 ```
 
-Les tours de conversation bruts sont supprimés au bout de ce délai ; les
-**insights** et les règles qui en ont été extraits sont conservés indéfiniment.
-La transcription est la matière première, les insights sont ce pour quoi elle a
-été lue : `memory.db` cesse donc de croître sans limite tandis que l'agent garde
-ce qu'il a appris.
+Une fois activé, les tours bruts plus anciens que ce délai sont supprimés ; les
+**insights** et les règles qui en ont été extraits sont conservés indéfiniment
+dans tous les cas. La transcription est la matière première, les insights sont ce
+pour quoi elle a été lue.
 
 **Deux** conditions doivent être réunies avant qu'une transcription disparaisse :
 être plus ancienne que la fenêtre **et** que le curateur ait déjà traité cette
@@ -206,11 +209,11 @@ session. Une session que le curateur n'a pas atteinte n'est jamais supprimée,
 quel que soit son âge — sinon la transcription serait détruite avant qu'on en ait
 rien appris.
 
-Le coût visible : `veles sessions search` ne trouve du texte qu'à l'intérieur de
-la fenêtre. `veles sessions list` continue d'afficher les exécutions anciennes,
-car les lignes de session (id, titre, horodatages) sont conservées : seuls les
-corps de messages disparaissent. Le nettoyage a lieu pendant `veles dream`, après
-l'extraction des insights.
+Le coût de l'activation : `veles sessions search` ne trouve du texte qu'à
+l'intérieur de la fenêtre. `veles sessions list` continue d'afficher les
+exécutions anciennes, car les lignes de session (id, titre, horodatages) sont
+conservées : seuls les corps de messages disparaissent. Le nettoyage a lieu
+pendant `veles dream`, après l'extraction des insights.
 
 ### Rotation des journaux
 
