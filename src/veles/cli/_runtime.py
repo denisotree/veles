@@ -654,11 +654,28 @@ def _load_skills(
         from veles.mcp.provision import ensure_mcp_project_tools
 
         ensure_mcp_project_tools(project)
+        # M251: `conn` was missing here, so the catalogue sync the loader is
+        # built to do never ran — every file-based tool stayed absent from the
+        # `tools` table, which is why `veles tool list` reported nothing in a
+        # project whose tools demonstrably worked. Best-effort: a catalogue
+        # write must not stop the agent from getting its tools.
+        conn = None
+        try:
+            from veles.core.memory import SessionStore
+
+            store = SessionStore(project.memory_db_path)
+            conn = store._conn
+        except Exception as exc:  # pragma: no cover - catalogue is not load-bearing
+            logger.warning("tool catalogue unavailable: %s", exc)
         report = load_into_registry(
             full,
             project_tools_dir=project.state_dir / "tools",
             user_tools_dir=user_home() / "tools",
+            conn=conn,
         )
+        if conn is not None:
+            with contextlib.suppress(Exception):
+                conn.commit()
         tool_names = [lt.entry.name for lt in report.loaded]
         for name, scope in report.errors:
             logger.warning("project tool %s failed to load: %s", name, scope)

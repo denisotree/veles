@@ -107,12 +107,26 @@ def upsert_tool(
         )
         return int(cur.lastrowid or 0)
     tool_id = int(existing["id"])
+    # M251: `base_tool_id` is only written when the caller named a base.
+    # Passing NULL unconditionally made every refresh CLEAR the inheritance
+    # link, because the sync callers (the file loader, and the dispatch-path
+    # catalogue write) know nothing about `extends:` and never pass one. Harmless
+    # while the sync ran nowhere; with `tool list` and every dispatch upserting,
+    # a re-sync would silently unlink an inherited tool from its base.
+    if base_tool_name:
+        conn.execute(
+            "UPDATE tools"
+            " SET scope = ?, origin = ?, base_tool_id = ?,"
+            "     manifest_json = ?, description = ?, updated_at = ?"
+            " WHERE id = ?",
+            (scope, origin, base_id, manifest, entry.description, wall, tool_id),
+        )
+        return tool_id
     conn.execute(
         "UPDATE tools"
-        " SET scope = ?, origin = ?, base_tool_id = ?,"
-        "     manifest_json = ?, description = ?, updated_at = ?"
+        " SET scope = ?, origin = ?, manifest_json = ?, description = ?, updated_at = ?"
         " WHERE id = ?",
-        (scope, origin, base_id, manifest, entry.description, wall, tool_id),
+        (scope, origin, manifest, entry.description, wall, tool_id),
     )
     return tool_id
 
