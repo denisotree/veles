@@ -194,6 +194,39 @@ subsection are not checked by Veles, because the upstream checks them: OpenRoute
 answers `400 provider: Unrecognized key: "quantization"` for a bad key and
 `404 No endpoints found …` for a value nothing matches.
 
+### How long transcripts are kept
+
+```toml
+[memory]
+turn_retention_days = 90   # 0 keeps everything forever
+```
+
+Raw conversation turns are deleted after this many days; the **insights** and
+rules extracted from them are kept forever. The transcript is the raw material,
+the insights are what it was read for — so `memory.db` stops growing without
+bound while the agent keeps what it learned.
+
+Two conditions must both hold before a transcript is dropped: it is older than
+the window, **and** the curator has already swept that session. A session the
+curator has not reached is never pruned, whatever its age — otherwise the
+transcript would be destroyed before anything was learned from it.
+
+The visible cost: `veles sessions search` only finds text inside the window.
+`veles sessions list` still shows older runs, because session rows (id, title,
+timestamps) are kept — only the message bodies go. Pruning runs during
+`veles dream`, after insight extraction.
+
+### Log rotation
+
+`traces.jsonl` and `events.jsonl` rotate at 50 MB to `<name>.<unix_ts>`, and the
+newest **10** rotations are kept — older ones are deleted when the next rotation
+happens. Before this they were kept forever.
+
+Nothing needs configuring at ordinary volume: at ~530 bytes per trace record and
+~1.1 KB of events per agent turn, a first rotation is years away. The setting
+exists because unbounded growth with no policy is a leak whoever inherits the
+box has to discover.
+
 ### Images
 
 A photo sent to a channel is described before the turn starts, using the model
