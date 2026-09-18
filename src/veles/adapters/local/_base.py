@@ -163,13 +163,25 @@ class _OpenAICompatibleBase(OpenAICompatibleProvider):
         build old enough to predate `chat_template_caps` all return False, which
         is exactly the pre-M256 behaviour. `VELES_LOCAL_TOOLS=1` still forces
         tools on for those.
+
+        **2s, not the 10s ollama's probe uses.** This runs on every provider
+        construction, which is on the startup path of a run, the curator and each
+        skill sub-agent. `openai-compat` inherits this probe and may well point
+        at something that is not llama.cpp and will never answer — the bound on
+        that mistake should be short. A local server that cannot return its own
+        metadata within 2s is not ready to serve a turn either.
+
+        **Deliberately not cached.** The obvious next move — memoise per base_url
+        — is wrong for the daemon, which outlives the llama.cpp server it talks
+        to: restart that server on a different model and a cached "no tools"
+        would stick for the daemon's whole life.
         """
         del model
         base = str(self._client.base_url).rstrip("/")
         if base.endswith("/v1"):
             base = base[:-3].rstrip("/")
         try:
-            resp = httpx.get(f"{base}/props", timeout=10.0)
+            resp = httpx.get(f"{base}/props", timeout=2.0)
             resp.raise_for_status()
             caps = resp.json().get("chat_template_caps") or {}
         except Exception:
