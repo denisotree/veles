@@ -65,4 +65,42 @@ def atomic_write_json(path: Path, data: Any, *, mode: int | None = None) -> None
             os.chmod(path, mode)
 
 
-__all__ = ["atomic_write_json", "load_optional_json"]
+def prune_rotated(path: Path, *, keep: int) -> list[Path]:
+    """Delete all but the newest `keep` rotated siblings of `path`.
+
+    `TraceWriter` and `EventWriter` both rotate to `<name>.<unix_ts>[.<n>]` and,
+    until now, kept every sibling forever — `trace.py` said outright that
+    "cleanup is a curator concern", and the curator does not do it. At measured
+    volume (~530 B per trace record, ~1.1 KB of events per agent turn) the first
+    50 MB rotation is years away, so this prevents a slow leak rather than
+    stopping an active one.
+
+    Only *rotated* files are touched — the live file has no numeric suffix and
+    is skipped by the pattern. Ordering is by mtime, not by the timestamp in the
+    name, so a same-second `.<ts>.<n>` collision cannot delete the wrong one.
+
+    Best-effort: a file that vanishes between listing and unlink (a second
+    process pruning, an external cleanup) is not an error worth failing a write
+    over. Returns what was actually removed, for the test to assert on.
+    """
+    if keep < 0:
+        raise ValueError("keep must be >= 0")
+    siblings = [
+        p
+        for p in path.parent.glob(f"{path.name}.*")
+        if p.is_file() and p.name[len(path.name) + 1 :].split(".")[0].isdigit()
+    ]
+    if len(siblings) <= keep:
+        return []
+    siblings.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    removed: list[Path] = []
+    for stale in siblings[keep:]:
+        try:
+            stale.unlink()
+        except OSError:  # pragma: no cover - raced with another pruner
+            continue
+        removed.append(stale)
+    return removed
+
+
+__all__ = ["atomic_write_json", "load_optional_json", "prune_rotated"]

@@ -29,7 +29,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from veles.core.io_utils import prune_rotated
+
 DEFAULT_MAX_BYTES = 50 * 1024 * 1024
+# How many rotated siblings survive a rotation (M257).
+DEFAULT_KEEP_ROTATED = 10
 EVENTS_FILENAME = "events.jsonl"
 
 
@@ -233,15 +237,22 @@ Event = (
 class EventWriter:
     """Append `Event`s to a JSONL file with size-bounded rotation.
 
-    Same rotation strategy as `TraceWriter`: rotate by total file size, keep
-    the rotated siblings in place. Failure to write is the caller's problem
+    Same rotation strategy as `TraceWriter`: rotate by total file size, then
+    keep only the newest `keep_rotated` siblings. Failure to write is the caller's problem
     — we don't swallow exceptions here; the agent loop catches them so a
     broken event log never kills a run, but unit tests can still see them.
     """
 
-    def __init__(self, path: Path, *, max_bytes: int = DEFAULT_MAX_BYTES) -> None:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        max_bytes: int = DEFAULT_MAX_BYTES,
+        keep_rotated: int = DEFAULT_KEEP_ROTATED,
+    ) -> None:
         self._path = path
         self._max_bytes = max_bytes
+        self._keep_rotated = keep_rotated
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
     @property
@@ -264,6 +275,7 @@ class EventWriter:
             target = self._path.with_name(f"{self._path.name}.{ts}.{n}")
             n += 1
         os.replace(self._path, target)
+        prune_rotated(self._path, keep=self._keep_rotated)
 
 
 def events_path_for_project(state_dir: Path) -> Path:
