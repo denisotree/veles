@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.0] — 2026-09-18
+
+Two runs of the same input can disagree, and you cannot tell whether the model
+changed its mind or the relay quietly sent you to a different machine. This
+release is about closing the gaps where Veles knew something and did not say it:
+which backend answered, which tools the agent can actually see, what its tools
+have been doing, and whether an empty answer means "nothing to add" or "cut off
+mid-sentence". Local models get the same treatment — llama.cpp can now be asked
+whether it speaks tool calls instead of being assumed not to.
+
 ### Added
 
 - **Pin which backend serves your model.** A relay like OpenRouter fans one
@@ -53,6 +63,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Config is written by hand. A misspelt provider name used to mean the pin never
   reached the wire while the run carried on unpinned — silently invalidating the
   measurement it was written for.
+- **Local models on llama.cpp can use tools without an env flag.** Only Ollama
+  could be asked whether a model speaks tool calls; llama.cpp and
+  OpenAI-compatible endpoints were assumed not to, and `VELES_LOCAL_TOOLS=1` was
+  the only way in. Since tools are how an agent reaches a file or a URL at all,
+  that made a grounded local answer impossible by default. llama.cpp is now
+  asked directly — it reports what the loaded model's chat template supports.
 
 ## [0.32.0] — 2026-09-02
 
