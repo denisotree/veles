@@ -241,7 +241,6 @@ def test_dream_step_prunes_and_reports(tmp_path, monkeypatch) -> None:
     from veles.core.curator_state import CuratorState, save_atomic
     from veles.core.dreaming import DreamResult, _dream_state_path, _step_prune_turns
     from veles.core.project import init_project
-
     from veles.core.project_config import save_project_config
 
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
