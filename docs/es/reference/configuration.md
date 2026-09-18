@@ -118,6 +118,126 @@ Tipos de tarea para `[routing.tasks]`: `default`, `curator`, `compressor`, `insi
 > `routing.nl.toml` autogenerado; las entradas explícitas de `[routing.tasks]` siempre
 > prevalecen. Ejecuta `veles route refresh` para reanalizarlas. Consulta [enrutamiento por tarea](../how-to/per-task-routing.md).
 
+### Fijar un backend y otras claves del cuerpo de la petición
+
+`[engine.request.<provider>]` se envía **tal cual** en el cuerpo de la petición de
+ese proveedor. Veles no modela el esquema del proveedor, así que cualquier opción
+que este acepte funciona sin esperar a que Veles la conozca:
+
+```toml
+[engine.request.openrouter.provider]
+order = ["GMICloud"]
+allow_fallbacks = false
+
+[engine.request.openrouter.reasoning]
+enabled = false
+```
+
+La sección se identifica por el **nombre del proveedor** (`openrouter`,
+`anthropic`, `openai`, `gemini`, `ollama`, `llamacpp`, `openai-compat`) para que
+una misma configuración de proyecto sobreviva a un cambio de backend: un bloque
+`provider` de OpenRouter enviado a llama.cpp sería un 400, así que cada backend
+lee solo su propia subsección. Sin sección declarada, las peticiones son idénticas
+byte a byte a las de antes.
+
+**Cuándo hace falta: mediciones reproducibles.** Un relé como OpenRouter reparte
+un mismo modelo entre muchos backends con cuantizaciones distintas, de modo que
+dos ejecuciones con la misma entrada pueden diferir por razones ajenas a la
+entrada. El enrutado persistente por `session_id` mantiene una conversación en un
+backend, pero no dice en **cuál**.
+
+Fija con `order`, no con `quantizations`. A 18-09-2026, `z-ai/glm-5.3-flash`
+tiene 29 endpoints: 16 en `fp8`, 3 en `fp4`, uno en `nvfp4`, **9 que no declaran
+cuantización alguna** y ninguno en `bf16`. Por tanto `quantizations = ["fp8"]`
+deja 16 candidatos con ventanas de contexto de 262144 a 1310720 tokens, mientras
+que un `order` de un solo elemento junto con `allow_fallbacks = false` determina
+el backend de forma inequívoca. Para listar los endpoints de un modelo:
+
+```bash
+curl -s https://openrouter.ai/api/v1/models/<author>/<slug>/endpoints \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" | jq '.data.endpoints[]
+  | {provider_name, quantization, context_length}'
+```
+
+Mantén la fijación solo en el proyecto de medición: producción quiere enrutado
+persistente, que preserva disponibilidad y fallback.
+
+**Comprobar que se mantuvo.** Cada llamada al modelo registra en
+`.veles/traces.jsonl` tanto la intención como el resultado: `request_extra` es lo
+que se envió, `upstream_provider` el backend que respondió. Una línea basta:
+
+```bash
+jq -r 'select(.session_id=="<sid>") | .upstream_provider' .veles/traces.jsonl | sort -u
+```
+
+Más de una línea significa que la ejecución mezcló backends. Los mismos registros
+llevan `reasoning_tokens` (cuánto presupuesto se fue en razonar) y `est_cost_usd`
+(el coste real facturado por el proveedor, cuando lo informa).
+
+**Los errores son ruidosos a propósito.** Un nombre de proveedor mal escrito o un
+error en la ruta de la sección (`[engine.reqest.…]`) aborta la ejecución con un
+`ConfigError` que nombra el fichero y los proveedores conocidos: una fijación que
+nunca llegó al cable invalidaría en silencio la medición para la que se escribió.
+Veles no comprueba las claves *dentro* de la subsección del proveedor, porque las
+comprueba el propio proveedor: OpenRouter responde
+`400 provider: Unrecognized key: "quantization"` a una clave desconocida y
+`404 No endpoints found …` a un valor que no casa con nada.
+
+### Cuánto tiempo se conservan las transcripciones
+
+```toml
+[memory]
+turn_retention_days = 90   # 0 conserva todo para siempre
+```
+
+Los turnos de conversación en bruto se eliminan pasados esos días; los
+**insights** y las reglas extraídos de ellos se conservan para siempre. La
+transcripción es la materia prima y los insights son aquello para lo que se leyó,
+de modo que `memory.db` deja de crecer sin límite mientras el agente conserva lo
+aprendido.
+
+Deben cumplirse **dos** condiciones antes de descartar una transcripción: que sea
+más antigua que la ventana **y** que el curador ya haya procesado esa sesión. Una
+sesión que el curador no ha alcanzado nunca se elimina, tenga la edad que tenga;
+de lo contrario se destruiría la transcripción antes de haber aprendido nada de
+ella.
+
+El coste visible: `veles sessions search` solo encuentra texto dentro de la
+ventana. `veles sessions list` sigue mostrando ejecuciones antiguas, porque las
+filas de sesión (id, título, marcas de tiempo) se conservan: solo se van los
+cuerpos de los mensajes. La limpieza ocurre durante `veles dream`, después de la
+extracción de insights.
+
+### Rotación de logs
+
+`traces.jsonl` y `events.jsonl` rotan a los 50 MB hacia `<nombre>.<unix_ts>`, y se
+conservan las **10** rotaciones más recientes; las anteriores se borran en la
+siguiente rotación. Antes se guardaban para siempre.
+
+Con volúmenes normales no hay nada que configurar: a ~530 bytes por registro de
+traza y ~1,1 KB de eventos por turno del agente, la primera rotación queda a años
+vista. El ajuste existe porque un crecimiento sin límite y sin política es una
+fuga que acabará descubriendo quien herede la máquina.
+
+### Imágenes
+
+Una foto enviada a un canal se describe antes de que empiece el turno, usando el
+modelo al que apunta `[routing.tasks].vision`, que sin ruta explícita es tu modelo
+de `[engine]`. Un motor multimodal no necesita, por tanto, ninguna configuración.
+
+`[vision] mode` elige la tubería:
+
+- `model` (por defecto) — el modelo de visión describe la imagen.
+- `ocr` — solo Tesseract. Local, gratuito, sin llamada al LLM; bueno para
+  escaneos de texto.
+- `ocr+model` — primero el texto literal, luego la descripción del modelo.
+- `off` — no se lee nada; el fichero se guarda igualmente y el agente puede
+  llamar a `image_describe` / `image_ocr` por su cuenta si quiere.
+
+Define `[vision] model` cuando el motor sea solo de texto. Sirve cualquier
+proveedor con visión, incluido un servidor local: `ollama:llava`, `llamacpp:…`,
+`openai-compat:…`.
+
 ### `project.toml`
 
 `<project>/.veles/project.toml` contiene metadatos inmutables del proyecto (`name`,

@@ -112,6 +112,104 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 > `AGENTS.md` 中的自然语言路由提示会被解析为自动生成的 `routing.nl.toml`；显式的 `[routing.tasks]` 条目始终优先。运行 `veles route refresh` 重新解析。参见[按任务路由](../how-to/per-task-routing.md)。
 
+### 固定后端，以及其他请求体键
+
+`[engine.request.<provider>]` 会**原样**转发到该提供商的请求体中。Veles 不去建模
+上游的 schema，因此提供商接受的任何选项都能直接生效，无需等待 Veles 支持：
+
+```toml
+[engine.request.openrouter.provider]
+order = ["GMICloud"]
+allow_fallbacks = false
+
+[engine.request.openrouter.reasoning]
+enabled = false
+```
+
+该小节以**提供商名称**为键（`openrouter`、`anthropic`、`openai`、`gemini`、
+`ollama`、`llamacpp`、`openai-compat`），这样同一份项目配置就能跨越后端切换：把
+OpenRouter 的 `provider` 块发给 llama.cpp 会得到 400，所以每个后端只读自己的子小节。
+不声明该小节时，请求与之前逐字节相同。
+
+**什么时候需要它：可复现的测量。** 像 OpenRouter 这样的中继会把同一个模型分发到许多
+量化方式不同的后端，于是同样输入的两次运行可能因为与输入无关的原因而不一致。基于
+`session_id` 的粘性路由能把一次会话固定在同一个后端，却不会告诉你是**哪一个**。
+
+请用 `order` 固定，而不是 `quantizations`。截至 2026-09-18，`z-ai/glm-5.3-flash`
+有 29 个端点：`fp8` 16 个、`fp4` 3 个、`nvfp4` 1 个、**完全不声明量化方式的有 9 个**，
+`bf16` 一个也没有。因此 `quantizations = ["fp8"]` 仍会留下 16 个候选，上下文窗口
+从 262144 到 1310720 token 不等；而只含一个元素的 `order` 加上
+`allow_fallbacks = false` 则能唯一确定后端。列出某个模型的端点：
+
+```bash
+curl -s https://openrouter.ai/api/v1/models/<author>/<slug>/endpoints \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" | jq '.data.endpoints[]
+  | {provider_name, quantization, context_length}'
+```
+
+固定只保留在测量项目里——生产环境需要粘性路由，它保住了可用性和回退。
+
+**验证固定是否生效。** 每次模型调用都会把意图和结果一起写入
+`.veles/traces.jsonl`：`request_extra` 是发出去的内容，`upstream_provider` 是真正
+应答的后端。一行命令即可：
+
+```bash
+jq -r 'select(.session_id=="<sid>") | .upstream_provider' .veles/traces.jsonl | sort -u
+```
+
+输出多于一行，说明这次运行混用了后端。同样的记录还带有 `reasoning_tokens`（预算中
+用于推理的部分）和 `est_cost_usd`（上游报告的实际计费成本）。
+
+**错误是故意吵闹的。** 提供商名称拼错，或小节路径写错（`[engine.reqest.…]`），都会以
+`ConfigError` 中断运行，并指出文件名和已知的提供商：一个从未到达线路的固定，会悄悄
+使它本来要服务的测量失效。提供商子小节*内部*的键 Veles 不做校验，因为上游会校验：
+OpenRouter 对未知键返回 `400 provider: Unrecognized key: "quantization"`，对无法匹配
+的值返回 `404 No endpoints found …`。
+
+### 对话记录保留多久
+
+```toml
+[memory]
+turn_retention_days = 90   # 0 表示永久保留
+```
+
+原始对话轮次会在超过该天数后删除，而从中提取出的**洞察**和规则则永久保留。记录是
+原材料，洞察才是阅读它的目的——于是 `memory.db` 不再无限增长，而智能体仍保有它学到的
+东西。
+
+一份记录被丢弃需要**同时**满足两个条件：早于保留窗口，**并且**策展器已经处理过该
+会话。策展器尚未触及的会话永远不会被删除，无论多旧——否则记录会在还没从中学到任何
+东西之前就被销毁。
+
+可见的代价：`veles sessions search` 只能找到窗口之内的文本。`veles sessions list`
+仍然会列出更早的运行，因为会话行（id、标题、时间戳）会保留，消失的只是消息正文。
+清理发生在 `veles dream` 期间，位于洞察提取之后。
+
+### 日志轮转
+
+`traces.jsonl` 与 `events.jsonl` 在 50 MB 时轮转为 `<名称>.<unix_ts>`，并保留最近的
+**10** 份，更早的会在下一次轮转时删除。此前它们会被永久保存。
+
+在通常的用量下无需任何配置：每条 trace 记录约 530 字节，智能体每轮约 1.1 KB 事件，
+距离第一次轮转还有数年。这个设置之所以存在，是因为没有策略的无限增长是一处泄漏，
+最终得由接手这台机器的人去发现。
+
+### 图片
+
+发送到频道的照片会在这一轮开始之前先被描述，使用的是 `[routing.tasks].vision` 指向的
+模型——若未显式配置路由，即你的 `[engine]` 模型。因此多模态引擎完全不需要配置。
+
+`[vision] mode` 选择处理流程：
+
+- `model`（默认）——由视觉模型描述图片。
+- `ocr` —— 仅用 Tesseract。本地、免费、不调用 LLM；适合文字扫描件。
+- `ocr+model` —— 先给出逐字文本，再给出模型的描述。
+- `off` —— 什么都不读；文件仍会保存，智能体如果需要可以自行调用
+  `image_describe` / `image_ocr`。
+
+当引擎只支持文本时，请设置 `[vision] model`。任何具备视觉能力的提供商都可以，包括
+本地服务器：`ollama:llava`、`llamacpp:…`、`openai-compat:…`。
+
 ### `project.toml`
 
 `<project>/.veles/project.toml` 保存不可变的项目元数据（`name`、`created_at`、`schema_version`、`layout`）。通常不需要手动编辑。

@@ -112,6 +112,122 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 > `AGENTS.md` 内の自然言語によるルーティングヒントは、自動生成される `routing.nl.toml` に解析されます。明示的な `[routing.tasks]` エントリが常に優先されます。再解析するには `veles route refresh` を実行してください。[タスク別ルーティング](../how-to/per-task-routing.md)を参照。
 
+### バックエンドの固定、およびリクエストボディのその他のキー
+
+`[engine.request.<provider>]` はそのプロバイダーのリクエストボディに**そのまま**
+転送されます。Veles は上流のスキーマをモデル化しないため、プロバイダーが受け付ける
+設定は Veles が対応するのを待たずにそのまま使えます。
+
+```toml
+[engine.request.openrouter.provider]
+order = ["GMICloud"]
+allow_fallbacks = false
+
+[engine.request.openrouter.reasoning]
+enabled = false
+```
+
+セクションのキーは**プロバイダー名**（`openrouter`、`anthropic`、`openai`、
+`gemini`、`ollama`、`llamacpp`、`openai-compat`）です。こうすることで、一つの
+プロジェクト設定がバックエンドの切り替えを乗り越えられます。OpenRouter の
+`provider` ブロックを llama.cpp に送れば 400 になるので、各バックエンドは自分の
+サブセクションだけを読みます。セクションを宣言しなければ、リクエストは以前と
+バイト単位で同一です。
+
+**必要になる場面：再現可能な計測。** OpenRouter のようなリレーは一つのモデルを
+量子化の異なる多数のバックエンドに振り分けるため、同じ入力の 2 回の実行が入力とは
+無関係な理由で食い違うことがあります。`session_id` によるスティッキールーティングは
+一つの会話を一つのバックエンドに留めますが、それが**どれ**かは教えてくれません。
+
+固定は `quantizations` ではなく `order` で行ってください。2026-09-18 時点で
+`z-ai/glm-5.3-flash` には 29 のエンドポイントがあります：`fp8` が 16、`fp4` が 3、
+`nvfp4` が 1、**量子化をまったく申告しないものが 9**、`bf16` はゼロです。つまり
+`quantizations = ["fp8"]` でも候補は 16 残り、コンテキスト長は 262144 から
+1310720 トークンまでばらつきます。一方、要素が一つだけの `order` と
+`allow_fallbacks = false` を併用すればバックエンドは一意に決まります。モデルの
+エンドポイント一覧：
+
+```bash
+curl -s https://openrouter.ai/api/v1/models/<author>/<slug>/endpoints \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" | jq '.data.endpoints[]
+  | {provider_name, quantization, context_length}'
+```
+
+固定は計測用プロジェクトにだけ残してください。本番にはスティッキールーティングが
+適しており、可用性とフォールバックが保たれます。
+
+**固定が維持されたかの確認。** モデル呼び出しごとに、意図と結果の両方が
+`.veles/traces.jsonl` に記録されます。`request_extra` が送った内容、
+`upstream_provider` が実際に応答したバックエンドです。1 行で分かります：
+
+```bash
+jq -r 'select(.session_id=="<sid>") | .upstream_provider' .veles/traces.jsonl | sort -u
+```
+
+2 行以上出れば、その実行はバックエンドを混ぜています。同じレコードには
+`reasoning_tokens`（予算のうち推論に使われた分）と `est_cost_usd`（上流が報告する
+実課金額）も含まれます。
+
+**エラーは意図的に大きな音を立てます。** プロバイダー名の綴り間違いや、セクション
+パスの誤り（`[engine.reqest.…]`）は `ConfigError` で実行を中断し、ファイル名と既知の
+プロバイダーを示します。配線に届かなかった固定は、それを書いた目的である計測を
+黙って無効にしてしまうからです。プロバイダーのサブセクション*内部*のキーは Veles は
+検証しません。上流が検証するからです：OpenRouter は未知のキーに
+`400 provider: Unrecognized key: "quantization"`、該当のない値に
+`404 No endpoints found …` を返します。
+
+### 会話記録の保持期間
+
+```toml
+[memory]
+turn_retention_days = 90   # 0 は永久保持
+```
+
+生の会話ターンはこの日数を過ぎると削除されますが、そこから抽出された**インサイト**
+とルールは永久に保持されます。会話記録は原材料であり、インサイトはそれを読んだ目的
+です。こうして `memory.db` は無制限に増え続けるのをやめる一方、エージェントは学んだ
+ことを保ち続けます。
+
+会話記録が削除されるには**両方**の条件が必要です。保持期間より古いこと、**かつ**
+キュレーターがそのセッションを既に処理済みであること。キュレーターがまだ到達して
+いないセッションは、どれほど古くても削除されません。さもなければ、何も学ばないうちに
+記録を破棄してしまいます。
+
+目に見える代償：`veles sessions search` は保持期間内のテキストしか見つけられません。
+`veles sessions list` は古い実行も表示し続けます。セッション行（id・タイトル・
+タイムスタンプ）は残り、消えるのはメッセージ本文だけだからです。削除は
+`veles dream` の中で、インサイト抽出の後に実行されます。
+
+### ログのローテーション
+
+`traces.jsonl` と `events.jsonl` は 50 MB で `<名前>.<unix_ts>` にローテーションし、
+最新の **10** 世代を保持します。それより古いものは次のローテーション時に削除されます。
+以前は無期限に保持されていました。
+
+通常の利用量では設定は不要です。トレース 1 レコードあたり約 530 バイト、エージェント
+1 ターンあたり約 1.1 KB のイベントなので、最初のローテーションまでには数年かかります。
+この設定が存在するのは、方針のない無制限の増加が、そのマシンを引き継ぐ人が発見する
+羽目になるリークだからです。
+
+### 画像
+
+チャンネルに送られた写真は、ターンが始まる前に説明が生成されます。使われるのは
+`[routing.tasks].vision` が指すモデルで、明示的なルートがなければ `[engine]` の
+モデルです。したがってマルチモーダルなエンジンなら設定は一切不要です。
+
+`[vision] mode` がパイプラインを選びます：
+
+- `model`（既定）— ビジョンモデルが画像を説明します。
+- `ocr` — Tesseract のみ。ローカル・無料・LLM 呼び出しなし。テキストのスキャンに
+  適します。
+- `ocr+model` — まず逐語的なテキスト、続いてモデルによる説明。
+- `off` — 何も読み取りません。ファイルは保存され、エージェントが必要と判断すれば
+  自分で `image_describe` / `image_ocr` を呼べます。
+
+エンジンがテキスト専用の場合は `[vision] model` を設定してください。ビジョン対応の
+プロバイダーなら何でも使えます。ローカルサーバーも含みます：`ollama:llava`、
+`llamacpp:…`、`openai-compat:…`。
+
 ### `project.toml`
 
 `<project>/.veles/project.toml` には不変のプロジェクトメタデータ（`name`、`created_at`、`schema_version`、`layout`）が格納されます。通常、手動で編集することはありません。

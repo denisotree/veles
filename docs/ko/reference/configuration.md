@@ -112,6 +112,119 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 > `AGENTS.md`의 자연어 라우팅 힌트는 자동 생성되는 `routing.nl.toml`로 파싱됩니다. 명시적인 `[routing.tasks]` 항목이 언제나 우선합니다. 다시 파싱하려면 `veles route refresh`를 실행하세요. [태스크별 라우팅](../how-to/per-task-routing.md)을 참고하세요.
 
+### 백엔드 고정 및 기타 요청 본문 키
+
+`[engine.request.<provider>]` 는 해당 제공자의 요청 본문에 **그대로** 전달됩니다.
+Veles 는 상위 제공자의 스키마를 모델링하지 않으므로, 제공자가 받아들이는 옵션은
+Veles 가 알게 될 때까지 기다릴 필요 없이 바로 동작합니다.
+
+```toml
+[engine.request.openrouter.provider]
+order = ["GMICloud"]
+allow_fallbacks = false
+
+[engine.request.openrouter.reasoning]
+enabled = false
+```
+
+섹션 키는 **제공자 이름**(`openrouter`, `anthropic`, `openai`, `gemini`,
+`ollama`, `llamacpp`, `openai-compat`)입니다. 덕분에 하나의 프로젝트 설정이 백엔드
+교체를 견딥니다. OpenRouter 의 `provider` 블록을 llama.cpp 로 보내면 400 이므로,
+각 백엔드는 자기 하위 섹션만 읽습니다. 섹션을 선언하지 않으면 요청은 이전과
+바이트 단위로 동일합니다.
+
+**필요한 상황: 재현 가능한 측정.** OpenRouter 같은 중계는 하나의 모델을 서로 다른
+양자화의 여러 백엔드로 분산하므로, 같은 입력에 대한 두 번의 실행이 입력과 무관한
+이유로 달라질 수 있습니다. `session_id` 기반 스티키 라우팅은 하나의 대화를 하나의
+백엔드에 묶어 주지만, 그것이 **어느** 백엔드인지는 알려 주지 않습니다.
+
+`quantizations` 가 아니라 `order` 로 고정하십시오. 2026-09-18 기준
+`z-ai/glm-5.3-flash` 의 엔드포인트는 29 개입니다: `fp8` 16 개, `fp4` 3 개,
+`nvfp4` 1 개, **양자화를 전혀 밝히지 않는 것이 9 개**, `bf16` 은 하나도 없습니다.
+따라서 `quantizations = ["fp8"]` 로도 후보가 16 개 남고 컨텍스트 길이는 262144 에서
+1310720 토큰까지 제각각인 반면, 원소가 하나뿐인 `order` 와
+`allow_fallbacks = false` 를 함께 쓰면 백엔드가 확정됩니다. 모델의 엔드포인트
+목록:
+
+```bash
+curl -s https://openrouter.ai/api/v1/models/<author>/<slug>/endpoints \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" | jq '.data.endpoints[]
+  | {provider_name, quantization, context_length}'
+```
+
+고정은 측정용 프로젝트에만 두십시오. 운영에는 가용성과 폴백을 유지하는 스티키
+라우팅이 맞습니다.
+
+**고정이 유지됐는지 확인.** 모델 호출마다 의도와 결과가 모두
+`.veles/traces.jsonl` 에 기록됩니다. `request_extra` 는 보낸 내용,
+`upstream_provider` 는 실제로 응답한 백엔드입니다. 한 줄이면 됩니다:
+
+```bash
+jq -r 'select(.session_id=="<sid>") | .upstream_provider' .veles/traces.jsonl | sort -u
+```
+
+두 줄 이상이면 그 실행은 백엔드를 섞은 것입니다. 같은 레코드에
+`reasoning_tokens`(예산 중 추론에 쓰인 양)과 `est_cost_usd`(상위 제공자가 보고하는
+실제 청구 비용)도 들어 있습니다.
+
+**오류는 의도적으로 요란합니다.** 제공자 이름 오타나 섹션 경로 오타
+(`[engine.reqest.…]`)는 파일과 알려진 제공자 목록을 알려 주는 `ConfigError` 로
+실행을 중단시킵니다. 전선까지 닿지 못한 고정은, 그것을 작성한 목적인 측정을 조용히
+무효로 만들기 때문입니다. 제공자 하위 섹션 *안쪽* 의 키는 Veles 가 검사하지
+않습니다. 상위 제공자가 검사하기 때문입니다: OpenRouter 는 모르는 키에
+`400 provider: Unrecognized key: "quantization"`, 맞는 대상이 없는 값에
+`404 No endpoints found …` 를 돌려줍니다.
+
+### 대화 기록 보관 기간
+
+```toml
+[memory]
+turn_retention_days = 90   # 0 이면 영구 보관
+```
+
+원본 대화 턴은 이 기간이 지나면 삭제되지만, 거기서 추출된 **인사이트** 와 규칙은
+영구히 보관됩니다. 대화 기록은 원재료이고 인사이트는 그것을 읽은 목적이므로,
+`memory.db` 는 무한정 커지기를 멈추는 한편 에이전트는 배운 것을 그대로 유지합니다.
+
+기록이 삭제되려면 **두** 조건이 모두 성립해야 합니다. 보관 기간보다 오래되었고,
+**그리고** 큐레이터가 이미 그 세션을 처리했어야 합니다. 큐레이터가 아직 도달하지
+못한 세션은 아무리 오래되었어도 삭제되지 않습니다. 그렇지 않으면 아무것도 배우기
+전에 기록을 없애 버리게 됩니다.
+
+눈에 보이는 비용: `veles sessions search` 는 보관 기간 안의 텍스트만 찾습니다.
+`veles sessions list` 는 오래된 실행도 계속 보여 줍니다. 세션 행(id, 제목,
+타임스탬프)은 남고 메시지 본문만 사라지기 때문입니다. 정리는 `veles dream` 중
+인사이트 추출 이후에 수행됩니다.
+
+### 로그 로테이션
+
+`traces.jsonl` 과 `events.jsonl` 은 50 MB 에서 `<이름>.<unix_ts>` 로 로테이션되며,
+가장 최근 **10** 개만 보관됩니다. 그보다 오래된 것은 다음 로테이션 때 삭제됩니다.
+이전에는 영구히 쌓였습니다.
+
+일반적인 사용량에서는 설정할 것이 없습니다. 트레이스 레코드당 약 530 바이트,
+에이전트 턴당 약 1.1 KB 의 이벤트이므로 첫 로테이션까지 수년이 걸립니다. 이 설정이
+있는 이유는, 정책 없는 무한 증가란 결국 그 장비를 물려받는 사람이 발견하게 되는
+누수이기 때문입니다.
+
+### 이미지
+
+채널로 전송된 사진은 턴이 시작되기 전에 설명이 생성됩니다. 사용되는 모델은
+`[routing.tasks].vision` 이 가리키는 모델이며, 명시적인 라우트가 없으면 `[engine]`
+모델입니다. 따라서 멀티모달 엔진이라면 별도 설정이 전혀 필요 없습니다.
+
+`[vision] mode` 가 파이프라인을 고릅니다:
+
+- `model`(기본값) — 비전 모델이 이미지를 설명합니다.
+- `ocr` — Tesseract 만 사용. 로컬, 무료, LLM 호출 없음. 텍스트 스캔에 적합합니다.
+- `ocr+model` — 먼저 그대로의 텍스트, 이어서 모델의 설명.
+- `off` — 아무것도 읽지 않습니다. 파일은 그래도 저장되며, 에이전트가 원하면 직접
+  `image_describe` / `image_ocr` 를 호출할 수 있습니다.
+
+엔진이 텍스트 전용이면 `[vision] model` 을 지정하십시오. 비전을 지원하는 제공자면
+무엇이든 됩니다. 로컬 서버도 포함입니다: `ollama:llava`, `llamacpp:…`,
+`openai-compat:…`.
+
 ### `project.toml`
 
 `<project>/.veles/project.toml`은 변경 불가능한 프로젝트 메타데이터(`name`, `created_at`, `schema_version`, `layout`)를 담습니다. 보통 직접 손으로 편집하지 않습니다.
