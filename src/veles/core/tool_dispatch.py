@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import time
 from collections.abc import Callable
 
 from veles.core.agent_state import record_invocation
@@ -156,6 +157,64 @@ def _invoke_tool_safely(
         return registry.dispatch(call.name, call.arguments, artifact_dir=artifact_dir), None
     except Exception as exc:
         return f"<error: {type(exc).__name__}: {exc}>", f"{type(exc).__name__}: {exc}"
+
+
+def _record_tool_use_in_db(
+    entry: ToolEntry,
+    *,
+    ok: bool,
+    latency_ms: int,
+    error_kind: str | None,
+    session_id: str | None,
+) -> None:
+    """Append one `tool_uses` row for `entry` in the active project's memory.db.
+
+    M252: `record_use` had **no production caller at all** — only tests, one of
+    which ("e2e") called it by hand and passed, which is why nobody noticed.
+    `tool_uses` was therefore always empty, and everything reading it was dead:
+    `veles tool list`'s uses/ok% columns, `skill_pattern_detector` (M121b, the
+    "propose a skill after 3 repetitions" loop) and `skill_suggester` all query a
+    table nothing ever wrote to. VISION §5.4 promises a tool registry *with
+    telemetry*; only half of it existed.
+
+    Mirrors `core/skills.py::_record_skill_use_in_db`, which fixed the identical
+    gap for skills in M244 — including the ordering that makes it work:
+    `record_use` is a silent no-op when the tool has no catalogue row, so the
+    upsert is the slow path taken once per tool rather than on every call, and it
+    is retried after a lost `UNIQUE(name)` race so the loser's use is not
+    dropped.
+
+    Resolves the project through `current_project()` rather than taking the
+    Agent's store, because `_dispatch` is also reached from the MCP server path,
+    where there is no Agent. Best-effort throughout: telemetry must never break a
+    tool call.
+    """
+    try:
+        project = current_project()
+        if project is None:
+            return
+        from veles.core.memory import SessionStore
+        from veles.core.tools.persistence import record_use, upsert_tool
+
+        store = SessionStore(project.memory_db_path)
+        try:
+            conn = store._conn
+            kwargs = {
+                "tool_name": entry.name,
+                "ok": ok,
+                "latency_ms": latency_ms,
+                "error_kind": error_kind,
+                "session_id": session_id,
+            }
+            if record_use(conn, **kwargs) == 0:
+                with contextlib.suppress(Exception):
+                    upsert_tool(conn, entry)
+                record_use(conn, **kwargs)
+            conn.commit()
+        finally:
+            store.close()
+    except Exception:  # pragma: no cover - telemetry is never load-bearing
+        logger.debug("tool telemetry write failed for %s", entry.name, exc_info=True)
 
 
 def _persist_approval_if_grant(
@@ -346,7 +405,17 @@ def _dispatch(
             )
         via_autopilot = decision.via_autopilot
 
+    started = time.monotonic()
     output, error = _invoke_tool_safely(registry, call, artifact_dir=artifact_dir)
+    _record_tool_use_in_db(
+        entry,
+        ok=error is None,
+        latency_ms=int((time.monotonic() - started) * 1000),
+        # `_invoke_tool_safely` formats errors as "TypeName: message"; the
+        # aggregate views only ever group by the type.
+        error_kind=error.split(":", 1)[0] if error else None,
+        session_id=session_id,
+    )
     try:
         if error:
             logger.warning("tool.error name=%s err=%s", call.name, error)

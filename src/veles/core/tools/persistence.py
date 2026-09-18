@@ -20,12 +20,15 @@ sqlite-vec embedding column on top without touching the dispatch path.
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import time
 from dataclasses import dataclass
 from typing import Any
 
 from veles.core.tools.registry import ToolEntry
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,12 +153,26 @@ def record_use(
     tool_id = _id_for_name(conn, tool_name)
     if tool_id is None:
         return 0
-    cur = conn.execute(
+    row = (tool_id, session_id, turn_id, wall, 1 if ok else 0, latency_ms, error_kind)
+    sql = (
         "INSERT INTO tool_uses("
         " tool_id, session_id, turn_id, invoked_at, ok, latency_ms, error_kind"
-        ") VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (tool_id, session_id, turn_id, wall, 1 if ok else 0, latency_ms, error_kind),
+        ") VALUES (?, ?, ?, ?, ?, ?, ?)"
     )
+    try:
+        cur = conn.execute(sql, row)
+    except sqlite3.IntegrityError:
+        # M252: `session_id` and `turn_id` are foreign keys into `sessions` /
+        # `turns`. A caller holding an id whose row isn't in THIS database (a
+        # sub-agent against a different store, a session pruned mid-run) would
+        # otherwise lose the use entirely — the whole failure this milestone
+        # exists to remove. Degrade to an unattributed row: the count and the
+        # outcome survive, only the grouping is lost.
+        logger.debug(
+            "tool_uses: session/turn id not in this database, recording %s unattributed",
+            tool_name,
+        )
+        cur = conn.execute(sql, (tool_id, None, None, *row[3:]))
     return int(cur.lastrowid)
 
 
