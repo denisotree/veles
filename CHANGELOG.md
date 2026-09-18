@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.0] — 2026-09-18
+
+Nothing in `memory.db` or `.veles/*.jsonl` had ever been deleted. That is fine
+until it isn't, and the day it isn't is not the day you want to start thinking
+about it. This release gives you a policy to turn on — and, because two separate
+defects this week turned out to be code that was written, tested, and never
+connected to anything, it adds checks that fail when that happens again.
+
+### Added — an optional ceiling on conversation history
+
+**Your history is not touched unless you ask.** `[memory] turn_retention_days`
+defaults to `0`, which keeps everything exactly as before. Set it to a number of
+days and `veles dream` starts deleting raw conversation turns older than that.
+The **insights** and rules extracted from them are kept forever either way — the
+transcript is raw material, the insights are what it was read for.
+
+Two conditions must both hold before anything is removed: the session is older
+than the window, **and** the curator has already processed it. A session the
+curator has not reached is never pruned, whatever its age, because deleting it
+would destroy the transcript before anything had been learned from it.
+
+What you give up by enabling it: `veles sessions search` only finds text inside
+the window. `veles sessions list` still shows older runs — session rows are kept,
+only the message bodies go.
+
+### Changed
+
+- **Rotated `traces.jsonl.*` and `events.jsonl.*` are pruned** — the newest 10
+  are kept instead of every one ever written. At measured volume the first
+  rotation is years away, so this closes a slow leak rather than an active one.
+
+### Fixed
+
+- **A Russian phrase in an English docstring** (`core/verify.py`), found by
+  auditing every tracked file.
+- **`configuration.md` is current in all 14 translations again.** It had been
+  behind since a section was added in August and never synced; three more
+  sections have accumulated since.
+
+### Internal
+
+Three checks that fail on a class of defect rather than on a symptom:
+
+- a function reachable only from tests — the shape of the tool-telemetry code
+  that sat uncalled for five months before 0.33.0 wired it up;
+- a translated doc falling behind the English one, which is how the
+  documentation gap above went unnoticed for a month;
+- Russian in a comment or docstring (string literals are data — stopword lists,
+  keyboard layouts, test fixtures — and are left alone).
+
+Each ships with the existing violations as a baseline that may shrink and never
+grow, and each was verified by reintroducing the defect it exists to catch.
+
 ## [0.33.0] — 2026-09-18
 
 Two runs of the same input can disagree, and you cannot tell whether the model

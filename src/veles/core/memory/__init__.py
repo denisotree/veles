@@ -733,6 +733,41 @@ class SessionStore:
             cur = self._conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
         return cur.rowcount > 0
 
+    def prune_turns(self, *, older_than: float, curated_before: float) -> int:
+        """Delete raw `turns` from old sessions that the curator has finished
+        with. Returns the number of rows removed (M257).
+
+        **The retention model, decided 2026-09-18: raw material is disposable,
+        what was learned from it is not.** `turns` are the transcript — the
+        bulkiest thing in `memory.db` and the only part that grows without
+        bound. `insights`, `rules` and their embeddings are what the transcript
+        was read *for*, and are never touched here.
+
+        **`curated_before` is the load-bearing argument, not a refinement.**
+        It is `CuratorState.last_curated_at`, so only sessions the curator has
+        already swept are eligible. Pruning on age alone would delete a
+        transcript before anything had been extracted from it — losing the raw
+        material *and* never producing the insight, which is worse than
+        unbounded growth. A session the curator has not reached yet survives
+        regardless of age.
+
+        **Session rows stay.** They are metadata (id, timestamps, title) and
+        cost almost nothing, so `veles sessions list` keeps showing the history;
+        only the bodies go. The visible consequence is that
+        `veles sessions search` — which searches `turns_fts` — can no longer
+        find text older than the retention window. That is the trade being
+        made, and the `turns_fts` delete triggers keep the index consistent
+        rather than leaving it pointing at rows that are gone.
+        """
+        cutoff = min(older_than, curated_before)
+        with self._tx():
+            cur = self._conn.execute(
+                "DELETE FROM turns WHERE session_id IN ("
+                " SELECT id FROM sessions WHERE last_activity_at < ?)",
+                (cutoff,),
+            )
+        return int(cur.rowcount or 0)
+
     def set_title(self, session_id: str, title: str) -> None:
         with self._tx():
             self._conn.execute("UPDATE sessions SET title=? WHERE id=?", (title, session_id))

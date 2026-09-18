@@ -118,6 +118,16 @@ class DreamResult:
         return "dream: " + " ".join(parts)
 
 
+# M257: how long raw transcripts survive after the curator has mined them.
+#
+# **Zero — pruning is opt-in.** A framework must not delete a user's history
+# because they upgraded; nobody agreed to lose it, and the loss is silent and
+# irreversible. Whoever wants the ceiling sets `[memory] turn_retention_days`
+# to a number of days; until then `memory.db` keeps everything, exactly as it
+# did before this existed.
+_DEFAULT_TURN_RETENTION_DAYS = 0
+
+
 def _dream_state_path(project: Project) -> Path:
     return project.state_dir / "curator.state.json"
 
@@ -278,6 +288,11 @@ def dream_cycle(
             # on superseded rows) for MemoryRouter's semantic recall. Off the
             # per-turn hot path; local-adapter-gated inside.
             _run_dream_step("embed_insights", lambda: _step_embed_insights(project, result), result)
+        if not dry_run:
+            # M257: drop raw transcripts the curator has already mined. Runs
+            # AFTER extraction and dedup on purpose — this cycle's insights are
+            # already out of those sessions by the time their bodies go.
+            _run_dream_step("prune_turns", lambda: _step_prune_turns(project, result), result)
         if include_consolidation and provider is not None:
             _run_dream_step(
                 "consolidation",
@@ -344,6 +359,54 @@ def _step_insights(
         except Exception as exc:  # pragma: no cover - extractor handles its own errors
             result.notes.append(f"insight extractor on {session_id}: {exc}")
     result.insights_written = written
+
+
+def _step_prune_turns(project: Project, result: DreamResult) -> None:
+    """M257: drop raw transcripts the curator has already mined.
+
+    Retention model (decided 2026-09-18): raw `turns` are disposable, the
+    `insights` extracted from them are not. `turns` is the only part of
+    `memory.db` that grows without bound; insights are the product the
+    transcript was read for and are never pruned.
+
+    **Off unless asked for.** `[memory] turn_retention_days` defaults to 0,
+    which prunes nothing — deleting a user's history because they upgraded is
+    not a decision a framework gets to make on their behalf. Setting it to a
+    number of days turns the ceiling on.
+
+    Once on, two gates are required, not one. Age, and — the load-bearing one —
+    `CuratorState.last_curated_at`, so a session the curator has not reached
+    survives no matter how old it is. Pruning on age alone would destroy a
+    transcript before anything had been learned from it, losing the raw material
+    *and* never producing the insight.
+    """
+    from veles.core.project_config import get_section, load_project_config
+
+    days = _DEFAULT_TURN_RETENTION_DAYS
+    raw = get_section(load_project_config(project), "memory").get("turn_retention_days")
+    if isinstance(raw, int) and raw >= 0:
+        days = raw
+    if days == 0:
+        result.notes.append("prune_turns: off (set [memory] turn_retention_days to enable)")
+        return
+
+    state = load(_dream_state_path(project))
+    if state.last_curated_at <= 0:
+        result.notes.append("prune_turns: skipped (curator has not run yet)")
+        return
+
+    from veles.core.memory import SessionStore
+
+    store = SessionStore(project.memory_db_path)
+    try:
+        removed = store.prune_turns(
+            older_than=time.time() - days * 86400,
+            curated_before=state.last_curated_at,
+        )
+    finally:
+        store.close()
+    if removed:
+        result.notes.append(f"prune_turns: {removed} turn(s) older than {days}d removed")
 
 
 def _step_embed_insights(project: Project, result: DreamResult) -> None:

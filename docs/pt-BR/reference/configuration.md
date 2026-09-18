@@ -120,6 +120,128 @@ Tipos de tarefa para `[routing.tasks]`: `default`, `curator`, `compressor`,
 > em `[routing.tasks]` sempre prevalecem. Execute `veles route refresh` para
 > reanalisar. Veja [roteamento por tarefa](../how-to/per-task-routing.md).
 
+### Fixar um backend e outras chaves do corpo do pedido
+
+`[engine.request.<provider>]` é enviado **tal como está** no corpo do pedido
+desse fornecedor. O Veles não modela o esquema do fornecedor, portanto qualquer
+opção que este aceite funciona sem esperar que o Veles a conheça:
+
+```toml
+[engine.request.openrouter.provider]
+order = ["GMICloud"]
+allow_fallbacks = false
+
+[engine.request.openrouter.reasoning]
+enabled = false
+```
+
+A secção é indexada pelo **nome do fornecedor** (`openrouter`, `anthropic`,
+`openai`, `gemini`, `ollama`, `llamacpp`, `openai-compat`) para que uma mesma
+configuração de projeto sobreviva a uma mudança de backend: um bloco `provider`
+do OpenRouter enviado ao llama.cpp seria um 400, por isso cada backend lê apenas
+a sua própria subsecção. Sem secção declarada, os pedidos são idênticos byte a
+byte aos anteriores.
+
+**Quando é preciso: medições reprodutíveis.** Um relé como o OpenRouter distribui
+um mesmo modelo por muitos backends com quantizações diferentes, pelo que duas
+execuções sobre a mesma entrada podem divergir por razões alheias à entrada. O
+encaminhamento persistente por `session_id` mantém uma conversa num único
+backend, mas não diz em **qual**.
+
+Fixe por `order`, não por `quantizations`. A 18-09-2026, `z-ai/glm-5.3-flash`
+tem 29 endpoints: 16 em `fp8`, 3 em `fp4`, um `nvfp4`, **9 que não declaram
+qualquer quantização** e nenhum em `bf16`. Ou seja, `quantizations = ["fp8"]`
+ainda deixa 16 candidatos, com janelas de contexto de 262144 a 1310720 tokens,
+ao passo que um `order` de um só elemento mais `allow_fallbacks = false`
+determina o backend sem ambiguidade. Para listar os endpoints de um modelo:
+
+```bash
+curl -s https://openrouter.ai/api/v1/models/<author>/<slug>/endpoints \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" | jq '.data.endpoints[]
+  | {provider_name, quantization, context_length}'
+```
+
+Mantenha a fixação apenas no projeto de medição: produção quer encaminhamento
+persistente, que preserva disponibilidade e fallback.
+
+**Confirmar que se manteve.** Cada chamada ao modelo regista em
+`.veles/traces.jsonl` tanto a intenção como o resultado: `request_extra` é o que
+foi enviado, `upstream_provider` o backend que respondeu. Basta uma linha:
+
+```bash
+jq -r 'select(.session_id=="<sid>") | .upstream_provider' .veles/traces.jsonl | sort -u
+```
+
+Mais do que uma linha significa que a execução misturou backends. Os mesmos
+registos trazem `reasoning_tokens` (quanto do orçamento foi para raciocínio) e
+`est_cost_usd` (o custo real faturado pelo fornecedor, quando este o comunica).
+
+**Os erros são ruidosos de propósito.** Um nome de fornecedor mal escrito ou um
+erro no caminho da secção (`[engine.reqest.…]`) aborta a execução com um
+`ConfigError` que nomeia o arquivo e os fornecedores conhecidos: uma fixação que
+nunca chegou ao fio invalidaria em silêncio a medição para a qual foi escrita. O
+Veles não verifica as chaves *dentro* da subsecção, porque é o fornecedor que o
+faz: o OpenRouter responde `400 provider: Unrecognized key: "quantization"` a uma
+chave desconhecida e `404 No endpoints found …` a um valor sem correspondência.
+
+### Durante quanto tempo as transcrições são guardadas
+
+**Nada é apagado a menos que o peça.** `turn_retention_days` vale `0` por
+padrão, o que guarda para sempre todos os turnos de conversa. Defina um
+número de dias para pôr um teto em `memory.db`:
+
+```toml
+[memory]
+turn_retention_days = 90   # 0 (padrão) guarda tudo
+```
+
+Com a opção ativa, os turnos em bruto mais antigos do que esse prazo são
+apagados; os **insights** e as regras deles extraídos são guardados para sempre
+em qualquer caso. A transcrição é a matéria-prima e os insights são aquilo para
+que foi lida.
+
+Uma transcrição só é descartada se **ambas** as condições se verificarem: ser mais
+antiga do que a janela **e** o curador já ter processado essa sessão. Uma sessão
+que o curador ainda não alcançou nunca é apagada, seja qual for a sua idade — caso
+contrário a transcrição seria destruída antes de dela se ter aprendido algo.
+
+O custo de a ativar: `veles sessions search` só encontra texto dentro da janela.
+`veles sessions list` continua a mostrar execuções antigas, porque as linhas de
+sessão (id, título, marcas temporais) são mantidas: só desaparecem os corpos das
+mensagens. A limpeza ocorre durante `veles dream`, depois da extração de
+insights.
+
+### Rotação de logs
+
+`traces.jsonl` e `events.jsonl` rodam aos 50 MB para `<nome>.<unix_ts>`, sendo
+guardadas as **10** rotações mais recentes — as anteriores são apagadas na
+rotação seguinte. Antes eram guardadas para sempre.
+
+Em volumes normais não há nada a configurar: a ~530 bytes por registo de trace e
+~1,1 KB de eventos por turno do agente, a primeira rotação está a anos de
+distância. A definição existe porque um crescimento sem limite e sem política é
+uma fuga que terá de ser descoberta por quem herdar a máquina.
+
+### Imagens
+
+Uma fotografia enviada para um canal é descrita antes de o turno começar, com o
+modelo para que aponta `[routing.tasks].vision` — que, sem rota explícita, é o seu
+modelo `[engine]`. Um motor multimodal não precisa, por isso, de qualquer
+configuração.
+
+`[vision] mode` escolhe o pipeline:
+
+- `model` (predefinição) — o modelo de visão descreve a imagem.
+- `ocr` — apenas Tesseract. Local, gratuito, sem chamada ao LLM; bom para
+  digitalizações de texto.
+- `ocr+model` — primeiro o texto literal, depois a descrição do modelo.
+- `off` — nada é lido; o arquivo é guardado à mesma e o agente pode chamar
+  `image_describe` / `image_ocr` por iniciativa própria.
+
+Defina `[vision] model` quando o motor for apenas de texto. Serve qualquer
+fornecedor com visão, incluindo um servidor local: `ollama:llava`, `llamacpp:…`,
+`openai-compat:…`.
+
 ### `project.toml`
 
 `<project>/.veles/project.toml` guarda metadados imutáveis do projeto (`name`,

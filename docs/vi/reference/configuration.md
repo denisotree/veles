@@ -119,6 +119,126 @@ Các loại tác vụ cho `[routing.tasks]`: `default`, `curator`, `compressor`,
 > thắng. Chạy `veles route refresh` để phân tích lại. Xem
 > [định tuyến theo tác vụ](../how-to/per-task-routing.md).
 
+### Ghim backend và các khoá khác trong thân yêu cầu
+
+`[engine.request.<provider>]` được chuyển **nguyên vẹn** vào thân yêu cầu của nhà
+cung cấp đó. Veles không mô hình hoá schema của thượng nguồn, nên bất kỳ tuỳ chọn
+nào nhà cung cấp chấp nhận đều dùng được ngay, không phải chờ Veles biết tới nó:
+
+```toml
+[engine.request.openrouter.provider]
+order = ["GMICloud"]
+allow_fallbacks = false
+
+[engine.request.openrouter.reasoning]
+enabled = false
+```
+
+Mục này lấy **tên nhà cung cấp** làm khoá (`openrouter`, `anthropic`, `openai`,
+`gemini`, `ollama`, `llamacpp`, `openai-compat`), nhờ vậy một cấu hình dự án sống
+sót qua việc đổi backend: khối `provider` của OpenRouter gửi tới llama.cpp sẽ là
+lỗi 400, nên mỗi backend chỉ đọc mục con của chính nó. Khi không khai báo mục
+này, các yêu cầu giống hệt trước đây tới từng byte.
+
+**Khi nào cần: các phép đo lặp lại được.** Một relay như OpenRouter phân phối cùng
+một mô hình tới nhiều backend với mức lượng tử hoá khác nhau, nên hai lần chạy
+trên cùng đầu vào có thể khác nhau vì lý do chẳng liên quan gì tới đầu vào. Định
+tuyến dính theo `session_id` giữ một cuộc hội thoại trên một backend, nhưng không
+cho biết đó là backend **nào**.
+
+Hãy ghim bằng `order`, đừng ghim bằng `quantizations`. Tính đến 18-09-2026,
+`z-ai/glm-5.3-flash` có 29 endpoint: 16 ở `fp8`, 3 ở `fp4`, một `nvfp4`, **9 cái
+không khai báo mức lượng tử hoá nào cả**, và không có cái nào ở `bf16`. Vì thế
+`quantizations = ["fp8"]` vẫn để lại 16 ứng viên với cửa sổ ngữ cảnh từ 262144 tới
+1310720 token, trong khi một `order` chỉ có một phần tử cùng
+`allow_fallbacks = false` xác định backend một cách dứt khoát. Liệt kê endpoint
+của một mô hình:
+
+```bash
+curl -s https://openrouter.ai/api/v1/models/<author>/<slug>/endpoints \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" | jq '.data.endpoints[]
+  | {provider_name, quantization, context_length}'
+```
+
+Chỉ giữ việc ghim trong dự án đo đạc — môi trường sản xuất cần định tuyến dính,
+thứ giữ được tính sẵn sàng và khả năng dự phòng.
+
+**Kiểm tra xem việc ghim có giữ được không.** Mỗi lần gọi mô hình đều ghi cả ý
+định lẫn kết quả vào `.veles/traces.jsonl`: `request_extra` là thứ đã gửi đi,
+`upstream_provider` là backend đã trả lời. Một dòng là đủ:
+
+```bash
+jq -r 'select(.session_id=="<sid>") | .upstream_provider' .veles/traces.jsonl | sort -u
+```
+
+Nhiều hơn một dòng nghĩa là lần chạy đó đã trộn lẫn các backend. Cùng các bản ghi
+ấy còn mang `reasoning_tokens` (phần ngân sách dành cho suy luận) và
+`est_cost_usd` (chi phí thực mà thượng nguồn tính, khi nó báo cáo).
+
+**Lỗi được làm cho ồn ào một cách cố ý.** Tên nhà cung cấp viết sai, hay sai đường
+dẫn mục (`[engine.reqest.…]`), sẽ dừng lần chạy bằng một `ConfigError` nêu rõ tệp
+và danh sách nhà cung cấp đã biết: một lần ghim chưa bao giờ tới được đường
+truyền sẽ âm thầm làm hỏng chính phép đo mà nó được viết ra để phục vụ. Veles
+không kiểm tra các khoá *bên trong* mục con, vì thượng nguồn đã làm việc đó:
+OpenRouter trả `400 provider: Unrecognized key: "quantization"` cho khoá lạ và
+`404 No endpoints found …` cho giá trị không khớp thứ gì.
+
+### Bản ghi hội thoại được giữ bao lâu
+
+**Không có gì bị xoá trừ khi bạn yêu cầu.** `turn_retention_days` mặc định là
+`0`, tức giữ mọi lượt hội thoại mãi mãi. Hãy đặt một số ngày nếu muốn giới hạn
+`memory.db`:
+
+```toml
+[memory]
+turn_retention_days = 90   # 0 (mặc định) giữ lại tất cả
+```
+
+Khi bật, các lượt hội thoại thô cũ hơn khoảng đó sẽ bị xoá; còn các **insight** và
+quy tắc rút ra từ chúng vẫn được giữ mãi mãi trong mọi trường hợp. Bản ghi là
+nguyên liệu thô, insight mới là thứ người ta đọc nó để có.
+
+Một bản ghi chỉ bị bỏ khi **cả hai** điều kiện cùng đúng: cũ hơn cửa sổ lưu trữ
+**và** bộ biên tập đã xử lý phiên đó. Phiên mà bộ biên tập chưa chạm tới thì không
+bao giờ bị xoá, dù cũ đến đâu — nếu không, bản ghi sẽ bị huỷ trước khi học được
+điều gì từ nó.
+
+Cái giá của việc bật nó: `veles sessions search` chỉ tìm được văn bản trong cửa
+sổ. `veles sessions list` vẫn hiện các lần chạy cũ, vì các dòng phiên (id, tiêu
+đề, mốc thời gian) được giữ lại — chỉ phần thân tin nhắn mất đi. Việc dọn dẹp diễn
+ra trong `veles dream`, sau bước rút trích insight.
+
+### Xoay vòng nhật ký
+
+`traces.jsonl` và `events.jsonl` xoay vòng ở mốc 50 MB thành `<tên>.<unix_ts>`, và
+**10** bản xoay vòng mới nhất được giữ lại — những bản cũ hơn bị xoá ở lần xoay
+vòng kế tiếp. Trước đây chúng được giữ mãi mãi.
+
+Ở mức dùng thông thường thì không cần cấu hình gì: với ~530 byte mỗi bản ghi trace
+và ~1,1 KB sự kiện mỗi lượt của tác tử, lần xoay vòng đầu tiên còn cách nhiều năm.
+Tuỳ chọn này tồn tại vì tăng trưởng vô hạn mà không có chính sách là một chỗ rò rỉ
+mà người tiếp quản cỗ máy sẽ phải tự phát hiện ra.
+
+### Hình ảnh
+
+Ảnh gửi vào một kênh được mô tả trước khi lượt bắt đầu, dùng mô hình mà
+`[routing.tasks].vision` trỏ tới — nếu không có tuyến rõ ràng thì đó chính là mô
+hình `[engine]` của bạn. Vì vậy một engine đa phương thức không cần cấu hình gì
+cả.
+
+`[vision] mode` chọn quy trình:
+
+- `model` (mặc định) — mô hình thị giác mô tả ảnh.
+- `ocr` — chỉ Tesseract. Cục bộ, miễn phí, không gọi LLM; hợp với ảnh quét văn
+  bản.
+- `ocr+model` — trước là văn bản nguyên văn, sau là mô tả của mô hình.
+- `off` — không đọc gì cả; tệp vẫn được lưu và tác tử có thể tự gọi
+  `image_describe` / `image_ocr` nếu muốn.
+
+Hãy đặt `[vision] model` khi engine chỉ xử lý văn bản. Bất kỳ nhà cung cấp nào có
+khả năng thị giác đều dùng được, kể cả máy chủ cục bộ: `ollama:llava`,
+`llamacpp:…`, `openai-compat:…`.
+
 ### `project.toml`
 
 `<project>/.veles/project.toml` chứa siêu dữ liệu bất biến của dự án (`name`,

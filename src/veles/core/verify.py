@@ -6,7 +6,8 @@ off-track) into a reusable, mode-agnostic decision usable from plain
 answers; an advisor-tier model (routed `advisor`, which may be a
 `claude-cli`) judges whether the answer is sound and grounded in the
 evidence; on a confident FAIL the prompt is re-run on the stronger model —
-the "fallback в умную CLI-модель при галлюцинациях" of the work bot.
+what the original brief called falling back to a smarter CLI model when the
+cheap one hallucinates.
 
 **Three-state verdict, deliberately.** PASS → keep the answer, FAIL →
 escalate, UNKNOWN → keep the answer. UNKNOWN covers BOTH an unavailable

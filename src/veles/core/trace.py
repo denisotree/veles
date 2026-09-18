@@ -26,7 +26,11 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from veles.core.io_utils import prune_rotated
+
 DEFAULT_MAX_BYTES = 50 * 1024 * 1024  # 50 MB before rotation
+# How many rotated siblings survive a rotation (M257).
+DEFAULT_KEEP_ROTATED = 10
 TRACE_FILENAME = "traces.jsonl"
 
 
@@ -111,13 +115,25 @@ class TraceWriter:
     """Append `TraceRecord`s to a JSONL file with size-bounded rotation.
 
     On rotation: existing file is renamed to `traces.jsonl.<unix_ts>` and a
-    fresh `traces.jsonl` starts. We keep all rotated files (no auto-prune) —
-    cleanup is a curator concern, not this writer's.
+    fresh `traces.jsonl` starts, then all but the newest `keep_rotated` siblings
+    are deleted.
+
+    Until M257 this kept every rotated file forever, on the stated grounds that
+    "cleanup is a curator concern" — which the curator never implemented, so
+    nothing pruned them at all. `keep_rotated=0` disables the prune for a caller
+    that wants the full history.
     """
 
-    def __init__(self, path: Path, *, max_bytes: int = DEFAULT_MAX_BYTES) -> None:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        max_bytes: int = DEFAULT_MAX_BYTES,
+        keep_rotated: int = DEFAULT_KEEP_ROTATED,
+    ) -> None:
         self._path = path
         self._max_bytes = max_bytes
+        self._keep_rotated = keep_rotated
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
     @property
@@ -141,6 +157,7 @@ class TraceWriter:
             target = self._path.with_name(f"{self._path.name}.{ts}.{n}")
             n += 1
         os.replace(self._path, target)
+        prune_rotated(self._path, keep=self._keep_rotated)
 
 
 def trace_path_for_project(state_dir: Path) -> Path:
