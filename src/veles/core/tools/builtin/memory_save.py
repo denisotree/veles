@@ -86,12 +86,23 @@ def save_insight_row(
                     "UPDATE insights SET file_path = ? WHERE id = ?", (view_rel, rid)
                 )
         store._conn.commit()
-        return rid
     except Exception:
         return 0
     finally:
         with contextlib.suppress(Exception):
             store._conn.close()
+
+    # M265: offer the fact to the external memory engine, after the local
+    # write and outside its transaction. Best-effort by contract — the fact is
+    # already stored, and a network failure must not turn a saved insight into
+    # a failed run. Rows that did not make it keep `synced_at IS NULL` and are
+    # offered again by the dream cycle.
+    if rid:
+        with contextlib.suppress(Exception):
+            from veles.core.memory.dual_write import push_insight
+
+            push_insight(proj, insight_id=rid, title=title, body=body)
+    return rid
 
 
 def _render_view(project: Project, *, rid: int, title: str, body: str) -> str | None:

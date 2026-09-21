@@ -27,6 +27,7 @@ import asyncio
 import datetime as _dt
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 
 from veles.core.memory import InsightHit, SessionStore, TurnHit, aio
@@ -168,16 +169,34 @@ class MemoryRouter:
 
     def _collect_extra(self, query: str, *, limit: int) -> list[RecallHit]:
         """Call every registered external provider, swallowing per-provider
-        failures so one slow / broken plugin can't tank the whole recall."""
-        out: list[RecallHit] = []
+        failures so one broken plugin can't tank the whole recall.
+
+        M265: the providers run **concurrently**. Sequentially they shared one
+        slot in the fan-out, so a single slow remote source consumed the whole
+        recall deadline and its siblings returned nothing — the failure mode
+        the deadline was supposed to prevent, one level down. Whatever has not
+        answered when this collector is cancelled is simply not included.
+        """
+        if not self._extra:
+            return []
         per_provider = max(1, limit // 2)
-        for p in self._extra:
+
+        def call(provider: object) -> list[RecallHit]:
             try:
-                hits = p.recall(query, limit=per_provider)  # type: ignore[attr-defined]
-            except Exception:
-                continue
-            out.extend(hits)
-        return out
+                return list(provider.recall(query, limit=per_provider))  # type: ignore[attr-defined]
+            except Exception as exc:
+                logger.warning(
+                    "recall: provider %s failed (%s: %s)",
+                    getattr(provider, "name", type(provider).__name__),
+                    type(exc).__name__,
+                    exc,
+                )
+                return []
+
+        if len(self._extra) == 1:
+            return call(self._extra[0])
+        with ThreadPoolExecutor(max_workers=len(self._extra)) as pool:
+            return [hit for hits in pool.map(call, self._extra) for hit in hits]
 
     # ---- collectors ----
 

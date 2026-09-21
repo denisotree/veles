@@ -291,6 +291,8 @@ def dream_cycle(
             # per-turn hot path; local-adapter-gated inside.
             _run_dream_step("embed_insights", lambda: _step_embed_insights(project, result), result)
         if not dry_run:
+            _run_dream_step("memory_resync", lambda: _step_memory_resync(project, result), result)
+        if not dry_run:
             # M257: drop raw transcripts the curator has already mined. Runs
             # AFTER extraction and dedup on purpose — this cycle's insights are
             # already out of those sessions by the time their bodies go.
@@ -420,6 +422,21 @@ def _step_embed_insights(project: Project, result: DreamResult) -> None:
     n = embed_survivor_insights(project)
     if n:
         result.notes.append(f"embedded {n} insight(s)")
+
+
+def _step_memory_resync(project: Project, result: DreamResult) -> None:
+    """M265: re-offer insights that never reached the external memory engine.
+
+    Dual-write is best-effort on the turn — the local row is the source of
+    truth and a remote outage must not fail an agent run — which only holds up
+    if something later retries. This is that something: idle time, where the
+    rest of the background memory work already happens, and never the turn.
+    No external engine configured → no rows, no work, no note."""
+    from veles.core.memory.dual_write import resync_pending
+
+    synced = resync_pending(project)
+    if synced:
+        result.notes.append(f"memory-resync: {synced} insight(s) pushed to the external engine")
 
 
 def _step_insight_dedup(project: Project, result: DreamResult, *, dry_run: bool) -> None:

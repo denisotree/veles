@@ -24,10 +24,14 @@ a remote provider), not between statements on one SQLite file.
 from __future__ import annotations
 
 import asyncio
+import logging
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from veles.core.memory import InsightHit, SessionStore, TurnHit
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import sqlite3
@@ -97,14 +101,109 @@ class SqliteStore:
         return self._sync
 
 
-def open_store(project: Project) -> SqliteStore:
-    """Open the memory store for `project`.
+class RemoteStore:
+    """Learned facts from an external engine, conversation state still local.
 
-    The single place a backend is chosen. Today there is one, and the signature
-    already says `project` rather than a path so that choosing a different one
-    never requires touching a call site again.
+    The split is not a compromise, it is the shape of the data. Insights are
+    the thing that grows without bound and wants an engine with a real index
+    behind it — measured, local brute-force vector recall stops fitting the
+    turn budget around 48k of them, and a million would need ~3 GB resident
+    *per tenant*. Sessions and turns are per-conversation state that a remote
+    memory engine has no notion of and no reason to hold.
+
+    So: `search_insights` goes out, everything else stays on the local file.
+
+    `knn_insights` deliberately returns nothing. The remote engine does its own
+    semantic matching inside `search_insights` — handing it a vector Veles
+    computed with a different model would be asking the wrong question, and
+    silently returning worse answers is the failure this codebase keeps trying
+    to avoid.
     """
-    return SqliteStore(project.memory_db_path)
+
+    def __init__(self, provider: object, local: SqliteStore) -> None:
+        self._provider = provider
+        self._local = local
+
+    async def search_insights(self, query: str, *, limit: int) -> list[InsightHit]:
+        def call() -> list[InsightHit]:
+            hits = self._provider.recall(query, limit=limit)  # type: ignore[attr-defined]
+            # Rank ordering is the provider's; position stands in for it, the
+            # same convention `rerank` already applies across sources.
+            return [
+                InsightHit(
+                    id=-1,  # not a local row id; nothing may touch or hide it
+                    title=hit.title,
+                    body=hit.summary,
+                    rank=float(position),
+                    ts=hit.ts if hit.ts is not None else time.time(),
+                    confidence=hit.confidence,
+                )
+                for position, hit in enumerate(hits)
+            ]
+
+        return await asyncio.to_thread(call)
+
+    async def knn_insights(self, query_vec: list[float], *, limit: int) -> list[InsightHit]:
+        return []
+
+    async def search_turns(self, query: str, *, limit: int, since: float | None) -> list[TurnHit]:
+        return await self._local.search_turns(query, limit=limit, since=since)
+
+    async def touch_insights(self, ids: list[int], at: float) -> None:
+        # Remote hits carry id -1: aging applies to local rows only, and a
+        # negative id must never reach an UPDATE.
+        local = [i for i in ids if i >= 0]
+        if local:
+            await self._local.touch_insights(local, at)
+
+    async def close(self) -> None:
+        await self._local.close()
+
+    @property
+    def sync(self) -> SessionStore:
+        return self._local.sync
 
 
-__all__ = ["MemoryStore", "SqliteStore", "open_store"]
+def open_store(project: Project) -> MemoryStore:
+    """Open the memory store for `project` — the single place a backend is
+    chosen.
+
+    `[memory.store] backend = "sqlite" | "remote"`, defaulting to `sqlite`, so
+    a project without the section behaves exactly as before. `remote` needs an
+    external provider configured (`[memory.external]`); with none, it falls
+    back to local rather than starting a project with no memory at all, and
+    says so.
+    """
+    local = SqliteStore(project.memory_db_path)
+    if _configured_backend(project) != "remote":
+        return local
+
+    from veles.core.memory.providers import build_extra_providers
+
+    providers = build_extra_providers()
+    if not providers:
+        logger.warning(
+            "[memory.store] backend = 'remote' but no [memory.external] provider is "
+            "configured; falling back to the local store"
+        )
+        return local
+    if len(providers) > 1:
+        logger.warning(
+            "remote store uses the first configured provider (%s); the rest stay "
+            "recall-only sources",
+            getattr(providers[0], "name", "?"),
+        )
+    return RemoteStore(providers[0], local)
+
+
+def _configured_backend(project: Project) -> str:
+    try:
+        from veles.core.project_config import get_section, load_project_config
+
+        raw = get_section(load_project_config(project), "memory", "store").get("backend")
+    except Exception:
+        return "sqlite"
+    return str(raw).strip().lower() if isinstance(raw, str) else "sqlite"
+
+
+__all__ = ["MemoryStore", "RemoteStore", "SqliteStore", "open_store"]
