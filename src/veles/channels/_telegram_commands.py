@@ -36,6 +36,7 @@ What's deferred (M116.next sub-tasks):
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
@@ -212,7 +213,8 @@ async def _cmd_insights(gateway: TelegramGateway, chat_key: str, args: str) -> s
     """List recent rows from the M119 `insights` table — mirrors the
     TUI `/insights` slash. Optional category filter as the first arg."""
     del chat_key
-    from veles.core.memory import SessionStore
+    from veles.core.memory.inspect import recent_insights
+    from veles.core.memory.store import open_store
 
     parts = args.strip().split()
     category_filter = parts[0].lower() if parts else None
@@ -224,34 +226,28 @@ async def _cmd_insights(gateway: TelegramGateway, chat_key: str, args: str) -> s
     project = _resolve_project(gateway)
     if project is None:
         return "<i>no active project — cannot query insights</i>"
+    category = category_filter if category_filter and category_filter != "all" else None
     try:
-        store = SessionStore(project.memory_db_path)
+        store = open_store(project)
     except Exception as exc:
         return f"could not open memory.db: {exc}"
     try:
-        if category_filter and category_filter != "all":
-            rows = store._conn.execute(
-                "SELECT title, category, created_at FROM insights"
-                " WHERE category = ?"
-                " ORDER BY created_at DESC, id DESC LIMIT ?",
-                (category_filter, limit),
-            ).fetchall()
-        else:
-            rows = store._conn.execute(
-                "SELECT title, category, created_at FROM insights"
-                " ORDER BY created_at DESC, id DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
+        # These handlers already run on the gateway's event loop, so they await
+        # the port directly — `aio.submit` refuses to block a running loop, and
+        # the read itself goes to a thread rather than stalling every other
+        # chat while SQLite works.
+        rows = await asyncio.to_thread(recent_insights, store.raw(), category=category, limit=limit)
     finally:
-        store._conn.close()
+        await store.close()
     if not rows:
         scope = f"category={category_filter}" if category_filter else "any category"
         return f"<i>no insights yet ({scope}).</i>"
     out = [f"<b>Insights (latest {len(rows)})</b>", ""]
     for r in rows:
-        cat = r["category"] or "—"
-        title = r["title"] or "(no title)"
-        out.append(f"• [<code>{cat}</code>] {title}")
+        cat = r.category or "—"
+        title = r.title or "(no title)"
+        hidden = f" <i>(hidden: {r.hidden_reason or 'unspecified'})</i>" if r.hidden else ""
+        out.append(f"• [<code>{cat}</code>] {title}{hidden}")
     return "\n".join(out)
 
 
@@ -259,7 +255,8 @@ async def _cmd_rules(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     """List recent rows from the M119 `rules` table — mirrors the TUI
     `/rules` slash. Optional kind filter as the first arg."""
     del chat_key
-    from veles.core.memory import SessionStore
+    from veles.core.memory.inspect import recent_rules
+    from veles.core.memory.store import open_store
 
     parts = args.strip().split()
     kind_filter = parts[0].lower() if parts else None
@@ -271,33 +268,22 @@ async def _cmd_rules(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     project = _resolve_project(gateway)
     if project is None:
         return "<i>no active project — cannot query rules</i>"
+    kind = kind_filter if kind_filter and kind_filter != "all" else None
     try:
-        store = SessionStore(project.memory_db_path)
+        store = open_store(project)
     except Exception as exc:
         return f"could not open memory.db: {exc}"
     try:
-        if kind_filter and kind_filter != "all":
-            rows = store._conn.execute(
-                "SELECT kind, body, source, created_at FROM rules"
-                " WHERE kind = ?"
-                " ORDER BY created_at DESC, id DESC LIMIT ?",
-                (kind_filter, limit),
-            ).fetchall()
-        else:
-            rows = store._conn.execute(
-                "SELECT kind, body, source, created_at FROM rules"
-                " ORDER BY created_at DESC, id DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
+        rows = await asyncio.to_thread(recent_rules, store.raw(), kind=kind, limit=limit)
     finally:
-        store._conn.close()
+        await store.close()
     if not rows:
         scope = f"kind={kind_filter}" if kind_filter else "any kind"
         return f"<i>no rules yet ({scope}).</i>"
     out = [f"<b>Rules (latest {len(rows)})</b>", ""]
     for r in rows:
-        kind = r["kind"] or "—"
-        body = (r["body"] or "").strip()
+        kind = r.kind or "—"
+        body = (r.body or "").strip()
         if len(body) > 100:
             body = body[:97] + "…"
         out.append(f"• [<code>{kind}</code>] {body}")

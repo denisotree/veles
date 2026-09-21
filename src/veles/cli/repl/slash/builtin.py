@@ -497,7 +497,9 @@ def _insights(line: str, ctx: SlashContext) -> SlashResult:
     Default shows 10 most recent across all categories. `/insights
     <category>` filters to one. `/insights all <N>` shows up to N rows.
     """
-    from veles.core.memory import SessionStore
+    from veles.core.memory import aio
+    from veles.core.memory.inspect import recent_insights
+    from veles.core.memory.store import open_store
 
     parts = (line or "").strip().split()
     category_filter: str | None = None
@@ -513,25 +515,13 @@ def _insights(line: str, ctx: SlashContext) -> SlashResult:
                 limit = _parse_int(parts[1], limit)
 
     try:
-        store = SessionStore(ctx.project.memory_db_path)
+        store = open_store(ctx.project)
     except Exception as exc:
         return SlashResult.err(f"/insights: cannot open memory.db: {exc}")
     try:
-        if category_filter:
-            rows = store._conn.execute(
-                "SELECT id, title, category, created_at, hidden_at, hidden_reason FROM insights"
-                " WHERE category = ?"
-                " ORDER BY created_at DESC, id DESC LIMIT ?",
-                (category_filter, limit),
-            ).fetchall()
-        else:
-            rows = store._conn.execute(
-                "SELECT id, title, category, created_at, hidden_at, hidden_reason FROM insights"
-                " ORDER BY created_at DESC, id DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
+        rows = recent_insights(store.raw(), category=category_filter, limit=limit)
     finally:
-        store._conn.close()
+        aio.submit(store.close())
 
     if not rows:
         scope = f"category {category_filter!r}" if category_filter else "any category"
@@ -543,13 +533,13 @@ def _insights(line: str, ctx: SlashContext) -> SlashResult:
     header_bits.append("):")
     out_lines = ["".join(header_bits)]
     for row in rows:
-        ts = _fmt_ts(row["created_at"]) if row["created_at"] else "—"
-        cat = row["category"] or "—"
-        title = row["title"] or "(no title)"
+        ts = _fmt_ts(row.created_at) if row.created_at else "—"
+        cat = row.category or "—"
+        title = row.title or "(no title)"
         # M260: a hidden row is still listed — the inspector's job is to show
         # what memory holds, and "why did the agent stop using this?" is only
         # answerable if the reason is visible next to the fact.
-        hidden = f"  (hidden: {row['hidden_reason'] or 'unspecified'})" if row["hidden_at"] else ""
+        hidden = f"  (hidden: {row.hidden_reason or 'unspecified'})" if row.hidden else ""
         out_lines.append(f"  [{cat}] {title}  · {ts}{hidden}")
     out_lines.append("")
     out_lines.append("Filter by category: /insights setup-hint | skill-suggestion | manager-report")
@@ -570,7 +560,9 @@ def _rules(line: str, ctx: SlashContext) -> SlashResult:
     filters to one of `format`, `do`, `dont`, `preference`.
     `/rules all <N>` shows up to N rows.
     """
-    from veles.core.memory import SessionStore
+    from veles.core.memory import aio
+    from veles.core.memory.inspect import recent_rules
+    from veles.core.memory.store import open_store
 
     parts = (line or "").strip().split()
     kind_filter: str | None = None
@@ -586,25 +578,13 @@ def _rules(line: str, ctx: SlashContext) -> SlashResult:
                 limit = _parse_int(parts[1], limit)
 
     try:
-        store = SessionStore(ctx.project.memory_db_path)
+        store = open_store(ctx.project)
     except Exception as exc:
         return SlashResult.err(f"/rules: cannot open memory.db: {exc}")
     try:
-        if kind_filter:
-            rows = store._conn.execute(
-                "SELECT id, kind, body, source, created_at FROM rules"
-                " WHERE kind = ?"
-                " ORDER BY created_at DESC, id DESC LIMIT ?",
-                (kind_filter, limit),
-            ).fetchall()
-        else:
-            rows = store._conn.execute(
-                "SELECT id, kind, body, source, created_at FROM rules"
-                " ORDER BY created_at DESC, id DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
+        rows = recent_rules(store.raw(), kind=kind_filter, limit=limit)
     finally:
-        store._conn.close()
+        aio.submit(store.close())
 
     if not rows:
         scope = f"kind {kind_filter!r}" if kind_filter else "any kind"
@@ -616,12 +596,12 @@ def _rules(line: str, ctx: SlashContext) -> SlashResult:
     header_bits.append("):")
     out_lines = ["".join(header_bits)]
     for row in rows:
-        ts = _fmt_ts(row["created_at"]) if row["created_at"] else "—"
-        kind = row["kind"] or "—"
-        body = (row["body"] or "(no body)").strip()
+        ts = _fmt_ts(row.created_at) if row.created_at else "—"
+        kind = row.kind or "—"
+        body = (row.body or "(no body)").strip()
         if len(body) > 120:
             body = body[:117] + "…"
-        src = row["source"] or "—"
+        src = row.source or "—"
         out_lines.append(f"  [{kind}] {body}  · {src} · {ts}")
     out_lines.append("")
     out_lines.append("Filter by kind: /rules format | do | dont | preference")
