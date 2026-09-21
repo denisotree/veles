@@ -88,16 +88,13 @@ class MemoryRouter:
     ) -> list[RecallHit]:
         if not query.strip():
             return []
+        deadline = _load_recall_deadline(self._project) if deadline_sec is None else deadline_sec
         streams = aio.submit(
-            self._collect_all(
-                query,
-                limit=limit,
-                deadline_sec=_RECALL_DEADLINE_SEC if deadline_sec is None else deadline_sec,
-            ),
+            self._collect_all(query, limit=limit, deadline_sec=deadline),
             # Backstop only: the per-collector deadline inside `_collect_all`
             # is what actually bounds the turn, and it returns partial results.
             # This one exists so a bug in that logic cannot hang a turn forever.
-            timeout=(_RECALL_DEADLINE_SEC if deadline_sec is None else deadline_sec) + 5.0,
+            timeout=deadline + 5.0,
         )
         # M141 scored rerank (relevance + recency + M221 confidence). M223 dropped
         # the `VELES_MEMORY_RERANK=0` round-robin fallback — a kill switch for a
@@ -111,6 +108,7 @@ class MemoryRouter:
             half_life_sec=half_life,
         )
         final = merged[:limit]
+        self._age_recalled_insights(final)
         # M145: scrub recall summaries before they enter the prompt — the one
         # memory surface that bypasses `scan_for_injection`. See
         # `_scrub_recall_hit`. Done on the final ≤limit hits only, so the cost
@@ -242,9 +240,9 @@ class MemoryRouter:
     def _collect_insights(self, query: str, *, limit: int) -> list[RecallHit]:
         """M140: pull matching rows from the `insights` SQL table and age them.
 
-        Every matched insight is `touch`ed (its `last_referenced_at` bumped)
-        as a side effect — being retrieved *is* a reference. No-op without a
-        store. M161: the SQL row is the sole insight store (the markdown
+        Aging happens in `_age_recalled_insights` after the merge, not here:
+        being *injected into the prompt* is the reference, not being matched.
+        No-op without a store. M161: the SQL row is the sole insight store (the markdown
         under `.veles/memory/insights/` is a rendered view, never searched)."""
         if self._store is None:
             return []
@@ -264,9 +262,31 @@ class MemoryRouter:
         # provenance confidence) before they reach the prompt — cheaper context,
         # less noise. Pre-M218 rows default to 1.0 and are never touched.
         hits = [h for h in hits if h.confidence >= _INSIGHT_CONFIDENCE_FLOOR]
-        if hits:
-            self._store.touch_insights([h.id for h in hits], time.time())
         return [_insight_hit_to_recall(h) for h in hits]
+
+    def _age_recalled_insights(self, final: list[RecallHit]) -> None:
+        """Stamp `last_referenced_at` on the insights that actually made it
+        into the prompt (M264).
+
+        The bump used to happen inside the collector, over every FTS/KNN match.
+        Two problems, one of which only appeared with the bounded fan-out:
+        matches that lost the rerank were aged as though they had been used,
+        and — once a collector could be cancelled at the deadline — a stream
+        that never reached the prompt at all still aged its rows. That signal
+        feeds `rerank`'s recency term *and* picks the canonical survivor in
+        M142 dedup, so a false reference is not cosmetic.
+
+        Being *injected* is the reference. Anything else is a query artefact.
+        """
+        if self._store is None:
+            return
+        ids = [
+            int(h.rel_path.removeprefix("insight:"))
+            for h in final
+            if h.rel_path.startswith("insight:") and h.rel_path.removeprefix("insight:").isdigit()
+        ]
+        if ids:
+            self._store.touch_insights(ids, time.time())
 
     def _collect_turns(self, query: str, *, limit: int) -> list[RecallHit]:
         """Pull recent turns matching `query`. No-op when no store is wired.
@@ -327,6 +347,28 @@ def _subproject_wiki_enabled(sub_root) -> bool:
         return wiki_enabled(load_project(sub_root))
     except Exception:
         return False
+
+
+def _load_recall_deadline(project: Project) -> float:
+    """`[memory.recall] deadline_sec`, defaulting to `_RECALL_DEADLINE_SEC`.
+
+    A constant would have been the wrong shape for the one knob a multi-tenant
+    integrator reaches for first — and every neighbouring tunable in this
+    subsystem (`[memory.rerank]`, `[memory] turn_retention_days`) already comes
+    from config. M265's provider deadline reads the same key rather than
+    inventing a second one. Non-positive or malformed values fall back rather
+    than disabling the bound: "no deadline" must not be reachable by typo."""
+    try:
+        from veles.core.project_config import get_section, load_project_config
+
+        raw = get_section(load_project_config(project), "memory", "recall").get("deadline_sec")
+    except Exception:
+        return _RECALL_DEADLINE_SEC
+    try:
+        value = float(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return _RECALL_DEADLINE_SEC
+    return value if value > 0 else _RECALL_DEADLINE_SEC
 
 
 def _load_rerank_config(project: Project) -> tuple[RerankWeights, float]:

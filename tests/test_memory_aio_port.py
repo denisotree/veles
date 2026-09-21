@@ -184,3 +184,54 @@ def test_recall_survives_a_failing_collector(tmp_path: Path, monkeypatch) -> Non
         store.close()
 
     assert [h.title for h in hits] == ["kept"]
+
+
+def test_dropped_collector_does_not_age_its_rows(tmp_path: Path, monkeypatch) -> None:
+    """`last_referenced_at` is the recency signal rerank scores on and the one
+    dedup picks its canonical survivor by. A collector cancelled at the deadline
+    must not bump it: those rows never reached the prompt, so calling them
+    "referenced" corrupts both.
+    """
+    from veles.core.memory.router import MemoryRouter
+
+    project = init_project(tmp_path / "p", name="p")
+    store = SessionStore(project.memory_db_path)
+    try:
+        store._conn.execute(
+            "INSERT INTO insights(title, body, category, created_at)"
+            " VALUES ('slow', 'terraform state locking notes', 'test', 1000.0)"
+        )
+        store._conn.commit()
+        real = MemoryRouter._collect_insights
+
+        def slow_insights(self, query: str, *, limit: int):
+            hits = real(self, query, limit=limit)
+            time.sleep(30)
+            return hits
+
+        monkeypatch.setattr(MemoryRouter, "_collect_insights", slow_insights)
+        MemoryRouter(project, store=store).recall("terraform state locking", deadline_sec=0.3)
+        referenced = store._conn.execute(
+            "SELECT last_referenced_at FROM insights WHERE title = 'slow'"
+        ).fetchone()[0]
+    finally:
+        store.close()
+
+    assert referenced is None
+
+
+def test_recall_deadline_comes_from_config(tmp_path: Path, monkeypatch) -> None:
+    """A multi-tenant deployment tunes this first, so it is a config key rather
+    than a constant -- and a malformed value falls back instead of removing the
+    bound, because "no deadline" must not be reachable by typo."""
+    from veles.core.memory.router import _RECALL_DEADLINE_SEC, _load_recall_deadline
+
+    project = init_project(tmp_path / "p", name="p")
+    config = project.state_dir / "config.toml"
+
+    config.write_text("[memory.recall]\ndeadline_sec = 0.25\n", encoding="utf-8")
+    assert _load_recall_deadline(project) == pytest.approx(0.25)
+
+    for broken in ("deadline_sec = 0\n", 'deadline_sec = "soon"\n', ""):
+        config.write_text("[memory.recall]\n" + broken, encoding="utf-8")
+        assert _load_recall_deadline(project) == _RECALL_DEADLINE_SEC
