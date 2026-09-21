@@ -23,7 +23,7 @@ textually and reported 90 sites. Most of those were `self._conn` inside
 `JobsStore`, `TasksStore` and `RuntimeSessionStore` — sibling stores that share
 the project's database file and legitimately own their own connection. They are
 not port violations, and counting them made the ratchet measure the wrong thing
-while looking rigorous. The real number was 34.
+while looking rigorous. The real number was 34, and it is now 0.
 """
 
 from __future__ import annotations
@@ -39,9 +39,20 @@ _SRC = Path(__file__).resolve().parent.parent / "src" / "veles"
 # connection. Counting them would make the ratchet measure itself.
 _EXEMPT = {Path("core/memory/store.py"), Path("core/memory/__init__.py")}
 
-# Measured at the M264c commit. Only ever revise downwards.
-_MAX_DIRECT_CONSTRUCTION = 28
-_MAX_CONNECTION_REACH = 22
+# Direct construction: 15 remain and they are legitimate. Each one opens a
+# store to hand to `Agent`, or to list sessions — session and turn state stays
+# on the local file under every backend, including `RemoteStore`, because it is
+# per-conversation state no remote memory engine has a notion of. Porting them
+# would mean widening `MemoryStore` with operations a remote backend could
+# never implement. The ceiling stops the number growing; it is not a target of
+# zero.
+_MAX_DIRECT_CONSTRUCTION = 15
+
+# Reach-through: **zero**, so this half is a ban rather than a ratchet. The
+# replacements are `store.raw()` (a port that has a local file behind it) and
+# `memory.store.local_connection(project)` (SQLite-specific work with no port
+# involved). Both name what they are doing; `store._conn` named nothing.
+_MAX_CONNECTION_REACH = 0
 
 
 def _iter_sources() -> list[tuple[Path, str]]:
@@ -115,7 +126,8 @@ def test_ceilings_are_not_stale() -> None:
         f"only {direct} direct constructions remain against a ceiling of "
         f"{_MAX_DIRECT_CONSTRUCTION} — lower `_MAX_DIRECT_CONSTRUCTION` to {direct}"
     )
-    assert reach >= _MAX_CONNECTION_REACH - 4, (
-        f"only {reach} reach-throughs remain against a ceiling of "
-        f"{_MAX_CONNECTION_REACH} — lower `_MAX_CONNECTION_REACH` to {reach}"
+    assert reach == _MAX_CONNECTION_REACH == 0, (
+        "reach-through is at zero and stays there; if a legitimate case appears, "
+        "it goes through `store.raw()` or `local_connection`, not through a "
+        "raised ceiling"
     )

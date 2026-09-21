@@ -199,12 +199,10 @@ def _record_tool_use_in_db(
         project = current_project()
         if project is None:
             return
-        from veles.core.memory import SessionStore
+        from veles.core.memory.store import local_connection
         from veles.core.tools.persistence import record_use, upsert_tool
 
-        store = SessionStore(project.memory_db_path)
-        try:
-            conn = store._conn
+        with local_connection(project) as conn:
             kwargs = {
                 "tool_name": entry.name,
                 "ok": ok,
@@ -217,8 +215,6 @@ def _record_tool_use_in_db(
                     upsert_tool(conn, entry)
                 record_use(conn, **kwargs)
             conn.commit()
-        finally:
-            store.close()
     except Exception:  # pragma: no cover - telemetry is never load-bearing
         logger.debug("tool telemetry write failed for %s", entry.name, exc_info=True)
 

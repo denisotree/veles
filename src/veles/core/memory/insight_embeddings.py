@@ -10,13 +10,11 @@ should be spent only on the survivor set that recall actually surfaces.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol
+import sqlite3
+from typing import Protocol
 
 from veles.core.memory.eligibility import eligible_sql
 from veles.core.memory.vector import ensure_embeddings_table, upsert_embedding
-
-if TYPE_CHECKING:
-    from veles.core.memory import SessionStore
 
 
 class _Embedder(Protocol):
@@ -29,7 +27,7 @@ def _insight_embedding_text(title: str, body: str) -> str:
 
 
 def backfill_insight_embeddings(
-    store: SessionStore,
+    conn: sqlite3.Connection,
     adapter: _Embedder,
     *,
     limit: int = 64,
@@ -38,8 +36,8 @@ def backfill_insight_embeddings(
     superseded rows. Returns the number embedded. Idempotent: a fully-embedded
     survivor set yields 0. Best-effort — a single embed failure aborts the batch
     without raising (recall keeps working on FTS)."""
-    ensure_embeddings_table(store._conn)
-    rows = store._conn.execute(
+    ensure_embeddings_table(conn)
+    rows = conn.execute(
         "SELECT i.id, i.title, i.body FROM insights i"
         " LEFT JOIN embeddings_blob e"
         "   ON e.ref_kind = 'insight' AND e.ref_id = i.id"
@@ -63,9 +61,9 @@ def backfill_insight_embeddings(
     for row, vec in zip(rows, vectors, strict=True):
         if not vec:
             continue
-        upsert_embedding(store._conn, ref_kind="insight", ref_id=int(row["id"]), vec=vec)
+        upsert_embedding(conn, ref_kind="insight", ref_id=int(row["id"]), vec=vec)
         embedded += 1
-    store._conn.commit()
+    conn.commit()
     return embedded
 
 
@@ -77,14 +75,11 @@ def embed_survivor_insights(project, *, limit: int = 64) -> int:
     count embedded (0 when there is no local adapter). Opens and closes its own
     store so callers don't need one.
     """
-    from veles.core.memory import SessionStore
+    from veles.core.memory.store import local_connection
     from veles.modules.embedding import get_local_embedding_adapter
 
     adapter = get_local_embedding_adapter()
     if adapter is None:
         return 0
-    store = SessionStore(project.memory_db_path)
-    try:
-        return backfill_insight_embeddings(store, adapter, limit=limit)
-    finally:
-        store.close()
+    with local_connection(project) as conn:
+        return backfill_insight_embeddings(conn, adapter, limit=limit)

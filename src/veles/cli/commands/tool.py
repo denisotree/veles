@@ -36,7 +36,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from veles.core.memory import SessionStore
+from veles.core.memory.store import local_connection
 from veles.core.project import Project
 from veles.core.tools.persistence import (
     ToolTelemetry,
@@ -188,14 +188,10 @@ def _cmd_approve(args: argparse.Namespace, project: Project) -> int:
 
 def _cmd_list(args: argparse.Namespace, project: Project) -> int:
     del args
-    store = SessionStore(project.memory_db_path)
-    try:
-        conn = store._conn
+    with local_connection(project) as conn:
         records, unapproved = _live_tools(project, conn)
         conn.commit()
         tele = telemetry_batch(conn, [r.name for r in records])
-    finally:
-        store.close()
     if not records:
         print("no tools available — the builtin registry is empty, which is a bug.")
         return 0
@@ -259,9 +255,7 @@ def _cmd_show(args: argparse.Namespace, project: Project) -> int:
     tell the same lie as `list`: a working builtin has no row there, so
     `veles tool show read_file` answered "no tool named 'read_file'"."""
     name = args.name
-    store = SessionStore(project.memory_db_path)
-    try:
-        conn = store._conn
+    with local_connection(project) as conn:
         live, _ = _live_tools(project, conn)
         conn.commit()
         entry = next((t for t in live if t.name == name), None)
@@ -283,8 +277,6 @@ def _cmd_show(args: argparse.Namespace, project: Project) -> int:
                 print(f"inherits:    {base['name']}")
         if rec is not None and rec.manifest_json:
             print(f"manifest:    {rec.manifest_json}")
-    finally:
-        store.close()
     print("---")
     print(f"use_count:     {t.use_count}")
     print(f"success_count: {t.success_count}")
@@ -349,11 +341,15 @@ def _cmd_promote(args: argparse.Namespace, project: Project) -> int:
     # Update the catalogue. The next load_into_registry call will see
     # the file at the new path and refresh manifest_json; this
     # in-place scope flip is just for users who inspect right now.
-    store = SessionStore(project.memory_db_path)
-    store._conn.execute(
-        "UPDATE tools SET scope = 'user', origin = 'manual', updated_at = ? WHERE name = ?",
-        (_now(), name),
-    )
+    with local_connection(project) as conn:
+        # M264c: the catalogue write is committed now. It never was — the store
+        # was opened, written to, and dropped without a commit or a close, so
+        # the scope flip this prints about was rolled back on the way out.
+        conn.execute(
+            "UPDATE tools SET scope = 'user', origin = 'manual', updated_at = ? WHERE name = ?",
+            (_now(), name),
+        )
+        conn.commit()
     print(f"promoted {name}: {src} → {dst}")
     return 0
 

@@ -27,7 +27,9 @@ import asyncio
 import logging
 import sqlite3
 import time
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from veles.core.memory import InsightHit, SessionStore, TurnHit
@@ -206,6 +208,30 @@ class RemoteStore:
         return self._local.sync
 
 
+@contextmanager
+def local_connection(project: Project) -> Iterator[sqlite3.Connection]:
+    """A connection to the project's local SQLite file, for the work that is
+    SQLite-specific by nature (M264c).
+
+    Tool and skill telemetry, the project-tree cache, the embedding blobs and
+    the setup-hint bookkeeping are per-installation state that no remote memory
+    engine has a notion of. They do not belong in `MemoryStore`, and they do
+    not need the async port either: `tool_dispatch` records telemetry on every
+    single tool call, and sending that through an event loop to reach a local
+    file would be ceremony charged to the hot path.
+
+    What they did need is to stop opening their own store and reaching into its
+    private connection. This is the one place that happens, it says in its name
+    that the caller is doing local SQLite work, and it is greppable when a
+    future backend has to account for every such site.
+    """
+    store = SessionStore(project.memory_db_path)
+    try:
+        yield store._conn
+    finally:
+        store.close()
+
+
 def open_store(project: Project) -> MemoryStore:
     """Open the memory store for `project` — the single place a backend is
     chosen.
@@ -248,4 +274,11 @@ def _configured_backend(project: Project) -> str:
     return str(raw).strip().lower() if isinstance(raw, str) else "sqlite"
 
 
-__all__ = ["LocalBackedStore", "MemoryStore", "RemoteStore", "SqliteStore", "open_store"]
+__all__ = [
+    "LocalBackedStore",
+    "MemoryStore",
+    "RemoteStore",
+    "SqliteStore",
+    "local_connection",
+    "open_store",
+]

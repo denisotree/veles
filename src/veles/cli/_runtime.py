@@ -338,16 +338,14 @@ def _relevant_paths_block(project: Project, query: str) -> str | None:
     rather than breaking prompt assembly."""
     if not query.strip():
         return None
-    from veles.core.memory import SessionStore
+    from veles.core.memory.store import local_connection
     from veles.core.project_tree import relevant_semantic
 
-    store = SessionStore(project.memory_db_path)
     try:
-        entries = relevant_semantic(store._conn, query, limit=_RELEVANT_PATHS_LIMIT)
+        with local_connection(project) as conn:
+            entries = relevant_semantic(conn, query, limit=_RELEVANT_PATHS_LIMIT)
     except Exception:
         return None
-    finally:
-        store.close()
     if not entries:
         return None
     lines = [
@@ -666,23 +664,27 @@ def _load_skills(
         # `tools` table, which is why `veles tool list` reported nothing in a
         # project whose tools demonstrably worked. Best-effort: a catalogue
         # write must not stop the agent from getting its tools.
-        conn = None
-        try:
-            from veles.core.memory import SessionStore
+        from veles.core.memory.store import local_connection
 
-            store = SessionStore(project.memory_db_path)
-            conn = store._conn
-        except Exception as exc:  # pragma: no cover - catalogue is not load-bearing
-            logger.warning("tool catalogue unavailable: %s", exc)
-        report = load_into_registry(
-            full,
-            project_tools_dir=project.state_dir / "tools",
-            user_tools_dir=user_home() / "tools",
-            conn=conn,
-        )
-        if conn is not None:
-            with contextlib.suppress(Exception):
-                conn.commit()
+        # M264c: the catalogue connection is closed on the way out now — this
+        # opened one per runtime build and dropped it. ExitStack because the
+        # loader still has to run with `conn=None` when the database is
+        # unavailable: a missing catalogue must not cost the agent its tools.
+        with contextlib.ExitStack() as stack:
+            conn = None
+            try:
+                conn = stack.enter_context(local_connection(project))
+            except Exception as exc:  # pragma: no cover - catalogue is not load-bearing
+                logger.warning("tool catalogue unavailable: %s", exc)
+            report = load_into_registry(
+                full,
+                project_tools_dir=project.state_dir / "tools",
+                user_tools_dir=user_home() / "tools",
+                conn=conn,
+            )
+            if conn is not None:
+                with contextlib.suppress(Exception):
+                    conn.commit()
         tool_names = [lt.entry.name for lt in report.loaded]
         for name, scope in report.errors:
             logger.warning("project tool %s failed to load: %s", name, scope)

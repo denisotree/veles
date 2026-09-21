@@ -332,16 +332,14 @@ def _apply_db_telemetry(project: Project, skills: list[Skill]) -> None:
     or locked database must never stop skills from loading.
     """
     try:
-        from veles.core.memory import SessionStore
+        from veles.core.memory.store import local_connection
         from veles.core.skills_persistence import skill_telemetry
 
-        db_path = project.memory_db_path
-        if not db_path.exists():
+        if not project.memory_db_path.exists():
             return
-        store = SessionStore(db_path)
-        try:
+        with local_connection(project) as conn:
             for skill in skills:
-                t = skill_telemetry(store._conn, skill.name)
+                t = skill_telemetry(conn, skill.name)
                 if t.use_count == 0:
                     continue
                 skill.use_count = t.use_count
@@ -351,8 +349,6 @@ def _apply_db_telemetry(project: Project, skills: list[Skill]) -> None:
                     skill.last_used = _dt.datetime.fromtimestamp(
                         float(t.last_used_at), tz=_dt.UTC
                     ).strftime("%Y-%m-%dT%H:%M:%SZ")
-        finally:
-            store.close()
     except Exception:  # pragma: no cover - never block skill discovery
         logger.debug("skill telemetry overlay failed", exc_info=True)
 
@@ -482,12 +478,10 @@ def _record_skill_use_in_db(skill: Skill, *, success: bool) -> None:
         project = current_project()
         if project is None:
             return
-        from veles.core.memory import SessionStore
+        from veles.core.memory.store import local_connection
         from veles.core.skills_persistence import record_skill_use, upsert_skill
 
-        store = SessionStore(project.memory_db_path)
-        try:
-            conn = store._conn
+        with local_connection(project) as conn:
             # `record_skill_use` is a no-op (returns 0) when the skill has no
             # catalogue row, so cataloguing is the slow path taken once per
             # skill rather than on every invocation.
@@ -503,8 +497,6 @@ def _record_skill_use_in_db(skill: Skill, *, success: bool) -> None:
                     upsert_skill(conn, skill)
                 record_skill_use(conn, skill_name=skill.name, ok=success)
             conn.commit()
-        finally:
-            store.close()
     except Exception:  # pragma: no cover - telemetry is never load-bearing
         logger.debug("skill telemetry write failed for %s", skill.name, exc_info=True)
 
