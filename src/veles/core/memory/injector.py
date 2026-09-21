@@ -9,6 +9,8 @@ memory rotates.
 
 from __future__ import annotations
 
+import re
+
 from veles.core.memory.artefacts import ProposalInfo
 from veles.core.memory.router import RecallHit
 
@@ -18,6 +20,22 @@ _PROPOSALS_OPEN = "<subproject-proposals>"
 _PROPOSALS_CLOSE = "</subproject-proposals>"
 _QUERY_HEADER_CAP = 120
 _PROPOSALS_MAX_CHARS = 1500
+
+# M259: the delimiters below are OURS, and everything between them is recalled
+# text — insight bodies, page titles, proposal summaries — i.e. content the
+# agent itself wrote earlier, or ingested from a source. A stored fact that
+# happens to contain `</memory-context>` closes the block early, and the rest
+# of recall is then read as ordinary prompt text outside any boundary.
+#
+# `scan_for_injection` does not cover this: it neutralises `<system>` /
+# `<im_start>`, not Veles' own block tags. Escaping (rather than scrubbing) is
+# deliberate — a page legitimately documenting these tags stays readable.
+_BLOCK_TAG = re.compile(r"<\s*/?\s*(?:memory-context|subproject-proposals)\b[^>]*>", re.IGNORECASE)
+
+
+def _escape_block_tags(text: str) -> str:
+    """Neutralise our own block delimiters inside interpolated content."""
+    return _BLOCK_TAG.sub(lambda m: m.group(0).replace("<", "&lt;").replace(">", "&gt;"), text)
 
 
 def build_memory_context_block(
@@ -30,7 +48,7 @@ def build_memory_context_block(
     # shortened list otherwise reads as "nothing else matched" (graphify's
     # truncation-notice lesson: silence must never read as absence).
     total = len(hits) if _total is None else _total
-    header_query = query.strip().replace("\n", " ")[:_QUERY_HEADER_CAP]
+    header_query = _escape_block_tags(query.strip().replace("\n", " ")[:_QUERY_HEADER_CAP])
     if len(hits) < total:
         header = (
             f'Showing {len(hits)} of {total} matches for "{header_query}" '
@@ -41,7 +59,7 @@ def build_memory_context_block(
     lines = [_BLOCK_OPEN, header]
     for h in hits:
         summary = h.summary.strip() or "(no summary)"
-        lines.append(f"- {h.rel_path} — {h.title}: {summary}")
+        lines.append(_escape_block_tags(f"- {h.rel_path} — {h.title}: {summary}"))
     lines.append(_BLOCK_CLOSE)
     block = "\n".join(lines)
     if len(block) <= max_chars:
@@ -74,7 +92,7 @@ def build_proposals_block(
     ]
     for p in proposals:
         summary = p.summary.strip() or "(no summary)"
-        lines.append(f"- {p.slug}: {summary}")
+        lines.append(_escape_block_tags(f"- {p.slug}: {summary}"))
     lines.append(
         "To accept one: `veles subproject init <slug>` then move the listed "
         "pages into the new subproject's wiki/."
