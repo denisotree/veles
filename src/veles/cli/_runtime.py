@@ -306,17 +306,23 @@ def _recall_block(project: Project, query: str) -> str | None:
     # M55 follow-up: ship external providers (Honcho/Mem0) when configured
     # in `~/.veles/config.toml [memory.external]`. Builder returns empty
     # when not configured; recall stays purely local in that case.
-    from veles.core.memory import SessionStore
+    from veles.core.memory import aio
     from veles.core.memory.providers import build_extra_providers
+    from veles.core.memory.store import open_store
 
-    store = SessionStore(project.memory_db_path)
+    # M264: the recall path is the first caller on the storage port. The
+    # collectors are still synchronous, so they take `store.sync` — the escape
+    # hatch is temporary by construction and shrinks as sites move over. What
+    # matters already is that the backend is chosen in one place instead of
+    # being welded into this call.
+    store = open_store(project)
     try:
         extras = build_extra_providers()
-        hits = MemoryRouter(project, store=store, extra_providers=extras).recall(
+        hits = MemoryRouter(project, store=store.sync, extra_providers=extras).recall(
             query, limit=_RECALL_LIMIT
         )
     finally:
-        store.close()
+        aio.submit(store.close())
     return build_memory_context_block(hits, query, max_chars=_RECALL_BLOCK_CHARS_CAP)
 
 

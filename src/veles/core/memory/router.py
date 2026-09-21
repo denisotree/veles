@@ -23,11 +23,13 @@ versa. Recency / BM25-weighted merging is a future refinement.
 
 from __future__ import annotations
 
+import asyncio
 import datetime as _dt
+import logging
 import time
 from dataclasses import dataclass, replace
 
-from veles.core.memory import InsightHit, SessionStore, TurnHit
+from veles.core.memory import InsightHit, SessionStore, TurnHit, aio
 from veles.core.memory.rerank import (
     DEFAULT_HALF_LIFE_SEC,
     DEFAULT_WEIGHTS,
@@ -37,6 +39,13 @@ from veles.core.memory.rerank import (
 from veles.core.project import Project
 from veles.core.safety import scan_for_injection
 from veles.core.subproject import load_subprojects, resolve_subproject_path
+
+logger = logging.getLogger(__name__)
+
+# M264: how long the whole recall fan-out may take before the turn moves on
+# with whatever finished. Two seconds mirrors the llama.cpp probe bound of
+# M256b, for the same reason: this is the path of every turn.
+_RECALL_DEADLINE_SEC = 2.0
 
 _TURN_SUMMARY_CAP = 200
 _TURN_RECENCY_WINDOW_SEC = 30 * 86_400  # only recall turns from the last 30 days
@@ -74,15 +83,22 @@ class MemoryRouter:
         # — every entry is duck-typed at call time.
         self._extra: list[object] = list(extra_providers or [])
 
-    def recall(self, query: str, *, limit: int = 5) -> list[RecallHit]:
+    def recall(
+        self, query: str, *, limit: int = 5, deadline_sec: float | None = None
+    ) -> list[RecallHit]:
         if not query.strip():
             return []
-        about_hits = self._collect_about_veles(query, limit=limit)
-        wiki_hits = self._collect_wiki(query, limit=limit)
-        insight_hits = self._collect_insights(query, limit=limit)
-        turn_hits = self._collect_turns(query, limit=limit)
-        extra_hits = self._collect_extra(query, limit=limit)
-        streams = [about_hits, wiki_hits, insight_hits, turn_hits, extra_hits]
+        streams = aio.submit(
+            self._collect_all(
+                query,
+                limit=limit,
+                deadline_sec=_RECALL_DEADLINE_SEC if deadline_sec is None else deadline_sec,
+            ),
+            # Backstop only: the per-collector deadline inside `_collect_all`
+            # is what actually bounds the turn, and it returns partial results.
+            # This one exists so a bug in that logic cannot hang a turn forever.
+            timeout=(_RECALL_DEADLINE_SEC if deadline_sec is None else deadline_sec) + 5.0,
+        )
         # M141 scored rerank (relevance + recency + M221 confidence). M223 dropped
         # the `VELES_MEMORY_RERANK=0` round-robin fallback — a kill switch for a
         # default that has led since M141 and only got richer since.
@@ -100,6 +116,57 @@ class MemoryRouter:
         # `_scrub_recall_hit`. Done on the final ≤limit hits only, so the cost
         # is a handful of regex passes per turn.
         return [_scrub_recall_hit(h) for h in final]
+
+    async def _collect_all(
+        self, query: str, *, limit: int, deadline_sec: float
+    ) -> list[list[RecallHit]]:
+        """Run every collector concurrently under one deadline (M264).
+
+        Sequentially, the turn paid the sum of five sources; a single slow one
+        — an external provider over the network, a KNN scan over a large
+        corpus — moved the whole turn. Concurrently it pays the slowest, and
+        past the deadline it pays the deadline and keeps whatever finished.
+
+        Partial beats empty: a source that missed the cut is dropped with a
+        warning, not silently, because a shorter list must never read as "there
+        was nothing" (the M219 lesson, one layer down).
+
+        The collectors are synchronous and stay that way — they are wrapped in
+        threads here. Two of them share one `sqlite3.Connection`, which is
+        allowed: the connection is opened with `check_same_thread=False` and
+        CPython 3.13 reports `sqlite3.threadsafety == 3` (SQLite serialises
+        internally).
+        """
+        jobs = {
+            "about": self._collect_about_veles,
+            "wiki": self._collect_wiki,
+            "insights": self._collect_insights,
+            "turns": self._collect_turns,
+            "extra": self._collect_extra,
+        }
+        tasks = {
+            name: asyncio.ensure_future(asyncio.to_thread(fn, query, limit=limit))
+            for name, fn in jobs.items()
+        }
+        await asyncio.wait(tasks.values(), timeout=deadline_sec)
+
+        streams: list[list[RecallHit]] = []
+        dropped: list[str] = []
+        for name, task in tasks.items():
+            if not task.done():
+                # Cancelling stops us waiting; the worker thread itself runs to
+                # completion, which is the price of wrapping sync code.
+                task.cancel()
+                dropped.append(f"{name} (deadline)")
+                continue
+            exc = task.exception()
+            if exc is not None:
+                dropped.append(f"{name} ({type(exc).__name__})")
+                continue
+            streams.append(task.result())
+        if dropped:
+            logger.warning("recall: dropped %s", ", ".join(dropped))
+        return streams
 
     def _collect_extra(self, query: str, *, limit: int) -> list[RecallHit]:
         """Call every registered external provider, swallowing per-provider
