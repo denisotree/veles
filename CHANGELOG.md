@@ -62,11 +62,21 @@ quietly mean "sometimes never". Retracted facts are never pushed out.
 
 ### Added — `veles doctor` warns before memory searches get slow
 
-Local vector search costs about 3.9 ms per thousand facts, so it stops fitting a
-200 ms budget at roughly **48 000 insights**. Past that, recall starts dropping
-whatever misses its deadline — which looks like memory going missing, not like a
-slow answer. Doctor now projects the per-turn cost from your row count and says
-so, with the number and what to do about it.
+Local vector search costs about 3.9 ms per thousand facts. Doctor now projects
+the per-turn cost from your row count and tells you which of two thresholds you
+are past, because they are different problems:
+
+- **~48 000 insights** — about 190 ms, past the 200 ms budget recall is
+  designed around. Turns are measurably slower. That is a warning.
+- **~505 000 insights** at the default 2-second deadline — recall starts
+  dropping whatever misses it, which shows up as memory quietly going missing
+  rather than as a slow answer. That is an error, and doctor reads your own
+  `[memory.recall] deadline_sec` rather than assuming the default.
+
+No approximate-nearest-neighbour index was added, deliberately: a personal
+project does not reach either number, and the case that does needs a remote
+engine rather than a local index, since a million facts is about 3 GB of
+resident memory per project.
 
 No approximate-nearest-neighbour index was added, deliberately: a personal
 project does not reach 48 000, and the case that does needs a remote engine

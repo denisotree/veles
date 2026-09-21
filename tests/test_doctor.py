@@ -558,7 +558,9 @@ def test_vector_recall_size_ok_when_unused(tmp_path: Path) -> None:
     assert _vector_check(project).status == "ok"
 
 
-def test_vector_recall_size_warns_before_the_ceiling(tmp_path: Path) -> None:
+def test_vector_recall_size_warns_past_the_design_budget(tmp_path: Path) -> None:
+    """Past 200 ms turns are slower, but nothing is lost yet — that is a warning,
+    and it has to name where the real loss begins."""
     from veles.core.doctor import _KNN_WARN_ROWS
     from veles.core.project import init_project
 
@@ -566,18 +568,32 @@ def test_vector_recall_size_warns_before_the_ceiling(tmp_path: Path) -> None:
     _seed_embeddings(project, _KNN_WARN_ROWS)
     result = _vector_check(project)
     assert result.status == "warn"
-    assert "ceiling" in result.message
+    assert "200 ms budget" in result.message
+    assert "dropped at" in result.message
 
 
-def test_vector_recall_size_errors_past_the_ceiling(tmp_path: Path) -> None:
-    """Past the budget, recall starts dropping the collector that missed its
-    deadline — which looks like memory going missing, not like slowness. The
-    check has to name that, or the symptom is unreadable."""
-    from veles.core.doctor import _KNN_CEILING_ROWS
+def test_vector_recall_size_errors_only_past_the_deadline(tmp_path: Path) -> None:
+    """The error tier is for actual loss: recall drops whatever misses the
+    configured deadline, which is an order of magnitude further out than the
+    design budget. Reporting an error at the budget would promise a failure
+    that is not happening yet.
+
+    Seeded against a deliberately tiny deadline, because the honest row count
+    for the 2 s default is half a million and seeding that to assert a string
+    would be a benchmark, not a test."""
+    from veles.core.doctor import _KNN_BUDGET_ROWS
     from veles.core.project import init_project
 
     project = init_project(tmp_path / "p", name="p")
-    _seed_embeddings(project, _KNN_CEILING_ROWS)
+    _seed_embeddings(project, _KNN_BUDGET_ROWS)
+
+    # At the default 2 s deadline this corpus is merely slow, not lossy.
+    assert _vector_check(project).status == "warn"
+
+    (project.state_dir / "config.toml").write_text(
+        "[memory.recall]\ndeadline_sec = 0.1\n", encoding="utf-8"
+    )
     result = _vector_check(project)
     assert result.status == "error"
+    assert "deadline" in result.message
     assert result.fix_hint and "remote backend" in result.fix_hint
