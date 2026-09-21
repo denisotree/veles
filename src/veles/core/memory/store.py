@@ -224,6 +224,14 @@ def local_connection(project: Project) -> Iterator[sqlite3.Connection]:
     private connection. This is the one place that happens, it says in its name
     that the caller is doing local SQLite work, and it is greppable when a
     future backend has to account for every such site.
+
+    **One deliberate exception, and it is the one to look at first if the
+    backend story changes:** `save_insight_row` and `save_rule_row` come
+    through here too, and insights are exactly what `RemoteStore` owns. They
+    are local by *contract*, not by omission — the local row is the source of
+    truth (`project_memory_no_loss`) and the external engine gets its copy
+    through the M265 dual-write, after the commit. If that contract is ever
+    revisited, those two writers are what has to move, not this helper.
     """
     store = SessionStore(project.memory_db_path)
     try:
