@@ -7,6 +7,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.36.0] — 2026-09-21
+
+Memory had never been measured. No project has ever had an embeddings table on
+disk, so the cost of searching by meaning was unknown — and it turned out to be
+not slow but impossible: at a hundred thousand facts a single vector query took
+**ten seconds**. This release measures memory, fixes what the measurement found,
+and gives memory a place to live other than the local file when one machine is
+no longer the right answer.
+
+### Changed — vector search got about 26× faster
+
+Vectors were stored as JSON text. A search reads every one of them, so every
+query rebuilt the entire corpus into Python lists before comparing anything.
+They are now packed binary:
+
+| facts | before | after |
+|---|---|---|
+| 10 000 | 1088 ms, 452 MB | **36 ms, 187 MB** |
+| 100 000 | 10 210 ms, 4082 MB | **393 ms, 915 MB** |
+
+Full-text search was never the problem — 7 ms at a hundred thousand facts.
+
+The conversion runs once, on first open, in batches with progress in the log.
+It resumes if interrupted, and it reclaims the freed space, because a storage
+migration that leaves your database twice as large is not one anyone asked for.
+
+### Changed — recall no longer waits for its slowest source
+
+Memory is assembled from several sources: the wiki, past conversations,
+insights, the framework's own knowledge, and any external provider you have
+configured. They ran one after another, so a turn paid the sum of all of them
+and one slow source held up everything.
+
+They now run together under a single deadline and return whatever finished,
+naming what was dropped. `[memory.recall] deadline_sec` sets it (default 2
+seconds). External providers run concurrently with each other too, so one slow
+remote source no longer starves the rest.
+
+### Added — memory can live in an external engine
+
+`[memory.store] backend = "remote"` sends insight search to an external memory
+engine (any configured provider — Honcho, Mem0, Supermemory, your own), while
+conversations and telemetry stay on your machine. That split is the shape of
+the data, not a compromise: insights grow without bound and want a real index
+behind them, conversation state is per-machine and no remote engine has a notion
+of it.
+
+Writing out is new. Providers can now accept insights as well as serve them, and
+writes are **dual**: the local row is written first and stays the source of
+truth, the external copy is best-effort and never fails your turn. A write that
+did not land is marked and retried by `veles dream`, so "best effort" does not
+quietly mean "sometimes never". Retracted facts are never pushed out.
+
+### Added — `veles doctor` warns before memory searches get slow
+
+Local vector search costs about 3.9 ms per thousand facts, so it stops fitting a
+200 ms budget at roughly **48 000 insights**. Past that, recall starts dropping
+whatever misses its deadline — which looks like memory going missing, not like a
+slow answer. Doctor now projects the per-turn cost from your row count and says
+so, with the number and what to do about it.
+
+No approximate-nearest-neighbour index was added, deliberately: a personal
+project does not reach 48 000, and the case that does needs a remote engine
+rather than a local index, since a million facts is about 3 GB of resident
+memory per project.
+
+### Fixed
+
+- **Insights were being aged when they had not been used.** Retrieval marks an
+  insight as referenced, and that mark decides both how recently-relevant it
+  looks and which copy survives deduplication. It was applied to every match,
+  including matches that lost ranking and never reached the model — and, once
+  sources could be dropped at a deadline, to entire sources that were never
+  consulted. Only insights that actually reach the prompt are marked now.
+- **A project configured for a remote engine still read from the local file.**
+  The recall path unwrapped the configured backend back into local storage, so
+  the engine was built, ignored, and never asked.
+- **`veles tool promote` did not save the change it announced.** The scope flip
+  was written without a commit and rolled back on the way out.
+- **Two connection leaks**: one per project-tree scan, one per runtime build.
+
+### Migration
+
+`memory.db` upgrades to schema v8 on first open, and the embeddings table is
+rebuilt into the new format. Automatic; on the empty embeddings table every
+current project has, it does nothing at all.
+
+
 ## [0.35.0] — 2026-09-21
 
 Memory has never deleted an insight — but it has been hiding them, silently and
@@ -1314,7 +1402,8 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v0.35.0...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v0.36.0...HEAD
+[0.36.0]: https://github.com/denisotree/veles/compare/v0.35.0...v0.36.0
 [0.35.0]: https://github.com/denisotree/veles/compare/v0.34.0...v0.35.0
 [0.34.0]: https://github.com/denisotree/veles/compare/v0.33.0...v0.34.0
 [0.33.0]: https://github.com/denisotree/veles/compare/v0.32.0...v0.33.0
