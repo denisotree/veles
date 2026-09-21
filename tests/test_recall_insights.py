@@ -13,7 +13,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from veles.core.memory import SessionStore
+from veles.core.memory import SessionStore, hide_insight
 from veles.core.project import init_project
 
 
@@ -69,7 +69,7 @@ def test_search_insights_excludes_superseded(tmp_path: Path) -> None:
             store, title="canonical", body="redis ttl 300 seconds session keys"
         )
         dup = _insert_insight(store, title="duplicate", body="redis ttl 300 seconds session keys")
-        store._conn.execute("UPDATE insights SET superseded_by = ? WHERE id = ?", (canonical, dup))
+        hide_insight(store._conn, dup, reason="merged-duplicate", superseded_by=canonical)
         store._conn.commit()
         hits = store.search_insights("redis ttl session", limit=5)
     finally:

@@ -238,7 +238,14 @@ CREATE TABLE IF NOT EXISTS insights (
     -- the current one. Supersession used to be encoded as an `insight_refs`
     -- row, which made it indistinguishable from any other relation; see
     -- `eligibility.eligible_sql`. The row itself is never deleted.
-    superseded_by      INTEGER REFERENCES insights(id) ON DELETE SET NULL
+    superseded_by      INTEGER REFERENCES insights(id) ON DELETE SET NULL,
+    -- M260: when this insight stopped being offered to recall, and why.
+    -- Hiding is the ONLY way a fact leaves recall — nothing deletes from this
+    -- table — so the pair is what makes the removal reversible (clear the
+    -- columns) and explainable (`/insights` prints the reason).
+    -- `hidden_reason` vocabulary: merged-duplicate | superseded | user-retracted.
+    hidden_at          REAL,
+    hidden_reason      TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_insights_category ON insights(category);
@@ -289,7 +296,35 @@ CREATE TRIGGER IF NOT EXISTS insights_au AFTER UPDATE ON insights BEGIN
 END;
 """
 
-_SCHEMA_VERSION = 5
+_SCHEMA_VERSION = 6
+
+
+def hide_insight(
+    conn: sqlite3.Connection,
+    insight_id: int,
+    *,
+    reason: str,
+    superseded_by: int | None = None,
+    now: float | None = None,
+) -> bool:
+    """Take one insight out of recall, recording why. Returns False when the
+    row was already hidden (the call is then a no-op, not an error).
+
+    This is the ONLY supported way a fact leaves recall — there is no delete.
+    It exists as a function rather than raw SQL at each writer because the
+    three columns have to move together: a row hidden without a reason is
+    exactly the state M260 set out to remove, and a `superseded_by` written
+    without `hidden_at` leaves the old fact competing with the one that
+    replaced it. `reason` vocabulary: merged-duplicate | superseded |
+    user-retracted.
+    """
+    cur = conn.execute(
+        "UPDATE insights SET hidden_at = ?, hidden_reason = ?,"
+        "   superseded_by = COALESCE(?, superseded_by)"
+        " WHERE id = ? AND hidden_at IS NULL",
+        (time.time() if now is None else now, reason, superseded_by, insight_id),
+    )
+    return cur.rowcount > 0
 
 
 def _make_session_id() -> str:
@@ -340,6 +375,8 @@ class SessionStore:
             self._migrate_to_v4(c)
         if current < 5:
             self._migrate_to_v5(c)
+        if current < 6:
+            self._migrate_to_v6(c)
         if current < _SCHEMA_VERSION:
             c.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
@@ -410,6 +447,28 @@ class SessionStore:
             "  AND id IN (SELECT from_insight_id FROM insight_refs)"
         )
         c.execute("DELETE FROM insight_refs")
+
+    def _migrate_to_v6(self, c: sqlite3.Connection) -> None:
+        """v5 → v6: add `insights.hidden_at` / `hidden_reason` (M260).
+
+        Recall eligibility moves onto `hidden_at`, so every row already
+        superseded has to be stamped or it would reappear in recall — which
+        would resurrect the duplicates dedup collapsed. The only writer of
+        supersession is the M142 dream dedup, so the reason for existing rows
+        is exactly `merged-duplicate`; the timestamp is unknown in retrospect
+        and is stamped as "now", the first moment the system can honestly
+        claim to know about it.
+        """
+        cols = {r[1] for r in c.execute("PRAGMA table_info(insights)").fetchall()}
+        if "hidden_at" not in cols:
+            c.execute("ALTER TABLE insights ADD COLUMN hidden_at REAL")
+        if "hidden_reason" not in cols:
+            c.execute("ALTER TABLE insights ADD COLUMN hidden_reason TEXT")
+        c.execute(
+            "UPDATE insights SET hidden_at = ?, hidden_reason = 'merged-duplicate'"
+            " WHERE superseded_by IS NOT NULL AND hidden_at IS NULL",
+            (time.time(),),
+        )
 
     def create_session(
         self, *, parent_session_id: str | None = None, title: str | None = None

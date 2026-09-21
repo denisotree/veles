@@ -1,4 +1,4 @@
-"""M258: supersession moves from `insight_refs` onto `insights.superseded_by`.
+"""M258/M260: supersession moves off `insight_refs`, and hiding gets a reason.
 
 The migration has to be exact rather than best-effort: the M142 dream dedup was
 the only writer of `insight_refs`, so every pre-v5 ref row *is* a supersession
@@ -109,3 +109,94 @@ def test_fresh_db_has_superseded_by(tmp_path: Path) -> None:
         assert "superseded_by" in cols
     finally:
         store.close()
+
+
+# ---- M260: visibility carries a reason, and nothing is deleted ----
+
+
+def test_v6_hides_rows_that_were_already_superseded(tmp_path: Path) -> None:
+    """Eligibility moved onto `hidden_at`, so a pre-M260 supersession has to be
+    stamped during the migration — otherwise every duplicate dedup collapsed
+    would walk back into recall."""
+    db = tmp_path / "memory.db"
+    canonical, dup = _make_v4_db(db)
+
+    store = SessionStore(db)
+    try:
+        row = store._conn.execute(
+            "SELECT hidden_at, hidden_reason, superseded_by FROM insights WHERE id = ?", (dup,)
+        ).fetchone()
+        assert row["hidden_at"] is not None
+        assert row["hidden_reason"] == "merged-duplicate"
+        assert row["superseded_by"] == canonical
+        ids = [h.id for h in store.search_insights("redis ttl session", limit=5)]
+        assert ids == [canonical]
+    finally:
+        store.close()
+
+
+def test_hidden_insight_is_still_stored_and_unhideable(tmp_path: Path) -> None:
+    """The invariant the whole design rests on: hiding removes a fact from
+    recall, never from the database, so clearing the columns brings it back."""
+    store = SessionStore(tmp_path / "memory.db")
+    try:
+        kept = _insert_insight(store._conn, "kept", "postgres vacuum runs nightly")
+        hidden = _insert_insight(store._conn, "hidden", "postgres vacuum runs weekly")
+        store._conn.execute(
+            "UPDATE insights SET hidden_at = 1.0, hidden_reason = 'user-retracted' WHERE id = ?",
+            (hidden,),
+        )
+        store._conn.commit()
+
+        assert [h.id for h in store.search_insights("postgres vacuum", limit=5)] == [kept]
+        # still on disk, with its reason
+        row = store._conn.execute(
+            "SELECT body, hidden_reason FROM insights WHERE id = ?", (hidden,)
+        ).fetchone()
+        assert row["body"] == "postgres vacuum runs weekly"
+        assert row["hidden_reason"] == "user-retracted"
+
+        store._conn.execute(
+            "UPDATE insights SET hidden_at = NULL, hidden_reason = NULL WHERE id = ?", (hidden,)
+        )
+        store._conn.commit()
+        ids = {h.id for h in store.search_insights("postgres vacuum", limit=5)}
+        assert ids == {kept, hidden}
+    finally:
+        store.close()
+
+
+def test_dedup_records_why_it_hid_the_duplicate(tmp_path: Path) -> None:
+    from veles.core.dreaming import DreamResult, _step_insight_dedup
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path / "p", name="p")
+    conn = sqlite3.connect(str(project.memory_db_path))
+    try:
+        conn.execute(
+            "INSERT INTO insights(title, body, category, created_at, last_referenced_at)"
+            " VALUES ('a', 'bump nginx worker_connections concurrent sockets',"
+            " 'curated-session', 100.0, 100.0)"
+        )
+        conn.execute(
+            "INSERT INTO insights(title, body, category, created_at, last_referenced_at)"
+            " VALUES ('b', 'increase nginx worker_connections concurrent sockets',"
+            " 'curated-session', 200.0, 200.0)"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    _step_insight_dedup(project, DreamResult(), dry_run=False)
+
+    conn = sqlite3.connect(str(project.memory_db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            "SELECT id, hidden_at, hidden_reason FROM insights WHERE hidden_at IS NOT NULL"
+        ).fetchall()
+    finally:
+        conn.close()
+    assert len(rows) == 1
+    assert rows[0]["hidden_reason"] == "merged-duplicate"
+    assert rows[0]["hidden_at"] > 0

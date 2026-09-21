@@ -15,6 +15,14 @@ M258 moves supersession onto its own column (`insights.superseded_by`)
 and funnels every query through `eligible_sql()`, so the next filter
 (visibility, expiry, review state) is added in one place instead of six.
 
+M260 is that next filter, and it subsumes the first: `hidden_at` records
+*that* a row left recall and `hidden_reason` records *why*, while
+`superseded_by` keeps the pointer to whatever replaced it. Dedup writes
+all three, so eligibility asks the visibility column alone. Nothing
+deletes from `insights` — hiding is the only way a fact leaves recall,
+which is what keeps the removal reversible (clear the columns) and
+explainable (`/insights` prints the reason).
+
 The predicate is deliberately a SQL fragment rather than a Python filter:
 all six call sites are SQL, and pulling ineligible rows into Python just
 to drop them would make recall pay for what the database can exclude.
@@ -32,4 +40,4 @@ def eligible_sql(alias: str = "") -> str:
     `FROM insights i`); empty means the columns are unqualified.
     """
     prefix = f"{alias}." if alias else ""
-    return f"{prefix}superseded_by IS NULL"
+    return f"{prefix}hidden_at IS NULL"

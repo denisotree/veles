@@ -48,6 +48,7 @@ from typing import TYPE_CHECKING
 
 from veles.core.curator_state import CuratorState, load, save_atomic
 from veles.core.file_lock import file_lock
+from veles.core.memory import hide_insight
 from veles.core.memory.artefacts import append_memory_log, write_proposal
 from veles.core.memory.eligibility import eligible_sql
 from veles.core.slug import now_timestamp_slug
@@ -427,12 +428,12 @@ def _step_insight_dedup(project: Project, result: DreamResult, *, dry_run: bool)
     Clusters the most-recent insights by TF-IDF cosine (shared
     `text_cluster.cluster_texts`); within each cluster the highest
     `last_referenced_at` (most-used / most-recent) is the canonical survivor,
-    and every other member gets `insights.superseded_by = <canonical>` (M258 —
-    previously an `insight_refs` row, which was indistinguishable from any
-    other relation). Recall (`MemoryRouter._collect_insights`) then excludes
-    superseded rows, so duplicates stop drowning the canonical without deleting
-    anything. Idempotent via the `superseded_by IS NULL` guard: a row already
-    pointing somewhere is left alone rather than re-pointed."""
+    and every other member is pointed at it (`superseded_by`) and hidden from
+    recall with a reason (`hidden_at` / `hidden_reason='merged-duplicate'`,
+    M260). Nothing is deleted: duplicates stop drowning the canonical, and the
+    variant stays on disk, findable, and un-hideable by clearing two columns.
+    Idempotent via the `hidden_at IS NULL` guard — a row already hidden (for
+    this or any other reason) is left alone rather than re-stamped."""
     import sqlite3
 
     from veles.core.text_cluster import cluster_texts
@@ -460,9 +461,11 @@ def _step_insight_dedup(project: Project, result: DreamResult, *, dry_run: bool)
             for i in indices:
                 if i == canonical:
                     continue
-                conn.execute(
-                    "UPDATE insights SET superseded_by = ? WHERE id = ? AND superseded_by IS NULL",
-                    (canonical_id, int(rows[i]["id"])),
+                hide_insight(
+                    conn,
+                    int(rows[i]["id"]),
+                    reason="merged-duplicate",
+                    superseded_by=canonical_id,
                 )
         conn.commit()
         result.notes.append(f"insight-dedup: {len(clusters)} cluster(s) collapsed")
