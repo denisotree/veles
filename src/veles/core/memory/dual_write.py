@@ -44,12 +44,23 @@ def _ingesting_providers() -> list[object]:
     return [p for p in build_extra_providers() if isinstance(p, IngestingMemoryProvider)]
 
 
-def push_insight(project: Project, *, insight_id: int, title: str, body: str) -> bool:
+def push_insight(
+    project: Project,
+    *,
+    insight_id: int,
+    title: str,
+    body: str,
+    providers: list[object] | None = None,
+) -> bool:
     """Offer one insight to every ingesting provider. Returns True when at
     least one accepted it, and stamps `synced_at` in that case.
 
+    `providers` is for callers pushing more than one row: building the list
+    parses `~/.veles/config.toml` and constructs every adapter, which is fine
+    once per save and wasteful fifty times per resync pass.
+
     Never raises: the caller has already stored the fact."""
-    providers = _ingesting_providers()
+    providers = _ingesting_providers() if providers is None else providers
     if not providers:
         return False
 
@@ -122,7 +133,11 @@ def resync_pending(project: Project, *, limit: int = _RESYNC_BATCH) -> int:
     accepted = 0
     for row in rows:
         if push_insight(
-            project, insight_id=int(row["id"]), title=row["title"] or "", body=row["body"] or ""
+            project,
+            insight_id=int(row["id"]),
+            title=row["title"] or "",
+            body=row["body"] or "",
+            providers=providers,
         ):
             accepted += 1
     return accepted

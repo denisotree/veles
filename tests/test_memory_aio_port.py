@@ -204,9 +204,9 @@ def test_dropped_collector_does_not_age_its_rows(tmp_path: Path, monkeypatch) ->
         store._conn.commit()
         real = MemoryRouter._collect_insights
 
-        def slow_insights(self, query: str, *, limit: int):
-            hits = real(self, query, limit=limit)
-            time.sleep(30)
+        async def slow_insights(self, query: str, *, limit: int):
+            hits = await real(self, query, limit=limit)
+            await asyncio.sleep(30)
             return hits
 
         monkeypatch.setattr(MemoryRouter, "_collect_insights", slow_insights)

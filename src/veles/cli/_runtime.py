@@ -310,15 +310,16 @@ def _recall_block(project: Project, query: str) -> str | None:
     from veles.core.memory.providers import build_extra_providers
     from veles.core.memory.store import open_store
 
-    # M264: the recall path is the first caller on the storage port. The
-    # collectors are still synchronous, so they take `store.sync` — the escape
-    # hatch is temporary by construction and shrinks as sites move over. What
-    # matters already is that the backend is chosen in one place instead of
-    # being welded into this call.
+    # M264/M265: the recall path is the first caller on the storage port, and
+    # it hands the router the port itself rather than the SQLite store behind
+    # it. Passing `store.sync` here would unwrap a configured `RemoteStore`
+    # back into the local file, so a project pointed at an external engine
+    # would build one, ignore it, and read from disk — the backend chosen in
+    # config has to be the backend that answers.
     store = open_store(project)
     try:
         extras = build_extra_providers()
-        hits = MemoryRouter(project, store=store.sync, extra_providers=extras).recall(
+        hits = MemoryRouter(project, store=store, extra_providers=extras).recall(
             query, limit=_RECALL_LIMIT
         )
     finally:

@@ -65,7 +65,24 @@ class SqliteStore:
 
     def __init__(self, db_path: Path | str) -> None:
         self._sync = SessionStore(db_path)
+        self._owns_sync = True
         self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="veles-sqlite")
+
+    @classmethod
+    def wrapping(cls, store: SessionStore) -> SqliteStore:
+        """Put the port in front of a `SessionStore` someone else opened.
+
+        The call sites that still construct their own store (see the ratchet)
+        hand it to `MemoryRouter`, which needs the port shape; opening a second
+        connection to the same file just to get that shape would be a second
+        connection to the same file. `close()` on a wrapper leaves the borrowed
+        store alone — closing something the caller opened is how a `finally`
+        block two frames up starts failing."""
+        self = cls.__new__(cls)
+        self._sync = store
+        self._owns_sync = False
+        self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="veles-sqlite")
+        return self
 
     async def _run(self, fn, *args, **kwargs):  # type: ignore[no-untyped-def]
         loop = asyncio.get_running_loop()
@@ -84,7 +101,8 @@ class SqliteStore:
         await self._run(self._sync.touch_insights, ids, at)
 
     async def close(self) -> None:
-        await self._run(self._sync.close)
+        if self._owns_sync:
+            await self._run(self._sync.close)
         self._pool.shutdown(wait=True)
 
     def raw(self) -> sqlite3.Connection:

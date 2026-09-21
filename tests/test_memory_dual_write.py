@@ -285,3 +285,82 @@ def test_remote_backend_reads_insights_from_the_provider(tmp_path: Path, monkeyp
     finally:
         conn.close()
     assert referenced == [(None,)]
+
+
+def test_remote_backend_serves_the_recall_path(tmp_path: Path, monkeypatch) -> None:
+    """The unit test above proves `RemoteStore.search_insights` works. This one
+    proves the router actually calls it — the gap where a remote backend can be
+    configured, constructed, and then quietly bypassed on the one path it
+    exists for.
+    """
+    from veles.cli._runtime import _recall_block
+
+    class _Engine(_Recorder):
+        def recall(self, query: str, *, limit: int) -> list[RecallHit]:
+            return [RecallHit(rel_path="remote:7", title="engine fact", summary="from the engine")]
+
+    project = init_project(tmp_path / "p", name="p")
+    (project.state_dir / "config.toml").write_text(
+        '[memory.store]\nbackend = "remote"\n', encoding="utf-8"
+    )
+    _insert(project, "local fact", "kafka consumer lag runbook")
+    _use(monkeypatch, [_Engine()])
+    monkeypatch.setattr(
+        "veles.core.memory.providers.builder.build_extra_providers", lambda: [], raising=False
+    )
+
+    block = _recall_block(project, "kafka consumer lag")
+
+    assert block is not None
+    assert "engine fact" in block
+    assert "local fact" not in block  # insights come from the engine now, not the file
+
+
+def test_the_row_is_committed_before_the_engine_sees_it(tmp_path: Path, monkeypatch) -> None:
+    """Local-first is the whole contract, and nothing else here pins the
+    ordering: if a refactor moved the push above the commit, every other test
+    would still pass while the invariant was gone. This provider reads the row
+    back from disk and fails if it is not already there."""
+    seen_body: list[str | None] = []
+
+    class _ReadsBack(_Recorder):
+        def __init__(self, project) -> None:
+            super().__init__()
+            self._project = project
+
+        def ingest(self, title: str, body: str, *, insight_id: int) -> bool:
+            conn = sqlite3.connect(str(self._project.memory_db_path))
+            try:
+                row = conn.execute(
+                    "SELECT body FROM insights WHERE id = ?", (insight_id,)
+                ).fetchone()
+            finally:
+                conn.close()
+            seen_body.append(row[0] if row else None)
+            return True
+
+    project = init_project(tmp_path / "p", name="p")
+    _use(monkeypatch, [_ReadsBack(project)])
+    save_insight_row(title="ordered", body="committed first", category="t", project=project)
+
+    assert seen_body == ["committed first"]
+
+
+def test_resync_builds_the_provider_list_once(tmp_path: Path, monkeypatch) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    for i in range(5):
+        _insert(project, f"n{i}", f"body {i}")
+
+    builds = 0
+    recorder = _Recorder()
+
+    def counting_build() -> list[object]:
+        nonlocal builds
+        builds += 1
+        return [recorder]
+
+    monkeypatch.setattr(
+        "veles.core.memory.providers.build_extra_providers", counting_build, raising=False
+    )
+    assert resync_pending(project) == 5
+    assert builds == 1

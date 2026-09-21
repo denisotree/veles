@@ -78,7 +78,11 @@ class MemoryRouter:
         extra_providers: list[object] | None = None,
     ) -> None:
         self._project = project
-        self._store = store
+        # M265: recall reads memory through the port, so a project configured
+        # onto a remote engine actually reaches it. Callers that still open
+        # their own `SessionStore` (see the storage-port ratchet) keep working:
+        # the store is wrapped, not reopened.
+        self._store = _as_port(store)
         # M55: opt-in external memory plugins (Honcho, Mem0, ...). Stored as
         # `object` to avoid an import cycle with `memory_provider.MemoryProvider`
         # — every entry is duck-typed at call time.
@@ -136,17 +140,23 @@ class MemoryRouter:
         CPython 3.13 reports `sqlite3.threadsafety == 3` (SQLite serialises
         internally).
         """
-        jobs = {
-            "about": self._collect_about_veles,
-            "wiki": self._collect_wiki,
-            "insights": self._collect_insights,
-            "turns": self._collect_turns,
-            "extra": self._collect_extra,
-        }
+        # The two that talk to the store are already coroutines (the port may
+        # be a network call); the three that touch files or plugins are
+        # synchronous and get a thread.
         tasks = {
-            name: asyncio.ensure_future(asyncio.to_thread(fn, query, limit=limit))
-            for name, fn in jobs.items()
+            "insights": asyncio.ensure_future(self._collect_insights(query, limit=limit)),
+            "turns": asyncio.ensure_future(self._collect_turns(query, limit=limit)),
         }
+        tasks.update(
+            {
+                name: asyncio.ensure_future(asyncio.to_thread(fn, query, limit=limit))
+                for name, fn in (
+                    ("about", self._collect_about_veles),
+                    ("wiki", self._collect_wiki),
+                    ("extra", self._collect_extra),
+                )
+            }
+        )
         await asyncio.wait(tasks.values(), timeout=deadline_sec)
 
         streams: list[list[RecallHit]] = []
@@ -256,7 +266,7 @@ class MemoryRouter:
                 )
         return hits
 
-    def _collect_insights(self, query: str, *, limit: int) -> list[RecallHit]:
+    async def _collect_insights(self, query: str, *, limit: int) -> list[RecallHit]:
         """M140: pull matching rows from the `insights` SQL table and age them.
 
         Aging happens in `_age_recalled_insights` after the merge, not here:
@@ -265,7 +275,7 @@ class MemoryRouter:
         under `.veles/memory/insights/` is a rendered view, never searched)."""
         if self._store is None:
             return []
-        hits = list(self._store.search_insights(query, limit=limit))
+        hits = list(await self._store.search_insights(query, limit=limit))
         # M192: fold in semantic (vector) neighbours, deduped by insight id, so
         # a paraphrased query that shares no tokens with an insight still
         # recalls it. Local-first: `_local_query_vector` embeds the query ONLY
@@ -273,7 +283,7 @@ class MemoryRouter:
         qvec = _local_query_vector(query)
         if qvec is not None:
             seen = {h.id for h in hits}
-            for vh in self._store.knn_insights(qvec, limit=limit):
+            for vh in await self._store.knn_insights(qvec, limit=limit):
                 if vh.id not in seen:
                     seen.add(vh.id)
                     hits.append(vh)
@@ -305,9 +315,9 @@ class MemoryRouter:
             if h.rel_path.startswith("insight:") and h.rel_path.removeprefix("insight:").isdigit()
         ]
         if ids:
-            self._store.touch_insights(ids, time.time())
+            aio.submit(self._store.touch_insights(ids, time.time()))
 
-    def _collect_turns(self, query: str, *, limit: int) -> list[RecallHit]:
+    async def _collect_turns(self, query: str, *, limit: int) -> list[RecallHit]:
         """Pull recent turns matching `query`. No-op when no store is wired.
 
         The 30-day window keeps recall focused on what the user might
@@ -320,8 +330,23 @@ class MemoryRouter:
         # turns into insights. Until the first curator/dream pass, raw turns are
         # the ONLY memory, so applying the window would silently drop it.
         since = None if _never_curated(self._project) else time.time() - _TURN_RECENCY_WINDOW_SEC
-        turn_hits = self._store.search_turns(query, limit=limit, since=since)
+        turn_hits = await self._store.search_turns(query, limit=limit, since=since)
         return [_turn_hit_to_recall(h) for h in turn_hits]
+
+
+def _as_port(store: object | None) -> object | None:
+    """Accept either a `MemoryStore` or the `SessionStore` most callers still
+    hold, and return the port. Wrapping rather than reopening matters: a second
+    connection to the same file would be a second connection to the same file,
+    and the caller's `finally: store.close()` still has to mean something."""
+    if store is None:
+        return None
+    from veles.core.memory import SessionStore as _SessionStore
+    from veles.core.memory.store import SqliteStore
+
+    if isinstance(store, _SessionStore):
+        return SqliteStore.wrapping(store)
+    return store
 
 
 def _never_curated(project) -> bool:
