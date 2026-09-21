@@ -25,7 +25,6 @@ rather than offering an API key as a fix that would not fix it.
 
 from __future__ import annotations
 
-import contextlib
 import logging
 import sqlite3
 import time
@@ -73,32 +72,24 @@ def maybe_surface_embedding_setup_hint(project: Project, *, now: float | None = 
     Returns True iff a fresh row was inserted (False = already there).
     Never raises — a sqlite hiccup just skips the notice."""
     wall = time.time() if now is None else now
-    try:
-        from veles.core.memory import SessionStore
+    from veles.core.memory.store import local_connection
 
-        store = SessionStore(project.memory_db_path)
-        conn = store._conn
-    except sqlite3.Error as exc:
-        logger.info("setup-hint: cannot open db: %s", exc)
-        return False
     try:
-        existing = conn.execute(
-            "SELECT 1 FROM insights WHERE title = ? AND category = ? LIMIT 1",
-            (SETUP_HINT_TITLE, SETUP_HINT_CATEGORY),
-        ).fetchone()
-        if existing is not None:
-            return False
-        conn.execute(
-            "INSERT INTO insights(title, body, category, created_at) VALUES (?, ?, ?, ?)",
-            (SETUP_HINT_TITLE, _BODY, SETUP_HINT_CATEGORY, wall),
-        )
-        return True
+        with local_connection(project) as conn:
+            existing = conn.execute(
+                "SELECT 1 FROM insights WHERE title = ? AND category = ? LIMIT 1",
+                (SETUP_HINT_TITLE, SETUP_HINT_CATEGORY),
+            ).fetchone()
+            if existing is not None:
+                return False
+            conn.execute(
+                "INSERT INTO insights(title, body, category, created_at) VALUES (?, ?, ?, ?)",
+                (SETUP_HINT_TITLE, _BODY, SETUP_HINT_CATEGORY, wall),
+            )
+            return True
     except sqlite3.Error as exc:
-        logger.info("setup-hint: write failed: %s", exc)
+        logger.info("setup-hint: db unavailable or write failed: %s", exc)
         return False
-    finally:
-        with contextlib.suppress(Exception):
-            conn.close()
 
 
 __all__ = [

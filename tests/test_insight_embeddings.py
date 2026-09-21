@@ -110,7 +110,7 @@ def test_backfill_embeds_insights_without_embeddings(tmp_path: Path) -> None:
         id1 = _insert_insight(store, title="deploy", body="run terraform apply")
         id2 = _insert_insight(store, title="lunch", body="sandwiches at noon")
 
-        n = backfill_insight_embeddings(store, _FakeEmbedder(), limit=10)
+        n = backfill_insight_embeddings(store._conn, _FakeEmbedder(), limit=10)
 
         assert n == 2
         assert get_embedding(store._conn, ref_kind="insight", ref_id=id1) is not None
@@ -123,9 +123,9 @@ def test_backfill_is_idempotent(tmp_path: Path) -> None:
     store = SessionStore(tmp_path / "m.db")
     try:
         _insert_insight(store, title="deploy", body="run terraform apply")
-        backfill_insight_embeddings(store, _FakeEmbedder(), limit=10)
+        backfill_insight_embeddings(store._conn, _FakeEmbedder(), limit=10)
 
-        n2 = backfill_insight_embeddings(store, _FakeEmbedder(), limit=10)
+        n2 = backfill_insight_embeddings(store._conn, _FakeEmbedder(), limit=10)
 
         assert n2 == 0  # already embedded — nothing new to do
     finally:
@@ -141,7 +141,7 @@ def test_backfill_skips_superseded_insights(tmp_path: Path) -> None:
         hide_insight(store._conn, dropped, reason="merged-duplicate", superseded_by=survivor)
         store._conn.commit()
 
-        n = backfill_insight_embeddings(store, _FakeEmbedder(), limit=10)
+        n = backfill_insight_embeddings(store._conn, _FakeEmbedder(), limit=10)
 
         assert n == 1  # only the survivor is embedded
         assert get_embedding(store._conn, ref_kind="insight", ref_id=survivor) is not None

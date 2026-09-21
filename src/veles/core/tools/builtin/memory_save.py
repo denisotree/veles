@@ -36,10 +36,13 @@ def _resolve_project(project: Project | None) -> Project:
     return proj
 
 
-def _open_store(project: Project | None = None):
-    from veles.core.memory import SessionStore
+def _open_conn(project: Project | None = None):
+    """The project's local connection. Insight and rule rows are written
+    locally whatever the configured backend — the external engine gets its
+    copy through the M265 dual-write, after the local commit."""
+    from veles.core.memory.store import local_connection
 
-    return SessionStore(_resolve_project(project).memory_db_path)
+    return local_connection(_resolve_project(project))
 
 
 def save_insight_row(
@@ -68,30 +71,36 @@ def save_insight_row(
     """
     try:
         proj = _resolve_project(project)
-        store = _open_store(proj)
     except Exception:
         return 0
     try:
-        cur = store._conn.execute(
-            "INSERT INTO insights"
-            "   (title, body, category, file_path, created_at, confidence, origin)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (title, body, category, file_path or None, time.time(), confidence, origin),
-        )
-        rid = int(cur.lastrowid or 0)
-        if rid and not file_path:
-            view_rel = _render_view(proj, rid=rid, title=title, body=body)
-            if view_rel:
-                store._conn.execute(
-                    "UPDATE insights SET file_path = ? WHERE id = ?", (view_rel, rid)
-                )
-        store._conn.commit()
-        return rid
+        with _open_conn(proj) as conn:
+            cur = conn.execute(
+                "INSERT INTO insights"
+                "   (title, body, category, file_path, created_at, confidence, origin)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (title, body, category, file_path or None, time.time(), confidence, origin),
+            )
+            rid = int(cur.lastrowid or 0)
+            if rid and not file_path:
+                view_rel = _render_view(proj, rid=rid, title=title, body=body)
+                if view_rel:
+                    conn.execute("UPDATE insights SET file_path = ? WHERE id = ?", (view_rel, rid))
+            conn.commit()
     except Exception:
         return 0
-    finally:
+
+    # M265: offer the fact to the external memory engine, after the local
+    # write and outside its transaction. Best-effort by contract — the fact is
+    # already stored, and a network failure must not turn a saved insight into
+    # a failed run. Rows that did not make it keep `synced_at IS NULL` and are
+    # offered again by the dream cycle.
+    if rid:
         with contextlib.suppress(Exception):
-            store._conn.close()
+            from veles.core.memory.dual_write import push_insight
+
+            push_insight(proj, insight_id=rid, title=title, body=body)
+    return rid
 
 
 def _render_view(project: Project, *, rid: int, title: str, body: str) -> str | None:
@@ -117,21 +126,15 @@ def save_rule_row(*, kind: str, body: str, source: str) -> int:
     if kind not in _RULE_KINDS:
         return 0
     try:
-        store = _open_store()
+        with _open_conn() as conn:
+            cur = conn.execute(
+                "INSERT INTO rules(kind, body, source, created_at) VALUES (?, ?, ?, ?)",
+                (kind, body, source, time.time()),
+            )
+            conn.commit()
+            return int(cur.lastrowid or 0)
     except Exception:
         return 0
-    try:
-        cur = store._conn.execute(
-            "INSERT INTO rules(kind, body, source, created_at) VALUES (?, ?, ?, ?)",
-            (kind, body, source, time.time()),
-        )
-        store._conn.commit()
-        return int(cur.lastrowid or 0)
-    except Exception:
-        return 0
-    finally:
-        with contextlib.suppress(Exception):
-            store._conn.close()
 
 
 @tool(risk_class=RiskClass.WRITE_LOCAL_PROJECT, side_effects=["filesystem"])

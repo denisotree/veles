@@ -255,7 +255,13 @@ CREATE TABLE IF NOT EXISTS insights (
     -- How many observations back this fact. Dedup adds the support of every
     -- duplicate it collapses, so a repeatedly-observed fact carries its
     -- evidence instead of merely surviving.
-    support_count      INTEGER NOT NULL DEFAULT 1
+    support_count      INTEGER NOT NULL DEFAULT 1,
+    -- M265: when this fact was last handed to the external memory engine, or
+    -- NULL when it has not been. Dual-write is best-effort by design -- the
+    -- local row is the source of truth and a network failure must not lose a
+    -- fact or fail a turn -- so the ones that did not make it have to be
+    -- findable afterwards, or "best-effort" quietly means "sometimes never".
+    synced_at          REAL
 );
 
 CREATE INDEX IF NOT EXISTS idx_insights_category ON insights(category);
@@ -306,7 +312,7 @@ CREATE TRIGGER IF NOT EXISTS insights_au AFTER UPDATE ON insights BEGIN
 END;
 """
 
-_SCHEMA_VERSION = 7
+_SCHEMA_VERSION = 8
 
 
 def hide_insight(
@@ -389,6 +395,8 @@ class SessionStore:
             self._migrate_to_v6(c)
         if current < 7:
             self._migrate_to_v7(c)
+        if current < 8:
+            self._migrate_to_v8(c)
         if current < _SCHEMA_VERSION:
             c.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
@@ -513,6 +521,18 @@ class SessionStore:
             " END"
             " WHERE origin IS NULL AND category IN ('remember-trigger', 'recovery-trigger')"
         )
+
+    def _migrate_to_v8(self, c: sqlite3.Connection) -> None:
+        """v7 → v8: add `insights.synced_at` (M265).
+
+        Existing rows stay NULL, which is accurate rather than convenient: they
+        predate the external engine and genuinely have not been sent. The
+        resync step will offer them, which is the correct behaviour for a
+        project that turns dual-write on later.
+        """
+        cols = {r[1] for r in c.execute("PRAGMA table_info(insights)").fetchall()}
+        if "synced_at" not in cols:
+            c.execute("ALTER TABLE insights ADD COLUMN synced_at REAL")
 
     def create_session(
         self, *, parent_session_id: str | None = None, title: str | None = None

@@ -6,6 +6,12 @@ __pycache__/
 *.egg-info/
 *.egg
 .venv/
+# Any per-platform venv too (`.venv-darwin`, `.venv-linux`). git already
+# ignores these through the `*` marker uv writes inside them, but hatchling
+# does not read nested ignore files -- without this line a local `uv build`
+# swept the whole virtualenv into the sdist: 66 MB against the 3 MB CI
+# publishes from a clean checkout.
+.venv*/
 venv/
 .python-version.local
 dist/

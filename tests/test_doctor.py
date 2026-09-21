@@ -521,3 +521,79 @@ def test_no_command_warns_about_sections_on_the_hot_path() -> None:
         check=True,
     )
     assert out.stdout.strip() == "False"
+
+
+# ---- M263b: the measured ceiling for local brute-force vector recall ----
+
+
+def _seed_embeddings(project, count: int) -> None:
+    from veles.core.memory import SessionStore
+    from veles.core.memory.vector import ensure_embeddings_table, pack
+
+    store = SessionStore(project.memory_db_path)
+    try:
+        ensure_embeddings_table(store._conn)
+        with store._conn:
+            store._conn.executemany(
+                "INSERT INTO embeddings_blob(ref_kind, ref_id, dim, vec_blob, created_at)"
+                " VALUES ('insight', ?, 2, ?, 1.0)",
+                [(i, pack([1.0, 0.0])) for i in range(1, count + 1)],
+            )
+    finally:
+        store.close()
+
+
+def _vector_check(project):
+    from veles.core.doctor import _check_vector_recall_size
+
+    return _check_vector_recall_size(project)
+
+
+def test_vector_recall_size_ok_when_unused(tmp_path: Path) -> None:
+    """Vector recall is opt-in; a project that never embedded anything must not
+    be told about a ceiling it cannot reach."""
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path / "p", name="p")
+    assert _vector_check(project).status == "ok"
+
+
+def test_vector_recall_size_warns_past_the_design_budget(tmp_path: Path) -> None:
+    """Past 200 ms turns are slower, but nothing is lost yet — that is a warning,
+    and it has to name where the real loss begins."""
+    from veles.core.doctor import _KNN_WARN_ROWS
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path / "p", name="p")
+    _seed_embeddings(project, _KNN_WARN_ROWS)
+    result = _vector_check(project)
+    assert result.status == "warn"
+    assert "200 ms budget" in result.message
+    assert "dropped at" in result.message
+
+
+def test_vector_recall_size_errors_only_past_the_deadline(tmp_path: Path) -> None:
+    """The error tier is for actual loss: recall drops whatever misses the
+    configured deadline, which is an order of magnitude further out than the
+    design budget. Reporting an error at the budget would promise a failure
+    that is not happening yet.
+
+    Seeded against a deliberately tiny deadline, because the honest row count
+    for the 2 s default is half a million and seeding that to assert a string
+    would be a benchmark, not a test."""
+    from veles.core.doctor import _KNN_BUDGET_ROWS
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path / "p", name="p")
+    _seed_embeddings(project, _KNN_BUDGET_ROWS)
+
+    # At the default 2 s deadline this corpus is merely slow, not lossy.
+    assert _vector_check(project).status == "warn"
+
+    (project.state_dir / "config.toml").write_text(
+        "[memory.recall]\ndeadline_sec = 0.1\n", encoding="utf-8"
+    )
+    result = _vector_check(project)
+    assert result.status == "error"
+    assert "deadline" in result.message
+    assert result.fix_hint and "remote backend" in result.fix_hint

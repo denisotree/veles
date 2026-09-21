@@ -272,13 +272,14 @@ def _maybe_surface_skill_suggestions(project: Project) -> None:
     a missing table doesn't break the user's turn.
     """
     try:
-        from veles.core.memory import SessionStore
         from veles.core.skill_suggester import surface_skill_suggestions
     except ImportError:
         return
     try:
-        store = SessionStore(project.memory_db_path)
-        surface_skill_suggestions(store._conn)
+        from veles.core.memory.store import local_connection
+
+        with local_connection(project) as conn:
+            surface_skill_suggestions(conn)
     except Exception as exc:
         # Same posture as the curator-skip log: don't fail the turn.
         with contextlib.suppress(Exception):

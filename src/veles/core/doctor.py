@@ -253,6 +253,100 @@ def _check_memory_fts(project: Project | None) -> CheckResult:
     )
 
 
+# M263b: what local brute-force vector recall costs, and the two different
+# thresholds that matter.
+#
+# Measured, not estimated (`tests/bench/bench_recall.py`, 768 dims, packed
+# float32, numpy): 10k rows -> 36 ms, 25k -> 89 ms, 50k -> 217 ms, 100k ->
+# 393 ms. Linear, at ~3.9 us per row, because the scan reads every vector.
+#
+# **Two thresholds, and conflating them would mislead.** The 200 ms *design
+# budget* for the whole recall (of which the other collectors take ~10 ms)
+# leaves KNN ~190 ms — about 48k insights. Past that, turns are measurably
+# slower. Sources only start being *dropped* when the cost passes the
+# configured `[memory.recall] deadline_sec`, which defaults to 2 s and is
+# therefore an order of magnitude further out. "Slower" and "memory goes
+# missing" are different failures and get different severities.
+#
+# No ANN index is built for this. The number a personal project actually
+# reaches is nowhere near either threshold (live projects hold single-digit
+# insight counts), and the multi-tenant case cannot be solved by an index
+# anyway: at 1M rows the resident set is ~3 GB *per tenant*, so that case
+# belongs on a remote backend. What is owed instead is that nobody discovers
+# either threshold by watching turns get slower.
+_KNN_US_PER_ROW = 190_000 / 48_000  # microseconds per row, from the bench
+_KNN_BUDGET_ROWS = 48_000  # ~190 ms: the 200 ms design budget for recall
+_KNN_WARN_ROWS = 35_000
+
+
+def _check_vector_recall_size(project: Project | None) -> CheckResult:
+    """Report what vector recall costs per turn, and which threshold it is past."""
+    if project is None or not project.memory_db_path.exists():
+        return CheckResult(name="vector_recall_size", status="info", message="no active project")
+    import sqlite3
+
+    try:
+        conn = sqlite3.connect(str(project.memory_db_path))
+        try:
+            embedded = conn.execute(
+                "SELECT COUNT(*) FROM embeddings_blob WHERE ref_kind = 'insight'"
+            ).fetchone()[0]
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        # No embeddings table at all is the normal state: vector recall is
+        # opt-in, and a project without it pays nothing here.
+        return CheckResult(
+            name="vector_recall_size", status="ok", message="vector recall not in use"
+        )
+
+    projected_ms = round(embedded * _KNN_US_PER_ROW / 1000)
+    deadline_ms = _recall_deadline_ms(project)
+    drop_rows = round(deadline_ms * 1000 / _KNN_US_PER_ROW)
+
+    if projected_ms >= deadline_ms:
+        return CheckResult(
+            name="vector_recall_size",
+            status="error",
+            message=(
+                f"{embedded:,} embedded insights — vector recall costs about "
+                f"{projected_ms} ms per turn, past the {deadline_ms:.0f} ms recall "
+                "deadline"
+            ),
+            fix_hint=(
+                "recall drops whatever misses its deadline, so this shows up as memory "
+                "quietly going missing rather than as a slow answer. Move this "
+                "project's memory to a remote backend "
+                '(`[memory.store] backend = "remote"`), or raise '
+                "`[memory.recall] deadline_sec` and accept the slower turn"
+            ),
+        )
+    if embedded >= _KNN_WARN_ROWS:
+        return CheckResult(
+            name="vector_recall_size",
+            status="warn",
+            message=(
+                f"{embedded:,} embedded insights — vector recall costs about "
+                f"{projected_ms} ms per turn, past the 200 ms budget recall is "
+                f"designed around. Sources start being dropped at ~{drop_rows:,}"
+            ),
+        )
+    return CheckResult(
+        name="vector_recall_size",
+        status="ok",
+        message=f"{embedded:,} embedded insights (~{projected_ms} ms per turn)",
+    )
+
+
+def _recall_deadline_ms(project: Project) -> float:
+    """The configured recall deadline, in milliseconds. Read from the same key
+    the router reads, so the check cannot describe a bound the turn does not
+    actually use."""
+    from veles.core.memory.router import _load_recall_deadline
+
+    return _load_recall_deadline(project) * 1000.0
+
+
 def repair_memory_fts(project: Project | None) -> bool:
     """M193: rebuild the project's recall FTS index. Returns True when a repair
     ran (the index is healthy afterwards), False when there's nothing to do."""
@@ -618,6 +712,7 @@ def run_all(project: Project | None) -> DoctorReport:
         _check_active_project,
         _check_config_schema,
         _check_memory_fts,
+        _check_vector_recall_size,
         _check_agents_md,
         _check_agents_md_identity,
         _check_agents_md_sections,

@@ -23,11 +23,14 @@ versa. Recency / BM25-weighted merging is a future refinement.
 
 from __future__ import annotations
 
+import asyncio
 import datetime as _dt
+import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 
-from veles.core.memory import InsightHit, SessionStore, TurnHit
+from veles.core.memory import InsightHit, SessionStore, TurnHit, aio
 from veles.core.memory.rerank import (
     DEFAULT_HALF_LIFE_SEC,
     DEFAULT_WEIGHTS,
@@ -37,6 +40,13 @@ from veles.core.memory.rerank import (
 from veles.core.project import Project
 from veles.core.safety import scan_for_injection
 from veles.core.subproject import load_subprojects, resolve_subproject_path
+
+logger = logging.getLogger(__name__)
+
+# M264: how long the whole recall fan-out may take before the turn moves on
+# with whatever finished. Two seconds mirrors the llama.cpp probe bound of
+# M256b, for the same reason: this is the path of every turn.
+_RECALL_DEADLINE_SEC = 2.0
 
 _TURN_SUMMARY_CAP = 200
 _TURN_RECENCY_WINDOW_SEC = 30 * 86_400  # only recall turns from the last 30 days
@@ -68,21 +78,29 @@ class MemoryRouter:
         extra_providers: list[object] | None = None,
     ) -> None:
         self._project = project
-        self._store = store
+        # M265: recall reads memory through the port, so a project configured
+        # onto a remote engine actually reaches it. Callers that still open
+        # their own `SessionStore` (see the storage-port ratchet) keep working:
+        # the store is wrapped, not reopened.
+        self._store = _as_port(store)
         # M55: opt-in external memory plugins (Honcho, Mem0, ...). Stored as
         # `object` to avoid an import cycle with `memory_provider.MemoryProvider`
         # — every entry is duck-typed at call time.
         self._extra: list[object] = list(extra_providers or [])
 
-    def recall(self, query: str, *, limit: int = 5) -> list[RecallHit]:
+    def recall(
+        self, query: str, *, limit: int = 5, deadline_sec: float | None = None
+    ) -> list[RecallHit]:
         if not query.strip():
             return []
-        about_hits = self._collect_about_veles(query, limit=limit)
-        wiki_hits = self._collect_wiki(query, limit=limit)
-        insight_hits = self._collect_insights(query, limit=limit)
-        turn_hits = self._collect_turns(query, limit=limit)
-        extra_hits = self._collect_extra(query, limit=limit)
-        streams = [about_hits, wiki_hits, insight_hits, turn_hits, extra_hits]
+        deadline = _load_recall_deadline(self._project) if deadline_sec is None else deadline_sec
+        streams = aio.submit(
+            self._collect_all(query, limit=limit, deadline_sec=deadline),
+            # Backstop only: the per-collector deadline inside `_collect_all`
+            # is what actually bounds the turn, and it returns partial results.
+            # This one exists so a bug in that logic cannot hang a turn forever.
+            timeout=deadline + 5.0,
+        )
         # M141 scored rerank (relevance + recency + M221 confidence). M223 dropped
         # the `VELES_MEMORY_RERANK=0` round-robin fallback — a kill switch for a
         # default that has led since M141 and only got richer since.
@@ -95,24 +113,101 @@ class MemoryRouter:
             half_life_sec=half_life,
         )
         final = merged[:limit]
+        self._age_recalled_insights(final)
         # M145: scrub recall summaries before they enter the prompt — the one
         # memory surface that bypasses `scan_for_injection`. See
         # `_scrub_recall_hit`. Done on the final ≤limit hits only, so the cost
         # is a handful of regex passes per turn.
         return [_scrub_recall_hit(h) for h in final]
 
+    async def _collect_all(
+        self, query: str, *, limit: int, deadline_sec: float
+    ) -> list[list[RecallHit]]:
+        """Run every collector concurrently under one deadline (M264).
+
+        Sequentially, the turn paid the sum of five sources; a single slow one
+        — an external provider over the network, a KNN scan over a large
+        corpus — moved the whole turn. Concurrently it pays the slowest, and
+        past the deadline it pays the deadline and keeps whatever finished.
+
+        Partial beats empty: a source that missed the cut is dropped with a
+        warning, not silently, because a shorter list must never read as "there
+        was nothing" (the M219 lesson, one layer down).
+
+        Mixed shapes on purpose: the two collectors that read the store are
+        coroutines, because the store may be a remote engine; the three that
+        touch local files or plugin objects are synchronous and get a thread.
+        The threaded ones may share one `sqlite3.Connection`, which is allowed
+        — it is opened with `check_same_thread=False` and CPython 3.13 reports
+        `sqlite3.threadsafety == 3` (SQLite serialises internally).
+        """
+        # The two that talk to the store are already coroutines (the port may
+        # be a network call); the three that touch files or plugins are
+        # synchronous and get a thread.
+        tasks = {
+            "insights": asyncio.ensure_future(self._collect_insights(query, limit=limit)),
+            "turns": asyncio.ensure_future(self._collect_turns(query, limit=limit)),
+        }
+        tasks.update(
+            {
+                name: asyncio.ensure_future(asyncio.to_thread(fn, query, limit=limit))
+                for name, fn in (
+                    ("about", self._collect_about_veles),
+                    ("wiki", self._collect_wiki),
+                    ("extra", self._collect_extra),
+                )
+            }
+        )
+        await asyncio.wait(tasks.values(), timeout=deadline_sec)
+
+        streams: list[list[RecallHit]] = []
+        dropped: list[str] = []
+        for name, task in tasks.items():
+            if not task.done():
+                # Cancelling stops us waiting; the worker thread itself runs to
+                # completion, which is the price of wrapping sync code.
+                task.cancel()
+                dropped.append(f"{name} (deadline)")
+                continue
+            exc = task.exception()
+            if exc is not None:
+                dropped.append(f"{name} ({type(exc).__name__})")
+                continue
+            streams.append(task.result())
+        if dropped:
+            logger.warning("recall: dropped %s", ", ".join(dropped))
+        return streams
+
     def _collect_extra(self, query: str, *, limit: int) -> list[RecallHit]:
         """Call every registered external provider, swallowing per-provider
-        failures so one slow / broken plugin can't tank the whole recall."""
-        out: list[RecallHit] = []
+        failures so one broken plugin can't tank the whole recall.
+
+        M265: the providers run **concurrently**. Sequentially they shared one
+        slot in the fan-out, so a single slow remote source consumed the whole
+        recall deadline and its siblings returned nothing — the failure mode
+        the deadline was supposed to prevent, one level down. Whatever has not
+        answered when this collector is cancelled is simply not included.
+        """
+        if not self._extra:
+            return []
         per_provider = max(1, limit // 2)
-        for p in self._extra:
+
+        def call(provider: object) -> list[RecallHit]:
             try:
-                hits = p.recall(query, limit=per_provider)  # type: ignore[attr-defined]
-            except Exception:
-                continue
-            out.extend(hits)
-        return out
+                return list(provider.recall(query, limit=per_provider))  # type: ignore[attr-defined]
+            except Exception as exc:
+                logger.warning(
+                    "recall: provider %s failed (%s: %s)",
+                    getattr(provider, "name", type(provider).__name__),
+                    type(exc).__name__,
+                    exc,
+                )
+                return []
+
+        if len(self._extra) == 1:
+            return call(self._extra[0])
+        with ThreadPoolExecutor(max_workers=len(self._extra)) as pool:
+            return [hit for hits in pool.map(call, self._extra) for hit in hits]
 
     # ---- collectors ----
 
@@ -172,16 +267,16 @@ class MemoryRouter:
                 )
         return hits
 
-    def _collect_insights(self, query: str, *, limit: int) -> list[RecallHit]:
+    async def _collect_insights(self, query: str, *, limit: int) -> list[RecallHit]:
         """M140: pull matching rows from the `insights` SQL table and age them.
 
-        Every matched insight is `touch`ed (its `last_referenced_at` bumped)
-        as a side effect — being retrieved *is* a reference. No-op without a
-        store. M161: the SQL row is the sole insight store (the markdown
+        Aging happens in `_age_recalled_insights` after the merge, not here:
+        being *injected into the prompt* is the reference, not being matched.
+        No-op without a store. M161: the SQL row is the sole insight store (the markdown
         under `.veles/memory/insights/` is a rendered view, never searched)."""
         if self._store is None:
             return []
-        hits = list(self._store.search_insights(query, limit=limit))
+        hits = list(await self._store.search_insights(query, limit=limit))
         # M192: fold in semantic (vector) neighbours, deduped by insight id, so
         # a paraphrased query that shares no tokens with an insight still
         # recalls it. Local-first: `_local_query_vector` embeds the query ONLY
@@ -189,7 +284,7 @@ class MemoryRouter:
         qvec = _local_query_vector(query)
         if qvec is not None:
             seen = {h.id for h in hits}
-            for vh in self._store.knn_insights(qvec, limit=limit):
+            for vh in await self._store.knn_insights(qvec, limit=limit):
                 if vh.id not in seen:
                     seen.add(vh.id)
                     hits.append(vh)
@@ -197,11 +292,33 @@ class MemoryRouter:
         # provenance confidence) before they reach the prompt — cheaper context,
         # less noise. Pre-M218 rows default to 1.0 and are never touched.
         hits = [h for h in hits if h.confidence >= _INSIGHT_CONFIDENCE_FLOOR]
-        if hits:
-            self._store.touch_insights([h.id for h in hits], time.time())
         return [_insight_hit_to_recall(h) for h in hits]
 
-    def _collect_turns(self, query: str, *, limit: int) -> list[RecallHit]:
+    def _age_recalled_insights(self, final: list[RecallHit]) -> None:
+        """Stamp `last_referenced_at` on the insights that actually made it
+        into the prompt (M264).
+
+        The bump used to happen inside the collector, over every FTS/KNN match.
+        Two problems, one of which only appeared with the bounded fan-out:
+        matches that lost the rerank were aged as though they had been used,
+        and — once a collector could be cancelled at the deadline — a stream
+        that never reached the prompt at all still aged its rows. That signal
+        feeds `rerank`'s recency term *and* picks the canonical survivor in
+        M142 dedup, so a false reference is not cosmetic.
+
+        Being *injected* is the reference. Anything else is a query artefact.
+        """
+        if self._store is None:
+            return
+        ids = [
+            int(h.rel_path.removeprefix("insight:"))
+            for h in final
+            if h.rel_path.startswith("insight:") and h.rel_path.removeprefix("insight:").isdigit()
+        ]
+        if ids:
+            aio.submit(self._store.touch_insights(ids, time.time()))
+
+    async def _collect_turns(self, query: str, *, limit: int) -> list[RecallHit]:
         """Pull recent turns matching `query`. No-op when no store is wired.
 
         The 30-day window keeps recall focused on what the user might
@@ -214,8 +331,23 @@ class MemoryRouter:
         # turns into insights. Until the first curator/dream pass, raw turns are
         # the ONLY memory, so applying the window would silently drop it.
         since = None if _never_curated(self._project) else time.time() - _TURN_RECENCY_WINDOW_SEC
-        turn_hits = self._store.search_turns(query, limit=limit, since=since)
+        turn_hits = await self._store.search_turns(query, limit=limit, since=since)
         return [_turn_hit_to_recall(h) for h in turn_hits]
+
+
+def _as_port(store: object | None) -> object | None:
+    """Accept either a `MemoryStore` or the `SessionStore` most callers still
+    hold, and return the port. Wrapping rather than reopening matters: a second
+    connection to the same file would be a second connection to the same file,
+    and the caller's `finally: store.close()` still has to mean something."""
+    if store is None:
+        return None
+    from veles.core.memory import SessionStore as _SessionStore
+    from veles.core.memory.store import SqliteStore
+
+    if isinstance(store, _SessionStore):
+        return SqliteStore.wrapping(store)
+    return store
 
 
 def _never_curated(project) -> bool:
@@ -260,6 +392,28 @@ def _subproject_wiki_enabled(sub_root) -> bool:
         return wiki_enabled(load_project(sub_root))
     except Exception:
         return False
+
+
+def _load_recall_deadline(project: Project) -> float:
+    """`[memory.recall] deadline_sec`, defaulting to `_RECALL_DEADLINE_SEC`.
+
+    A constant would have been the wrong shape for the one knob a multi-tenant
+    integrator reaches for first — and every neighbouring tunable in this
+    subsystem (`[memory.rerank]`, `[memory] turn_retention_days`) already comes
+    from config. M265's provider deadline reads the same key rather than
+    inventing a second one. Non-positive or malformed values fall back rather
+    than disabling the bound: "no deadline" must not be reachable by typo."""
+    try:
+        from veles.core.project_config import get_section, load_project_config
+
+        raw = get_section(load_project_config(project), "memory", "recall").get("deadline_sec")
+    except Exception:
+        return _RECALL_DEADLINE_SEC
+    try:
+        value = float(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return _RECALL_DEADLINE_SEC
+    return value if value > 0 else _RECALL_DEADLINE_SEC
 
 
 def _load_rerank_config(project: Project) -> tuple[RerankWeights, float]:

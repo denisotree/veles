@@ -198,9 +198,12 @@ def test_setup_hint_no_crash_on_db_error(tmp_path: Path, monkeypatch: pytest.Mon
     def _boom(_path):
         raise _sqlite3.Error("simulated db open failure")
 
-    # Patch the module that `maybe_surface_embedding_setup_hint`
-    # imports SessionStore from (lazy import → patch the source).
-    monkeypatch.setattr("veles.core.memory.SessionStore", _boom)
+    # M264c: patch where the name is *looked up*, not where it is defined.
+    # The hint now opens its connection through `memory.store.local_connection`,
+    # which binds SessionStore at its own import time — patching the definition
+    # module only worked while `store` happened not to be imported yet, which
+    # made this test pass or fail depending on what ran before it.
+    monkeypatch.setattr("veles.core.memory.store.SessionStore", _boom)
     fake = Project(root=tmp_path / "ghost", name="ghost", created_at=0.0)
     # Should not raise
     result = maybe_surface_embedding_setup_hint(fake)

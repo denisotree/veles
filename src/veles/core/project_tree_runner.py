@@ -22,7 +22,6 @@ from __future__ import annotations
 import logging
 import sqlite3
 
-from veles.core.memory import SessionStore
 from veles.core.project import Project
 from veles.core.project_tree import Scanner, ScanReport
 
@@ -33,14 +32,13 @@ def scan_project_tree(project: Project) -> ScanReport | None:
     """Run one Scanner pass against `project.memory_db_path`.
     Returns the report or None on failure (logged). Safe to call
     repeatedly — the scanner is idempotent on unchanged trees."""
+    from veles.core.memory.store import local_connection
+
     try:
-        store = SessionStore(project.memory_db_path)
-        conn = store._conn
-    except sqlite3.Error as exc:
-        logger.info("project_tree scan skipped: cannot open db: %s", exc)
-        return None
-    try:
-        report = Scanner(project.root, conn).scan()
+        # M264c: the connection is closed on the way out now. It never was —
+        # this function opened a store per scan and dropped it on the floor.
+        with local_connection(project) as conn:
+            report = Scanner(project.root, conn).scan()
         logger.debug(
             "project_tree scan: scanned=%d added=%d updated=%d removed=%d",
             report.scanned,
@@ -49,6 +47,9 @@ def scan_project_tree(project: Project) -> ScanReport | None:
             report.removed,
         )
         return report
+    except sqlite3.Error as exc:
+        logger.info("project_tree scan skipped: cannot open db: %s", exc)
+        return None
     except Exception as exc:
         logger.info("project_tree scan failed: %s", exc)
         return None
