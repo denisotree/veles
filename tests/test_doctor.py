@@ -521,3 +521,63 @@ def test_no_command_warns_about_sections_on_the_hot_path() -> None:
         check=True,
     )
     assert out.stdout.strip() == "False"
+
+
+# ---- M263b: the measured ceiling for local brute-force vector recall ----
+
+
+def _seed_embeddings(project, count: int) -> None:
+    from veles.core.memory import SessionStore
+    from veles.core.memory.vector import ensure_embeddings_table, pack
+
+    store = SessionStore(project.memory_db_path)
+    try:
+        ensure_embeddings_table(store._conn)
+        with store._conn:
+            store._conn.executemany(
+                "INSERT INTO embeddings_blob(ref_kind, ref_id, dim, vec_blob, created_at)"
+                " VALUES ('insight', ?, 2, ?, 1.0)",
+                [(i, pack([1.0, 0.0])) for i in range(1, count + 1)],
+            )
+    finally:
+        store.close()
+
+
+def _vector_check(project):
+    from veles.core.doctor import _check_vector_recall_size
+
+    return _check_vector_recall_size(project)
+
+
+def test_vector_recall_size_ok_when_unused(tmp_path: Path) -> None:
+    """Vector recall is opt-in; a project that never embedded anything must not
+    be told about a ceiling it cannot reach."""
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path / "p", name="p")
+    assert _vector_check(project).status == "ok"
+
+
+def test_vector_recall_size_warns_before_the_ceiling(tmp_path: Path) -> None:
+    from veles.core.doctor import _KNN_WARN_ROWS
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path / "p", name="p")
+    _seed_embeddings(project, _KNN_WARN_ROWS)
+    result = _vector_check(project)
+    assert result.status == "warn"
+    assert "ceiling" in result.message
+
+
+def test_vector_recall_size_errors_past_the_ceiling(tmp_path: Path) -> None:
+    """Past the budget, recall starts dropping the collector that missed its
+    deadline — which looks like memory going missing, not like slowness. The
+    check has to name that, or the symptom is unreadable."""
+    from veles.core.doctor import _KNN_CEILING_ROWS
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path / "p", name="p")
+    _seed_embeddings(project, _KNN_CEILING_ROWS)
+    result = _vector_check(project)
+    assert result.status == "error"
+    assert result.fix_hint and "remote backend" in result.fix_hint
