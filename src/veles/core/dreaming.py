@@ -442,7 +442,8 @@ def _step_insight_dedup(project: Project, result: DreamResult, *, dry_run: bool)
     conn.row_factory = sqlite3.Row
     try:
         rows = conn.execute(
-            "SELECT id, title, body, COALESCE(last_referenced_at, created_at) AS ts"
+            "SELECT id, title, body, support_count,"
+            " COALESCE(last_referenced_at, created_at) AS ts"
             " FROM insights"
             f" WHERE {eligible_sql()}"
             " ORDER BY created_at DESC LIMIT ?",
@@ -458,14 +459,25 @@ def _step_insight_dedup(project: Project, result: DreamResult, *, dry_run: bool)
         for indices, _score in clusters:
             canonical = max(indices, key=lambda i: rows[i]["ts"])
             canonical_id = int(rows[canonical]["id"])
+            merged_support = 0
             for i in indices:
                 if i == canonical:
                     continue
-                hide_insight(
+                if hide_insight(
                     conn,
                     int(rows[i]["id"]),
                     reason="merged-duplicate",
                     superseded_by=canonical_id,
+                ):
+                    merged_support += int(rows[i]["support_count"] or 1)
+            if merged_support:
+                # M261: the survivor inherits the evidence, not just the slot.
+                # Observing the same thing five times is a stronger fact than
+                # observing it once, and collapsing the copies used to throw
+                # that number away.
+                conn.execute(
+                    "UPDATE insights SET support_count = support_count + ? WHERE id = ?",
+                    (merged_support, canonical_id),
                 )
         conn.commit()
         result.notes.append(f"insight-dedup: {len(clusters)} cluster(s) collapsed")

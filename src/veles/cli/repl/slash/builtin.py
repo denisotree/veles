@@ -166,7 +166,13 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
             from veles.core.memory.artefacts import append_memory_log
             from veles.core.tools.builtin.memory_save import save_insight_row
 
-            rid = save_insight_row(title=title, body=body, category="tui-save", project=ctx.project)
+            rid = save_insight_row(
+                title=title,
+                body=body,
+                category="tui-save",
+                project=ctx.project,
+                origin="stated",
+            )
             if rid == 0:
                 return SlashResult.err("/save failed: could not write insight to memory.db")
             with contextlib.suppress(Exception):
@@ -186,7 +192,9 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
         from veles.core.memory.artefacts import append_memory_log
         from veles.core.tools.builtin.memory_save import save_insight_row
 
-        rid = save_insight_row(title=title, body=last, category="tui-save", project=ctx.project)
+        rid = save_insight_row(
+            title=title, body=last, category="tui-save", project=ctx.project, origin="stated"
+        )
         if rid == 0:
             return SlashResult.err("/save failed: could not write insight to memory.db")
         with contextlib.suppress(Exception):

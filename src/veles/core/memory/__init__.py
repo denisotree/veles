@@ -245,7 +245,17 @@ CREATE TABLE IF NOT EXISTS insights (
     -- columns) and explainable (`/insights` prints the reason).
     -- `hidden_reason` vocabulary: merged-duplicate | superseded | user-retracted.
     hidden_at          REAL,
-    hidden_reason      TEXT
+    hidden_reason      TEXT,
+    -- M261: where the fact came from, kept separate from `confidence`.
+    -- `stated` the user said it · `derived` the agent concluded it ·
+    -- `heuristic` a trigger guessed it. NULL = written before M261, unknown.
+    -- Read-only provenance for now: ranking deliberately ignores it, because
+    -- folding it into `confidence` would silently re-rank every existing row.
+    origin             TEXT,
+    -- How many observations back this fact. Dedup adds the support of every
+    -- duplicate it collapses, so a repeatedly-observed fact carries its
+    -- evidence instead of merely surviving.
+    support_count      INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE INDEX IF NOT EXISTS idx_insights_category ON insights(category);
@@ -296,7 +306,7 @@ CREATE TRIGGER IF NOT EXISTS insights_au AFTER UPDATE ON insights BEGIN
 END;
 """
 
-_SCHEMA_VERSION = 6
+_SCHEMA_VERSION = 7
 
 
 def hide_insight(
@@ -377,6 +387,8 @@ class SessionStore:
             self._migrate_to_v5(c)
         if current < 6:
             self._migrate_to_v6(c)
+        if current < 7:
+            self._migrate_to_v7(c)
         if current < _SCHEMA_VERSION:
             c.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
@@ -468,6 +480,28 @@ class SessionStore:
             "UPDATE insights SET hidden_at = ?, hidden_reason = 'merged-duplicate'"
             " WHERE superseded_by IS NOT NULL AND hidden_at IS NULL",
             (time.time(),),
+        )
+
+    def _migrate_to_v7(self, c: sqlite3.Connection) -> None:
+        """v6 → v7: add `insights.origin` / `support_count` (M261).
+
+        Origin is backfilled only where the existing `category` states it
+        outright — the two insight-extractor triggers. Everything else keeps
+        NULL rather than a guess: the column exists to say where a fact came
+        from, and inventing that for old rows would defeat it. Nothing reads
+        either column yet; ranking stays on `confidence` alone.
+        """
+        cols = {r[1] for r in c.execute("PRAGMA table_info(insights)").fetchall()}
+        if "origin" not in cols:
+            c.execute("ALTER TABLE insights ADD COLUMN origin TEXT")
+        if "support_count" not in cols:
+            c.execute("ALTER TABLE insights ADD COLUMN support_count INTEGER NOT NULL DEFAULT 1")
+        c.execute(
+            "UPDATE insights SET origin = CASE category"
+            "   WHEN 'remember-trigger' THEN 'stated'"
+            "   WHEN 'recovery-trigger' THEN 'heuristic'"
+            " END"
+            " WHERE origin IS NULL AND category IN ('remember-trigger', 'recovery-trigger')"
         )
 
     def create_session(

@@ -50,9 +50,15 @@ def save_insight_row(
     file_path: str = "",
     project: Project | None = None,
     confidence: float = 1.0,
+    origin: str = "derived",
 ) -> int:
     """Canonical insight writer — used by the @tool wrapper, the insight
     extractor, the TUI `/save`, and worker mini-reports.
+
+    `origin` (M261) records where the fact came from — `stated` (the user
+    said it), `derived` (the agent concluded it), `heuristic` (a trigger
+    guessed it). It defaults to `derived` because the @tool path is the
+    agent writing down its own conclusion; callers who know better say so.
 
     Inserts the SQL row (source of truth); on success renders the
     markdown view best-effort and backfills `file_path` with the view's
@@ -67,9 +73,10 @@ def save_insight_row(
         return 0
     try:
         cur = store._conn.execute(
-            "INSERT INTO insights(title, body, category, file_path, created_at, confidence)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            (title, body, category, file_path or None, time.time(), confidence),
+            "INSERT INTO insights"
+            "   (title, body, category, file_path, created_at, confidence, origin)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (title, body, category, file_path or None, time.time(), confidence, origin),
         )
         rid = int(cur.lastrowid or 0)
         if rid and not file_path:

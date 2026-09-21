@@ -200,3 +200,111 @@ def test_dedup_records_why_it_hid_the_duplicate(tmp_path: Path) -> None:
     assert len(rows) == 1
     assert rows[0]["hidden_reason"] == "merged-duplicate"
     assert rows[0]["hidden_at"] > 0
+
+
+# ---- M261: provenance, kept separate from the ranking weight ----
+
+
+def test_v7_backfills_origin_only_where_category_states_it(tmp_path: Path) -> None:
+    """A guessed origin would defeat the column. Rows whose category names the
+    trigger are backfilled; everything else stays NULL — unknown, and honest
+    about it."""
+    db = tmp_path / "memory.db"
+    _make_v4_db(db)
+    conn = sqlite3.connect(str(db))
+    try:
+        for title, category in (
+            ("remembered", "remember-trigger"),
+            ("recovered", "recovery-trigger"),
+            ("curated", "curated-session"),
+        ):
+            conn.execute(
+                "INSERT INTO insights(title, body, category, created_at)"
+                " VALUES (?, 'body', ?, 1000.0)",
+                (title, category),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    store = SessionStore(db)
+    try:
+        origins = dict(
+            store._conn.execute(
+                "SELECT title, origin FROM insights WHERE category IS NOT 'test'"
+            ).fetchall()
+        )
+    finally:
+        store.close()
+    assert origins["remembered"] == "stated"
+    assert origins["recovered"] == "heuristic"
+    assert origins["curated"] is None
+
+
+def test_origin_does_not_change_ranking(tmp_path: Path) -> None:
+    """M261 is read-only provenance: `confidence` still decides the weight, so
+    adding the column re-ranks nothing. A heuristic row written with full
+    confidence must rank exactly as it did before."""
+    from veles.core.project import init_project
+    from veles.core.tools.builtin.memory_save import save_insight_row
+
+    project = init_project(tmp_path / "p", name="p")
+    rid = save_insight_row(
+        title="guessed",
+        body="kafka retention is seven days",
+        category="recovery-trigger",
+        project=project,
+        confidence=1.0,
+        origin="heuristic",
+    )
+    store = SessionStore(project.memory_db_path)
+    try:
+        row = store._conn.execute(
+            "SELECT origin, support_count FROM insights WHERE id = ?", (rid,)
+        ).fetchone()
+        hit = store.search_insights("kafka retention", limit=1)[0]
+    finally:
+        store.close()
+    assert row["origin"] == "heuristic"
+    assert row["support_count"] == 1
+    assert hit.confidence == 1.0  # untouched by origin
+
+
+def test_dedup_gives_the_survivor_the_merged_support(tmp_path: Path) -> None:
+    from veles.core.dreaming import DreamResult, _step_insight_dedup
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path / "p", name="p")
+    conn = sqlite3.connect(str(project.memory_db_path))
+    try:
+        for title, body, ts in (
+            ("a", "bump nginx worker_connections concurrent sockets", 100.0),
+            ("b", "increase nginx worker_connections concurrent sockets", 200.0),
+            ("c", "raise nginx worker_connections for concurrent sockets", 300.0),
+        ):
+            conn.execute(
+                "INSERT INTO insights(title, body, category, created_at, last_referenced_at)"
+                " VALUES (?, ?, 'curated-session', ?, ?)",
+                (title, body, ts, ts),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    _step_insight_dedup(project, DreamResult(), dry_run=False)
+
+    conn = sqlite3.connect(str(project.memory_db_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = {
+            r["title"]: (r["support_count"], r["hidden_reason"])
+            for r in conn.execute(
+                "SELECT title, support_count, hidden_reason FROM insights"
+            ).fetchall()
+        }
+    finally:
+        conn.close()
+    # `c` is the most recently referenced → canonical, and inherits a + b.
+    assert rows["c"] == (3, None)
+    assert rows["a"][1] == "merged-duplicate"
+    assert rows["b"][1] == "merged-duplicate"
