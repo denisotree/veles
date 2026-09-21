@@ -48,7 +48,9 @@ from typing import TYPE_CHECKING
 
 from veles.core.curator_state import CuratorState, load, save_atomic
 from veles.core.file_lock import file_lock
+from veles.core.memory import hide_insight
 from veles.core.memory.artefacts import append_memory_log, write_proposal
+from veles.core.memory.eligibility import eligible_sql
 from veles.core.slug import now_timestamp_slug
 
 if TYPE_CHECKING:
@@ -426,10 +428,12 @@ def _step_insight_dedup(project: Project, result: DreamResult, *, dry_run: bool)
     Clusters the most-recent insights by TF-IDF cosine (shared
     `text_cluster.cluster_texts`); within each cluster the highest
     `last_referenced_at` (most-used / most-recent) is the canonical survivor,
-    and every other member gets an `insight_refs(from=dup, to=canonical)` row.
-    Recall (`MemoryRouter._collect_insights`) then excludes superseded rows, so
-    duplicates stop drowning the canonical without deleting the audit trail.
-    Idempotent via the `insight_refs` PK + `INSERT OR IGNORE`."""
+    and every other member is pointed at it (`superseded_by`) and hidden from
+    recall with a reason (`hidden_at` / `hidden_reason='merged-duplicate'`,
+    M260). Nothing is deleted: duplicates stop drowning the canonical, and the
+    variant stays on disk, findable, and un-hideable by clearing two columns.
+    Idempotent via the `hidden_at IS NULL` guard — a row already hidden (for
+    this or any other reason) is left alone rather than re-stamped."""
     import sqlite3
 
     from veles.core.text_cluster import cluster_texts
@@ -438,9 +442,10 @@ def _step_insight_dedup(project: Project, result: DreamResult, *, dry_run: bool)
     conn.row_factory = sqlite3.Row
     try:
         rows = conn.execute(
-            "SELECT id, title, body, COALESCE(last_referenced_at, created_at) AS ts"
+            "SELECT id, title, body, support_count,"
+            " COALESCE(last_referenced_at, created_at) AS ts"
             " FROM insights"
-            " WHERE id NOT IN (SELECT from_insight_id FROM insight_refs)"
+            f" WHERE {eligible_sql()}"
             " ORDER BY created_at DESC LIMIT ?",
             (_INSIGHT_DEDUP_LIMIT,),
         ).fetchall()
@@ -454,13 +459,25 @@ def _step_insight_dedup(project: Project, result: DreamResult, *, dry_run: bool)
         for indices, _score in clusters:
             canonical = max(indices, key=lambda i: rows[i]["ts"])
             canonical_id = int(rows[canonical]["id"])
+            merged_support = 0
             for i in indices:
                 if i == canonical:
                     continue
+                if hide_insight(
+                    conn,
+                    int(rows[i]["id"]),
+                    reason="merged-duplicate",
+                    superseded_by=canonical_id,
+                ):
+                    merged_support += int(rows[i]["support_count"] or 1)
+            if merged_support:
+                # M261: the survivor inherits the evidence, not just the slot.
+                # Observing the same thing five times is a stronger fact than
+                # observing it once, and collapsing the copies used to throw
+                # that number away.
                 conn.execute(
-                    "INSERT OR IGNORE INTO insight_refs(from_insight_id, to_insight_id)"
-                    " VALUES (?, ?)",
-                    (int(rows[i]["id"]), canonical_id),
+                    "UPDATE insights SET support_count = support_count + ? WHERE id = ?",
+                    (merged_support, canonical_id),
                 )
         conn.commit()
         result.notes.append(f"insight-dedup: {len(clusters)} cluster(s) collapsed")
@@ -601,7 +618,7 @@ def _collect_insight_snippets(project: Project, *, limit: int) -> list[str]:
         try:
             rows = conn.execute(
                 "SELECT title, body FROM insights"
-                " WHERE id NOT IN (SELECT from_insight_id FROM insight_refs)"
+                f" WHERE {eligible_sql()}"
                 " ORDER BY created_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()

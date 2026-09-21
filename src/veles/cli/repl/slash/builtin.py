@@ -166,7 +166,13 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
             from veles.core.memory.artefacts import append_memory_log
             from veles.core.tools.builtin.memory_save import save_insight_row
 
-            rid = save_insight_row(title=title, body=body, category="tui-save", project=ctx.project)
+            rid = save_insight_row(
+                title=title,
+                body=body,
+                category="tui-save",
+                project=ctx.project,
+                origin="stated",
+            )
             if rid == 0:
                 return SlashResult.err("/save failed: could not write insight to memory.db")
             with contextlib.suppress(Exception):
@@ -186,7 +192,9 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
         from veles.core.memory.artefacts import append_memory_log
         from veles.core.tools.builtin.memory_save import save_insight_row
 
-        rid = save_insight_row(title=title, body=last, category="tui-save", project=ctx.project)
+        rid = save_insight_row(
+            title=title, body=last, category="tui-save", project=ctx.project, origin="stated"
+        )
         if rid == 0:
             return SlashResult.err("/save failed: could not write insight to memory.db")
         with contextlib.suppress(Exception):
@@ -511,14 +519,14 @@ def _insights(line: str, ctx: SlashContext) -> SlashResult:
     try:
         if category_filter:
             rows = store._conn.execute(
-                "SELECT id, title, category, created_at FROM insights"
+                "SELECT id, title, category, created_at, hidden_at, hidden_reason FROM insights"
                 " WHERE category = ?"
                 " ORDER BY created_at DESC, id DESC LIMIT ?",
                 (category_filter, limit),
             ).fetchall()
         else:
             rows = store._conn.execute(
-                "SELECT id, title, category, created_at FROM insights"
+                "SELECT id, title, category, created_at, hidden_at, hidden_reason FROM insights"
                 " ORDER BY created_at DESC, id DESC LIMIT ?",
                 (limit,),
             ).fetchall()
@@ -538,7 +546,11 @@ def _insights(line: str, ctx: SlashContext) -> SlashResult:
         ts = _fmt_ts(row["created_at"]) if row["created_at"] else "—"
         cat = row["category"] or "—"
         title = row["title"] or "(no title)"
-        out_lines.append(f"  [{cat}] {title}  · {ts}")
+        # M260: a hidden row is still listed — the inspector's job is to show
+        # what memory holds, and "why did the agent stop using this?" is only
+        # answerable if the reason is visible next to the fact.
+        hidden = f"  (hidden: {row['hidden_reason'] or 'unspecified'})" if row["hidden_at"] else ""
+        out_lines.append(f"  [{cat}] {title}  · {ts}{hidden}")
     out_lines.append("")
     out_lines.append("Filter by category: /insights setup-hint | skill-suggestion | manager-report")
     return SlashResult.ok("\n".join(out_lines))

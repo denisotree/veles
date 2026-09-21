@@ -4,7 +4,7 @@
 This module embeds insights that lack a vector so `MemoryRouter` can KNN over
 them. It runs off the hot path (the dream/curator cycle calls `backfill_*`),
 never on the per-turn recall path — embedding round-trips must not block prompt
-assembly. Superseded insights (dream dedup, `insight_refs`) are skipped: embeds
+assembly. Superseded insights (dream dedup, `superseded_by`) are skipped: embeds
 should be spent only on the survivor set that recall actually surfaces.
 """
 
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol
 
+from veles.core.memory.eligibility import eligible_sql
 from veles.core.memory.vector import ensure_embeddings_table, upsert_embedding
 
 if TYPE_CHECKING:
@@ -43,7 +44,7 @@ def backfill_insight_embeddings(
         " LEFT JOIN embeddings_blob e"
         "   ON e.ref_kind = 'insight' AND e.ref_id = i.id"
         " WHERE e.id IS NULL"
-        "   AND i.id NOT IN (SELECT from_insight_id FROM insight_refs)"
+        f"   AND {eligible_sql('i')}"
         " ORDER BY i.id LIMIT ?",
         (limit,),
     ).fetchall()

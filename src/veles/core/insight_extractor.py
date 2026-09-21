@@ -332,7 +332,13 @@ def make_insight_extractor(
         return _parse_extractor_output(result.text or "")
 
     def _persist_one(
-        *, prompt: str, snippet: str, slug_id: str, trigger_label: str, confidence: float
+        *,
+        prompt: str,
+        snippet: str,
+        slug_id: str,
+        trigger_label: str,
+        confidence: float,
+        origin: str,
     ) -> int:
         """Run one extractor pass and persist the result. Returns 1 on success, 0 otherwise."""
         parsed = _extract_one(prompt, snippet)
@@ -343,7 +349,12 @@ def make_insight_extractor(
         # SQL row is canonical — a db failure means the insight is NOT
         # persisted (no orphaned markdown that recall can't see).
         rid = save_insight_row(
-            title=title, body=body, category=trigger_label, project=project, confidence=confidence
+            title=title,
+            body=body,
+            category=trigger_label,
+            project=project,
+            confidence=confidence,
+            origin=origin,
         )
         if rid == 0:
             return 0
@@ -379,6 +390,7 @@ def make_insight_extractor(
                 trigger_label="remember-trigger",
                 # User explicitly asked to remember this → user-asserted.
                 confidence=1.0,
+                origin="stated",
             )
 
         for rtrig in triggers_recovery:
@@ -389,6 +401,7 @@ def make_insight_extractor(
                 trigger_label="recovery-trigger",
                 # Heuristically inferred from a tool-error window → lower trust.
                 confidence=0.6,
+                origin="heuristic",
             )
 
         return written

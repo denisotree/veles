@@ -1,5 +1,6 @@
-"""M142: the dream cycle dedupes near-duplicate insights via supersede-links in
-`insight_refs`, and the insight step caps transcripts per cycle."""
+"""M142: the dream cycle dedupes near-duplicate insights by pointing each
+duplicate at its canonical survivor (`insights.superseded_by` since M258), and
+the insight step caps transcripts per cycle."""
 
 from __future__ import annotations
 
@@ -30,12 +31,14 @@ def _insert(project, *, title: str, body: str, ts: float) -> int:
 
 
 def _refs(project) -> list[tuple[int, int]]:
+    """Every (superseded, canonical) pair recorded by dedup. M258 moved these
+    off `insight_refs` onto `insights.superseded_by`; the pairs are the same."""
     conn = sqlite3.connect(str(project.memory_db_path))
     try:
         return [
             (int(r[0]), int(r[1]))
             for r in conn.execute(
-                "SELECT from_insight_id, to_insight_id FROM insight_refs"
+                "SELECT id, superseded_by FROM insights WHERE superseded_by IS NOT NULL ORDER BY id"
             ).fetchall()
         ]
     finally:
@@ -75,7 +78,7 @@ def test_insight_dedup_idempotent(tmp_path: Path) -> None:
     )
     _step_insight_dedup(project, DreamResult(), dry_run=False)
     _step_insight_dedup(project, DreamResult(), dry_run=False)
-    assert len(_refs(project)) == 1  # INSERT OR IGNORE → no duplicate ref
+    assert len(_refs(project)) == 1  # the `superseded_by IS NULL` guard → no re-pointing
 
 
 def test_insight_dedup_dry_run_writes_nothing(tmp_path: Path) -> None:

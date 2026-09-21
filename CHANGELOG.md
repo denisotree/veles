@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.35.0] — 2026-09-21
+
+Memory has never deleted an insight — but it has been hiding them, silently and
+without a reason, and the only way to notice was that the agent stopped
+applying something. This release makes that removal visible and reversible, and
+separates where a fact came from the weight it carries when memory is searched.
+
+### Added — a fact that leaves recall says why
+
+Duplicate insights are collapsed during `veles dream`: one survivor per cluster,
+the rest hidden. They were hidden by a structural link with nothing recorded
+about the decision — you could not tell "merged as a duplicate" from
+"superseded by something newer", and you could not undo it.
+
+Each hidden row now carries the time and the reason, `/insights` prints it
+beside the title (in Telegram too, where the marker did not exist at all), and
+clearing two columns brings the fact back into recall. Nothing is deleted:
+**the only way a fact leaves recall is by being hidden, and hiding is
+reversible.**
+
+### Added — where a fact came from, separately from how much it weighs
+
+`confidence` was doing two jobs: recording provenance and setting rank. An
+insight now also carries `origin` (`stated` — you said it, `derived` — the agent
+concluded it, `heuristic` — a trigger guessed it) and `support_count`, the
+number of observations behind it. Dedup adds each collapsed duplicate's support
+to the survivor, so a fact observed five times keeps the number instead of
+losing it in the merge.
+
+**Ranking is deliberately unchanged.** Deriving weight from origin would
+silently re-rank every insight you already have, so these two fields are
+provenance you can read, and nothing more, until there is enough data to
+compare before and after. Older rows get an origin only where their category
+already states it; the rest stay unset rather than guessed.
+
+### Fixed
+
+- **A related insight no longer disappears from recall.** Recall hid every
+  insight that appeared as the source of a link in `insight_refs` — a table
+  meant for relations in general. The moment a second kind of relation was
+  stored there, every linked insight would have vanished from memory. The
+  supersession marker moved onto its own column; existing links were migrated
+  exactly, since dedup was the table's only writer.
+- **A stored fact can no longer cut the memory block short.** Everything
+  between `<memory-context>` and `</memory-context>` is recalled text. An
+  insight containing the closing tag ended the block early, and everything after
+  it was read by the model as ordinary prompt text, outside any boundary. The
+  tags are now escaped inside recalled content — escaped, not stripped, so a
+  page that legitimately documents them stays readable.
+
+### Migration
+
+`memory.db` upgrades from schema v4 to v7 on first open. Additive and automatic;
+nothing is rewritten except the supersession links, which move to their new
+column and are dated by when the fact was last in use rather than by the moment
+you upgraded.
+
+
 ## [0.34.0] — 2026-09-18
 
 Nothing in `memory.db` or `.veles/*.jsonl` had ever been deleted. That is fine
@@ -1256,7 +1314,11 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v0.31.0...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v0.35.0...HEAD
+[0.35.0]: https://github.com/denisotree/veles/compare/v0.34.0...v0.35.0
+[0.34.0]: https://github.com/denisotree/veles/compare/v0.33.0...v0.34.0
+[0.33.0]: https://github.com/denisotree/veles/compare/v0.32.0...v0.33.0
+[0.32.0]: https://github.com/denisotree/veles/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/denisotree/veles/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/denisotree/veles/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/denisotree/veles/compare/v0.28.1...v0.29.0

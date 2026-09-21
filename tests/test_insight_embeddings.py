@@ -11,7 +11,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from veles.core.memory import SessionStore
+from veles.core.memory import SessionStore, hide_insight
 from veles.core.memory.insight_embeddings import (
     backfill_insight_embeddings,
     embed_survivor_insights,
@@ -138,10 +138,7 @@ def test_backfill_skips_superseded_insights(tmp_path: Path) -> None:
         survivor = _insert_insight(store, title="keep", body="canonical fact")
         dropped = _insert_insight(store, title="dup", body="duplicate fact")
         # Mark `dropped` as superseded by `survivor` (dream dedup convention).
-        store._conn.execute(
-            "INSERT INTO insight_refs(from_insight_id, to_insight_id) VALUES (?, ?)",
-            (dropped, survivor),
-        )
+        hide_insight(store._conn, dropped, reason="merged-duplicate", superseded_by=survivor)
         store._conn.commit()
 
         n = backfill_insight_embeddings(store, _FakeEmbedder(), limit=10)
@@ -178,10 +175,7 @@ def test_knn_insights_excludes_superseded_even_when_embedded(tmp_path: Path) -> 
         drop = _insert_insight(store, title="D", body="drop")
         upsert_embedding(store._conn, ref_kind="insight", ref_id=keep, vec=[1.0, 0.0])
         upsert_embedding(store._conn, ref_kind="insight", ref_id=drop, vec=[1.0, 0.0])
-        store._conn.execute(
-            "INSERT INTO insight_refs(from_insight_id, to_insight_id) VALUES (?, ?)",
-            (drop, keep),
-        )
+        hide_insight(store._conn, drop, reason="merged-duplicate", superseded_by=keep)
         store._conn.commit()
 
         ids = [h.id for h in store.knn_insights([1.0, 0.0], limit=5)]

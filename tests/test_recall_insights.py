@@ -13,7 +13,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from veles.core.memory import SessionStore
+from veles.core.memory import SessionStore, hide_insight
 from veles.core.project import init_project
 
 
@@ -61,18 +61,15 @@ def test_search_insights_carries_ts(tmp_path: Path) -> None:
 
 
 def test_search_insights_excludes_superseded(tmp_path: Path) -> None:
-    """M142: an insight linked as superseded (a `from_insight_id` in
-    `insight_refs`) must not surface in recall — only the canonical does."""
+    """M142: an insight marked `superseded_by` must not surface in recall —
+    only the canonical survivor does."""
     store = SessionStore(tmp_path / "m.db")
     try:
         canonical = _insert_insight(
             store, title="canonical", body="redis ttl 300 seconds session keys"
         )
         dup = _insert_insight(store, title="duplicate", body="redis ttl 300 seconds session keys")
-        store._conn.execute(
-            "INSERT INTO insight_refs(from_insight_id, to_insight_id) VALUES (?, ?)",
-            (dup, canonical),
-        )
+        hide_insight(store._conn, dup, reason="merged-duplicate", superseded_by=canonical)
         store._conn.commit()
         hits = store.search_insights("redis ttl session", limit=5)
     finally:
@@ -80,6 +77,28 @@ def test_search_insights_excludes_superseded(tmp_path: Path) -> None:
     ids = [h.id for h in hits]
     assert canonical in ids
     assert dup not in ids
+
+
+def test_related_insight_link_does_not_hide_it(tmp_path: Path) -> None:
+    """M258: `insight_refs` is a generic relation table, not a supersede
+    marker. Linking A to B must leave A recallable — before M258 the two
+    meanings shared one row, so any non-supersede relation silently deleted
+    its source from recall."""
+    store = SessionStore(tmp_path / "m.db")
+    try:
+        target = _insert_insight(store, title="target", body="kafka consumer lag alert runbook")
+        related = _insert_insight(store, title="related", body="kafka consumer lag alert metrics")
+        store._conn.execute(
+            "INSERT INTO insight_refs(from_insight_id, to_insight_id) VALUES (?, ?)",
+            (related, target),
+        )
+        store._conn.commit()
+        hits = store.search_insights("kafka consumer lag alert", limit=5)
+    finally:
+        store.close()
+    ids = [h.id for h in hits]
+    assert target in ids
+    assert related in ids
 
 
 def test_search_insights_empty_query(tmp_path: Path) -> None:
