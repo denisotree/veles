@@ -15,6 +15,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from veles.core.memory.eligibility import eligible_sql
 from veles.core.project import Project
 
 
@@ -118,7 +119,7 @@ def _recent_insight_titles(project: Project, *, limit: int) -> list[str]:
         try:
             rows = conn.execute(
                 "SELECT title FROM insights"
-                " WHERE id NOT IN (SELECT from_insight_id FROM insight_refs)"
+                f" WHERE {eligible_sql()}"
                 " ORDER BY COALESCE(last_referenced_at, created_at) DESC LIMIT ?",
                 (limit,),
             ).fetchall()

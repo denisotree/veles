@@ -139,8 +139,7 @@ def test_backfill_skips_superseded_insights(tmp_path: Path) -> None:
         dropped = _insert_insight(store, title="dup", body="duplicate fact")
         # Mark `dropped` as superseded by `survivor` (dream dedup convention).
         store._conn.execute(
-            "INSERT INTO insight_refs(from_insight_id, to_insight_id) VALUES (?, ?)",
-            (dropped, survivor),
+            "UPDATE insights SET superseded_by = ? WHERE id = ?", (survivor, dropped)
         )
         store._conn.commit()
 
@@ -178,10 +177,7 @@ def test_knn_insights_excludes_superseded_even_when_embedded(tmp_path: Path) -> 
         drop = _insert_insight(store, title="D", body="drop")
         upsert_embedding(store._conn, ref_kind="insight", ref_id=keep, vec=[1.0, 0.0])
         upsert_embedding(store._conn, ref_kind="insight", ref_id=drop, vec=[1.0, 0.0])
-        store._conn.execute(
-            "INSERT INTO insight_refs(from_insight_id, to_insight_id) VALUES (?, ?)",
-            (drop, keep),
-        )
+        store._conn.execute("UPDATE insights SET superseded_by = ? WHERE id = ?", (keep, drop))
         store._conn.commit()
 
         ids = [h.id for h in store.knn_insights([1.0, 0.0], limit=5)]

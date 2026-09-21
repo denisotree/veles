@@ -49,6 +49,7 @@ from typing import TYPE_CHECKING
 from veles.core.curator_state import CuratorState, load, save_atomic
 from veles.core.file_lock import file_lock
 from veles.core.memory.artefacts import append_memory_log, write_proposal
+from veles.core.memory.eligibility import eligible_sql
 from veles.core.slug import now_timestamp_slug
 
 if TYPE_CHECKING:
@@ -426,10 +427,12 @@ def _step_insight_dedup(project: Project, result: DreamResult, *, dry_run: bool)
     Clusters the most-recent insights by TF-IDF cosine (shared
     `text_cluster.cluster_texts`); within each cluster the highest
     `last_referenced_at` (most-used / most-recent) is the canonical survivor,
-    and every other member gets an `insight_refs(from=dup, to=canonical)` row.
-    Recall (`MemoryRouter._collect_insights`) then excludes superseded rows, so
-    duplicates stop drowning the canonical without deleting the audit trail.
-    Idempotent via the `insight_refs` PK + `INSERT OR IGNORE`."""
+    and every other member gets `insights.superseded_by = <canonical>` (M258 —
+    previously an `insight_refs` row, which was indistinguishable from any
+    other relation). Recall (`MemoryRouter._collect_insights`) then excludes
+    superseded rows, so duplicates stop drowning the canonical without deleting
+    anything. Idempotent via the `superseded_by IS NULL` guard: a row already
+    pointing somewhere is left alone rather than re-pointed."""
     import sqlite3
 
     from veles.core.text_cluster import cluster_texts
@@ -440,7 +443,7 @@ def _step_insight_dedup(project: Project, result: DreamResult, *, dry_run: bool)
         rows = conn.execute(
             "SELECT id, title, body, COALESCE(last_referenced_at, created_at) AS ts"
             " FROM insights"
-            " WHERE id NOT IN (SELECT from_insight_id FROM insight_refs)"
+            f" WHERE {eligible_sql()}"
             " ORDER BY created_at DESC LIMIT ?",
             (_INSIGHT_DEDUP_LIMIT,),
         ).fetchall()
@@ -458,9 +461,8 @@ def _step_insight_dedup(project: Project, result: DreamResult, *, dry_run: bool)
                 if i == canonical:
                     continue
                 conn.execute(
-                    "INSERT OR IGNORE INTO insight_refs(from_insight_id, to_insight_id)"
-                    " VALUES (?, ?)",
-                    (int(rows[i]["id"]), canonical_id),
+                    "UPDATE insights SET superseded_by = ? WHERE id = ? AND superseded_by IS NULL",
+                    (canonical_id, int(rows[i]["id"])),
                 )
         conn.commit()
         result.notes.append(f"insight-dedup: {len(clusters)} cluster(s) collapsed")
@@ -601,7 +603,7 @@ def _collect_insight_snippets(project: Project, *, limit: int) -> list[str]:
         try:
             rows = conn.execute(
                 "SELECT title, body FROM insights"
-                " WHERE id NOT IN (SELECT from_insight_id FROM insight_refs)"
+                f" WHERE {eligible_sql()}"
                 " ORDER BY created_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()

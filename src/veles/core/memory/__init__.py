@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from veles.core.fts import escape_query
+from veles.core.memory.eligibility import eligible_sql
 from veles.core.provider import Message, ToolCall
 
 logger = logging.getLogger(__name__)
@@ -232,7 +233,12 @@ CREATE TABLE IF NOT EXISTS insights (
     -- M218: provenance confidence in [0,1]. 1.0 = user-asserted / curated;
     -- lower = heuristically inferred (e.g. a tool-error recovery guess).
     -- Recall prunes sub-floor rows before they reach the prompt.
-    confidence         REAL NOT NULL DEFAULT 1.0
+    confidence         REAL NOT NULL DEFAULT 1.0,
+    -- M258: the insight that replaced this one, or NULL while this row is
+    -- the current one. Supersession used to be encoded as an `insight_refs`
+    -- row, which made it indistinguishable from any other relation; see
+    -- `eligibility.eligible_sql`. The row itself is never deleted.
+    superseded_by      INTEGER REFERENCES insights(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_insights_category ON insights(category);
@@ -283,7 +289,7 @@ CREATE TRIGGER IF NOT EXISTS insights_au AFTER UPDATE ON insights BEGIN
 END;
 """
 
-_SCHEMA_VERSION = 4
+_SCHEMA_VERSION = 5
 
 
 def _make_session_id() -> str:
@@ -332,6 +338,8 @@ class SessionStore:
             self._migrate_to_v3(c)
         if current < 4:
             self._migrate_to_v4(c)
+        if current < 5:
+            self._migrate_to_v5(c)
         if current < _SCHEMA_VERSION:
             c.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
 
@@ -375,6 +383,33 @@ class SessionStore:
         cols = {r[1] for r in c.execute("PRAGMA table_info(insights)").fetchall()}
         if "confidence" not in cols:
             c.execute("ALTER TABLE insights ADD COLUMN confidence REAL NOT NULL DEFAULT 1.0")
+
+    def _migrate_to_v5(self, c: sqlite3.Connection) -> None:
+        """v4 → v5: add `insights.superseded_by` (M258) and move the existing
+        supersession links off `insight_refs` onto it.
+
+        Until now `insight_refs` carried both meanings — "A relates to B" and
+        "A was superseded by B" — and recall hid every row appearing as a
+        `from_insight_id`. The only writer is the M142 dream dedup, so every
+        existing ref *is* a supersession and the backfill is exact; the refs
+        rows are then deleted, leaving the table for the relations it is
+        documented to hold. No insight row is removed: superseded rows stay
+        readable and can be un-superseded by clearing the column.
+        """
+        cols = {r[1] for r in c.execute("PRAGMA table_info(insights)").fetchall()}
+        if "superseded_by" not in cols:
+            c.execute(
+                "ALTER TABLE insights ADD COLUMN superseded_by INTEGER"
+                " REFERENCES insights(id) ON DELETE SET NULL"
+            )
+        c.execute(
+            "UPDATE insights SET superseded_by = ("
+            "    SELECT to_insight_id FROM insight_refs"
+            "     WHERE from_insight_id = insights.id LIMIT 1"
+            ") WHERE superseded_by IS NULL"
+            "  AND id IN (SELECT from_insight_id FROM insight_refs)"
+        )
+        c.execute("DELETE FROM insight_refs")
 
     def create_session(
         self, *, parent_session_id: str | None = None, title: str | None = None
@@ -617,7 +652,7 @@ class SessionStore:
                 " WHERE insights_fts MATCH ?"
                 # M142: skip insights superseded by dream dedup (kept on disk
                 # for audit, but the canonical survivor is what recall surfaces).
-                " AND i.id NOT IN (SELECT from_insight_id FROM insight_refs)"
+                f" AND {eligible_sql('i')}"
                 " ORDER BY rank LIMIT ?",
                 (escaped, limit),
             ).fetchall()
@@ -688,7 +723,7 @@ class SessionStore:
         rows = self._conn.execute(
             "SELECT id, title, body, COALESCE(last_referenced_at, created_at) AS ts, confidence"
             f" FROM insights WHERE id IN ({placeholders})"
-            " AND id NOT IN (SELECT from_insight_id FROM insight_refs)",
+            f" AND {eligible_sql()}",
             ids,
         ).fetchall()
         by_id = {int(r["id"]): r for r in rows}
