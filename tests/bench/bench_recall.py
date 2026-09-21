@@ -42,7 +42,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from veles.core.memory import SessionStore
-from veles.core.memory.vector import ensure_embeddings_table
+from veles.core.memory.vector import ensure_embeddings_table, pack
 
 # nomic-embed-text, the default local embedder, emits 768 dimensions. The
 # openai default is 1536; 768 is therefore the *optimistic* case, which is the
@@ -92,7 +92,7 @@ def _peak_rss_bytes() -> int:
 
 def _timings(samples_ms: list[float], name: str, *, planned: int) -> CollectorTiming:
     ordered = sorted(samples_ms)
-    idx = min(len(ordered) - 1, int(round(0.95 * (len(ordered) - 1))))
+    idx = min(len(ordered) - 1, round(0.95 * (len(ordered) - 1)))
     return CollectorTiming(
         name=name,
         p50_ms=round(statistics.median(ordered), 3),
@@ -154,8 +154,7 @@ def seed(db_path: Path, rows: int, *, with_vectors: bool = True) -> None:
                 )
             with conn:
                 conn.executemany(
-                    "INSERT INTO insights(title, body, category, created_at)"
-                    " VALUES (?, ?, ?, ?)",
+                    "INSERT INTO insights(title, body, category, created_at) VALUES (?, ?, ?, ?)",
                     insights,
                 )
             if not with_vectors:
@@ -166,14 +165,14 @@ def seed(db_path: Path, rows: int, *, with_vectors: bool = True) -> None:
                     "insight",
                     first_id + n,
                     _DIM,
-                    json.dumps([round(rng.uniform(-1.0, 1.0), 6) for _ in range(_DIM)]),
+                    pack([rng.uniform(-1.0, 1.0) for _ in range(_DIM)]),
                     now,
                 )
                 for n in range(count)
             ]
             with conn:
                 conn.executemany(
-                    "INSERT INTO embeddings_blob(ref_kind, ref_id, dim, vec_json, created_at)"
+                    "INSERT INTO embeddings_blob(ref_kind, ref_id, dim, vec_blob, created_at)"
                     " VALUES (?, ?, ?, ?, ?)",
                     vectors,
                 )
@@ -203,6 +202,10 @@ def measure(db_path: Path, *, rows: int, samples: int, budget_s: float) -> SizeR
     store = SessionStore(db_path)
     router = MemoryRouter(project, store=store)
     query_vec = [0.5] * _DIM
+    # Pay any one-off schema upgrade (M263a converts a JSON-vector database on
+    # first open) BEFORE the clock starts: it is not part of steady-state recall
+    # and would otherwise land entirely on the first sample.
+    ensure_embeddings_table(store._conn)
 
     collectors: list[tuple[str, object]] = [
         ("insights-FTS", lambda q: store.search_insights(q, limit=5)),
@@ -246,7 +249,9 @@ def _render(results: list[SizeResult], *, gate_ms: float) -> str:
         "",
         f"Gate: p95 of the whole recall under {gate_ms:.0f} ms at 1M insights.",
         "",
-        "| rows | db | peak RSS Δ | " + " | ".join(c.name for c in results[0].collectors) + " | total |",
+        "| rows | db | peak RSS Δ | "
+        + " | ".join(c.name for c in results[0].collectors)
+        + " | total |",
         "|---" * (4 + len(results[0].collectors)) + "|",
     ]
     for r in results:

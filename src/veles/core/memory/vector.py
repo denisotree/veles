@@ -11,8 +11,15 @@ Two layers, picked in priority order at runtime:
    vectors; flag a warning when the catalogue grows past that.
 
 Both paths share the same on-disk shape: an `embeddings_blob` table
-with `ref_kind`/`ref_id`/`vec_json` columns. Vectors are stored as JSON
-arrays of floats — portable across platforms.
+with `ref_kind`/`ref_id`/`vec_blob` columns.
+
+M263a replaced the original JSON storage with packed little-endian float32.
+JSON cost roughly 12 bytes per dimension against 4, and — the part that
+actually hurt — every row had to be parsed by `json.loads` on every query,
+because a brute-force scan reads all of them. At the 768 dimensions the
+default local embedder emits, a million rows is ~8.6 GB of JSON text to parse
+per query versus 2.86 GB of bytes to read. Little-endian is explicit rather
+than native so a database file stays readable after it moves machines.
 
 (M215: the former sqlite-vec tier was removed — it never built the
 promised `vec0` index and brute-forced `vec_distance_cosine` per row via
@@ -22,10 +29,11 @@ brute-force ever becomes the bottleneck.)
 
 from __future__ import annotations
 
-import json
+import contextlib
 import logging
 import math
 import sqlite3
+import struct
 from collections.abc import Iterable
 from dataclasses import dataclass
 
@@ -38,7 +46,7 @@ CREATE TABLE IF NOT EXISTS embeddings_blob (
     ref_kind  TEXT NOT NULL,
     ref_id    INTEGER NOT NULL,
     dim       INTEGER NOT NULL,
-    vec_json  TEXT NOT NULL,
+    vec_blob  BLOB NOT NULL,
     created_at REAL NOT NULL,
     UNIQUE (ref_kind, ref_id)
 );
@@ -46,6 +54,21 @@ CREATE TABLE IF NOT EXISTS embeddings_blob (
 CREATE INDEX IF NOT EXISTS idx_embeddings_blob_ref
     ON embeddings_blob(ref_kind, ref_id);
 """
+
+# Rows converted per statement while migrating a pre-M263a database. Small
+# enough that a huge table does not build one giant transaction, large enough
+# that the round-trips do not dominate.
+_MIGRATE_BATCH = 2_000
+
+
+def pack(vec: Iterable[float]) -> bytes:
+    """Little-endian float32 wire format for one vector."""
+    values = [float(x) for x in vec]
+    return struct.pack(f"<{len(values)}f", *values)
+
+
+def unpack(blob: bytes) -> list[float]:
+    return list(struct.unpack(f"<{len(blob) // 4}f", blob))
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,8 +118,79 @@ def ensure_embeddings_table(conn: sqlite3.Connection) -> None:
     """Create the blob-backed table on `conn`. Idempotent. Callers
     typically run this once per SessionStore open — the SessionStore
     schema bootstrap (`_init_schema`) doesn't, because the blob table
-    is opt-in: not every install needs embeddings."""
+    is opt-in: not every install needs embeddings.
+
+    The M263a JSON→float32 upgrade lives here rather than in SessionStore's
+    `PRAGMA user_version` chain for the same reason: this table is outside the
+    versioned schema, so a version bump would claim to describe a table half
+    the databases do not have."""
     conn.executescript(_SCHEMA_BLOB_SQL)
+    _migrate_json_vectors(conn)
+
+
+def _migrate_json_vectors(conn: sqlite3.Connection) -> None:
+    """Convert a pre-M263a `vec_json` table to packed `vec_blob`, in batches.
+
+    This is the one migration in the project that can take real time on a real
+    database, so it reports progress instead of stalling an open silently. It
+    is also the only one that drops a column — done last, and only once every
+    row has been converted, so an interrupted run resumes instead of losing
+    vectors."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(embeddings_blob)").fetchall()}
+    if "vec_json" not in cols:
+        return
+    if "vec_blob" not in cols:
+        conn.execute("ALTER TABLE embeddings_blob ADD COLUMN vec_blob BLOB")
+
+    remaining = conn.execute(
+        "SELECT COUNT(*) FROM embeddings_blob WHERE vec_blob IS NULL"
+    ).fetchone()[0]
+    if remaining:
+        logger.warning(
+            "converting %d embedding vector(s) from JSON to float32 (one-off, M263a)", remaining
+        )
+        import json as _json
+
+        done = 0
+        while True:
+            rows = conn.execute(
+                "SELECT id, vec_json FROM embeddings_blob WHERE vec_blob IS NULL LIMIT ?",
+                (_MIGRATE_BATCH,),
+            ).fetchall()
+            if not rows:
+                break
+            with conn:
+                conn.executemany(
+                    "UPDATE embeddings_blob SET vec_blob = ? WHERE id = ?",
+                    [(pack(_json.loads(r[1])), r[0]) for r in rows],
+                )
+            done += len(rows)
+            logger.warning("  %d/%d vectors converted", done, remaining)
+
+    # Rebuild without the old column. `DROP COLUMN` is refused while a NOT NULL
+    # column has no default, which `vec_json` is on pre-M263a databases, so the
+    # table is recreated instead of patched.
+    with conn:
+        conn.execute("ALTER TABLE embeddings_blob RENAME TO embeddings_blob_old")
+        conn.executescript(_SCHEMA_BLOB_SQL)
+        conn.execute(
+            "INSERT INTO embeddings_blob(id, ref_kind, ref_id, dim, vec_blob, created_at)"
+            " SELECT id, ref_kind, ref_id, dim, vec_blob, created_at"
+            "   FROM embeddings_blob_old WHERE vec_blob IS NOT NULL"
+        )
+        conn.execute("DROP TABLE embeddings_blob_old")
+
+    # Dropping the table frees pages but does not shrink the file: measured on
+    # the benchmark corpus, a converted 100k-row database reported 1594 MB
+    # against 810 MB before, purely as freelist. A storage migration that makes
+    # the file twice as large is not a migration anyone asked for, so reclaim
+    # it. VACUUM cannot run inside a transaction and rewrites the whole file —
+    # acceptable exactly once, on a path that is already slow and already
+    # reporting progress.
+    if remaining:
+        logger.warning("reclaiming freed pages (VACUUM)")
+    with contextlib.suppress(sqlite3.OperationalError):
+        conn.execute("VACUUM")
 
 
 # ---------- writes ----------
@@ -120,21 +214,21 @@ def upsert_embedding(
     if not vec_list:
         raise ValueError("embedding vector is empty")
     dim = len(vec_list)
-    payload = json.dumps(vec_list)
+    payload = pack(vec_list)
     existing = conn.execute(
         "SELECT id FROM embeddings_blob WHERE ref_kind = ? AND ref_id = ?",
         (ref_kind, ref_id),
     ).fetchone()
     if existing is None:
         cur = conn.execute(
-            "INSERT INTO embeddings_blob(ref_kind, ref_id, dim, vec_json, created_at)"
+            "INSERT INTO embeddings_blob(ref_kind, ref_id, dim, vec_blob, created_at)"
             " VALUES (?, ?, ?, ?, ?)",
             (ref_kind, ref_id, dim, payload, wall),
         )
         return int(cur.lastrowid or 0)
     row_id = int(existing["id"])
     conn.execute(
-        "UPDATE embeddings_blob SET dim = ?, vec_json = ?, created_at = ? WHERE id = ?",
+        "UPDATE embeddings_blob SET dim = ?, vec_blob = ?, created_at = ? WHERE id = ?",
         (dim, payload, wall, row_id),
     )
     return row_id
@@ -143,12 +237,12 @@ def upsert_embedding(
 def get_embedding(conn: sqlite3.Connection, *, ref_kind: str, ref_id: int) -> list[float] | None:
     ensure_embeddings_table(conn)
     row = conn.execute(
-        "SELECT vec_json FROM embeddings_blob WHERE ref_kind = ? AND ref_id = ?",
+        "SELECT vec_blob FROM embeddings_blob WHERE ref_kind = ? AND ref_id = ?",
         (ref_kind, ref_id),
     ).fetchone()
     if row is None:
         return None
-    return json.loads(row["vec_json"])
+    return unpack(row["vec_blob"])
 
 
 def delete_embedding(conn: sqlite3.Connection, *, ref_kind: str, ref_id: int) -> bool:
@@ -199,24 +293,30 @@ def _knn_numpy(
     except ImportError:
         return _knn_python(conn, query, ref_kind, limit)
 
+    dim = len(query)
+    # Filter by width in SQL: a row of another dimension cannot match, and
+    # fetching it only to drop it in Python is the whole corpus moving for
+    # nothing. `dim` is stored, so the database can answer this.
     rows = conn.execute(
-        "SELECT ref_kind, ref_id, vec_json FROM embeddings_blob"
-        + (" WHERE ref_kind = ?" if ref_kind else ""),
-        (ref_kind,) if ref_kind else (),
+        "SELECT ref_kind, ref_id, vec_blob FROM embeddings_blob WHERE dim = ?"
+        + (" AND ref_kind = ?" if ref_kind else ""),
+        (dim, ref_kind) if ref_kind else (dim,),
     ).fetchall()
     if not rows:
         return []
     refs: list[tuple[str, int]] = []
-    vecs: list[list[float]] = []
+    blobs: list[bytes] = []
     for row in rows:
-        vec = json.loads(row["vec_json"])
-        if len(vec) != len(query):
+        blob = row["vec_blob"]
+        if len(blob) != dim * 4:
             continue
         refs.append((row["ref_kind"], int(row["ref_id"])))
-        vecs.append(vec)
-    if not vecs:
+        blobs.append(blob)
+    if not blobs:
         return []
-    mat = np.asarray(vecs, dtype=np.float32)
+    # One buffer, one reshape: no per-row Python object is built for the
+    # vectors at all, which is the point of the packed format.
+    mat = np.frombuffer(b"".join(blobs), dtype="<f4").reshape(len(blobs), dim)
     q = np.asarray(query, dtype=np.float32)
     # Cosine: 1 - (a·b / (||a|| * ||b||)); guard zero-norm vectors with
     # epsilon so a degenerate row doesn't blow up the whole batch.
@@ -250,18 +350,19 @@ def _knn_python(
     limit: int,
 ) -> list[EmbeddingHit]:
     """Pure-Python fallback. O(n·dim) per call but no native deps."""
+    dim = len(query)
     rows = conn.execute(
-        "SELECT ref_kind, ref_id, vec_json FROM embeddings_blob"
-        + (" WHERE ref_kind = ?" if ref_kind else ""),
-        (ref_kind,) if ref_kind else (),
+        "SELECT ref_kind, ref_id, vec_blob FROM embeddings_blob WHERE dim = ?"
+        + (" AND ref_kind = ?" if ref_kind else ""),
+        (dim, ref_kind) if ref_kind else (dim,),
     ).fetchall()
     if not rows:
         return []
     hits: list[EmbeddingHit] = []
     for row in rows:
-        cand = json.loads(row["vec_json"])
-        if len(cand) != len(query):
+        if len(row["vec_blob"]) != dim * 4:
             continue
+        cand = unpack(row["vec_blob"])
         d = _cosine_distance(query, cand)
         hits.append(
             EmbeddingHit(
@@ -293,5 +394,7 @@ __all__ = [
     "ensure_embeddings_table",
     "get_embedding",
     "knn",
+    "pack",
+    "unpack",
     "upsert_embedding",
 ]
