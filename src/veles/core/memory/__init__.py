@@ -467,9 +467,18 @@ class SessionStore:
         superseded has to be stamped or it would reappear in recall — which
         would resurrect the duplicates dedup collapsed. The only writer of
         supersession is the M142 dream dedup, so the reason for existing rows
-        is exactly `merged-duplicate`; the timestamp is unknown in retrospect
-        and is stamped as "now", the first moment the system can honestly
-        claim to know about it.
+        is exactly `merged-duplicate`.
+
+        The true moment of hiding was never recorded, so it is approximated by
+        `COALESCE(last_referenced_at, created_at)` — when the fact was last
+        alive — rather than by "now". `hidden_at` is the only visibility
+        signal there is, and stamping every historical dedup with the upgrade
+        time would tell any later "what did the agent stop using recently?"
+        question that all of it happened at once.
+
+        The UPDATE fires the `insights_au` FTS trigger once per affected row.
+        It is one-shot and bounded by the number of already-superseded rows,
+        which is why it is left as a plain statement.
         """
         cols = {r[1] for r in c.execute("PRAGMA table_info(insights)").fetchall()}
         if "hidden_at" not in cols:
@@ -477,9 +486,10 @@ class SessionStore:
         if "hidden_reason" not in cols:
             c.execute("ALTER TABLE insights ADD COLUMN hidden_reason TEXT")
         c.execute(
-            "UPDATE insights SET hidden_at = ?, hidden_reason = 'merged-duplicate'"
-            " WHERE superseded_by IS NOT NULL AND hidden_at IS NULL",
-            (time.time(),),
+            "UPDATE insights"
+            "   SET hidden_at = COALESCE(last_referenced_at, created_at),"
+            "       hidden_reason = 'merged-duplicate'"
+            " WHERE superseded_by IS NOT NULL AND hidden_at IS NULL"
         )
 
     def _migrate_to_v7(self, c: sqlite3.Connection) -> None:

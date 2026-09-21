@@ -126,7 +126,13 @@ def test_v6_hides_rows_that_were_already_superseded(tmp_path: Path) -> None:
         row = store._conn.execute(
             "SELECT hidden_at, hidden_reason, superseded_by FROM insights WHERE id = ?", (dup,)
         ).fetchone()
-        assert row["hidden_at"] is not None
+        # Stamped with when the fact was last alive, not with the upgrade
+        # time -- `hidden_at` is the only visibility signal, so a migration
+        # that stamped "now" would date every historical dedup to the upgrade.
+        created = store._conn.execute(
+            "SELECT created_at FROM insights WHERE id = ?", (dup,)
+        ).fetchone()[0]
+        assert row["hidden_at"] == created
         assert row["hidden_reason"] == "merged-duplicate"
         assert row["superseded_by"] == canonical
         ids = [h.id for h in store.search_insights("redis ttl session", limit=5)]
