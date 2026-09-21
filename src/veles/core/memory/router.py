@@ -134,11 +134,12 @@ class MemoryRouter:
         warning, not silently, because a shorter list must never read as "there
         was nothing" (the M219 lesson, one layer down).
 
-        The collectors are synchronous and stay that way — they are wrapped in
-        threads here. Two of them share one `sqlite3.Connection`, which is
-        allowed: the connection is opened with `check_same_thread=False` and
-        CPython 3.13 reports `sqlite3.threadsafety == 3` (SQLite serialises
-        internally).
+        Mixed shapes on purpose: the two collectors that read the store are
+        coroutines, because the store may be a remote engine; the three that
+        touch local files or plugin objects are synchronous and get a thread.
+        The threaded ones may share one `sqlite3.Connection`, which is allowed
+        — it is opened with `check_same_thread=False` and CPython 3.13 reports
+        `sqlite3.threadsafety == 3` (SQLite serialises internally).
         """
         # The two that talk to the store are already coroutines (the port may
         # be a network call); the three that touch files or plugins are
