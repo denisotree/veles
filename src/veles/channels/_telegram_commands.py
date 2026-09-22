@@ -41,7 +41,7 @@ import contextlib
 import html
 import re
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from veles.channels.telegram import TelegramGateway
@@ -61,10 +61,10 @@ async def _cmd_help(gateway: TelegramGateway, chat_key: str, args: str) -> str:
         "/reset — clear conversation history\n"
         "/session — show current session id\n"
         "/status — model / mode / session / connection snapshot\n"
-        "/mode — list available agent modes\n"
+        "/mode — switch this chat's agent mode (default / auto / planning / writing)\n"
         "/insights [category] — recent insights (curated sessions, skill suggestions)\n"
         "/rules [kind] — recent behavioral rules (preferences, dont)\n"
-        "/goal &lt;task&gt; — long-running goal mode (decompose + iterate)\n"
+        "/goal — how to run a long-running goal\n"
         "/dream — trigger memory consolidation pass\n"
         "/tokens — per-session token totals (work in progress)\n"
         "/context — context window vs limit (work in progress)\n\n"
@@ -148,27 +148,43 @@ def chat_key_to_int(chat_key: str) -> int:
         return 0
 
 
+# What `/mode` offers. `goal` is not here: a goal starts with `/goal <task>`,
+# which also gives the goal its objective.
+_MODE_CHOICES = (
+    ("default", "the agent answers directly"),
+    ("auto", "decides per message: plan first, or act"),
+    ("planning", "plans only, changes nothing"),
+    ("writing", "acts directly with its tools"),
+)
+
+
 async def _cmd_mode(gateway: TelegramGateway, chat_key: str, args: str) -> str:
-    """M126: list agent modes as inline keyboard buttons. Tapping
-    PATCHes the session's mode override."""
+    """List agent modes as inline buttons, the chat's current one marked.
+    Tapping PATCHes the session's mode, and since M280 the next turn runs in
+    it (before, the choice was stored and ignored)."""
     del args
 
     session_id = gateway.session_map.get(chat_key)
     if not session_id:
         return "<i>send a message first to start a session — then /mode can switch its mode.</i>"
 
-    modes = [
-        ("auto", "classifier picks per turn"),
-        ("planning", "multi-step planning"),
-        ("writing", "single-turn writer"),
-        ("goal", "long-running goal loop"),
-    ]
+    client: Any = gateway.daemon_client
+    try:
+        current = (await client.get_session(session_id)).get("mode")
+    except Exception:
+        current = None  # the picker still works; only the mark is missing
     buttons = [
-        [{"text": f"{name} — {desc}", "callback_data": f"mo:{name}"}] for name, desc in modes
+        [
+            {
+                "text": f"{'✓ ' if name == current else ''}{name} — {desc}",
+                "callback_data": f"mo:{name}",
+            }
+        ]
+        for name, desc in _MODE_CHOICES
     ]
     body = (
-        "<b>Pick a mode</b> — applies to this chat's session.\n"
-        "Change takes effect on the next message you send."
+        "<b>Pick a mode</b> for this chat.\n"
+        "It applies from your next message, until the daemon restarts."
     )
     try:
         await gateway._send_message(
@@ -356,7 +372,7 @@ def menu_descriptors() -> list[dict[str, str]]:
         {"command": "help", "description": "List available commands"},
         {"command": "status", "description": "Session / project snapshot"},
         {"command": "session", "description": "Show current session id"},
-        {"command": "mode", "description": "List available agent modes"},
+        {"command": "mode", "description": "Switch this chat's agent mode"},
         {
             "command": "insights",
             "description": "Recent insights (skill suggestions, manager reports)",

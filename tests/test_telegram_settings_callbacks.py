@@ -33,24 +33,16 @@ class _RecordingClient:
         self.update_calls: list[dict[str, Any]] = []
         self.submit_calls: list[dict[str, Any]] = []
         self.fail_update: Exception | None = None
+        self.current_mode = "default"
 
-    async def update_session(
-        self,
-        session_id: str,
-        *,
-        model: str | None = None,
-        mode: str | None = None,
-        provider: str | None = None,
-    ) -> dict[str, Any]:
+    async def get_session(self, session_id: str) -> dict[str, Any]:
+        return {"session_id": session_id, "mode": self.current_mode}
+
+    async def update_session(self, session_id: str, *, mode: str) -> dict[str, Any]:
         if self.fail_update is not None:
             raise self.fail_update
-        self.update_calls.append(
-            {"session_id": session_id, "model": model, "mode": mode, "provider": provider}
-        )
-        return {
-            "session_id": session_id,
-            "overrides": {"model": model, "mode": mode, "provider": provider},
-        }
+        self.update_calls.append({"session_id": session_id, "mode": mode})
+        return {"session_id": session_id, "mode": mode}
 
     async def submit_prompt_answer(
         self, run_id: str, prompt_id: str, choice: str
@@ -102,9 +94,23 @@ async def test_mode_command_sends_inline_keyboard(session_map) -> None:
     kb = msgs[0].get("reply_markup", {}).get("inline_keyboard")
     assert kb is not None
     flat = [b for row in kb for b in row]
-    assert len(flat) == 4
-    callback_data = {b["callback_data"] for b in flat}
-    assert callback_data == {"mo:auto", "mo:planning", "mo:writing", "mo:goal"}
+    # goal starts with `/goal <task>` (it needs an objective), not a mode tap
+    assert [b["callback_data"] for b in flat] == [
+        "mo:default",
+        "mo:auto",
+        "mo:planning",
+        "mo:writing",
+    ]
+
+
+async def test_mode_command_marks_the_current_mode(session_map) -> None:
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway, client = _make_gateway(session_map, sends)
+    client.current_mode = "planning"
+    await dispatch(gateway, "42", "mode", "")
+    kb = next(p for m, p in sends if m == "sendMessage")["reply_markup"]["inline_keyboard"]
+    marked = [b["callback_data"] for row in kb for b in row if b["text"].startswith("✓")]
+    assert marked == ["mo:planning"]
 
 
 async def test_mode_command_without_session_returns_hint(tmp_path: Path) -> None:
@@ -133,14 +139,7 @@ async def test_mode_callback_calls_update_session(session_map) -> None:
         "message": {"chat": {"id": 42}, "message_id": 7},
     }
     await gateway._handle_callback_query(callback)
-    assert client.update_calls == [
-        {
-            "session_id": "sess-existing",
-            "model": None,
-            "mode": "planning",
-            "provider": None,
-        }
-    ]
+    assert client.update_calls == [{"session_id": "sess-existing", "mode": "planning"}]
     # User got an ack
     acks = [p for m, p in sends if m == "answerCallbackQuery"]
     assert acks and "planning" in acks[0]["text"]

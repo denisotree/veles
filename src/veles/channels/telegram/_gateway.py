@@ -785,7 +785,8 @@ class TelegramGateway:
             return
 
         if kind == "mo":
-            # `mo:<mode>` — mode is exactly one of auto/planning/writing/goal
+            # `mo:<mode>` — one of `_MODE_CHOICES` (default/auto/planning/writing);
+            # the daemon validates it (unknown → 400 / ValueError).
             if len(parts) < 2 or not parts[1]:
                 await self._answer_callback_query(callback_id, text="bad payload")
                 return
@@ -794,7 +795,7 @@ class TelegramGateway:
                 await self.daemon_client.update_session(  # type: ignore[attr-defined]
                     session_id, mode=mode
                 )
-            except (DaemonClientError, AttributeError) as exc:
+            except (DaemonClientError, AttributeError, ValueError) as exc:
                 await self._answer_callback_query(callback_id, text=f"could not set mode: {exc}")
                 return
             await self._answer_callback_query(callback_id, text=f"✓ mode → {mode}")

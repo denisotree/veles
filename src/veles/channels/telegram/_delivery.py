@@ -48,12 +48,14 @@ class _TurnOutcome:
     `acked` is True when the placeholder was already edited into a
     contextual "on it" ack (the agent's first action was a tool call),
     so `deliver` sends the final answer as a NEW message instead of
-    overwriting the ack."""
+    overwriting the ack. `notices` (M280) are an agent mode's status lines
+    ("auto → plan", a goal's phase change), shown above the answer."""
 
     text: str | None
     session_id: str | None
     error: str | None
     acked: bool = False
+    notices: tuple[str, ...] = ()
 
 
 class TelegramDelivery:
@@ -110,6 +112,7 @@ class TelegramDelivery:
         completed_text: str | None = None
         error: str | None = None
         acked = False
+        notices: list[str] = []
         try:
             async for event in gw.daemon_client.stream_events(run_id):
                 kind = event.get("type")
@@ -136,6 +139,10 @@ class TelegramDelivery:
                 elif kind == "error":
                     err = event.get("error")
                     error = str(err) if err else "unknown error"
+                elif kind == "notice":
+                    note = event.get("text")
+                    if isinstance(note, str) and note.strip():
+                        notices.append(note.strip().strip("[]"))
                 elif kind in ("trust_prompt", "approval_prompt", "critical_prompt"):
                     await gw._post_prompt(chat_id, run_id, event)
                 elif kind == "prompt_resolved":
@@ -153,6 +160,7 @@ class TelegramDelivery:
             session_id=completed_session,
             error=error,
             acked=acked,
+            notices=tuple(notices),
         )
 
     async def _show_ack(self, chat_id: int, message_id: int, tool_name: Any) -> bool:
@@ -181,10 +189,16 @@ class TelegramDelivery:
         model's answer is treated as Markdown and rendered through the
         Telegram-allowed HTML subset (`markdown_to_telegram_html`)."""
         gw = self._gw
+        notices_html = "\n".join(f"<i>{escape_html(n)}</i>" for n in outcome.notices)
         if outcome.error:
             final_html = f"<b>⚠️ error:</b> {escape_html(outcome.error)}"
         elif outcome.text:
-            final_html = markdown_to_telegram_html(outcome.text)
+            answer = markdown_to_telegram_html(outcome.text)
+            final_html = f"{notices_html}\n\n{answer}" if notices_html else answer
+        elif notices_html:
+            # A mode's phase-change turn answers nothing; its status line is the
+            # reply, instead of leaving the "..." placeholder.
+            final_html = notices_html
         else:
             final_html = escape_html(_PLACEHOLDER_TEXT)
         # Long answers are split into ≤-limit chunks rather than truncated:

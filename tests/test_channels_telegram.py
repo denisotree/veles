@@ -276,6 +276,42 @@ async def test_final_edit_carries_complete_text(session_map: SessionMap) -> None
     assert edits[-1]["text"] == "hello world"
 
 
+async def test_a_modes_notice_heads_the_answer(session_map: SessionMap) -> None:
+    """M280: an agent mode's status line (`notice`) is shown, not dropped."""
+    daemon = _FakeDaemonClient(
+        events=[
+            {"type": "started", "run_id": "run-1"},
+            {"type": "notice", "text": "[auto → plan]"},
+            {"type": "text_delta", "delta": "Here is the plan."},
+            {"type": "completed", "text": "Here is the plan.", "session_id": "s1"},
+        ]
+    )
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await _deliver(gateway, _message_update(42, "design it"))
+    edits = [p for m, p in sends if m == "editMessageText"]
+    assert edits[-1]["text"] == "<i>auto → plan</i>\n\nHere is the plan."
+
+
+async def test_a_turn_with_only_a_notice_does_not_leave_the_placeholder(
+    session_map: SessionMap,
+) -> None:
+    """A goal's phase-change turn answers nothing; before M280's notice the
+    chat was left staring at "..."."""
+    daemon = _FakeDaemonClient(
+        events=[
+            {"type": "started", "run_id": "run-1"},
+            {"type": "notice", "text": "[goal: confirmed → plan]"},
+            {"type": "completed", "text": "", "session_id": "s1"},
+        ]
+    )
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await _deliver(gateway, _message_update(42, "yes"))
+    edits = [p for m, p in sends if m == "editMessageText"]
+    assert edits[-1]["text"] == "<i>goal: confirmed → plan</i>"
+
+
 async def test_answer_disables_link_preview(session_map: SessionMap) -> None:
     """Agent answers set link_preview_options.is_disabled so incidental
     links don't render as large preview cards."""
