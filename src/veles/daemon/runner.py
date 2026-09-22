@@ -137,10 +137,20 @@ async def _run_deliver_hook(
         logging.getLogger("veles.daemon").warning("run %s delivery failed: %s", handle.run_id, exc)
 
 
+# One turn driven by something other than a bare `agent.run` — an agent mode
+# (M280, `daemon/mode_turn.py`). Called in the worker thread with the text
+# sink, the typed-event sink, and a raw poster for extra event dicts.
+TurnFn = Callable[
+    [Callable[[str], None], Callable[[Any], None], Callable[[dict[str, Any]], None]],
+    RunResult,
+]
+
+
 async def run_agent_in_background(
     handle: RunHandle,
     *,
-    agent: Agent,
+    agent: Agent | None = None,
+    turn: TurnFn | None = None,
     prompt: str,
     on_finished: Callable[[RunHandle], None] | None = None,
     post_turn_hook: Callable[[RunResult], None] | None = None,
@@ -162,7 +172,15 @@ async def run_agent_in_background(
     be REPL-only. `turn_lock` (M204): when given, the WHOLE turn runs under it —
     the per-session serializer that lets a background-op RESUME turn queue
     behind a live user turn instead of racing it on one session history.
+
+    `turn` (M280) replaces `agent` when an agent mode drives the turn; exactly
+    one of the two is given. Everything else — prompters, trust turn, locks,
+    hooks — is shared. A mode's phase-transition turn returns a
+    `stopped_reason == "synthetic"` result: nothing was asked of the model, so
+    `verify_hook` and `post_turn_hook` (insight extraction) are skipped for it.
     """
+    if (agent is None) == (turn is None):
+        raise ValueError("run_agent_in_background needs exactly one of agent= or turn=")
     loop = asyncio.get_running_loop()
     if turn_lock is not None:
         await turn_lock.acquire()
@@ -255,6 +273,9 @@ async def run_agent_in_background(
     turn_token = begin_trust_turn()
 
     def _worker() -> RunResult:
+        if turn is not None:
+            return turn(_on_text_delta, _on_event, _post)
+        assert agent is not None
         return agent.run(prompt, on_text_delta=_on_text_delta, event_listener=_on_event)
 
     try:
@@ -281,7 +302,8 @@ async def run_agent_in_background(
         # it. Runs off the event loop (the advisor + escalation re-run hit
         # the LLM). Best-effort: a hook failure keeps the base result — a
         # broken advisor must never wedge a turn.
-        if verify_hook is not None:
+        synthetic = result.stopped_reason == "synthetic"
+        if verify_hook is not None and not synthetic:
             with contextlib.suppress(Exception):
                 result = await asyncio.to_thread(verify_hook, prompt, result)
 
@@ -318,7 +340,7 @@ async def run_agent_in_background(
         handle.event_added.set()
         if on_finished is not None:
             on_finished(handle)
-        if post_turn_hook is not None:
+        if post_turn_hook is not None and not synthetic:
             # Run the learning loop off the event loop — it may hit the LLM
             # (insight extractor) and shouldn't block aiohttp request handlers.
             with contextlib.suppress(Exception):
