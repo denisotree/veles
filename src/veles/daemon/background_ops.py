@@ -200,7 +200,9 @@ def make_on_op_finished(state):
             kind=job.kind,
             summary=wrap_untrusted(summary, source=f"background-{job.kind}:{job.id}"),
         )
-        agent = state.agent_factory(session_id, prompt=seed)
+        # Off the event loop: the build runs memory recall, which the M264
+        # bridge refuses to do on a running loop (see `daemon/turns.py`).
+        agent = await asyncio.to_thread(state.agent_factory, session_id, prompt=seed)
         handle = new_run_handle(session_id=session_id)
         state.add_run(handle)
         loop = asyncio.get_running_loop()

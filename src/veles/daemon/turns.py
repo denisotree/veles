@@ -48,7 +48,7 @@ def manager_opt_in(prompt: str) -> bool:
         return False
 
 
-def start_turn(
+async def start_turn(
     state: DaemonState,
     *,
     prompt: str,
@@ -62,6 +62,12 @@ def start_turn(
     Building the agent can fail (bad provider config, …). The handle is then
     marked failed — it used to stay "pending" forever on the channel path — and
     the original exception propagates for the caller to report.
+
+    The agent is built **off the event loop**. Its system prompt runs memory
+    recall through the M264 bridge (`core/memory/aio.py`), which refuses to
+    block a running loop — building it here, on the loop, failed every chat
+    turn with text from 0.36.0 to 0.39.0. It is also real work (recall, skills,
+    the session probe) that has no business stalling every other request.
     """
     handle = new_run_handle(session_id=session_id)
     state.add_run(handle)
@@ -89,7 +95,7 @@ def start_turn(
     turn = None
     try:
         if chosen_mode is None:
-            agent = state.agent_factory(session_id, prompt=prompt)
+            agent = await asyncio.to_thread(state.agent_factory, session_id, prompt=prompt)
             # The factory allocates the session eagerly (fresh id for a new chat,
             # or a re-allocated one when the caller's id was stale).
             effective_session_id = getattr(agent, "session_id", None) or session_id

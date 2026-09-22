@@ -36,7 +36,7 @@ class InProcessRunBackend:
         # Same entry as `POST /v1/runs` (manager gate, agent build, background
         # run). A channel turn neither touches daemon activity nor carries a
         # `deliver_to` — the gateway streams the answer itself.
-        handle = start_turn(self._state, prompt=prompt, session_id=session_id, origin=origin)
+        handle = await start_turn(self._state, prompt=prompt, session_id=session_id, origin=origin)
         return {"run_id": handle.run_id, "session_id": handle.session_id}
 
     async def stream_events(self, run_id: str) -> AsyncIterator[dict[str, Any]]:

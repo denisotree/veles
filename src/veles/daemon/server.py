@@ -310,7 +310,7 @@ async def _handle_create_run(request: web.Request) -> web.Response:
     from veles.daemon.turns import start_turn
 
     try:
-        handle = start_turn(
+        handle = await start_turn(
             state,
             prompt=prompt,
             session_id=session_id,

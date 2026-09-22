@@ -221,6 +221,13 @@ def test_mapped_session_resumes_and_delivers_final_text(tmp_path: Path) -> None:
 
     def agent_factory(session_id, *, prompt=None):
         seen["session_id"] = session_id
+        # The real build runs memory recall, which the M264 bridge refuses to
+        # do on a running event loop — the resume agent must be built off it.
+        try:
+            asyncio.get_running_loop()
+            seen["built_on_loop"] = True
+        except RuntimeError:
+            seen["built_on_loop"] = False
         return _ResumeAgent()
 
     smap = SessionMap.load(channel_session_path("telegram"))
@@ -231,6 +238,7 @@ def test_mapped_session_resumes_and_delivers_final_text(tmp_path: Path) -> None:
     job = _job(project, deliver_to="telegram:12345")
 
     asyncio.run(make_on_op_finished(state)(job, "Ingested 3/3 file(s)."))
+    assert seen["built_on_loop"] is False
     # Resumed INTO the mapped session with an untrusted-wrapped summary seed…
     assert seen["session_id"] == "sess-1"
     assert "3/3" in seen["prompt"] and "untrusted" in seen["prompt"].lower()
