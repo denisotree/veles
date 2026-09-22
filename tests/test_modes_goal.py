@@ -669,7 +669,7 @@ def test_check_feeds_the_step_outcome_to_the_advisor(project, state) -> None:
 
 
 def test_check_ignores_an_interleaved_manual_checkpoint(project, state) -> None:
-    """`veles goal checkpoint` can append a note between EXECUTE and CHECK;
+    """A note appended between EXECUTE and CHECK (`append_checkpoint`) —
     `progress[-1]` would then shadow the step actually under review."""
     from veles.core.goal import append_checkpoint
 

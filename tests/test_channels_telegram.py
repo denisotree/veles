@@ -188,6 +188,17 @@ async def test_unknown_command_hints_at_help(session_map: SessionMap) -> None:
     assert "/help" in sends[0][1]["text"]
 
 
+async def test_a_message_starting_with_a_path_reaches_the_agent(session_map: SessionMap) -> None:
+    """M274, through `_handle_update`: before the fix this got the "Unknown
+    command" hint above and was never submitted."""
+    daemon = _FakeDaemonClient()
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    await _deliver(gateway, _message_update(42, "/var/log/app.log почему падает?"))
+    assert [prompt for prompt, _sid in daemon.submitted] == ["/var/log/app.log почему падает?"]
+    assert not any("Unknown command" in (p.get("text") or "") for _m, p in sends)
+
+
 async def test_publish_command_menu_sends_setmycommands(
     session_map: SessionMap,
 ) -> None:

@@ -51,6 +51,7 @@ veles secret set OPENROUTER_API_KEY       # prompts (or pipe via stdin)
 veles secret list                         # which secrets are configured
 veles secret get OPENROUTER_API_KEY --reveal
 veles secret delete OPENROUTER_API_KEY
+veles secret set OPENROUTER_API_KEY --project myproj   # a key for one project only
 ```
 
 Việc tra cứu sẽ dự phòng về [biến môi trường](../reference/environment-variables.md)

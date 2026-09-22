@@ -267,17 +267,17 @@ vengono messi in cache per 24h; i provider locali sono sempre live.
 
 ## Task di lunga durata
 
-### `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}`
+### `veles goal {list,show,start,pause,resume,cancel}`
 Obiettivi a lungo orizzonte con budget e checkpoint.
 
 | Sottocomando | Scopo |
 |---|---|
 | `list [--status active\|paused\|completed\|blocked\|cancelled]` | Elenca gli obiettivi |
 | `show <id> [--json]` | Mostra un obiettivo |
-| `start "<objective>" [--scope S] [--done-when D] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n] [--forbid A]… [--approve A]…` | Crea un obiettivo |
-| `checkpoint <id> "<note>" [--evidence U] [--cost-usd f] [--no-advance]` | Aggiunge un avanzamento |
-| `pause <id>` / `resume <id>` | Metti in pausa / riprendi |
-| `done <id> [--evidence E]` / `cancel <id> [--reason R]` | Completa / annulla |
+| `start "<objective>" --done-when D [--scope S] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n]` | Esegue un obiettivo fino alla condizione di completamento (in primo piano) |
+| `pause <id>` | Mette in pausa; uno `start`/`resume` in corso si ferma al turno successivo |
+| `resume <id>` | Riprende un obiettivo in pausa o interrotto da dove si era fermato |
+| `cancel <id> [--reason R]` | Annulla |
 
 ### `veles job {add,list,show,pause,resume,trigger,remove,history,tick}`
 Job dell'agente pianificati.

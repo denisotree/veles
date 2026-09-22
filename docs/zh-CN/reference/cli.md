@@ -235,17 +235,17 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 ## 长时运行任务
 
-### `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}`
+### `veles goal {list,show,start,pause,resume,cancel}`
 带预算和检查点的长周期目标。
 
 | 子命令 | 用途 |
 |---|---|
 | `list [--status active\|paused\|completed\|blocked\|cancelled]` | 列出目标 |
 | `show <id> [--json]` | 显示某个目标 |
-| `start "<objective>" [--scope S] [--done-when D] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n] [--forbid A]… [--approve A]…` | 创建一个目标 |
-| `checkpoint <id> "<note>" [--evidence U] [--cost-usd f] [--no-advance]` | 追加进展 |
-| `pause <id>` / `resume <id>` | 暂停 / 恢复 |
-| `done <id> [--evidence E]` / `cancel <id> [--reason R]` | 完成 / 取消 |
+| `start "<objective>" --done-when D [--scope S] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n]` | 运行目标直到满足完成条件（前台） |
+| `pause <id>` | 暂停；正在运行的 `start`/`resume` 在下一轮停止 |
+| `resume <id>` | 从停下的地方继续已暂停或中断的目标 |
+| `cancel <id> [--reason R]` | 取消 |
 
 ### `veles job {add,list,show,pause,resume,trigger,remove,history,tick}`
 定时的 agent 任务。

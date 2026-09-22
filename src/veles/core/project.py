@@ -243,6 +243,9 @@ def init_project(
             f"warning: layout pack {layout!r} not found; initialising without a content scaffold",
             file=sys.stderr,
         )
+    # M272: before the scaffold writes a template AGENTS.md — once it exists,
+    # `apply_scaffold` leaves it alone, which is exactly what keeps the import.
+    _import_existing_context_files(root)
     apply_scaffold(pack, root, resolved_name)
 
     if healing_foreign_memory:
@@ -322,6 +325,39 @@ def _toml_escape(s: str) -> str:
     return s.replace("\\", "\\\\").replace('"', '\\"')
 
 
+def _import_existing_context_files(root: Path) -> None:
+    """Bring a real CLAUDE.md / GEMINI.md into a not-yet-existing AGENTS.md (M272).
+
+    Before this, `veles init` in a Claude Code project wrote a template
+    AGENTS.md and left CLAUDE.md alone with a one-line warning — and the agent
+    reads only AGENTS.md, so the project's existing instructions were silently
+    not loaded (verified live: a CLAUDE.md rule appeared 0 times in AGENTS.md).
+
+    Now the content is imported losslessly and each original is kept as
+    `<name>.bak`; `_ensure_symlinks` then puts `CLAUDE.md → AGENTS.md` in its
+    place, so Claude CLI and Veles read the same file (design constraint #3).
+    Only when AGENTS.md does not exist yet: an existing AGENTS.md is the user's
+    source of truth and is never rewritten here."""
+    if (root / _AGENTS_MD).exists():
+        return
+    from veles.core.agents_md_normalizer import (
+        apply_merge,
+        import_context_files,
+        scan_for_context_files,
+    )
+
+    originals = [f for f in scan_for_context_files(root).conflicting if f.name != _AGENTS_MD]
+    text = import_context_files(originals)
+    if not text:
+        return
+    actions = apply_merge(root, text, originals=originals)
+    kept = ", ".join(f"{name} {what}" for name, what in actions.items() if name != _AGENTS_MD)
+    print(
+        f"imported {', '.join(f.name for f in originals)} into AGENTS.md ({kept})",
+        file=sys.stderr,
+    )
+
+
 def _ensure_symlinks(root: Path) -> None:
     target = root / _AGENTS_MD
     for name in _SYMLINK_TARGETS:
@@ -329,8 +365,12 @@ def _ensure_symlinks(root: Path) -> None:
         if link.is_symlink():
             continue
         if link.exists():
+            # Only reachable when AGENTS.md already existed (otherwise the file
+            # was imported and moved aside above) — so its content is not read.
             print(
-                f"warning: {name} exists at {root} and is not a symlink; leaving it alone",
+                f"warning: {name} is a regular file, not a symlink to AGENTS.md — "
+                "Veles reads only AGENTS.md, so its content is not loaded; move it "
+                f"into AGENTS.md, then delete {name} and re-run `veles init --force`",
                 file=sys.stderr,
                 flush=True,
             )

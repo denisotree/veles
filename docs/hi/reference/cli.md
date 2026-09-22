@@ -259,17 +259,17 @@ curated registries ब्राउज़ करें।
 
 ## लंबे समय तक चलने वाले tasks
 
-### `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}`
+### `veles goal {list,show,start,pause,resume,cancel}`
 budgets और checkpoints के साथ दीर्घकालिक objectives।
 
 | Subcommand | उद्देश्य |
 |---|---|
 | `list [--status active\|paused\|completed\|blocked\|cancelled]` | goals सूचीबद्ध करें |
 | `show <id> [--json]` | एक goal दिखाएँ |
-| `start "<objective>" [--scope S] [--done-when D] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n] [--forbid A]… [--approve A]…` | एक goal बनाएँ |
-| `checkpoint <id> "<note>" [--evidence U] [--cost-usd f] [--no-advance]` | प्रगति जोड़ें |
-| `pause <id>` / `resume <id>` | रोकें / फिर से शुरू करें |
-| `done <id> [--evidence E]` / `cancel <id> [--reason R]` | समाप्त / रद्द करें |
+| `start "<objective>" --done-when D [--scope S] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n]` | done condition तक एक goal चलाएँ (foreground) |
+| `pause <id>` | रोकें; चल रहा `start`/`resume` अगले turn पर रुकेगा |
+| `resume <id>` | रुके या बाधित goal को वहीं से जारी रखें |
+| `cancel <id> [--reason R]` | रद्द करें |
 
 ### `veles job {add,list,show,pause,resume,trigger,remove,history,tick}`
 Scheduled agent jobs।

@@ -37,6 +37,25 @@ def test_tavily_available_with_key(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _TavilyProvider().available() is True
 
 
+def test_a_key_stored_with_veles_secret_is_used(
+    monkeypatch: pytest.MonkeyPatch, fake_keyring
+) -> None:
+    """M271: the key is set through the real `veles secret set`, not planted in
+    the keyring by hand — the bug was the command and this reader disagreeing.
+    Before the fix the reader looked at the environment only."""
+    from veles.cli import main as cli_main
+
+    monkeypatch.delenv("BRAVE_SEARCH_API_KEY", raising=False)
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    assert cli_main(["secret", "set", "BRAVE_SEARCH_API_KEY", "from-keychain"]) == 0
+    assert _BraveProvider().available() is True
+    assert _resolve_provider().name() == "brave"
+    with patch("veles.core.tools.builtin.web_search.httpx.get") as get:
+        get.return_value = MagicMock(json=lambda: {"web": {"results": []}})
+        _BraveProvider().search("q", 3)
+    assert get.call_args.kwargs["headers"]["X-Subscription-Token"] == "from-keychain"
+
+
 def test_searxng_available_with_url(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SEARXNG_URL", "http://localhost:8080")
     assert _SearXNGProvider().available() is True

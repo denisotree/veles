@@ -157,9 +157,10 @@ Descompone la pregunta en subpreguntas paralelas, explora cada una y sintetiza u
 ### Objetivos de larga duración
 
 ```bash
-veles goal start "Migrate auth module to the new provider" --max-cost-usd 2.00
+veles goal start "Migrate auth module to the new provider" \
+  --done-when "nothing imports the old provider and tests pass" --max-cost-usd 2.00
 veles goal list
-veles goal checkpoint <id> "Completed step 1: identified all call sites"
+veles goal resume <id>    # continue after a pause or Ctrl+C
 ```
 
 ### Tareas programadas
@@ -336,7 +337,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles schema {validate,edit}` | Validar / editar AGENTS.md |
 | `veles self-doc` | Generar la autodocumentación del proyecto |
 | `veles layout {sync}` | Mantenimiento del layout-pack |
-| `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | Objetivos de largo horizonte |
+| `veles goal {list,show,start,pause,resume,cancel}` | Objetivos de largo horizonte |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | Tareas programadas |
 | `veles dream` | Ciclo de consolidación de memoria en segundo plano |
 | `veles project {list,add,remove,switch}` | Registro multiproyecto |

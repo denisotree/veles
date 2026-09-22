@@ -185,9 +185,15 @@ def make_on_op_finished(state):
 
         if session_id is None or depth >= 1 or state.agent_factory is None:
             # No session to resume (or the auto-resume loop guard tripped) —
-            # last-resort plain notification.
+            # last-resort plain notification. M273: bound to the chat's session
+            # like every other delivery, so a reply to the notice has context
+            # (the binder opens and maps a session when the chat has none).
             if router is not None:
                 await router.deliver(target, notify_text)
+                try:
+                    await make_proactive_binder(state)(target, notify_text)
+                except Exception as exc:  # binding never un-delivers the notice
+                    logger.warning("job %s post-deliver bind failed: %s", job.id, exc)
             return
 
         seed = _RESUME_SEED.format(

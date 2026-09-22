@@ -16,7 +16,6 @@ import pytest
 
 from veles.channels._telegram_commands import (
     dispatch,
-    is_known_command,
     menu_descriptors,
     parse_command,
 )
@@ -60,24 +59,15 @@ def test_parse_command_trims_whitespace() -> None:
     assert parse_command("  /status  arg  ") == ("status", "arg")
 
 
-# ---- is_known_command ----
-
-
-def test_known_commands_include_gateway_owned() -> None:
-    """`start` / `reset` are owned by the gateway flow, but they still
-    count as known so the gateway never sends them through the message
-    buffer."""
-    assert is_known_command("start")
-    assert is_known_command("reset")
-
-
-def test_known_commands_include_dispatcher_handled() -> None:
-    for cmd in ("help", "status", "session", "tokens", "context"):
-        assert is_known_command(cmd), cmd
-
-
-def test_unknown_command() -> None:
-    assert not is_known_command("foobar")
+def test_a_message_that_starts_with_a_path_is_not_a_command() -> None:
+    """M274: Telegram's own grammar (`[a-z0-9_]{1,32}`, checked against the
+    Bot API docs) decides what is a command. Before this, a path at the start
+    of a message was parsed as a command and answered "Unknown command"."""
+    assert parse_command("/var/log/app.log почему падает?") is None
+    assert parse_command("/Users/me/report.pdf посмотри файл") is None
+    assert parse_command("/tmp") == ("tmp", "")  # a valid name is still a command
+    assert parse_command("/" + "a" * 33) is None  # past Telegram's 32-char limit
+    assert parse_command("/ help") is None  # Telegram has no command with a space
 
 
 # ---- menu_descriptors ----
@@ -198,73 +188,68 @@ async def test_dispatch_context_is_placeholder(session_map: SessionMap) -> None:
     assert "/context" in reply or "not exposed" in reply.lower()
 
 
-async def test_dispatch_goal_without_task_returns_usage(
-    session_map: SessionMap,
-) -> None:
-    gateway = _make_gateway(session_map)
-    reply = await dispatch(gateway, "42", "goal", "")
-    assert reply is not None
-    # Empty task = usage hint, no submit_run call expected
-    assert "long-running" in reply or "&lt;task&gt;" in reply
+class _RecordingClient:
+    """Fails the test if a command sneaks a prompt into the chat's session."""
+
+    def __init__(self, dream: dict | Exception | None = None) -> None:
+        self.submitted: list[str] = []
+        self.dreams = 0
+        self._dream = dream
+
+    async def submit_run(self, prompt: str, *, session_id=None, origin=None):
+        self.submitted.append(prompt)
+        return {"run_id": "r1", "session_id": session_id, "state": "running"}
+
+    async def stream_events(self, run_id):
+        if False:
+            yield
+
+    async def run_dream(self):
+        self.dreams += 1
+        if isinstance(self._dream, Exception):
+            raise self._dream
+        return self._dream
 
 
-async def test_dispatch_goal_with_task_submits_run(session_map: SessionMap) -> None:
-    submitted: list[tuple[str, str | None]] = []
-
-    class _Client:
-        async def submit_run(self, prompt: str, *, session_id=None, origin=None):
-            submitted.append((prompt, session_id))
-            return {"run_id": "g1", "session_id": session_id, "state": "running"}
-
-        async def stream_events(self, run_id):
-            if False:
-                yield
-
+def _gateway_with(client: _RecordingClient, session_map: SessionMap):
     from veles.channels.telegram import TelegramGateway
 
-    gateway = TelegramGateway(
+    return TelegramGateway(
         bot_token="X",
-        daemon_client=_Client(),  # type: ignore[arg-type]
+        daemon_client=client,  # type: ignore[arg-type]
         session_map=session_map,
     )
-    session_map.set("42", "sess-abc")
 
-    reply = await dispatch(gateway, "42", "goal", "deploy to staging")
+
+async def test_goal_points_to_the_cli_and_submits_nothing(session_map: SessionMap) -> None:
+    """M276: /goal used to send "[GOAL MODE] <task>" as a plain prompt that
+    nothing interpreted, promising progress that never came."""
+    client = _RecordingClient()
+    reply = await dispatch(_gateway_with(client, session_map), "42", "goal", "deploy to staging")
     assert reply is not None
-    assert "deploy" in reply
-    assert submitted, "goal-mode should submit one run"
-    prompt, session = submitted[0]
-    assert "[GOAL MODE]" in prompt
-    assert "deploy to staging" in prompt
-    assert session == "sess-abc"
+    assert "veles goal start" in reply
+    assert "--done-when" in reply
+    assert client.submitted == []
 
 
-async def test_dispatch_dream_submits_consolidation_run(
+async def test_dream_runs_the_dream_runner_and_reports_its_result(
     session_map: SessionMap,
 ) -> None:
-    submitted: list[str] = []
-
-    class _Client:
-        async def submit_run(self, prompt: str, *, session_id=None, origin=None):
-            submitted.append(prompt)
-            return {"run_id": "d1", "session_id": session_id, "state": "running"}
-
-        async def stream_events(self, run_id):
-            if False:
-                yield
-
-    from veles.channels.telegram import TelegramGateway
-
-    gateway = TelegramGateway(
-        bot_token="X",
-        daemon_client=_Client(),  # type: ignore[arg-type]
-        session_map=session_map,
-    )
-    reply = await dispatch(gateway, "42", "dream", "")
+    """M276: /dream used to send "[DREAM MODE] …" as an ordinary prompt."""
+    client = _RecordingClient({"summary": "insights=2 dedup=0", "notes": ["lint <skipped>"]})
+    reply = await dispatch(_gateway_with(client, session_map), "42", "dream", "")
+    assert client.dreams == 1
+    assert client.submitted == []
     assert reply is not None
-    assert "consolidation" in reply.lower()
-    assert submitted
-    assert "[DREAM MODE]" in submitted[0]
+    assert "insights=2 dedup=0" in reply
+    assert "lint &lt;skipped&gt;" in reply
+
+
+async def test_dream_reports_a_daemon_without_a_dream_runner(session_map: SessionMap) -> None:
+    client = _RecordingClient(RuntimeError("the dream runner is not enabled on this daemon"))
+    reply = await dispatch(_gateway_with(client, session_map), "42", "dream", "")
+    assert reply is not None
+    assert "not enabled" in reply
 
 
 async def test_goal_dream_appear_in_menu_descriptors() -> None:

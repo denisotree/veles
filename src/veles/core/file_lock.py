@@ -30,21 +30,29 @@ else:  # pragma: no cover - non-target platform
     fcntl = None  # type: ignore[assignment]
 
 
+class LockHeld(Exception):
+    """`file_lock(..., blocking=False)` found the lock taken by someone else."""
+
+
 @contextmanager
-def file_lock(lock_path: Path) -> Iterator[None]:
+def file_lock(lock_path: Path, *, blocking: bool = True) -> Iterator[None]:
     """Hold an exclusive flock on `lock_path` for the body's duration.
 
     The lock file is created if missing. On exit the lock is released
-    (also released implicitly if an exception propagates). The file
-    itself is left in place — flock state lives on the open fd, not on
-    disk, so cleanup adds no value.
+    (also released implicitly if an exception propagates, and by the OS if
+    the process dies — no stale locks). The file itself is left in place —
+    flock state lives on the open fd, not on disk, so cleanup adds no value.
+    With `blocking=False`, raises `LockHeld` instead of waiting.
     """
     if fcntl is None:  # pragma: no cover - non-target platform
         yield
         return
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with open(lock_path, "w", encoding="utf-8") as fh:
-        fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+        try:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
+        except BlockingIOError:
+            raise LockHeld(str(lock_path)) from None
         try:
             yield
         finally:

@@ -10,11 +10,13 @@ Step order:
                              only one pack is installed)
     2. Bootstrap            (confirm → init_project(layout=picked))
     3. Provider override    (optional; per-project API-key flow)
-    4. AGENTS.md normalize  (only when CLAUDE.md/GEMINI.md conflicts exist;
-                             stub here — full implementation lands in M96)
-    5. Daemon mode          (optional; if accepted → host/port + a channel
+    4. Daemon mode          (optional; if accepted → host/port + a channel
                              via the shared registry-driven flow; else skipped)
-    6. Recap                (always shown)
+    5. Recap                (always shown)
+
+There is no AGENTS.md-normalization step: `init_project` itself folds an
+existing CLAUDE.md/GEMINI.md into AGENTS.md without loss (M272), so by the time
+bootstrap returns there is nothing left to reconcile.
 
 The old "wiki seed" step (bulk-copy README/docs into sources/seed/) was removed:
 content enters the wiki only via content-aware `veles add`, which distils each
@@ -296,62 +298,6 @@ async def _project_api_key_flow(ctx: WizardContext, project: Project, provider: 
         ctx.answers["project_api_key_status"] = f"keychain-unavailable: {exc}"
 
 
-# ---------------- Step 3: AGENTS.md normalization (M96 stub) ----------------
-
-
-@dataclass
-class NormalizationStep:
-    """Detects AGENTS.md / CLAUDE.md / GEMINI.md conflicts. Full LLM-merge
-    lands in M96; for now we record what we'd merge so the recap screen
-    can mention it and the user knows to expect the prompt later."""
-
-    name: str = "agents_md_normalization"
-    title: str = "AGENTS.md normalization"
-
-    async def run(self, ctx: WizardContext) -> WizardOutcome:
-        project: Project = ctx.answers["project"]
-        conflicts = _detect_context_file_conflicts(project.root)
-        if not conflicts:
-            ctx.answers["normalization"] = "no-conflict"
-            return WizardOutcome.SKIP
-        sample = ", ".join(conflicts)
-        wants = await ctx.app.push_screen_wait(
-            ConfirmScreen(
-                title=self.title,
-                question=(
-                    f"Found context files outside Veles convention: {sample}. "
-                    "Merge them into a single AGENTS.md? Smart merge of "
-                    "multiple context files is coming soon; for now we'll "
-                    "just record the intent and continue."
-                ),
-                default=False,
-            )
-        )
-        nav = _nav(wants)
-        if nav is not None:
-            return nav
-        ctx.answers["normalization"] = {
-            "files": conflicts,
-            "wants_merge": bool(wants),
-        }
-        return WizardOutcome.NEXT
-
-
-def _detect_context_file_conflicts(root: Path) -> list[str]:
-    """Return the list of files (relative names) that are real files and
-    not symlinks pointing at AGENTS.md."""
-    names = ("AGENTS.md", "CLAUDE.md", "GEMINI.md")
-    real_files: list[str] = []
-    for name in names:
-        p = root / name
-        try:
-            if p.exists() and not p.is_symlink():
-                real_files.append(name)
-        except OSError:
-            continue
-    return real_files if len(real_files) >= 2 else []
-
-
 # ---------------- Step 4: Daemon mode + channel ----------------
 
 
@@ -499,7 +445,6 @@ def project_wizard_steps(cwd: Path) -> list:
         LayoutPickerStep(),
         BootstrapStep(cwd=cwd),
         ProviderOverrideStep(),
-        NormalizationStep(),
         DaemonModeStep(),
         RecapStep(),
     ]
@@ -559,7 +504,6 @@ __all__ = [
     "BootstrapStep",
     "DaemonModeStep",
     "LayoutPickerStep",
-    "NormalizationStep",
     "ProviderOverrideStep",
     "RecapStep",
     "project_wizard_steps",

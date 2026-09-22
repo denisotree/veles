@@ -264,17 +264,17 @@ têm cache de 24h; provedores locais são sempre consultados ao vivo.
 
 ## Tarefas de longa duração
 
-### `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}`
+### `veles goal {list,show,start,pause,resume,cancel}`
 Objetivos de longo prazo com orçamentos e checkpoints.
 
 | Subcomando | Finalidade |
 |---|---|
 | `list [--status active\|paused\|completed\|blocked\|cancelled]` | Lista metas |
 | `show <id> [--json]` | Mostra uma meta |
-| `start "<objective>" [--scope S] [--done-when D] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n] [--forbid A]… [--approve A]…` | Cria uma meta |
-| `checkpoint <id> "<note>" [--evidence U] [--cost-usd f] [--no-advance]` | Acrescenta progresso |
-| `pause <id>` / `resume <id>` | Pausa / retoma |
-| `done <id> [--evidence E]` / `cancel <id> [--reason R]` | Conclui / cancela |
+| `start "<objective>" --done-when D [--scope S] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n]` | Executa uma meta até a condição de conclusão (em primeiro plano) |
+| `pause <id>` | Pausa; um `start`/`resume` em execução para no próximo turno |
+| `resume <id>` | Retoma uma meta pausada ou interrompida de onde parou |
+| `cancel <id> [--reason R]` | Cancela |
 
 ### `veles job {add,list,show,pause,resume,trigger,remove,history,tick}`
 Jobs de agente agendados.

@@ -1,13 +1,18 @@
 """Web search tool — query the web and return ranked results.
 
-Supports multiple search backends selected by env-var priority:
+Supports multiple search backends, selected by which key is configured:
 
-| Provider   | Env var              | Notes                             |
+| Provider   | Secret / env var     | Notes                             |
 |------------|----------------------|-----------------------------------|
 | Brave      | BRAVE_SEARCH_API_KEY | 2 000 free queries/month          |
 | Tavily     | TAVILY_API_KEY       | AI-optimised results, paid tier   |
 | SearXNG    | SEARXNG_URL          | Self-hosted meta-search, free     |
 | DuckDuckGo | (none)               | Fallback; requires `ddgs` package |
+
+API keys are read through `secrets.get_secret` — the OS keychain first
+(`veles secret set BRAVE_SEARCH_API_KEY`), the environment second. Before M271
+they were read from the environment only, so a key stored with `veles secret
+set` was never seen.
 
 Auto-detect order: Brave → Tavily → SearXNG → DuckDuckGo.
 Override with `VELES_WEB_SEARCH_BACKEND=brave|tavily|searxng|ddgs`.
@@ -23,6 +28,7 @@ from typing import Any
 import httpx
 
 from veles.core.risk import RiskClass
+from veles.core.secrets import get_secret
 from veles.core.tools.registry import tool
 from veles.core.untrusted import wrap_untrusted
 
@@ -30,6 +36,16 @@ _TIMEOUT = 30.0
 _USER_AGENT = "Veles/0.0.1"
 _DEFAULT_LIMIT = 5
 _MAX_LIMIT = 20
+
+
+def _required_key(name: str) -> str:
+    """The key `available()` already confirmed, re-read at call time; a clear
+    error if it vanished in between rather than an auth failure from the API."""
+    value = get_secret(name)
+    if not value:
+        raise RuntimeError(f"{name} is not set (veles secret set {name})")
+    return value
+
 
 # ---- provider base ----
 
@@ -55,10 +71,10 @@ class _BraveProvider(_Provider):
         return "brave"
 
     def available(self) -> bool:
-        return bool(os.environ.get("BRAVE_SEARCH_API_KEY"))
+        return bool(get_secret("BRAVE_SEARCH_API_KEY"))
 
     def search(self, query: str, limit: int) -> list[dict[str, Any]]:
-        api_key = os.environ["BRAVE_SEARCH_API_KEY"]
+        api_key = _required_key("BRAVE_SEARCH_API_KEY")
         resp = httpx.get(
             self._API,
             params={"q": query, "count": min(limit, 20)},
@@ -93,13 +109,13 @@ class _TavilyProvider(_Provider):
         return "tavily"
 
     def available(self) -> bool:
-        return bool(os.environ.get("TAVILY_API_KEY"))
+        return bool(get_secret("TAVILY_API_KEY"))
 
     def search(self, query: str, limit: int) -> list[dict[str, Any]]:
         resp = httpx.post(
             self._API,
             json={
-                "api_key": os.environ["TAVILY_API_KEY"],
+                "api_key": _required_key("TAVILY_API_KEY"),
                 "query": query,
                 "max_results": min(limit, 20),
                 "include_raw_content": False,

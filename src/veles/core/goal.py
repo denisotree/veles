@@ -1,21 +1,22 @@
-"""Goal-like loop primitives (Tier δ extension, prev. deferred).
+"""Goal records: a long-horizon objective, its done condition, budget and FSM state.
 
-A *goal* is a long-horizon objective with a measurable done condition and
-a budget — distinct from a plan (`core/plan_artifact.py` will land this
-session) which is the *how*. Best-practices §planning-and-goals: «plan:
-how to approach the work; goal: what state should eventually be true».
+A *goal* is what state should eventually be true, with a measurable done
+condition and a budget — distinct from a plan (`core/plan_artifact.py`), which
+is the *how*. A goal lives as a single JSON file under
+`<project>/.veles/goals/<id>.json` so external tools (jq, cron, dashboards) can
+read state without a SQLite handle.
 
-This module is *opt-in*. The agent loop is unchanged when no goal is
-attached. CLI exposes `veles goal {list,show,start,step,done,pause,resume}`
-for the user-facing surface. A goal lives as a single JSON file per
-goal_id under `<project>/.veles/goals/<id>.json` so external tools
-(jq, cron, dashboards) can read state without a SQLite handle.
+This module is storage only. GoalMode (`core/modes/goal.py`) runs a goal one
+phase per turn — from the REPL (`/goal`), where a person answers the interview
+— and `core/modes/goal_driver.py` runs one to an end without a person, for
+`veles goal start` / `resume` (M276). The agent loop is unchanged when no goal
+is active; nothing wraps a plain `veles run` in goal machinery.
 
-Forbidden: goal-loop wrapping `agent.run()` automatically. The user
-explicitly attaches a goal_id to a run via `veles run --goal <id>` or
-calls `GoalLoop.step(goal_id, agent)` from a script. This keeps the
-short-task path (one-shot `veles run`) free of goal-loop machinery
-overhead.
+M276 removed the `forbidden_actions` / `approval_required_for` fields and the
+`render_system_block` that would have shown them: nothing ever enforced either
+list, so `veles goal start --forbid …` promised a guard that did not exist.
+Goal files written before still load — `_from_dict` reads only the keys it
+knows.
 """
 
 from __future__ import annotations
@@ -88,18 +89,16 @@ class Goal:
     done_condition: str = ""
     status: GoalStatus = "active"
     budget: GoalBudget = field(default_factory=GoalBudget)
-    forbidden_actions: list[str] = field(default_factory=list)
-    approval_required_for: list[str] = field(default_factory=list)
     progress: list[CheckpointEntry] = field(default_factory=list)
     steps_done: int = 0
     cost_spent_usd: float = 0.0
     created_at: str = ""
     updated_at: str = ""
     completed_at: str | None = None
-    # GoalMode FSM state (TUI Shift+Tab → goal). Optional: a goal
-    # created via `veles goal start` (CLI) never enters GoalMode and
-    # these stay at their defaults. `_from_dict` round-trips with safe
-    # fallbacks so old JSON files load unchanged.
+    # GoalMode FSM state. A REPL `/goal` starts at `interview`; `veles goal
+    # start` starts at `plan` (the interview's output is given on the command
+    # line). `_from_dict` round-trips with safe fallbacks so old JSON files load
+    # unchanged.
     current_phase: GoalPhase = "interview"
     plan_id: str | None = None
     interview_summary: str = ""
@@ -124,8 +123,6 @@ def create_goal(
     scope: str = "",
     done_condition: str = "",
     budget: GoalBudget | None = None,
-    forbidden_actions: list[str] | None = None,
-    approval_required_for: list[str] | None = None,
 ) -> Goal:
     """Persist a new Goal and return it. Raises ValueError on empty objective."""
     if not objective.strip():
@@ -137,8 +134,6 @@ def create_goal(
         scope=scope,
         done_condition=done_condition,
         budget=budget or GoalBudget(),
-        forbidden_actions=list(forbidden_actions or []),
-        approval_required_for=list(approval_required_for or []),
         created_at=now,
         updated_at=now,
     )
@@ -287,31 +282,6 @@ def budget_exhausted(goal: Goal) -> str | None:
     return None
 
 
-def render_system_block(goal: Goal) -> str:
-    """Render `<goal>...</goal>` block for system-prompt injection.
-
-    The agent loop opts in via `Agent(goal_id=...)`. Block is brief on
-    purpose: objective + done_condition + budget summary; forbidden /
-    approval lists go into the same block only when non-empty.
-    """
-    lines = [
-        f'<goal id="{goal.id}" status="{goal.status}">',
-        f"Objective: {goal.objective}",
-    ]
-    if goal.done_condition:
-        lines.append(f"Done when: {goal.done_condition}")
-    lines.append(
-        f"Budget: {goal.steps_done}/{goal.budget.max_steps} steps, "
-        f"${goal.cost_spent_usd:.2f}/${goal.budget.max_cost_usd:.2f}"
-    )
-    if goal.forbidden_actions:
-        lines.append("Forbidden actions: " + ", ".join(goal.forbidden_actions))
-    if goal.approval_required_for:
-        lines.append("Approval required for: " + ", ".join(goal.approval_required_for))
-    lines.append("</goal>")
-    return "\n".join(lines)
-
-
 # ---------- internals ----------
 
 
@@ -368,8 +338,6 @@ def _from_dict(raw: dict[str, Any]) -> Goal:
         done_condition=str(raw.get("done_condition", "")),
         status=raw.get("status", "active"),
         budget=budget,
-        forbidden_actions=list(raw.get("forbidden_actions") or []),
-        approval_required_for=list(raw.get("approval_required_for") or []),
         progress=progress,
         steps_done=int(raw.get("steps_done", 0)),
         cost_spent_usd=float(raw.get("cost_spent_usd", 0.0)),
@@ -415,7 +383,6 @@ __all__ = [
     "list_goals",
     "pause",
     "read_goal",
-    "render_system_block",
     "resume",
     "update_fsm",
 ]

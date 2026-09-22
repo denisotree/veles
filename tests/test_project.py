@@ -101,12 +101,17 @@ def test_init_project_does_not_overwrite_existing_agents_md(tmp_path: Path) -> N
     assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") == "user content"
 
 
-def test_init_project_does_not_overwrite_non_symlink_claude_md(tmp_path: Path) -> None:
+def test_init_project_never_loses_a_user_claude_md(tmp_path: Path) -> None:
+    """The invariant this test always guarded: the user's CLAUDE.md is never
+    overwritten or lost. Until M272 it was kept by leaving the file alone —
+    which also meant the agent, reading only AGENTS.md, never saw it. Now it is
+    imported into AGENTS.md *and* kept byte for byte as CLAUDE.md.bak, and
+    CLAUDE.md becomes the AGENTS.md symlink."""
     (tmp_path / "CLAUDE.md").write_text("user-managed CLAUDE.md", encoding="utf-8")
     init_project(tmp_path, name="alpha")
-    claude = tmp_path / "CLAUDE.md"
-    assert not claude.is_symlink()
-    assert claude.read_text(encoding="utf-8") == "user-managed CLAUDE.md"
+    assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") == "user-managed CLAUDE.md\n"
+    assert (tmp_path / "CLAUDE.md.bak").read_text(encoding="utf-8") == "user-managed CLAUDE.md"
+    assert (tmp_path / "CLAUDE.md").is_symlink()
 
 
 def test_init_project_raises_on_existing_state_without_force(tmp_path: Path) -> None:

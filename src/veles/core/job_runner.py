@@ -81,6 +81,7 @@ class JobRunner:
         tz=None,
         kind_handlers: dict[str, Callable[[JobRecord], str]] | None = None,
         on_op_finished: Callable[[JobRecord, str], Any] | None = None,
+        on_delivered: Callable[[str, str], Any] | None = None,
     ) -> None:
         self._store = store
         self._agent_factory = agent_factory
@@ -102,6 +103,13 @@ class JobRunner:
         # path owns notification (incl. the no-session fallback), so routing
         # both would double-post into the chat.
         self._on_op_finished = on_op_finished
+        # M273: fired (awaited) after a job's output is delivered to a chat, with
+        # `(target, text)` — the daemon wires M214's binder here, as it already
+        # did for reminders, so the text lands in that chat's session. Without it
+        # a reply to a scheduled message ("tell me more about point 2") reached
+        # an agent that had no record of sending it. `channels/mirror.py` was
+        # written for this and never wired; the binder is the convention chosen.
+        self._on_delivered = on_delivered
         self._loop_task: asyncio.Task | None = None
         self._running = False
         self._inflight: set[asyncio.Task] = set()
@@ -208,11 +216,21 @@ class JobRunner:
         output_path = self._write_output(job, result, started)
         delivery_err: str | None = None
         if job.deliver_to and self._delivery is not None:
+            text = result.text or ""
+            delivered = False
             try:
-                await self._delivery.deliver(job.deliver_to, result.text or "")
+                await self._delivery.deliver(job.deliver_to, text)
+                delivered = True
             except Exception as exc:  # pragma: no cover - delivery is best-effort
                 delivery_err = f"delivery failed: {type(exc).__name__}: {exc}"
                 logger.warning("job %s delivery failed: %s", job.id, exc)
+            # Only what actually reached the chat is recorded in its session, and a
+            # binding failure never turns a delivered job into a failed one.
+            if delivered and self._on_delivered is not None:
+                try:
+                    await self._on_delivered(job.deliver_to, text)
+                except Exception as exc:
+                    logger.warning("job %s post-deliver bind failed: %s", job.id, exc)
         self._store.mark_run_finished(
             run_id=rid,
             status="ok",

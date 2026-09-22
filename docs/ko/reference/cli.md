@@ -235,17 +235,17 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 ## 장시간 실행 작업
 
-### `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}`
+### `veles goal {list,show,start,pause,resume,cancel}`
 예산과 체크포인트를 갖춘 장기 목표.
 
 | 하위 명령 | 용도 |
 |---|---|
 | `list [--status active\|paused\|completed\|blocked\|cancelled]` | 목표 나열 |
 | `show <id> [--json]` | 목표 하나 표시 |
-| `start "<objective>" [--scope S] [--done-when D] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n] [--forbid A]… [--approve A]…` | 목표 생성 |
-| `checkpoint <id> "<note>" [--evidence U] [--cost-usd f] [--no-advance]` | 진행 상황 추가 |
-| `pause <id>` / `resume <id>` | 일시정지 / 재개 |
-| `done <id> [--evidence E]` / `cancel <id> [--reason R]` | 완료 / 취소 |
+| `start "<objective>" --done-when D [--scope S] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n]` | 완료 조건까지 목표 실행 (포그라운드) |
+| `pause <id>` | 일시정지; 실행 중인 `start`/`resume`은 다음 턴에 멈춤 |
+| `resume <id>` | 일시정지되었거나 중단된 목표를 멈춘 곳에서 계속 |
+| `cancel <id> [--reason R]` | 취소 |
 
 ### `veles job {add,list,show,pause,resume,trigger,remove,history,tick}`
 예약된 에이전트 작업.

@@ -44,6 +44,30 @@ def test_channel_run_requires_daemon_token(isolated_user_home: Path, capsys, mon
     assert "VELES_DAEMON_TOKEN" in err
 
 
+def test_channel_run_reads_a_daemon_token_stored_with_veles_secret(
+    isolated_user_home: Path, capsys, monkeypatch, fake_keyring
+) -> None:
+    """M271: the token was read from the environment only, so one stored with
+    `veles secret set` was never used. Stored through the real CLI here; the
+    run then fails *later* (unknown channel), which proves the token check passed."""
+    from veles.cli import main as cli_main
+
+    monkeypatch.delenv("VELES_DAEMON_TOKEN", raising=False)
+    assert cli_main(["secret", "set", "VELES_DAEMON_TOKEN", "vd_from_keychain"]) == 0
+    capsys.readouterr()
+    args = _ns(
+        channel_command="run",
+        channel="no-such-channel",
+        bot_token="bot-xyz",
+        daemon_url=None,
+        daemon_token=None,
+    )
+    channel_cmd.cmd_channel(args)
+    err = capsys.readouterr().err
+    assert "VELES_DAEMON_TOKEN is required" not in err
+    assert "no-such-channel" in err
+
+
 def test_channel_run_refuses_unknown_channel(isolated_user_home: Path, capsys, monkeypatch) -> None:
     args = _ns(
         channel_command="run",

@@ -259,17 +259,17 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 ## দীর্ঘমেয়াদী টাস্ক
 
-### `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}`
+### `veles goal {list,show,start,pause,resume,cancel}`
 বাজেট ও চেকপয়েন্টসহ দীর্ঘ-দিগন্তের লক্ষ্য।
 
 | সাবকমান্ড | উদ্দেশ্য |
 |---|---|
 | `list [--status active\|paused\|completed\|blocked\|cancelled]` | লক্ষ্য তালিকাভুক্ত করে |
 | `show <id> [--json]` | একটি লক্ষ্য দেখায় |
-| `start "<objective>" [--scope S] [--done-when D] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n] [--forbid A]… [--approve A]…` | একটি লক্ষ্য তৈরি করে |
-| `checkpoint <id> "<note>" [--evidence U] [--cost-usd f] [--no-advance]` | অগ্রগতি যোগ করে |
-| `pause <id>` / `resume <id>` | বিরতি / পুনরায় শুরু |
-| `done <id> [--evidence E]` / `cancel <id> [--reason R]` | সমাপ্ত / বাতিল |
+| `start "<objective>" --done-when D [--scope S] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n]` | সমাপ্তির শর্ত পর্যন্ত একটি লক্ষ্য চালায় (সামনে) |
+| `pause <id>` | বিরতি; চলমান `start`/`resume` পরের টার্নে থামে |
+| `resume <id>` | বিরত বা বাধাপ্রাপ্ত লক্ষ্য যেখানে থেমেছিল সেখান থেকে চালায় |
+| `cancel <id> [--reason R]` | বাতিল |
 
 ### `veles job {add,list,show,pause,resume,trigger,remove,history,tick}`
 শিডিউল করা এজেন্ট জব।

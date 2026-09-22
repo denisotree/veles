@@ -19,10 +19,10 @@ back to `_telegram_direct_deliver` for built-in platforms, or raises
 `DeliveryError` otherwise.
 
 Deliberately not a multi-target broadcast DSL — chained delivery is the
-caller's responsibility. We keep mirror separate (`channels/mirror.py`) and
-delegate truncation to `DisplayTier`, so this layer stays small instead of
-absorbing per-platform truncation, attachment handling, and inline mirror
-writes.
+caller's responsibility. Recording a delivery in the receiving chat's session
+is the caller's too: the runners pass an `on_delivered` hook (M214's binder,
+`daemon/background_ops.make_proactive_binder`; M273 for jobs), and truncation
+is delegated to `DisplayTier`, so this layer stays small.
 """
 
 from __future__ import annotations

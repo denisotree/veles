@@ -49,6 +49,7 @@ veles secret set OPENROUTER_API_KEY       # 提示输入（或通过 stdin 传�
 veles secret list                         # 已配置了哪些密钥
 veles secret get OPENROUTER_API_KEY --reveal
 veles secret delete OPENROUTER_API_KEY
+veles secret set OPENROUTER_API_KEY --project myproj   # 仅用于某个项目的密钥
 ```
 
 除非你传入 `--no-env-fallback`，否则查找会回退到对应的

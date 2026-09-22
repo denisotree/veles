@@ -13,7 +13,6 @@ from veles.tui.wizard.app import WizardApp
 from veles.tui.wizard.project_steps import (
     BootstrapStep,
     DaemonModeStep,
-    NormalizationStep,
     ProviderOverrideStep,
     RecapStep,
     project_wizard_steps,
@@ -151,28 +150,6 @@ async def test_provider_override_skip(tmp_cwd: Path) -> None:
     assert answers["provider_override"] is None
 
 
-# ---------------- Normalization (M96 stub) ----------------
-
-
-async def test_normalization_skipped_when_no_conflict(tmp_cwd: Path) -> None:
-    steps = [BootstrapStep(cwd=tmp_cwd), NormalizationStep(), RecapStep()]
-    answers = await _drive(steps, ["y", "enter"])
-    assert answers["normalization"] == "no-conflict"
-
-
-async def test_normalization_detects_existing_files(tmp_cwd: Path) -> None:
-    (tmp_cwd / "CLAUDE.md").write_text("a", encoding="utf-8")
-    (tmp_cwd / "GEMINI.md").write_text("b", encoding="utf-8")
-    steps = [BootstrapStep(cwd=tmp_cwd), NormalizationStep(), RecapStep()]
-    # init_project creates AGENTS.md as a real file too — so we already
-    # have 3 reals: CLAUDE, GEMINI, AGENTS. Answer y to "want merge".
-    answers = await _drive(steps, ["y", "y", "enter"])
-    norm = answers["normalization"]
-    assert isinstance(norm, dict)
-    assert set(norm["files"]) >= {"CLAUDE.md", "GEMINI.md"}
-    assert norm["wants_merge"] is True
-
-
 # ---------------- Full project_wizard_steps shape ----------------
 
 
@@ -185,7 +162,6 @@ def test_project_wizard_steps_order(tmp_cwd: Path) -> None:
         "layout-picker",
         "bootstrap",
         "provider_override",
-        "agents_md_normalization",
         "daemon_mode",
         "recap",
     ]

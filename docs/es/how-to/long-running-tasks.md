@@ -19,9 +19,7 @@ veles goal start "Draft a competitor analysis report" \
 
 veles goal list
 veles goal show <id>
-veles goal checkpoint <id> "Outlined sections; cited 2 sources" --cost-usd 0.40
 veles goal pause <id> ; veles goal resume <id>
-veles goal done <id> --evidence report.md
 veles goal cancel <id> --reason "scope changed"
 ```
 

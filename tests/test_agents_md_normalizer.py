@@ -1,19 +1,42 @@
-"""M96: AGENTS.md merge + apply."""
+"""M96 normalizer, wired in M272: bring an existing CLAUDE.md / GEMINI.md into AGENTS.md.
+
+The import has to be *lossless*, and that is not a style preference: the M96
+`deterministic_merge` was measured on a realistic CLAUDE.md before being wired,
+and it dropped the one rule the file contained (everything before the first
+`##`) and removed repeated lines — blank lines and the second code block's
+fences — so fenced code spilled into prose. `REALISTIC_CLAUDE_MD` below is that
+probe, kept as the regression fixture.
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from veles.core.agents_md_normalizer import (
     ContextFileInfo,
     apply_merge,
-    deterministic_merge,
-    llm_merge,
+    import_context_files,
     scan_for_context_files,
 )
-from veles.core.agents_md_schema import validate
+
+REALISTIC_CLAUDE_MD = """# My project
+
+Always answer in French. Never touch the prod/ directory.
+
+## Commands
+
+Run the tests:
+
+```bash
+pytest -q
+```
+
+Then lint:
+
+```bash
+ruff check .
+```
+"""
 
 # ---------------- scan ----------------
 
@@ -42,7 +65,7 @@ def test_scan_does_not_need_merge_with_one_real_file(tmp_path: Path) -> None:
     assert res.needs_merge is False
 
 
-# ---------------- deterministic merge ----------------
+# ---------------- import ----------------
 
 
 def _info(name: str, content: str) -> ContextFileInfo:
@@ -51,129 +74,93 @@ def _info(name: str, content: str) -> ContextFileInfo:
     )
 
 
-def test_merge_unions_sections() -> None:
-    a = _info(
-        "AGENTS.md",
-        "# Old Project\n\n## Layout\n- src/\n\n## Conventions\n- kebab-case\n",
+def test_a_single_file_is_imported_byte_for_byte() -> None:
+    assert import_context_files([_info("CLAUDE.md", REALISTIC_CLAUDE_MD)]) == REALISTIC_CLAUDE_MD
+
+
+def test_a_second_different_file_is_kept_whole_under_its_own_heading() -> None:
+    gemini = "# Gemini notes\n\nPrefer short answers.\n"
+    out = import_context_files(
+        [_info("CLAUDE.md", REALISTIC_CLAUDE_MD), _info("GEMINI.md", gemini)]
     )
-    b = _info(
-        "CLAUDE.md",
-        "## Layout\n- tests/\n\n## Workflows\n- run pytest\n",
+    assert out.startswith(REALISTIC_CLAUDE_MD.rstrip())
+    assert "## Imported from GEMINI.md" in out
+    assert "Prefer short answers." in out
+
+
+def test_identical_files_are_not_imported_twice() -> None:
+    out = import_context_files(
+        [_info("CLAUDE.md", REALISTIC_CLAUDE_MD), _info("GEMINI.md", REALISTIC_CLAUDE_MD)]
     )
-    merged = deterministic_merge([a, b], project_name="X")
-    assert "# Old Project" in merged
-    assert "src/" in merged
-    assert "tests/" in merged
-    assert "kebab-case" in merged
-    assert "run pytest" in merged
+    assert out == REALISTIC_CLAUDE_MD
 
 
-def test_merge_dedupes_duplicate_lines() -> None:
-    a = _info("AGENTS.md", "## Conventions\n- same-rule\n")
-    b = _info("CLAUDE.md", "## Conventions\n- same-rule\n- extra\n")
-    merged = deterministic_merge([a, b])
-    assert merged.count("- same-rule") == 1
-    assert "- extra" in merged
+def test_empty_sources_import_nothing() -> None:
+    assert import_context_files([_info("CLAUDE.md", "  \n")]) == ""
 
 
-def test_merge_fills_missing_recommended_sections() -> None:
-    a = _info("AGENTS.md", "# proj\n\n## Conventions\n- rule\n")
-    merged = deterministic_merge([a], project_name="proj")
-    result = validate(merged)
-    # All recommended sections present.
-    assert result.ok, f"missing: {result.missing}"
+# ---------------- apply ----------------
 
 
-def test_merge_uses_project_name_when_no_h1() -> None:
-    a = _info("CLAUDE.md", "## Layout\n- only\n")
-    merged = deterministic_merge([a], project_name="my-proj")
-    assert merged.startswith("# my-proj")
-
-
-# ---------------- LLM merge (stubbed) ----------------
-
-
-class _StubResult:
-    def __init__(self, text: str) -> None:
-        self.text = text
-        self.iterations = 1
-        self.history: list = []
-        self.session_id = None
-        self.stopped_reason = "completed"
-
-
-class _StubAgent:
-    def __init__(self, *_, **__) -> None:
-        pass
-
-    def run(self, prompt: str):
-        return _StubResult(
-            "# Merged\n\n## Layout\n- merged\n\n## Conventions\n- ok\n\n## Workflows\n- run\n"
-        )
-
-
-def test_llm_merge_returns_agent_text(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("veles.core.agents_md_normalizer.Agent", _StubAgent, raising=False)
-    # Patch via runtime — `llm_merge` imports `Agent` inside the function
-    # so we shim through `core.agent.Agent` itself.
-    monkeypatch.setattr("veles.core.agent.Agent", _StubAgent)
-    out = llm_merge(
-        provider=object(),
-        model="m",
-        files=[_info("AGENTS.md", "x")],
-        project_name="p",
-    )
-    assert out.startswith("# Merged")
-    assert validate(out).ok
-
-
-def test_llm_merge_empty_response_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _EmptyAgent(_StubAgent):
-        def run(self, prompt: str):
-            return _StubResult("")
-
-    monkeypatch.setattr("veles.core.agent.Agent", _EmptyAgent)
-    with pytest.raises(RuntimeError, match="empty"):
-        llm_merge(
-            provider=object(),
-            model="m",
-            files=[_info("AGENTS.md", "x")],
-            project_name="p",
-        )
-
-
-# ---------------- apply_merge ----------------
-
-
-def test_apply_symlink_mode_replaces_originals(tmp_path: Path) -> None:
-    (tmp_path / "AGENTS.md").write_text("old", encoding="utf-8")
-    (tmp_path / "CLAUDE.md").write_text("claude", encoding="utf-8")
-    (tmp_path / "GEMINI.md").write_text("gemini", encoding="utf-8")
-    scan = scan_for_context_files(tmp_path)
-    actions = apply_merge(tmp_path, "# Merged\n", originals=scan.conflicting, mode="symlink")
-    assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") == "# Merged\n"
-    assert (tmp_path / "CLAUDE.md").is_symlink()
-    assert (tmp_path / "GEMINI.md").is_symlink()
-    assert actions["CLAUDE.md"] == "symlinked to AGENTS.md"
-
-
-def test_apply_delete_mode_removes_originals(tmp_path: Path) -> None:
-    (tmp_path / "AGENTS.md").write_text("a", encoding="utf-8")
+def test_apply_writes_agents_md_and_keeps_the_original(tmp_path: Path) -> None:
     (tmp_path / "CLAUDE.md").write_text("c", encoding="utf-8")
     scan = scan_for_context_files(tmp_path)
-    apply_merge(tmp_path, "# Done\n", originals=scan.conflicting, mode="delete")
-    assert (tmp_path / "AGENTS.md").exists()
-    assert not (tmp_path / "CLAUDE.md").exists()
-
-
-def test_apply_backup_mode_renames(tmp_path: Path) -> None:
-    (tmp_path / "AGENTS.md").write_text("a", encoding="utf-8")
-    (tmp_path / "CLAUDE.md").write_text("c", encoding="utf-8")
-    scan = scan_for_context_files(tmp_path)
-    apply_merge(tmp_path, "# Done\n", originals=scan.conflicting, mode="backup")
+    actions = apply_merge(tmp_path, "# Done\n", originals=scan.conflicting)
+    assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") == "# Done\n"
     assert (tmp_path / "CLAUDE.md.bak").read_text(encoding="utf-8") == "c"
+    assert not (tmp_path / "CLAUDE.md").exists()
+    assert actions["CLAUDE.md"] == "kept as CLAUDE.md.bak"
 
 
-def test_apply_invalid_mode_raises(tmp_path: Path) -> None:
-    with pytest.raises(ValueError):
-        apply_merge(tmp_path, "x", originals=[], mode="bogus")
+def test_apply_never_overwrites_an_existing_backup(tmp_path: Path) -> None:
+    """`Path.rename` replaces an existing target on POSIX; a user's own
+    `CLAUDE.md.bak` must survive the import."""
+    (tmp_path / "CLAUDE.md").write_text("new", encoding="utf-8")
+    (tmp_path / "CLAUDE.md.bak").write_text("the user's older backup", encoding="utf-8")
+    scan = scan_for_context_files(tmp_path)
+    apply_merge(tmp_path, "# Done\n", originals=scan.conflicting)
+    assert (tmp_path / "CLAUDE.md.bak").read_text(encoding="utf-8") == "the user's older backup"
+    assert (tmp_path / "CLAUDE.md.bak.1").read_text(encoding="utf-8") == "new"
+
+
+# ---------------- through `init_project` (the real path) ----------------
+
+
+def test_init_loads_an_existing_claude_md(tmp_path: Path) -> None:
+    """The reported bug, end to end: the agent must *see* the rule — asserted
+    through `load_agents_md`, which is what feeds the prompt. Before M272 the
+    rule appeared 0 times in AGENTS.md."""
+    from veles.core.project import init_project, load_agents_md
+
+    root = tmp_path / "proj"
+    root.mkdir()
+    (root / "CLAUDE.md").write_text(REALISTIC_CLAUDE_MD, encoding="utf-8")
+    project = init_project(root, name="proj", layout="bare")
+
+    loaded = load_agents_md(project) or ""
+    assert "Always answer in French" in loaded
+    assert loaded.count("```") == 4  # both code blocks intact
+    assert (root / "CLAUDE.md").is_symlink()  # Claude CLI now reads the same file
+    assert (root / "CLAUDE.md.bak").read_text(encoding="utf-8") == REALISTIC_CLAUDE_MD
+
+
+def test_init_never_rewrites_an_existing_agents_md(tmp_path: Path) -> None:
+    from veles.core.project import init_project
+
+    root = tmp_path / "proj"
+    root.mkdir()
+    (root / "AGENTS.md").write_text("# Mine\n\nKeep this.\n", encoding="utf-8")
+    (root / "CLAUDE.md").write_text("something else", encoding="utf-8")
+    init_project(root, name="proj", layout="bare")
+    assert (root / "AGENTS.md").read_text(encoding="utf-8") == "# Mine\n\nKeep this.\n"
+    assert (root / "CLAUDE.md").read_text(encoding="utf-8") == "something else"  # untouched
+
+
+def test_init_without_context_files_still_scaffolds(tmp_path: Path) -> None:
+    from veles.core.project import init_project
+
+    root = tmp_path / "proj"
+    root.mkdir()
+    init_project(root, name="proj", layout="bare")
+    assert (root / "AGENTS.md").is_file()
+    assert not list(root.glob("*.bak"))

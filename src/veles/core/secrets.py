@@ -17,10 +17,22 @@ The functions degrade gracefully:
   - Keychain access denied at the OS level → returns None / env fallback.
   - Backend not configured (some Linux CI environments) → env fallback.
 
-`get_secret(name, env_fallback=True)` is the read-side: keychain first,
-env second. Adapters can swap their `os.environ.get("OPENROUTER_API_KEY")`
-calls for `get_secret("OPENROUTER_API_KEY")` and become keychain-aware
-without breaking anyone whose secrets are still in `.env`.
+**Two kinds of entry, one router (M271).**
+
+  - A *provider API key* (`OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, …) lives
+    at `veles:<provider>:<scope>` — scope `default` or a project slug (M92).
+    Read by `get_provider_key` (project scope → default → env), which is what
+    every provider uses. Written by the setup wizards and by `veles secret`.
+    Channel credentials (a Telegram bot token) share this layout.
+  - *Every other secret* (`TAVILY_API_KEY`, `VELES_DAEMON_TOKEN`, …) lives at
+    `veles:<NAME>`, read by `get_secret` (keychain → env).
+
+`provider_for_env_name` decides which kind a name is, from
+`PROVIDER_API_KEY_ENVS`. Before M271 there was no router: `veles secret`
+wrote every name as the second kind, including provider keys, whose flat entry
+M149 had stopped reading as a legacy form — so `veles secret set
+OPENROUTER_API_KEY` stored a key nothing used, and the web-search keys were
+read from the environment only.
 """
 
 from __future__ import annotations
@@ -174,6 +186,25 @@ def list_known_names() -> list[str]:
 # ---------------- M92: scoped provider keys ----------------
 
 
+def provider_for_env_name(name: str) -> str | None:
+    """The provider whose API key `name` is (`OPENROUTER_API_KEY` → `openrouter`),
+    or None for a secret that is not a provider key.
+
+    M271: this is the router between the two kinds of keychain entry. A
+    provider key lives at `veles:<provider>:<scope>` (M92) because that is the
+    only place the runtime reads it from (`provider_factory.resolve_api_key`);
+    every other secret lives at `veles:<NAME>`. Before this, `veles secret set
+    OPENROUTER_API_KEY` wrote the second kind for a provider key, so the key was
+    stored and never used. Derived from `PROVIDER_API_KEY_ENVS` rather than a
+    second table, so a new provider cannot be routed differently in two places."""
+    from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
+
+    for provider, env_names in PROVIDER_API_KEY_ENVS.items():
+        if name in env_names:
+            return provider
+    return None
+
+
 def get_provider_key(
     provider: str, *, project: str | None = None, env_fallback: bool = True
 ) -> str | None:
@@ -244,9 +275,24 @@ def list_provider_keys(provider: str) -> list[str]:
 
 
 def list_providers_with_keys() -> dict[str, list[str]]:
-    """Snapshot of every provider → its known scopes. Used by `veles secret list`
-    and the wizard recap screen."""
+    """Snapshot of every provider → its *recorded* scopes, from the sidecar
+    index. The index can outlive a keychain entry revoked out-of-band, so a
+    caller that shows the user what is stored should confirm each scope with
+    `stored_scopes`."""
     return _load_index()
+
+
+def stored_scopes(provider: str) -> list[str]:
+    """Scopes for `provider` whose keychain entry actually exists.
+
+    `veles secret list` reports from this, not from the index alone: reporting
+    a key that is no longer there would be the same kind of lie as reporting a
+    working key as unset, which is the bug M271 fixes."""
+    return [
+        scope
+        for scope in list_provider_keys(provider)
+        if _read_keychain(_scoped_entry_name(provider, scope))
+    ]
 
 
 # ---------------- helpers ----------------
@@ -288,6 +334,8 @@ __all__ = [
     "list_known_names",
     "list_provider_keys",
     "list_providers_with_keys",
+    "provider_for_env_name",
     "set_provider_key",
     "set_secret",
+    "stored_scopes",
 ]

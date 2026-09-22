@@ -49,6 +49,7 @@ veles secret set OPENROUTER_API_KEY       # يطلب الإدخال (أو مرّ
 veles secret list                         # أيُّ الأسرار مُهيَّأة
 veles secret get OPENROUTER_API_KEY --reveal
 veles secret delete OPENROUTER_API_KEY
+veles secret set OPENROUTER_API_KEY --project myproj   # مفتاح لمشروع واحد فقط
 ```
 
 يلجأ البحث احتياطيًّا إلى [متغيّر البيئة](../reference/environment-variables.md) المطابق

@@ -38,6 +38,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import html
+import re
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
@@ -117,36 +119,19 @@ async def _cmd_context_placeholder(gateway: TelegramGateway, chat_key: str, args
 
 
 async def _cmd_goal(gateway: TelegramGateway, chat_key: str, args: str) -> str:
-    """Forward the user's goal description as an agent prompt prefixed
-    with a goal-mode marker the daemon factory reads. Until M122c wires
-    the full FSM through the channels API, the prompt prefix is the
-    contract: the agent sees "[GOAL MODE] <task>" and proceeds with
-    that framing (the daemon's mode resolver upgrades to GoalMode when
-    it sees the marker)."""
-    task = args.strip()
-    if not task:
-        return (
-            "<b>/goal &lt;task&gt;</b>\n"
-            "Run the agent in long-running goal-mode: it decomposes, "
-            "explores, iterates until done. Pass the task description "
-            "after the command, e.g. <code>/goal write a deploy script "
-            "for the staging env</code>."
-        )
-    # We just queue the agent prompt — the actual long-loop FSM
-    # behaviour lives in `core/modes/goal.py` and is reached through
-    # the daemon's factory (M71+). The marker keeps this path simple
-    # while M122c lands a proper channel-side progress mirror.
-    try:
-        await gateway.daemon_client.submit_run(  # type: ignore[attr-defined]
-            f"[GOAL MODE] {task}",
-            session_id=gateway.session_map.get(chat_key),
-        )
-    except Exception as exc:
-        return f"could not start goal-mode run: {exc}"
+    """Say where goals run. M276: this used to submit "[GOAL MODE] <task>" as
+    a plain prompt — no daemon code read that marker, and the run's reply was
+    never streamed back, so the bot promised progress updates that never came.
+    Daemon turns do not go through agent modes yet, so a goal cannot run from a
+    chat; the host's `veles goal start` can."""
+    del gateway, chat_key, args
     return (
-        f"started goal-mode run for: <code>{task[:80]}</code>\n"
-        "I'll send progress updates as the agent works. Reply with "
-        "<code>/status</code> to check session state."
+        "<b>/goal</b>\n"
+        "Goals don't run from Telegram yet. On the host, run:\n"
+        '<code>veles goal start "&lt;task&gt;" --done-when "&lt;how you know '
+        "it's done&gt;\"</code>\n"
+        "It plans, executes and checks until the done condition holds or a "
+        "budget runs out."
     )
 
 
@@ -291,22 +276,20 @@ async def _cmd_rules(gateway: TelegramGateway, chat_key: str, args: str) -> str:
 
 
 async def _cmd_dream(gateway: TelegramGateway, chat_key: str, args: str) -> str:
-    """Trigger one consolidation pass on the project memory. Same
-    daemon-side prompt-prefix contract as /goal — the marker upgrades
-    to `dream` mode in the factory."""
-    del args
+    """Run one consolidation pass on the project memory and report its result.
+
+    M276: this used to submit "[DREAM MODE] …" as an ordinary chat prompt —
+    nothing read the marker, so the agent just answered the words. Now it runs
+    the daemon's own dream runner (the one the schedule uses) and waits: each
+    update is handled in its own task, so the wait blocks nothing else."""
+    del chat_key, args
     try:
-        await gateway.daemon_client.submit_run(  # type: ignore[attr-defined]
-            "[DREAM MODE] consolidate insights, lint wiki, prune stale claims",
-            session_id=gateway.session_map.get(chat_key),
-        )
+        result = await gateway.daemon_client.run_dream()  # type: ignore[attr-defined]
     except Exception as exc:
-        return f"could not start dream-mode run: {exc}"
-    return (
-        "started dream-mode consolidation. The agent will compact "
-        "sessions into wiki, lint for contradictions, surface insight "
-        "candidates. Use <code>/status</code> when it finishes."
-    )
+        return f"could not run dream: {html.escape(str(exc))}"
+    lines = [f"<b>dream</b> — {html.escape(str(result.get('summary', 'done')))}"]
+    lines += [f"• {html.escape(str(note))}" for note in result.get("notes") or []]
+    return "\n".join(lines)
 
 
 # Mapping cmd-without-slash → handler. Lookup is exact (no aliases yet).
@@ -324,6 +307,13 @@ _HANDLERS: dict[str, CommandHandler] = {
 }
 
 
+# Telegram's own command grammar (Bot API `BotCommand.command`: "1-32
+# characters. Can contain only lowercase English letters, digits and
+# underscores"; users may type Latin letters in either case — checked against
+# core.telegram.org on 2026-09-22). Matched after lower-casing.
+_COMMAND_NAME = re.compile(r"[a-z0-9_]{1,32}")
+
+
 def parse_command(text: str) -> tuple[str, str] | None:
     """Parse `/<cmd> <args…>` from a Telegram text message.
 
@@ -331,23 +321,21 @@ def parse_command(text: str) -> tuple[str, str] | None:
     of the leading `/`, or `None` when the text isn't a command.
     Telegram allows `/cmd@BotName` — the `@BotName` suffix is
     stripped so the bot responds when addressed in a group.
+
+    M274: only a name Telegram itself would treat as a command counts.
+    Anything else starting with `/` was parsed as a command and answered
+    "Unknown command", so a message that merely *began* with a path —
+    `/var/log/app.log why does it crash?` — never reached the agent.
     """
     stripped = text.strip()
     if not stripped.startswith("/"):
         return None
-    body = stripped[1:].lstrip()
-    if not body:
-        return None
-    head, _, args = body.partition(" ")
+    head, _, args = stripped[1:].partition(" ")
     cmd, _, _bot_at = head.partition("@")
-    return cmd.lower(), args.strip()
-
-
-def is_known_command(cmd: str) -> bool:
-    """True when the gateway's existing flow (`/start`, `/reset`) or
-    this module's dispatcher recognises the command. Used by the
-    gateway to keep buffering disabled for any slash input."""
-    return cmd in {"start", "reset"} or cmd in _HANDLERS
+    cmd = cmd.lower()
+    if not _COMMAND_NAME.fullmatch(cmd):
+        return None
+    return cmd, args.strip()
 
 
 async def dispatch(gateway: TelegramGateway, chat_key: str, cmd: str, args: str) -> str | None:
@@ -374,8 +362,8 @@ def menu_descriptors() -> list[dict[str, str]]:
             "description": "Recent insights (skill suggestions, manager reports)",
         },
         {"command": "rules", "description": "Recent behavioral rules (preferences, dont)"},
-        {"command": "goal", "description": "Run agent in long-running goal mode"},
-        {"command": "dream", "description": "Trigger memory consolidation pass"},
+        {"command": "goal", "description": "How to run a long-running goal"},
+        {"command": "dream", "description": "Run a memory consolidation pass now"},
         {"command": "tokens", "description": "Token totals (WIP)"},
         {"command": "context", "description": "Context window usage (WIP)"},
         {"command": "reset", "description": "Clear conversation history"},
@@ -384,7 +372,6 @@ def menu_descriptors() -> list[dict[str, str]]:
 
 __all__ = [
     "dispatch",
-    "is_known_command",
     "menu_descriptors",
     "parse_command",
 ]

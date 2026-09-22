@@ -52,6 +52,7 @@ veles secret set OPENROUTER_API_KEY       # prompt करता है (या s
 veles secret list                         # कौन-से secrets configured हैं
 veles secret get OPENROUTER_API_KEY --reveal
 veles secret delete OPENROUTER_API_KEY
+veles secret set OPENROUTER_API_KEY --project myproj   # सिर्फ़ एक project के लिए key
 ```
 
 जब तक आप `--no-env-fallback` पास न करें, lookup मिलते-जुलते

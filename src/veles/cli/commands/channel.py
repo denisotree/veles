@@ -127,11 +127,17 @@ def _cmd_channel_run(args: argparse.Namespace) -> int:
         bot_token = args.bot_token or os.environ.get("TELEGRAM_BOT_TOKEN") or ""
 
     daemon_url = args.daemon_url or os.environ.get("VELES_DAEMON_URL") or "http://127.0.0.1:8765"
-    daemon_token = args.daemon_token or os.environ.get("VELES_DAEMON_TOKEN")
+    # M271: keychain first (`veles secret set VELES_DAEMON_TOKEN`), env second —
+    # before this only the env was read, so a token stored with `veles secret`
+    # was never used.
+    from veles.core.secrets import get_secret
+
+    daemon_token = args.daemon_token or get_secret("VELES_DAEMON_TOKEN")
     if not daemon_token:
         print(
-            "error: --daemon-token or VELES_DAEMON_TOKEN env var is required\n"
-            "       create one via `veles daemon token add <name>`",
+            "error: --daemon-token or VELES_DAEMON_TOKEN is required\n"
+            "       create one via `veles daemon token add <name>`, then store it with\n"
+            "       `veles secret set VELES_DAEMON_TOKEN` or export it",
             file=sys.stderr,
         )
         return 2

@@ -190,7 +190,7 @@ def test_proposals_block_present_in_system_prompt(project_with_cluster) -> None:
     )
     prompt = _build_run_system_prompt(args, project_with_cluster)
     assert prompt is not None
-    assert "<subproject-proposals>" in prompt
+    assert "<proposals>" in prompt
     assert "frontend-stack" in prompt
 
 
@@ -204,7 +204,7 @@ def test_proposals_block_absent_when_none(project_with_cluster) -> None:
     )
     prompt = _build_run_system_prompt(args, project_with_cluster)
     # No proposals were written
-    assert prompt is None or "<subproject-proposals>" not in prompt
+    assert prompt is None or "<proposals>" not in prompt
 
 
 def test_proposals_block_skipped_when_stale(project_with_cluster) -> None:
@@ -221,7 +221,35 @@ def test_proposals_block_skipped_when_stale(project_with_cluster) -> None:
 
     args = _ns(no_agents_md=False, no_index=False, prompt="x")
     prompt = _build_run_system_prompt(args, project_with_cluster)
-    assert prompt is None or "<subproject-proposals>" not in prompt
+    assert prompt is None or "<proposals>" not in prompt
+
+
+def test_a_skill_promotion_is_not_offered_as_a_subproject(project_with_cluster) -> None:
+    """M275, through the `veles run` prompt builder: a promotion proposal —
+    exactly what `write_promote_proposals` writes — used to be listed as a
+    "candidate subproject" to accept with `veles subproject init promote-…`."""
+    from veles.cli._runtime import _build_run_system_prompt
+    from veles.core.memory.artefacts import write_proposal
+    from veles.core.skill_promotion import proposal_slug
+
+    write_proposal(
+        project_with_cluster,
+        slug=proposal_slug("summarise-paper"),
+        title="Promote skill: summarise-paper",
+        content="# Promote skill: summarise-paper\n\n12 invocations, 92% success.\n",
+    )
+    cluster = Cluster(slug="frontend-stack", pages=["wiki/concepts/a.md"], score=0.5, rationale="r")
+    write_proposals(project_with_cluster, [cluster])
+
+    prompt = _build_run_system_prompt(
+        _ns(no_agents_md=False, no_index=False, prompt="x"), project_with_cluster
+    )
+    assert prompt is not None
+    subprojects, _, promotions = prompt.partition("Skills worth promoting")
+    assert "frontend-stack" in subprojects and "promote-" not in subprojects
+    assert "- summarise-paper:" in promotions
+    assert "veles skill promote <name>" in promotions
+    assert "veles subproject init" not in promotions
 
 
 def test_recent_proposals_used_by_runtime(project_with_cluster) -> None:

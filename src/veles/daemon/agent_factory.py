@@ -98,6 +98,8 @@ def _attach_background_runners(
             args, project=project, store=store, toolset="run"
         )
 
+    from veles.daemon.background_ops import make_proactive_binder
+
     jobs_store = JobsStore(project.memory_db_path)
     state.job_runner = JobRunner(
         store=jobs_store,
@@ -109,6 +111,9 @@ def _attach_background_runners(
         tz=resolve_schedule_tz(project),
         kind_handlers=kind_handlers,
         on_op_finished=on_op_finished,
+        # M273: the same binder reminders use (M214) — what a job sends into a
+        # chat is recorded in that chat's session.
+        on_delivered=make_proactive_binder(state),
     )
 
     # M166: the reminder sweep shares the SAME delivery_router (the one channels
@@ -120,7 +125,6 @@ def _attach_background_runners(
     from veles.core.proactive.target_resolver import resolve_last_active_target
     from veles.core.reminder_runner import ReminderRunner
     from veles.core.tasks_store import TasksStore
-    from veles.daemon.background_ops import make_proactive_binder
 
     state.reminder_runner = ReminderRunner(
         store=TasksStore(project.memory_db_path),

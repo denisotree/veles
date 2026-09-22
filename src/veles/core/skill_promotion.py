@@ -33,6 +33,7 @@ import time
 from dataclasses import dataclass
 
 from veles.core.memory.artefacts import (
+    PROMOTE_PROPOSAL_PREFIX,
     ProposalInfo,
     append_memory_log,
     list_proposals,
@@ -43,7 +44,7 @@ from veles.core.skills import Skill, discover_skills, user_skills_dir
 
 _DEFAULT_MIN_USES = 10
 _DEFAULT_MIN_SUCCESS_RATE = 0.7
-_PROPOSAL_SLUG_PREFIX = "promote-"
+_PROPOSAL_SLUG_PREFIX = PROMOTE_PROPOSAL_PREFIX
 _DEFAULT_MAX_AGE_DAYS = 7
 
 

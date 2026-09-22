@@ -42,6 +42,7 @@ veles secret set OPENROUTER_API_KEY       # 입력 프롬프트 표시 (또는 s
 veles secret list                         # 설정된 시크릿 목록
 veles secret get OPENROUTER_API_KEY --reveal
 veles secret delete OPENROUTER_API_KEY
+veles secret set OPENROUTER_API_KEY --project myproj   # 한 프로젝트 전용 키
 ```
 
 조회 시 `--no-env-fallback`을 전달하지 않으면, 키체인에 값이 없을 때 해당 [환경 변수](../reference/environment-variables.md)로 자동 대체됩니다.
