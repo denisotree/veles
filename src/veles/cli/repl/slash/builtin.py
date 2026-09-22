@@ -139,47 +139,20 @@ def _session(line: str, ctx: SlashContext) -> SlashResult:
 
 
 def _save(line: str, ctx: SlashContext) -> SlashResult:
-    """M87 shapes:
-    - `/save` (no args) — list pending insight candidates the periodic
-      extractor surfaced; user reruns with a slug to commit.
-    - `/save <slug>` — if the slug matches a pending candidate, save
-      it into the project's insight memory (M161: SQL row + rendered
-      view under `.veles/memory/insights/`). Otherwise fall back to
-      the legacy behaviour: save the last assistant reply to
-      `wiki/queries/<slug>.md` (user content).
+    """`/save <slug>` — keep the last assistant reply: as `wiki/queries/<slug>.md`
+    when the layout has a wiki, otherwise as a memory insight.
+
+    M87 also had `/save` with no argument list "pending insight candidates",
+    and a matching slug commit one. Nothing ever produced a candidate — not in
+    the Textual UI and not after M187 — so that branch always answered "needs a
+    slug" and was removed. Insights are extracted automatically by the curator
+    and dream passes.
     """
     from veles.core.layout.engines import wiki_enabled
 
-    candidates = list(ctx.state.insight_candidates)
     if not line:
-        if not candidates:
-            return SlashResult.err("/save needs a slug, e.g. `/save graph-traversal-notes`")
-        rows = [f"insight candidates ({len(candidates)}). Run `/save <slug>` to keep one:"]
-        for slug, title, _body in candidates:
-            rows.append(f"  - {slug}  —  {title}")
-        return SlashResult.ok("\n".join(rows))
-
+        return SlashResult.err("/save needs a slug, e.g. `/save graph-traversal-notes`")
     slug = line.split()[0]
-    # First, try matching a pending candidate.
-    for cand_slug, title, body in candidates:
-        if cand_slug == slug:
-            from veles.core.memory.artefacts import append_memory_log
-            from veles.core.tools.builtin.memory_save import save_insight_row
-
-            rid = save_insight_row(
-                title=title,
-                body=body,
-                category="tui-save",
-                project=ctx.project,
-                origin="stated",
-            )
-            if rid == 0:
-                return SlashResult.err("/save failed: could not write insight to memory.db")
-            with contextlib.suppress(Exception):
-                append_memory_log(ctx.project, op="tui-save-insight", summary=f"-> insight #{rid}")
-            ctx.state.insight_candidates = [c for c in candidates if c[0] != slug]
-            return SlashResult.ok(f"saved insight #{rid}")
-    # Fall back to saving the last assistant reply.
     last = ctx.state.last_assistant_text
     if not last or not last.strip():
         return SlashResult.err("/save: nothing to save yet (no assistant response in this run)")
@@ -462,8 +435,8 @@ def _daemon(line: str, ctx: SlashContext) -> SlashResult:
 
 def _status(line: str, ctx: SlashContext) -> SlashResult:
     """One-screen snapshot of the TUI: model, mode, session, provider,
-    busy, queue depth, insight candidates. Useful when handing the
-    machine to a fresh session and you need to know what's loaded."""
+    busy, queue depth. Useful when handing the machine to a fresh session
+    and you need to know what's loaded."""
     del line
     st = ctx.state
     rows = [
@@ -474,7 +447,6 @@ def _status(line: str, ctx: SlashContext) -> SlashResult:
         f"  session:  {st.session_id or '<no session yet>'}",
         f"  busy:     {'yes' if st.busy else 'no'}",
         f"  queue:    {len(st.queue)} pending",
-        f"  insights: {len(st.insight_candidates)} candidate(s)",
     ]
     return SlashResult.ok("\n".join(rows))
 

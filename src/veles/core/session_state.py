@@ -64,11 +64,6 @@ class AppState:
     # M178: cache-read tokens for the last turn — surfaced as a `cache` chip so
     # the user can see prompt caching is working (or regressing).
     last_turn_cache_read: int = 0
-    # M87: batch insight extractor candidates awaiting `/save` confirmation.
-    # Each entry is a tuple (slug, title, body). Populated by the periodic
-    # extractor; consumed (and cleared per slug) by `/save <slug>`.
-    insight_candidates: list[tuple[str, str, str]] = field(default_factory=list)
-    turns_since_insight_scan: int = 0
     # M115.3: select_mode removed — native terminal text-selection is
     # always on (Textual mouse capture is permanently disabled on
     # mount). VISION §7.2 forbids a mode toggle for selection.
