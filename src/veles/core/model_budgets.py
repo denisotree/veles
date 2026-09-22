@@ -95,8 +95,90 @@ def request_timeout_for(model: str | None) -> float:
     return _REASONING_TIMEOUT_S
 
 
+# ---- project overrides (M266) ----
+#
+# The name is a bad source for a timeout *in principle*: it names a family,
+# while the response time is set by the backend serving it, which the family
+# does not own — `glm-5.3-flash` runs at 33 tok/s on one backend and 0.8 tok/s
+# on another, a forty-fold spread behind one id. So the derived number above is
+# a default, not an answer, and a project must be able to say otherwise.
+#
+# `request_timeout_for("z-ai/glm-5.3-flash")` is 450s, and the SDK retries twice
+# by default — up to 1350s on a single turn, inside an investigation budgeted at
+# 900s. Nothing could override either: `[engine.request.<provider>]` (M250) goes
+# into the request *body*, while both of these are client parameters.
+#
+#     [engine]
+#     request_timeout_s = 180
+#     max_retries = 1
+#
+# Read here rather than in the adapter so the rule for where a budget comes from
+# lives in one module. Only the OpenRouter adapter takes these today — the
+# Anthropic/OpenAI/Gemini clients are built without either parameter, and the
+# keys are ignored there.
+
+
+def _engine_section() -> dict[str, object]:
+    """`[engine]` of the active project's config, or `{}` outside a project."""
+    from veles.core.context import current_project
+    from veles.core.project_config import get_section, load_project_config
+
+    project = current_project()
+    if project is None:
+        return {}
+    return get_section(load_project_config(project), "engine")
+
+
+def _config_error(key: str, value: object, expected: str) -> Exception:
+    from veles.core.config_schema import ConfigError
+    from veles.core.context import current_project
+    from veles.core.project_config import project_config_path
+
+    project = current_project()
+    assert project is not None  # only reached from inside `_engine_section`'s project
+    return ConfigError(
+        f"[engine] {key} = {value!r} is not {expected}.",
+        path=project_config_path(project),
+    )
+
+
+def resolve_request_timeout(model: str | None, *, explicit: float | None = None) -> float:
+    """Seconds to wait for one request: explicit → `[engine]` → per-model default.
+
+    Raises `ConfigError` on a non-positive or non-numeric `request_timeout_s`.
+    A bad *value* is caught here rather than in `config_schema`, whose finding
+    shape is "unknown key"; this runs on every provider build, which is loud
+    enough — the cost is that `veles doctor` flags a misspelt key but not a
+    nonsense value."""
+    if explicit is not None:
+        return explicit
+    raw = _engine_section().get("request_timeout_s")
+    if raw is None:
+        return request_timeout_for(model)
+    if isinstance(raw, bool) or not isinstance(raw, int | float) or raw <= 0:
+        raise _config_error("request_timeout_s", raw, "a positive number of seconds")
+    return float(raw)
+
+
+def resolve_max_retries(*, explicit: int | None = None) -> int | None:
+    """Retries per request: explicit → `[engine]` → None (the SDK's own default).
+
+    None rather than a number on the miss, so an unconfigured project keeps the
+    SDK default byte for byte instead of freezing today's value into Veles."""
+    if explicit is not None:
+        return explicit
+    raw = _engine_section().get("max_retries")
+    if raw is None:
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
+        raise _config_error("max_retries", raw, "a non-negative integer")
+    return raw
+
+
 __all__ = [
     "default_max_tokens_for",
     "is_reasoning_model",
     "request_timeout_for",
+    "resolve_max_retries",
+    "resolve_request_timeout",
 ]
