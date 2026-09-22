@@ -67,6 +67,15 @@ veles channel reset-session <chat_id>    # le prochain message de cette conversa
 veles channel remove telegram            # supprime la liaison du canal
 ```
 
+## Modes de l'agent dans une conversation
+
+`/mode` change le mode de l'agent dans la conversation : `default` (l'agent
+répond directement, comme avant tout changement), `auto` (décide pour chaque
+message s'il faut d'abord planifier), `planning` (planifie seulement, ne modifie
+rien) et `writing` (agit avec ses outils). Le mode actuel est coché. Le choix
+dure jusqu'au redémarrage du daemon. La ligne d'état du mode, par exemple
+*auto → plan*, s'affiche au-dessus de la réponse.
+
 ## Limitation multimodale
 
 L'envoi d'une **photo ou d'un message vocal** renvoie actuellement un avis « non

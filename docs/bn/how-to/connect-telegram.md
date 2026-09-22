@@ -65,6 +65,14 @@ veles channel reset-session <chat_id>    # next message from that chat starts fr
 veles channel remove telegram            # drop the channel binding
 ```
 
+## চ্যাটে এজেন্টের মোড
+
+`/mode` চ্যাটের এজেন্ট মোড বদলায়: `default` (যেকোনো বদলের আগের মতো এজেন্ট সরাসরি
+উত্তর দেয়), `auto` (প্রতিটি বার্তায় ঠিক করে আগে পরিকল্পনা করবে কি না),
+`planning` (শুধু পরিকল্পনা করে, কিছু বদলায় না) এবং `writing` (নিজের টুল দিয়ে
+কাজ করে)। বর্তমান মোডে টিক চিহ্ন থাকে। বেছে নেওয়া মোড daemon পুনরায় চালু হওয়া
+পর্যন্ত থাকে। মোডের স্ট্যাটাস লাইন, যেমন *auto → plan*, উত্তরের উপরে দেখা যায়।
+
 ## Multimodal সীমাবদ্ধতা
 
 একটি **photo বা voice message** পাঠালে বর্তমানে একটি "not configured" নোটিশ ফেরত আসে।

@@ -67,6 +67,15 @@ veles channel reset-session <chat_id>    # next message from that chat starts fr
 veles channel remove telegram            # drop the channel binding
 ```
 
+## Modos del agente en un chat
+
+`/mode` cambia el modo del agente en el chat: `default` (el agente responde
+directamente, como antes de cualquier cambio), `auto` (decide en cada mensaje si
+planificar primero), `planning` (solo planifica, no cambia nada) y `writing`
+(actúa con sus herramientas). El modo actual aparece marcado. La elección dura
+hasta que se reinicia el daemon. La línea de estado del modo, por ejemplo
+*auto → plan*, aparece encima de la respuesta.
+
 ## Limitación multimodal
 
 Enviar una **foto o un mensaje de voz** actualmente devuelve un aviso de "no
