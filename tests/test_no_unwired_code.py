@@ -30,13 +30,15 @@ call restores the M252 state, and the lock fails naming
 `persistence.py:137`. A lock that has not been shown to catch its own
 motivating case is decoration.
 
-`_BASELINE` holds the 54 findings that already existed when the lock went in.
-Spot-checked by hand: superseded leftovers, not gaps — `untrusted_corpus` lost to
-`untrusted_page_corpus()`, which the egress gate does read
-(`permission/engine.py`); `default_decision` lost to M124's `effective_policy()`;
-`parse_tool_calls` lost to `parse_tool_calls_with_errors`; `get_provider` lives
-only in an `__all__`. **The list may shrink, never grow.** Deleting one is
-welcome; adding one means a mechanism was built and left disconnected.
+`_BASELINE` held the 54 findings that already existed when the lock went in; a
+per-function review on 2026-09-22 (plan `dev-requests-2026-09-22.md`, step 10)
+took it to 37. That review found the list was *not* all harmless leftovers:
+three entries were features a user could see failing — `set_title` (no session
+had ever been titled), `recent_error_events` (`/errors` lost earlier runs in
+M187) and `update_settings` (the daemon picker showed a stale model and port) —
+and were wired up rather than deleted. So an entry here is a question, not a
+verdict. **The list may shrink, never grow.** Deleting one is welcome; adding
+one means a mechanism was built and left disconnected.
 """
 
 from __future__ import annotations
@@ -66,6 +68,9 @@ _BASELINE = frozenset(
         "apply_merge",
         "available_locales",
         "bump",
+        # Kept on purpose (reviewed 2026-09-22): observation hooks that let tests
+        # read state from outside instead of reaching into `_is_dead` /
+        # `_active_state`. Test-only by design, not by neglect.
         "cooling_down",
         "current_state",
         "current_version",
