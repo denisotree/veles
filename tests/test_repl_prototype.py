@@ -994,6 +994,64 @@ def test_handle_slash_help_quit_unknown(tmp_path, capsys: pytest.CaptureFixture[
         store.close()
 
 
+def test_errors_shows_a_failure_from_before_a_restart(
+    tmp_path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """M132 behaviour restored: an earlier run's failure survives a REPL restart.
+
+    Starts from a real failing `Agent.run` — which writes the ErrorEvent to
+    `events.jsonl` — rather than a hand-written event, so the test proves the
+    two ends are actually connected. The "restart" is a fresh in-memory error
+    list and a fresh state, which is all a new REPL process has."""
+    from veles.core.agent import Agent
+    from veles.core.tools.registry import Registry
+
+    class _Exploding:
+        name = "exploding"
+        supports_tools = True
+        supports_streaming = False
+
+        def create_message(self, *args, **kwargs):
+            raise RuntimeError("upstream [bold]exploded[/bold]")
+
+        def stream_message(self, *args, **kwargs):
+            raise NotImplementedError
+
+    from veles.core.context import reset_active_project, set_active_project
+
+    project, store = _project_and_store(tmp_path)
+    try:
+        # The Agent finds its events.jsonl through the active project, exactly
+        # as `veles run` / the REPL / the daemon set it.
+        token = set_active_project(project)
+        try:
+            agent = Agent(_Exploding(), Registry(), model="m")
+            with pytest.raises(RuntimeError):
+                agent.run("anything")
+        finally:
+            reset_active_project(token)
+
+        registry = build_default_registry(project=project)
+        _handle_slash("/errors", registry, _state(), project, store, _console(), [])
+        out = capsys.readouterr().out
+        assert "earlier runs" in out
+        assert "RuntimeError" in out
+        # Escaped, not rendered: an error message is data, not Rich markup.
+        assert "[bold]exploded[/bold]" in out
+    finally:
+        store.close()
+
+
+def test_errors_with_nothing_to_show(tmp_path, capsys: pytest.CaptureFixture[str]) -> None:
+    project, store = _project_and_store(tmp_path)
+    try:
+        registry = build_default_registry(project=project)
+        _handle_slash("/errors", registry, _state(), project, store, _console(), [])
+        assert "no errors in this session or the last 24h" in capsys.readouterr().out
+    finally:
+        store.close()
+
+
 def test_handle_slash_clear_resets_session(tmp_path) -> None:
     project, store = _project_and_store(tmp_path)
     console = _console()

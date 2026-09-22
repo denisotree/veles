@@ -90,8 +90,6 @@ _BASELINE = frozenset(
         "mirror_to_session",
         "parse_plan_ref",
         "parse_tool_calls",
-        "read_events",
-        "recent_error_events",
         "recent_promote_proposals",
         "render_system_block",
         "scan_for_context_files",

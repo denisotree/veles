@@ -257,7 +257,7 @@ def _print_repl_help(console) -> None:
         ("/status", "model/mode/session/provider snapshot"),
         ("/save <slug>", "save the last answer to the wiki"),
         ("/insights · /rules", "recent learned insights / behavioural rules"),
-        ("/errors", "show errors from this REPL session"),
+        ("/errors", "errors from this session, plus earlier runs in the last 24h"),
         ("/clear", "start a fresh session"),
         ("/quit", "exit (or Ctrl+D)"),
     ]
