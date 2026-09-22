@@ -40,9 +40,6 @@ from veles import __version__
 from veles.daemon.auth import TokenStore, bearer_auth_middleware
 from veles.daemon.runner import (
     AgentFactory,
-    new_run_handle,
-    run_agent_in_background,
-    run_manager_in_background,
 )
 from veles.daemon.state import DaemonState
 
@@ -276,17 +273,12 @@ async def _handle_create_run(request: web.Request) -> web.Response:
             {"error": "no delivery channel is running on this daemon"}, status=503
         )
 
-    handle = new_run_handle(session_id=session_id)
-    state.add_run(handle)
-    logger.info(
-        "POST /v1/runs run_id=%s session_id=%s prompt_len=%d",
-        handle.run_id,
-        session_id or "<new>",
-        len(prompt),
-    )
-
     def _on_finished(_: Any) -> None:
         state.touch_activity()
+
+    # Filled once the run is registered; `_deliver` runs after the turn, by
+    # which time it holds the run's final session id.
+    started: dict[str, Any] = {}
 
     # Built here rather than handing the router to the runner: `daemon/runner.py`
     # stays ignorant of DeliveryRouter, the same way it takes `verify_hook` /
@@ -301,102 +293,45 @@ async def _handle_create_run(request: web.Request) -> web.Response:
             # and M273 jobs are), so a reply has context — unless the run WAS
             # that session and already holds it. Compared at delivery time: the
             # factory may have re-allocated a stale session id meanwhile.
+            run = started["handle"]
             slot = _chat_session_slot(state, target)
             chat_session = slot[0].get(slot[1]) if slot else None
-            if handle.session_id is not None and handle.session_id == chat_session:
+            if run.session_id is not None and run.session_id == chat_session:
                 return
             try:
                 from veles.daemon.background_ops import make_proactive_binder
 
                 await make_proactive_binder(state)(target, text)
             except Exception as exc:  # binding never un-delivers the answer
-                logger.warning("run %s post-deliver bind failed: %s", handle.run_id, exc)
+                logger.warning("run %s post-deliver bind failed: %s", run.run_id, exc)
 
         deliver_hook = _deliver
 
-    # M124: route long / research-keyword prompts through the manager-
-    # spawn orchestrator. Worker factory is per-daemon (built in
-    # `_make_worker_agent_factory`); when absent (older callers /
-    # tests), skip silently and fall through to the direct path.
-    if state.worker_agent_factory is not None and _should_use_manager_safe(prompt):
-        task = asyncio.create_task(
-            run_manager_in_background(
-                handle,
-                worker_agent_factory=state.worker_agent_factory,
-                prompt=prompt,
-                on_finished=_on_finished,
-                verify_hook=state.verify_hook,
-                origin=origin,
-                store=state.store,
-                deliver_hook=deliver_hook,
-            )
-        )
-        state.run_tasks.add(task)
-        task.add_done_callback(state.run_tasks.discard)
-        return web.json_response(handle.to_summary(), status=202)
+    from veles.daemon.turns import start_turn
 
     try:
-        agent = state.agent_factory(session_id, prompt=prompt)
-    except Exception as exc:
-        handle.state = "failed"
-        handle.error = f"{type(exc).__name__}: {exc}"
-        handle.finished_at = time.time()
-        logger.error(
-            "failed to build agent for run_id=%s: %s: %s",
-            handle.run_id,
-            type(exc).__name__,
-            exc,
-        )
-        return web.json_response(
-            {"error": "failed to build agent", "detail": handle.error},
-            status=500,
-        )
-
-    # The factory allocates the session eagerly (fresh id for a new chat, or a
-    # re-allocated one when the caller's id was stale), so the real session id
-    # is known BEFORE the run starts. Adopt it on the handle now so `started`
-    # carries it and channels can persist the chat→session mapping even if the
-    # turn later errors — closing the window where an errored/interrupted first
-    # turn left the mapping unset and the next message started fresh (amnesia).
-    effective_session_id = getattr(agent, "session_id", None) or session_id
-    handle.session_id = effective_session_id
-
-    task = asyncio.create_task(
-        run_agent_in_background(
-            handle,
-            agent=agent,
+        handle = start_turn(
+            state,
             prompt=prompt,
-            on_finished=_on_finished,
-            post_turn_hook=state.post_turn_hook,
-            verify_hook=state.verify_hook,
+            session_id=session_id,
             origin=origin,
-            # M204: sub-agent factory (delegate/wiki_add under the daemon) +
-            # per-session serialization against background-op resume turns.
-            subagent_factory=state.subagent_factory,
-            turn_lock=(state.session_lock(effective_session_id) if effective_session_id else None),
+            on_finished=_on_finished,
             deliver_hook=deliver_hook,
         )
+    except Exception as exc:
+        logger.error("failed to build agent for POST /v1/runs: %s: %s", type(exc).__name__, exc)
+        return web.json_response(
+            {"error": "failed to build agent", "detail": f"{type(exc).__name__}: {exc}"},
+            status=500,
+        )
+    started["handle"] = handle
+    logger.info(
+        "POST /v1/runs run_id=%s session_id=%s prompt_len=%d",
+        handle.run_id,
+        session_id or "<new>",
+        len(prompt),
     )
-    state.run_tasks.add(task)
-    task.add_done_callback(state.run_tasks.discard)
     return web.json_response(handle.to_summary(), status=202)
-
-
-def _should_use_manager_safe(prompt: str) -> bool:
-    """Resolve the manager gate without crashing the daemon if the
-    orchestration module isn't importable (defensive — should always
-    be present in normal installs).
-
-    M122f: opt-in, default OFF — the daemon routes through the manager only
-    when `VELES_MANAGER_MODE=1` is set in its environment (the auto-heuristic
-    is disabled so background/channel turns don't silently fan out to N
-    sub-agents)."""
-    try:
-        from veles.core.orchestration import should_use_manager
-
-        return should_use_manager(prompt, use_heuristic_default=False)
-    except Exception:
-        return False
 
 
 async def _handle_list_runs(request: web.Request) -> web.Response:

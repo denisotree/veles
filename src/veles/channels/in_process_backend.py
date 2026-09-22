@@ -18,21 +18,10 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
-from veles.daemon.runner import new_run_handle, run_agent_in_background
 from veles.daemon.state import DaemonState
+from veles.daemon.turns import start_turn
 
 logger = logging.getLogger(__name__)
-
-
-def _manager_opt_in(prompt: str) -> bool:
-    """M122f manager gate for the channel path — opt-in, default OFF
-    (`VELES_MANAGER_MODE=1`). Defensive: never raises out into the run loop."""
-    try:
-        from veles.core.orchestration import should_use_manager
-
-        return should_use_manager(prompt, use_heuristic_default=False)
-    except Exception:
-        return False
 
 
 class InProcessRunBackend:
@@ -44,54 +33,10 @@ class InProcessRunBackend:
     async def submit_run(
         self, prompt: str, *, session_id: str | None = None, origin: str | None = None
     ) -> dict[str, Any]:
-        handle = new_run_handle(session_id=session_id)
-        self._state.add_run(handle)
-        # M122f: channel turns route through the manager-spawn orchestrator
-        # under the same opt-in as the HTTP path (default OFF; enabled by
-        # `VELES_MANAGER_MODE=1`). Falls through to the single-agent path when
-        # no worker factory is wired or the gate is off.
-        if self._state.worker_agent_factory is not None and _manager_opt_in(prompt):
-            from veles.daemon.runner import run_manager_in_background
-
-            task = asyncio.create_task(
-                run_manager_in_background(
-                    handle,
-                    worker_agent_factory=self._state.worker_agent_factory,
-                    prompt=prompt,
-                    verify_hook=self._state.verify_hook,
-                    origin=origin,
-                    store=self._state.store,
-                )
-            )
-            self._state.run_tasks.add(task)
-            task.add_done_callback(self._state.run_tasks.discard)
-            return {"run_id": handle.run_id, "session_id": handle.session_id}
-        agent = self._state.agent_factory(session_id, prompt=prompt)
-        # The factory allocates the session eagerly, so the real id is known
-        # before the run starts. Adopt it on the handle now so `started` carries
-        # it and the gateway can persist the chat→session mapping even if the
-        # turn errors — otherwise an errored/interrupted turn left the mapping
-        # unset and the next message started a fresh, empty session (amnesia).
-        effective_session_id = getattr(agent, "session_id", None) or session_id
-        handle.session_id = effective_session_id
-        task = asyncio.create_task(
-            run_agent_in_background(
-                handle,
-                agent=agent,
-                prompt=prompt,
-                post_turn_hook=self._state.post_turn_hook,
-                verify_hook=self._state.verify_hook,
-                origin=origin,
-                # M204: sub-agent factory (delegate/wiki_add under channels) +
-                # per-session serialization against background-op resume turns.
-                subagent_factory=getattr(self._state, "subagent_factory", None),
-                turn_lock=(
-                    self._state.session_lock(effective_session_id) if effective_session_id else None
-                ),
-            )
-        )
-        self._state.run_tasks.add(task)
-        task.add_done_callback(self._state.run_tasks.discard)
+        # Same entry as `POST /v1/runs` (manager gate, agent build, background
+        # run). A channel turn neither touches daemon activity nor carries a
+        # `deliver_to` — the gateway streams the answer itself.
+        handle = start_turn(self._state, prompt=prompt, session_id=session_id, origin=origin)
         return {"run_id": handle.run_id, "session_id": handle.session_id}
 
     async def stream_events(self, run_id: str) -> AsyncIterator[dict[str, Any]]:
