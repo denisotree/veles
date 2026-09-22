@@ -106,9 +106,14 @@ class DaemonClient:
 
     async def run_dream(self) -> dict[str, Any]:
         """One memory-consolidation pass (`POST /v1/dream/run`); returns
-        `{"summary", "notes"}` once it finishes."""
+        `{"summary", "notes"}` once it finishes. No total timeout: an LLM
+        consolidation can outlast aiohttp's 5-minute default, which would report
+        a failure while the dream kept running; a dropped connection still errors."""
         async with self.session.post(
-            f"{self._base}/v1/dream/run", json={}, headers=self._auth
+            f"{self._base}/v1/dream/run",
+            json={},
+            headers=self._auth,
+            timeout=aiohttp.ClientTimeout(total=None),
         ) as resp:
             return await _read_json(resp)
 
