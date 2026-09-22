@@ -138,8 +138,13 @@ def _pause(state, args):
 
 
 def _resume(args, project: Project) -> int:
+    """Continue a paused goal — or an active one whose run stopped (stalled,
+    turn cap, Ctrl+C): those stay `active`, and the stop message itself points
+    here, so only `paused` needs the status transition."""
+    goal = read_goal(project.state_dir, args.id)
     try:
-        resume(project.state_dir, args.id)
+        if goal is None or goal.status != "active":
+            resume(project.state_dir, args.id)
     except (KeyError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

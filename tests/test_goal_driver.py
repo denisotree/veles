@@ -109,6 +109,22 @@ def test_the_budget_still_ends_a_goal_that_never_finishes(project) -> None:
     assert outcome.turns < 10
 
 
+def test_an_unavailable_advisor_is_not_an_off_track_verdict(project) -> None:
+    """Live-seen: with no advisor model routed, CHECK read `<advisor unavailable…>`
+    as off-track and re-planned a finished goal until the turn cap (28 turns).
+    It must stay in CHECK, say why, and let the stall guard stop it."""
+    goal = start_goal(project.state_dir, objective="say hi", done_condition="hello.txt exists")
+    ctx, calls, lines = _ctx(project)
+    with patch(ADVISOR, return_value="<advisor unavailable: no model configured>"):
+        outcome = drive_goal(ctx, goal.id, max_stalled_turns=3)
+    assert outcome.status == "stalled", outcome
+    assert calls == ["planning", "writing"]  # never re-planned
+    after = read_goal(project.state_dir, goal.id)
+    assert after.current_phase == "check"
+    assert not any("advisor:" in p.description for p in after.progress)
+    assert any("cannot check the step" in line for line in lines)
+
+
 def test_a_plan_phase_that_never_plans_is_stopped_as_stalled(project) -> None:
     """The model keeps answering PLAN without calling `create_plan`; GoalMode
     stays in PLAN by design, so only the loop can notice nothing is happening."""
@@ -176,13 +192,18 @@ def test_veles_goal_start_requires_a_done_condition(project, monkeypatch, capsys
     assert "--done-when" in capsys.readouterr().err
 
 
-def test_veles_goal_resume_continues_a_stopped_goal(project, monkeypatch) -> None:
+@pytest.mark.parametrize("paused", [True, False], ids=["paused", "stopped-while-active"])
+def test_veles_goal_resume_continues_a_stopped_goal(project, monkeypatch, paused) -> None:
+    """A stall, the turn cap and Ctrl+C leave the goal `active` and print
+    "`veles goal resume <id>` continues from here" — live-seen failing with
+    "cannot transition … from 'active' to 'active'"."""
     from veles.cli import main as cli_main
 
     goal = start_goal(project.state_dir, objective="x", done_condition="y")
     ctx, _, _ = _ctx(project)
     drive_goal(ctx, goal.id, max_turns=1)  # interrupted after PLAN
-    pause(project.state_dir, goal.id)
+    if paused:
+        pause(project.state_dir, goal.id)
 
     runtime, calls = _fake_runtime(project)
     monkeypatch.chdir(project.root)

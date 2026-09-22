@@ -699,6 +699,14 @@ class GoalMode:
             f"Steps completed: {goal.steps_done}\n"
         )
         raw = call_advisor(check_input, system_prompt=_CHECK_SYSTEM)
+        if raw.startswith(("<advisor unavailable", "<advisor failed")):
+            # No verdict at all — not an off-track one. Treating it as off-track
+            # re-planned a finished goal forever (live-seen with no advisor model
+            # routed). Stay in CHECK: the next turn retries, and the goal driver
+            # stops a goal whose turns change nothing.
+            ctx.post(SystemLine(text=f"[goal: cannot check the step — {raw.strip('<>')}]"))
+            ctx.post(TurnDone(result=RunResult(text=raw, iterations=0, stopped_reason="synthetic")))
+            return
         verdict, reason = parse_check_verdict(raw)
         append_checkpoint(
             ctx.project.state_dir,
