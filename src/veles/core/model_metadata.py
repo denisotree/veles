@@ -98,15 +98,16 @@ def _read_cache() -> dict[str, dict[str, Any]] | None:
 
 
 def _write_cache(models: dict[str, dict[str, Any]]) -> None:
+    """Atomic, because daemon sessions build providers concurrently and a reader
+    must never see half a file (it would read as a miss and fetch again)."""
+    from veles.core.io_utils import atomic_write_json
+
     path = _cache_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(
-                {"fetched_at": datetime.now(UTC).isoformat(timespec="seconds"), "models": models},
-                indent=2,
-            ),
-            encoding="utf-8",
+        atomic_write_json(
+            path,
+            {"fetched_at": datetime.now(UTC).isoformat(timespec="seconds"), "models": models},
         )
     except OSError as exc:
         _logger.debug("cannot write model metadata cache %s: %s", path, exc)
@@ -161,11 +162,20 @@ def model_facts(model: str | None) -> dict[str, Any] | None:
     private to be listed."""
     if not model:
         return None
-    facts = _catalogue().get(model)
-    if facts is None and model.startswith("openrouter/"):
-        # Callers routinely carry a route prefix; `model_windows` tolerates it too.
-        facts = _catalogue().get(model.removeprefix("openrouter/"))
-    return facts
+    # Callers routinely carry a route prefix; `model_windows` tolerates it too.
+    key = model.removeprefix("openrouter/")
+    if "/" not in key:
+        # Every OpenRouter id is `vendor/slug`, so a bare id — an ollama tag like
+        # `qwen3.8:27b`, a direct-API id like `gpt-4o` or `claude-sonnet-4-6` —
+        # can never be in this catalogue. Without this guard a fully local run
+        # made an outbound request to openrouter.ai it could not benefit from
+        # (found in review before 0.37.0), paying up to the fetch timeout on
+        # every process where that connection hangs.
+        # ponytail: an id with a slash on a non-OpenRouter backend (a llama.cpp
+        # HF-style name) still triggers one lookup and misses; gate on the
+        # active provider if that ever matters.
+        return None
+    return _catalogue().get(key)
 
 
 __all__ = ["model_facts", "refresh_cache", "reset_for_tests"]

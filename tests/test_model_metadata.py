@@ -313,3 +313,26 @@ def test_the_table_still_answers_without_facts(monkeypatch) -> None:
     assert context_window_for("anthropic/claude-sonnet-4.6") == 1_000_000
     assert context_window_for("openai/gpt-4o") == 128_000
     assert context_window_for("vendor/made-up-9") == 200_000
+
+
+def test_a_bare_id_never_reaches_the_network(no_network) -> None:
+    """Found in review before 0.37.0: an Agent on ollama (`qwen3.8:27b`) or on a
+    direct API (`gpt-4o`) fetched OpenRouter's catalogue on construction — an
+    outbound request a local-first run cannot benefit from, since every
+    OpenRouter id is `vendor/slug`. `no_network` fails the test on any call."""
+    from veles.core.model_budgets import default_max_tokens_for, request_timeout_for
+    from veles.core.model_windows import context_window_for
+
+    for model in ("qwen3.8:27b", "gpt-4o", "claude-sonnet-4-6", "openrouter/gpt-4o"):
+        assert model_metadata.model_facts(model) is None
+        default_max_tokens_for(model)
+        request_timeout_for(model)
+        context_window_for(model)
+
+
+def test_a_bare_id_still_gets_the_family_budget(no_network) -> None:
+    """Skipping the catalogue must not skip the fallback: a local reasoning
+    model keeps the budget its family earns."""
+    from veles.core.model_budgets import default_max_tokens_for
+
+    assert default_max_tokens_for("qwen3.8:27b") == 32_000

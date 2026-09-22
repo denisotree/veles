@@ -71,6 +71,10 @@ reached: the lookup is cached for a day, needs no API key, gives up after three
 seconds, and falls back to the name-based tables. A project with no `[engine]`
 section sends byte-for-byte the same requests it did before.
 
+The catalogue is only consulted for OpenRouter-shaped ids (`vendor/model`). A
+run on a local backend such as ollama, or on a direct Anthropic, OpenAI or
+Gemini key, never contacts openrouter.ai.
+
 ## [0.36.0] — 2026-09-21
 
 Memory had never been measured. No project has ever had an embeddings table on
