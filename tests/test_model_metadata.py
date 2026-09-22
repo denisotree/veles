@@ -27,6 +27,10 @@ LIVE_PAYLOAD = {
             "id": "deepseek/deepseek-v4-flash",
             "context_length": 1048576,
             "supported_parameters": ["max_tokens", "reasoning", "reasoning_effort", "tools"],
+            # Measured: `mandatory: false`, yet it thinks unprompted (34 of 37
+            # completion tokens were reasoning). The catalogue does not answer
+            # "thinks by default" — see `is_slow_by_default`.
+            "reasoning": {"mandatory": False, "default_effort": "high"},
         },
         {
             "id": "openai/gpt-4o",
@@ -64,7 +68,13 @@ def _write_cache(tmp_path, *, age: timedelta = timedelta(0), models=None):
                 "fetched_at": (datetime.now(UTC) - age).isoformat(timespec="seconds"),
                 "models": models
                 if models is not None
-                else {"deepseek/deepseek-v4-flash": {"reasoning": True, "context_length": 1048576}},
+                else {
+                    "deepseek/deepseek-v4-flash": {
+                        "reasoning": True,
+                        "reasoning_mandatory": False,
+                        "context_length": 1048576,
+                    }
+                },
             }
         ),
         encoding="utf-8",
@@ -143,6 +153,7 @@ def test_a_successful_fetch_is_cached_to_disk(tmp_path, monkeypatch) -> None:
     )
     assert payload["models"]["deepseek/deepseek-v4-flash"] == {
         "reasoning": True,
+        "reasoning_mandatory": False,
         "context_length": 1048576,
     }
 
@@ -168,23 +179,65 @@ def test_refresh_cache_stores_a_catalogue_someone_else_fetched(tmp_path, no_netw
 
 def test_the_reported_damage_is_gone(tmp_path, no_network) -> None:
     """The exact case from the 18.09 comparison: deepseek-v4 ran on 4096 tokens
-    and a 120s timeout because no substring matched it, returned 5 empty
-    verdicts out of 12, and was called unfit."""
-    from veles.core.model_budgets import default_max_tokens_for, request_timeout_for
+    because no substring matched it, returned 5 empty verdicts out of 12, and was
+    called unfit. The failure was truncation, so the cap is what had to move —
+    the timeout stays on the family list (see the test below for why)."""
+    from veles.core.model_budgets import default_max_tokens_for
 
     _write_cache(tmp_path)
-    model = "deepseek/deepseek-v4-flash"
-    assert default_max_tokens_for(model) == 32_000  # was 4096
-    assert request_timeout_for(model) == 450.0  # was 120.0
+    assert default_max_tokens_for("deepseek/deepseek-v4-flash") == 32_000  # was 4096
+
+
+def test_the_capability_does_not_stretch_the_timeout(tmp_path, no_network) -> None:
+    """M267b. `supported_parameters: ["reasoning"]` means "can think if asked",
+    and 311 of 442 models declare it — including `claude-sonnet-4.6`, which
+    Veles never asks and which measured 0 reasoning tokens unprompted on
+    2026-09-22. Keying the timeout on the capability took the project's default
+    model from a 120s ceiling to 900s, times two SDK retries: 2700s to fail a
+    hung request instead of 360s. A cap is not a spend; a timeout is."""
+    from veles.core.model_budgets import default_max_tokens_for, request_timeout_for
+
+    _write_cache(
+        tmp_path,
+        models={"anthropic/claude-sonnet-4.6": {"reasoning": True, "reasoning_mandatory": False}},
+    )
+    assert default_max_tokens_for("anthropic/claude-sonnet-4.6") == 32_000
+    assert request_timeout_for("anthropic/claude-sonnet-4.6") == 120.0
+
+
+def test_a_mandatory_thinker_does_get_the_long_timeout(tmp_path, no_network) -> None:
+    """`reasoning.mandatory` is the catalogue's own "cannot be asked not to" —
+    102 of 442 models, 64 of them invisible to the family list."""
+    from veles.core.model_budgets import is_slow_by_default, request_timeout_for
+
+    _write_cache(
+        tmp_path, models={"vendor/silent-thinker": {"reasoning": True, "reasoning_mandatory": True}}
+    )
+    assert is_slow_by_default("vendor/silent-thinker") is True
+    assert request_timeout_for("vendor/silent-thinker") == 900.0
 
 
 def test_the_catalogue_overrules_a_substring_match(tmp_path, no_network) -> None:
-    """A name that looks like a family but does not think must not be budgeted
-    as if it did — otherwise the list is still in charge."""
+    """A name that looks like a family but cannot think must not get the big cap
+    — otherwise the list is still in charge of the capability question."""
     from veles.core.model_budgets import is_reasoning_model
 
     _write_cache(tmp_path, models={"vendor/gpt-5-lite": {"reasoning": False}})
     assert is_reasoning_model("vendor/gpt-5-lite") is False
+
+
+def test_the_family_list_still_governs_the_timeout_it_was_calibrated_for(
+    tmp_path, no_network
+) -> None:
+    """`glm-5.3-flash` is `mandatory: true`, but the OR must keep the family list
+    too: `deepseek-v4-flash` is `mandatory: false` and still thinks unprompted, so
+    the catalogue alone would under-budget every such model."""
+    from veles.core.model_budgets import request_timeout_for
+
+    _write_cache(
+        tmp_path, models={"z-ai/glm-5.3-flash": {"reasoning": True, "reasoning_mandatory": False}}
+    )
+    assert request_timeout_for("z-ai/glm-5.3-flash") == 450.0  # from the family list
 
 
 def test_without_facts_every_old_answer_stands(monkeypatch) -> None:

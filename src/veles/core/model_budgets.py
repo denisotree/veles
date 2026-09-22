@@ -71,11 +71,19 @@ _REASONING_MARKERS = (
 _FAST_REASONING_MARKERS = ("flash", "mini", "turbo")
 
 
+def _matches_family(model: str) -> bool:
+    m = model.lower()
+    return any(marker in m for marker in _REASONING_MARKERS)
+
+
 def is_reasoning_model(model: str | None) -> bool:
-    """True when `model` spends completion budget on a thinking channel.
+    """True when `model` *can* spend completion budget on a thinking channel.
 
     Asks the provider's own catalogue first (M267) and falls back to the family
-    substrings when it has no answer — offline, or a model it does not list."""
+    substrings when it has no answer — offline, or a model it does not list.
+
+    This is the capability, which is the right question for a completion cap and
+    the wrong one for a timeout — see `request_timeout_for`."""
     if not model:
         return False
     from veles.core.model_metadata import model_facts
@@ -83,8 +91,7 @@ def is_reasoning_model(model: str | None) -> bool:
     facts = model_facts(model)
     if facts is not None:
         return bool(facts["reasoning"])
-    m = model.lower()
-    return any(marker in m for marker in _REASONING_MARKERS)
+    return _matches_family(model)
 
 
 def default_max_tokens_for(model: str | None) -> int:
@@ -94,13 +101,51 @@ def default_max_tokens_for(model: str | None) -> int:
     the tail of the budget. Note a `flash`/`mini` variant is NOT exempt: being
     fast per token says nothing about how many thinking tokens it emits, and
     `glm-5.3-flash` is exactly the model that returned an empty answer at 16k.
+
+    Keyed on the *capability* (`is_reasoning_model`) rather than on "thinks by
+    default": a cap is not a spend, so over-capping a model that stays quiet
+    costs nothing, while under-capping one that thinks truncates its answer —
+    which is the whole reported failure. The asymmetry runs the other way for
+    the timeout, which is why the two are keyed differently.
     """
     return _REASONING_MAX_TOKENS if is_reasoning_model(model) else _DEFAULT_MAX_TOKENS
 
 
+def is_slow_by_default(model: str | None) -> bool:
+    """True when `model` thinks whether it is asked to or not.
+
+    A *different* question from `is_reasoning_model`, and M267b exists because
+    conflating them was a regression. `supported_parameters: ["reasoning"]` says
+    the model can think *if asked*; 311 of 442 models declare it, including
+    `anthropic/claude-sonnet-4.6`, which Veles never asks — measured unprompted
+    on 2026-09-22 it spent 5 completion tokens and **0** reasoning tokens, while
+    `deepseek/deepseek-v4-flash` on the same question spent 37 of which **34**
+    were reasoning. Budgeting the first as a slow thinker would have taken the
+    project's default model from a 120s ceiling to 900s — times the SDK's two
+    retries, 2700s to fail a hung request instead of 360s.
+
+    The catalogue's `reasoning.mandatory` marks the models that cannot be asked
+    not to (102 of 442, 64 of them invisible to the family list). It is a subset,
+    not a replacement: `deepseek-v4-flash` is `mandatory: false` and still thinks
+    unprompted, so the family list stays in the OR."""
+    if not model:
+        return False
+    from veles.core.model_metadata import model_facts
+
+    facts = model_facts(model)
+    if facts is not None and facts.get("reasoning_mandatory"):
+        return True
+    return _matches_family(model)
+
+
 def request_timeout_for(model: str | None) -> float:
-    """HTTP timeout (seconds) for one request to `model`."""
-    if not is_reasoning_model(model):
+    """HTTP timeout (seconds) for one request to `model`.
+
+    Keyed on `is_slow_by_default`, not on the capability: a timeout is a failure
+    *ceiling*, and setting it high for a model that answers in two seconds only
+    buys a longer hang. The completion cap is the opposite — see
+    `default_max_tokens_for`."""
+    if not is_slow_by_default(model):
         return _DEFAULT_TIMEOUT_S
     m = (model or "").lower()
     if any(marker in m for marker in _FAST_REASONING_MARKERS):
@@ -191,6 +236,7 @@ def resolve_max_retries(*, explicit: int | None = None) -> int | None:
 __all__ = [
     "default_max_tokens_for",
     "is_reasoning_model",
+    "is_slow_by_default",
     "request_timeout_for",
     "resolve_max_retries",
     "resolve_request_timeout",

@@ -55,9 +55,12 @@ def _cache_path() -> Path:
 def _trim(payload: Any) -> dict[str, dict[str, Any]]:
     """Keep the two fields a budget is made of, not the 2KB record per model.
 
-    `context_length` has no consumer in M267 — it is stored because it is the
-    same parsed field, and leaving it out would mean changing the cache format
-    (and invalidating every cache) the moment something asks for it."""
+    Two reasoning fields, because they answer different questions.
+    `supported_parameters` contains `reasoning` when the model *can* think if
+    asked; `reasoning.mandatory` is true when it thinks whether asked or not.
+    `context_length` has no consumer yet — it is stored because it is the same
+    parsed field, and leaving it out would mean changing the cache format (and
+    invalidating every cache) the moment something asks for it."""
     out: dict[str, dict[str, Any]] = {}
     for entry in payload.get("data", []) if isinstance(payload, dict) else []:
         if not isinstance(entry, dict):
@@ -67,8 +70,10 @@ def _trim(payload: Any) -> dict[str, dict[str, Any]]:
             continue
         params = entry.get("supported_parameters")
         window = entry.get("context_length")
+        reasoning = entry.get("reasoning")
         out[model_id] = {
             "reasoning": isinstance(params, list) and "reasoning" in params,
+            "reasoning_mandatory": bool(isinstance(reasoning, dict) and reasoning.get("mandatory")),
             "context_length": window if isinstance(window, int) and window > 0 else None,
         }
     return out
