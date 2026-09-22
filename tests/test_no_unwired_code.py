@@ -187,3 +187,85 @@ def test_baseline_does_not_rot() -> None:
         "Baseline entries that are no longer test-only (wired up or deleted) — "
         f"remove them from _BASELINE: {stale}"
     )
+
+
+# ---- M277: the same defect one level up — a whole module nothing imports ----
+#
+# The function lock cannot see it: every function in an orphan module is
+# referenced by its siblings, so none of them is "only at its definition".
+# Measured 2026-09-22: 8 of 385 modules had no importer in src/. Two were wired
+# by name (`mcp_server` is launched with `-m`; `graphify_rebuild` is a template
+# copied into projects) — the rules below recognise both without a list. The
+# other six are the baseline. Same contract: it may shrink, never grow.
+_MODULE_BASELINE = frozenset(
+    {
+        "veles.channels.base",  # imported by nothing, not even tests
+        "veles.cli.repl.completer",
+        "veles.core.model_naming",
+        "veles.core.provider_pool",
+        "veles.core.provider_routing",
+        "veles.core.version",  # its release script does not exist
+    }
+)
+
+
+def _module_name(path: Path) -> str:
+    parts = list(path.relative_to(_SRC.parent).with_suffix("").parts)
+    return ".".join(parts[:-1] if parts[-1] == "__init__" else parts)
+
+
+def _entry_point_modules() -> set[str]:
+    import tomllib
+
+    scripts = tomllib.loads((_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"][
+        "scripts"
+    ]
+    return {target.split(":", 1)[0] for target in scripts.values()}
+
+
+def find_unimported_modules() -> set[str]:
+    """Modules under src/ that nothing in src/ imports or launches by name."""
+    modules = {
+        _module_name(p): p
+        for p in _SRC.rglob("*.py")
+        if "templates" not in p.relative_to(_SRC).parts  # data copied into projects
+    }
+    reached: set[str] = set(_entry_point_modules())
+    for path in _SRC.rglob("*.py"):
+        here = _module_name(path)
+        package = here if path.name == "__init__.py" else here.rpartition(".")[0]
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                targets = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                base = node.module or ""
+                if node.level:
+                    anchor = package.split(".")[: len(package.split(".")) - node.level + 1]
+                    base = ".".join(anchor + ([node.module] if node.module else []))
+                targets = [base] + [f"{base}.{alias.name}" for alias in node.names]
+            elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+                targets = [node.value]  # `python -m veles.x.y`: the exact dotted name
+            else:
+                continue
+            for target in targets:
+                parts = target.split(".")  # importing a.b.c runs a and a.b too
+                reached.update(".".join(parts[: k + 1]) for k in range(len(parts)))
+    return {
+        name
+        for name in modules
+        if name not in reached and not name.endswith("__main__") and name != "veles"
+    }
+
+
+def test_no_new_unimported_modules() -> None:
+    new = sorted(find_unimported_modules() - _MODULE_BASELINE)
+    assert not new, (
+        "These modules are imported by nothing in src/ — built and never connected:\n"
+        + "\n".join(f"  {m}" for m in new)
+        + "\n\nImport it where it belongs, or delete it."
+    )
+
+
+def test_module_baseline_does_not_rot() -> None:
+    stale = sorted(_MODULE_BASELINE - find_unimported_modules())
+    assert not stale, f"Now imported or deleted — remove from _MODULE_BASELINE: {stale}"
