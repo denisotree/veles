@@ -8,6 +8,7 @@ that forgets its `TurnDone`, a goal that ends and hands the chat back).
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 
 import pytest
@@ -78,6 +79,13 @@ async def _run(state, sid: str, prompt: str, **kw):
     await run_agent_in_background(
         handle, turn=make_mode_turn(state, session_id=sid, prompt=prompt), prompt=prompt, **kw
     )
+    # Events are appended via `call_soon_threadsafe`; read them the way a
+    # channel does — until the terminal event lands — not the instant the
+    # runner returns (that raced on CI).
+    for _ in range(200):
+        if any(e.get("type") in ("completed", "error") for e in handle.events):
+            break
+        await asyncio.sleep(0.01)
     return handle
 
 
