@@ -1,18 +1,15 @@
 """M-R1.1: single source of truth for the provider catalogue.
 
 `core/providers.py::ALL_PROVIDERS` is the canonical list every wizard
-and model_naming.KNOWN_PROVIDERS derives from. These tests pin that
-contract — invariants here catch silent drift if someone adds a new
-provider directly to one wizard.
+derives from. These tests pin that contract — invariants here catch silent
+drift if someone adds a new provider directly to one wizard.
 """
 
 from __future__ import annotations
 
-from veles.core.model_naming import KNOWN_PROVIDERS
 from veles.core.provider_factory import LOCAL_PROVIDERS, PROVIDER_API_KEY_ENVS
 from veles.core.providers import (
     ALL_PROVIDERS,
-    PROVIDER_VALUES,
     ProviderSpec,
     get_provider,
     tui_label,
@@ -22,12 +19,6 @@ from veles.core.providers import (
 def test_all_providers_unique_values() -> None:
     values = [p.value for p in ALL_PROVIDERS]
     assert len(values) == len(set(values))
-
-
-def test_known_providers_matches_catalogue() -> None:
-    """model_naming.KNOWN_PROVIDERS is derived from PROVIDER_VALUES;
-    they must agree."""
-    assert frozenset(PROVIDER_VALUES) == KNOWN_PROVIDERS
 
 
 def test_every_provider_classified_somewhere() -> None:
