@@ -167,6 +167,14 @@ class InProcessRunBackend:
             "provider": self._state.provider,
         }
 
+    async def run_dream(self) -> dict[str, Any]:
+        """In-process equivalent of `DaemonClient.run_dream`."""
+        runner = self._state.dream_runner
+        if runner is None:
+            raise RuntimeError("the dream runner is not enabled on this daemon")
+        result = await runner.force_run()
+        return {"summary": result.summary(), "notes": result.notes}
+
     async def submit_prompt_answer(
         self, run_id: str, prompt_id: str, choice: str
     ) -> dict[str, Any]:

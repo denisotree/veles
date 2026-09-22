@@ -104,6 +104,14 @@ class DaemonClient:
         ) as resp:
             return await _read_json(resp)
 
+    async def run_dream(self) -> dict[str, Any]:
+        """One memory-consolidation pass (`POST /v1/dream/run`); returns
+        `{"summary", "notes"}` once it finishes."""
+        async with self.session.post(
+            f"{self._base}/v1/dream/run", json={}, headers=self._auth
+        ) as resp:
+            return await _read_json(resp)
+
     async def get_session(self, session_id: str) -> dict[str, Any]:
         """GET /v1/sessions/{id} — returns the session row + current
         overrides. Channels use this to highlight the active model in

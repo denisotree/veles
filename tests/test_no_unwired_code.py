@@ -78,7 +78,6 @@ _BASELINE = frozenset(
         "detect_api_mode",
         "event_decision_str",
         "find_parent_project",
-        "force_run",
         "get_embedding",
         "get_provider",
         "get_skill",

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from veles.channels.in_process_backend import InProcessRunBackend
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
@@ -207,3 +209,29 @@ async def test_health_reports_daemon_provider(tmp_path) -> None:
     payload = await backend.health()
     assert payload["provider"] == "ollama"
     assert payload["status"] == "ok"
+
+
+async def test_run_dream_runs_the_daemons_dream_runner(tmp_path) -> None:
+    """Telegram /dream (M276) reaches the same runner the schedule uses."""
+    from veles.core.dreaming import DreamResult
+
+    calls: list[bool] = []
+
+    class _Runner:
+        async def force_run(self, *, include_consolidation: bool = True) -> DreamResult:
+            calls.append(include_consolidation)
+            return DreamResult(notes=["n1"])
+
+    state = _build_state(tmp_path)
+    state.dream_runner = _Runner()  # type: ignore[assignment]
+    payload = await InProcessRunBackend(state).run_dream()
+    assert calls == [True]
+    assert payload["notes"] == ["n1"]
+    assert payload["summary"]
+
+
+async def test_run_dream_without_a_dream_runner_raises(tmp_path) -> None:
+    state = _build_state(tmp_path)
+    state.dream_runner = None
+    with pytest.raises(RuntimeError, match="not enabled"):
+        await InProcessRunBackend(state).run_dream()
