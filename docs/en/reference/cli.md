@@ -299,17 +299,17 @@ List models for a provider. Cloud providers (openrouter/openai/gemini) are cache
 
 ## Long-running tasks
 
-### `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}`
+### `veles goal {list,show,start,pause,resume,cancel}`
 Long-horizon objectives with budgets and checkpoints.
 
 | Subcommand | Purpose |
 |---|---|
 | `list [--status active\|paused\|completed\|blocked\|cancelled]` | List goals |
 | `show <id> [--json]` | Show one goal |
-| `start "<objective>" [--scope S] [--done-when D] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n] [--forbid A]… [--approve A]…` | Create a goal |
-| `checkpoint <id> "<note>" [--evidence U] [--cost-usd f] [--no-advance]` | Append progress |
-| `pause <id>` / `resume <id>` | Pause / resume |
-| `done <id> [--evidence E]` / `cancel <id> [--reason R]` | Finish / cancel |
+| `start "<objective>" --done-when D [--scope S] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n]` | Run a goal to its done condition (foreground) |
+| `pause <id>` | Pause; a running `start`/`resume` stops at its next turn |
+| `resume <id>` | Continue a paused or interrupted goal where it stopped |
+| `cancel <id> [--reason R]` | Cancel |
 
 ### `veles job {add,list,show,pause,resume,trigger,remove,history,tick}`
 Scheduled agent jobs.

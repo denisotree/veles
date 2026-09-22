@@ -217,9 +217,9 @@ _CONFIRM_YES_EXACT: frozenset[str] = frozenset({"y", "yes!", "go", "go!", "+"})
 def _last_execute_checkpoint(goal) -> Any | None:
     """The most recent EXECUTE checkpoint, identified by its `metrics`.
 
-    Not `progress[-1]`: CHECK appends its own verdict checkpoint, and
-    `veles goal checkpoint` (cli/commands/goal.py) lets a user interleave an
-    arbitrary note. Both would shadow the step we actually want to judge.
+    Not `progress[-1]`: CHECK appends its own verdict checkpoint, and any other
+    `append_checkpoint` caller can interleave an arbitrary note. Both would
+    shadow the step we actually want to judge.
     Pre-M235 goals have no `outcome` key, so they degrade to the old
     description-only behaviour instead of raising.
     """

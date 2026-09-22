@@ -157,9 +157,10 @@ Phân rã câu hỏi thành các câu hỏi con song song, khảo sát từng c�
 ### Mục tiêu chạy dài
 
 ```bash
-veles goal start "Migrate auth module to the new provider" --max-cost-usd 2.00
+veles goal start "Migrate auth module to the new provider" \
+  --done-when "nothing imports the old provider and tests pass" --max-cost-usd 2.00
 veles goal list
-veles goal checkpoint <id> "Completed step 1: identified all call sites"
+veles goal resume <id>    # continue after a pause or Ctrl+C
 ```
 
 ### Tác vụ theo lịch
@@ -337,7 +338,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles schema {validate,edit}` | Kiểm tra / chỉnh sửa AGENTS.md |
 | `veles self-doc` | Tạo tài liệu tự mô tả cho dự án |
 | `veles layout {sync}` | Bảo trì gói layout |
-| `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | Mục tiêu dài hạn |
+| `veles goal {list,show,start,pause,resume,cancel}` | Mục tiêu dài hạn |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | Tác vụ theo lịch |
 | `veles dream` | Chu kỳ hợp nhất bộ nhớ nền |
 | `veles project {list,add,remove,switch}` | Registry đa dự án |

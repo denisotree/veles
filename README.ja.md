@@ -157,9 +157,10 @@ veles research "What are the trade-offs between SQLite and PostgreSQL for this u
 ### 長時間実行のゴール
 
 ```bash
-veles goal start "Migrate auth module to the new provider" --max-cost-usd 2.00
+veles goal start "Migrate auth module to the new provider" \
+  --done-when "nothing imports the old provider and tests pass" --max-cost-usd 2.00
 veles goal list
-veles goal checkpoint <id> "Completed step 1: identified all call sites"
+veles goal resume <id>    # continue after a pause or Ctrl+C
 ```
 
 ### スケジュールジョブ
@@ -336,7 +337,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles schema {validate,edit}` | AGENTS.md の検証／編集 |
 | `veles self-doc` | プロジェクトの自己ドキュメントを生成 |
 | `veles layout {sync}` | レイアウトパックのメンテナンス |
-| `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | 長期ホライズンのゴール |
+| `veles goal {list,show,start,pause,resume,cancel}` | 長期ホライズンのゴール |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | スケジュールジョブ |
 | `veles dream` | バックグラウンドのメモリ統合サイクル |
 | `veles project {list,add,remove,switch}` | マルチプロジェクトのレジストリ |

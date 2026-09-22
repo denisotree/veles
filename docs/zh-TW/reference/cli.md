@@ -235,17 +235,17 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 ## 長時間執行的任務
 
-### `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}`
+### `veles goal {list,show,start,pause,resume,cancel}`
 具備預算與檢查點的長期目標。
 
 | 子命令 | 用途 |
 |---|---|
 | `list [--status active\|paused\|completed\|blocked\|cancelled]` | 列出目標 |
 | `show <id> [--json]` | 顯示單一目標 |
-| `start "<objective>" [--scope S] [--done-when D] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n] [--forbid A]… [--approve A]…` | 建立一個目標 |
-| `checkpoint <id> "<note>" [--evidence U] [--cost-usd f] [--no-advance]` | 追加進度 |
-| `pause <id>` / `resume <id>` | 暫停／恢復 |
-| `done <id> [--evidence E]` / `cancel <id> [--reason R]` | 完成／取消 |
+| `start "<objective>" --done-when D [--scope S] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n]` | 執行目標直到符合完成條件（前景） |
+| `pause <id>` | 暫停；執行中的 `start`/`resume` 會在下一輪停止 |
+| `resume <id>` | 從停下的地方繼續已暫停或中斷的目標 |
+| `cancel <id> [--reason R]` | 取消 |
 
 ### `veles job {add,list,show,pause,resume,trigger,remove,history,tick}`
 排程的代理工作。

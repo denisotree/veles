@@ -259,17 +259,17 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 ## المهام طويلة الأمد
 
-### `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}`
+### `veles goal {list,show,start,pause,resume,cancel}`
 أهداف بعيدة الأفق بميزانيات ونقاط تفتيش.
 
 | الأمر الفرعي | الغرض |
 |---|---|
 | `list [--status active\|paused\|completed\|blocked\|cancelled]` | سرد الأهداف |
 | `show <id> [--json]` | عرض هدف واحد |
-| `start "<objective>" [--scope S] [--done-when D] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n] [--forbid A]… [--approve A]…` | إنشاء هدف |
-| `checkpoint <id> "<note>" [--evidence U] [--cost-usd f] [--no-advance]` | إضافة تقدّم |
-| `pause <id>` / `resume <id>` | إيقاف مؤقت / استئناف |
-| `done <id> [--evidence E]` / `cancel <id> [--reason R]` | إنهاء / إلغاء |
+| `start "<objective>" --done-when D [--scope S] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n]` | تشغيل هدف حتى شرط الإتمام (في الواجهة) |
+| `pause <id>` | إيقاف مؤقت؛ يتوقف `start`/`resume` الجاري في دوره التالي |
+| `resume <id>` | متابعة هدف متوقف مؤقتًا أو مقطوع من حيث توقف |
+| `cancel <id> [--reason R]` | إلغاء |
 
 ### `veles job {add,list,show,pause,resume,trigger,remove,history,tick}`
 مهام وكيل مجدولة.

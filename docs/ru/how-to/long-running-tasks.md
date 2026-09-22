@@ -9,7 +9,9 @@
 
 ## Цели — задачи с бюджетами и контрольными точками
 
-Цель — это задача на длинном горизонте с явными ограничениями и журналом прогресса:
+Цель — это задача на длинном горизонте с явными ограничениями и журналом прогресса.
+`veles goal start` ведёт её на переднем плане — план, шаг, проверка по условию
+завершения, снова — пока условие не выполнено или не кончился бюджет:
 
 ```bash
 veles goal start "Draft a competitor analysis report" \
@@ -18,11 +20,16 @@ veles goal start "Draft a competitor analysis report" \
 
 veles goal list
 veles goal show <id>
-veles goal checkpoint <id> "Outlined sections; cited 2 sources" --cost-usd 0.40
 veles goal pause <id> ; veles goal resume <id>
-veles goal done <id> --evidence report.md
 veles goal cancel <id> --reason "scope changed"
 ```
+
+`--done-when` обязателен: именно его проверяет фаза проверки. Одобрения
+инструментов спрашиваются в терминале, как в `veles run`; без присмотра (cron)
+запускайте только с включённым autopilot. Прерванная или приостановленная цель
+продолжается с места остановки через `veles goal resume <id>`. Код выхода: `0`
+выполнена, `3` отменена (бюджет или невыполнимость), `4` остановлена (застой,
+пауза, лимит ходов).
 
 В TUI режим запуска **goal** (переключается через `Shift+Tab`) управляет тем же
 конечным автоматом интерактивно: он расспрашивает вас, подтверждает план,

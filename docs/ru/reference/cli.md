@@ -262,17 +262,17 @@ wiki-страницу. Принимает общие флаги цикла аг�
 
 ## Долгие задачи
 
-### `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}`
+### `veles goal {list,show,start,pause,resume,cancel}`
 Долгосрочные цели с бюджетами и контрольными точками.
 
 | Подкоманда | Назначение |
 |---|---|
 | `list [--status active\|paused\|completed\|blocked\|cancelled]` | Список целей |
 | `show <id> [--json]` | Показать одну цель |
-| `start "<objective>" [--scope S] [--done-when D] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n] [--forbid A]… [--approve A]…` | Создать цель |
-| `checkpoint <id> "<note>" [--evidence U] [--cost-usd f] [--no-advance]` | Добавить запись о прогрессе |
-| `pause <id>` / `resume <id>` | Пауза / возобновление |
-| `done <id> [--evidence E]` / `cancel <id> [--reason R]` | Завершить / отменить |
+| `start "<objective>" --done-when D [--scope S] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n]` | Запустить цель до условия завершения (на переднем плане) |
+| `pause <id>` | Пауза; запущенный `start`/`resume` остановится на следующем ходе |
+| `resume <id>` | Продолжить приостановленную или прерванную цель с места остановки |
+| `cancel <id> [--reason R]` | Отменить |
 
 ### `veles job {add,list,show,pause,resume,trigger,remove,history,tick}`
 Запланированные задачи агента.

@@ -259,17 +259,17 @@ Liệt kê các model của một nhà cung cấp. Các nhà cung cấp đám m�
 
 ## Tác vụ chạy dài
 
-### `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}`
+### `veles goal {list,show,start,pause,resume,cancel}`
 Các mục tiêu tầm xa với ngân sách và checkpoint.
 
 | Lệnh con | Mục đích |
 |---|---|
 | `list [--status active\|paused\|completed\|blocked\|cancelled]` | Liệt kê các goal |
 | `show <id> [--json]` | Hiển thị một goal |
-| `start "<objective>" [--scope S] [--done-when D] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n] [--forbid A]… [--approve A]…` | Tạo một goal |
-| `checkpoint <id> "<note>" [--evidence U] [--cost-usd f] [--no-advance]` | Ghi nhận tiến độ |
-| `pause <id>` / `resume <id>` | Tạm dừng / tiếp tục |
-| `done <id> [--evidence E]` / `cancel <id> [--reason R]` | Hoàn thành / hủy |
+| `start "<objective>" --done-when D [--scope S] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n]` | Chạy một goal tới điều kiện hoàn thành (tiền cảnh) |
+| `pause <id>` | Tạm dừng; `start`/`resume` đang chạy sẽ dừng ở lượt kế tiếp |
+| `resume <id>` | Tiếp tục một goal đã tạm dừng hoặc bị ngắt từ chỗ đã dừng |
+| `cancel <id> [--reason R]` | Hủy |
 
 ### `veles job {add,list,show,pause,resume,trigger,remove,history,tick}`
 Các job agent được lên lịch.

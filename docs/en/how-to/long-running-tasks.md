@@ -8,7 +8,10 @@ parallel, and decompose work across a **manager** and sub-agents.
 
 ## Goals — objectives with budgets and checkpoints
 
-A goal is a long-horizon objective with explicit limits and a progress log:
+A goal is a long-horizon objective with explicit limits and a progress log.
+`veles goal start` runs it in the foreground — plan, execute a step, check it
+against the done condition, repeat — until the condition is met or a budget
+runs out:
 
 ```bash
 veles goal start "Draft a competitor analysis report" \
@@ -17,11 +20,15 @@ veles goal start "Draft a competitor analysis report" \
 
 veles goal list
 veles goal show <id>
-veles goal checkpoint <id> "Outlined sections; cited 2 sources" --cost-usd 0.40
 veles goal pause <id> ; veles goal resume <id>
-veles goal done <id> --evidence report.md
 veles goal cancel <id> --reason "scope changed"
 ```
+
+`--done-when` is required: it is what the check phase tests. Tool approvals
+prompt in the terminal as they do for `veles run`; run unattended (cron) only
+with autopilot on. An interrupted or paused goal continues where it stopped with
+`veles goal resume <id>`. Exit code: `0` done, `3` cancelled (budget or
+infeasible), `4` stopped (stalled, paused, turn cap).
 
 In the TUI, the **goal** run mode (cycle with `Shift+Tab`) drives the same FSM
 interactively: it interviews you, confirms a plan, executes, and checks.

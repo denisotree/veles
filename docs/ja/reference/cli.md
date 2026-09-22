@@ -235,17 +235,17 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 ## 長時間タスク
 
-### `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}`
+### `veles goal {list,show,start,pause,resume,cancel}`
 予算とチェックポイントを伴う長期的な目標です。
 
 | サブコマンド | 目的 |
 |---|---|
 | `list [--status active\|paused\|completed\|blocked\|cancelled]` | 目標を一覧表示する |
 | `show <id> [--json]` | 1 つの目標を表示する |
-| `start "<objective>" [--scope S] [--done-when D] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n] [--forbid A]… [--approve A]…` | 目標を作成する |
-| `checkpoint <id> "<note>" [--evidence U] [--cost-usd f] [--no-advance]` | 進捗を追記する |
-| `pause <id>` / `resume <id>` | 一時停止/再開 |
-| `done <id> [--evidence E]` / `cancel <id> [--reason R]` | 完了/キャンセル |
+| `start "<objective>" --done-when D [--scope S] [--max-steps n] [--max-cost-usd f] [--max-wall-time-s n]` | 完了条件まで目標を実行する（フォアグラウンド） |
+| `pause <id>` | 一時停止する。実行中の `start`/`resume` は次のターンで止まる |
+| `resume <id>` | 一時停止・中断した目標を止まった所から続ける |
+| `cancel <id> [--reason R]` | キャンセルする |
 
 ### `veles job {add,list,show,pause,resume,trigger,remove,history,tick}`
 スケジュールされたエージェントジョブです。

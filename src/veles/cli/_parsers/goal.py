@@ -1,14 +1,16 @@
-"""Parser for `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}`."""
+"""Parser for `veles goal {list,show,start,pause,resume,cancel}`."""
 
 from __future__ import annotations
 
 import argparse
 
+from veles.cli._parsers._common import add_common_run_flags
+
 
 def register(sub: argparse._SubParsersAction) -> None:
     goal = sub.add_parser(
         "goal",
-        help="Manage long-horizon objectives with budgets and checkpoints.",
+        help="Run long-horizon goals to a done condition, within a budget.",
     )
     goal_sub = goal.add_subparsers(dest="goal_command", required=True)
 
@@ -24,17 +26,25 @@ def register(sub: argparse._SubParsersAction) -> None:
     g_show.add_argument("id", help="Goal id.")
     g_show.add_argument("--json", action="store_true", help="Output the goal as JSON.")
 
-    g_start = goal_sub.add_parser("start", help="Create a new goal in active status.")
+    g_start = goal_sub.add_parser(
+        "start",
+        help="Run a goal now: plan, execute and check until it is done or the budget ends.",
+        description=(
+            "Runs in the foreground. Tool approvals prompt in this terminal as they "
+            "do for `veles run`; without a terminal (cron) write actions are refused "
+            "unless autopilot is on (`veles autopilot enable --until …`)."
+        ),
+    )
     g_start.add_argument("objective", help="One-line objective sentence.")
-    g_start.add_argument("--scope", default=None, help="Optional scope / context for the goal.")
     g_start.add_argument(
         "--done-when",
         dest="done_when",
-        default=None,
-        help="Done-condition (e.g. 'report.md exists and cites ≥3 sources').",
+        required=True,
+        help="Done condition the advisor checks, e.g. 'report.md exists and cites ≥3 sources'.",
     )
+    g_start.add_argument("--scope", default=None, help="Optional scope / context for the goal.")
     g_start.add_argument(
-        "--max-steps", type=int, default=30, help="Step budget before the goal blocks (default 30)."
+        "--max-steps", type=int, default=30, help="Step budget before the goal stops (default 30)."
     )
     g_start.add_argument(
         "--max-cost-usd", type=float, default=5.0, help="Cost budget in USD (default 5.0)."
@@ -45,43 +55,18 @@ def register(sub: argparse._SubParsersAction) -> None:
         default=3600,
         help="Wall-clock budget in seconds (default 3600).",
     )
-    g_start.add_argument(
-        "--forbid",
-        action="append",
-        default=None,
-        metavar="ACTION",
-        help="Forbid an action (repeatable).",
-    )
-    g_start.add_argument(
-        "--approve",
-        action="append",
-        default=None,
-        metavar="ACTION",
-        help="Pre-approve an action so it runs without a prompt (repeatable).",
-    )
+    add_common_run_flags(g_start)
 
-    g_cp = goal_sub.add_parser("checkpoint", help="Append a progress entry to a goal.")
-    g_cp.add_argument("id", help="Goal id.")
-    g_cp.add_argument("note", help="What progressed.")
-    g_cp.add_argument("--evidence", default=None, help="Optional artifact URI / ref.")
-    g_cp.add_argument(
-        "--cost-usd", type=float, default=None, help="Cost attributed to this checkpoint (USD)."
+    g_pause = goal_sub.add_parser(
+        "pause", help="Pause a goal; a running `start`/`resume` stops at its next turn."
     )
-    g_cp.add_argument(
-        "--no-advance",
-        action="store_true",
-        help="Don't count this checkpoint against max_steps (info-only note).",
-    )
-
-    g_pause = goal_sub.add_parser("pause", help="Pause an active goal.")
     g_pause.add_argument("id", help="Goal id.")
 
-    g_resume = goal_sub.add_parser("resume", help="Resume a paused goal.")
+    g_resume = goal_sub.add_parser(
+        "resume", help="Continue a paused or interrupted goal from where it stopped."
+    )
     g_resume.add_argument("id", help="Goal id.")
-
-    g_done = goal_sub.add_parser("done", help="Mark a goal completed.")
-    g_done.add_argument("id", help="Goal id.")
-    g_done.add_argument("--evidence", default=None, help="Optional final-evidence note.")
+    add_common_run_flags(g_resume)
 
     g_cancel = goal_sub.add_parser("cancel", help="Cancel a non-completed goal.")
     g_cancel.add_argument("id", help="Goal id.")

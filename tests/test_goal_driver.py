@@ -139,6 +139,61 @@ def test_a_goal_still_in_interview_is_refused_not_answered(project) -> None:
     assert calls == []
 
 
+# ---- through the CLI (`veles goal start` / `resume`) ----
+
+
+def _fake_runtime(project):
+    """What `_build_runtime` returns, with the model call replaced — the CLI
+    wiring (argument handling, goal creation, driving, exit code) is real."""
+    from veles.core.memory import SessionStore
+
+    ctx, calls, _ = _ctx(project)
+    return (ctx.state, ctx.factory, SessionStore(project.memory_db_path), None), calls
+
+
+def test_veles_goal_start_runs_the_goal(project, monkeypatch, capsys) -> None:
+    """The reported bug: `veles goal start` printed "started goal …" and nothing
+    ever ran it. Now the command itself drives it to the done condition."""
+    from veles.cli import main as cli_main
+
+    runtime, calls = _fake_runtime(project)
+    monkeypatch.chdir(project.root)
+    monkeypatch.setattr("veles.cli.repl.runtime._build_runtime", lambda *_a, **_k: runtime)
+    with patch(ADVISOR, return_value='{"verdict": "goal_reached", "reason": "file exists"}'):
+        rc = cli_main(["goal", "start", "say hi", "--done-when", "hello.txt exists"])
+    assert rc == 0
+    assert calls == ["planning", "writing"]
+    err = capsys.readouterr().err
+    assert "completed" in err
+
+
+def test_veles_goal_start_requires_a_done_condition(project, monkeypatch, capsys) -> None:
+    from veles.cli import main as cli_main
+
+    monkeypatch.chdir(project.root)
+    with pytest.raises(SystemExit):
+        cli_main(["goal", "start", "say hi"])
+    assert "--done-when" in capsys.readouterr().err
+
+
+def test_veles_goal_resume_continues_a_stopped_goal(project, monkeypatch) -> None:
+    from veles.cli import main as cli_main
+
+    goal = start_goal(project.state_dir, objective="x", done_condition="y")
+    ctx, _, _ = _ctx(project)
+    drive_goal(ctx, goal.id, max_turns=1)  # interrupted after PLAN
+    pause(project.state_dir, goal.id)
+
+    runtime, calls = _fake_runtime(project)
+    monkeypatch.chdir(project.root)
+    monkeypatch.setattr("veles.cli.repl.runtime._build_runtime", lambda *_a, **_k: runtime)
+    with patch(ADVISOR, return_value='{"verdict": "goal_reached", "reason": "ok"}'):
+        rc = cli_main(["goal", "resume", goal.id])
+    assert rc == 0
+    assert calls == ["writing"]  # continued at EXECUTE, no re-plan
+    assert read_goal(project.state_dir, goal.id).status == "completed"
+
+
 def test_a_driven_goal_resumes_where_it_stopped(project) -> None:
     """The state lives on disk (phase in goals/<id>.json, plan in
     plans/active/), so a second `drive_goal` — `veles goal resume` — continues

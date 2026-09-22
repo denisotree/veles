@@ -157,9 +157,10 @@ veles research "What are the trade-offs between SQLite and PostgreSQL for this u
 ### लंबे समय तक चलने वाले goals
 
 ```bash
-veles goal start "Migrate auth module to the new provider" --max-cost-usd 2.00
+veles goal start "Migrate auth module to the new provider" \
+  --done-when "nothing imports the old provider and tests pass" --max-cost-usd 2.00
 veles goal list
-veles goal checkpoint <id> "Completed step 1: identified all call sites"
+veles goal resume <id>    # continue after a pause or Ctrl+C
 ```
 
 ### Scheduled jobs
@@ -336,7 +337,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles schema {validate,edit}` | AGENTS.md validate / edit करें |
 | `veles self-doc` | project self-documentation generate करें |
 | `veles layout {sync}` | Layout-pack maintenance |
-| `veles goal {list,show,start,checkpoint,pause,resume,done,cancel}` | Long-horizon goals |
+| `veles goal {list,show,start,pause,resume,cancel}` | Long-horizon goals |
 | `veles job {list,add,show,pause,resume,trigger,remove,history}` | Scheduled jobs |
 | `veles dream` | Background memory-consolidation cycle |
 | `veles project {list,add,remove,switch}` | Multi-project registry |

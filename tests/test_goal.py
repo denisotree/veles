@@ -19,7 +19,6 @@ from veles.core.goal import (
     list_goals,
     pause,
     read_goal,
-    render_system_block,
     resume,
 )
 
@@ -47,15 +46,32 @@ def test_create_goal_carries_all_optional_fields(tmp_path: Path) -> None:
         scope="src/veles/core",
         done_condition="pytest green + mypy --strict clean",
         budget=GoalBudget(max_steps=10, max_cost_usd=1.0, max_wall_time_s=600),
-        forbidden_actions=["git_push"],
-        approval_required_for=["delete_file"],
     )
     loaded = read_goal(tmp_path, g.id)
     assert loaded is not None
     assert loaded.scope == "src/veles/core"
     assert loaded.budget.max_steps == 10
-    assert loaded.forbidden_actions == ["git_push"]
-    assert loaded.approval_required_for == ["delete_file"]
+
+
+def test_a_goal_file_from_before_m276_still_loads(tmp_path: Path) -> None:
+    """M276 removed `forbidden_actions` / `approval_required_for` (nothing ever
+    enforced them); files written earlier still carry the keys and must load."""
+    import json
+
+    (tmp_path / GOALS_DIRNAME).mkdir()
+    (tmp_path / GOALS_DIRNAME / "old1.json").write_text(
+        json.dumps(
+            {
+                "id": "old1",
+                "objective": "legacy",
+                "forbidden_actions": ["git_push"],
+                "approval_required_for": ["delete_file"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    loaded = read_goal(tmp_path, "old1")
+    assert loaded is not None and loaded.objective == "legacy"
 
 
 def test_read_missing_goal_returns_none(tmp_path: Path) -> None:
@@ -233,32 +249,6 @@ def test_seconds_since_iso_treats_input_as_utc(monkeypatch) -> None:
         # Restore default TZ so subsequent tests aren't affected.
         monkeypatch.delenv("TZ", raising=False)
         time.tzset()
-
-
-# ---------- render_system_block ----------
-
-
-def test_render_block_has_required_lines() -> None:
-    g = Goal(
-        id="abc",
-        objective="Build digest.",
-        done_condition="report.md exists",
-        budget=GoalBudget(max_steps=5),
-        steps_done=2,
-        cost_spent_usd=0.1,
-    )
-    block = render_system_block(g)
-    assert block.startswith('<goal id="abc"')
-    assert "Build digest." in block
-    assert "report.md exists" in block
-    assert "2/5 steps" in block
-    assert block.endswith("</goal>")
-
-
-def test_render_block_includes_forbidden_when_set() -> None:
-    g = Goal(id="x", objective="o", forbidden_actions=["git_push", "send_email"])
-    block = render_system_block(g)
-    assert "git_push, send_email" in block
 
 
 # ---------- path helper ----------
