@@ -44,8 +44,13 @@ _DEFAULT_TIMEOUT_S = 120.0
 _REASONING_MAX_TOKENS = 32_000
 _REASONING_TIMEOUT_S = 900.0
 
-# Substrings that mark a model as reasoning-first. Deliberately a list of
-# families rather than exact ids: ids churn, families do not.
+# Substrings that mark a model as reasoning-first — the FALLBACK since M267,
+# not the answer. Measured against OpenRouter's catalogue on 2026-09-22: of 442
+# models, 311 declare `reasoning` and this list recognises 92 of them. The 219
+# it misses included `deepseek-v4`, which was therefore budgeted at 4096 tokens
+# against `glm-5.3-flash`'s 32000 and written off as unfit when it was truncated.
+# Still the right fallback: it needs no network, and it answers for ids the
+# catalogue does not carry (local backends, private routes, brand-new models).
 _REASONING_MARKERS = (
     "glm-5",
     "glm-4.7",
@@ -67,9 +72,17 @@ _FAST_REASONING_MARKERS = ("flash", "mini", "turbo")
 
 
 def is_reasoning_model(model: str | None) -> bool:
-    """True when `model` spends completion budget on a thinking channel."""
+    """True when `model` spends completion budget on a thinking channel.
+
+    Asks the provider's own catalogue first (M267) and falls back to the family
+    substrings when it has no answer — offline, or a model it does not list."""
     if not model:
         return False
+    from veles.core.model_metadata import model_facts
+
+    facts = model_facts(model)
+    if facts is not None:
+        return bool(facts["reasoning"])
     m = model.lower()
     return any(marker in m for marker in _REASONING_MARKERS)
 

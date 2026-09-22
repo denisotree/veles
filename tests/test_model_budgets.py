@@ -5,6 +5,11 @@ Both constants they replace were measured wrong on `z-ai/glm-5.3-flash`
 EMPTY content field twice — the whole budget went to the hidden reasoning
 channel — and at the flat 120s timeout the per-chunk read timeout killed a
 2.7-hour research run mid-stream.
+
+M267 note: these now assert the **fallback** path. `is_reasoning_model` asks
+OpenRouter's catalogue first and only consults the family substrings when it has
+no answer, which is the state every test runs in (`conftest._offline_model_
+catalogue`). The catalogue-driven answers live in `test_model_metadata.py`.
 """
 
 from __future__ import annotations

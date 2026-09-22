@@ -12,6 +12,7 @@ OpenAI adapter + local-model adapters."""
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from openai import OpenAI
@@ -28,6 +29,8 @@ from veles.core.provider import Message, TokenUsage
 _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 _DEFAULT_REFERER = "https://github.com/denisotree/veles"
 _DEFAULT_TITLE = "Veles"
+
+_logger = logging.getLogger(__name__)
 
 
 # Re-exported for tests that import the function from this module.
@@ -81,6 +84,22 @@ class OpenRouterProvider(OpenAICompatibleProvider):
             # don't freeze today's value into Veles.
             kwargs["max_retries"] = retries
         super().__init__(client=OpenAI(**kwargs))
+
+    def list_models(self) -> list[str]:
+        """Ids, and — for free — the catalogue behind them (M267).
+
+        `/model` and `veles models` come through here anyway, so the round trip
+        that already happened warms the metadata cache too. Without this the
+        first headless `veles run` in a day pays a 3s lookup of its own.
+        """
+        from veles.core.model_metadata import refresh_cache
+
+        page = list(self._client.models.list())
+        try:
+            refresh_cache({"data": [m.model_dump() for m in page]})
+        except Exception as exc:  # a listing must never fail over its side effect
+            _logger.debug("could not refresh model metadata: %s", exc)
+        return [m.id for m in page]
 
     def _prepare_messages(self, messages: list[Message], model: str) -> list[dict[str, Any]]:
         return apply_cache_hints([to_openai_message(m) for m in messages], model)

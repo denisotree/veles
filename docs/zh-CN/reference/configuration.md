@@ -58,6 +58,8 @@ args = ["-m", "my_mcp_server"]
 [engine]
 provider = "openrouter"                               # provider name for the main agent + routing base
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
+request_timeout_s = 180                              # 可选；等待一次响应的时长
+max_retries = 1                                      # 可选；每个请求的重试次数
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -99,7 +101,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 | 节 | 用途 |
 |---|---|
-| `[engine]` | 基础提供方（`provider` = 提供方名称）+ 模型（`model` = 模型 id），供主 agent 和路由级联使用 |
+| `[engine]` | 基础提供方（`provider` = 提供方名称）+ 模型（`model` = 模型 id），供主 agent 和路由级联使用，以及客户端预算 `request_timeout_s` / `max_retries` |
 | `[routing.tasks]` | 按任务的 `provider:model` 覆盖——参见[按任务路由](../how-to/per-task-routing.md) |
 | `[permissions]` | 按 tool 的权限策略（项目作用域） |
 | `[daemon]` | 未命名/"默认" daemon 的绑定地址 + 自动启动 |
@@ -111,6 +113,33 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 `[routing.tasks]` 的任务类型：`default`、`curator`、`compressor`、`insights`、`skills`、`advisor`、`vision`、`embedding`。
 
 > `AGENTS.md` 中的自然语言路由提示会被解析为自动生成的 `routing.nl.toml`；显式的 `[routing.tasks]` 条目始终优先。运行 `veles route refresh` 重新解析。参见[按任务路由](../how-to/per-task-routing.md)。
+
+### 等待响应多久，重试几次
+
+```toml
+[engine]
+request_timeout_s = 180
+max_retries = 1
+```
+
+两者都是**客户端**参数，因此平铺在 `[engine]` 之下，而不在
+`[engine.request.<provider>]` 里：那一节是请求*体*，而超时从不随请求体传输。
+
+不设置时，超时由模型 id 推断：推理系列得到 900 秒，其 `flash`/`mini` 变体 450 秒，
+其余 120 秒。这个推断在结构上是脆弱的：**名字描述的是系列，而响应时间由提供服务的
+后端决定。** 同一个 id 在一个后端跑 33 tok/s，在另一个后端只有 0.8 tok/s。当推断出
+的数字不适合你的运行时就自己设定；若想让这个数字两次意味着同一件事，再按下文固定
+后端。
+
+`max_retries` 重要的原因相同。不设置时 SDK 会重试两次，于是 450 秒的超时在单个回合里
+实际上最多是 1350 秒 —— 足以击穿一个看起来宽裕的预算。`0` 是合法取值，与省略该键并
+不相同。
+
+两者的优先级：代码中的显式参数 → `[engine]` → 按模型推断的默认值。取值若不是正数
+（`max_retries` 若不是非负整数），会以指明文件名的 `ConfigError` 中止。
+
+**适用范围：** 目前只有 OpenRouter 适配器读取这两个键。Anthropic、OpenAI 和 Gemini
+的客户端在构造时不接收这两个参数，会忽略它们。
 
 ### 固定后端，以及其他请求体键
 

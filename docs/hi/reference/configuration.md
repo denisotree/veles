@@ -61,6 +61,8 @@ args = ["-m", "my_mcp_server"]
 [engine]
 provider = "openrouter"                               # provider name for the main agent + routing base
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
+request_timeout_s = 180                              # वैकल्पिक; एक उत्तर के लिए कितनी प्रतीक्षा
+max_retries = 1                                      # वैकल्पिक; प्रति अनुरोध पुनः प्रयास
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -102,7 +104,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 | Section | उद्देश्य |
 |---|---|
-| `[engine]` | main agent और routing cascade के लिए base provider (`provider` = provider name) + model (`model` = model id) |
+| `[engine]` | main agent और routing cascade के लिए base provider (`provider` = provider name) + model (`model` = model id), साथ ही क्लाइंट बजट `request_timeout_s` / `max_retries` |
 | `[routing.tasks]` | प्रति-task `provider:model` overrides — देखें [per-task routing](../how-to/per-task-routing.md) |
 | `[permissions]` | प्रति-tool permission policy (project scope) |
 | `[daemon]` | unnamed/"default" daemon का bind + autostart |
@@ -117,6 +119,37 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 > `AGENTS.md` में natural-language routing hints एक auto-generated `routing.nl.toml`
 > में parse की जाती हैं; explicit `[routing.tasks]` entries हमेशा जीतती हैं। फिर से
 > parse करने हेतु `veles route refresh` चलाएँ। देखें [per-task routing](../how-to/per-task-routing.md)।
+
+### उत्तर के लिए कितनी प्रतीक्षा, और कितने पुनः प्रयास
+
+```toml
+[engine]
+request_timeout_s = 180
+max_retries = 1
+```
+
+दोनों **क्लाइंट** पैरामीटर हैं, इसीलिए वे `[engine.request.<provider>]` के भीतर नहीं
+बल्कि सीधे `[engine]` के नीचे रहते हैं: वह सेक्शन अनुरोध की *बॉडी* है, और टाइमआउट
+कभी बॉडी में यात्रा नहीं करता।
+
+इनके बिना टाइमआउट मॉडल id से अनुमानित होता है: रीज़निंग परिवार को 900 सेकंड, उसी का
+`flash`/`mini` संस्करण 450 सेकंड, बाकी सब 120 सेकंड। यह अनुमान संरचनात्मक रूप से
+कमज़ोर है: **नाम एक परिवार का वर्णन करता है, जबकि उत्तर का समय उसे सर्व करने वाला
+बैकएंड तय करता है।** एक ही id एक बैकएंड पर 33 टोकन/सेकंड और दूसरे पर 0.8 टोकन/सेकंड
+देता है। जब अनुमानित संख्या आपके रन के लिए ठीक न हो, उसे स्वयं सेट करें; और यदि आप
+चाहते हैं कि वह संख्या दो बार एक ही अर्थ रखे, तो नीचे बताए अनुसार बैकएंड पिन करें।
+
+`max_retries` भी इसी कारण मायने रखता है। इसके बिना SDK दो बार पुनः प्रयास करता है,
+यानी 450 सेकंड का टाइमआउट एक ही टर्न में वास्तव में 1350 सेकंड तक हो सकता है — जो
+उदार दिखने वाले बजट को उड़ाने के लिए काफी है। `0` एक वैध मान है और कुंजी छोड़ देने के
+बराबर नहीं है।
+
+दोनों की प्राथमिकता: कोड में स्पष्ट आर्गुमेंट → `[engine]` → मॉडल-आधारित डिफ़ॉल्ट।
+ऐसा मान जो धनात्मक संख्या न हो (या `max_retries` के लिए अऋणात्मक पूर्णांक न हो),
+फ़ाइल का नाम बताते हुए `ConfigError` के साथ रन रोक देता है।
+
+**दायरा:** आज ये कुंजियाँ केवल OpenRouter अडैप्टर पढ़ता है। Anthropic, OpenAI और
+Gemini के क्लाइंट दोनों पैरामीटर के बिना बनते हैं और इन्हें अनदेखा करते हैं।
 
 ### बैकएंड पिन करना, और रिक्वेस्ट बॉडी की अन्य कुंजियाँ
 

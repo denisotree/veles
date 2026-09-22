@@ -221,6 +221,26 @@ def _deterministic_embedding_backend() -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True)
+def _offline_model_catalogue() -> Iterator[None]:
+    """Keep every test on the substring fallback, off OpenRouter (M267).
+
+    Same shape as the embedding pin above, same reason: `model_facts` fetches
+    the live catalogue on a cache miss, so unpinned the suite would depend on
+    what OpenRouter publishes today — `anthropic/claude-sonnet-4.6` declares
+    `reasoning`, which silently turns "plain model" budget assertions into
+    reasoning ones. Marking the lookup as done-and-empty makes every test see
+    "no facts"; tests that want facts write a cache and call `reset_for_tests`
+    (see `tests/test_model_metadata.py`)."""
+    from veles.core import model_metadata
+
+    model_metadata._memo = {}
+    try:
+        yield
+    finally:
+        model_metadata.reset_for_tests()
+
+
+@pytest.fixture(autouse=True)
 def _hermetic_user_home(
     tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
