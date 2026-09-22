@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.39.0] — 2026-09-22
+
+Bugs found by reading the code for them, each confirmed before it was fixed.
+`veles goal` was also run for real against a model, which found two more.
+
+### Changed — `veles goal start` runs the goal
+
+Before, `veles goal start` saved the goal, printed "started goal …" and stopped.
+Nothing ever picked the goal up. Now it runs the goal in the foreground: plan,
+do a step, check it against the done condition, repeat. It stops when the
+condition holds or a budget runs out.
+
+- `--done-when` is now required, because the check step tests it.
+- `veles goal resume <id>` continues a goal that was paused, interrupted with
+  Ctrl+C, or stopped for making no progress.
+- Exit codes: `0` done, `3` cancelled (budget spent or the goal can't be done),
+  `4` stopped (no progress, paused, or turn limit reached).
+- If the reviewer model that checks each step isn't configured, the goal now
+  stops and says so. Before, it re-planned a finished goal over and over.
+- Removed `veles goal checkpoint`, `veles goal done`, `--forbid` and
+  `--approve`. The running goal now records its own progress and status. Nothing
+  ever enforced `--forbid` or `--approve`. Tool approvals work as they do in
+  `veles run`.
+
+### Fixed — `veles secret set` for provider keys
+
+`veles secret set OPENROUTER_API_KEY` stored the key where the providers never
+looked. A key saved by the setup wizard worked, but `veles secret list` showed
+it as unset. `set`, `get`, `delete` and `list` now use the same entries the
+providers read. `--project <name>` stores a key for one project. `veles doctor`
+checks keys where the runtime reads them. If a key is stuck in the old place and
+the provider has no working key, doctor names it; run `veles secret set` again to
+fix it. The Tavily and Brave search keys and the daemon token can now come from
+the keychain, not only from environment variables.
+
+### Fixed — `veles init` no longer ignores your CLAUDE.md
+
+Veles reads only AGENTS.md. `veles init` used to leave an existing CLAUDE.md or
+GEMINI.md alone, so the agent never saw your rules. It now copies them into
+AGENTS.md word for word and keeps each original as `.bak`. CLAUDE.md then
+becomes a link to AGENTS.md, so Claude Code and Veles read the same file.
+
+### Fixed — Telegram
+
+- A message that starts with a path, like `/var/log/app.log why does it crash?`,
+  now reaches the agent. It used to get "Unknown command".
+- `/dream` now runs memory consolidation and replies with the result. Before, it
+  sent the words to the agent as an ordinary message.
+- `/goal` now tells you to run `veles goal start` on the host. It used to promise
+  progress updates that never came.
+- A scheduled job's message to a chat is now saved in that chat's session, so the
+  agent knows about it when you reply. Reminders already worked this way.
+
+### Fixed — skill promotions offered as subprojects
+
+A suggestion to promote a skill showed up in the agent's context as a
+"candidate subproject", with a command that would have created a subproject named
+after the skill. Skill promotions now have their own section with
+`veles skill promote <name>`.
+
+### Known issue
+
+- Telegram `/mode` has no effect yet. Chats always run in the default mode.
+
 ## [0.38.0] — 2026-09-22
 
 Three things the interface showed you were never actually connected. Found by
@@ -1514,7 +1578,10 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v0.36.0...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v0.39.0...HEAD
+[0.39.0]: https://github.com/denisotree/veles/compare/v0.38.0...v0.39.0
+[0.38.0]: https://github.com/denisotree/veles/compare/v0.37.0...v0.38.0
+[0.37.0]: https://github.com/denisotree/veles/compare/v0.36.0...v0.37.0
 [0.36.0]: https://github.com/denisotree/veles/compare/v0.35.0...v0.36.0
 [0.35.0]: https://github.com/denisotree/veles/compare/v0.34.0...v0.35.0
 [0.34.0]: https://github.com/denisotree/veles/compare/v0.33.0...v0.34.0
