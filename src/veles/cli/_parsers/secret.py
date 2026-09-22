@@ -12,6 +12,11 @@ def register(sub: argparse._SubParsersAction) -> None:
     )
     secret_sub = secret.add_subparsers(dest="secret_command", required=True)
 
+    project_help = (
+        "Provider keys only: the project this key is for. Omitted = the default key, "
+        "used by every project that has no key of its own."
+    )
+
     s_set = secret_sub.add_parser("set", help="Store a secret in the OS keychain.")
     s_set.add_argument("name", help="Secret name (e.g. OPENROUTER_API_KEY).")
     s_set.add_argument(
@@ -20,6 +25,7 @@ def register(sub: argparse._SubParsersAction) -> None:
         default=None,
         help="Value (omit for interactive prompt or piped stdin).",
     )
+    s_set.add_argument("--project", default=None, help=project_help)
 
     s_get = secret_sub.add_parser("get", help="Look up a secret (env-fallback by default).")
     s_get.add_argument("name", help="Secret name (e.g. OPENROUTER_API_KEY).")
@@ -29,8 +35,10 @@ def register(sub: argparse._SubParsersAction) -> None:
         action="store_true",
         help="Don't fall back to environment variables when not in keychain.",
     )
+    s_get.add_argument("--project", default=None, help=project_help)
 
-    secret_sub.add_parser("list", help="Show which canonical secrets are configured.")
+    secret_sub.add_parser("list", help="Show which secrets are configured, and where.")
 
     s_del = secret_sub.add_parser("delete", help="Remove a secret from the keychain.")
     s_del.add_argument("name", help="Secret name to remove.")
+    s_del.add_argument("--project", default=None, help=project_help)

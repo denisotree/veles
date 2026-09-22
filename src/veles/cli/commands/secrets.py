@@ -1,4 +1,14 @@
-"""`veles secret {set,get,list,delete}` — keychain-backed secret CLI."""
+"""`veles secret {set,get,list,delete}` — keychain-backed secret CLI.
+
+M271: a provider API key (`OPENROUTER_API_KEY`, …) is routed to the entry the
+runtime actually reads, `veles:<provider>:<scope>` (M92) — the same place the
+setup wizard writes. Before this, the command wrote `veles:OPENROUTER_API_KEY`,
+which M149 had deliberately stopped reading as a legacy form: `set` reported
+success for a key no provider would ever see, and `list` reported a working
+wizard-stored key as "(unset)". Every other secret keeps its flat
+`veles:<NAME>` entry. The routing table is `PROVIDER_API_KEY_ENVS`, via
+`secrets.provider_for_env_name`.
+"""
 
 from __future__ import annotations
 
@@ -9,11 +19,30 @@ import sys
 
 from veles.core.secrets import (
     KeyringUnavailable,
+    delete_provider_key,
     delete_secret,
+    get_provider_key,
     get_secret,
     list_known_names,
+    provider_for_env_name,
+    set_provider_key,
     set_secret,
 )
+
+
+def _scope_label(project: str | None) -> str:
+    return f"project {project!r}" if project else "default"
+
+
+def _reject_project_for_plain_secret(args: argparse.Namespace) -> bool:
+    """`--project` scopes provider keys only; say so instead of ignoring it."""
+    if getattr(args, "project", None):
+        print(
+            f"error: --project applies to provider API keys only; {args.name} is not one.",
+            file=sys.stderr,
+        )
+        return True
+    return False
 
 
 def cmd_secret(args: argparse.Namespace) -> int:
@@ -31,6 +60,9 @@ def cmd_secret(args: argparse.Namespace) -> int:
 
 
 def _set(args: argparse.Namespace) -> int:
+    provider = provider_for_env_name(args.name)
+    if provider is None and _reject_project_for_plain_secret(args):
+        return 2
     value = args.value
     if value is None:
         # Read from a pipe when stdin isn't a TTY, otherwise prompt
@@ -40,7 +72,10 @@ def _set(args: argparse.Namespace) -> int:
         else:
             value = sys.stdin.read().rstrip("\n")
     try:
-        set_secret(args.name, value)
+        if provider is not None:
+            set_provider_key(provider, value, project=args.project)
+        else:
+            set_secret(args.name, value)
     except KeyringUnavailable as exc:
         print(
             f"error: keychain backend unavailable: {exc}\n"
@@ -48,12 +83,26 @@ def _set(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
-    print(f"stored secret veles:{args.name}", file=sys.stderr)
+    except ValueError as exc:  # set_provider_key refuses an empty key
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if provider is not None:
+        print(f"stored {provider} API key ({_scope_label(args.project)})", file=sys.stderr)
+    else:
+        print(f"stored secret veles:{args.name}", file=sys.stderr)
     return 0
 
 
 def _get(args: argparse.Namespace) -> int:
-    value = get_secret(args.name, env_fallback=not args.no_env_fallback)
+    provider = provider_for_env_name(args.name)
+    if provider is None and _reject_project_for_plain_secret(args):
+        return 2
+    if provider is not None:
+        value = get_provider_key(
+            provider, project=args.project, env_fallback=not args.no_env_fallback
+        )
+    else:
+        value = get_secret(args.name, env_fallback=not args.no_env_fallback)
     if value is None:
         print(f"(unset) {args.name}", file=sys.stderr)
         return 1
@@ -86,6 +135,16 @@ def _list(args: argparse.Namespace) -> int:
 
 
 def _delete(args: argparse.Namespace) -> int:
+    provider = provider_for_env_name(args.name)
+    if provider is not None:
+        scope = _scope_label(args.project)
+        if delete_provider_key(provider, project=args.project):
+            print(f"deleted {provider} API key ({scope})", file=sys.stderr)
+            return 0
+        print(f"no {provider} API key stored ({scope})", file=sys.stderr)
+        return 1
+    if _reject_project_for_plain_secret(args):
+        return 2
     if delete_secret(args.name):
         print(f"deleted secret veles:{args.name}", file=sys.stderr)
         return 0

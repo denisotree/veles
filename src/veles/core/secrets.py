@@ -174,6 +174,25 @@ def list_known_names() -> list[str]:
 # ---------------- M92: scoped provider keys ----------------
 
 
+def provider_for_env_name(name: str) -> str | None:
+    """The provider whose API key `name` is (`OPENROUTER_API_KEY` → `openrouter`),
+    or None for a secret that is not a provider key.
+
+    M271: this is the router between the two kinds of keychain entry. A
+    provider key lives at `veles:<provider>:<scope>` (M92) because that is the
+    only place the runtime reads it from (`provider_factory.resolve_api_key`);
+    every other secret lives at `veles:<NAME>`. Before this, `veles secret set
+    OPENROUTER_API_KEY` wrote the second kind for a provider key, so the key was
+    stored and never used. Derived from `PROVIDER_API_KEY_ENVS` rather than a
+    second table, so a new provider cannot be routed differently in two places."""
+    from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
+
+    for provider, env_names in PROVIDER_API_KEY_ENVS.items():
+        if name in env_names:
+            return provider
+    return None
+
+
 def get_provider_key(
     provider: str, *, project: str | None = None, env_fallback: bool = True
 ) -> str | None:
@@ -288,6 +307,7 @@ __all__ = [
     "list_known_names",
     "list_provider_keys",
     "list_providers_with_keys",
+    "provider_for_env_name",
     "set_provider_key",
     "set_secret",
 ]
