@@ -9,7 +9,6 @@ import pytest
 from veles.core.memory.artefacts import (
     ProposalInfo,
     append_memory_log,
-    ensure_memory_dirs,
     insights_dir,
     list_proposals,
     memory_log_path,
@@ -39,8 +38,12 @@ def test_paths_live_under_state_dir(project: Project) -> None:
     assert proposals_dir(project) == project.memory_dir / "proposals"
 
 
-def test_ensure_memory_dirs_creates_tree(project: Project) -> None:
-    ensure_memory_dirs(project)
+def test_writers_create_their_own_directories(project: Project) -> None:
+    """Each writer makes its directory on first write, which is why no
+    up-front `ensure_memory_dirs` pass exists (it did, and nothing called it)."""
+    write_proposal(project, slug="p", title="P", content="body")
+    write_session_summary(project, slug="s", title="S", content="body")
+    write_insight_view(project, slug="i", title="I", body="body")
     assert insights_dir(project).is_dir()
     assert sessions_dir(project).is_dir()
     assert proposals_dir(project).is_dir()
@@ -48,7 +51,6 @@ def test_ensure_memory_dirs_creates_tree(project: Project) -> None:
 
 def test_artefacts_never_touch_user_content(project: Project) -> None:
     """The whole memory tree stays under `.veles/` — never in `wiki/`."""
-    ensure_memory_dirs(project)
     write_proposal(project, slug="p", title="P", content="body")
     write_session_summary(project, slug="s", title="S", content="body")
     write_insight_view(project, slug="i", title="I", body="body")

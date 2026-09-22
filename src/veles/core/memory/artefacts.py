@@ -71,11 +71,6 @@ def proposals_dir(project: Project) -> Path:
     return project.memory_dir / _PROPOSALS_DIR
 
 
-def ensure_memory_dirs(project: Project) -> None:
-    for d in (insights_dir(project), sessions_dir(project), proposals_dir(project)):
-        d.mkdir(parents=True, exist_ok=True)
-
-
 def append_memory_log(project: Project, *, op: str, summary: str) -> None:
     """Append one entry to the system-ops journal (`.veles/memory/LOG.md`).
 

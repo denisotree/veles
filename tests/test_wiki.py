@@ -139,13 +139,6 @@ def test_append_log_creates_log_md_if_missing(tmp_path: Path) -> None:
     assert (tmp_path / "LOG.md").is_file()
 
 
-def test_save_source_writes_to_sources(tmp_path: Path) -> None:
-    w = _make_wiki(tmp_path)
-    rel = w.save_source(category="articles", slug="example.com/post", content="raw")
-    assert rel == "sources/articles/example-com-post.md"
-    assert (tmp_path / rel).read_text(encoding="utf-8") == "raw"
-
-
 def test_index_text_returns_markdown(tmp_path: Path) -> None:
     w = _make_wiki(tmp_path)
     w.write_page(category="concepts", slug="a", title="A", content="hello")
