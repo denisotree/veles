@@ -114,7 +114,6 @@ _BASELINE = frozenset(
         "start_navigation",
         "strip_provider_prefix",
         "unregister_platform",
-        "untrusted_corpus",
         "update_settings",
         "update_status",
     }
