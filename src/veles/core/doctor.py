@@ -49,9 +49,6 @@ class CheckResult:
     fix_hint: str = ""
     details: dict[str, object] = field(default_factory=dict)
 
-    def is_failing(self) -> bool:
-        return self.status == "error"
-
 
 @dataclass(slots=True)
 class DoctorReport:

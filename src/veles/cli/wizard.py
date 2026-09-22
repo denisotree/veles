@@ -34,7 +34,6 @@ from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
 from veles.core.providers import PROVIDER_VALUES as _PROVIDER_CHOICES
 from veles.core.user_config import (
     UserConfig,
-    load_user_config,
     save_user_config,
     user_config_path,
 )
@@ -219,8 +218,3 @@ def maybe_run_first_run_wizard(args: argparse.Namespace) -> None:
             f"warning: first-run wizard failed: {type(exc).__name__}: {exc}",
             file=sys.stderr,
         )
-
-
-def existing_user_config() -> UserConfig | None:
-    """Convenience accessor for callers that want the saved config."""
-    return load_user_config()

@@ -252,17 +252,12 @@ def test_local_json_mode_and_pin_coexist(project_with) -> None:
     """`response_format` is a top-level key, the pin lives in `extra_body` —
     the local adapter's M239 override must keep both."""
     from veles.adapters.local.llamacpp import LlamaCppProvider
-    from veles.core.context import set_strict_json
+    from veles.core.context import strict_json_mode
 
     project_with("llamacpp", {"cache_prompt": True})
     provider = LlamaCppProvider(client=SimpleNamespace())
-    tok = set_strict_json(True)
-    try:
+    with strict_json_mode():
         opts = provider._request_options("qwen3.8-27b")
-    finally:
-        from veles.core.context import reset_strict_json
-
-        reset_strict_json(tok)
     assert opts["extra_body"] == {"cache_prompt": True}
     assert opts["response_format"] == {"type": "json_object"}
 

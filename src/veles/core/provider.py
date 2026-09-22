@@ -145,23 +145,3 @@ class Provider(Protocol):
         model: str,
         max_tokens: int = 4096,
     ) -> Iterator[StreamEvent]: ...
-
-
-def default_stream_via_create(
-    provider: Provider,
-    messages: list[Message],
-    tools: list[dict[str, Any]] | None = None,
-    *,
-    model: str,
-    max_tokens: int = 4096,
-) -> Iterator[StreamEvent]:
-    """Adapter helper — degrade to a one-shot create_message call.
-
-    Adapters that lack native streaming (e.g. claude-cli at M11) call this
-    from their `stream_message` to satisfy the Protocol while still letting
-    the agent loop work uniformly.
-    """
-    response = provider.create_message(messages, tools=tools, model=model, max_tokens=max_tokens)
-    if response.text:
-        yield TextDelta(text=response.text)
-    yield StreamEnd(response=response)

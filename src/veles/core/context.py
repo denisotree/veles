@@ -172,14 +172,6 @@ def expects_strict_json() -> bool:
     return _strict_json.get()
 
 
-def set_strict_json(on: bool) -> Token:
-    return _strict_json.set(on)
-
-
-def reset_strict_json(token: Token) -> None:
-    _strict_json.reset(token)
-
-
 @contextmanager
 def strict_json_mode() -> Iterator[None]:
     """Mark the enclosed provider calls as expecting a bare JSON object."""
