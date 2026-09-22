@@ -741,10 +741,9 @@ def _make_tool_aware_provider(
     knows which OpenRouter model to use when running project skills.
     """
     if name == "openrouter":
-        from veles.core.model_budgets import request_timeout_for
-
-        # M247: same per-model timeout as `provider_factory.make_provider`.
-        return OpenRouterProvider(timeout=request_timeout_for(skill_model))
+        # M266: the constructor resolves the timeout and retry count itself
+        # (explicit → `[engine]` → per-model default).
+        return OpenRouterProvider(model=skill_model)
     if name == "anthropic":
         from veles.adapters.anthropic import AnthropicProvider
 

@@ -97,11 +97,12 @@ def make_provider(name: str, model: str | None = None) -> Provider:
     """
     if name == "openrouter":
         from veles.adapters.openrouter import OpenRouterProvider
-        from veles.core.model_budgets import request_timeout_for
 
         # M247: a reasoning model generates for minutes before emitting visible
-        # text, and the flat 120s default killed a long run mid-stream.
-        return OpenRouterProvider(timeout=request_timeout_for(model))
+        # text, and the flat 120s default killed a long run mid-stream. M266
+        # moved the decision into the constructor, so every build site — this
+        # one, the CLI runtime, and the MCP server — gets it from one place.
+        return OpenRouterProvider(model=model)
     if name == "anthropic":
         from veles.adapters.anthropic import AnthropicProvider
 

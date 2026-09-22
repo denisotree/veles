@@ -103,3 +103,60 @@ def test_a_nonsense_retry_count_is_an_error(project_with, bad) -> None:
     project_with({"max_retries": bad})
     with pytest.raises(ConfigError):
         resolve_max_retries()
+
+
+# ---- the adapter resolves both on its own ----
+
+
+def _openrouter(**kwargs):
+    from veles.adapters.openrouter import OpenRouterProvider
+
+    return OpenRouterProvider(api_key="sk-test", **kwargs)  # offline: no network here
+
+
+def test_bare_construction_picks_up_the_config(project_with) -> None:
+    """`adapters/cli/mcp_server.py` builds the provider with no arguments at
+    all — before M266 that was a flat 120s in bypass of every budget."""
+    project_with({"request_timeout_s": 180, "max_retries": 1})
+    client = _openrouter()._client
+    assert client.timeout == 180.0
+    assert client.max_retries == 1
+
+
+def test_bare_construction_still_honours_the_model_budget(project_with) -> None:
+    project_with(None)
+    assert _openrouter(model=SLOW)._client.timeout == 450.0
+
+
+def test_unconfigured_retries_leave_the_sdk_default(project_with) -> None:
+    """Unset must mean "whatever the SDK currently does", not a number Veles
+    froze — and `0` must be distinguishable from unset."""
+    from openai import OpenAI
+
+    sdk_default = OpenAI(api_key="sk-test").max_retries
+    project_with(None)
+    assert _openrouter()._client.max_retries == sdk_default
+
+
+def test_explicit_timeout_still_wins_over_the_config(project_with) -> None:
+    project_with({"request_timeout_s": 180})
+    assert _openrouter(timeout=30.0, model=SLOW)._client.timeout == 30.0
+
+
+def test_factory_propagates_the_model(project_with, monkeypatch) -> None:
+    """`make_provider` used to compute the timeout itself; it now only has to
+    hand over the model."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    project_with(None)
+    from veles.core.provider_factory import make_provider
+
+    assert make_provider("openrouter", model=SLOW)._client.timeout == 450.0
+
+
+def test_skill_runtime_propagates_the_model(project_with, monkeypatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    project = project_with(None)
+    from veles.cli._runtime import _make_tool_aware_provider
+
+    provider = _make_tool_aware_provider("openrouter", project, skill_model=SLOW)
+    assert provider._client.timeout == 450.0
