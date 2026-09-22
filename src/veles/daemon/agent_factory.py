@@ -335,8 +335,18 @@ def _build_agent_for_turn(
     provider=None,
     compressor=_UNSET,
     tools: tuple[str, ...] | None = None,
+    mode: str | None = None,
+    extra_system: str | None = None,
+    toolless: bool = False,
 ):
     """Assemble one Agent for a single turn.
+
+    `mode` / `extra_system` / `toolless` (M280): what an agent mode asks of its
+    agent, mirroring the REPL factory (`cli/repl/runtime.py`). `planning` gets
+    the read-only planning toolset and `plan_mode`; every mode's
+    `system_block` and a phase's `extra_system` are appended to the prompt;
+    `toolless` hands the turn an empty registry (GoalMode's interview). The
+    REPL's terminal behaviour block is deliberately not carried over.
 
     The system prompt is rebuilt on every turn (M108) — adapters re-emit
     it on every API call, and the Telegram bot needs the AGENTS.md
@@ -361,6 +371,7 @@ def _build_agent_for_turn(
     workers see the project AGENTS.md plus their role-specific
     instructions."""
     from veles.cli import (
+        _PLANNING_TOOLS,
         _RUN_TOOLS,
         _load_skills,
         _make_provider,
@@ -368,19 +379,24 @@ def _build_agent_for_turn(
         build_run_system_prompt,
     )
     from veles.core.agent import Agent
+    from veles.core.tools.registry import Registry
 
     if provider is None:
         provider = _make_provider(settings.provider_name, settings.model)
-    registry = _load_skills(
-        project,
-        # M204: `tools` narrows the surface for scoped sub-agents (e.g. the
-        # [ingest] set for background ingest workers — no run_shell/fetch_url,
-        # B1). Default stays the full run surface.
-        tools if tools is not None else _RUN_TOOLS,
-        provider=provider,
-        model=settings.model,
-        skills_cache_ttl=settings.skills_cache_ttl,
-    )
+    is_planning = mode == "planning"
+    if toolless:
+        registry = Registry()
+    else:
+        registry = _load_skills(
+            project,
+            # M204: `tools` narrows the surface for scoped sub-agents (e.g. the
+            # [ingest] set for background ingest workers — no run_shell/fetch_url,
+            # B1). Default stays the full run surface; planning gets its own.
+            tools if tools is not None else (_PLANNING_TOOLS if is_planning else _RUN_TOOLS),
+            provider=provider,
+            model=settings.model,
+            skills_cache_ttl=settings.skills_cache_ttl,
+        )
     # Channel session maps survive daemon restarts and DB resets, so a
     # caller-supplied session_id may point at a row that no longer
     # exists. Hitting `append_turn` with a dangling id trips the FK
@@ -411,6 +427,12 @@ def _build_agent_for_turn(
         )
     else:
         system_prompt = base_system
+    if mode is not None or extra_system:
+        from veles.core.modes import get_mode
+
+        block = get_mode(mode).system_block.strip() if mode is not None else ""
+        chunks = [c for c in (system_prompt, block, (extra_system or "").strip()) if c]
+        system_prompt = "\n\n".join(chunks) or None
     # Resolve hard-ceiling once so both the compressor (for its sub-
     # agent input cap) and Agent (for emergency truncation) agree.
     effective_hard_ceiling, effective_summariser_input = _effective_ceilings(settings)
@@ -436,6 +458,7 @@ def _build_agent_for_turn(
         system_prompt=system_prompt,
         compressor=compressor,
         hard_ceiling_tokens=effective_hard_ceiling,
+        plan_mode=is_planning,
     )
 
 
@@ -499,14 +522,22 @@ def _make_agent_factory(
             )
         return reused["provider"], reused["compressor"]
 
-    def factory(session_id: str | None, *, prompt: str | None = None):
+    def factory(
+        session_id: str | None,
+        *,
+        prompt: str | None = None,
+        mode: str | None = None,
+        extra_system: str | None = None,
+        toolless: bool = False,
+    ):
         # One INFO line per turn — daemon admins can grep this to confirm
         # which model/provider the config resolved to for each session.
         factory_logger.info(
-            "session=%s using model=%s provider=%s",
+            "session=%s using model=%s provider=%s mode=%s",
             session_id,
             settings.model,
             settings.provider_name,
+            mode or "default",
         )
         provider, compressor = _reused_provider_and_compressor()
         return _build_agent_for_turn(
@@ -517,6 +548,9 @@ def _make_agent_factory(
             prompt=prompt,
             provider=provider,
             compressor=compressor,
+            mode=mode,
+            extra_system=extra_system,
+            toolless=toolless,
         )
 
     return factory
