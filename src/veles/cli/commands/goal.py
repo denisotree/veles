@@ -162,6 +162,22 @@ def _cancel(state, args):
 
 
 def _drive(args, project: Project, goal_id: str) -> int:
+    """Run the goal unless another process already is. A goal left `active`
+    by a stall looks exactly like one running in another terminal, and the
+    stop message says to `resume` — a second driver would run the same step
+    twice, spend twice, and race on `goals/<id>.json`."""
+    from veles.core.file_lock import LockHeld, file_lock
+    from veles.core.goal import goals_dir
+
+    try:
+        with file_lock(goals_dir(project.state_dir) / f"{goal_id}.lock", blocking=False):
+            return _drive_locked(args, project, goal_id)
+    except LockHeld:
+        print(f"error: goal {goal_id} is already running in another process", file=sys.stderr)
+        return 2
+
+
+def _drive_locked(args, project: Project, goal_id: str) -> int:
     """Run the goal in the foreground on the same runtime the REPL builds —
     provider, model, tools, compressor, session store — so a goal behaves the
     same here as it does after `/goal` in the REPL."""

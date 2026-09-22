@@ -215,6 +215,42 @@ def test_veles_goal_resume_continues_a_stopped_goal(project, monkeypatch, paused
     assert read_goal(project.state_dir, goal.id).status == "completed"
 
 
+def test_resume_refuses_a_goal_already_running_elsewhere(project, monkeypatch) -> None:
+    """A goal running in another terminal is `active`, exactly like one that
+    stalled — and the stall message says to `resume`. Two drivers would run
+    the same step twice."""
+    import subprocess
+    import sys
+
+    from veles.cli import main as cli_main
+    from veles.core.goal import goals_dir
+
+    goal = start_goal(project.state_dir, objective="x", done_condition="y")
+    lock = goals_dir(project.state_dir) / f"{goal.id}.lock"
+    holder = subprocess.Popen(  # another process, as a second terminal would be
+        [
+            sys.executable,
+            "-c",
+            "import sys, fcntl; f = open(sys.argv[1], 'w'); "
+            "fcntl.flock(f, fcntl.LOCK_EX); print('held', flush=True); sys.stdin.read()",
+            str(lock),
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert holder.stdout is not None and holder.stdout.readline().strip() == "held"
+        runtime, calls = _fake_runtime(project)
+        monkeypatch.chdir(project.root)
+        monkeypatch.setattr("veles.cli.repl.runtime._build_runtime", lambda *_a, **_k: runtime)
+        rc = cli_main(["goal", "resume", goal.id])
+    finally:
+        holder.communicate("")
+    assert rc == 2
+    assert calls == []
+
+
 def test_a_driven_goal_resumes_where_it_stopped(project) -> None:
     """The state lives on disk (phase in goals/<id>.json, plan in
     plans/active/), so a second `drive_goal` — `veles goal resume` — continues
