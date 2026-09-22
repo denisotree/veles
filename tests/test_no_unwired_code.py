@@ -65,7 +65,6 @@ _REGISTERING_DECORATORS = ("tool", "property", "hook", "setter", "command")
 
 _BASELINE = frozenset(
     {
-        "apply_merge",
         "available_locales",
         "bump",
         # Kept on purpose (reviewed 2026-09-22): observation hooks that let tests
@@ -77,7 +76,6 @@ _BASELINE = frozenset(
         "delete_embedding",
         "denied",
         "detect_api_mode",
-        "deterministic_merge",
         "event_decision_str",
         "find_parent_project",
         "force_run",
@@ -88,13 +86,11 @@ _BASELINE = frozenset(
         "is_known_command",
         "list_completed",
         "list_skills",
-        "llm_merge",
         "mirror_to_session",
         "parse_plan_ref",
         "parse_tool_calls",
         "recent_promote_proposals",
         "render_system_block",
-        "scan_for_context_files",
         "set_project_wizard_prompter",
         "set_wizard_prompter",
         "skeleton_ref_index",

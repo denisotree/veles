@@ -585,7 +585,11 @@ def _check_symlinks(project: Project | None) -> CheckResult:
             issues.append(f"{name} missing")
             continue
         if not p.is_symlink():
-            issues.append(f"{name} is a regular file, not a symlink to AGENTS.md")
+            # M272: say what it costs — the agent reads only AGENTS.md.
+            issues.append(
+                f"{name} is a regular file, not a symlink to AGENTS.md, "
+                "so Veles does not load its content"
+            )
             continue
         try:
             target = os.readlink(p)
@@ -599,7 +603,11 @@ def _check_symlinks(project: Project | None) -> CheckResult:
             name="symlinks",
             status="warn",
             message="; ".join(issues),
-            fix_hint="run `veles init --force` to re-create symlinks (preserves AGENTS.md)",
+            # `init --force` alone never replaced a regular file — it only
+            # links a *missing* one — so the old hint could not fix this case.
+            fix_hint="move anything a regular CLAUDE.md/GEMINI.md says into AGENTS.md and "
+            "delete it, then run `veles init --force` to re-create the symlinks "
+            "(AGENTS.md is preserved)",
         )
     return CheckResult(name="symlinks", status="ok", message="CLAUDE.md and GEMINI.md → AGENTS.md")
 
