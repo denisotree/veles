@@ -54,6 +54,7 @@ veles secret set OPENROUTER_API_KEY       # pede o valor (ou passe por stdin)
 veles secret list                         # que segredos estão configurados
 veles secret get OPENROUTER_API_KEY --reveal
 veles secret delete OPENROUTER_API_KEY
+veles secret set OPENROUTER_API_KEY --project myproj   # uma chave só para um projeto
 ```
 
 A pesquisa recorre, em alternativa, à [variável de ambiente](../reference/environment-variables.md)

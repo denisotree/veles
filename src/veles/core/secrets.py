@@ -17,10 +17,22 @@ The functions degrade gracefully:
   - Keychain access denied at the OS level → returns None / env fallback.
   - Backend not configured (some Linux CI environments) → env fallback.
 
-`get_secret(name, env_fallback=True)` is the read-side: keychain first,
-env second. Adapters can swap their `os.environ.get("OPENROUTER_API_KEY")`
-calls for `get_secret("OPENROUTER_API_KEY")` and become keychain-aware
-without breaking anyone whose secrets are still in `.env`.
+**Two kinds of entry, one router (M271).**
+
+  - A *provider API key* (`OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, …) lives
+    at `veles:<provider>:<scope>` — scope `default` or a project slug (M92).
+    Read by `get_provider_key` (project scope → default → env), which is what
+    every provider uses. Written by the setup wizards and by `veles secret`.
+    Channel credentials (a Telegram bot token) share this layout.
+  - *Every other secret* (`TAVILY_API_KEY`, `VELES_DAEMON_TOKEN`, …) lives at
+    `veles:<NAME>`, read by `get_secret` (keychain → env).
+
+`provider_for_env_name` decides which kind a name is, from
+`PROVIDER_API_KEY_ENVS`. Before M271 there was no router: `veles secret`
+wrote every name as the second kind, including provider keys, whose flat entry
+M149 had stopped reading as a legacy form — so `veles secret set
+OPENROUTER_API_KEY` stored a key nothing used, and the web-search keys were
+read from the environment only.
 """
 
 from __future__ import annotations
