@@ -83,7 +83,6 @@ _BASELINE = frozenset(
         "get_provider",
         "get_skill",
         "get_skill_tool_refs",
-        "is_known_command",
         "list_completed",
         "list_skills",
         "parse_plan_ref",

@@ -16,7 +16,6 @@ import pytest
 
 from veles.channels._telegram_commands import (
     dispatch,
-    is_known_command,
     menu_descriptors,
     parse_command,
 )
@@ -60,24 +59,15 @@ def test_parse_command_trims_whitespace() -> None:
     assert parse_command("  /status  arg  ") == ("status", "arg")
 
 
-# ---- is_known_command ----
-
-
-def test_known_commands_include_gateway_owned() -> None:
-    """`start` / `reset` are owned by the gateway flow, but they still
-    count as known so the gateway never sends them through the message
-    buffer."""
-    assert is_known_command("start")
-    assert is_known_command("reset")
-
-
-def test_known_commands_include_dispatcher_handled() -> None:
-    for cmd in ("help", "status", "session", "tokens", "context"):
-        assert is_known_command(cmd), cmd
-
-
-def test_unknown_command() -> None:
-    assert not is_known_command("foobar")
+def test_a_message_that_starts_with_a_path_is_not_a_command() -> None:
+    """M274: Telegram's own grammar (`[a-z0-9_]{1,32}`, checked against the
+    Bot API docs) decides what is a command. Before this, a path at the start
+    of a message was parsed as a command and answered "Unknown command"."""
+    assert parse_command("/var/log/app.log почему падает?") is None
+    assert parse_command("/Users/me/report.pdf посмотри файл") is None
+    assert parse_command("/tmp") == ("tmp", "")  # a valid name is still a command
+    assert parse_command("/" + "a" * 33) is None  # past Telegram's 32-char limit
+    assert parse_command("/ help") is None  # Telegram has no command with a space
 
 
 # ---- menu_descriptors ----

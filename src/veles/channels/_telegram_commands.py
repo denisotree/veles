@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import re
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
@@ -324,6 +325,13 @@ _HANDLERS: dict[str, CommandHandler] = {
 }
 
 
+# Telegram's own command grammar (Bot API `BotCommand.command`: "1-32
+# characters. Can contain only lowercase English letters, digits and
+# underscores"; users may type Latin letters in either case — checked against
+# core.telegram.org on 2026-09-22). Matched after lower-casing.
+_COMMAND_NAME = re.compile(r"[a-z0-9_]{1,32}")
+
+
 def parse_command(text: str) -> tuple[str, str] | None:
     """Parse `/<cmd> <args…>` from a Telegram text message.
 
@@ -331,23 +339,21 @@ def parse_command(text: str) -> tuple[str, str] | None:
     of the leading `/`, or `None` when the text isn't a command.
     Telegram allows `/cmd@BotName` — the `@BotName` suffix is
     stripped so the bot responds when addressed in a group.
+
+    M274: only a name Telegram itself would treat as a command counts.
+    Anything else starting with `/` was parsed as a command and answered
+    "Unknown command", so a message that merely *began* with a path —
+    `/var/log/app.log почему падает?` — never reached the agent.
     """
     stripped = text.strip()
     if not stripped.startswith("/"):
         return None
-    body = stripped[1:].lstrip()
-    if not body:
-        return None
-    head, _, args = body.partition(" ")
+    head, _, args = stripped[1:].partition(" ")
     cmd, _, _bot_at = head.partition("@")
-    return cmd.lower(), args.strip()
-
-
-def is_known_command(cmd: str) -> bool:
-    """True when the gateway's existing flow (`/start`, `/reset`) or
-    this module's dispatcher recognises the command. Used by the
-    gateway to keep buffering disabled for any slash input."""
-    return cmd in {"start", "reset"} or cmd in _HANDLERS
+    cmd = cmd.lower()
+    if not _COMMAND_NAME.fullmatch(cmd):
+        return None
+    return cmd, args.strip()
 
 
 async def dispatch(gateway: TelegramGateway, chat_key: str, cmd: str, args: str) -> str | None:
@@ -384,7 +390,6 @@ def menu_descriptors() -> list[dict[str, str]]:
 
 __all__ = [
     "dispatch",
-    "is_known_command",
     "menu_descriptors",
     "parse_command",
 ]
