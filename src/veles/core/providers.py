@@ -1,15 +1,12 @@
 """Single source of truth for the list of LLM providers Veles supports.
 
-Adding a new provider used to require five edits (CLI stdin wizard,
-project stdin wizard, TUI user wizard, TUI project wizard, plus the
-KNOWN_PROVIDERS frozenset in `core/model_naming.py`). Each list could
-drift independently — `cli/wizard.py` listed providers as bare strings,
+Adding a new provider used to require an edit in every wizard, and each list
+could drift independently — `cli/wizard.py` listed providers as bare strings,
 TUI wizards as `ChoiceItem` objects with different label conventions.
 
 This module centralises the catalogue. `ALL_PROVIDERS` is the canonical
 ordered tuple; the wizards build their own UI primitives (`ChoiceItem`,
-plain strings) from it. `core/model_naming.py::KNOWN_PROVIDERS` is
-re-derived here as well so the strip-prefix logic stays in sync.
+plain strings) from it.
 
 Order matters — it's the order users see in the provider picker, with
 the most common choice (OpenRouter) first.

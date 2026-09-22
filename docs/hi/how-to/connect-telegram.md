@@ -67,6 +67,14 @@ veles channel reset-session <chat_id>    # next message from that chat starts fr
 veles channel remove telegram            # drop the channel binding
 ```
 
+## चैट में एजेंट मोड
+
+`/mode` चैट का एजेंट मोड बदलता है: `default` (किसी भी बदलाव से पहले की तरह एजेंट
+सीधे जवाब देता है), `auto` (हर संदेश पर तय करता है कि पहले योजना बनानी है या नहीं),
+`planning` (सिर्फ़ योजना बनाता है, कुछ नहीं बदलता) और `writing` (अपने टूल से काम
+करता है)। मौजूदा मोड पर निशान लगा होता है। चुना गया मोड daemon के दोबारा शुरू
+होने तक रहता है। मोड की स्थिति-पंक्ति, जैसे *auto → plan*, जवाब के ऊपर दिखती है।
+
 ## Multimodal सीमा
 
 **photo या voice message** भेजने पर फ़िलहाल "not configured" notice मिलता है।

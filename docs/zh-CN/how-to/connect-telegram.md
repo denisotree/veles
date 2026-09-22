@@ -61,6 +61,13 @@ veles channel reset-session <chat_id>    # next message from that chat starts fr
 veles channel remove telegram            # drop the channel binding
 ```
 
+## 聊天中的智能体模式
+
+`/mode` 切换聊天的智能体模式：`default`（智能体直接回答，与切换前相同）、`auto`
+（对每条消息决定是否先做计划）、`planning`（只做计划，不做任何修改）和 `writing`
+（使用工具直接执行）。当前模式会打勾。所选模式在守护进程重启前有效。模式的状态行
+（例如 *auto → plan*）显示在回答上方。
+
 ## 多模态限制
 
 目前发送**照片或语音消息**会返回一条“未配置”的提示。Veles 定义了 `VisionAdapter` / STT 适配器协议以及一个注册表（`modules/vision.py`、`modules/stt.py`），但**没有任何具体适配器随附发布，也没有在守护进程启动时注册任何适配器**，所以图像和音频暂时不会被分析。文本聊天功能完整可用。参见[提供方参考](../reference/providers.md#multimodal-status-vision--speech-to-text)。

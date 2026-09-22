@@ -68,6 +68,26 @@ def _default_channels_dir() -> Path:
     return user_home() / "channels"
 
 
+def chat_key_for_target(target: str) -> tuple[str, str] | None:
+    """`(platform, key)` under which a chat's session is mapped, for a
+    `<platform>:<chat_id>[:<thread>]` delivery target; None for any other target.
+
+    The key is what the gateway itself writes — `str(chat_id)`
+    (`telegram/_gateway.py`: `chat_key = str(chat_id)`), not the target string.
+    Code that bound a delivery to a chat used to look up `"telegram:42"` in a
+    map the gateway keys by `"42"`, so every reminder (M214) and job (M273) was
+    recorded in a session the chat never read."""
+    from veles.channels.delivery import DeliveryTarget
+
+    try:
+        parsed = DeliveryTarget.parse(target)
+    except ValueError:
+        return None
+    if parsed.kind != "platform" or not parsed.platform or not parsed.chat_id:
+        return None
+    return parsed.platform, parsed.chat_id
+
+
 def channel_session_path(channel: str, *, base_dir: Path | None = None) -> Path:
     target = base_dir or _default_channels_dir()
     return target / f"{channel}-sessions.json"

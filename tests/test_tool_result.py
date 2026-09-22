@@ -16,7 +16,6 @@ from veles.core.tool_result import (
     serialize_for_dispatch,
     store_artifact,
     success,
-    to_dict,
     truncate_with_artifact,
 )
 
@@ -34,21 +33,6 @@ def test_summary_is_clipped_to_500_chars() -> None:
     r = success(long)
     assert len(r.summary) <= SUMMARY_MAX_CHARS
     assert r.summary.endswith("…")
-
-
-def test_to_dict_round_trip() -> None:
-    r = ToolResult(
-        status="success",
-        summary="ok",
-        data={"k": "v"},
-        evidence_ref="artifact://veles/abc",
-        next_valid_actions=["read_file"],
-        error_type=None,
-    )
-    d = to_dict(r)
-    assert d["status"] == "success"
-    assert d["data"] == {"k": "v"}
-    assert d["evidence_ref"] == "artifact://veles/abc"
 
 
 # ---------- serialize_for_dispatch ----------

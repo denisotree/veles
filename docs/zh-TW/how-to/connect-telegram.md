@@ -67,6 +67,13 @@ veles channel reset-session <chat_id>    # next message from that chat starts fr
 veles channel remove telegram            # drop the channel binding
 ```
 
+## 聊天中的智能體模式
+
+`/mode` 切換聊天的智能體模式：`default`（智能體直接回答，與切換前相同）、`auto`
+（對每則訊息決定是否先做計畫）、`planning`（只做計畫，不做任何修改）和 `writing`
+（使用工具直接執行）。目前的模式會打勾。所選模式在守護程序重新啟動前有效。模式的
+狀態列（例如 *auto → plan*）顯示在回答上方。
+
 ## 多模態限制
 
 傳送**照片或語音訊息**目前會回傳一則「not configured」通知。

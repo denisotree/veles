@@ -149,55 +149,37 @@ async def test_stream_events_unknown_run_id_raises(tmp_path) -> None:
     raise AssertionError("expected LookupError for unknown run_id")
 
 
-async def test_update_session_writes_overrides(tmp_path, caplog) -> None:
-    """Channel-side `update_session` (model swap via /model) must land
-    in `state.session_overrides` so the next agent build picks it up,
-    and the daemon log must mention the swap so operators can audit
-    it."""
+async def test_update_session_switches_the_mode(tmp_path, caplog) -> None:
+    """The Telegram `/mode` tap lands in `state.chat_modes`, which the next
+    turn reads (M280), and the daemon log records it for operators."""
     state = _build_state(tmp_path)
     backend = InProcessRunBackend(state)
     with caplog.at_level("INFO", logger="veles.channels.in_process_backend"):
-        payload = await backend.update_session("sess-x", model="openai/gpt-4o")
-    assert payload["session_id"] == "sess-x"
-    assert payload["overrides"]["model"] == "openai/gpt-4o"
-    stored = state.get_overrides("sess-x")
-    assert stored is not None and stored.model == "openai/gpt-4o"
-    matched = [
-        r
-        for r in caplog.records
-        if "in-process session=sess-x" in r.message and "openai/gpt-4o" in r.message
-    ]
-    assert matched, f"expected override log, got: {[r.message for r in caplog.records]}"
+        payload = await backend.update_session("sess-x", mode="planning")
+    assert payload == {"session_id": "sess-x", "mode": "planning"}
+    assert state.chat_mode("sess-x").mode == "planning"
+    assert any("in-process session=sess-x mode=planning" in r.message for r in caplog.records)
 
 
-async def test_update_session_requires_field(tmp_path) -> None:
+async def test_update_session_default_switches_back(tmp_path) -> None:
     state = _build_state(tmp_path)
-    backend = InProcessRunBackend(state)
-    try:
-        await backend.update_session("sess-x")
-    except ValueError:
-        return
-    raise AssertionError("expected ValueError when no field provided")
+    state.set_chat_mode("sess-x", "writing")
+    await InProcessRunBackend(state).update_session("sess-x", mode="default")
+    assert state.chat_mode("sess-x").mode is None
 
 
-async def test_get_session_returns_overrides_when_set(tmp_path) -> None:
-    """get_session surfaces the current per-session overrides so the
-    gateway can resolve the active model in the /model picker."""
+async def test_update_session_rejects_an_unknown_mode(tmp_path) -> None:
     state = _build_state(tmp_path)
-    state.set_overrides("sess-x", model="openai/gpt-4o")
-    backend = InProcessRunBackend(state)
-    payload = await backend.get_session("sess-x")
-    assert payload["session_id"] == "sess-x"
-    assert payload["overrides"]["model"] == "openai/gpt-4o"
+    with pytest.raises(ValueError, match="unknown mode"):
+        await InProcessRunBackend(state).update_session("sess-x", mode="turbo")
 
 
-async def test_get_session_returns_null_overrides_when_none(tmp_path) -> None:
-    """No override yet → overrides=null so the caller can fall back to
-    the daemon default model."""
+async def test_get_session_reports_the_mode(tmp_path) -> None:
     state = _build_state(tmp_path)
+    state.set_chat_mode("sess-x", "auto")
     backend = InProcessRunBackend(state)
-    payload = await backend.get_session("sess-unknown")
-    assert payload["overrides"] is None
+    assert (await backend.get_session("sess-x"))["mode"] == "auto"
+    assert (await backend.get_session("sess-unknown"))["mode"] == "default"
 
 
 async def test_health_reports_daemon_provider(tmp_path) -> None:

@@ -148,6 +148,61 @@ async def test_deliver_to_pushes_the_answer_to_the_target(aiohttp_client, state,
     assert seen == [("42", ANSWER, None)]
 
 
+# ---- M278: the delivered answer is part of the chat's conversation ----
+
+
+def _assistant_turns(store: SessionStore, session_id: str | None) -> list[str]:
+    if session_id is None:
+        return []
+    return [m.content or "" for m in store.load_messages(session_id) if m.role == "assistant"]
+
+
+async def test_a_delivered_answer_is_in_the_chat_session(aiohttp_client, state, app, auth):
+    """Without it, "tell me more about point 2" reached a chat agent with no
+    record of having sent anything — the M273 class, on `POST /v1/runs`."""
+    from veles.daemon.server import _channel_session_map
+
+    async def fake(chat_id, text, thread_id):
+        pass
+
+    _attach_router(state, fake)
+    chat_session = state.store.create_session()
+    _channel_session_map(state, "telegram").set("42", chat_session)  # as the gateway writes it
+    client = await aiohttp_client(app)
+
+    resp = await client.post(
+        "/v1/runs", json={"prompt": "hi", "deliver_to": "telegram:42"}, headers=auth
+    )
+    assert resp.status == 202
+    assert await _wait_for(lambda: ANSWER in _assistant_turns(state.store, chat_session))
+
+
+async def test_a_run_in_the_chats_own_session_is_not_recorded_twice(
+    aiohttp_client, state, app, auth
+):
+    from veles.daemon.server import _channel_session_map
+
+    delivered: list[str] = []
+
+    async def fake(chat_id, text, thread_id):
+        delivered.append(text)
+
+    _attach_router(state, fake)
+    chat_session = state.store.create_session()
+    _channel_session_map(state, "telegram").set("42", chat_session)
+    client = await aiohttp_client(app)
+
+    resp = await client.post(
+        "/v1/runs",
+        json={"prompt": "hi", "session_id": chat_session, "deliver_to": "telegram:42"},
+        headers=auth,
+    )
+    assert resp.status == 202
+    assert await _wait_for(lambda: bool(delivered))
+    await asyncio.sleep(0.1)  # let a (wrong) bind land if it were going to
+    assert _assistant_turns(state.store, chat_session) == [ANSWER]
+
+
 async def test_deliver_to_origin_resolves_against_the_request_origin(
     aiohttp_client, state, app, auth
 ):

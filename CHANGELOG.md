@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.40.0] — 2026-09-23
+
+### Fixed — the daemon answers chat messages again
+
+Since 0.36.0, every message to a Telegram bot and every `POST /v1/runs` with
+text failed with "failed to build agent: memory.aio.submit() called from inside
+an event loop". Updating to 0.40.0 fixes it. Background ingest and research
+resumes were affected the same way, and so were `/insights` and `/rules` in the
+`veles` REPL, which failed with the same error.
+
+### Fixed — Telegram `/mode` works
+
+Choosing a mode used to be saved and then ignored. Every message still ran as
+the plain agent. Now the chat's next message runs in the chosen mode:
+
+- `default` — the agent answers directly, as before. Chats you never switched
+  stay here.
+- `auto` — decides for each message whether to plan first.
+- `planning` — plans only and changes nothing.
+- `writing` — acts with its tools.
+
+`/mode` ticks the current mode. The choice lasts until the daemon restarts. A
+mode's status line, for example *auto → plan*, appears above the answer.
+
+### Fixed — reminders and scheduled messages are part of the chat
+
+Reminders, scheduled jobs and finished background tasks were saved to a
+conversation the chat never reads. When you replied, the agent did not know it
+had sent anything. This is fixed, and a message sent to a chat through
+`POST /v1/runs` with `deliver_to` is now saved to that chat's conversation too.
+Notices meant for "the last active chat" can be delivered again. Named daemons
+now use their own chat list for this.
+
+### Changed
+
+- `PATCH /v1/sessions/{id}` accepts `default`, `auto`, `planning`, `writing` or
+  `goal` and returns `{"session_id", "mode"}`. `GET /v1/sessions/{id}` returns
+  `mode` instead of `overrides`.
+
+### Removed
+
+- Six modules and one function that nothing in Veles used: a provider failover
+  pool, an API-mode detector, a version helper, a model-name helper, an old
+  channel protocol and an old tab completer.
+
+### Known issue
+
+- Goals don't run from Telegram yet. `/goal` explains how to run one on the
+  host with `veles goal start`.
+
 ## [0.39.0] — 2026-09-22
 
 Bugs found by reading the code for them, each confirmed before it was fixed.
@@ -1578,7 +1628,8 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v0.39.0...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v0.40.0...HEAD
+[0.40.0]: https://github.com/denisotree/veles/compare/v0.39.0...v0.40.0
 [0.39.0]: https://github.com/denisotree/veles/compare/v0.38.0...v0.39.0
 [0.38.0]: https://github.com/denisotree/veles/compare/v0.37.0...v0.38.0
 [0.37.0]: https://github.com/denisotree/veles/compare/v0.36.0...v0.37.0

@@ -67,6 +67,15 @@ veles channel reset-session <chat_id>    # tin nhắn tiếp theo từ chat đó
 veles channel remove telegram            # bỏ liên kết kênh
 ```
 
+## Chế độ của agent trong cuộc trò chuyện
+
+`/mode` chuyển chế độ của agent trong cuộc trò chuyện: `default` (agent trả lời
+trực tiếp, như trước khi chuyển), `auto` (với mỗi tin nhắn tự quyết có lập kế
+hoạch trước không), `planning` (chỉ lập kế hoạch, không thay đổi gì) và `writing`
+(hành động bằng công cụ của nó). Chế độ hiện tại được đánh dấu. Lựa chọn có hiệu
+lực đến khi daemon khởi động lại. Dòng trạng thái của chế độ, ví dụ
+*auto → plan*, hiện phía trên câu trả lời.
+
 ## Hạn chế đa phương thức (multimodal)
 
 Việc gửi một **ảnh hoặc tin nhắn thoại** hiện trả về thông báo "not configured".

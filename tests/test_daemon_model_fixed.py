@@ -7,7 +7,7 @@ tests lock the post-M127 behaviour:
     even when an old DB still carries a stale `session_model_overrides`
     row (the exact mind-palace dashboard bug).
   * the SessionStore no longer exposes model-override persistence.
-  * `set_overrides` no longer writes anything to the store.
+  * a session's agent mode (M280, `set_chat_mode`) is kept in memory only.
 """
 
 from __future__ import annotations
@@ -52,8 +52,7 @@ def test_build_state_starts_with_empty_overrides(project: Project, token_store: 
         agent_factory=_noop_factory(),
         default_model="qwen3:4b-instruct",
     )
-    assert state.session_overrides == {}
-    assert state.last_override_session_id is None
+    assert state.chat_modes == {}
 
 
 def test_store_has_no_model_override_api(project: Project) -> None:
@@ -68,7 +67,7 @@ def test_store_has_no_model_override_api(project: Project) -> None:
         assert not hasattr(store, gone), f"{gone} should be removed in M127"
 
 
-def test_set_overrides_does_not_touch_store(project: Project, token_store: TokenStore) -> None:
+def test_a_chat_mode_is_kept_in_memory(project: Project, token_store: TokenStore) -> None:
     store = SessionStore(project.memory_db_path)
     state = DaemonState(
         project=project,
@@ -76,10 +75,11 @@ def test_set_overrides_does_not_touch_store(project: Project, token_store: Token
         token_store=token_store,
         agent_factory=_noop_factory(),
     )
-    # mode is carried in-memory; nothing is persisted.
-    state.set_overrides("sess-1", mode="planning")
-    assert state.get_overrides("sess-1").mode == "planning"  # type: ignore[union-attr]
-    assert state.last_override_session_id is None
+    state.set_chat_mode("sess-1", "planning")
+    assert state.chat_mode("sess-1").mode == "planning"
+    assert state.chat_mode("sess-2").mode is None  # never switched → default
+    with pytest.raises(ValueError, match="unknown mode"):
+        state.set_chat_mode("sess-1", "turbo")
 
 
 def test_build_state_ignores_legacy_override_table(
@@ -87,7 +87,7 @@ def test_build_state_ignores_legacy_override_table(
 ) -> None:
     """Mirror the mind-palace incident: an old DB still has a
     `session_model_overrides` row from a pre-M127 Telegram /model swap.
-    M127 must NOT resurrect it — `session_overrides` stays empty."""
+    M127 must NOT resurrect it — no per-session state is rehydrated."""
     store = SessionStore(project.memory_db_path)
     # Recreate the pre-M127 table + a stale row by hand (the schema no
     # longer creates it).
@@ -106,8 +106,7 @@ def test_build_state_ignores_legacy_override_table(
         agent_factory=_noop_factory(),
         default_model="qwen3:4b-instruct",
     )
-    assert state.session_overrides == {}
-    assert state.last_override_session_id is None
+    assert state.chat_modes == {}
 
 
 async def test_health_active_model_is_config_not_stale_override(

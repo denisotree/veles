@@ -152,7 +152,7 @@ async def test_a_delivered_job_is_in_the_chat_session(tmp_path: Path) -> None:
         )
         await state.job_runner._tick_once(200_000.0)
 
-        sid = _channel_session_map(state, "telegram").get("telegram:42")
+        sid = _channel_session_map(state, "telegram").get("42")  # the gateway's key
         assert sid is not None
         recorded = [m.content for m in state.store.load_messages(sid) if m.role == "assistant"]
         assert any("disk 91%" in (c or "") for c in recorded)
@@ -174,7 +174,7 @@ async def test_an_undelivered_job_is_not_recorded(tmp_path: Path) -> None:
             name="daily", prompt="summarise", schedule_expr="30m", deliver_to="telegram:42", now=100
         )
         await state.job_runner._tick_once(200_000.0)
-        assert _channel_session_map(state, "telegram").get("telegram:42") is None
+        assert _channel_session_map(state, "telegram").get("42") is None
     finally:
         jobs_store.close()
         state.store.close()

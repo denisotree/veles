@@ -66,16 +66,12 @@ _REGISTERING_DECORATORS = ("tool", "property", "hook", "setter", "command")
 _BASELINE = frozenset(
     {
         "available_locales",
-        "bump",
-        # Kept on purpose (reviewed 2026-09-22): observation hooks that let tests
-        # read state from outside instead of reaching into `_is_dead` /
-        # `_active_state`. Test-only by design, not by neglect.
-        "cooling_down",
+        # Kept on purpose (reviewed 2026-09-22): an observation hook that lets
+        # tests read state from outside instead of reaching into `_active_state`.
+        # Test-only by design, not by neglect.
         "current_state",
-        "current_version",
         "delete_embedding",
         "denied",
-        "detect_api_mode",
         "event_decision_str",
         "find_parent_project",
         "get_embedding",
@@ -90,7 +86,6 @@ _BASELINE = frozenset(
         "set_wizard_prompter",
         "skeleton_ref_index",
         "stable_text",
-        "strip_provider_prefix",
         "unregister_platform",
         "update_status",
     }
@@ -196,17 +191,9 @@ def test_baseline_does_not_rot() -> None:
 # Measured 2026-09-22: 8 of 385 modules had no importer in src/. Two were wired
 # by name (`mcp_server` is launched with `-m`; `graphify_rebuild` is a template
 # copied into projects) — the rules below recognise both without a list. The
-# other six are the baseline. Same contract: it may shrink, never grow.
-_MODULE_BASELINE = frozenset(
-    {
-        "veles.channels.base",  # imported by nothing, not even tests
-        "veles.cli.repl.completer",
-        "veles.core.model_naming",
-        "veles.core.provider_pool",
-        "veles.core.provider_routing",
-        "veles.core.version",  # its release script does not exist
-    }
-)
+# other six were reviewed one by one in M279 and all deleted, so the baseline is
+# empty: any module nothing imports now fails this test.
+_MODULE_BASELINE: frozenset[str] = frozenset()
 
 
 def _module_name(path: Path) -> str:

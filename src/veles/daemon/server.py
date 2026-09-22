@@ -40,11 +40,8 @@ from veles import __version__
 from veles.daemon.auth import TokenStore, bearer_auth_middleware
 from veles.daemon.runner import (
     AgentFactory,
-    new_run_handle,
-    run_agent_in_background,
-    run_manager_in_background,
 )
-from veles.daemon.state import DaemonState
+from veles.daemon.state import CHAT_MODES, DaemonState
 
 logger = logging.getLogger(__name__)
 
@@ -276,17 +273,12 @@ async def _handle_create_run(request: web.Request) -> web.Response:
             {"error": "no delivery channel is running on this daemon"}, status=503
         )
 
-    handle = new_run_handle(session_id=session_id)
-    state.add_run(handle)
-    logger.info(
-        "POST /v1/runs run_id=%s session_id=%s prompt_len=%d",
-        handle.run_id,
-        session_id or "<new>",
-        len(prompt),
-    )
-
     def _on_finished(_: Any) -> None:
         state.touch_activity()
+
+    # Filled once the run is registered; `_deliver` runs after the turn, by
+    # which time it holds the run's final session id.
+    started: dict[str, Any] = {}
 
     # Built here rather than handing the router to the runner: `daemon/runner.py`
     # stays ignorant of DeliveryRouter, the same way it takes `verify_hook` /
@@ -297,92 +289,49 @@ async def _handle_create_run(request: web.Request) -> web.Response:
 
         async def _deliver(text: str) -> None:
             await router.deliver(target, text)
+            # M278: record the answer in the chat's session (as M214 reminders
+            # and M273 jobs are), so a reply has context — unless the run WAS
+            # that session and already holds it. Compared at delivery time: the
+            # factory may have re-allocated a stale session id meanwhile.
+            run = started["handle"]
+            slot = _chat_session_slot(state, target)
+            chat_session = slot[0].get(slot[1]) if slot else None
+            if run.session_id is not None and run.session_id == chat_session:
+                return
+            try:
+                from veles.daemon.background_ops import make_proactive_binder
+
+                await make_proactive_binder(state)(target, text)
+            except Exception as exc:  # binding never un-delivers the answer
+                logger.warning("run %s post-deliver bind failed: %s", run.run_id, exc)
 
         deliver_hook = _deliver
 
-    # M124: route long / research-keyword prompts through the manager-
-    # spawn orchestrator. Worker factory is per-daemon (built in
-    # `_make_worker_agent_factory`); when absent (older callers /
-    # tests), skip silently and fall through to the direct path.
-    if state.worker_agent_factory is not None and _should_use_manager_safe(prompt):
-        task = asyncio.create_task(
-            run_manager_in_background(
-                handle,
-                worker_agent_factory=state.worker_agent_factory,
-                prompt=prompt,
-                on_finished=_on_finished,
-                verify_hook=state.verify_hook,
-                origin=origin,
-                store=state.store,
-                deliver_hook=deliver_hook,
-            )
-        )
-        state.run_tasks.add(task)
-        task.add_done_callback(state.run_tasks.discard)
-        return web.json_response(handle.to_summary(), status=202)
+    from veles.daemon.turns import start_turn
 
     try:
-        agent = state.agent_factory(session_id, prompt=prompt)
-    except Exception as exc:
-        handle.state = "failed"
-        handle.error = f"{type(exc).__name__}: {exc}"
-        handle.finished_at = time.time()
-        logger.error(
-            "failed to build agent for run_id=%s: %s: %s",
-            handle.run_id,
-            type(exc).__name__,
-            exc,
-        )
-        return web.json_response(
-            {"error": "failed to build agent", "detail": handle.error},
-            status=500,
-        )
-
-    # The factory allocates the session eagerly (fresh id for a new chat, or a
-    # re-allocated one when the caller's id was stale), so the real session id
-    # is known BEFORE the run starts. Adopt it on the handle now so `started`
-    # carries it and channels can persist the chat→session mapping even if the
-    # turn later errors — closing the window where an errored/interrupted first
-    # turn left the mapping unset and the next message started fresh (amnesia).
-    effective_session_id = getattr(agent, "session_id", None) or session_id
-    handle.session_id = effective_session_id
-
-    task = asyncio.create_task(
-        run_agent_in_background(
-            handle,
-            agent=agent,
+        handle = await start_turn(
+            state,
             prompt=prompt,
-            on_finished=_on_finished,
-            post_turn_hook=state.post_turn_hook,
-            verify_hook=state.verify_hook,
+            session_id=session_id,
             origin=origin,
-            # M204: sub-agent factory (delegate/wiki_add under the daemon) +
-            # per-session serialization against background-op resume turns.
-            subagent_factory=state.subagent_factory,
-            turn_lock=(state.session_lock(effective_session_id) if effective_session_id else None),
+            on_finished=_on_finished,
             deliver_hook=deliver_hook,
         )
+    except Exception as exc:
+        logger.error("failed to build agent for POST /v1/runs: %s: %s", type(exc).__name__, exc)
+        return web.json_response(
+            {"error": "failed to build agent", "detail": f"{type(exc).__name__}: {exc}"},
+            status=500,
+        )
+    started["handle"] = handle
+    logger.info(
+        "POST /v1/runs run_id=%s session_id=%s prompt_len=%d",
+        handle.run_id,
+        session_id or "<new>",
+        len(prompt),
     )
-    state.run_tasks.add(task)
-    task.add_done_callback(state.run_tasks.discard)
     return web.json_response(handle.to_summary(), status=202)
-
-
-def _should_use_manager_safe(prompt: str) -> bool:
-    """Resolve the manager gate without crashing the daemon if the
-    orchestration module isn't importable (defensive — should always
-    be present in normal installs).
-
-    M122f: opt-in, default OFF — the daemon routes through the manager only
-    when `VELES_MANAGER_MODE=1` is set in its environment (the auto-heuristic
-    is disabled so background/channel turns don't silently fan out to N
-    sub-agents)."""
-    try:
-        from veles.core.orchestration import should_use_manager
-
-        return should_use_manager(prompt, use_heuristic_default=False)
-    except Exception:
-        return False
 
 
 async def _handle_list_runs(request: web.Request) -> web.Response:
@@ -542,12 +491,6 @@ async def _handle_get_session(request: web.Request) -> web.Response:
                 else [],
             }
         )
-    # M126 observability: surface the per-session overrides set via
-    # PATCH /v1/sessions/{id}. Empty/absent override → `null` so callers
-    # can tell "no override" from "override cleared to default".
-    overrides = state.get_overrides(session_id)
-    overrides_payload: dict[str, Any] | None
-    overrides_payload = None if overrides is None or overrides.is_empty() else overrides.to_dict()
     return web.json_response(
         {
             "id": info.id,
@@ -556,7 +499,8 @@ async def _handle_get_session(request: web.Request) -> web.Response:
             "turn_count": info.turn_count,
             "title": info.title,
             "messages": history,
-            "overrides": overrides_payload,
+            # M280: the session's agent mode (PATCH below); "default" = never switched.
+            "mode": state.chat_mode(session_id).mode or "default",
         }
     )
 
@@ -570,16 +514,13 @@ async def _handle_delete_session(request: web.Request) -> web.Response:
     return web.json_response({"deleted": True, "session_id": session_id})
 
 
-# M126: per-session config overrides — used by channels (Telegram
-# inline keyboards) so users can switch model/mode mid-conversation
-# without going through TUI or restarting the daemon.
-_VALID_MODES_PATCH = frozenset({"auto", "planning", "writing", "goal"})
-
-
 async def _handle_patch_session(request: web.Request) -> web.Response:
-    """PATCH /v1/sessions/{session_id} — set the per-session `mode`.
+    """PATCH /v1/sessions/{session_id} — set the session's agent mode.
 
-    Body: `{"mode": str}` where mode is one of auto/planning/writing/goal.
+    Body: `{"mode": str}`, one of `default`/auto/planning/writing/goal;
+    `default` returns the chat to the plain single-agent turn. M280: the next
+    turn of that session runs in this mode (`daemon/turns.py::start_turn`) —
+    before M280 the value was stored and never read.
 
     M127: `model` and `provider` are **fixed at daemon launch** from
     `config.toml` (`[engine]` / `[routing.tasks]`) and can no longer be
@@ -611,18 +552,18 @@ async def _handle_patch_session(request: web.Request) -> web.Response:
     mode = body.get("mode", _SENTINEL)
     if mode is _SENTINEL:
         return web.json_response({"error": "mode required"}, status=400)
-    if mode is not None and (not isinstance(mode, str) or mode not in _VALID_MODES_PATCH):
+    if not isinstance(mode, str) or (mode != "default" and mode not in CHAT_MODES):
         return web.json_response(
             {
                 "error": f"invalid mode {mode!r}",
-                "valid_modes": sorted(_VALID_MODES_PATCH),
+                "valid_modes": ["default", *sorted(CHAT_MODES)],
             },
             status=400,
         )
 
-    overrides = state.set_overrides(session_id, mode=mode)
-    logger.info("PATCH /v1/sessions/%s overrides=%s", session_id, overrides.to_dict())
-    return web.json_response({"session_id": session_id, "overrides": overrides.to_dict()})
+    state.set_chat_mode(session_id, None if mode == "default" else mode)
+    logger.info("PATCH /v1/sessions/%s mode=%s", session_id, mode)
+    return web.json_response({"session_id": session_id, "mode": mode})
 
 
 _SENTINEL = object()
@@ -861,6 +802,18 @@ def _channel_session_map(state: DaemonState, platform: str):
     return SessionMap.load(channel_session_path(key))
 
 
+def _chat_session_slot(state: DaemonState, target: str):
+    """`(session map, key)` of the chat a delivery target names, keyed the way
+    its gateway keys it (`chat_key_for_target`); None for a non-chat target."""
+    from veles.channels.session_map import chat_key_for_target
+
+    found = chat_key_for_target(target)
+    if found is None:
+        return None
+    platform, key = found
+    return _channel_session_map(state, platform), key
+
+
 def _float_setting(cfg: dict, key: str) -> float | None:
     """Read an optional numeric channel setting. A typo warns and falls
     back to the code default rather than crashing daemon startup."""
@@ -997,11 +950,10 @@ def build_state(
 ) -> DaemonState:
     """Convenience constructor used by both CLI and tests.
 
-    M127: the daemon's model/provider are fixed at launch from config, so
-    `session_overrides` starts empty and is NOT rehydrated from the store
-    (the per-session `session_model_overrides` table was removed). This is
-    what makes `/v1/health` `active_model` always reflect the configured
-    model instead of resurrecting a stale Telegram `/model` choice."""
+    M127: the daemon's model/provider are fixed at launch from config and
+    nothing per-session is rehydrated from the store, so `/v1/health`
+    `active_model` always reflects the configured model. Chat modes (M280)
+    start empty too — every chat on its default after a restart."""
     return DaemonState(
         project=project,
         store=store,
