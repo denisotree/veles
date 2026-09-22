@@ -60,7 +60,7 @@ async def test_dream_to_delivery_end_to_end(tmp_path: Path):
     # 2) a chat becomes active (SessionMap under a base_dir we control)
     maps_dir = tmp_path / "channels"
     smap = SessionMap.load(channel_session_path("telegram", base_dir=maps_dir))
-    smap.set("telegram:4242", "sess-1")
+    smap.set("4242", "sess-1")  # keyed as the gateway keys a chat: str(chat_id)
 
     # 3) the sweep resolves the last active channel and delivers the notice
     router = _RecordingRouter()

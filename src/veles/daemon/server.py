@@ -297,6 +297,20 @@ async def _handle_create_run(request: web.Request) -> web.Response:
 
         async def _deliver(text: str) -> None:
             await router.deliver(target, text)
+            # M278: record the answer in the chat's session (as M214 reminders
+            # and M273 jobs are), so a reply has context — unless the run WAS
+            # that session and already holds it. Compared at delivery time: the
+            # factory may have re-allocated a stale session id meanwhile.
+            slot = _chat_session_slot(state, target)
+            chat_session = slot[0].get(slot[1]) if slot else None
+            if handle.session_id is not None and handle.session_id == chat_session:
+                return
+            try:
+                from veles.daemon.background_ops import make_proactive_binder
+
+                await make_proactive_binder(state)(target, text)
+            except Exception as exc:  # binding never un-delivers the answer
+                logger.warning("run %s post-deliver bind failed: %s", handle.run_id, exc)
 
         deliver_hook = _deliver
 
@@ -859,6 +873,18 @@ def _channel_session_map(state: DaemonState, platform: str):
 
     key = f"{state.session_name}-{platform}" if state.session_name else platform
     return SessionMap.load(channel_session_path(key))
+
+
+def _chat_session_slot(state: DaemonState, target: str):
+    """`(session map, key)` of the chat a delivery target names, keyed the way
+    its gateway keys it (`chat_key_for_target`); None for a non-chat target."""
+    from veles.channels.session_map import chat_key_for_target
+
+    found = chat_key_for_target(target)
+    if found is None:
+        return None
+    platform, key = found
+    return _channel_session_map(state, platform), key
 
 
 def _float_setting(cfg: dict, key: str) -> float | None:

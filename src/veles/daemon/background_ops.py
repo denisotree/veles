@@ -168,7 +168,7 @@ def make_on_op_finished(state):
         from veles.core.context import reset_resume_depth, set_resume_depth
         from veles.core.untrusted import wrap_untrusted
         from veles.daemon.runner import new_run_handle, run_agent_in_background
-        from veles.daemon.server import _channel_session_map
+        from veles.daemon.server import _chat_session_slot
 
         target = (job.deliver_to or "").strip()
         router = state.delivery_router
@@ -177,9 +177,9 @@ def make_on_op_finished(state):
             return
         notify_text = f"Background {job.kind} finished. {summary}"
         depth = int((job.params or {}).get("resume_depth", 0))
-        platform = target.split(":", 1)[0]
         try:
-            session_id = _channel_session_map(state, platform).get(target)
+            slot = _chat_session_slot(state, target)
+            session_id = slot[0].get(slot[1]) if slot else None
         except Exception:  # pragma: no cover - a broken map must not eat the notice
             session_id = None
 
@@ -249,18 +249,18 @@ def make_proactive_binder(state):
 
     async def on_delivered(target: str, text: str) -> None:
         from veles.core.provider import Message
-        from veles.daemon.server import _channel_session_map
+        from veles.daemon.server import _chat_session_slot
 
-        if ":" not in target or state.store is None:
+        slot = _chat_session_slot(state, target)
+        if slot is None or state.store is None:
             return
-        platform = target.split(":", 1)[0]
-        smap = _channel_session_map(state, platform)
-        session_id = smap.get(target)
+        smap, key = slot
+        session_id = smap.get(key)
         if session_id is None:
             # The chat has no conversation yet — open one and map the chat to
             # it, so the user's reply lands in this same session.
             session_id = state.store.create_session()
-            smap.set(target, session_id)
+            smap.set(key, session_id)
         lock = state.session_lock(session_id)
         async with lock:
             await asyncio.to_thread(

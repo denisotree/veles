@@ -224,7 +224,7 @@ def test_mapped_session_resumes_and_delivers_final_text(tmp_path: Path) -> None:
         return _ResumeAgent()
 
     smap = SessionMap.load(channel_session_path("telegram"))
-    smap.set("telegram:12345", "sess-1")
+    smap.set("12345", "sess-1")  # keyed as the gateway keys a chat (M278)
     smap.save()
 
     state = _FakeState(project=project, agent_factory=agent_factory, delivery_router=router)
@@ -252,7 +252,7 @@ def test_resume_depth_cap_degrades_to_notify_only(tmp_path: Path) -> None:
         raise AssertionError("depth-capped completion must NOT resume")
 
     smap = SessionMap.load(channel_session_path("telegram"))
-    smap.set("telegram:12345", "sess-1")
+    smap.set("12345", "sess-1")  # keyed as the gateway keys a chat (M278)
     smap.save()
 
     state = _FakeState(project=project, agent_factory=agent_factory, delivery_router=router)
