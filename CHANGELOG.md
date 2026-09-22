@@ -14,7 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Since 0.36.0, every message to a Telegram bot and every `POST /v1/runs` with
 text failed with "failed to build agent: memory.aio.submit() called from inside
 an event loop". Updating to 0.40.0 fixes it. Background ingest and research
-resumes were affected the same way.
+resumes were affected the same way, and so were `/insights` and `/rules` in the
+`veles` REPL, which failed with the same error.
 
 ### Fixed — Telegram `/mode` works
 
