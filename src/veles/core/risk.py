@@ -105,11 +105,6 @@ def is_sensitive_class(rc: RiskClass) -> bool:
     return rc in _SENSITIVE_DEFAULTS
 
 
-def default_decision(rc: RiskClass) -> str:
-    """Permission Engine starting point for `rc`. See `DEFAULT_POLICY`."""
-    return DEFAULT_POLICY[rc]
-
-
 def is_mutation_class(rc: RiskClass) -> bool:
     """True when the class side-effects something (write, network, exec).
 
@@ -117,25 +112,3 @@ def is_mutation_class(rc: RiskClass) -> bool:
     search, and draft freely but cannot commit until the plan is approved.
     """
     return rc in _MUTATION_CLASSES
-
-
-# Retry policy hint per risk class (§20.4). Used opportunistically by the
-# dispatch path / future Permission Engine — never as security boundary.
-_AUTO_RETRY: frozenset[RiskClass] = frozenset(
-    {
-        RiskClass.READ_ONLY,
-        RiskClass.SEARCH_ONLY,
-        RiskClass.COMPUTE_ONLY,
-        RiskClass.DRAFT_ONLY,
-    }
-)
-
-
-def auto_retry_allowed(rc: RiskClass) -> bool:
-    """True if transient failures may be auto-retried for this class.
-
-    Destructive / external / privileged calls are never auto-retried;
-    the user (or an explicit `idempotent=True` opt-in, later) is the
-    only path to a second attempt.
-    """
-    return rc in _AUTO_RETRY

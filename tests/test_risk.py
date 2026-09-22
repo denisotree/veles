@@ -5,8 +5,6 @@ from __future__ import annotations
 from veles.core.risk import (
     DEFAULT_POLICY,
     RiskClass,
-    auto_retry_allowed,
-    default_decision,
     is_sensitive_class,
 )
 
@@ -30,7 +28,7 @@ def test_read_side_defaults_to_allow() -> None:
         RiskClass.COMPUTE_ONLY,
         RiskClass.DRAFT_ONLY,
     ):
-        assert default_decision(rc) == "allow"
+        assert DEFAULT_POLICY[rc] == "allow"
 
 
 def test_external_and_execution_default_to_approval() -> None:
@@ -39,12 +37,12 @@ def test_external_and_execution_default_to_approval() -> None:
         RiskClass.NETWORK_OPEN_WORLD,
         RiskClass.PROCESS_EXECUTION,
     ):
-        assert default_decision(rc) == "approval_required"
+        assert DEFAULT_POLICY[rc] == "approval_required"
 
 
 def test_destructive_and_admin_are_always_confirm() -> None:
-    assert default_decision(RiskClass.DESTRUCTIVE) == "always_confirm"
-    assert default_decision(RiskClass.PRIVILEGED_ADMIN) == "always_confirm"
+    assert DEFAULT_POLICY[RiskClass.DESTRUCTIVE] == "always_confirm"
+    assert DEFAULT_POLICY[RiskClass.PRIVILEGED_ADMIN] == "always_confirm"
 
 
 def test_is_sensitive_class_matches_legacy_gate() -> None:
@@ -60,14 +58,3 @@ def test_is_sensitive_class_matches_legacy_gate() -> None:
         RiskClass.PRIVILEGED_ADMIN,
     }
     assert sensitive == expected
-
-
-def test_auto_retry_only_for_safe_classes() -> None:
-    safe = {
-        RiskClass.READ_ONLY,
-        RiskClass.SEARCH_ONLY,
-        RiskClass.COMPUTE_ONLY,
-        RiskClass.DRAFT_ONLY,
-    }
-    for rc in RiskClass:
-        assert auto_retry_allowed(rc) == (rc in safe)

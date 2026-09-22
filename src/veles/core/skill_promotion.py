@@ -31,13 +31,11 @@ from __future__ import annotations
 import datetime as _dt
 import time
 from dataclasses import dataclass
-from pathlib import Path
 
 from veles.core.memory.artefacts import (
     ProposalInfo,
     append_memory_log,
     list_proposals,
-    proposals_dir,
     write_proposal,
 )
 from veles.core.project import Project
@@ -103,10 +101,6 @@ def find_promote_candidates(
 
 def proposal_slug(skill_name: str) -> str:
     return f"{_PROPOSAL_SLUG_PREFIX}{skill_name}"
-
-
-def proposal_path(project: Project, skill_name: str) -> Path:
-    return proposals_dir(project) / f"{proposal_slug(skill_name)}.md"
 
 
 def _render_proposal(candidate: PromoteCandidate) -> tuple[str, str]:

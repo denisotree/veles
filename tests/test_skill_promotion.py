@@ -10,7 +10,6 @@ import pytest
 from veles.core.project import Project, init_project
 from veles.core.skill_promotion import (
     find_promote_candidates,
-    proposal_path,
     proposal_slug,
     recent_promote_proposals,
     write_promote_proposals,
@@ -115,7 +114,10 @@ def test_write_creates_page_and_log(project: Project) -> None:
     candidates = find_promote_candidates(project)
     written = write_promote_proposals(project, candidates)
     assert len(written) == 1
-    page = proposal_path(project, "winner")
+    # Located through the path the writer returns, not a parallel path builder:
+    # `proposal_path` recomputed it on its own and was never called by src/.
+    page = project.root / written[0]
+    assert page.name == f"{proposal_slug('winner')}.md"
     assert page.is_file()
     body = page.read_text(encoding="utf-8")
     assert "Promote skill: winner" in body
@@ -133,14 +135,15 @@ def test_write_idempotent_rewrites(project: Project) -> None:
     """Re-running with updated telemetry should overwrite the page."""
     _write_skill(project, "winner", use_count=20, success_count=18)
     cands1 = find_promote_candidates(project)
-    write_promote_proposals(project, cands1)
-    body1 = proposal_path(project, "winner").read_text(encoding="utf-8")
+    [first] = write_promote_proposals(project, cands1)
+    body1 = (project.root / first).read_text(encoding="utf-8")
     assert "20 invocations" in body1
     # Bump the telemetry.
     _write_skill(project, "winner", use_count=50, success_count=45)
     cands2 = find_promote_candidates(project)
-    write_promote_proposals(project, cands2)
-    body2 = proposal_path(project, "winner").read_text(encoding="utf-8")
+    [second] = write_promote_proposals(project, cands2)
+    assert second == first  # same page, rewritten — not a second file
+    body2 = (project.root / second).read_text(encoding="utf-8")
     assert "50 invocations" in body2
 
 
@@ -149,11 +152,11 @@ def test_write_idempotent_rewrites(project: Project) -> None:
 
 def test_recent_filters_by_age(project: Project) -> None:
     _write_skill(project, "winner", use_count=20, success_count=18)
-    write_promote_proposals(project, find_promote_candidates(project))
+    [written] = write_promote_proposals(project, find_promote_candidates(project))
     fresh = recent_promote_proposals(project, max_age_days=7)
     assert len(fresh) == 1
     # Backdate the proposal page 30 days.
-    page = proposal_path(project, "winner")
+    page = project.root / written
     old = time.time() - 30 * 86400
     import os
 

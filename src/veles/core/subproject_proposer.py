@@ -43,14 +43,12 @@ import datetime as _dt
 import re
 import time
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from veles.core.memory.artefacts import (
     ProposalInfo,
     append_memory_log,
     list_proposals,
-    proposals_dir,
     write_proposal,
 )
 from veles.core.project import Project
@@ -204,10 +202,6 @@ def _build_cluster_summary(pages: list[WikiPageInfo]) -> tuple[str, str]:
         f"{', '.join(leading) or '(generic)'}; consider extracting into a subproject."
     )
     return slug, rationale
-
-
-def proposal_page_path(project: Project, cluster: Cluster) -> Path:
-    return proposals_dir(project) / f"{cluster.slug}.md"
 
 
 def _render_proposal(cluster: Cluster) -> tuple[str, str]:
