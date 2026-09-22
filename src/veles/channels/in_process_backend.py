@@ -63,45 +63,20 @@ class InProcessRunBackend:
             await handle.event_added.wait()
 
     async def get_session(self, session_id: str) -> dict[str, Any]:
-        """In-process equivalent of `DaemonClient.get_session`. Returns
-        `{"session_id", "overrides"}` so the gateway can resolve the
-        active model for the /model picker."""
-        overrides = self._state.get_overrides(session_id)
-        return {
-            "session_id": session_id,
-            "overrides": overrides.to_dict() if overrides else None,
-        }
+        """In-process equivalent of `DaemonClient.get_session`: the session's
+        agent mode, `"default"` when never switched."""
+        mode = self._state.chat_mode(session_id).mode or "default"
+        return {"session_id": session_id, "mode": mode}
 
-    async def update_session(
-        self,
-        session_id: str,
-        *,
-        model: str | None = None,
-        mode: str | None = None,
-        provider: str | None = None,
-    ) -> dict[str, Any]:
-        """In-process equivalent of `DaemonClient.update_session`.
-
-        Writes directly to `state.session_overrides` so the next agent
-        build picks up the override — same path the HTTP PATCH handler
-        takes. Validation is intentionally lighter than the HTTP variant
-        because the only caller is the gateway's inline-keyboard tap,
-        which never produces unvalidated user input here."""
-        if model is None and mode is None and provider is None:
-            raise ValueError("update_session requires at least one of model/mode/provider")
-        overrides = self._state.set_overrides(session_id, model=model, mode=mode, provider=provider)
-        # Mirror the format of `daemon/server.py:_handle_patch_session`
-        # so log scrapers can match a single regex regardless of the
-        # backend (HTTP or in-process).
-        logger.info(
-            "in-process session=%s overrides=%s",
-            session_id,
-            overrides.to_dict(),
-        )
-        return {
-            "session_id": session_id,
-            "overrides": overrides.to_dict(),
-        }
+    async def update_session(self, session_id: str, *, mode: str) -> dict[str, Any]:
+        """In-process equivalent of `DaemonClient.update_session` (PATCH):
+        switch the session's agent mode; `"default"` switches it back. An
+        unknown mode raises `ValueError`, as the HTTP route answers 400."""
+        self._state.set_chat_mode(session_id, None if mode == "default" else mode)
+        # Same line format as `server.py::_handle_patch_session`, so one log
+        # regex matches either backend.
+        logger.info("in-process session=%s mode=%s", session_id, mode)
+        return {"session_id": session_id, "mode": mode}
 
     async def health(self) -> dict[str, Any]:
         """In-process equivalent of `DaemonClient.health`. The gateway

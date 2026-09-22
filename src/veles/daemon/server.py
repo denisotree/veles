@@ -41,7 +41,7 @@ from veles.daemon.auth import TokenStore, bearer_auth_middleware
 from veles.daemon.runner import (
     AgentFactory,
 )
-from veles.daemon.state import DaemonState
+from veles.daemon.state import CHAT_MODES, DaemonState
 
 logger = logging.getLogger(__name__)
 
@@ -491,12 +491,6 @@ async def _handle_get_session(request: web.Request) -> web.Response:
                 else [],
             }
         )
-    # M126 observability: surface the per-session overrides set via
-    # PATCH /v1/sessions/{id}. Empty/absent override → `null` so callers
-    # can tell "no override" from "override cleared to default".
-    overrides = state.get_overrides(session_id)
-    overrides_payload: dict[str, Any] | None
-    overrides_payload = None if overrides is None or overrides.is_empty() else overrides.to_dict()
     return web.json_response(
         {
             "id": info.id,
@@ -505,7 +499,8 @@ async def _handle_get_session(request: web.Request) -> web.Response:
             "turn_count": info.turn_count,
             "title": info.title,
             "messages": history,
-            "overrides": overrides_payload,
+            # M280: the session's agent mode (PATCH below); "default" = never switched.
+            "mode": state.chat_mode(session_id).mode or "default",
         }
     )
 
@@ -519,16 +514,13 @@ async def _handle_delete_session(request: web.Request) -> web.Response:
     return web.json_response({"deleted": True, "session_id": session_id})
 
 
-# M126: per-session config overrides — used by channels (Telegram
-# inline keyboards) so users can switch model/mode mid-conversation
-# without going through TUI or restarting the daemon.
-_VALID_MODES_PATCH = frozenset({"auto", "planning", "writing", "goal"})
-
-
 async def _handle_patch_session(request: web.Request) -> web.Response:
-    """PATCH /v1/sessions/{session_id} — set the per-session `mode`.
+    """PATCH /v1/sessions/{session_id} — set the session's agent mode.
 
-    Body: `{"mode": str}` where mode is one of auto/planning/writing/goal.
+    Body: `{"mode": str}`, one of `default`/auto/planning/writing/goal;
+    `default` returns the chat to the plain single-agent turn. M280: the next
+    turn of that session runs in this mode (`daemon/turns.py::start_turn`) —
+    before M280 the value was stored and never read.
 
     M127: `model` and `provider` are **fixed at daemon launch** from
     `config.toml` (`[engine]` / `[routing.tasks]`) and can no longer be
@@ -560,18 +552,18 @@ async def _handle_patch_session(request: web.Request) -> web.Response:
     mode = body.get("mode", _SENTINEL)
     if mode is _SENTINEL:
         return web.json_response({"error": "mode required"}, status=400)
-    if mode is not None and (not isinstance(mode, str) or mode not in _VALID_MODES_PATCH):
+    if not isinstance(mode, str) or (mode != "default" and mode not in CHAT_MODES):
         return web.json_response(
             {
                 "error": f"invalid mode {mode!r}",
-                "valid_modes": sorted(_VALID_MODES_PATCH),
+                "valid_modes": ["default", *sorted(CHAT_MODES)],
             },
             status=400,
         )
 
-    overrides = state.set_overrides(session_id, mode=mode)
-    logger.info("PATCH /v1/sessions/%s overrides=%s", session_id, overrides.to_dict())
-    return web.json_response({"session_id": session_id, "overrides": overrides.to_dict()})
+    state.set_chat_mode(session_id, None if mode == "default" else mode)
+    logger.info("PATCH /v1/sessions/%s mode=%s", session_id, mode)
+    return web.json_response({"session_id": session_id, "mode": mode})
 
 
 _SENTINEL = object()
@@ -958,11 +950,10 @@ def build_state(
 ) -> DaemonState:
     """Convenience constructor used by both CLI and tests.
 
-    M127: the daemon's model/provider are fixed at launch from config, so
-    `session_overrides` starts empty and is NOT rehydrated from the store
-    (the per-session `session_model_overrides` table was removed). This is
-    what makes `/v1/health` `active_model` always reflect the configured
-    model instead of resurrecting a stale Telegram `/model` choice."""
+    M127: the daemon's model/provider are fixed at launch from config and
+    nothing per-session is rehydrated from the store, so `/v1/health`
+    `active_model` always reflects the configured model. Chat modes (M280)
+    start empty too — every chat on its default after a restart."""
     return DaemonState(
         project=project,
         store=store,

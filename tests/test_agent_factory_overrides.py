@@ -1,6 +1,6 @@
 """M127: daemon `_make_agent_factory` always builds with the config-derived
-`_FactorySettings` — model/provider are fixed at daemon launch and a
-per-session override (a leftover `SessionOverrides.model`) is NEVER applied.
+`_FactorySettings` — model/provider are fixed at daemon launch; nothing
+per-session (M280: not even a chat's agent mode) changes them.
 
 Supersedes the M126 suite that asserted overrides took effect.
 """
@@ -89,9 +89,9 @@ def test_factory_uses_config_model_without_state(project, store) -> None:
 
 
 def test_factory_ignores_stray_session_override(project, store, state) -> None:
-    """Even when a session carries a leftover model/provider override,
-    the factory builds with the config model — M127 fixed-at-launch."""
-    state.set_overrides("sess-target", model="haiku-leftover", provider="anthropic")
+    """A session switched to another agent mode still builds with the config
+    model and provider — M127 fixed-at-launch."""
+    state.set_chat_mode("sess-target", "planning")
 
     captured = {}
 
@@ -115,7 +115,7 @@ def test_factory_none_session_id_uses_config_model(project, store, state, monkey
     # The factory validates the routed provider's API key before building;
     # CI has none, so inject a dummy (no network call — the build is patched).
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key-unused")
-    state.set_overrides("any-session", model="should-not-apply")
+    state.set_chat_mode("any-session", "writing")
     captured = {}
 
     def fake_build(settings, **kw):
@@ -138,7 +138,7 @@ def test_factory_log_line_shows_config_model_no_overridden_marker(
 ) -> None:
     """The per-turn log names the config model and never says
     `(overridden)` — the override path is gone."""
-    state.set_overrides("sess-target", model="haiku-leftover")
+    state.set_chat_mode("sess-target", "planning")
 
     with patch(
         "veles.daemon.agent_factory._build_agent_for_turn",

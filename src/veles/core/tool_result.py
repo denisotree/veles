@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
@@ -165,8 +165,3 @@ def serialize_for_dispatch(result: ToolResult) -> str:
     if result.error_type:
         payload["error_type"] = result.error_type
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-
-
-def to_dict(result: ToolResult) -> dict[str, Any]:
-    """Dict form for typed event logs / trace records."""
-    return asdict(result)

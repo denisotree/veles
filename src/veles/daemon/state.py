@@ -23,29 +23,25 @@ from veles.core.project import Project
 from veles.daemon.auth import TokenStore
 from veles.daemon.runner import AgentFactory, RunHandle
 
+# Agent modes a chat can be switched to (`PATCH /v1/sessions/{id}`, Telegram
+# `/mode`). "default" is not one of them: it is the absence of a choice.
+CHAT_MODES = frozenset({"auto", "planning", "writing", "goal"})
+
 
 @dataclass(slots=True)
-class SessionOverrides:
-    """M126: per-session config that beats `_FactorySettings` defaults.
+class ChatModeState:
+    """M280: what a session's agent mode carries between turns — the REPL keeps
+    the same three fields on `AppState`.
 
-    A channel (Telegram inline-keyboard, future TUI hotkey, …) can
-    POST `PATCH /v1/sessions/{id}` to set any of these; the daemon's
-    agent factory reads the override before building the next Agent
-    for that session.
-
-    Storage is in-memory only (M126b will persist across restarts);
-    `None` means "fall back to daemon default for this field".
+    `mode=None` is the chat's default: the daemon's plain single-agent turn,
+    exactly as before M280 (the user chose to keep it rather than route every
+    message through AutoMode's classifier). In memory only: after a daemon
+    restart a chat is back on its default; a goal stays on disk.
     """
 
-    model: str | None = None
     mode: str | None = None
-    provider: str | None = None
-
-    def is_empty(self) -> bool:
-        return self.model is None and self.mode is None and self.provider is None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"model": self.model, "mode": self.mode, "provider": self.provider}
+    last_mode_in_session: str | None = None
+    active_goal_id: str | None = None
 
 
 @dataclass(slots=True)
@@ -70,10 +66,6 @@ class DaemonState:
     # when a session has no override. Surfaced via /v1/health so
     # channels can highlight the effective model in their pickers.
     default_model: str | None = None
-    # M127: retained for struct stability but always None — model is
-    # fixed at launch, so `_handle_health` reports the config model and
-    # no session ever "overrides" it.
-    last_override_session_id: str | None = None
     job_runner: Any | None = None  # M75 JobRunner; lazy import to avoid cycles
     dream_runner: Any | None = None  # M76 DreamRunner
     reminder_runner: Any | None = None  # M166 ReminderRunner — pushes due task reminders
@@ -97,9 +89,11 @@ class DaemonState:
     # in daemon path. When None, manager-mode is skipped and runs always
     # go through the regular `agent_factory` (legacy single-agent path).
     worker_agent_factory: Any | None = None
-    # M126: per-session overrides for model/mode/provider. Keyed by
-    # session_id; set via `PATCH /v1/sessions/{id}`.
-    session_overrides: dict[str, SessionOverrides] = field(default_factory=dict)
+    # M280: per-session agent mode, set via `PATCH /v1/sessions/{id}` (Telegram
+    # `/mode`) and read by `daemon/turns.py::start_turn`. Replaces M126's
+    # `session_overrides`, whose model/provider fields M127 had already
+    # forbidden and whose mode nothing ever read.
+    chat_modes: dict[str, ChatModeState] = field(default_factory=dict)
     # M204: `factory(*, system_prompt, tools) -> Agent` installed around every
     # daemon turn so delegate/wiki_add can spawn scoped sub-agents (this used
     # to be REPL-only). Built by `_attach_background_runners`, capped at [run].
@@ -111,31 +105,21 @@ class DaemonState:
     def session_lock(self, session_id: str) -> asyncio.Lock:
         return self.session_locks.setdefault(session_id, asyncio.Lock())
 
-    def get_overrides(self, session_id: str | None) -> SessionOverrides | None:
+    def chat_mode(self, session_id: str | None) -> ChatModeState:
+        """The session's mode state; a session never switched is on its default."""
         if session_id is None:
-            return None
-        return self.session_overrides.get(session_id)
+            return ChatModeState()
+        return self.chat_modes.get(session_id) or ChatModeState()
 
-    def set_overrides(
-        self,
-        session_id: str,
-        *,
-        model: str | None = None,
-        mode: str | None = None,
-        provider: str | None = None,
-    ) -> SessionOverrides:
-        existing = self.session_overrides.get(session_id, SessionOverrides())
-        merged = SessionOverrides(
-            model=model if model is not None else existing.model,
-            mode=mode if mode is not None else existing.mode,
-            provider=provider if provider is not None else existing.provider,
-        )
-        self.session_overrides[session_id] = merged
-        # M127: model/provider are fixed at daemon launch from config and
-        # are no longer persisted, rehydrated, or applied. `set_overrides`
-        # is now effectively a `mode`-only path (the only field PATCH
-        # accepts); nothing is written to the store.
-        return merged
+    def set_chat_mode(self, session_id: str, mode: str | None) -> ChatModeState:
+        """Switch a session's mode (`None` = back to the default). Keeps the
+        goal and mode-switch history, which a switch must not erase."""
+        if mode is not None and mode not in CHAT_MODES:
+            raise ValueError(f"unknown mode {mode!r}; expected one of {sorted(CHAT_MODES)}")
+        current = self.chat_mode(session_id)
+        current.mode = mode
+        self.chat_modes[session_id] = current
+        return current
 
     def add_run(self, handle: RunHandle) -> None:
         self.runs[handle.run_id] = handle

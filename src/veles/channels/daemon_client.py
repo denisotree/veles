@@ -118,38 +118,20 @@ class DaemonClient:
             return await _read_json(resp)
 
     async def get_session(self, session_id: str) -> dict[str, Any]:
-        """GET /v1/sessions/{id} — returns the session row + current
-        overrides. Channels use this to highlight the active model in
-        the /model picker."""
+        """GET /v1/sessions/{id} — the session row, history and agent `mode`."""
         async with self.session.get(
             f"{self._base}/v1/sessions/{session_id}",
             headers=self._auth,
         ) as resp:
             return await _read_json(resp)
 
-    async def update_session(
-        self,
-        session_id: str,
-        *,
-        model: str | None = None,
-        mode: str | None = None,
-        provider: str | None = None,
-    ) -> dict[str, Any]:
-        """M126: PATCH /v1/sessions/{id} — set per-session overrides
-        (model, mode, provider). At least one must be non-None; the
-        daemon validates and returns the merged override map."""
-        body: dict[str, Any] = {}
-        if model is not None:
-            body["model"] = model
-        if mode is not None:
-            body["mode"] = mode
-        if provider is not None:
-            body["provider"] = provider
-        if not body:
-            raise DaemonClientError("update_session requires at least one of model/mode/provider")
+    async def update_session(self, session_id: str, *, mode: str) -> dict[str, Any]:
+        """PATCH /v1/sessions/{id} — switch the session's agent mode
+        (`"default"` switches it back). Model and provider are fixed at
+        daemon launch (M127), so mode is the only thing to set."""
         async with self.session.patch(
             f"{self._base}/v1/sessions/{session_id}",
-            json=body,
+            json={"mode": mode},
             headers=self._auth,
         ) as resp:
             return await _read_json(resp)

@@ -188,8 +188,7 @@ async def test_health_active_model_is_config_fixed(
     aiohttp_client, project: Project, store: SessionStore, token_store: TokenStore
 ) -> None:
     """M127: model is fixed at launch — `active_model` always equals the
-    configured `default_model`, never a per-session override (a stray
-    `SessionOverrides.model` must not leak into the dashboard)."""
+    configured `default_model`; a session's agent mode (M280) is not a model."""
     sid = store.create_session()
     factory = _make_stub_factory(store)
     state = build_state(
@@ -200,7 +199,7 @@ async def test_health_active_model_is_config_fixed(
         provider="openrouter",
         default_model="default-model",
     )
-    state.set_overrides(sid, model="picked-model")  # stray; must be ignored
+    state.set_chat_mode(sid, "planning")
     app = make_app(state)
     client = await aiohttp_client(app)
     body = await (await client.get("/v1/health")).json()
@@ -425,12 +424,8 @@ async def test_get_then_delete_session(
     body = await get.json()
     assert body["turn_count"] == 2
     assert [m["role"] for m in body["messages"]] == ["user", "assistant"]
-    # No PATCH happened on this session → overrides is `null`, not a
-    # dict full of `None`s. Callers (TUI status panel, channel ops
-    # dashboards) use this to distinguish "session uses daemon
-    # defaults" from "session was explicitly overridden but later
-    # cleared".
-    assert body["overrides"] is None
+    # No PATCH happened on this session → it runs on the chat default.
+    assert body["mode"] == "default"
 
     delete = await client.delete(f"/v1/sessions/{sid}", headers=headers)
     assert delete.status == 200
@@ -443,9 +438,9 @@ async def test_get_then_delete_session(
 async def test_get_session_surfaces_mode_override_after_patch(
     aiohttp_client, app, good_token: str, store: SessionStore
 ) -> None:
-    """Observability: once a session has been PATCH'd with a `mode`
-    override, GET returns the same dict. (M127: model/provider are fixed
-    at launch and rejected by PATCH, so only `mode` is ever set.)"""
+    """Observability: once a session has been PATCH'd with a `mode`, GET
+    reports it. (M127: model/provider are fixed at launch and rejected by
+    PATCH, so `mode` is the only per-session setting.)"""
     sid = store.create_session()
     store.append_turn(sid, Message(role="user", content="hi"))
 
@@ -460,11 +455,7 @@ async def test_get_session_surfaces_mode_override_after_patch(
 
     get = await client.get(f"/v1/sessions/{sid}", headers=headers)
     body = await get.json()
-    assert body["overrides"] == {
-        "model": None,
-        "mode": "planning",
-        "provider": None,
-    }
+    assert body["mode"] == "planning"
 
 
 async def test_list_sessions_limit_query_clamped(
