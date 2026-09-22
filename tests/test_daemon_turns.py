@@ -130,6 +130,14 @@ async def test_a_turn_with_memory_recall_starts_on_the_http_path(
     assert resp.status == 202, await resp.text()
 
 
+async def test_a_scheduled_job_can_build_its_agent_on_the_loop(state, real_build) -> None:
+    """`JobRunner._execute` still calls `factory(None)` on the loop (its
+    `agent.run` goes to a thread). That is safe only because an empty prompt
+    skips recall before the memory bridge — checked with the real build."""
+    agent = state.agent_factory(None)
+    assert agent.session_id
+
+
 # ---- a5: the session's mode picks the path ----
 
 
