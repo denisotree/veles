@@ -96,7 +96,6 @@ _BASELINE = frozenset(
         "render_system_block",
         "scan_for_context_files",
         "set_project_wizard_prompter",
-        "set_title",
         "set_wizard_prompter",
         "skeleton_ref_index",
         "stable_text",

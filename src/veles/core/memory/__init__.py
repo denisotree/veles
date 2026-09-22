@@ -347,6 +347,20 @@ def _make_session_id() -> str:
     return f"{int(time.time()):010d}-{secrets.token_hex(4)}"
 
 
+_SESSION_TITLE_MAX = 60
+
+
+def _session_title(text: str) -> str:
+    """First non-blank line of `text`, whitespace collapsed, cut to one list row."""
+    for line in text.splitlines():
+        line = " ".join(line.split())
+        if line:
+            if len(line) > _SESSION_TITLE_MAX:
+                return line[: _SESSION_TITLE_MAX - 1].rstrip() + "…"
+            return line
+    return ""
+
+
 class SessionStore:
     def __init__(self, db_path: Path | str) -> None:
         self._path: Path | str = ":memory:" if db_path == ":memory:" else Path(db_path)
@@ -595,6 +609,7 @@ class SessionStore:
         from veles.core.sanitize import sanitize
 
         now = time.time()
+        content = sanitize(message.content) if message.content else message.content
         tool_calls_json = (
             json.dumps(
                 [
@@ -618,7 +633,7 @@ class SessionStore:
                     session_id,
                     next_seq,
                     message.role,
-                    sanitize(message.content) if message.content else message.content,
+                    content,
                     tool_calls_json,
                     message.tool_call_id,
                     now,
@@ -628,6 +643,21 @@ class SessionStore:
                 "UPDATE sessions SET last_activity_at=? WHERE id=?",
                 (now, session_id),
             )
+            # Title a session from its first user message. The column existed,
+            # the session picker, `veles sessions list` and `/resume` all show
+            # it, and nothing ever wrote it — every session in every project was
+            # "(untitled)" (0 of 9 in two real projects, 2026-09-22). Done here
+            # rather than at `create_session` because a daemon or channel opens
+            # the session before its first message exists; every path that
+            # records a conversation comes through this method. `title IS NULL`
+            # keeps the first message's title and never overwrites a set one.
+            if message.role == "user" and content:
+                title = _session_title(content)
+                if title:
+                    self._conn.execute(
+                        "UPDATE sessions SET title=? WHERE id=? AND title IS NULL",
+                        (title, session_id),
+                    )
         return int(next_seq)
 
     def load_messages(self, session_id: str) -> list[Message]:
@@ -925,10 +955,6 @@ class SessionStore:
                 (cutoff,),
             )
         return int(cur.rowcount or 0)
-
-    def set_title(self, session_id: str, title: str) -> None:
-        with self._tx():
-            self._conn.execute("UPDATE sessions SET title=? WHERE id=?", (title, session_id))
 
     def close(self) -> None:
         self._conn.close()
