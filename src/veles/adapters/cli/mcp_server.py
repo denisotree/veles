@@ -203,7 +203,7 @@ def _register_project_skills(registry_obj: Registry, project: Project, model: st
     skills = discover_skills(project)
     if not skills:
         return []
-    provider = OpenRouterProvider()
+    provider = OpenRouterProvider(model=model)
     out: list[str] = []
     for skill in skills:
         try:

@@ -61,6 +61,8 @@ args = ["-m", "my_mcp_server"]
 [engine]
 provider = "openrouter"                               # provider name for the main agent + routing base
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
+request_timeout_s = 180                              # ঐচ্ছিক; একটি উত্তরের জন্য কত অপেক্ষা
+max_retries = 1                                      # ঐচ্ছিক; প্রতি অনুরোধে পুনঃচেষ্টা
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -102,7 +104,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 | সেকশন | উদ্দেশ্য |
 |---|---|
-| `[engine]` | মূল এজেন্ট এবং রাউটিং ক্যাসকেডের জন্য বেস প্রোভাইডার (`provider` = provider name) + মডেল (`model` = model id) |
+| `[engine]` | মূল এজেন্ট এবং রাউটিং ক্যাসকেডের জন্য বেস প্রোভাইডার (`provider` = provider name) + মডেল (`model` = model id), এবং ক্লায়েন্ট বাজেট `request_timeout_s` / `max_retries` |
 | `[routing.tasks]` | পার-টাস্ক `provider:model` ওভাররাইড — দেখুন [পার-টাস্ক রাউটিং](../how-to/per-task-routing.md) |
 | `[permissions]` | পার-টুল পারমিশন পলিসি (প্রজেক্ট স্কোপ) |
 | `[daemon]` | unnamed/"default" ডিমনের bind + autostart |
@@ -117,6 +119,36 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 > `AGENTS.md`-এর ন্যাচারাল-ল্যাঙ্গুয়েজ রাউটিং হিন্ট একটি অটো-জেনারেটেড
 > `routing.nl.toml`-এ পার্স হয়; স্পষ্ট `[routing.tasks]` এন্ট্রি সর্বদা জেতে। পুনরায়
 > পার্স করতে `veles route refresh` চালান। দেখুন [পার-টাস্ক রাউটিং](../how-to/per-task-routing.md)।
+
+### উত্তরের জন্য কত অপেক্ষা, আর কতবার পুনঃচেষ্টা
+
+```toml
+[engine]
+request_timeout_s = 180
+max_retries = 1
+```
+
+দুটোই **ক্লায়েন্ট** প্যারামিটার, তাই এগুলো `[engine.request.<provider>]`-এর ভেতরে নয়,
+সরাসরি `[engine]`-এর নিচে থাকে: ওই সেকশনটি অনুরোধের *বডি*, আর টাইমআউট কখনও বডিতে
+যায় না।
+
+এগুলো না দিলে টাইমআউট মডেল id থেকে অনুমান করা হয়: রিজনিং পরিবার পায় ৯০০ সেকেন্ড, তার
+`flash`/`mini` সংস্করণ ৪৫০ সেকেন্ড, বাকি সব ১২০ সেকেন্ড। এই অনুমানটি কাঠামোগতভাবেই
+দুর্বল: **নাম একটি পরিবারের কথা বলে, অথচ উত্তরের সময় ঠিক করে সেটিকে পরিবেশনকারী
+ব্যাকএন্ড।** একই id এক ব্যাকএন্ডে ৩৩ টোকেন/সেকেন্ড, অন্যটিতে ০.৮ টোকেন/সেকেন্ড চলে।
+অনুমিত সংখ্যাটি আপনার রানের জন্য ঠিক না হলে নিজেই ঠিক করে দিন; আর সংখ্যাটি যাতে দুবার
+একই অর্থ বহন করে, তার জন্য নিচের মতো ব্যাকএন্ড পিন করুন।
+
+একই কারণে `max_retries`-ও গুরুত্বপূর্ণ। এটি না দিলে SDK দুবার পুনঃচেষ্টা করে, অর্থাৎ
+৪৫০ সেকেন্ডের টাইমআউট একটি টার্নেই আসলে ১৩৫০ সেকেন্ড পর্যন্ত — উদার দেখতে বাজেট
+ওড়ানোর জন্য যা যথেষ্ট। `0` একটি বৈধ মান, কী বাদ দেওয়ার সমান নয়।
+
+দুটোরই অগ্রাধিকার: কোডে স্পষ্ট আর্গুমেন্ট → `[engine]` → মডেলভিত্তিক ডিফল্ট। ধনাত্মক
+সংখ্যা নয় এমন মান (বা `max_retries`-এর ক্ষেত্রে অঋণাত্মক পূর্ণসংখ্যা নয় এমন) ফাইলের
+নাম উল্লেখ করে `ConfigError` দিয়ে রান থামিয়ে দেয়।
+
+**পরিধি:** আজ কেবল OpenRouter অ্যাডাপ্টারই এই কী দুটি পড়ে। Anthropic, OpenAI ও Gemini
+ক্লায়েন্ট দুটি প্যারামিটার ছাড়াই তৈরি হয় এবং কী দুটি উপেক্ষা করে।
 
 ### ব্যাকএন্ড পিন করা এবং রিকোয়েস্ট বডির অন্যান্য কী
 

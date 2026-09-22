@@ -64,6 +64,8 @@ args = ["-m", "my_mcp_server"]
 [engine]
 provider = "openrouter"                               # provider name for the main agent + routing base
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
+request_timeout_s = 180                              # facoltativo; quanto attendere una risposta
+max_retries = 1                                      # facoltativo; tentativi per richiesta
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -105,7 +107,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 | Sezione | Scopo |
 |---|---|
-| `[engine]` | Provider di base (`provider` = nome del provider) + modello (`model` = id del modello) per l'agente principale e la cascata di routing |
+| `[engine]` | Provider di base (`provider` = nome del provider) + modello (`model` = id del modello) per l'agente principale e la cascata di routing, più i budget del client `request_timeout_s` / `max_retries` |
 | `[routing.tasks]` | Override `provider:model` per task — vedi [routing per task](../how-to/per-task-routing.md) |
 | `[permissions]` | Policy di permessi per tool (scope di progetto) |
 | `[daemon]` | Bind + autostart del daemon senza nome/"default" |
@@ -121,6 +123,38 @@ Tipi di task per `[routing.tasks]`: `default`, `curator`, `compressor`,
 > analizzati e tradotti in un `routing.nl.toml` generato automaticamente; le voci
 > esplicite di `[routing.tasks]` vincono sempre. Esegui `veles route refresh` per
 > rianalizzarli. Vedi [routing per task](../how-to/per-task-routing.md).
+
+### Quanto attendere una risposta, e quanti tentativi
+
+```toml
+[engine]
+request_timeout_s = 180
+max_retries = 1
+```
+
+Sono parametri del **client**, per questo stanno piatti sotto `[engine]` e non in
+`[engine.request.<provider>]`: quella sezione è il *corpo* della richiesta, e un
+timeout lì dentro non viaggia mai.
+
+Senza di esse il timeout si deduce dall'id del modello: una famiglia di
+ragionamento riceve 900 s, una sua variante `flash`/`mini` 450 s, tutto il resto
+120 s. È una congettura strutturalmente debole: **il nome descrive una famiglia,
+mentre il tempo di risposta lo stabilisce il backend che la serve.** Uno stesso id
+può girare a 33 tok/s su un backend e 0,8 tok/s su un altro. Quando il numero
+dedotto non va bene per la tua esecuzione, impostalo; e fissa anche il backend
+(sotto) se vuoi che quel numero significhi la stessa cosa due volte.
+
+`max_retries` conta per lo stesso motivo. Senza, l'SDK riprova due volte, quindi un
+timeout di 450 s vale fino a 1350 s su un solo turno: abbastanza per far saltare un
+budget che sembrava generoso. `0` è un valore legittimo e non equivale a omettere
+la chiave.
+
+Precedenza per entrambe: argomento esplicito nel codice → `[engine]` → valore per
+modello. Un valore che non sia un numero positivo (o, per `max_retries`, un intero
+non negativo) interrompe con un `ConfigError` che nomina il file.
+
+**Ambito:** oggi solo l'adattatore OpenRouter legge queste chiavi. I client
+Anthropic, OpenAI e Gemini vengono costruiti senza entrambi i parametri e le ignorano.
 
 ### Fissare un backend e altre chiavi del corpo della richiesta
 

@@ -58,6 +58,8 @@ args = ["-m", "my_mcp_server"]
 [engine]
 provider = "openrouter"                               # provider name for the main agent + routing base
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
+request_timeout_s = 180                              # 選用；等待一次回應的時長
+max_retries = 1                                      # 選用；每個請求的重試次數
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -99,7 +101,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 | 區段 | 用途 |
 |---|---|
-| `[engine]` | 基礎供應商（`provider` = 供應商名稱）＋模型（`model` = 模型 ID），供主代理與路由串接使用 |
+| `[engine]` | 基礎供應商（`provider` = 供應商名稱）＋模型（`model` = 模型 ID），供主代理與路由串接使用，以及用戶端預算 `request_timeout_s` / `max_retries` |
 | `[routing.tasks]` | 逐任務的 `provider:model` 覆寫——參見[逐任務路由](../how-to/per-task-routing.md) |
 | `[permissions]` | 逐工具的權限策略（專案範圍） |
 | `[daemon]` | 未具名／「預設」daemon 的綁定＋自動啟動 |
@@ -111,6 +113,33 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 `[routing.tasks]` 的任務類型：`default`、`curator`、`compressor`、`insights`、`skills`、`advisor`、`vision`、`embedding`。
 
 > `AGENTS.md` 中的自然語言路由提示會被解析進一個自動產生的 `routing.nl.toml`；明確的 `[routing.tasks]` 條目永遠優先。執行 `veles route refresh` 可重新解析。參見[逐任務路由](../how-to/per-task-routing.md)。
+
+### 等待回應多久，重試幾次
+
+```toml
+[engine]
+request_timeout_s = 180
+max_retries = 1
+```
+
+兩者都是**用戶端**參數，因此平鋪在 `[engine]` 之下，而不在
+`[engine.request.<provider>]` 裡：那一節是請求*主體*，而逾時從不隨主體傳輸。
+
+不設定時，逾時由模型 id 推斷：推理系列得到 900 秒，其 `flash`/`mini` 變體 450 秒，
+其餘 120 秒。這個推斷在結構上是脆弱的：**名字描述的是系列，而回應時間由提供服務的
+後端決定。** 同一個 id 在一個後端跑 33 tok/s，在另一個後端只有 0.8 tok/s。當推斷出
+的數字不適合你的執行時就自行設定；若想讓這個數字兩次意味著同一件事，再依下文固定
+後端。
+
+`max_retries` 重要的原因相同。不設定時 SDK 會重試兩次，於是 450 秒的逾時在單一回合裡
+實際上最多是 1350 秒 —— 足以擊穿一個看起來寬裕的預算。`0` 是合法取值，與省略該鍵並
+不相同。
+
+兩者的優先順序：程式碼中的明確參數 → `[engine]` → 依模型推斷的預設值。取值若不是
+正數（`max_retries` 若不是非負整數），會以指明檔名的 `ConfigError` 中止。
+
+**適用範圍：** 目前只有 OpenRouter 轉接器讀取這兩個鍵。Anthropic、OpenAI 與 Gemini
+的用戶端在建構時不接收這兩個參數，會忽略它們。
 
 ### 固定後端，以及其他請求主體鍵
 

@@ -47,8 +47,11 @@ _CHANNEL_BASE_KEYS = frozenset({"enabled", "chat_id"})
 # Keys valid under `[engine]` (M255). Verified against every consumer:
 # `model_resolver.resolve_effective_provider/model`, `routing/ensemble.py`, and
 # `tui_state.persist_model_choice` read `provider`/`model` and nothing else;
-# `request` is the M250 passthrough table.
-_ENGINE_KNOWN = frozenset({"provider", "model", "request"})
+# `request` is the M250 passthrough table. `request_timeout_s`/`max_retries`
+# (M266) are read by `model_budgets.resolve_request_timeout/resolve_max_retries`
+# — client parameters, not body keys, which is why they sit flat here rather
+# than under `[engine.request.<provider>]`.
+_ENGINE_KNOWN = frozenset({"provider", "model", "request", "request_timeout_s", "max_retries"})
 
 
 class ConfigError(ValueError):

@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.37.0] — 2026-09-22
+
+How long to wait for a model, and how much to let it write, were both guessed
+from its name. The guess is structurally weak — a name describes a family, while
+the response time is set by the backend serving it, and one relayed model id runs
+at 33 tokens/sec on one backend and 0.8 on another. This release takes the
+answers from the provider's own catalogue where the catalogue knows them, and
+lets your project override the rest.
+
+### Fixed — a model was declared unfit when it had simply been cut off
+
+`deepseek-v4` was not recognised as a model that thinks, so it ran with a
+4096-token budget while a competitor ran with 32000. It returned five empty
+answers out of twelve, and the comparison concluded the model was broken. It
+was not: thinking had consumed the whole budget before the visible answer began,
+which looks identical from outside.
+
+Re-run with the corrected budget, pinned to a single backend: **three correct
+answers out of three, none empty.** The earlier conclusion is withdrawn.
+
+The recognition list was substrings — `glm-5`, `deepseek-r`, and ten more
+families. Measured against OpenRouter's catalogue: of 442 models, 311 can think
+and the list recognised 92 of them. The catalogue is now asked first.
+
+### Added — `request_timeout_s` and `max_retries`
+
+```toml
+[engine]
+request_timeout_s = 180
+max_retries = 1
+```
+
+Neither could be set before. A model whose name suggested slow reasoning got a
+450-second timeout, and the SDK retried twice on top of that — up to 1350
+seconds on a single turn, inside a task budgeted at 900. The request-body
+passthrough could not reach either, because both are client parameters.
+
+Read by the OpenRouter adapter; the Anthropic, OpenAI and Gemini clients ignore
+them. A value that is not a positive number stops the run and names the file.
+
+### Fixed — the context window was capped at 200k for models that have far more
+
+The window was a lookup table, and anything missing from it fell back to
+200 000 tokens. That is safe for an unknown model and wrong for a known one:
+`deepseek-v4-flash` has a 1 048 576-token window, `glm-5.3-flash` 1 310 720,
+`kimi-k3` 1 048 576. The guard that drops the oldest turns was firing at 180 000
+— about five times earlier than it had to, without saying so.
+
+The real figure now comes from the catalogue, in both directions: a window the
+table over-estimated comes down too.
+
+### Fixed — the MCP server ignored per-model budgets entirely
+
+One of the three places that build an OpenRouter client passed no budget at all,
+so anything reached through the MCP server ran on a flat 120-second timeout
+regardless of the model. All three now resolve it in one place.
+
+### Note
+
+Everything above degrades to the previous behaviour when the catalogue cannot be
+reached: the lookup is cached for a day, needs no API key, gives up after three
+seconds, and falls back to the name-based tables. A project with no `[engine]`
+section sends byte-for-byte the same requests it did before.
+
+The catalogue is only consulted for OpenRouter-shaped ids (`vendor/model`). A
+run on a local backend such as ollama, or on a direct Anthropic, OpenAI or
+Gemini key, never contacts openrouter.ai.
+
 ## [0.36.0] — 2026-09-21
 
 Memory had never been measured. No project has ever had an embeddings table on

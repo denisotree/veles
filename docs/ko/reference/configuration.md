@@ -58,6 +58,8 @@ args = ["-m", "my_mcp_server"]
 [engine]
 provider = "openrouter"                               # provider name for the main agent + routing base
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
+request_timeout_s = 180                              # 선택. 한 번의 응답을 기다리는 시간
+max_retries = 1                                      # 선택. 요청당 재시도 횟수
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -99,7 +101,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 | 섹션 | 용도 |
 |---|---|
-| `[engine]` | 메인 에이전트와 라우팅 캐스케이드의 기반 프로바이더(`provider` = 프로바이더 이름) + 모델(`model` = 모델 ID) |
+| `[engine]` | 메인 에이전트와 라우팅 캐스케이드의 기반 프로바이더(`provider` = 프로바이더 이름) + 모델(`model` = 모델 ID), 그리고 클라이언트 예산 `request_timeout_s` / `max_retries` |
 | `[routing.tasks]` | 태스크별 `provider:model` 재정의 — [태스크별 라우팅](../how-to/per-task-routing.md) 참고 |
 | `[permissions]` | 도구별 권한 정책(프로젝트 범위) |
 | `[daemon]` | 이름 없는/"기본" 데몬의 바인드 + 자동 시작 |
@@ -111,6 +113,36 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 `[routing.tasks]`의 태스크 유형: `default`, `curator`, `compressor`, `insights`, `skills`, `advisor`, `vision`, `embedding`.
 
 > `AGENTS.md`의 자연어 라우팅 힌트는 자동 생성되는 `routing.nl.toml`로 파싱됩니다. 명시적인 `[routing.tasks]` 항목이 언제나 우선합니다. 다시 파싱하려면 `veles route refresh`를 실행하세요. [태스크별 라우팅](../how-to/per-task-routing.md)을 참고하세요.
+
+### 응답을 얼마나 기다릴지, 몇 번 재시도할지
+
+```toml
+[engine]
+request_timeout_s = 180
+max_retries = 1
+```
+
+둘 다 **클라이언트** 파라미터이므로 `[engine.request.<provider>]`가 아니라 `[engine]`
+바로 아래에 평평하게 놓입니다. 그쪽은 요청 *본문*이고, 타임아웃은 본문으로 전달되지
+않습니다.
+
+지정하지 않으면 타임아웃은 모델 id에서 유추됩니다. 추론 계열은 900초, 그 계열의
+`flash`/`mini` 변형은 450초, 나머지는 120초입니다. 이 유추는 구조적으로 약합니다.
+**이름은 계열을 설명할 뿐이고, 응답 시간은 그것을 서빙하는 백엔드가 정하기
+때문입니다.** 같은 id가 어떤 백엔드에서는 33 tok/s, 다른 백엔드에서는 0.8 tok/s로
+돕니다. 유추된 값이 당신의 실행에 맞지 않으면 직접 지정하세요. 그 숫자가 두 번
+같은 의미를 갖게 하려면 아래의 백엔드 고정도 함께 쓰십시오.
+
+`max_retries`가 중요한 이유도 같습니다. 설정하지 않으면 SDK가 두 번 재시도하므로
+450초 타임아웃은 한 턴에 최대 1350초가 되고, 넉넉해 보이던 예산을 날리기에 충분합니다.
+`0`은 정당한 값이며 키를 생략한 것과 같지 않습니다.
+
+두 값의 우선순위는 코드의 명시적 인자 → `[engine]` → 모델별 기본값입니다. 양수가
+아닌 값(`max_retries`는 음이 아닌 정수가 아닌 값)은 파일 이름을 알려주는
+`ConfigError`로 중단됩니다.
+
+**적용 범위:** 현재 이 키들을 읽는 것은 OpenRouter 어댑터뿐입니다. Anthropic, OpenAI,
+Gemini 클라이언트는 두 파라미터 없이 생성되며 키를 무시합니다.
 
 ### 백엔드 고정 및 기타 요청 본문 키
 

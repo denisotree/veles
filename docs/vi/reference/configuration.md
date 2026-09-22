@@ -61,6 +61,8 @@ args = ["-m", "my_mcp_server"]
 [engine]
 provider = "openrouter"                               # provider name for the main agent + routing base
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
+request_timeout_s = 180                              # tuỳ chọn; chờ một phản hồi bao lâu
+max_retries = 1                                      # tuỳ chọn; số lần thử lại mỗi yêu cầu
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -102,7 +104,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 | Mục | Mục đích |
 |---|---|
-| `[engine]` | Nhà cung cấp cơ sở (`provider` = tên nhà cung cấp) + model (`model` = id model) cho agent chính và chuỗi cascade định tuyến |
+| `[engine]` | Nhà cung cấp cơ sở (`provider` = tên nhà cung cấp) + model (`model` = id model) cho agent chính và chuỗi cascade định tuyến, cùng các ngân sách phía client `request_timeout_s` / `max_retries` |
 | `[routing.tasks]` | Ghi đè `provider:model` theo từng tác vụ — xem [định tuyến theo tác vụ](../how-to/per-task-routing.md) |
 | `[permissions]` | Chính sách quyền theo từng tool (phạm vi dự án) |
 | `[daemon]` | Bind + autostart của daemon không tên/"default" |
@@ -118,6 +120,36 @@ Các loại tác vụ cho `[routing.tasks]`: `default`, `curator`, `compressor`,
 > thành một `routing.nl.toml` tự sinh; các mục `[routing.tasks]` tường minh luôn
 > thắng. Chạy `veles route refresh` để phân tích lại. Xem
 > [định tuyến theo tác vụ](../how-to/per-task-routing.md).
+
+### Chờ phản hồi bao lâu, và thử lại bao nhiêu lần
+
+```toml
+[engine]
+request_timeout_s = 180
+max_retries = 1
+```
+
+Cả hai đều là tham số của **client**, nên chúng nằm phẳng dưới `[engine]` chứ không
+trong `[engine.request.<provider>]`: mục đó là *thân* yêu cầu, còn thời gian chờ thì
+không bao giờ đi trong thân.
+
+Nếu không đặt, thời gian chờ được suy ra từ id mô hình: họ mô hình suy luận nhận
+900 giây, biến thể `flash`/`mini` của họ đó 450 giây, còn lại 120 giây. Suy luận này
+yếu về mặt cấu trúc: **cái tên mô tả một họ, trong khi thời gian phản hồi do backend
+phục vụ nó quyết định.** Cùng một id có thể chạy 33 token/giây trên backend này và
+0,8 token/giây trên backend khác. Khi con số suy ra không hợp với lần chạy của bạn,
+hãy tự đặt; và ghim backend (bên dưới) nếu bạn muốn con số ấy có cùng ý nghĩa hai lần.
+
+`max_retries` quan trọng vì cùng lý do. Không đặt, SDK thử lại hai lần, nên thời gian
+chờ 450 giây thực chất là tới 1350 giây trong một lượt — đủ để thổi bay một ngân sách
+trông có vẻ rộng rãi. `0` là giá trị hợp lệ và không giống việc bỏ khoá đi.
+
+Thứ tự ưu tiên của cả hai: đối số tường minh trong mã → `[engine]` → giá trị mặc định
+theo mô hình. Giá trị không phải số dương (hoặc, với `max_retries`, không phải số
+nguyên không âm) sẽ dừng lần chạy bằng `ConfigError` nêu rõ tên tệp.
+
+**Phạm vi:** hiện chỉ adapter OpenRouter đọc hai khoá này. Client của Anthropic,
+OpenAI và Gemini được dựng mà không có cả hai tham số và bỏ qua chúng.
 
 ### Ghim backend và các khoá khác trong thân yêu cầu
 

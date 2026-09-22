@@ -12,6 +12,7 @@ OpenAI adapter + local-model adapters."""
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from openai import OpenAI
@@ -28,6 +29,8 @@ from veles.core.provider import Message, TokenUsage
 _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 _DEFAULT_REFERER = "https://github.com/denisotree/veles"
 _DEFAULT_TITLE = "Veles"
+
+_logger = logging.getLogger(__name__)
 
 
 # Re-exported for tests that import the function from this module.
@@ -49,21 +52,54 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         base_url: str = _OPENROUTER_BASE_URL,
         referer: str = _DEFAULT_REFERER,
         title: str = _DEFAULT_TITLE,
-        timeout: float = 120.0,
+        timeout: float | None = None,
+        model: str | None = None,
+        max_retries: int | None = None,
     ) -> None:
+        """M266: both client budgets are resolved here, not by the caller.
+
+        The provider is built in three places — `provider_factory`, the CLI
+        runtime, and `adapters/cli/mcp_server.py` — and only the first two
+        passed a timeout, so the MCP path ran on a flat 120s regardless of the
+        model. Resolving inside the constructor closes that hole and any fourth
+        one: `timeout` is now `None` ("decide for me") rather than a third
+        hardcoded default that silently outranked `model_budgets`.
+        """
+        from veles.core.model_budgets import resolve_max_retries, resolve_request_timeout
         from veles.core.provider_factory import require_api_key
 
         key = require_api_key("openrouter", explicit=api_key)
-        client = OpenAI(
-            api_key=key,
-            base_url=base_url,
-            default_headers={
+        kwargs: dict[str, Any] = {
+            "api_key": key,
+            "base_url": base_url,
+            "default_headers": {
                 "HTTP-Referer": referer,
                 "X-Title": title,
             },
-            timeout=timeout,
-        )
-        super().__init__(client=client)
+            "timeout": resolve_request_timeout(model, explicit=timeout),
+        }
+        retries = resolve_max_retries(explicit=max_retries)
+        if retries is not None:
+            # Unset means the SDK's own default, whatever it currently is —
+            # don't freeze today's value into Veles.
+            kwargs["max_retries"] = retries
+        super().__init__(client=OpenAI(**kwargs))
+
+    def list_models(self) -> list[str]:
+        """Ids, and — for free — the catalogue behind them (M267).
+
+        `/model` and `veles models` come through here anyway, so the round trip
+        that already happened warms the metadata cache too. Without this the
+        first headless `veles run` in a day pays a 3s lookup of its own.
+        """
+        from veles.core.model_metadata import refresh_cache
+
+        page = list(self._client.models.list())
+        try:
+            refresh_cache({"data": [m.model_dump() for m in page]})
+        except Exception as exc:  # a listing must never fail over its side effect
+            _logger.debug("could not refresh model metadata: %s", exc)
+        return [m.id for m in page]
 
     def _prepare_messages(self, messages: list[Message], model: str) -> list[dict[str, Any]]:
         return apply_cache_hints([to_openai_message(m) for m in messages], model)

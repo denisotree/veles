@@ -61,6 +61,8 @@ args = ["-m", "my_mcp_server"]
 [engine]
 provider = "openrouter"                              # provider name for the main agent + routing base
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
+request_timeout_s = 180                              # optional; how long to wait for one response
+max_retries = 1                                      # optional; retries per request
 
 [engine.request.openrouter.provider]   # forwarded into the request body as-is
 order = ["GMICloud"]                   # pin one backend (see "Pinning a backend" below)
@@ -113,7 +115,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 | Section | Purpose |
 |---|---|
-| `[engine]` | Base provider (`provider` = provider name) + model (`model` = model id) for the main agent and the routing cascade |
+| `[engine]` | Base provider (`provider` = provider name) + model (`model` = model id) for the main agent and the routing cascade, plus the client budgets `request_timeout_s` / `max_retries` |
 | `[engine.request.<provider>]` | Extra keys sent verbatim in that provider's request body — backend pinning, reasoning controls |
 | `[routing.tasks]` | Per-task `provider:model` overrides — see [per-task routing](../how-to/per-task-routing.md) |
 | `[permissions]` | Per-tool permission policy (project scope) |
@@ -130,6 +132,37 @@ Task types for `[routing.tasks]`: `default`, `curator`, `compressor`, `insights`
 > Natural-language routing hints in `AGENTS.md` are parsed into an auto-generated
 > `routing.nl.toml`; explicit `[routing.tasks]` entries always win. Run
 > `veles route refresh` to re-parse. See [per-task routing](../how-to/per-task-routing.md).
+
+### How long to wait, and how many times to retry
+
+```toml
+[engine]
+request_timeout_s = 180
+max_retries = 1
+```
+
+Both are **client** parameters, which is why they sit flat under `[engine]` rather
+than in `[engine.request.<provider>]` — that section is the request *body*, and a
+timeout never travels in it.
+
+Without them, the timeout is derived from the model id: a reasoning family gets
+900s, a `flash`/`mini` variant of one gets 450s, anything else 120s. That default
+is a guess, and the guess is structurally weak — **the name describes a family,
+while the response time is set by the backend serving it.** One relayed id can run
+at 33 tok/s on one backend and 0.8 tok/s on another. So when the derived number is
+wrong for your run, set it; and pin the backend (below) if you want the number to
+mean something twice.
+
+`max_retries` matters for the same reason. Unset, the SDK retries twice, so a 450s
+timeout is really up to 1350s on a single turn — enough to blow a budget that looks
+generous. `0` is a legitimate value and is not the same as leaving the key out.
+
+Precedence for both: an explicit argument in code → `[engine]` → the per-model
+default. A value that is not a positive number (or, for `max_retries`, a
+non-negative integer) aborts with a `ConfigError` naming the file.
+
+**Scope:** only the OpenRouter adapter reads these today. The Anthropic, OpenAI and
+Gemini clients are built without either parameter and ignore the keys.
 
 ### Pinning a backend, and other request-body keys
 

@@ -58,6 +58,8 @@ args = ["-m", "my_mcp_server"]
 [engine]
 provider = "openrouter"                               # provider name for the main agent + routing base
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
+request_timeout_s = 180                              # 任意。1 回の応答を待つ時間
+max_retries = 1                                      # 任意。リクエストあたりの再試行回数
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -99,7 +101,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 
 | セクション | 目的 |
 |---|---|
-| `[engine]` | メインエージェントとルーティングカスケードのベースとなるプロバイダー（`provider` = プロバイダー名）+ モデル（`model` = モデル ID） |
+| `[engine]` | メインエージェントとルーティングカスケードのベースとなるプロバイダー（`provider` = プロバイダー名）+ モデル（`model` = モデル ID）、およびクライアント側の予算 `request_timeout_s` / `max_retries` |
 | `[routing.tasks]` | タスクごとの `provider:model` の上書き — [タスク別ルーティング](../how-to/per-task-routing.md)を参照 |
 | `[permissions]` | ツールごとのパーミッションポリシー（プロジェクトスコープ） |
 | `[daemon]` | 無名/「デフォルト」デーモンのバインド + 自動起動 |
@@ -111,6 +113,35 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 `[routing.tasks]` のタスクタイプ: `default`、`curator`、`compressor`、`insights`、`skills`、`advisor`、`vision`、`embedding`。
 
 > `AGENTS.md` 内の自然言語によるルーティングヒントは、自動生成される `routing.nl.toml` に解析されます。明示的な `[routing.tasks]` エントリが常に優先されます。再解析するには `veles route refresh` を実行してください。[タスク別ルーティング](../how-to/per-task-routing.md)を参照。
+
+### 応答をどれだけ待つか、何回再試行するか
+
+```toml
+[engine]
+request_timeout_s = 180
+max_retries = 1
+```
+
+どちらも**クライアント**のパラメータです。だから `[engine.request.<provider>]` では
+なく `[engine]` の直下に置かれます。あちらはリクエスト*ボディ*であり、タイムアウトが
+ボディを流れることはありません。
+
+指定しない場合、タイムアウトはモデル id から推測されます。推論系ファミリーは 900 秒、
+その `flash`/`mini` 版は 450 秒、それ以外は 120 秒です。この推測は構造的に弱いもの
+です。**名前が表すのはファミリーであって、応答時間を決めるのはそれを提供する
+バックエンドだからです。** 同じ id が、あるバックエンドでは 33 tok/s、別の
+バックエンドでは 0.8 tok/s で動きます。推測値が自分の実行に合わないなら設定して
+ください。その数値に二度同じ意味を持たせたいなら、下記のバックエンド固定も行います。
+
+`max_retries` が重要なのも同じ理由です。未設定だと SDK は 2 回再試行するため、
+450 秒のタイムアウトは 1 ターンで最大 1350 秒になり、余裕に見えた予算を食い潰すのに
+十分です。`0` は正当な値であり、キーを省略することとは別物です。
+
+両方の優先順位はコード内の明示的な引数 → `[engine]` → モデル別の既定値。正の数
+(`max_retries` は非負整数) でない値は、ファイル名を示す `ConfigError` で中断します。
+
+**適用範囲:** 現時点でこれらを読むのは OpenRouter アダプタだけです。Anthropic、
+OpenAI、Gemini のクライアントはどちらのパラメータも受け取らず、キーを無視します。
 
 ### バックエンドの固定、およびリクエストボディのその他のキー
 
