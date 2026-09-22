@@ -187,6 +187,36 @@ def test_mark_session_running_and_stopped(tmp_path):
     store.close()
 
 
+def test_starting_refreshes_the_settings_the_picker_shows(tmp_path, monkeypatch):
+    """The row is written at `session create`; the daemon starts from
+    `[daemon.<name>]` + flags. After a hand edit of config.toml the picker kept
+    showing the creation-time model and port — and used that port for its own
+    actions. Reproduced live 2026-09-22 (picker `gpt-4o-mini:8811`, daemon
+    `glm-5.3-flash:8822`). Asserted through the picker's own tree builder, since
+    the picker is where the stale value was visible."""
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "userhome"))
+    from veles.cli.commands.daemon import _mark_session_running
+    from veles.tui.screens._daemon_picker_data import build_daemon_tree
+
+    project = init_project(tmp_path / "proj", name="proj")
+    store = RuntimeSessionStore(project.memory_db_path)
+    store.create("work", "daemon", model="openai/gpt-4o-mini", port=8811, host="127.0.0.1")
+    store.close()
+
+    _mark_session_running(
+        project,
+        "work",
+        pid=4242,
+        host="127.0.0.1",
+        port=8822,
+        provider="openrouter",
+        model="z-ai/glm-5.3-flash",
+    )
+
+    node = next(n for n in build_daemon_tree(project).current if n.name == "work")
+    assert (node.model, node.port) == ("z-ai/glm-5.3-flash", 8822)
+
+
 def test_mark_session_running_is_noop_when_unnamed(tmp_path):
     """The legacy daemon (name=None) has no runtime_sessions row — marking
     must be a no-op and never touch the DB."""

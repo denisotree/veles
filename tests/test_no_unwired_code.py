@@ -99,7 +99,6 @@ _BASELINE = frozenset(
         "stable_text",
         "strip_provider_prefix",
         "unregister_platform",
-        "update_settings",
         "update_status",
     }
 )
