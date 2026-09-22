@@ -343,7 +343,7 @@ def parse_command(text: str) -> tuple[str, str] | None:
     M274: only a name Telegram itself would treat as a command counts.
     Anything else starting with `/` was parsed as a command and answered
     "Unknown command", so a message that merely *began* with a path —
-    `/var/log/app.log почему падает?` — never reached the agent.
+    `/var/log/app.log why does it crash?` — never reached the agent.
     """
     stripped = text.strip()
     if not stripped.startswith("/"):
