@@ -11,13 +11,15 @@ from __future__ import annotations
 
 import re
 
-from veles.core.memory.artefacts import ProposalInfo
+from veles.core.memory.artefacts import PROMOTE_PROPOSAL_PREFIX, ProposalInfo
 from veles.core.memory.router import RecallHit
 
 _BLOCK_OPEN = "<memory-context>"
 _BLOCK_CLOSE = "</memory-context>"
-_PROPOSALS_OPEN = "<subproject-proposals>"
-_PROPOSALS_CLOSE = "</subproject-proposals>"
+# M275: renamed from <subproject-proposals> — the block now also carries skill
+# promotions, and a tag that names only one kind is how the two got conflated.
+_PROPOSALS_OPEN = "<proposals>"
+_PROPOSALS_CLOSE = "</proposals>"
 _QUERY_HEADER_CAP = 120
 _PROPOSALS_MAX_CHARS = 1500
 
@@ -30,7 +32,7 @@ _PROPOSALS_MAX_CHARS = 1500
 # `scan_for_injection` does not cover this: it neutralises `<system>` /
 # `<im_start>`, not Veles' own block tags. Escaping (rather than scrubbing) is
 # deliberate — a page legitimately documenting these tags stays readable.
-_BLOCK_TAG = re.compile(r"<\s*/?\s*(?:memory-context|subproject-proposals)\b[^>]*>", re.IGNORECASE)
+_BLOCK_TAG = re.compile(r"<\s*/?\s*(?:memory-context|proposals)\b[^>]*>", re.IGNORECASE)
 
 
 def _escape_block_tags(text: str) -> str:
@@ -74,35 +76,56 @@ def build_memory_context_block(
 
 
 def build_proposals_block(
-    proposals: list[ProposalInfo], *, max_chars: int = _PROPOSALS_MAX_CHARS
+    subprojects: list[ProposalInfo],
+    promotions: list[ProposalInfo] | None = None,
+    *,
+    max_chars: int = _PROPOSALS_MAX_CHARS,
 ) -> str | None:
-    """Render fresh M62 subproject proposals into a system-prompt block.
+    """Render fresh curator proposals into one system-prompt block.
 
-    The agent reads this block on every turn after the auto-trigger
-    fires, and can choose to surface the suggestions to the user
-    (VISION §2.2: the agent — not the user — initiates decomposition).
+    Two kinds, each with its own accept command, because the command is what
+    the agent will relay to the user: M62 subproject clusters (VISION §2.2 —
+    the agent, not the user, initiates decomposition) and M61 skill promotions.
+    Before M275 a promotion was listed as a "candidate subproject" under
+    `veles subproject init <slug>`, which would have created a subproject named
+    `promote-<skill>` instead of promoting the skill.
     """
-    if not proposals:
+    promotions = promotions or []
+    if not subprojects and not promotions:
         return None
     lines = [
         _PROPOSALS_OPEN,
-        f"The curator has identified {len(proposals)} candidate subproject(s) "
-        "in this project. Each is persisted under .veles/memory/proposals/.",
-        "Consider mentioning these to the user when relevant:",
+        "The curator left suggestions under .veles/memory/proposals/. "
+        "Consider mentioning them to the user when relevant.",
     ]
-    for p in proposals:
-        summary = p.summary.strip() or "(no summary)"
-        lines.append(_escape_block_tags(f"- {p.slug}: {summary}"))
-    lines.append(
-        "To accept one: `veles subproject init <slug>` then move the listed "
-        "pages into the new subproject's wiki/."
-    )
+    if subprojects:
+        lines.append(f"Candidate subprojects ({len(subprojects)}):")
+        for p in subprojects:
+            summary = p.summary.strip() or "(no summary)"
+            lines.append(_escape_block_tags(f"- {p.slug}: {summary}"))
+        lines.append(
+            "To accept one: `veles subproject init <slug>` then move the listed "
+            "pages into the new subproject's wiki/."
+        )
+    if promotions:
+        lines.append(f"Skills worth promoting to user scope ({len(promotions)}):")
+        for p in promotions:
+            name = p.slug.removeprefix(PROMOTE_PROPOSAL_PREFIX)
+            summary = p.summary.strip() or "(no summary)"
+            lines.append(_escape_block_tags(f"- {name}: {summary}"))
+        lines.append(
+            "To accept one: `veles skill promote <name>` — the skill then works "
+            "in every project on this machine."
+        )
     lines.append(_PROPOSALS_CLOSE)
     block = "\n".join(lines)
     if len(block) <= max_chars:
         return block
-    if len(proposals) > 1:
-        return build_proposals_block(proposals[:-1], max_chars=max_chars)
+    # Drop from the tail to fit, promotions first, keeping at least one entry.
+    if len(promotions) + len(subprojects) > 1:
+        if promotions:
+            return build_proposals_block(subprojects, promotions[:-1], max_chars=max_chars)
+        return build_proposals_block(subprojects[:-1], max_chars=max_chars)
     suffix = "...\n" + _PROPOSALS_CLOSE
     cut = max_chars - len(suffix)
     if cut <= 0:

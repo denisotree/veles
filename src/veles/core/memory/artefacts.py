@@ -40,6 +40,14 @@ _SESSIONS_DIR = "sessions"
 _PROPOSALS_DIR = "proposals"
 _SUMMARY_CHAR_CAP = 200
 
+# Two writers share `proposals/`: M62 subproject clusters and M61 skill
+# promotions, told apart only by this slug prefix. Defined once, here beside the
+# directory, because M275 found a reader that did not know it existed —
+# `subproject_proposer.recent_proposals` listed promotions as "candidate
+# subprojects" and the prompt told the agent to accept one with
+# `veles subproject init promote-…`.
+PROMOTE_PROPOSAL_PREFIX = "promote-"
+
 
 @dataclass(slots=True)
 class ProposalInfo:

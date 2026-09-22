@@ -438,16 +438,17 @@ def _workspace_block(project: Project) -> str | None:
 
 
 def _proposals_block(project: Project) -> str | None:
-    """M62 — surface fresh subproject proposals into the system prompt.
+    """M62 + M275 — surface fresh curator proposals into the system prompt:
+    subproject clusters and skill promotions, each under its own command.
 
     Imported lazily so test fixtures that monkey-patch
     `veles.core.subproject_proposer.recent_proposals` see their override
     at call time.
     """
+    from veles.core.skill_promotion import recent_promote_proposals
     from veles.core.subproject_proposer import recent_proposals
 
-    proposals = recent_proposals(project)
-    return build_proposals_block(proposals) if proposals else None
+    return build_proposals_block(recent_proposals(project), recent_promote_proposals(project))
 
 
 def _load_context_file(project: Project) -> str | None:

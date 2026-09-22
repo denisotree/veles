@@ -46,6 +46,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from veles.core.memory.artefacts import (
+    PROMOTE_PROPOSAL_PREFIX,
     ProposalInfo,
     append_memory_log,
     list_proposals,
@@ -258,10 +259,17 @@ def write_proposals(project: Project, clusters: list[Cluster]) -> list[str]:
 
 
 def recent_proposals(project: Project, *, max_age_days: int = 7) -> list[ProposalInfo]:
-    """Return proposal pages whose mtime is newer than `max_age_days` ago."""
+    """Return *subproject* proposal pages whose mtime is newer than `max_age_days` ago.
+
+    Skill-promotion proposals share the directory and are excluded — they have
+    their own reader (`skill_promotion.recent_promote_proposals`) and their own
+    accept command. Before M275 they were returned here too and rendered to the
+    agent as subproject candidates."""
     cutoff = time.time() - max_age_days * 86_400
     out: list[ProposalInfo] = []
     for page in list_proposals(project):
+        if page.slug.startswith(PROMOTE_PROPOSAL_PREFIX):
+            continue
         try:
             mtime = page.path.stat().st_mtime
         except OSError:

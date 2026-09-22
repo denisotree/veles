@@ -87,7 +87,6 @@ _BASELINE = frozenset(
         "list_skills",
         "parse_plan_ref",
         "parse_tool_calls",
-        "recent_promote_proposals",
         "render_system_block",
         "set_project_wizard_prompter",
         "set_wizard_prompter",
