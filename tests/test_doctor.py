@@ -115,6 +115,68 @@ def test_provider_keys_ok_when_set(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "anthropic" in r.details["providers"]  # type: ignore[index]
 
 
+# ---- M271: keys where the runtime reads them ----
+
+
+def _clear_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for env in (
+        "OPENROUTER_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+    ):
+        monkeypatch.delenv(env, raising=False)
+
+
+def _provider_keys(project=None) -> CheckResult:
+    """Through `run_all`, the path `veles doctor` takes — not the check by hand."""
+    return next(r for r in run_all(project).results if r.name == "provider_keys")
+
+
+def test_a_keychain_key_is_not_reported_missing(monkeypatch, fake_keyring) -> None:
+    """The reported bug: a working key stored with `veles secret set` (or the
+    wizard) was answered with "no provider API keys set in environment"."""
+    from veles.cli import main as cli_main
+
+    _clear_provider_env(monkeypatch)
+    assert cli_main(["secret", "set", "OPENROUTER_API_KEY", "sk-test"]) == 0
+    r = _provider_keys()
+    assert r.status == "ok"
+    assert "openrouter (keychain)" in r.message
+
+
+def test_a_project_scoped_key_counts_for_that_project(monkeypatch, fake_keyring, tmp_path) -> None:
+    from veles.core.project import init_project
+    from veles.core.secrets import set_provider_key
+
+    _clear_provider_env(monkeypatch)
+    project = init_project(tmp_path / "proj", name="proj")
+    set_provider_key("openrouter", "sk-proj", project="proj")  # the project wizard's call
+    assert _provider_keys(project).status == "ok"
+
+
+def test_a_stranded_legacy_entry_is_named(monkeypatch, fake_keyring) -> None:
+    """A key an older `veles secret set` put at the flat name, which M149 stopped
+    reading: the user believes it is configured, so say exactly what happened."""
+    _clear_provider_env(monkeypatch)
+    fake_keyring.store[("veles", "OPENROUTER_API_KEY")] = "sk-old"
+    r = _provider_keys()
+    assert r.status == "warn"
+    assert "OPENROUTER_API_KEY" in r.message
+    assert "veles secret set OPENROUTER_API_KEY" in r.fix_hint
+
+
+def test_a_stranded_entry_beside_a_working_key_is_left_alone(monkeypatch, fake_keyring) -> None:
+    """Nothing is broken for this user — no nag."""
+    from veles.core.secrets import set_provider_key
+
+    _clear_provider_env(monkeypatch)
+    fake_keyring.store[("veles", "OPENROUTER_API_KEY")] = "sk-old"
+    set_provider_key("openrouter", "sk-wizard")
+    assert _provider_keys().status == "ok"
+
+
 def test_agents_md_missing(tmp_path: Path) -> None:
     proj = _make_project(tmp_path)
     r = _check_agents_md(proj)

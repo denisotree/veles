@@ -33,13 +33,6 @@ _TRACES_SIZE_WARN_BYTES = 40 * 1024 * 1024  # warn at 40 MB; rotation at 50.
 _EVENTS_SIZE_WARN_BYTES = 40 * 1024 * 1024
 _AUTOPILOT_REVIEW_WINDOW_S = 7 * 24 * 60 * 60
 
-_PROVIDER_KEY_ENVS: dict[str, str] = {
-    "openrouter": "OPENROUTER_API_KEY",
-    "anthropic": "ANTHROPIC_API_KEY",
-    "openai": "OPENAI_API_KEY",
-    "gemini": "GOOGLE_API_KEY",
-}
-
 
 @dataclass(slots=True, frozen=True)
 class CheckResult:
@@ -158,20 +151,59 @@ def _check_user_config() -> CheckResult:
     return CheckResult(name="user_config", status="ok", message=f"{cfg} parses cleanly")
 
 
-def _check_provider_keys() -> CheckResult:
-    present = sorted(p for p, env in _PROVIDER_KEY_ENVS.items() if os.environ.get(env))
-    if not present:
+def _check_provider_keys(project: Project | None = None) -> CheckResult:
+    """Which providers have a key, checked where the runtime looks for one.
+
+    M271: this read the environment only, so a user whose key came from the
+    setup wizard — the keychain, the recommended path — was told "no provider
+    API keys set in environment" and pointed at `export`, steering them off
+    the path that was already working. Now it asks the same resolver the
+    providers use (`get_provider_key`: project scope → default → env) and names
+    the source.
+
+    It also names a key stored by an older `veles secret set` under the flat
+    `veles:OPENROUTER_API_KEY` entry, which the runtime has not read since M149
+    — but only for a provider that has no working key, so someone with both a
+    stale entry and a wizard key is not told to fix what is not broken."""
+    from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
+    from veles.core.secrets import get_provider_key, get_secret
+
+    scope = project.name if project is not None else None
+    sources: dict[str, str] = {}
+    stranded: list[str] = []
+    for provider, env_names in PROVIDER_API_KEY_ENVS.items():
+        if get_provider_key(provider, project=scope, env_fallback=False):
+            sources[provider] = "keychain"
+        elif any(os.environ.get(n) for n in env_names):
+            sources[provider] = "env"
+        else:
+            stranded += [n for n in env_names if get_secret(n, env_fallback=False)]
+
+    if stranded:
         return CheckResult(
             name="provider_keys",
             status="warn",
-            message="no provider API keys set in environment",
-            fix_hint=("export at least one of: " + ", ".join(sorted(_PROVIDER_KEY_ENVS.values()))),
+            message=(
+                f"{', '.join(stranded)} was stored by an older `veles secret set` "
+                "in a keychain entry the runtime never reads"
+            ),
+            fix_hint=f"run `veles secret set {stranded[0]}` again to store it where it is read",
+            details={"providers": sorted(sources), "stranded": stranded},
+        )
+    if not sources:
+        return CheckResult(
+            name="provider_keys",
+            status="warn",
+            message="no provider API key found (keychain or environment)",
+            fix_hint="`veles secret set OPENROUTER_API_KEY` (or another provider's key), "
+            "or run the setup wizard",
         )
     return CheckResult(
         name="provider_keys",
         status="ok",
-        message=f"keys present for: {', '.join(present)}",
-        details={"providers": present},
+        message="keys present for: "
+        + ", ".join(f"{p} ({src})" for p, src in sorted(sources.items())),
+        details={"providers": sorted(sources)},
     )
 
 
@@ -702,10 +734,11 @@ def run_all(project: Project | None) -> DoctorReport:
         _check_python_version,
         _check_user_home,
         _check_user_config,
-        _check_provider_keys,
         _check_embedding_backend,
     ]
     project_aware: list[Callable[[Project | None], CheckResult]] = [
+        # Project-aware because the runtime resolves a key per project scope.
+        _check_provider_keys,
         _check_active_project,
         _check_config_schema,
         _check_memory_fts,
