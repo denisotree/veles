@@ -540,10 +540,10 @@ class TurnMixin:
         with contextlib.suppress(Exception):
             self.app.invalidate()
 
-    async def _in_terminal(self, func) -> None:
+    async def _in_terminal(self, func, *, in_executor: bool = False) -> None:
         from prompt_toolkit.application import run_in_terminal
 
-        await run_in_terminal(func)
+        await run_in_terminal(func, in_executor=in_executor)
 
     def _echo_user(self, text: str) -> None:
         """Echo the request into the scrollback, accent-marked as user input
@@ -605,8 +605,12 @@ class TurnMixin:
             )
 
         # run_in_terminal: /sessions may read input (rich.Prompt.ask), which
-        # needs the terminal handed back from the app.
-        await self._in_terminal(_do)
+        # needs the terminal handed back from the app. In an executor thread,
+        # like a turn: slash handlers are synchronous code, and on the loop
+        # thread the M264 memory bridge refuses to run — `/insights` and
+        # `/rules` failed with "memory.aio.submit() called from inside an event
+        # loop" from 0.36.0 to 0.39.0. prompt_toolkit copies the context in.
+        await self._in_terminal(_do, in_executor=True)
         # `/theme <name>` sets state.theme_name via the registry's `_theme`
         # handler (already persisted there) — restyle the running app here so
         # the direct-set path applies live too, same as picking from `_tp_pick`.
