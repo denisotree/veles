@@ -277,3 +277,39 @@ def test_listing_models_warms_the_metadata_cache(tmp_path, monkeypatch) -> None:
     )
     assert provider.list_models() == ["deepseek/deepseek-v4-flash", "openai/gpt-4o"]
     assert model_metadata.model_facts("deepseek/deepseek-v4-flash")["reasoning"] is True
+
+
+# ---- the context window (M268) ----
+
+
+def test_the_window_comes_from_the_catalogue(tmp_path, no_network) -> None:
+    """`deepseek-v4-flash` is a 1M-token model that the substring table did not
+    know, so it was held to the 200k default and the emergency-truncation guard
+    dropped history at 180k — about five times earlier than it had to."""
+    from veles.core.model_windows import context_window_for, default_hard_ceiling_for
+
+    _write_cache(tmp_path)
+    model = "deepseek/deepseek-v4-flash"
+    assert context_window_for(model) == 1_048_576  # was 200_000
+    assert default_hard_ceiling_for(model) == 943_718  # was 180_000
+
+
+def test_the_catalogue_can_also_lower_a_window(tmp_path, no_network) -> None:
+    """The point is the real figure, not a bigger one: a model the table
+    over-estimates must come down, or the request blows the provider's limit."""
+    from veles.core.model_windows import context_window_for
+
+    _write_cache(tmp_path, models={"anthropic/claude-sonnet-4.6": {"context_length": 200_000}})
+    assert context_window_for("anthropic/claude-sonnet-4.6") == 200_000
+
+
+def test_the_table_still_answers_without_facts(monkeypatch) -> None:
+    def _dead(*args, **kwargs):
+        raise urllib.error.URLError("offline")
+
+    monkeypatch.setattr(model_metadata.urllib.request, "urlopen", _dead)
+    from veles.core.model_windows import context_window_for
+
+    assert context_window_for("anthropic/claude-sonnet-4.6") == 1_000_000
+    assert context_window_for("openai/gpt-4o") == 128_000
+    assert context_window_for("vendor/made-up-9") == 200_000
