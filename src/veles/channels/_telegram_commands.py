@@ -350,13 +350,6 @@ def is_known_command(cmd: str) -> bool:
     return cmd in {"start", "reset"} or cmd in _HANDLERS
 
 
-def all_command_names() -> list[str]:
-    """Sorted union of every command name the gateway dispatcher
-    recognises — including the gateway-owned `start`/`reset`. Useful
-    for tests and the suggestion UI ("did you mean…?")."""
-    return sorted({"start", "reset"} | set(_HANDLERS.keys()))
-
-
 async def dispatch(gateway: TelegramGateway, chat_key: str, cmd: str, args: str) -> str | None:
     """Run the handler for `cmd`. Returns the reply text or `None` if
     the command isn't owned by this dispatcher (`/start` and `/reset`

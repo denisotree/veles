@@ -190,12 +190,58 @@ def test_user_version_matches_schema_version(store: SessionStore) -> None:
     assert v == _SCHEMA_VERSION
 
 
-def test_set_title(store: SessionStore) -> None:
-    sid = store.create_session()
-    store.set_title(sid, "Magic Word Demo")
-    info = store.get_session(sid)
+# ---- session titles ----
+#
+# The `title` column was shown by the session picker, `veles sessions list` and
+# `/resume`, and never written: every session in every project read
+# "(untitled)". `set_title` existed, was tested here, and had no caller.
+
+
+def test_a_session_is_titled_by_an_agent_run(store: SessionStore) -> None:
+    """Through the real path — an `Agent.run`, not a store call made by hand —
+    because a test that writes the title itself is how the column stayed empty
+    while its test passed."""
+    from tests.conftest import StubProvider
+    from veles.core.agent import Agent
+    from veles.core.provider import ProviderResponse, TokenUsage
+    from veles.core.tools.registry import Registry
+
+    provider = StubProvider(
+        responses=[ProviderResponse(text="ok", tool_calls=[], usage=TokenUsage())]
+    )
+    agent = Agent(provider, Registry(), model="m", store=store, system_prompt="be terse")
+    result = agent.run("  research moving to Guimarães\nbudget: 2k/month")
+    info = store.get_session(result.session_id)
     assert info is not None
-    assert info.title == "Magic Word Demo"
+    assert info.title == "research moving to Guimarães"
+
+
+def test_the_first_user_message_wins(store: SessionStore) -> None:
+    sid = store.create_session()
+    store.append_turn(sid, Message(role="system", content="system prompt, not a title"))
+    store.append_turn(sid, Message(role="user", content="first question"))
+    store.append_turn(sid, Message(role="user", content="a later nudge"))
+    assert store.get_session(sid).title == "first question"
+
+
+def test_a_title_given_at_creation_is_kept(store: SessionStore) -> None:
+    sid = store.create_session(title="named on purpose")
+    store.append_turn(sid, Message(role="user", content="first question"))
+    assert store.get_session(sid).title == "named on purpose"
+
+
+def test_a_long_first_message_is_cut_to_one_row(store: SessionStore) -> None:
+    sid = store.create_session()
+    store.append_turn(sid, Message(role="user", content="word " * 40))
+    title = store.get_session(sid).title
+    assert len(title) == 60
+    assert title.endswith("…")
+
+
+def test_a_session_without_a_user_message_stays_untitled(store: SessionStore) -> None:
+    sid = store.create_session()
+    store.append_turn(sid, Message(role="system", content="mirrored channel line"))
+    assert store.get_session(sid).title is None
 
 
 def test_wal_mode_enabled(tmp_path) -> None:

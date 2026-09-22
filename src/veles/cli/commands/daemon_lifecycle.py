@@ -494,9 +494,27 @@ def _instance_log_slug(project, name: str | None) -> str:
     return f"{project.name}-{name}" if name else project.name
 
 
-def _mark_session_running(project, name: str | None, *, pid: int) -> None:
+def _mark_session_running(
+    project,
+    name: str | None,
+    *,
+    pid: int,
+    host: str | None = None,
+    port: int | None = None,
+    provider: str | None = None,
+    model: str | None = None,
+) -> None:
     """Best-effort: stamp the named ``runtime_sessions`` row 'running'. No-op
-    when unnamed or the row is absent — the legacy daemon has no store row."""
+    when unnamed or the row is absent — the legacy daemon has no store row.
+
+    Also refreshes the row's settings to what this process actually resolved.
+    The row is written once, at `veles daemon session create`, while the daemon
+    starts from `[daemon.<name>]` plus flags — so after a hand edit of
+    config.toml the picker showed the old model and, worse, the old port, which
+    its own actions then used (reproduced 2026-09-22: picker `gpt-4o-mini:8811`,
+    daemon `glm-5.3-flash:8822`). `update_settings` existed for exactly this and
+    had no caller. The values passed in are the *resolved* ones, so an explicit
+    `--port` beats the config block here too."""
     if not name:
         return
     from veles.core.runtime_sessions import RuntimeSessionStore
@@ -505,6 +523,7 @@ def _mark_session_running(project, name: str | None, *, pid: int) -> None:
     try:
         rec = store.get_by_name(name, kind="daemon")
         if rec is not None:
+            store.update_settings(rec.id, host=host, port=port, provider=provider, model=model)
             store.mark_started(rec.id, pid=pid)
     finally:
         store.close()

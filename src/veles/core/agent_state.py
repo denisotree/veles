@@ -102,11 +102,6 @@ _untrusted_corpus: ContextVar[tuple[tuple[str, str], ...]] = ContextVar(
 )
 
 
-def untrusted_corpus() -> tuple[str, ...]:
-    """Untrusted-content blocks recorded in the current run (bodies only)."""
-    return tuple(body for body, _source in _untrusted_corpus.get())
-
-
 # M242: the corpus records WHERE each block came from, because the two sources
 # carry very different risk and the M198 egress rule was treating them alike.
 #
@@ -121,11 +116,6 @@ def untrusted_corpus() -> tuple[str, ...]:
 # non-TTY context. Observed live 2026-09-01: a research goal in a headless run
 # retried against that wall until its iterations ran out.
 _SEARCH_SOURCE_PREFIX = "web_search:"
-
-
-def untrusted_corpus_items() -> tuple[tuple[str, str], ...]:
-    """`(body, source)` pairs for the current run, newest last."""
-    return _untrusted_corpus.get()
 
 
 def untrusted_page_corpus() -> tuple[str, ...]:

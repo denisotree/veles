@@ -393,17 +393,6 @@ class Wiki:
         with log_path.open("a", encoding="utf-8") as f:
             f.write(entry)
 
-    def save_source(self, *, category: str, slug: str, content: str, ext: str = "md") -> str:
-        clean_slug = _normalize_slug(slug)
-        clean_cat = _normalize_slug(category) or "misc"
-        self.ensure_layout()
-        cat_dir = self._root / _SOURCES_DIR / clean_cat
-        cat_dir.mkdir(parents=True, exist_ok=True)
-        ext_clean = ext.lstrip(".").lower() or "md"
-        out_path = cat_dir / f"{clean_slug}.{ext_clean}"
-        out_path.write_text(content, encoding="utf-8")
-        return f"{_SOURCES_DIR}/{clean_cat}/{out_path.name}"
-
     def _resolve_under_root(self, rel_path: str) -> Path:
         rel = Path(rel_path)
         if rel.is_absolute():

@@ -41,12 +41,6 @@ def _make_project(tmp_path: Path) -> Project:
 # ---------- CheckResult / DoctorReport ----------
 
 
-def test_check_result_is_failing() -> None:
-    assert CheckResult(name="x", status="error", message="m").is_failing() is True
-    assert CheckResult(name="x", status="warn", message="m").is_failing() is False
-    assert CheckResult(name="x", status="ok", message="m").is_failing() is False
-
-
 def test_report_to_json_round_trip() -> None:
     report = DoctorReport(results=[CheckResult(name="a", status="ok", message="fine")])
     obj = json.loads(report.to_json())

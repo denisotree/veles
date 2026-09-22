@@ -1,8 +1,7 @@
-"""Unit tests for streaming: TextDelta/StreamEnd, default fallback, agent callback."""
+"""Unit tests for streaming: TextDelta/StreamEnd and the agent callback."""
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -13,11 +12,9 @@ from veles.core.provider import (
     Message,
     ProviderResponse,
     StreamEnd,
-    StreamEvent,
     TextDelta,
     TokenUsage,
     ToolCall,
-    default_stream_via_create,
 )
 from veles.core.tools.registry import Registry, ToolEntry
 
@@ -57,43 +54,10 @@ class _SyncStubProvider:
             finish_reason="stop",
         )
 
-    def stream_message(self, *args, **kwargs) -> Iterator[StreamEvent]:
-        yield from default_stream_via_create(self, *args, **kwargs)
-
-
-def test_default_stream_emits_one_delta_then_end() -> None:
-    provider = _SyncStubProvider(reply="hello world")
-    events = list(
-        provider.stream_message([Message(role="user", content="x")], tools=None, model="m")
-    )
-    assert len(events) == 2
-    assert isinstance(events[0], TextDelta)
-    assert events[0].text == "hello world"
-    assert isinstance(events[1], StreamEnd)
-    assert events[1].response.text == "hello world"
-
-
-def test_default_stream_skips_delta_when_text_is_none() -> None:
-    @dataclass
-    class _NoTextProvider:
-        name: str = "no-text"
-        supports_tools: bool = True
-        supports_streaming: bool = False
-
-        def create_message(self, *_args, **_kwargs) -> ProviderResponse:
-            return ProviderResponse(
-                text=None,
-                tool_calls=[ToolCall(id="c", name="x", arguments={})],
-                usage=TokenUsage(),
-            )
-
-        def stream_message(self, *args, **kwargs):
-            yield from default_stream_via_create(self, *args, **kwargs)
-
-    provider = _NoTextProvider()
-    events = list(provider.stream_message([Message(role="user", content="x")], model="m"))
-    assert len(events) == 1
-    assert isinstance(events[0], StreamEnd)
+    def stream_message(self, *args, **kwargs):
+        # `supports_streaming=False`, so the agent never reaches this; it exists
+        # only so the stub still satisfies the `Provider` protocol.
+        raise NotImplementedError
 
 
 # ---------- agent integration ----------

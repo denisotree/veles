@@ -13,10 +13,8 @@ automatically by `list_themes()` / `load_theme()`.
 
 from __future__ import annotations
 
-import os
-import tempfile
 import tomllib
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 
 _THEME_FIELDS = (
@@ -120,7 +118,7 @@ def themes_dir() -> Path:
     return user_themes_dir()
 
 
-# ---- load / save ----
+# ---- load ----
 
 
 def load_theme(name: str) -> TuiTheme | None:
@@ -134,22 +132,6 @@ def load_theme(name: str) -> TuiTheme | None:
         except (ValueError, OSError):
             return None
     return None
-
-
-def save_custom_theme(theme: TuiTheme) -> None:
-    """Atomically write theme to ~/.veles/themes/<name>.toml."""
-    td = themes_dir()
-    td.mkdir(parents=True, exist_ok=True)
-    target = td / f"{theme.name}.toml"
-    text = _render_theme_toml(theme)
-    fd, tmp = tempfile.mkstemp(prefix=target.name + ".", suffix=".tmp", dir=td)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(text)
-        os.replace(tmp, target)
-    except Exception:
-        Path(tmp).unlink(missing_ok=True)
-        raise
 
 
 def import_theme_from_file(path: Path) -> TuiTheme:
@@ -189,19 +171,3 @@ def list_themes() -> list[str]:
         for p in td.glob("*.toml"):
             names.add(p.stem)
     return sorted(names)
-
-
-# ---- TOML rendering ----
-
-
-def _escape(s: str) -> str:
-    return s.replace("\\", "\\\\").replace('"', '\\"')
-
-
-def _render_theme_toml(theme: TuiTheme) -> str:
-    d = asdict(theme)
-    lines = []
-    for key in (*_THEME_FIELDS, "pt_header"):
-        if key in d:
-            lines.append(f'{key} = "{_escape(d[key])}"')
-    return "\n".join(lines) + "\n"

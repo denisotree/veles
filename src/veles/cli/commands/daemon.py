@@ -286,8 +286,17 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     if name is None:
         _register_in_registry(state, args, project, info_path)
     else:
-        # Child owns the runtime_sessions row; mark it running with our pid.
-        _mark_session_running(project, name, pid=os.getpid())
+        # Child owns the runtime_sessions row; mark it running with our pid and
+        # the settings this process actually resolved, so the picker shows them.
+        _mark_session_running(
+            project,
+            name,
+            pid=os.getpid(),
+            host=args.host,
+            port=args.port,
+            provider=provider_name,
+            model=settings_for_health.model,
+        )
 
     print(
         f"veles daemon listening on http://{args.host}:{args.port}/ "

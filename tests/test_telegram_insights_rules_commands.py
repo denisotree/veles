@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from veles.channels._telegram_commands import (
-    all_command_names,
+    _HANDLERS,
     dispatch,
     menu_descriptors,
 )
@@ -99,7 +99,7 @@ async def test_insights_in_menu_and_commands(session_map) -> None:
     del session_map
     cmds = {d["command"] for d in menu_descriptors()}
     assert "insights" in cmds
-    assert "insights" in all_command_names()
+    assert "insights" in _HANDLERS
 
 
 # ---- /rules ----
@@ -136,7 +136,7 @@ async def test_rules_in_menu_and_commands(session_map) -> None:
     del session_map
     cmds = {d["command"] for d in menu_descriptors()}
     assert "rules" in cmds
-    assert "rules" in all_command_names()
+    assert "rules" in _HANDLERS
 
 
 async def test_help_lists_insights_and_rules(session_map, project) -> None:

@@ -366,6 +366,38 @@ def _run_mode_turn(state, project, factory, line: str, console, errors: list[str
     return holder.get("result")
 
 
+# `/errors` also reaches back past this process (M132): a failure in an earlier
+# REPL run, a `veles run` or the daemon is written to `events.jsonl` and would
+# otherwise be invisible after a restart. Bounded so a days-old, already-fixed
+# failure doesn't resurface on a fresh start. The Textual inspector did this
+# seeding; it was lost when that UI was deleted (M187), and `recent_error_events`
+# sat uncalled until this was wired back in.
+_EARLIER_ERRORS_WINDOW_S = 24 * 60 * 60
+_EARLIER_ERRORS_LIMIT = 10
+
+
+def _earlier_errors(project, current_session_id: str | None) -> list[tuple[str, str]]:
+    """`(ts, text)` for recent `error` events from other runs. Best-effort: a
+    missing or unreadable log yields nothing rather than breaking `/errors`."""
+    if project is None:
+        return []
+    from veles.core.events import events_path_for_project, read_events, recent_error_events
+
+    try:
+        events = read_events(events_path_for_project(project.state_dir))
+    except OSError:
+        return []
+    recent = recent_error_events(
+        events, within_seconds=_EARLIER_ERRORS_WINDOW_S, limit=_EARLIER_ERRORS_LIMIT
+    )
+    return [
+        (str(e.get("ts", "")), f"{e.get('error_type', 'error')}: {e.get('message', '')}")
+        for e in recent
+        # This session's own failures are already in the in-memory list.
+        if not current_session_id or e.get("session_id") != current_session_id
+    ]
+
+
 def _handle_slash(
     line: str, registry, state, project, store, console, errors: list[str]
 ) -> tuple[bool, str | None]:
@@ -378,11 +410,18 @@ def _handle_slash(
         _print_repl_help(console)
         return False, None
     if cmd == "/errors":
-        if not errors:
-            console.print("  [dim]no errors this session[/dim]")
-        else:
-            for e in errors[-20:]:
-                console.print(f"  [red]·[/red] {e}")
+        from rich.markup import escape
+
+        earlier = _earlier_errors(project, getattr(state, "session_id", None))
+        if not errors and not earlier:
+            console.print("  [dim]no errors in this session or the last 24h[/dim]")
+            return False, None
+        for e in errors[-20:]:
+            console.print(f"  [red]·[/red] {escape(e)}")
+        if earlier:
+            console.print("  [dim]earlier runs, last 24h:[/dim]")
+            for ts, text in earlier:
+                console.print(f"  [red]·[/red] [dim]{escape(ts)}[/dim] {escape(text)}")
         return False, None
     if cmd == "/sessions":
         _pick_session(store, state, console)

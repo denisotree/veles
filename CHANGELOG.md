@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.38.0] — 2026-09-22
+
+Three things the interface showed you were never actually connected. Found by
+going through every function that only the tests ever called, one at a time.
+
+### Fixed — sessions have titles
+
+The session picker, `veles sessions list` and `/resume` all had a title column,
+and nothing ever filled it: every session read "(untitled)". A session is now
+titled from your first message. Sessions from before this release keep no title.
+
+### Fixed — `/errors` shows failures from earlier runs again
+
+`/errors` showed only the current REPL session, so a failure in a previous run,
+a `veles run` or the daemon disappeared once you restarted. It now also lists
+errors from the last 24 hours of other runs, marked as such. The old chat UI did
+this; it was lost when that UI was replaced.
+
+### Fixed — the daemon picker showed a named daemon's old model and port
+
+A named daemon starts from its `[daemon.<name>]` block in config.toml, but the
+picker showed what was recorded when the session was created. After editing
+the config, the picker kept showing the old model — and the old port, which its
+own start/stop/log actions then used. It now shows what the daemon actually
+started with.
+
+### Removed
+
+- `/save` with no argument. It was meant to list suggested insights to keep,
+  but nothing ever produced a suggestion, so it only ever said "needs a slug".
+  `/save <slug>` is unchanged; insights are still extracted automatically.
+- About twenty internal helpers whose work had moved elsewhere. No behaviour
+  change.
+
 ## [0.37.0] — 2026-09-22
 
 How long to wait for a model, and how much to let it write, were both guessed
