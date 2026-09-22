@@ -80,3 +80,19 @@ def test_doctor_reports_config_typo_as_error(tmp_path) -> None:
     cfg_check = next(r for r in report.results if r.name == "config_schema")
     assert cfg_check.status == "error"
     assert "whitlist" in cfg_check.message
+
+
+def test_engine_client_knobs_validate_clean() -> None:
+    """M266: `[engine] request_timeout_s`/`max_retries` are known keys.
+
+    Without this, `request_body_overrides` (M255 raises on any unknown
+    `[engine]` key) would turn the new knobs into a hard failure on every
+    OpenRouter call — the feature would break the thing it configures."""
+    cfg = {"engine": {"model": "z-ai/glm-5.3-flash", "request_timeout_s": 180, "max_retries": 1}}
+    assert validate_config(cfg) == []
+
+
+def test_engine_client_knob_typo_is_still_flagged() -> None:
+    cfg = {"engine": {"requst_timeout_s": 180}}
+    findings = validate_config(cfg)
+    assert any(f.key == "requst_timeout_s" and f.section == "engine" for f in findings)
