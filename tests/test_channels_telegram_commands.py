@@ -283,16 +283,17 @@ async def test_help_lists_goal_and_dream(session_map: SessionMap) -> None:
     assert "/dream" in reply
 
 
-async def test_all_command_names_includes_owned_and_handled() -> None:
-    from veles.channels._telegram_commands import all_command_names
+async def test_every_menu_command_is_dispatchable() -> None:
+    """The invariant the old `all_command_names` checks were approximating:
+    a command the bot publishes in its menu (`setMyCommands`) must have
+    something that answers it — the dispatcher or the gateway itself. A menu
+    entry with no handler is a button that does nothing."""
+    from veles.channels._telegram_commands import _HANDLERS, menu_descriptors
 
-    names = all_command_names()
-    assert "start" in names
-    assert "reset" in names
-    assert "goal" in names
-    assert "dream" in names
-    # Sorted
-    assert names == sorted(names)
+    gateway_owned = {"start", "reset"}
+    published = {d["command"] for d in menu_descriptors()}
+    assert published - (set(_HANDLERS) | gateway_owned) == set()
+    assert {"goal", "dream"} <= published
 
 
 async def test_dispatch_unknown_command_returns_none(session_map: SessionMap) -> None:

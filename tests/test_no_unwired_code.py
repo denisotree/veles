@@ -63,7 +63,6 @@ _REGISTERING_DECORATORS = ("tool", "property", "hook", "setter", "command")
 
 _BASELINE = frozenset(
     {
-        "all_command_names",
         "apply_merge",
         "available_locales",
         "bump",
@@ -95,7 +94,6 @@ _BASELINE = frozenset(
         "recent_error_events",
         "recent_promote_proposals",
         "render_system_block",
-        "save_custom_theme",
         "scan_for_context_files",
         "set_project_wizard_prompter",
         "set_title",

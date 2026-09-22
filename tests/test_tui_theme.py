@@ -1,4 +1,10 @@
-"""Tests for veles.cli.tui_theme — TuiTheme dataclass, THEMES dict, load/save."""
+"""Tests for veles.cli.tui_theme — TuiTheme dataclass, THEMES dict, loading.
+
+Custom themes are TOML files a user writes into `~/.veles/themes/`. There is no
+writer in Veles (`save_custom_theme` existed for a theme editor that was never
+built and was removed), so fixtures here write the file by hand — which is the
+real path a custom theme takes.
+"""
 
 from __future__ import annotations
 
@@ -8,11 +14,9 @@ import pytest
 
 from veles.cli.tui_theme import (
     THEMES,
-    TuiTheme,
     import_theme_from_file,
     list_themes,
     load_theme,
-    save_custom_theme,
     themes_dir,
 )
 
@@ -84,63 +88,13 @@ def test_load_theme_unknown_returns_none() -> None:
     assert load_theme("nonexistent-xyz") is None
 
 
-def test_load_theme_custom_after_save(tmp_path: Path) -> None:
-    custom = TuiTheme(
-        name="mytest",
-        error="#111111",
-        success="#222222",
-        warning="#333333",
-        accent="#444444",
-        muted="#555555",
-        border="#444444",
-        pt_selected="bold fg:#222222",
-        pt_hint="fg:#555555",
-    )
-    save_custom_theme(custom)
+def test_load_theme_custom_from_the_themes_dir() -> None:
+    themes_dir().mkdir(parents=True, exist_ok=True)
+    _make_theme_toml(themes_dir() / "mytest.toml", name="mytest", error="#111111")
     loaded = load_theme("mytest")
     assert loaded is not None
     assert loaded.name == "mytest"
     assert loaded.error == "#111111"
-
-
-# ---- save_custom_theme ----
-
-
-def test_save_custom_theme_creates_file() -> None:
-    custom = TuiTheme(
-        name="saveme",
-        error="#aaa",
-        success="#bbb",
-        warning="#ccc",
-        accent="#ddd",
-        muted="#eee",
-        border="#ddd",
-        pt_selected="bold fg:#bbb",
-        pt_hint="fg:#eee",
-    )
-    save_custom_theme(custom)
-    td = themes_dir()
-    assert (td / "saveme.toml").is_file()
-
-
-def test_save_and_load_round_trip() -> None:
-    original = THEMES["dracula"]
-    custom = TuiTheme(
-        name="dracula-copy",
-        error=original.error,
-        success=original.success,
-        warning=original.warning,
-        accent=original.accent,
-        muted=original.muted,
-        border=original.border,
-        pt_selected=original.pt_selected,
-        pt_hint=original.pt_hint,
-    )
-    save_custom_theme(custom)
-    loaded = load_theme("dracula-copy")
-    assert loaded is not None
-    assert loaded.error == original.error
-    assert loaded.pt_selected == original.pt_selected
 
 
 # ---- import_theme_from_file ----
@@ -200,19 +154,9 @@ def test_list_themes_sorted() -> None:
     assert names == sorted(names)
 
 
-def test_list_themes_includes_custom_after_save() -> None:
-    custom = TuiTheme(
-        name="zzcustom",
-        error="#111",
-        success="#222",
-        warning="#333",
-        accent="#444",
-        muted="#555",
-        border="#444",
-        pt_selected="bold fg:#222",
-        pt_hint="fg:#555",
-    )
-    save_custom_theme(custom)
+def test_list_themes_includes_a_custom_file() -> None:
+    themes_dir().mkdir(parents=True, exist_ok=True)
+    _make_theme_toml(themes_dir() / "zzcustom.toml", name="zzcustom")
     assert "zzcustom" in list_themes()
 
 

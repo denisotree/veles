@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from veles.channels._telegram_commands import (
-    all_command_names,
+    _HANDLERS,
     dispatch,
     menu_descriptors,
 )
@@ -62,9 +62,8 @@ async def test_mode_in_menu_model_absent(session_map: SessionMap) -> None:
 
 async def test_mode_recognised_model_not(session_map: SessionMap) -> None:
     del session_map
-    names = all_command_names()
-    assert "mode" in names
-    assert "model" not in names
+    assert "mode" in _HANDLERS
+    assert "model" not in _HANDLERS
 
 
 async def test_model_is_unknown_command(session_map: SessionMap) -> None:
