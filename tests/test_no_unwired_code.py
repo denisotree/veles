@@ -86,7 +86,6 @@ _BASELINE = frozenset(
         "is_known_command",
         "list_completed",
         "list_skills",
-        "mirror_to_session",
         "parse_plan_ref",
         "parse_tool_calls",
         "recent_promote_proposals",
