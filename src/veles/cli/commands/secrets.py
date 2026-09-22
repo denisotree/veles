@@ -24,9 +24,11 @@ from veles.core.secrets import (
     get_provider_key,
     get_secret,
     list_known_names,
+    list_providers_with_keys,
     provider_for_env_name,
     set_provider_key,
     set_secret,
+    stored_scopes,
 )
 
 
@@ -115,22 +117,45 @@ def _get(args: argparse.Namespace) -> int:
     return 0
 
 
+def _sources(name: str) -> str:
+    """Where `name` is set, in the order the runtime reads it: keychain, then env.
+
+    A provider key is looked for where the runtime looks (`veles:<provider>:<scope>`),
+    and every scope that holds one is named — `keychain (default, myproj)`."""
+    provider = provider_for_env_name(name)
+    found: list[str] = []
+    if provider is not None:
+        scopes = stored_scopes(provider)
+        if scopes:
+            found.append(f"keychain ({', '.join(scopes)})")
+    elif get_secret(name, env_fallback=False) is not None:
+        found.append("keychain")
+    if os.environ.get(name):
+        found.append("env")
+    return "; ".join(found) or "(unset)"
+
+
 def _list(args: argparse.Namespace) -> int:
     del args
-    rows = []
-    for name in list_known_names():
-        in_keyring = get_secret(name, env_fallback=False)
-        in_env = os.environ.get(name)
-        if in_keyring is not None:
-            source = "keychain"
-        elif in_env is not None:
-            source = "env"
-        else:
-            source = "(unset)"
-        rows.append((name, source))
+    rows = [(name, _sources(name)) for name in list_known_names()]
+    # Channel credentials (a Telegram bot token, …) share the scoped layout —
+    # `channel_wizard` stores them with `set_provider_key(<platform>, …)` — but
+    # are not model providers, so they have no env name in the table above.
+    from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
+
+    channels = sorted(
+        (platform, stored_scopes(platform))
+        for platform in list_providers_with_keys()
+        if platform not in PROVIDER_API_KEY_ENVS
+    )
     width = max(len(r[0]) for r in rows)
     for name, source in rows:
         print(f"  {name:<{width}}  {source}")
+    shown = [(p, s) for p, s in channels if s]
+    if shown:
+        print("channel credentials:")
+        for platform, scopes in shown:
+            print(f"  {platform:<{width}}  keychain ({', '.join(scopes)})")
     return 0
 
 

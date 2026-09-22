@@ -263,9 +263,24 @@ def list_provider_keys(provider: str) -> list[str]:
 
 
 def list_providers_with_keys() -> dict[str, list[str]]:
-    """Snapshot of every provider → its known scopes. Used by `veles secret list`
-    and the wizard recap screen."""
+    """Snapshot of every provider → its *recorded* scopes, from the sidecar
+    index. The index can outlive a keychain entry revoked out-of-band, so a
+    caller that shows the user what is stored should confirm each scope with
+    `stored_scopes`."""
     return _load_index()
+
+
+def stored_scopes(provider: str) -> list[str]:
+    """Scopes for `provider` whose keychain entry actually exists.
+
+    `veles secret list` reports from this, not from the index alone: reporting
+    a key that is no longer there would be the same kind of lie as reporting a
+    working key as unset, which is the bug M271 fixes."""
+    return [
+        scope
+        for scope in list_provider_keys(provider)
+        if _read_keychain(_scoped_entry_name(provider, scope))
+    ]
 
 
 # ---------------- helpers ----------------
@@ -310,4 +325,5 @@ __all__ = [
     "provider_for_env_name",
     "set_provider_key",
     "set_secret",
+    "stored_scopes",
 ]

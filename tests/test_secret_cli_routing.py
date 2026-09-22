@@ -84,6 +84,48 @@ def test_project_flag_is_rejected_for_a_plain_secret(fake_keyring, capsys) -> No
     assert fake_keyring.store == {}
 
 
+# ---- list ----
+
+
+def _listed(capsys, name: str) -> str:
+    for line in capsys.readouterr().out.splitlines():
+        if line.split() and line.split()[0] == name:
+            return line.split(None, 1)[1].strip()
+    raise AssertionError(f"{name} not listed")
+
+
+def test_list_shows_a_wizard_stored_key(fake_keyring, capsys) -> None:
+    """The other half of the reported bug: this printed "(unset)"."""
+    set_provider_key("openrouter", "sk-wizard")
+    set_provider_key("openrouter", "sk-proj", project="myproj")
+    assert cli_main(["secret", "list"]) == 0
+    assert _listed(capsys, "OPENROUTER_API_KEY") == "keychain (default, myproj)"
+
+
+def test_list_does_not_trust_a_stale_index(fake_keyring, capsys) -> None:
+    """The sidecar index can outlive an entry revoked outside Veles; reporting
+    a key that is gone would be the mirror image of the bug."""
+    set_provider_key("openrouter", "sk-wizard")
+    fake_keyring.store.clear()  # revoked in the OS keychain UI
+    assert cli_main(["secret", "list"]) == 0
+    assert _listed(capsys, "OPENROUTER_API_KEY") == "(unset)"
+
+
+def test_list_names_env_alongside_keychain(fake_keyring, capsys, monkeypatch) -> None:
+    set_provider_key("anthropic", "k")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "also-in-env")
+    assert cli_main(["secret", "list"]) == 0
+    assert _listed(capsys, "ANTHROPIC_API_KEY") == "keychain (default); env"
+
+
+def test_list_shows_channel_credentials(fake_keyring, capsys) -> None:
+    set_provider_key("telegram", "bot-token", project="myproj")  # channel_wizard's call
+    assert cli_main(["secret", "list"]) == 0
+    out = capsys.readouterr().out
+    assert "channel credentials:" in out
+    assert "telegram" in out and "keychain (myproj)" in out
+
+
 def test_plain_secrets_keep_their_flat_entry(fake_keyring) -> None:
     assert cli_main(["secret", "set", "TAVILY_API_KEY", "tv-key"]) == 0
     assert fake_keyring.store[("veles", "TAVILY_API_KEY")] == "tv-key"
