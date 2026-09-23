@@ -81,6 +81,26 @@ def make_app(state: DaemonState) -> web.Application:
     return app
 
 
+async def _json_object(request: web.Request) -> dict[str, Any] | web.Response:
+    """The request body as a JSON object, or the 400 response to return."""
+    try:
+        body = await request.json()
+    except (json.JSONDecodeError, ValueError):
+        return web.json_response({"error": "body must be JSON"}, status=400)
+    if not isinstance(body, dict):
+        return web.json_response({"error": "body must be a JSON object"}, status=400)
+    return body
+
+
+def _runner_status(runner: Any) -> dict[str, Any] | None:
+    """A background runner's `status()`, `{"enabled": True}` when it has none,
+    None when the runner is not wired."""
+    if runner is None:
+        return None
+    status_fn = getattr(runner, "status", None)
+    return status_fn() if callable(status_fn) else {"enabled": True}
+
+
 async def _handle_health(request: web.Request) -> web.Response:
     from veles.core.sanitize import sanitize
 
@@ -119,16 +139,6 @@ async def _handle_status(request: web.Request) -> web.Response:
     state: DaemonState = request.app["state"]
     runs = state.list_runs()
     active = sum(1 for h in runs if not h.done.is_set())
-    job_status = None
-    if state.job_runner is not None:
-        # Best-effort: any concrete JobRunner that exposes `status()` wins;
-        # otherwise we report just `enabled`.
-        status_fn = getattr(state.job_runner, "status", None)
-        job_status = status_fn() if callable(status_fn) else {"enabled": True}
-    dream_status = None
-    if state.dream_runner is not None:
-        status_fn = getattr(state.dream_runner, "status", None)
-        dream_status = status_fn() if callable(status_fn) else {"enabled": True}
     from veles.core.sanitize import sanitize
 
     return web.json_response(
@@ -143,8 +153,8 @@ async def _handle_status(request: web.Request) -> web.Response:
                 "total": len(runs),
                 "active": active,
             },
-            "jobs": job_status,
-            "dream": dream_status,
+            "jobs": _runner_status(state.job_runner),
+            "dream": _runner_status(state.dream_runner),
             # The docstring has always promised channels here; surface the
             # actually-running set (M158-followup — was omitted before).
             "channels": list(state.active_channels),
@@ -236,12 +246,9 @@ def _resolve_deliver_to(raw: Any, origin: str | None) -> tuple[str | None, str |
 
 async def _handle_create_run(request: web.Request) -> web.Response:
     state: DaemonState = request.app["state"]
-    try:
-        body = await request.json()
-    except (json.JSONDecodeError, ValueError):
-        return web.json_response({"error": "body must be JSON"}, status=400)
-    if not isinstance(body, dict):
-        return web.json_response({"error": "body must be a JSON object"}, status=400)
+    body = await _json_object(request)
+    if isinstance(body, web.Response):
+        return body
     prompt = body.get("prompt")
     if not isinstance(prompt, str) or not prompt.strip():
         return web.json_response({"error": "'prompt' (non-empty string) required"}, status=400)
@@ -383,12 +390,9 @@ async def _handle_resolve_prompt(request: web.Request) -> web.Response:
     handle = state.get_run(run_id)
     if handle is None:
         return web.json_response({"error": f"run {run_id!r} not found"}, status=404)
-    try:
-        body = await request.json()
-    except (json.JSONDecodeError, ValueError):
-        return web.json_response({"error": "body must be JSON"}, status=400)
-    if not isinstance(body, dict):
-        return web.json_response({"error": "body must be a JSON object"}, status=400)
+    body = await _json_object(request)
+    if isinstance(body, web.Response):
+        return body
     choice = body.get("choice")
     if not isinstance(choice, str) or not choice:
         return web.json_response({"error": "'choice' (non-empty string) required"}, status=400)
@@ -523,12 +527,9 @@ async def _handle_patch_session(request: web.Request) -> web.Response:
     """
     state: DaemonState = request.app["state"]
     session_id = request.match_info["session_id"]
-    try:
-        body = await request.json()
-    except (json.JSONDecodeError, ValueError):
-        return web.json_response({"error": "body must be JSON"}, status=400)
-    if not isinstance(body, dict):
-        return web.json_response({"error": "body must be a JSON object"}, status=400)
+    body = await _json_object(request)
+    if isinstance(body, web.Response):
+        return body
 
     # M127: model/provider are immutable after launch.
     if body.get("model", _SENTINEL) is not _SENTINEL or (
@@ -573,17 +574,21 @@ def _require_jobs_store(state: DaemonState):
     return getattr(jr, "_store", None)
 
 
-async def _handle_create_job(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    store = _require_jobs_store(state)
+def _jobs_store_or_503(request: web.Request) -> Any:
+    """The scheduler's jobs store, or the 503 response when none is running."""
+    store = _require_jobs_store(request.app["state"])
     if store is None:
         return web.json_response({"error": "scheduler not enabled on this daemon"}, status=503)
-    try:
-        body = await request.json()
-    except (json.JSONDecodeError, ValueError):
-        return web.json_response({"error": "body must be JSON"}, status=400)
-    if not isinstance(body, dict):
-        return web.json_response({"error": "body must be a JSON object"}, status=400)
+    return store
+
+
+async def _handle_create_job(request: web.Request) -> web.Response:
+    store = _jobs_store_or_503(request)
+    if isinstance(store, web.Response):
+        return store
+    body = await _json_object(request)
+    if isinstance(body, web.Response):
+        return body
     try:
         rec = store.add_job(
             name=str(body.get("name") or ""),
@@ -611,10 +616,9 @@ async def _handle_list_jobs(request: web.Request) -> web.Response:
 
 
 async def _handle_get_job(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    store = _require_jobs_store(state)
-    if store is None:
-        return web.json_response({"error": "scheduler not enabled"}, status=503)
+    store = _jobs_store_or_503(request)
+    if isinstance(store, web.Response):
+        return store
     rec = store.get_job(request.match_info["job_id"])
     if rec is None:
         return web.json_response({"error": "not found"}, status=404)
@@ -622,16 +626,12 @@ async def _handle_get_job(request: web.Request) -> web.Response:
 
 
 async def _handle_update_job(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    store = _require_jobs_store(state)
-    if store is None:
-        return web.json_response({"error": "scheduler not enabled"}, status=503)
-    try:
-        body = await request.json()
-    except (json.JSONDecodeError, ValueError):
-        return web.json_response({"error": "body must be JSON"}, status=400)
-    if not isinstance(body, dict):
-        return web.json_response({"error": "body must be a JSON object"}, status=400)
+    store = _jobs_store_or_503(request)
+    if isinstance(store, web.Response):
+        return store
+    body = await _json_object(request)
+    if isinstance(body, web.Response):
+        return body
     try:
         ok = store.update_job(request.match_info["job_id"], **body)
     except ValueError as exc:
@@ -643,20 +643,18 @@ async def _handle_update_job(request: web.Request) -> web.Response:
 
 
 async def _handle_delete_job(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    store = _require_jobs_store(state)
-    if store is None:
-        return web.json_response({"error": "scheduler not enabled"}, status=503)
+    store = _jobs_store_or_503(request)
+    if isinstance(store, web.Response):
+        return store
     if not store.delete_job(request.match_info["job_id"]):
         return web.json_response({"error": "not found"}, status=404)
     return web.json_response({"deleted": True})
 
 
 async def _handle_trigger_job(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    store = _require_jobs_store(state)
-    if store is None:
-        return web.json_response({"error": "scheduler not enabled"}, status=503)
+    store = _jobs_store_or_503(request)
+    if isinstance(store, web.Response):
+        return store
     if not store.trigger_job(request.match_info["job_id"]):
         return web.json_response({"error": "not found"}, status=404)
     return web.json_response({"triggered": True})
@@ -697,12 +695,7 @@ async def _handle_list_job_runs(request: web.Request) -> web.Response:
 
 async def _handle_dream_status(request: web.Request) -> web.Response:
     state: DaemonState = request.app["state"]
-    if state.dream_runner is None:
-        return web.json_response({"enabled": False})
-    status_fn = getattr(state.dream_runner, "status", None)
-    if callable(status_fn):
-        return web.json_response(status_fn())
-    return web.json_response({"enabled": True})
+    return web.json_response(_runner_status(state.dream_runner) or {"enabled": False})
 
 
 async def _handle_dream_run(request: web.Request) -> web.Response:
@@ -725,16 +718,8 @@ async def _handle_dream_run(request: web.Request) -> web.Response:
 async def _start_background_runners(app: web.Application) -> None:
     """Start JobRunner / DreamRunner / channel gateways if they're wired."""
     state: DaemonState = app["state"]
-    if state.job_runner is not None:
-        start_fn = getattr(state.job_runner, "start", None)
-        if callable(start_fn):
-            await start_fn()
-    if state.dream_runner is not None:
-        start_fn = getattr(state.dream_runner, "start", None)
-        if callable(start_fn):
-            await start_fn()
-    if state.reminder_runner is not None:
-        start_fn = getattr(state.reminder_runner, "start", None)
+    for runner in (state.job_runner, state.dream_runner, state.reminder_runner):
+        start_fn = getattr(runner, "start", None)
         if callable(start_fn):
             await start_fn()
     _start_channel_runners(state)
