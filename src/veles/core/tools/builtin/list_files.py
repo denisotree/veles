@@ -19,7 +19,8 @@ from veles.core.tools.registry import tool
 
 logger = logging.getLogger(__name__)
 
-_IGNORE_DIRS: frozenset[str] = frozenset(
+# Directories no file-walking tool descends into (shared with `search_files`).
+IGNORE_DIRS: frozenset[str] = frozenset(
     {
         ".git",
         ".hg",
@@ -82,7 +83,7 @@ def list_files(
             rel_parts = entry.relative_to(root).parts
         except ValueError:
             rel_parts = entry.parts
-        if any(part in _IGNORE_DIRS for part in rel_parts):
+        if any(part in IGNORE_DIRS for part in rel_parts):
             continue
         rows.append(_format_entry(entry, root))
 

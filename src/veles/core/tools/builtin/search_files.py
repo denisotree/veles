@@ -35,30 +35,13 @@ from pathlib import Path
 
 from veles.core.path_guard import resolve_safe
 from veles.core.risk import RiskClass
+from veles.core.tools.builtin.list_files import IGNORE_DIRS
 from veles.core.tools.registry import tool
 
 logger = logging.getLogger(__name__)
 
 _MAX_FILE_BYTES = 2 * 1024 * 1024  # 2 MiB
 _MAX_LINE_LEN = 400  # truncate long lines so the agent's tail isn't trashed
-_IGNORE_DIRS: frozenset[str] = frozenset(
-    {
-        ".git",
-        ".hg",
-        ".svn",
-        "__pycache__",
-        "node_modules",
-        ".venv",
-        "venv",
-        ".tox",
-        "tmp",
-        "dist",
-        "build",
-        ".pytest_cache",
-        ".mypy_cache",
-        ".ruff_cache",
-    }
-)
 
 
 @tool(
@@ -132,7 +115,7 @@ def _search_with_ripgrep(
     ]
     if case_insensitive:
         cmd.append("-i")
-    for ignored in _IGNORE_DIRS:
+    for ignored in IGNORE_DIRS:
         cmd.extend(["--glob", f"!{ignored}"])
     if glob and glob != "**/*":
         cmd.extend(["--glob", glob])
@@ -182,7 +165,7 @@ def _search_with_python(
             rel_parts = file_path.relative_to(root).parts
         except ValueError:
             rel_parts = file_path.parts
-        if any(part in _IGNORE_DIRS for part in rel_parts):
+        if any(part in IGNORE_DIRS for part in rel_parts):
             continue
         try:
             if file_path.stat().st_size > _MAX_FILE_BYTES:
