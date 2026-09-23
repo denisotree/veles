@@ -458,7 +458,13 @@ class TelegramGateway:
         await self._run_turn_serial(chat_id, chat_key, prompt, trigger_id=trigger_id)
 
     async def _run_turn_serial(
-        self, chat_id: int, chat_key: str, prompt: str, *, trigger_id: int | None = None
+        self,
+        chat_id: int,
+        chat_key: str,
+        prompt: str,
+        *,
+        trigger_id: int | None = None,
+        mode: str | None = None,
     ) -> None:
         """Run one turn under the chat's serial lock. If a turn is already
         in flight for this chat, acknowledge the wait (a 👀 reaction on the
@@ -484,7 +490,7 @@ class TelegramGateway:
                 with contextlib.suppress(Exception):
                     await self._send_message(chat_id, t("telegram.ack_queued"))
         async with lock:
-            await self._run_turn(chat_id, chat_key, prompt, reply_to=reply_to)
+            await self._run_turn(chat_id, chat_key, prompt, reply_to=reply_to, mode=mode)
 
     # ---- media (delegates → TelegramMedia, M155) ----
 
@@ -495,14 +501,20 @@ class TelegramGateway:
         return await self._media.describe_photo(chat_id, photo)
 
     async def _run_turn(
-        self, chat_id: int, chat_key: str, text: str, *, reply_to: int | None = None
+        self,
+        chat_id: int,
+        chat_key: str,
+        text: str,
+        *,
+        reply_to: int | None = None,
+        mode: str | None = None,
     ) -> None:
         """Pipeline: submit_run → placeholder → drain stream with
         typing indicator → final edit.
 
         M108 dropped intermediate edits; M-R2.4 split the pipeline into
         helper methods so each step is testable in isolation."""
-        run_id = await self._submit_or_report(chat_id, chat_key, text)
+        run_id = await self._submit_or_report(chat_id, chat_key, text, mode=mode)
         if run_id is None:
             return
         message_id = await self._send_placeholder(chat_id, reply_to=reply_to)
@@ -512,15 +524,20 @@ class TelegramGateway:
             outcome = await self._drain_stream(run_id, chat_id, message_id)
         await self._deliver(chat_id, chat_key, message_id, outcome)
 
-    async def _submit_or_report(self, chat_id: int, chat_key: str, text: str) -> str | None:
+    async def _submit_or_report(
+        self, chat_id: int, chat_key: str, text: str, *, mode: str | None = None
+    ) -> str | None:
         """Submit the user's text to the daemon and return the run_id,
-        or None after surfacing the failure to the user."""
+        or None after surfacing the failure to the user. `mode` switches the
+        chat's agent mode first (`/goal <task>`); omitted otherwise, so a
+        backend without mode support still serves ordinary messages."""
         session_id = self.session_map.get(chat_key)
+        extra = {"mode": mode} if mode is not None else {}
         try:
             run = await self.daemon_client.submit_run(
-                text, session_id=session_id, origin=f"telegram:{chat_id}"
+                text, session_id=session_id, origin=f"telegram:{chat_id}", **extra
             )
-        except DaemonClientError as exc:
+        except (DaemonClientError, ValueError) as exc:
             await self._send_message(chat_id, f"<daemon error: {exc}>")
             return None
         run_id = run.get("run_id")

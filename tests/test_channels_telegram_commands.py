@@ -221,17 +221,6 @@ def _gateway_with(client: _RecordingClient, session_map: SessionMap):
     )
 
 
-async def test_goal_points_to_the_cli_and_submits_nothing(session_map: SessionMap) -> None:
-    """M276: /goal used to send "[GOAL MODE] <task>" as a plain prompt that
-    nothing interpreted, promising progress that never came."""
-    client = _RecordingClient()
-    reply = await dispatch(_gateway_with(client, session_map), "42", "goal", "deploy to staging")
-    assert reply is not None
-    assert "veles goal start" in reply
-    assert "--done-when" in reply
-    assert client.submitted == []
-
-
 async def test_dream_runs_the_dream_runner_and_reports_its_result(
     session_map: SessionMap,
 ) -> None:

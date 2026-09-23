@@ -266,6 +266,13 @@ async def _handle_create_run(request: web.Request) -> web.Response:
     deliver_to, err = _resolve_deliver_to(body.get("deliver_to"), origin)
     if err is not None:
         return web.json_response({"error": err}, status=400)
+    # M280b: switch the session's agent mode for this and later turns (the
+    # same as PATCH, but usable before the chat has a session).
+    mode = body.get("mode")
+    if mode is not None and mode not in CHAT_MODES:
+        return web.json_response(
+            {"error": f"invalid mode {mode!r}", "valid_modes": sorted(CHAT_MODES)}, status=400
+        )
     if deliver_to is not None and state.delivery_router is None:
         # Fail loudly rather than accept a delivery contract this daemon cannot
         # honour: no channel is running, so nothing would ever be sent.
@@ -317,6 +324,7 @@ async def _handle_create_run(request: web.Request) -> web.Response:
             origin=origin,
             on_finished=_on_finished,
             deliver_hook=deliver_hook,
+            mode=mode,
         )
     except Exception as exc:
         logger.error("failed to build agent for POST /v1/runs: %s: %s", type(exc).__name__, exc)

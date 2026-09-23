@@ -31,12 +31,20 @@ class InProcessRunBackend:
         self._state = state
 
     async def submit_run(
-        self, prompt: str, *, session_id: str | None = None, origin: str | None = None
+        self,
+        prompt: str,
+        *,
+        session_id: str | None = None,
+        origin: str | None = None,
+        mode: str | None = None,
     ) -> dict[str, Any]:
         # Same entry as `POST /v1/runs` (manager gate, agent build, background
         # run). A channel turn neither touches daemon activity nor carries a
-        # `deliver_to` — the gateway streams the answer itself.
-        handle = await start_turn(self._state, prompt=prompt, session_id=session_id, origin=origin)
+        # `deliver_to` — the gateway streams the answer itself. `mode` switches
+        # the session first (`/goal <task>`).
+        handle = await start_turn(
+            self._state, prompt=prompt, session_id=session_id, origin=origin, mode=mode
+        )
         return {"run_id": handle.run_id, "session_id": handle.session_id}
 
     async def stream_events(self, run_id: str) -> AsyncIterator[dict[str, Any]]:

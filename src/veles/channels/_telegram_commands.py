@@ -119,20 +119,31 @@ async def _cmd_context_placeholder(gateway: TelegramGateway, chat_key: str, args
 
 
 async def _cmd_goal(gateway: TelegramGateway, chat_key: str, args: str) -> str:
-    """Say where goals run. M276: this used to submit "[GOAL MODE] <task>" as
-    a plain prompt — no daemon code read that marker, and the run's reply was
-    never streamed back, so the bot promised progress updates that never came.
-    Daemon turns do not go through agent modes yet, so a goal cannot run from a
-    chat; the host's `veles goal start` can."""
-    del gateway, chat_key, args
-    return (
-        "<b>/goal</b>\n"
-        "Goals don't run from Telegram yet. On the host, run:\n"
-        '<code>veles goal start "&lt;task&gt;" --done-when "&lt;how you know '
-        "it's done&gt;\"</code>\n"
-        "It plans, executes and checks until the done condition holds or a "
-        "budget runs out."
-    )
+    """`/goal <task>` starts a goal in this chat (M280b).
+
+    The chat switches to goal mode and the task goes in as an ordinary turn —
+    same streaming, approval buttons and delivery as any message — so GoalMode
+    opens with its interview; once the plan is confirmed the goal runs to its
+    end within that turn. (M276 answered "not from Telegram yet": daemon turns
+    had no agent modes until M280a.)"""
+    task = args.strip()
+    if not task:
+        return (
+            "<b>/goal &lt;task&gt;</b>\n"
+            "Starts a goal in this chat: I ask what I need to know, confirm a plan "
+            "with you, then work until it is done or a budget runs out."
+        )
+    session_id = gateway.session_map.get(chat_key)
+    if session_id:
+        client: Any = gateway.daemon_client
+        with contextlib.suppress(Exception):
+            if (await client.get_session(session_id)).get("mode") == "goal":
+                return (
+                    "A goal is already running in this chat — answer its question, "
+                    "or /goal cancel it first."
+                )
+    await gateway._run_turn_serial(chat_key_to_int(chat_key), chat_key, task, mode="goal")
+    return ""
 
 
 # M127: the Telegram `/model` picker (`MODEL_PAGE_SIZE`, `_render_model_page`,

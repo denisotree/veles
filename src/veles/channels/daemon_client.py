@@ -73,13 +73,20 @@ class DaemonClient:
             return await _read_json(resp)
 
     async def submit_run(
-        self, prompt: str, *, session_id: str | None = None, origin: str | None = None
+        self,
+        prompt: str,
+        *,
+        session_id: str | None = None,
+        origin: str | None = None,
+        mode: str | None = None,
     ) -> dict[str, Any]:
         body: dict[str, Any] = {"prompt": prompt}
         if session_id is not None:
             body["session_id"] = session_id
         if origin is not None:
             body["origin"] = origin
+        if mode is not None:
+            body["mode"] = mode
         async with self.session.post(
             f"{self._base}/v1/runs", json=body, headers=self._auth
         ) as resp:

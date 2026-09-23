@@ -56,8 +56,14 @@ async def start_turn(
     origin: str | None,
     on_finished: Callable[[RunHandle], None] | None = None,
     deliver_hook: Callable[[str], Awaitable[None]] | None = None,
+    mode: str | None = None,
 ) -> RunHandle:
     """Register a run and start it in the background; returns its handle.
+
+    `mode` switches the session to that agent mode before the turn (Telegram
+    `/goal <task>`: the task is the goal's first message). A chat that has
+    never spoken has no session yet, so one is allocated for it here — the
+    channel maps the chat to it from the run's `started` event.
 
     Building the agent can fail (bad provider config, …). The handle is then
     marked failed — it used to stay "pending" forever on the channel path — and
@@ -69,6 +75,10 @@ async def start_turn(
     turn with text from 0.36.0 to 0.39.0. It is also real work (recall, skills,
     the session probe) that has no business stalling every other request.
     """
+    if mode is not None:
+        if session_id is None:
+            session_id = state.store.create_session()
+        state.set_chat_mode(session_id, mode)  # an unknown mode raises before any run
     handle = new_run_handle(session_id=session_id)
     state.add_run(handle)
     chosen_mode = state.chat_mode(session_id).mode
