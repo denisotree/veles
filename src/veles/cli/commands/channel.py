@@ -50,10 +50,10 @@ def cmd_channel(args: argparse.Namespace) -> int:
     return 2
 
 
-def _resolve_project_or_error():
+def _resolve_project_or_error(args: argparse.Namespace):
     from veles.cli import _resolve_active_project
 
-    project = _resolve_active_project(argparse.Namespace())
+    project = _resolve_active_project(args)
     if project is None:
         print(
             "error: no Veles project found here. Run `veles init` first.",
@@ -66,7 +66,7 @@ def _cmd_channel_add(args: argparse.Namespace) -> int:
     """`veles channel add` — wizard to attach a channel to a daemon session."""
     from veles.cli.channel_wizard import add_channel
 
-    project = _resolve_project_or_error()
+    project = _resolve_project_or_error(args)
     if project is None:
         return 2
     return add_channel(
@@ -80,7 +80,7 @@ def _cmd_channel_remove(args: argparse.Namespace) -> int:
     """`veles channel remove <channel>` — drop a channel's config block."""
     from veles.cli.channel_wizard import remove_channel
 
-    project = _resolve_project_or_error()
+    project = _resolve_project_or_error(args)
     if project is None:
         return 2
     return remove_channel(project, args.channel, session=getattr(args, "session", None))
