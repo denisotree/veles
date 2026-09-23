@@ -125,4 +125,55 @@ def prune_rotated(path: Path, *, keep: int) -> list[Path]:
     return removed
 
 
-__all__ = ["atomic_write_json", "load_optional_json", "prune_rotated"]
+def dump_toml(data: dict[str, Any]) -> str:
+    """Emit nested tables to TOML at arbitrary depth; string / bool / int / float /
+    list-of-scalars values. The one TOML writer (stdlib `tomllib` only reads).
+
+    Scalar keys are emitted *before* sub-table headers (TOML requires a table's
+    own keys to precede its `[parent.child]` headers, else they'd bind to the
+    wrong table). A parent header is skipped when it carries only sub-tables and
+    no scalars — so `{routing: {tasks: {…}}}` emits a clean `[routing.tasks]`
+    without a stray empty `[routing]`."""
+    lines: list[str] = []
+    _emit_table(data, (), lines)
+    return "\n".join(lines).strip() + "\n"
+
+
+def _emit_table(table: dict[str, Any], prefix: tuple[str, ...], lines: list[str]) -> None:
+    scalars = {k: v for k, v in table.items() if not isinstance(v, dict)}
+    subtables = {k: v for k, v in table.items() if isinstance(v, dict)}
+    if prefix:
+        # Emit this table's header when it has scalar keys, or when it has no
+        # sub-tables at all (preserve a genuinely empty `[section]`).
+        if scalars or not subtables:
+            lines.append(f"[{'.'.join(prefix)}]")
+            for k, v in scalars.items():
+                lines.append(f"{k} = {_emit_value(v)}")
+            lines.append("")
+    else:
+        # Root-level scalars (rare) are emitted bare, before any section.
+        for k, v in scalars.items():
+            lines.append(f"{k} = {_emit_value(v)}")
+    for sub_key, sub_val in subtables.items():
+        _emit_table(sub_val, (*prefix, sub_key), lines)
+
+
+def _emit_value(v: Any) -> str:
+    if isinstance(v, list):
+        return "[" + ", ".join(_emit_value(item) for item in v) + "]"
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, str):
+        escaped = v.replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{escaped}"'
+    return str(v)
+
+
+__all__ = [
+    "atomic_write_json",
+    "atomic_write_text",
+    "dump_toml",
+    "load_optional_json",
+    "load_optional_toml",
+    "prune_rotated",
+]

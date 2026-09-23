@@ -51,7 +51,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from veles.core.io_utils import atomic_write_text, load_optional_toml
+from veles.core.io_utils import atomic_write_text, dump_toml, load_optional_toml
 from veles.core.project import Project
 from veles.core.routing.ensemble import KNOWN_TASKS, RoutingConfig, parse_spec
 
@@ -305,13 +305,8 @@ def _render_toml(config: RoutingConfig) -> str:
         "# to regenerate. Manual overrides go in routing.toml (via `veles route set`)\n"
         "# and always take precedence over this file.\n\n"
     )
-    if not config.tasks:
-        return header + "[routing.tasks]\n"
-    lines = [header.rstrip() + "\n", "[routing.tasks]"]
-    for name in sorted(config.tasks):
-        spec = config.tasks[name].replace("\\", "\\\\").replace('"', '\\"')
-        lines.append(f'{name} = "{spec}"')
-    return "\n".join(lines) + "\n"
+    tasks = {name: config.tasks[name] for name in sorted(config.tasks)}
+    return header + dump_toml({"routing": {"tasks": tasks}})
 
 
 # ---- state file ----

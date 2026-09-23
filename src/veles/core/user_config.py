@@ -29,8 +29,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from veles.core.io_utils import atomic_write_text, load_optional_toml
-from veles.core.project_config import _emit_toml
+from veles.core.io_utils import atomic_write_text, dump_toml, load_optional_toml
 
 logger = logging.getLogger(__name__)
 
@@ -119,24 +118,13 @@ def persist_tui_theme(theme_name: str, path: Path | None = None) -> None:
     user_section["tui_theme"] = theme_name
 
     with contextlib.suppress(OSError):
-        atomic_write_text(target, _emit_toml(data))
+        atomic_write_text(target, dump_toml(data))
 
 
 def _render_toml(cfg: UserConfig) -> str:
-    body = ["[user]"]
-    fields = asdict(cfg)
-    body.append(f'language = "{_escape(fields["language"])}"')
-    body.append(f'default_provider = "{_escape(fields["default_provider"])}"')
-    if fields["first_project_name"]:
-        body.append(f'first_project_name = "{_escape(fields["first_project_name"])}"')
-    body.append(f'tui_theme = "{_escape(fields["tui_theme"])}"')
-    if fields.get("default_model"):
-        body.append(f'default_model = "{_escape(fields["default_model"])}"')
-    return "\n".join(body) + "\n"
-
-
-def _escape(s: str) -> str:
-    return s.replace("\\", "\\\\").replace('"', '\\"')
+    # The optional fields are left out when unset rather than written empty.
+    user = {k: v for k, v in asdict(cfg).items() if v is not None and v != ""}
+    return dump_toml({"user": user})
 
 
 # ---- raw dict access (M124-perm-unify) ----
