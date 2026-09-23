@@ -32,9 +32,10 @@ import json
 import logging
 import urllib.error
 import urllib.request
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from veles.core.io_utils import read_fresh_json, write_stamped_json
 
 _logger = logging.getLogger(__name__)
 
@@ -80,37 +81,18 @@ def _trim(payload: Any) -> dict[str, dict[str, Any]]:
 
 
 def _read_cache() -> dict[str, dict[str, Any]] | None:
-    path = _cache_path()
-    if not path.is_file():
-        return None
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        fetched_at = datetime.fromisoformat(payload["fetched_at"])
-        if fetched_at.tzinfo is None:
-            fetched_at = fetched_at.replace(tzinfo=UTC)
-        if (datetime.now(UTC) - fetched_at).total_seconds() >= _CACHE_TTL_SECONDS:
-            return None
-        models = payload["models"]
-        return models if isinstance(models, dict) else None
-    except Exception as exc:  # corrupt/partial cache — a miss, never a crash
-        _logger.debug("model metadata cache %s unreadable: %s", path, exc)
-        return None
+    payload = read_fresh_json(_cache_path(), max_age_s=_CACHE_TTL_SECONDS)
+    models = payload.get("models") if payload else None
+    return models if isinstance(models, dict) else None
 
 
 def _write_cache(models: dict[str, dict[str, Any]]) -> None:
     """Atomic, because daemon sessions build providers concurrently and a reader
     must never see half a file (it would read as a miss and fetch again)."""
-    from veles.core.io_utils import atomic_write_json
-
-    path = _cache_path()
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        atomic_write_json(
-            path,
-            {"fetched_at": datetime.now(UTC).isoformat(timespec="seconds"), "models": models},
-        )
+        write_stamped_json(_cache_path(), {"models": models})
     except OSError as exc:
-        _logger.debug("cannot write model metadata cache %s: %s", path, exc)
+        _logger.debug("cannot write model metadata cache %s: %s", _cache_path(), exc)
 
 
 def _fetch() -> dict[str, dict[str, Any]] | None:

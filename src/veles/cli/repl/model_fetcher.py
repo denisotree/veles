@@ -29,15 +29,14 @@ caller can tell the user why they're seeing the fallback.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
 from veles.cli.repl.model_catalog import known_models
+from veles.core.io_utils import read_fresh_json, write_stamped_json
 
 _logger = logging.getLogger(__name__)
 
@@ -72,34 +71,15 @@ def _cache_path(provider: str) -> Path:
 
 
 def _read_cache(provider: str) -> list[str] | None:
-    path = _cache_path(provider)
-    if not path.is_file():
+    payload = read_fresh_json(_cache_path(provider), max_age_s=CACHE_TTL_SECONDS)
+    models = payload.get("models") if payload else None
+    if not isinstance(models, list) or not all(isinstance(m, str) for m in models):
         return None
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        fetched_at = datetime.fromisoformat(payload["fetched_at"])
-        if fetched_at.tzinfo is None:
-            fetched_at = fetched_at.replace(tzinfo=UTC)
-        age = (datetime.now(UTC) - fetched_at).total_seconds()
-        if age >= CACHE_TTL_SECONDS:
-            return None
-        models = payload.get("models")
-        if not isinstance(models, list) or not all(isinstance(m, str) for m in models):
-            return None
-        return models
-    except Exception as exc:  # corrupt cache — treat as a miss
-        _logger.debug("model cache %s unreadable: %s", path, exc)
-        return None
+    return models
 
 
 def _write_cache(provider: str, models: list[str]) -> None:
-    path = _cache_path(provider)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "fetched_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "models": models,
-    }
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    write_stamped_json(_cache_path(provider), {"models": models})
 
 
 def _merge_with_curated(live: list[str], provider: str) -> list[str]:

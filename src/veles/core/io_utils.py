@@ -22,6 +22,7 @@ import os
 import sqlite3
 import tempfile
 import tomllib
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -58,6 +59,29 @@ def load_optional_json[T](path: Path, *, default: T | None = None) -> Any | T | 
     except (OSError, json.JSONDecodeError):
         return default
     return data
+
+
+def read_fresh_json(path: Path, *, max_age_s: float) -> dict[str, Any] | None:
+    """A cache file written by `write_stamped_json`, or None when it is missing,
+    corrupt, or older than `max_age_s`. Never raises — a bad cache is a miss."""
+    data = load_optional_json(path)
+    if not isinstance(data, dict):
+        return None
+    try:
+        fetched_at = datetime.fromisoformat(data["fetched_at"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if fetched_at.tzinfo is None:
+        fetched_at = fetched_at.replace(tzinfo=UTC)
+    if (datetime.now(UTC) - fetched_at).total_seconds() >= max_age_s:
+        return None
+    return data
+
+
+def write_stamped_json(path: Path, data: dict[str, Any]) -> None:
+    """Atomically write `data` plus a `fetched_at` stamp for `read_fresh_json`."""
+    stamp = datetime.now(UTC).isoformat(timespec="seconds")
+    atomic_write_json(path, {**data, "fetched_at": stamp})
 
 
 def atomic_write_json(path: Path, data: Any, *, mode: int | None = None) -> None:
@@ -199,4 +223,6 @@ __all__ = [
     "load_optional_toml",
     "open_sqlite",
     "prune_rotated",
+    "read_fresh_json",
+    "write_stamped_json",
 ]

@@ -57,6 +57,17 @@ def test_atomic_write_with_mode(tmp_path: Path) -> None:
     assert perms == 0o600
 
 
+def test_stamped_json_is_fresh_then_stale(tmp_path: Path) -> None:
+    from veles.core.io_utils import read_fresh_json, write_stamped_json
+
+    p = tmp_path / "cache" / "c.json"
+    write_stamped_json(p, {"models": ["a"]})
+    assert read_fresh_json(p, max_age_s=60)["models"] == ["a"]
+    assert read_fresh_json(p, max_age_s=0) is None
+    p.write_text('{"models": []}', encoding="utf-8")  # no stamp → a miss
+    assert read_fresh_json(p, max_age_s=60) is None
+
+
 def test_load_optional_toml_is_permissive(tmp_path: Path) -> None:
     from veles.core.io_utils import load_optional_toml
 
