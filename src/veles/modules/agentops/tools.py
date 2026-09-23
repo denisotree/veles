@@ -198,28 +198,19 @@ def research(question: str, max_subquestions: int = 4) -> str:
 def _submit_background_research(question: str, max_subquestions: int, origin: str) -> str:
     """Submit deep research as a structured one-shot job (mirrors the
     `wiki_add` background path — concrete `deliver_to`, resume-depth guard)."""
-    from veles.core.context import current_project, current_resume_depth
-    from veles.core.jobs_store import JobsStore
+    from veles.core.context import current_project
+    from veles.core.jobs_store import submit_oneshot_job
 
     project = current_project()
     if project is None:
         return "<error: no active project — cannot schedule background research>"
-    store = JobsStore(project.memory_db_path)
-    try:
-        rec = store.add_job(
-            name=f"research: {question[:60]}",
-            prompt="",
-            schedule_expr="once:+0s",
-            kind="research",
-            params={
-                "question": question,
-                "max_subquestions": max_subquestions,
-                "resume_depth": current_resume_depth(),
-            },
-            deliver_to=origin,
-        )
-    finally:
-        store.close()
+    rec = submit_oneshot_job(
+        project,
+        kind="research",
+        name=f"research: {question[:60]}",
+        params={"question": question, "max_subquestions": max_subquestions},
+        deliver_to=origin,
+    )
     return (
         f"Started background research (job {rec.id}). I'll report back in this "
         "chat with the synthesised, source-cited report when it's done."

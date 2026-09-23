@@ -17,6 +17,7 @@ import contextlib
 
 from veles.core.context import current_project
 from veles.core.risk import RiskClass
+from veles.core.slug import normalize_slug
 from veles.core.text import first_heading
 from veles.core.tools.registry import tool
 from veles.modules.wiki.wiki import Wiki
@@ -338,28 +339,18 @@ def _submit_background_ingest(src, glob: str, origin: str) -> str:
     "origin" is undeliverable from a detached/restarted job) and doubles as
     the SessionMap key the resume path uses. `resume_depth` carries the
     auto-resume loop guard."""
-    from veles.core.context import current_project, current_resume_depth
-    from veles.core.jobs_store import JobsStore
+    from veles.core.jobs_store import submit_oneshot_job
 
     project = current_project()
     if project is None:
         return "<error: no active project — cannot schedule a background ingest>"
-    store = JobsStore(project.memory_db_path)
-    try:
-        rec = store.add_job(
-            name=f"ingest {src}",
-            prompt="",
-            schedule_expr="once:+0s",
-            kind="ingest",
-            params={
-                "source": str(src),
-                "glob": glob,
-                "resume_depth": current_resume_depth(),
-            },
-            deliver_to=origin,
-        )
-    finally:
-        store.close()
+    rec = submit_oneshot_job(
+        project,
+        kind="ingest",
+        name=f"ingest {src}",
+        params={"source": str(src), "glob": glob},
+        deliver_to=origin,
+    )
     return (
         f"Started background ingest of {src} (job {rec.id}). It runs file-by-file "
         "with fresh sub-agents; I'll report back in this chat when it's done."
@@ -382,7 +373,4 @@ def _ingest_worker_tools() -> list[str]:
 
 
 def _kebab(value: str) -> str:
-    import re
-
-    cleaned = re.sub(r"[^a-zA-Z0-9]+", "-", value).strip("-").lower()
-    return cleaned[:60]
+    return normalize_slug(value)[:60].strip("-")

@@ -24,9 +24,13 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from veles.core.io_utils import open_sqlite
 from veles.core.job_schedule import Schedule, initial_next_run, parse_schedule
+
+if TYPE_CHECKING:
+    from veles.core.project import Project
 
 _JOBS_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -435,4 +439,27 @@ def _row_to_job(row: sqlite3.Row) -> JobRecord:
     )
 
 
-__all__ = ["JobRecord", "JobRunRecord", "JobsStore"]
+def submit_oneshot_job(
+    project: Project, *, kind: str, name: str, params: dict, deliver_to: str
+) -> JobRecord:
+    """Queue a structured job (`kind` handled by a JobRunner kind handler) to run
+    once, now. `deliver_to` is the concrete origin the result goes back to — it
+    doubles as the chat-session key the resume path uses — and the current
+    auto-resume depth rides along in `params` as the loop guard."""
+    from veles.core.context import current_resume_depth
+
+    store = JobsStore(project.memory_db_path)
+    try:
+        return store.add_job(
+            name=name,
+            prompt="",
+            schedule_expr="once:+0s",
+            kind=kind,
+            params={**params, "resume_depth": current_resume_depth()},
+            deliver_to=deliver_to,
+        )
+    finally:
+        store.close()
+
+
+__all__ = ["JobRecord", "JobRunRecord", "JobsStore", "submit_oneshot_job"]
