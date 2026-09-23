@@ -250,7 +250,9 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     token_store = _initialise_token_store()
 
     store = SessionStore(project.memory_db_path)
-    worker_agent_factory = _make_worker_agent_factory(args, project=project, store=store)
+    worker_agent_factory = _make_worker_agent_factory(
+        args, project=project, store=store, daemon_session=name
+    )
     # M126: build state first (with a placeholder) so the agent factory
     # closure can capture it for per-session override lookup. Replace
     # the factory immediately after.

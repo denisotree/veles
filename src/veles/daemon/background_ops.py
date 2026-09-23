@@ -50,14 +50,20 @@ _RESUME_SEED = (
 )
 
 
-def _scoped_factory_for(args: argparse.Namespace, project, store, toolset: str):
+def _scoped_factory_for(
+    args: argparse.Namespace, project, store, toolset: str, *, daemon_session: str | None
+):
     """Seam for tests: build the toolset-capped sub-agent factory."""
     from veles.daemon.agent_factory import _make_scoped_subagent_factory
 
-    return _make_scoped_subagent_factory(args, project=project, store=store, toolset=toolset)
+    return _make_scoped_subagent_factory(
+        args, project=project, store=store, toolset=toolset, daemon_session=daemon_session
+    )
 
 
-def make_ingest_kind_handler(args: argparse.Namespace, *, project, store):
+def make_ingest_kind_handler(
+    args: argparse.Namespace, *, project, store, daemon_session: str | None = None
+):
     """Build the `kind="ingest"` handler for `JobRunner(kind_handlers=…)`.
 
     Runs inside a `to_thread` worker: resolves the file list, then drives the
@@ -65,7 +71,7 @@ def make_ingest_kind_handler(args: argparse.Namespace, *, project, store):
     factory (`[ingest]` toolset — no `run_shell`/`fetch_url`, B1). Returns the
     summary text used for the job output file and the notify/resume path.
     """
-    factory = _scoped_factory_for(args, project, store, "ingest")
+    factory = _scoped_factory_for(args, project, store, "ingest", daemon_session=daemon_session)
 
     def handler(job) -> str:
         from veles.modules.wiki.ingest import (
@@ -103,7 +109,9 @@ def make_ingest_kind_handler(args: argparse.Namespace, *, project, store):
     return handler
 
 
-def make_research_kind_handler(args: argparse.Namespace, *, project, store):
+def make_research_kind_handler(
+    args: argparse.Namespace, *, project, store, daemon_session: str | None = None
+):
     """Build the `kind="research"` handler (M204 Phase 4).
 
     Drives `run_deep_research` (plan → parallel explore → synthesize) with
@@ -115,7 +123,7 @@ def make_research_kind_handler(args: argparse.Namespace, *, project, store):
     """
     from veles.core.trust import trust_auto_allow
 
-    factory = _scoped_factory_for(args, project, store, "research")
+    factory = _scoped_factory_for(args, project, store, "research", daemon_session=daemon_session)
 
     def handler(job) -> str:
         from veles.core.orchestration.research import (

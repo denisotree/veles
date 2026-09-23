@@ -71,6 +71,36 @@ def test_scoped_factory_caps_tools_at_the_toolset(tmp_path: Path, monkeypatch) -
         reset_active_project(token)
 
 
+def test_worker_factories_use_the_named_daemon_model(tmp_path: Path, monkeypatch) -> None:
+    """A named daemon's `[daemon.<name>] model` reaches its workers, not only its chat."""
+    from veles.daemon.agent_factory import _make_worker_agent_factory
+
+    project = init_project(tmp_path, name=None, force=False)
+    (project.state_dir / "config.toml").write_text(
+        '[daemon.bot]\nmodel = "named/model"\n', encoding="utf-8"
+    )
+    args = argparse.Namespace(model="", provider="openrouter", _provider_explicit=True)
+    token = set_active_project(project)
+    try:
+        store = SessionStore(project.memory_db_path)
+        captured: dict = {}
+        _patched_cli(monkeypatch, captured)
+        scoped = _make_scoped_subagent_factory(
+            args, project=project, store=store, toolset="ingest", daemon_session="bot"
+        )
+        scoped(system_prompt="SP", tools=None)
+        assert captured["model"] == "named/model"
+
+        captured.clear()
+        worker = _make_worker_agent_factory(
+            args, project=project, store=store, daemon_session="bot"
+        )
+        worker(system_prompt="SP")
+        assert captured["model"] == "named/model"
+    finally:
+        reset_active_project(token)
+
+
 def test_scoped_factory_defaults_to_the_full_toolset(tmp_path: Path, monkeypatch) -> None:
     project = init_project(tmp_path, name=None, force=False)
     token = set_active_project(project)
