@@ -21,7 +21,7 @@ from veles.core.context_compressor import CompressionConfig, make_default_compre
 from veles.core.defaults import DEFAULT_COMPRESS_THRESHOLD_TOKENS
 from veles.core.project import Project
 from veles.core.provider import Provider
-from veles.core.provider_factory import has_api_key, make_provider
+from veles.core.provider_factory import CLI_PROVIDERS, has_api_key, make_provider
 from veles.core.routing import route
 
 _compressor_logger = logging.getLogger("veles.core.context_compressor")
@@ -144,7 +144,7 @@ def budget_scope(args: argparse.Namespace, project: Project | None = None):
     initial_consumed = budget.consumed
     if (
         project is not None
-        and getattr(args, "provider", None) in {"claude-cli", "gemini-cli"}
+        and getattr(args, "provider", None) in CLI_PROVIDERS
         and budget.limit > 0
     ):
         snapshot_path = project.state_dir / "budget.state.json"

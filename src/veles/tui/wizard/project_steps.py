@@ -26,7 +26,6 @@ redundant, unstructured pile.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -188,12 +187,10 @@ async def _pick_project_model(
     ctx: WizardContext, provider: str, *, default_pref: str | None
 ) -> str | None:
     """Mirror of user-level ModelStep, scoped to the project."""
-    from veles.cli.repl.model_fetcher import (
-        known_models,
-        validate_and_fetch_models,
-    )
+    from veles.cli.repl.model_fetcher import validate_and_fetch_models
     from veles.core.provider_factory import LOCAL_PROVIDERS
     from veles.core.secrets import get_provider_key
+    from veles.tui.wizard.user_steps import model_choice_screen
 
     project: Project = ctx.answers["project"]
     slug = project.name
@@ -205,23 +202,12 @@ async def _pick_project_model(
             return None
 
     ok, models, _err = validate_and_fetch_models(provider, api_key)
-    if not ok or not models:
-        models = list(known_models(provider))
-    if not models:
-        return None
-    models = sorted(models, key=str.casefold)
-    items = [ChoiceItem(label=m, value=m) for m in models]
-    default = default_pref if default_pref in models else models[0]
-    result = await ctx.app.push_screen_wait(
-        ChoiceScreen(
-            title="Project model override",
-            items=items,
-            subtitle=f"{len(models)} model(s) available from {provider}.",
-            default=default,
-            filterable=True,
-            filter_placeholder="filter models (e.g. claude, gpt, 70b)",
-        )
+    screen = model_choice_screen(
+        "Project model override", provider, models if ok else [], default=default_pref
     )
+    if screen is None:
+        return None
+    result = await ctx.app.push_screen_wait(screen)
     if result is None or result == _CANCEL_SENTINEL:
         return None
     return str(result)
@@ -229,26 +215,20 @@ async def _pick_project_model(
 
 async def _project_api_key_flow(ctx: WizardContext, project: Project, provider: str) -> None:
     """Same shape as user-level ApiKeyStep but writes to the project scope."""
-    from veles.core.provider_factory import LOCAL_PROVIDERS, PROVIDER_API_KEY_ENVS
+    from veles.core.provider_factory import env_api_key, needs_api_key
     from veles.core.secrets import (
         KeyringUnavailable,
         get_provider_key,
         set_provider_key,
     )
 
-    if provider in LOCAL_PROVIDERS or provider in ("claude-cli", "gemini-cli"):
+    if not needs_api_key(provider):
         ctx.answers["project_api_key_status"] = "not-required"
         return
 
     slug = project.name
     default_key = get_provider_key(provider, env_fallback=False)
-    env_value: str | None = None
-    env_name: str | None = None
-    for name in PROVIDER_API_KEY_ENVS.get(provider, ()):
-        value = os.environ.get(name)
-        if value:
-            env_value, env_name = value, name
-            break
+    env_name, env_value = env_api_key(provider) or (None, None)
 
     options: list[ChoiceItem] = []
     if default_key:

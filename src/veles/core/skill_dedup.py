@@ -174,19 +174,13 @@ def _build_embedding_provider(project: Project | None):
     """
     if project is None:
         raise RuntimeError("embedding mode requires an active project for routing")
-    from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
+    from veles.core.provider_factory import env_api_key
     from veles.core.routing import route
     from veles.core.skill_embedding import OpenAIEmbeddingAdapter
 
     provider_name, model = route("embedding", project)
-    env_names = PROVIDER_API_KEY_ENVS.get(provider_name) or ()
-    api_key: str | None = None
-    import os
-
-    for env_name in env_names:
-        api_key = os.environ.get(env_name)
-        if api_key:
-            break
+    found = env_api_key(provider_name)
+    api_key = found[1] if found else None
     if not api_key and provider_name in ("openai", "openrouter"):
         raise RuntimeError(f"no API key for routed embedding provider {provider_name!r}")
     base_url = "https://openrouter.ai/api/v1" if provider_name == "openrouter" else None

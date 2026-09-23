@@ -46,6 +46,21 @@ PROVIDER_API_KEY_ENVS: dict[str, tuple[str, ...]] = {
 }
 
 LOCAL_PROVIDERS: frozenset[str] = frozenset({"ollama", "llamacpp", "openai-compat"})
+CLI_PROVIDERS: frozenset[str] = frozenset({"claude-cli", "gemini-cli"})
+
+
+def needs_api_key(provider: str) -> bool:
+    """False for local servers and subscription CLIs, which carry no key."""
+    return provider not in LOCAL_PROVIDERS and provider not in CLI_PROVIDERS
+
+
+def env_api_key(provider: str) -> tuple[str, str] | None:
+    """`(env_name, value)` of the first set env var for `provider`, or None."""
+    for name in PROVIDER_API_KEY_ENVS.get(provider, ()):
+        value = os.environ.get(name)
+        if value:
+            return name, value
+    return None
 
 
 def _local_tools_override() -> bool | None:

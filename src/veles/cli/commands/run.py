@@ -47,6 +47,7 @@ def _build_escalator(args, project, adv_provider, adv_model, store):
     advisor-tier model with the full run tool surface. None when the advisor
     agent can't be built (e.g. missing API key)."""
     from veles.cli._agent_builder import build_command_agent
+    from veles.core.provider_factory import CLI_PROVIDERS
     from veles.runtime.prompt import system_prompt_from_args
     from veles.runtime.registry import RUN_TOOLS
     from veles.runtime.run import run_agent_streaming_aware
@@ -55,7 +56,7 @@ def _build_escalator(args, project, adv_provider, adv_model, store):
     esc_args.provider = adv_provider
     esc_args.model = adv_model
     esc_args.stream = False
-    tool_aware = adv_provider in {"claude-cli", "gemini-cli"}
+    tool_aware = adv_provider in CLI_PROVIDERS
 
     def escalator(prompt: str):
         esc_agent = build_command_agent(

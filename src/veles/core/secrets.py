@@ -314,13 +314,10 @@ def _read_keychain(name: str) -> str | None:
 def _env_for_provider(provider: str) -> str | None:
     """ENV fallback honouring the canonical names in `PROVIDER_API_KEY_ENVS`.
     Imported lazily to keep `secrets.py` free of cross-package deps."""
-    from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
+    from veles.core.provider_factory import env_api_key
 
-    for name in PROVIDER_API_KEY_ENVS.get(provider, ()):
-        value = os.environ.get(name)
-        if value:
-            return value
-    return None
+    found = env_api_key(provider)
+    return found[1] if found else None
 
 
 __all__ = [
