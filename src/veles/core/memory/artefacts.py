@@ -24,6 +24,7 @@ Never write user-content (`wiki/`) paths from this module.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -39,7 +40,6 @@ _LOG_FILE = "LOG.md"
 _INSIGHTS_DIR = "insights"
 _SESSIONS_DIR = "sessions"
 _PROPOSALS_DIR = "proposals"
-_SUMMARY_CHAR_CAP = 200
 
 # Two writers share `proposals/`: M62 subproject clusters and M61 skill
 # promotions, told apart only by this slug prefix. Defined once, here beside the
@@ -116,6 +116,19 @@ def write_insight_view(project: Project, *, slug: str, title: str, body: str) ->
     file is a best-effort human-readable mirror, regenerable from the row.
     """
     return _write_page(insights_dir(project), slug=slug, title=title, content=body)
+
+
+def fresh_proposals(project: Project, *, max_age_days: int) -> list[ProposalInfo]:
+    """Proposals whose file was written within the last `max_age_days` days."""
+    cutoff = time.time() - max_age_days * 86_400
+    out: list[ProposalInfo] = []
+    for page in list_proposals(project):
+        try:
+            if page.path.stat().st_mtime >= cutoff:
+                out.append(page)
+        except OSError:
+            continue
+    return out
 
 
 def list_proposals(project: Project) -> list[ProposalInfo]:

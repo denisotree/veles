@@ -28,14 +28,13 @@ trigger.
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass
 
 from veles.core.memory.artefacts import (
     PROMOTE_PROPOSAL_PREFIX,
     ProposalInfo,
     append_memory_log,
-    list_proposals,
+    fresh_proposals,
     write_proposal,
 )
 from veles.core.project import Project
@@ -168,15 +167,8 @@ def recent_promote_proposals(
     Used by the system-prompt surfacing block so the agent only
     mentions promotions the user might still be interested in.
     """
-    cutoff = time.time() - max_age_days * 86_400
-    out: list[ProposalInfo] = []
-    for page in list_proposals(project):
-        if not page.slug.startswith(_PROPOSAL_SLUG_PREFIX):
-            continue
-        try:
-            mtime = page.path.stat().st_mtime
-        except OSError:
-            continue
-        if mtime >= cutoff:
-            out.append(page)
-    return out
+    return [
+        page
+        for page in fresh_proposals(project, max_age_days=max_age_days)
+        if page.slug.startswith(_PROPOSAL_SLUG_PREFIX)
+    ]

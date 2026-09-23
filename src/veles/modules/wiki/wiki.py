@@ -65,7 +65,6 @@ _DEFAULT_CATEGORIES = (
     "sessions",
     "self-doc",
 )
-_SUMMARY_CHAR_CAP = 200
 
 
 def project_categories_path(root: Path) -> Path:
