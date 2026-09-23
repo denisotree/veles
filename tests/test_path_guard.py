@@ -1,8 +1,8 @@
 """M37 — sandbox enforcement on builtin file/shell tools.
 
 Tests the resolution policy directly + integration with read_file /
-write_file / run_shell. We monkey-patch `veles.core.path_guard.Path.home`
-and the active-project ContextVar so the sandbox roots point at
+write_file / run_shell. We point `VELES_USER_HOME` at a temp dir
+and set the active-project ContextVar so the sandbox roots point at
 `tmp_path` rather than the developer's real `~/.veles/`.
 """
 
@@ -106,10 +106,7 @@ def test_no_project_falls_back_to_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path:
     monkeypatch.delenv("VELES_SANDBOX_ROOTS", raising=False)
     fake_home = tmp_path / "home_outside"
     fake_home.mkdir()
-    monkeypatch.setattr(
-        "veles.core.path_guard.Path.home",
-        classmethod(lambda cls: fake_home),
-    )
+    monkeypatch.setenv("VELES_USER_HOME", str(fake_home))
     cwd = tmp_path / "cwd_outside"
     cwd.mkdir()
     monkeypatch.chdir(cwd)
@@ -138,10 +135,7 @@ def test_user_root_whitelist_admits_existing_subdirs(
     projects_root = fake_home / ".veles" / "projects"
     for p in (skills_root, locales_root, projects_root):
         p.mkdir(parents=True)
-    monkeypatch.setattr(
-        "veles.core.path_guard.Path.home",
-        classmethod(lambda cls: fake_home),
-    )
+    monkeypatch.setenv("VELES_USER_HOME", str(fake_home))
     # Pin cwd outside fake_home so dedupe doesn't subsume the whitelist roots.
     cwd_outside = tmp_path / "cwd_elsewhere"
     cwd_outside.mkdir()
@@ -180,10 +174,7 @@ def test_read_file_rejects_user_root_registry(
     registry = fake_home / ".veles" / "projects" / "registry.json"
     registry.parent.mkdir(parents=True)
     registry.write_text('{"projects":[]}', encoding="utf-8")
-    monkeypatch.setattr(
-        "veles.core.path_guard.Path.home",
-        classmethod(lambda cls: fake_home),
-    )
+    monkeypatch.setenv("VELES_USER_HOME", str(fake_home))
     project = init_project(tmp_path / "p", name="p")
     token = set_active_project(project)
     try:
@@ -201,10 +192,7 @@ def test_read_file_allows_user_root_skills(monkeypatch: pytest.MonkeyPatch, tmp_
     skill = fake_home / ".veles" / "skills" / "my-skill" / "SKILL.md"
     skill.parent.mkdir(parents=True)
     skill.write_text("# my skill\n", encoding="utf-8")
-    monkeypatch.setattr(
-        "veles.core.path_guard.Path.home",
-        classmethod(lambda cls: fake_home),
-    )
+    monkeypatch.setenv("VELES_USER_HOME", str(fake_home))
     project = init_project(tmp_path / "p", name="p")
     token = set_active_project(project)
     try:
@@ -218,10 +206,7 @@ def test_active_project_replaces_cwd_in_roots(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.delenv("VELES_SANDBOX_ROOTS", raising=False)
-    monkeypatch.setattr(
-        "veles.core.path_guard.Path.home",
-        classmethod(lambda cls: tmp_path / "home"),
-    )
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
     project = init_project(tmp_path / "p", name="p")
     token = set_active_project(project)
     try:

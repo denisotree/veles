@@ -43,9 +43,9 @@ import os
 from pathlib import Path
 
 from veles.core.context import current_project
+from veles.core.user_paths import user_home
 
 _SANDBOX_ENV = "VELES_SANDBOX_ROOTS"
-_USER_ROOT_REL = ".veles"
 # Subdirectories of `~/.veles/` the agent is allowed to read. Adding to
 # this list expands the agent's reach across all projects — think hard
 # before extending. The daemon itself still reaches into `~/.veles/`
@@ -71,7 +71,7 @@ def _get_sandbox_roots() -> list[Path]:
     project = current_project()
     if project is not None:
         roots.append(project.root.resolve())
-    user_root = Path.home() / _USER_ROOT_REL
+    user_root = user_home()
     for name in _USER_ROOT_WHITELIST:
         # Whitelist subdirs are admitted whether or not they exist on disk —
         # `resolve_safe` itself supports non-existent targets (write_file

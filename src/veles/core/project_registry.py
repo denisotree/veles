@@ -25,8 +25,8 @@ from pathlib import Path
 
 from veles.core.project import Project
 from veles.core.slug import normalize_slug as _normalize_slug
+from veles.core.user_paths import user_home
 
-_DEFAULT_REGISTRY_REL = ".veles/projects/registry.json"
 _REGISTRY_VERSION = 1
 
 
@@ -39,11 +39,11 @@ class RegistryEntry:
 
 
 def default_registry_path() -> Path:
-    """Resolve the registry path. `VELES_REGISTRY_PATH` overrides for tests."""
+    """Resolve the registry path: `VELES_REGISTRY_PATH`, else `<user_home>/projects/`."""
     override = os.environ.get("VELES_REGISTRY_PATH")
     if override:
         return Path(override)
-    return Path.home() / _DEFAULT_REGISTRY_REL
+    return user_home() / "projects" / "registry.json"
 
 
 class Registry:

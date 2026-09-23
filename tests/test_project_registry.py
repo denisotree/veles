@@ -32,9 +32,12 @@ def test_default_registry_path_uses_env_override(
     assert default_registry_path() == custom
 
 
-def test_default_registry_path_falls_back_to_home(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_default_registry_path_falls_back_to_user_home(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.delenv("VELES_REGISTRY_PATH", raising=False)
-    assert default_registry_path() == Path.home() / ".veles/projects/registry.json"
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path))
+    assert default_registry_path() == tmp_path / ".veles/projects/registry.json"
 
 
 # ---- load / save ----

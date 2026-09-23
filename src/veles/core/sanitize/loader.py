@@ -34,16 +34,16 @@ from typing import Any
 from veles.core.project import Project
 from veles.core.sanitize.builtin import builtin_rules
 from veles.core.sanitize.rule import LiteralRule, RegexRule, Rule, RuleSet
+from veles.core.user_paths import user_home
 
 logger = logging.getLogger(__name__)
 
-_GLOBAL_CONFIG_REL = Path(".veles") / "sanitize.toml"
 _PROJECT_CONFIG_REL = Path(".veles") / "sanitize.toml"
 _lock = threading.Lock()
 
 
 def _global_config_path() -> Path:
-    return Path.home() / _GLOBAL_CONFIG_REL
+    return user_home() / "sanitize.toml"
 
 
 def _project_config_path(project_root: Path) -> Path:
