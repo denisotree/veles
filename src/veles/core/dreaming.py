@@ -40,7 +40,6 @@ from __future__ import annotations
 
 import logging
 import time
-from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -139,23 +138,6 @@ def _dream_lock_path(project: Project) -> Path:
     return project.state_dir / "dream.lock"
 
 
-@contextmanager
-def _maybe_lock(project: Project, *, blocking: bool):
-    """Hold the dream-lock for the body. If `blocking=False` and the lock is
-    contended, yield None so callers can skip."""
-    lock_path = _dream_lock_path(project)
-    if blocking:
-        with file_lock(lock_path):
-            yield True
-        return
-    # Non-blocking: best-effort. The simplest portable signal is to attempt
-    # the blocking lock with no contention assumed — if another dream is
-    # active, the caller can detect it via a sentinel timestamp. For now we
-    # just block briefly and rely on the throttle to keep contention rare.
-    with file_lock(lock_path):
-        yield True
-
-
 _DEFAULT_CONSOLIDATION_MODEL = "anthropic/claude-haiku-4.5"
 
 
@@ -234,7 +216,7 @@ def dream_cycle(
     # M128-followup: if the project marker is gone (project deleted out from
     # under a still-running daemon), bail before any filesystem touch so the
     # cycle can't `mkdir` a marker-less zombie `.veles/` back into existence
-    # (`_maybe_lock`/state write would otherwise recreate the state dir).
+    # (the lock file / state write would otherwise recreate the state dir).
     if not project.project_toml_path.is_file():
         result.notes.append("skipped: project marker (project.toml) missing")
         return result
@@ -253,7 +235,7 @@ def dream_cycle(
         wiki = None
     model = consolidation_model or _DEFAULT_CONSOLIDATION_MODEL
 
-    with _maybe_lock(project, blocking=True):
+    with file_lock(_dream_lock_path(project)):
         if not skip_insights and insight_history_loader is not None and provider is not None:
             _run_dream_step(
                 "insights",
