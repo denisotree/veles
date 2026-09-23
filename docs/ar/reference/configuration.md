@@ -109,6 +109,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[permissions]` | سياسة الإذن لكل أداة (نطاق المشروع) |
 | `[daemon]` | ربط العفريت غير المُسمّى/"الافتراضي" + التشغيل التلقائي |
 | `[daemon.<name>]` | جلسة عفريت مُسمّاة (لها نموذجها/مزوّدها/مضيفها/منفذها/وضعها الخاص) |
+| `[goal]` | ميزانية الهدف الجديد — `max_steps` (30)، `max_cost_usd` (5.0)، `max_wall_time_s` (3600)؛ خيارات `veles goal start` تتقدّم عليها |
 | `[channels.<type>]` | قناة يقدّمها العفريت غير المُسمّى (مثل `telegram`) |
 | `[daemon.<name>.channels.<type>]` | قناة مرتبطة بجلسة عفريت مُسمّاة |
 | `[mcp.servers.<name>]` | خادم MCP خارجي (مصدر أدوات) |

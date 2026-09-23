@@ -56,8 +56,14 @@ async def start_turn(
     origin: str | None,
     on_finished: Callable[[RunHandle], None] | None = None,
     deliver_hook: Callable[[str], Awaitable[None]] | None = None,
+    mode: str | None = None,
 ) -> RunHandle:
     """Register a run and start it in the background; returns its handle.
+
+    `mode` switches the session to that agent mode before the turn (Telegram
+    `/goal <task>`: the task is the goal's first message). A chat that has
+    never spoken has no session yet, so one is allocated for it here — the
+    channel maps the chat to it from the run's `started` event.
 
     Building the agent can fail (bad provider config, …). The handle is then
     marked failed — it used to stay "pending" forever on the channel path — and
@@ -69,6 +75,10 @@ async def start_turn(
     turn with text from 0.36.0 to 0.39.0. It is also real work (recall, skills,
     the session probe) that has no business stalling every other request.
     """
+    if mode is not None:
+        if session_id is None:
+            session_id = state.store.create_session()
+        state.set_chat_mode(session_id, mode)  # an unknown mode raises before any run
     handle = new_run_handle(session_id=session_id)
     state.add_run(handle)
     chosen_mode = state.chat_mode(session_id).mode
@@ -130,9 +140,22 @@ async def start_turn(
             subagent_factory=getattr(state, "subagent_factory", None),
             turn_lock=(state.session_lock(effective_session_id) if effective_session_id else None),
             deliver_hook=deliver_hook,
+            ask_channel=asks_questions(origin),
         ),
     )
     return handle
+
+
+# Channels whose gateway renders a `clarification_prompt` and takes the reply.
+_QUESTION_CHANNELS = frozenset({"telegram"})
+
+
+def asks_questions(origin: str | None) -> bool:
+    """M284: may the agent's `ask_user` wait for an answer from this turn's
+    origin? Only a chat that renders the question can; an HTTP caller or a
+    scheduled job gets "no human available" at once, as before, instead of a
+    run stalled for the prompt timeout."""
+    return bool(origin) and origin.split(":", 1)[0] in _QUESTION_CHANNELS  # type: ignore[union-attr]
 
 
 def _session_for_mode_turn(state: DaemonState, session_id: str) -> str:
@@ -149,6 +172,7 @@ def _session_for_mode_turn(state: DaemonState, session_id: str) -> str:
     moved = state.chat_modes.pop(session_id, None)
     if moved is not None:
         state.chat_modes[fresh] = moved
+        state.save_chat_modes()
     return fresh
 
 

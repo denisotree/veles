@@ -153,3 +153,16 @@ def test_repl_post_turn_hooks_skip_cancelled_turn(
     _run_repl_post_turn_hooks(argparse.Namespace(), project, cancelled)
 
     assert calls == []
+
+
+def test_a_toolless_turn_prompt_has_no_mode_block(tmp_path: Path) -> None:
+    """The REPL factory passes `mode=None` for a toolless turn (GoalMode's
+    interview): its phase prompt stands alone, without the planning block that
+    had the interview tell the user to "/mode writing" (M280b)."""
+    project = init_project(tmp_path, name="t")
+    prompt = _repl_turn_system_prompt(
+        _args(), project, mode=None, query="", extra_system="PHASE: interview"
+    )
+    assert prompt is not None
+    assert get_mode("planning").system_block.strip() not in prompt
+    assert prompt.endswith("PHASE: interview")

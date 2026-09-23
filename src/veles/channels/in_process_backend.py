@@ -31,12 +31,20 @@ class InProcessRunBackend:
         self._state = state
 
     async def submit_run(
-        self, prompt: str, *, session_id: str | None = None, origin: str | None = None
+        self,
+        prompt: str,
+        *,
+        session_id: str | None = None,
+        origin: str | None = None,
+        mode: str | None = None,
     ) -> dict[str, Any]:
         # Same entry as `POST /v1/runs` (manager gate, agent build, background
         # run). A channel turn neither touches daemon activity nor carries a
-        # `deliver_to` — the gateway streams the answer itself.
-        handle = await start_turn(self._state, prompt=prompt, session_id=session_id, origin=origin)
+        # `deliver_to` — the gateway streams the answer itself. `mode` switches
+        # the session first (`/goal <task>`).
+        handle = await start_turn(
+            self._state, prompt=prompt, session_id=session_id, origin=origin, mode=mode
+        )
         return {"run_id": handle.run_id, "session_id": handle.session_id}
 
     async def stream_events(self, run_id: str) -> AsyncIterator[dict[str, Any]]:
@@ -64,9 +72,18 @@ class InProcessRunBackend:
 
     async def get_session(self, session_id: str) -> dict[str, Any]:
         """In-process equivalent of `DaemonClient.get_session`: the session's
-        agent mode, `"default"` when never switched."""
-        mode = self._state.chat_mode(session_id).mode or "default"
-        return {"session_id": session_id, "mode": mode}
+        agent mode (`"default"` when never switched) and its goal, if any."""
+        return {
+            "session_id": session_id,
+            "mode": self._state.chat_mode(session_id).mode or "default",
+            "goal": self._state.chat_goal(session_id),
+        }
+
+    async def cancel_goal(self, session_id: str) -> dict[str, Any]:
+        """In-process equivalent of `DaemonClient.cancel_goal`: cancel the
+        chat's goal; `{"cancelled": null}` when it had none."""
+        goal = self._state.cancel_chat_goal(session_id, reason="cancelled from the chat")
+        return {"session_id": session_id, "cancelled": goal}
 
     async def update_session(self, session_id: str, *, mode: str) -> dict[str, Any]:
         """In-process equivalent of `DaemonClient.update_session` (PATCH):
@@ -110,7 +127,7 @@ class InProcessRunBackend:
         pending = handle.pending_prompts.pop(prompt_id, None)
         if pending is None:
             raise LookupError(f"prompt {prompt_id!r} not pending on run {run_id!r}")
-        if choice not in pending.valid_choices:
+        if not pending.accepts(choice):
             # Restore so a follow-up call with a valid key can resolve.
             handle.pending_prompts[prompt_id] = pending
             raise ValueError(f"choice {choice!r} not valid for {pending.kind} prompt")

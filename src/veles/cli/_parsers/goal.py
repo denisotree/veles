@@ -43,17 +43,25 @@ def register(sub: argparse._SubParsersAction) -> None:
         help="Done condition the advisor checks, e.g. 'report.md exists and cites ≥3 sources'.",
     )
     g_start.add_argument("--scope", default=None, help="Optional scope / context for the goal.")
+    # M283: no hardcoded defaults here — an omitted flag takes `[goal]` from the
+    # project's config.toml, else the built-in 30 steps / $5 / 3600 s.
     g_start.add_argument(
-        "--max-steps", type=int, default=30, help="Step budget before the goal stops (default 30)."
+        "--max-steps",
+        type=int,
+        default=None,
+        help="Step budget before the goal stops (default: [goal] max_steps, else 30).",
     )
     g_start.add_argument(
-        "--max-cost-usd", type=float, default=5.0, help="Cost budget in USD (default 5.0)."
+        "--max-cost-usd",
+        type=float,
+        default=None,
+        help="Cost budget in USD (default: [goal] max_cost_usd, else 5.0).",
     )
     g_start.add_argument(
         "--max-wall-time-s",
         type=int,
-        default=3600,
-        help="Wall-clock budget in seconds (default 3600).",
+        default=None,
+        help="Wall-clock budget in seconds (default: [goal] max_wall_time_s, else 3600).",
     )
     add_common_run_flags(g_start)
 

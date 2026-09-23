@@ -106,6 +106,18 @@ def test_toolless_hands_the_turn_an_empty_registry(build) -> None:
     assert registry.list_names() == []
 
 
+def test_the_interview_gets_its_phase_prompt_without_the_planning_block(build) -> None:
+    """GoalMode's interview asks for `mode_override="planning", toolless=True`.
+    The planning block tells the model to send users to `/mode writing`, which
+    the interview then repeated to a chat running a goal."""
+    _build, captured, _, _ = build
+    _build(mode="planning", toolless=True, extra_system="PHASE: interview")
+    prompt = str(captured["system_prompt"])
+    assert get_mode("planning").system_block.strip() not in prompt
+    assert prompt.endswith("PHASE: interview")
+    assert captured["plan_mode"] is True  # the mutation guard stays on
+
+
 def test_a_phase_prompt_is_appended_after_the_mode_block(build) -> None:
     _build, captured, _, _ = build
     _build(mode="goal", extra_system="PHASE: interview")

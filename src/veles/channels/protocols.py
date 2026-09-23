@@ -20,12 +20,18 @@ class RunBackend(Protocol):
     follow its event stream until completion."""
 
     async def submit_run(
-        self, prompt: str, *, session_id: str | None = None, origin: str | None = None
+        self,
+        prompt: str,
+        *,
+        session_id: str | None = None,
+        origin: str | None = None,
+        mode: str | None = None,
     ) -> dict[str, Any]:
         """POST one turn. Returns at least `{"run_id": ..., "session_id": ...}`.
 
         `origin` (M166) is the originating chat as a delivery target
-        (e.g. "telegram:<id>") so reminder tools can default to "this chat"."""
+        (e.g. "telegram:<id>") so reminder tools can default to "this chat".
+        `mode` (M280b) switches the session's agent mode first."""
         ...
 
     def stream_events(self, run_id: str) -> AsyncIterator[dict[str, Any]]:

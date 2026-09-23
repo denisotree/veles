@@ -37,6 +37,10 @@ class _PendingTelegramPrompt:
     # Inline-keyboard buttons accept arbitrary `callback_data` strings
     # up to 64 bytes. We send a short code per option (`o`/`p`/`r`,
     # `y`/`n`) and decode here.
+    # M284: a question's text and its option labels by key, so the resolved
+    # message can read "question → answer" instead of an option key.
+    question: str = ""
+    labels: dict[str, str] | None = None
 
 
 # Short codes for callback_data — Telegram's 64-byte limit means we
@@ -109,11 +113,12 @@ def _format_prompt_body(kind: str, event: dict[str, Any]) -> str:
     tool = str(event.get("tool") or "?")
     if kind == "clarification":
         question = str(event.get("question") or "(no question)")
-        return (
-            f"❓ <b>The agent needs your input</b>\n"
-            f"{escape_html(sanitize(question))}\n\n"
-            f"Tap an option below, or reply with a free-form answer."
+        hint = (
+            "Tap an option below, or reply with a free-form answer."
+            if event.get("options")
+            else "Reply with your answer."
         )
+        return f"❓ <b>The agent needs your input</b>\n{escape_html(sanitize(question))}\n\n{hint}"
     if kind == "critical":
         # M213: critical ops carry `op` + `summary` (the Confirmer contract),
         # not tool/arguments. Deliberately alarming — this is the channel

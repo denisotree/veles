@@ -19,6 +19,7 @@ from veles.core.goal import (
     GoalBudget,
     budget_exhausted,
     cancel,
+    default_budget,
     list_goals,
     pause,
     read_goal,
@@ -107,10 +108,14 @@ def _show(state, args):
 def _start(args, project: Project) -> int:
     from veles.core.modes.goal_driver import start_goal
 
+    # The project's `[goal]` budget, with only the flags actually given on top.
+    base = default_budget(project)
     budget = GoalBudget(
-        max_steps=args.max_steps,
-        max_cost_usd=args.max_cost_usd,
-        max_wall_time_s=args.max_wall_time_s,
+        max_steps=args.max_steps if args.max_steps is not None else base.max_steps,
+        max_cost_usd=args.max_cost_usd if args.max_cost_usd is not None else base.max_cost_usd,
+        max_wall_time_s=(
+            args.max_wall_time_s if args.max_wall_time_s is not None else base.max_wall_time_s
+        ),
     )
     try:
         g = start_goal(

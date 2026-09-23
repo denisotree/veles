@@ -430,7 +430,10 @@ def _build_agent_for_turn(
     if mode is not None or extra_system:
         from veles.core.modes import get_mode
 
-        block = get_mode(mode).system_block.strip() if mode is not None else ""
+        # A toolless turn (GoalMode's interview) carries its own phase prompt;
+        # the planning block made it tell the user to "/mode writing" — in a
+        # goal, exactly wrong (live-seen in M280b). Same rule as the REPL.
+        block = get_mode(mode).system_block.strip() if mode is not None and not toolless else ""
         chunks = [c for c in (system_prompt, block, (extra_system or "").strip()) if c]
         system_prompt = "\n\n".join(chunks) or None
     # Resolve hard-ceiling once so both the compressor (for its sub-

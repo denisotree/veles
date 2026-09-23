@@ -76,6 +76,16 @@ hoạch trước không), `planning` (chỉ lập kế hoạch, không thay đ�
 lực đến khi daemon khởi động lại. Dòng trạng thái của chế độ, ví dụ
 *auto → plan*, hiện phía trên câu trả lời.
 
+`/goal <nhiệm vụ>` chạy một mục tiêu ngay trong cuộc trò chuyện. Agent hỏi những
+gì nó cần biết và cho xem kế hoạch sẽ làm theo. Khi bạn trả lời `yes`, nó tự làm
+và gửi một dòng sau mỗi bước, cho đến khi đạt mục tiêu hoặc hết ngân sách. Yêu cầu
+phê duyệt vẫn đến dưới dạng nút bấm. `/goal` cho xem tiến độ, `/goal cancel` dừng
+sau bước hiện tại, còn `/goal resume` tiếp tục một mục tiêu đã dừng.
+
+Khi agent cần một chi tiết mà chỉ bạn biết, nó sẽ hỏi trong cuộc trò chuyện.
+Chạm vào một câu trả lời gợi ý hoặc tự nhập câu trả lời. Nếu bạn không trả lời
+trong năm phút, nó tiếp tục theo giả định hợp lý nhất và nói rõ đã giả định gì.
+
 ## Hạn chế đa phương thức (multimodal)
 
 Việc gửi một **ảnh hoặc tin nhắn thoại** hiện trả về thông báo "not configured".

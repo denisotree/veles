@@ -142,8 +142,20 @@ class TelegramDelivery:
                 elif kind == "notice":
                     note = event.get("text")
                     if isinstance(note, str) and note.strip():
-                        notices.append(note.strip().strip("[]"))
-                elif kind in ("trust_prompt", "approval_prompt", "critical_prompt"):
+                        note = note.strip().strip("[]")
+                        if event.get("live"):
+                            # A goal driving itself (M280b): progress, sent as
+                            # it happens — the run lasts minutes. Best-effort.
+                            with contextlib.suppress(Exception):
+                                await gw._send_message(chat_id, f"<i>{escape_html(note)}</i>")
+                        else:
+                            notices.append(note)
+                elif kind in (
+                    "trust_prompt",
+                    "approval_prompt",
+                    "critical_prompt",
+                    "clarification_prompt",  # M284: the agent's ask_user
+                ):
                     await gw._post_prompt(chat_id, run_id, event)
                 elif kind == "prompt_resolved":
                     await gw._finalise_prompt_message(event)

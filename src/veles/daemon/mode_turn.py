@@ -51,10 +51,11 @@ def make_mode_turn(state: DaemonState, *, session_id: str, prompt: str) -> TurnF
         )
         app.mode = chat.mode  # type: ignore[assignment]
         app.last_mode_in_session = chat.last_mode_in_session  # type: ignore[assignment]
-        app.active_goal_id = chat.active_goal_id
+        app.active_goal_id = _live_goal(state, chat.active_goal_id)
 
         streamed: list[str] = []
         done: list[RunResult] = []
+        driving = [False]  # set while a goal runs on its own (M280b)
 
         def text(delta: str) -> None:
             streamed.append(delta)
@@ -66,7 +67,12 @@ def make_mode_turn(state: DaemonState, *, session_id: str, prompt: str) -> TurnF
             elif isinstance(msg, ChatDelta):
                 text(msg.text)
             elif isinstance(msg, SystemLine):
-                post_event({"type": "notice", "text": msg.text})
+                # While a goal drives itself the turn lasts minutes: its phase
+                # lines are progress, which a channel shows as they happen.
+                # GoalMode's lines say "mode → auto" (true in the REPL); a chat
+                # goes back to its own default instead (see the write-back below).
+                note = msg.text.replace("mode → auto", "back to the chat's default mode")
+                post_event({"type": "notice", "text": note, "live": driving[0]})
             elif isinstance(msg, AgentError):
                 raise msg.exc
 
@@ -88,28 +94,109 @@ def make_mode_turn(state: DaemonState, *, session_id: str, prompt: str) -> TurnF
             on_event=on_event,
         )
         mode_name = app.mode
+        goal_before = app.active_goal_id
         get_mode(mode_name).run_turn(prompt, ctx)
+        outcome = None
+        if mode_name == "goal":
+            # GoalMode clears `active_goal_id` when a goal ends, so keep the id.
+            goal_id = app.active_goal_id or goal_before
+            outcome = _drive_if_ready(state, ctx, driving, goal_id)
 
         chat.last_mode_in_session = app.last_mode_in_session
         chat.active_goal_id = app.active_goal_id
         if app.mode != mode_name:
             chat.mode = None if app.mode == "auto" else app.mode
+        state.save_chat_modes()  # M282: a goal started or ended in this turn
 
+        if outcome is not None:
+            return RunResult(
+                text=outcome, iterations=0, stopped_reason="synthetic", session_id=session_id
+            )
         if not done:
             raise RuntimeError(f"agent mode {mode_name!r} ended the turn without a result")
         result = done[-1]
         if result.stopped_reason == "synthetic":
             return RunResult(
-                text="".join(streamed),
+                text=_for_the_chat("".join(streamed)),
                 iterations=0,
                 stopped_reason="synthetic",
                 session_id=session_id,
             )
         if result.session_id is None:
             result.session_id = session_id
+        result.text = _for_the_chat(result.text)
         return result
 
     return turn
+
+
+def _drive_if_ready(
+    state: DaemonState, ctx: Any, driving: list[bool], goal_id: str | None
+) -> str | None:
+    """Run the chat's goal to an end if this turn left it in a phase that needs
+    no one — plan, execute, check. That is right after the user confirms the
+    plan, and also any later message to a goal that stopped (stalled, turn cap)
+    — which is how a chat resumes one. Interview and confirm are conversation,
+    so those turns just answer. Returns the text that ends the turn, or None.
+    A goal that ended within the turn itself (a resumed CHECK that says done)
+    gets the same closing line as one that ended during the drive.
+
+    Inside the run, not in the background (the user's choice): approval
+    prompts reach the chat as buttons only while a run is being streamed. The
+    goal's lock (M276) keeps a `veles goal resume` on the host and this chat
+    from driving one goal twice."""
+    from veles.core.file_lock import LockHeld, file_lock
+    from veles.core.goal import goals_dir, read_goal
+    from veles.core.modes.goal_driver import drive_goal
+
+    goal = read_goal(state.project.state_dir, goal_id) if goal_id else None
+    if goal is None:
+        return None
+    if goal.status in ("completed", "cancelled"):
+        last = goal.progress[-1].description if goal.progress else ""
+        head = "✅ Goal done" if goal.status == "completed" else "Goal cancelled"
+        return f"{head} — {last}" if last else head
+    if goal.status != "active" or goal.current_phase not in _AUTONOMOUS:
+        return None
+    try:
+        with file_lock(goals_dir(state.project.state_dir) / f"{goal_id}.lock", blocking=False):
+            driving[0] = True
+            try:
+                outcome = drive_goal(ctx, goal_id)
+            finally:
+                driving[0] = False
+    except LockHeld:
+        return "This goal is already running elsewhere (e.g. `veles goal` on the host)."
+    if outcome.completed:
+        return f"✅ Goal done — {outcome.reason}"
+    if outcome.status == "cancelled":
+        return f"Goal cancelled — {outcome.reason}"
+    return f"Goal stopped — {outcome.reason}. Send /goal resume to continue it."
+
+
+_AUTONOMOUS = ("plan", "execute", "check")
+
+
+def _for_the_chat(text: str) -> str:
+    """GoalMode's interview ends with `<ready>summary</ready>` — a marker for
+    the FSM, not for the reader. A chat showed it verbatim, escaped
+    (`&lt;ready&gt;…`, live-seen in M280b); the summary itself is what the
+    user is asked to confirm, so it stays."""
+    from veles.core.modes.goal import _READY_RE
+
+    return _READY_RE.sub(lambda m: m.group(1).strip(), text or "")
+
+
+def _live_goal(state: DaemonState, goal_id: str | None) -> str | None:
+    """The chat's goal only while it is still active. GoalMode itself never
+    looks at a goal's status, so a goal finished or cancelled outside the
+    turn (`/goal cancel`, the host's `veles goal cancel`) would otherwise have
+    its phases run again by the chat's next goal-mode message — which should
+    start a new goal instead."""
+    from veles.core.goal import read_goal
+
+    goal = read_goal(state.project.state_dir, goal_id) if goal_id else None
+    return goal_id if goal is not None and goal.status == "active" else None
 
 
 __all__ = ["make_mode_turn"]

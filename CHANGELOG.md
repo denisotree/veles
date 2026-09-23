@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.41.0] — 2026-09-23
+
+### Added — goals in a Telegram chat
+
+`/goal <task>` runs a goal in the chat:
+
+1. The agent asks what it needs to know and shows the plan it will follow.
+2. You reply `yes`.
+3. It works through the plan on its own and sends a line after each step,
+   until the goal is done or a budget runs out.
+
+Approval prompts still arrive as buttons. Other commands:
+
+- `/goal` shows the goal's progress.
+- `/goal cancel` stops it after the current step, even while it is running.
+- `/goal resume` continues a goal that stopped.
+
+`POST /v1/runs` accepts `"mode"`, and `DELETE /v1/sessions/{id}/goal` cancels a
+chat's goal.
+
+### Added — the agent can ask you in a Telegram chat
+
+When the agent needs a detail only you can give, it asks in the chat. Tap a
+suggested answer or type your own. If there is no answer within five minutes,
+it goes ahead on its best assumption, as it always did before. Runs started over
+HTTP or by a scheduled job are not kept waiting.
+
+### Added — `[goal]` in a project's config.toml
+
+`max_steps`, `max_cost_usd` and `max_wall_time_s` set a new goal's budget in
+the REPL, in Telegram and in `veles goal start`. Flags given to
+`veles goal start` still override them. The built-in defaults stay 30 steps,
+$5 and one hour.
+
+### Changed — a chat keeps its mode and goal across daemon restarts
+
+A restarted daemon used to forget a chat's mode and the goal it was running.
+They are now saved to `.veles/chat_modes.json`, so `/goal` and
+`/goal resume` still find the goal after a restart.
+
+### Fixed — goals everywhere
+
+- A goal set up through the interview (REPL `/goal`, and now Telegram) kept a
+  placeholder objective, "(in interview; awaiting clarification)", with no done
+  condition. The check step judged progress against that, and `veles goal list`
+  showed it. The goal now takes the summary you agreed to as its objective.
+- Cancelling a goal while a step was running, from another terminal or a chat,
+  crashed the run with "cannot append to goal in status 'cancelled'". The goal
+  now stops cleanly.
+- The interview no longer tells you to type `/mode writing`, which would have
+  taken you out of the goal.
+
 ## [0.40.0] — 2026-09-23
 
 ### Fixed — the daemon answers chat messages again
@@ -1628,7 +1680,8 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v0.40.0...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v0.41.0...HEAD
+[0.41.0]: https://github.com/denisotree/veles/compare/v0.40.0...v0.41.0
 [0.40.0]: https://github.com/denisotree/veles/compare/v0.39.0...v0.40.0
 [0.39.0]: https://github.com/denisotree/veles/compare/v0.38.0...v0.39.0
 [0.38.0]: https://github.com/denisotree/veles/compare/v0.37.0...v0.38.0

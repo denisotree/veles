@@ -214,6 +214,25 @@ _CONFIRM_YES_PREFIXES: tuple[str, ...] = (
 _CONFIRM_YES_EXACT: frozenset[str] = frozenset({"y", "yes!", "go", "go!", "+"})
 
 
+def _ended_meanwhile(ctx: ModeContext, goal_id: str, result: Any) -> bool:
+    """True — and the turn is closed — when the goal stopped being active while
+    a step or a check was running: someone cancelled it (`/goal cancel` in a
+    chat, `veles goal cancel` in another terminal). Writing the step's
+    checkpoint then raised "cannot append to goal in status 'cancelled'" and
+    the turn died with an error (live-found in M280b)."""
+    from veles.core.goal import read_goal
+
+    goal = read_goal(ctx.project.state_dir, goal_id)
+    if goal is not None and goal.status == "active":
+        return False
+    status = goal.status if goal is not None else "gone"
+    ctx.state.active_goal_id = None
+    ctx.state.mode = "auto"  # type: ignore[assignment]
+    ctx.post(SystemLine(text=f"[goal {goal_id} {status} meanwhile — stopping; mode → auto]"))
+    ctx.post(TurnDone(result=result))
+    return True
+
+
 def _last_execute_checkpoint(goal) -> Any | None:
     """The most recent EXECUTE checkpoint, identified by its `metrics`.
 
@@ -284,6 +303,7 @@ class GoalMode:
             cancel,
             complete,
             create_goal,
+            default_budget,
             read_goal,
             update_fsm,
         )
@@ -303,6 +323,7 @@ class GoalMode:
                 state_dir,
                 objective="(in interview; awaiting clarification)",
                 done_condition="",
+                budget=default_budget(ctx.project),  # M283: `[goal]` in config.toml
             )
             ctx.state.active_goal_id = goal.id
             ctx.post(SystemLine(text=f"[goal mode active — goal {goal.id} in interview]"))
@@ -399,11 +420,17 @@ class GoalMode:
 
         summary = parse_ready_marker(result.text or "")
         if summary:
+            # The summary IS the agreed objective (the interview prompt asks for
+            # objective + done condition + constraints). Without this the goal
+            # kept its "(in interview; …)" placeholder for life: CHECK judged
+            # every step against a placeholder and an empty done condition, and
+            # `veles goal list` showed the placeholder (live-found in M280b).
             update_fsm(
                 ctx.project.state_dir,
                 goal.id,
                 phase="confirm",
                 interview_summary=summary,
+                objective=summary,
             )
             ctx.post(SystemLine(text="[goal: interview complete → confirm next]"))
             # M185: surface the ack instruction in the SAME turn. The
@@ -601,6 +628,8 @@ class GoalMode:
         # empty `text` after doing all the work through tools (the reason
         # `RunResult.invoked_tools` exists at all, agent.py). Without the tool
         # list an empty `outcome` is indistinguishable from a failed step.
+        if _ended_meanwhile(ctx, goal.id, result):
+            return
         append_checkpoint(
             ctx.project.state_dir,
             goal.id,
@@ -692,7 +721,8 @@ class GoalMode:
         last_step = step_cp.description if step_cp else "(no progress yet)"
         check_input = (
             f"Goal objective: {goal.objective}\n"
-            f"Done condition: {goal.done_condition}\n"
+            # An interviewed goal's summary carries its done condition.
+            f"Done condition: {goal.done_condition or '(as stated in the objective)'}\n"
             f"Plan: {plan_body}\n"
             f"Last executed step: {last_step}\n"
             f"{_render_step_outcome(step_cp)}"
@@ -708,6 +738,10 @@ class GoalMode:
             ctx.post(TurnDone(result=RunResult(text=raw, iterations=0, stopped_reason="synthetic")))
             return
         verdict, reason = parse_check_verdict(raw)
+        if _ended_meanwhile(
+            ctx, goal.id, RunResult(text="", iterations=0, stopped_reason="synthetic")
+        ):
+            return
         append_checkpoint(
             ctx.project.state_dir,
             goal.id,

@@ -66,6 +66,7 @@ def make_app(state: DaemonState) -> web.Application:
     app.router.add_get("/v1/sessions/{session_id}", _handle_get_session)
     app.router.add_delete("/v1/sessions/{session_id}", _handle_delete_session)
     app.router.add_patch("/v1/sessions/{session_id}", _handle_patch_session)
+    app.router.add_delete("/v1/sessions/{session_id}/goal", _handle_cancel_session_goal)
     # M75 jobs API
     app.router.add_post("/v1/jobs", _handle_create_job)
     app.router.add_get("/v1/jobs", _handle_list_jobs)
@@ -266,6 +267,13 @@ async def _handle_create_run(request: web.Request) -> web.Response:
     deliver_to, err = _resolve_deliver_to(body.get("deliver_to"), origin)
     if err is not None:
         return web.json_response({"error": err}, status=400)
+    # M280b: switch the session's agent mode for this and later turns (the
+    # same as PATCH, but usable before the chat has a session).
+    mode = body.get("mode")
+    if mode is not None and mode not in CHAT_MODES:
+        return web.json_response(
+            {"error": f"invalid mode {mode!r}", "valid_modes": sorted(CHAT_MODES)}, status=400
+        )
     if deliver_to is not None and state.delivery_router is None:
         # Fail loudly rather than accept a delivery contract this daemon cannot
         # honour: no channel is running, so nothing would ever be sent.
@@ -317,6 +325,7 @@ async def _handle_create_run(request: web.Request) -> web.Response:
             origin=origin,
             on_finished=_on_finished,
             deliver_hook=deliver_hook,
+            mode=mode,
         )
     except Exception as exc:
         logger.error("failed to build agent for POST /v1/runs: %s: %s", type(exc).__name__, exc)
@@ -386,7 +395,7 @@ async def _handle_resolve_prompt(request: web.Request) -> web.Response:
     pending = handle.pending_prompts.pop(prompt_id, None)
     if pending is None:
         return web.json_response({"error": f"prompt {prompt_id!r} not pending"}, status=404)
-    if choice not in pending.valid_choices:
+    if not pending.accepts(choice):
         # Put it back so a follow-up POST with the right key can still resolve.
         handle.pending_prompts[prompt_id] = pending
         return web.json_response(
@@ -501,6 +510,8 @@ async def _handle_get_session(request: web.Request) -> web.Response:
             "messages": history,
             # M280: the session's agent mode (PATCH below); "default" = never switched.
             "mode": state.chat_mode(session_id).mode or "default",
+            # M280b: the goal this chat is running (null when none), for `/goal`.
+            "goal": state.chat_goal(session_id),
         }
     )
 
@@ -512,6 +523,16 @@ async def _handle_delete_session(request: web.Request) -> web.Response:
     if not deleted:
         return web.json_response({"error": f"session {session_id!r} not found"}, status=404)
     return web.json_response({"deleted": True, "session_id": session_id})
+
+
+async def _handle_cancel_session_goal(request: web.Request) -> web.Response:
+    """DELETE /v1/sessions/{session_id}/goal — cancel the goal this chat runs
+    (Telegram `/goal cancel`); the chat returns to its default mode. A drive in
+    progress stops on its next turn. `cancelled` is null when there was none."""
+    state: DaemonState = request.app["state"]
+    session_id = request.match_info["session_id"]
+    goal = state.cancel_chat_goal(session_id, reason="cancelled from the chat")
+    return web.json_response({"session_id": session_id, "cancelled": goal})
 
 
 async def _handle_patch_session(request: web.Request) -> web.Response:
@@ -951,9 +972,13 @@ def build_state(
     """Convenience constructor used by both CLI and tests.
 
     M127: the daemon's model/provider are fixed at launch from config and
-    nothing per-session is rehydrated from the store, so `/v1/health`
-    `active_model` always reflects the configured model. Chat modes (M280)
-    start empty too — every chat on its default after a restart."""
+    nothing about models is rehydrated from the store, so `/v1/health`
+    `active_model` always reflects the configured model. Chat modes and their
+    goals (M280/M282) ARE reloaded: a restart must not make a chat forget the
+    goal it is running."""
+    from veles.daemon.state import chat_modes_file, load_chat_modes
+
+    path = chat_modes_file(project, session_name)
     return DaemonState(
         project=project,
         store=store,
@@ -963,4 +988,6 @@ def build_state(
         provider=provider,
         default_model=default_model,
         session_name=session_name,
+        chat_modes=load_chat_modes(path),
+        chat_modes_path=path,
     )

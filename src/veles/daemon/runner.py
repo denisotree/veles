@@ -48,14 +48,20 @@ class PendingPrompt:
     The worker thread blocks on `future.result(timeout)`; the HTTP
     endpoint `POST /v1/runs/{id}/prompts/{pid}` resolves the future
     when the channel reports the user's choice. `kind` is `"trust"`,
-    `"approval"`, or `"critical"` (M213); `valid_choices` is the
-    whitelist the endpoint validates against."""
+    `"approval"`, `"critical"` (M213) or `"clarification"` (M284, the
+    agent's `ask_user`); `valid_choices` is the whitelist the endpoint
+    validates against, unless `free_text` — a question accepts any answer
+    typed in reply, its options being only suggestions."""
 
     kind: str
     tool: str
     valid_choices: tuple[str, ...]
     future: Future[str] = field(default_factory=Future)
     created_at: float = field(default_factory=time.time)
+    free_text: bool = False
+
+    def accepts(self, choice: str) -> bool:
+        return self.free_text or choice in self.valid_choices
 
 
 def _make_run_id() -> str:
@@ -159,6 +165,7 @@ async def run_agent_in_background(
     subagent_factory: Callable[..., Any] | None = None,
     turn_lock: asyncio.Lock | None = None,
     deliver_hook: Callable[[str], Awaitable[None]] | None = None,
+    ask_channel: bool = False,
 ) -> None:
     """Drive `agent.run(prompt)` to completion, mirroring events into `handle`.
 
@@ -264,12 +271,16 @@ async def run_agent_in_background(
     from veles.daemon.channel_prompter import make_critical_confirmer
 
     critical_token = set_critical_confirmer(make_critical_confirmer(handle, loop))
-    # M148: ask_user must not reach the default stdin prompter on the daemon /
-    # channel path — a foreground `veles channel run` has a TTY and would block
-    # on the *operator's* stdin instead of asking the channel user. Skip for
-    # now (→ "proceed on best assumption"); routing the question to the channel
-    # is M148b.
-    question_token = set_question_prompter(lambda _q, _opts=None: None)
+    # M148: ask_user must never reach the default stdin prompter here — a
+    # foreground `veles channel run` has a TTY and would block on the
+    # *operator's* stdin. M284: a chat that can answer gets the question as a
+    # `clarification_prompt`; anything else still hears "no human available"
+    # at once instead of waiting out the prompt timeout.
+    from veles.daemon.channel_prompter import make_question_prompter
+
+    question_token = set_question_prompter(
+        make_question_prompter(handle, loop) if ask_channel else (lambda _q, _opts=None: None)
+    )
     turn_token = begin_trust_turn()
 
     def _worker() -> RunResult:
