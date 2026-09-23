@@ -102,7 +102,7 @@ def make_worker_factory(
     *,
     provider: Provider,
     registry: Registry,
-    base_system: str,
+    base_system: str | None,
     compressor: Callable | None,
 ) -> Callable[..., Agent]:
     """A `factory(system_prompt=…)` for orchestration workers (manager spawn,
@@ -114,7 +114,7 @@ def make_worker_factory(
         full_system = (
             f"{base_system}\n\n---\n\n{worker_system}"
             if base_system and worker_system
-            else (worker_system or base_system)
+            else (worker_system or base_system or "")
         )
         return Agent(
             provider=provider,
