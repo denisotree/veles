@@ -8,15 +8,15 @@ from pathlib import Path
 
 import pytest
 
-from veles.cli.commands.daemon import (
+from veles.core.context import reset_active_project, set_active_project
+from veles.core.memory import SessionStore
+from veles.core.project import init_project
+from veles.daemon.agent_factory import (
     _build_agent_for_turn,
     _factory_settings_from_args,
     _FactorySettings,
     _make_agent_factory,
 )
-from veles.core.context import reset_active_project, set_active_project
-from veles.core.memory import SessionStore
-from veles.core.project import init_project
 
 
 def test_factory_settings_extracts_defaults(tmp_path: Path) -> None:

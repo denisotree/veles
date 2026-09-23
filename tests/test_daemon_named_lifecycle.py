@@ -154,8 +154,8 @@ def test_resolve_instance_paths_named_vs_default(tmp_path, monkeypatch):
 
 def test_instance_log_slug_matches_instance_log_path(tmp_path, monkeypatch):
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path))
-    from veles.cli.commands.daemon import _instance_log_slug, daemon_log_path
-    from veles.daemon.paths import instance_log_path
+    from veles.cli.commands.daemon_lifecycle import _instance_log_slug
+    from veles.daemon.paths import daemon_log_path, instance_log_path
 
     project = _P("myproj", tmp_path / "memory.db")
     slug = _instance_log_slug(project, "api")
@@ -167,7 +167,10 @@ def test_instance_log_slug_matches_instance_log_path(tmp_path, monkeypatch):
 
 
 def test_mark_session_running_and_stopped(tmp_path):
-    from veles.cli.commands.daemon import _mark_session_running, _mark_session_stopped
+    from veles.cli.commands.daemon_lifecycle import (
+        _mark_session_running,
+        _mark_session_stopped,
+    )
 
     project = _P("myproj", tmp_path / "memory.db")
     store = RuntimeSessionStore(project.memory_db_path)

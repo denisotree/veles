@@ -33,9 +33,7 @@ and the thin `_cmd_daemon_*` verb handlers. The moved clusters:
 - token-store bootstrap + `token` CRUD →
   `veles.cli.commands.daemon_tokens`.
 
-Every moved name stays importable from here via the re-export block
-below, so historic `from veles.cli.commands.daemon import …` sites keep
-working. New code should import from the canonical modules.
+Import those names from their own modules; this one imports only what it uses.
 """
 
 from __future__ import annotations
@@ -51,51 +49,28 @@ from pathlib import Path
 
 from aiohttp import web
 
-# M153 re-exports — canonical home is `commands/daemon_lifecycle.py`.
-from veles.cli.commands.daemon_lifecycle import (  # noqa: F401 (re-export)
+from veles.cli.commands.daemon_lifecycle import (
     _bootstrap_daemon,
     _cleanup_daemon_exit,
     _detach_and_report,
     _graceful_stop,
-    _instance_log_slug,
     _mark_session_running,
-    _mark_session_stopped,
     _register_in_registry,
     _resolve_instance_paths,
     _restart_named_session,
     _stop_status_paths,
     _write_pid_and_info,
 )
-
-# M153 re-exports — canonical home is `commands/daemon_tokens.py`.
-from veles.cli.commands.daemon_tokens import (  # noqa: F401 (re-export)
-    _cmd_daemon_token,
-    _cmd_daemon_token_add,
-    _cmd_daemon_token_list,
-    _cmd_daemon_token_remove,
-    _initialise_token_store,
-)
+from veles.cli.commands.daemon_tokens import _cmd_daemon_token, _initialise_token_store
 from veles.core.defaults import DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT
-from veles.core.user_paths import user_home as _user_home_dir  # noqa: F401 (legacy alias)
-
-# M153 re-exports — canonical home is `veles.daemon.agent_factory`.
-from veles.daemon.agent_factory import (  # noqa: F401 (re-export)
+from veles.daemon.agent_factory import (
     _attach_background_runners,
-    _build_agent_for_turn,
     _factory_settings_from_args,
-    _FactorySettings,
     _make_agent_factory,
     _make_post_turn_hook,
     _make_verify_hook,
     _make_worker_agent_factory,
 )
-
-# M-R1.4: path helpers and logging setup moved to `daemon/paths.py` +
-# `daemon/logging.py` so the TUI picker can import them without
-# reaching into the CLI layer. These thin re-exports keep historic
-# call sites + plugin imports working.
-from veles.daemon.auth import TokenStore, _default_tokens_path  # noqa: F401 (re-export)
-from veles.daemon.logging import setup_daemon_logging as _setup_daemon_logging  # noqa: F401
 from veles.daemon.paths import daemon_log_path, read_pid
 from veles.daemon.registry import is_alive
 

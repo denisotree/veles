@@ -53,6 +53,14 @@ def _resolve_active_project(args: argparse.Namespace) -> Project | None:
     return load_project(found)
 
 
+def require_project(args: argparse.Namespace) -> Project | None:
+    """`_resolve_active_project`, printing the standard error when there is none."""
+    project = _resolve_active_project(args)
+    if project is None:
+        print("error: no Veles project found here. Run `veles init` first.", file=sys.stderr)
+    return project
+
+
 def _register_project(project: Project, *, slug: str | None = None) -> None:
     """Add `project` to the multi-project registry (best-effort)."""
     try:

@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from veles.cli._project import require_project
 from veles.core.project_config import load_project_config, save_project_config
 from veles.core.runtime_sessions import RuntimeSessionExists, RuntimeSessionStore
 
@@ -33,20 +34,8 @@ def cmd_daemon_session(args: argparse.Namespace) -> int:
     return 2
 
 
-def _resolve_project(args: argparse.Namespace):
-    from veles.cli._project import _resolve_active_project
-
-    project = _resolve_active_project(args)
-    if project is None:
-        print(
-            "error: no Veles project found here. Run `veles init` first.",
-            file=sys.stderr,
-        )
-    return project
-
-
 def _create(args: argparse.Namespace) -> int:
-    project = _resolve_project(args)
+    project = require_project(args)
     if project is None:
         return 2
     name = args.name.strip()
@@ -112,7 +101,7 @@ def _create(args: argparse.Namespace) -> int:
 
 
 def _list(args: argparse.Namespace) -> int:
-    project = _resolve_project(args)
+    project = require_project(args)
     if project is None:
         return 2
     store = RuntimeSessionStore(project.memory_db_path)
@@ -134,7 +123,7 @@ def _list(args: argparse.Namespace) -> int:
 
 
 def _delete(args: argparse.Namespace) -> int:
-    project = _resolve_project(args)
+    project = require_project(args)
     if project is None:
         return 2
     name = args.name.strip()
