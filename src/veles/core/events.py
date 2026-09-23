@@ -317,7 +317,3 @@ def recent_error_events(
         if ts_epoch is None or ts_epoch >= cutoff:
             fresh.append(event)
     return fresh[-limit:]
-
-
-def now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())

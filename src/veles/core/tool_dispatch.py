@@ -32,8 +32,8 @@ from veles.core.log_util import truncate_for_log
 from veles.core.modules import VetoResult, fire_hook
 from veles.core.permission import evaluate as evaluate_permission
 from veles.core.provider import Message, ToolCall
+from veles.core.timeutil import utc_iso
 from veles.core.tools.registry import Registry, ToolEntry
-from veles.core.trace import now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ def _emit_tool_refusal(
     _emit(
         event_writer,
         ToolResultEvent(
-            ts=now_iso(),
+            ts=utc_iso(),
             session_id=session_id,
             tool_call_id=call.id,
             name=call.name,
@@ -107,7 +107,7 @@ def _run_approval_prompt(
     _emit(
         event_writer,
         ApprovalRequest(
-            ts=now_iso(),
+            ts=utc_iso(),
             session_id=session_id,
             action=f"dispatch {call.name}",
             target=call.name,
@@ -123,7 +123,7 @@ def _run_approval_prompt(
     _emit(
         event_writer,
         ApprovalResult(
-            ts=now_iso(),
+            ts=utc_iso(),
             session_id=session_id,
             action=f"dispatch {call.name}",
             status="approved" if answer.approved else "denied",
@@ -298,7 +298,7 @@ def _dispatch(
     _emit(
         event_writer,
         ToolCallEvent(
-            ts=now_iso(),
+            ts=utc_iso(),
             session_id=session_id,
             tool_call_id=call.id,
             name=call.name,
@@ -313,7 +313,7 @@ def _dispatch(
         _emit(
             event_writer,
             PermissionDecision(
-                ts=now_iso(),
+                ts=utc_iso(),
                 session_id=session_id,
                 tool_name=call.name,
                 decision="deny",
@@ -349,7 +349,7 @@ def _dispatch(
         _emit(
             event_writer,
             PermissionDecision(
-                ts=now_iso(),
+                ts=utc_iso(),
                 session_id=session_id,
                 tool_name=call.name,
                 decision="deny",
@@ -384,7 +384,7 @@ def _dispatch(
         _emit(
             event_writer,
             PermissionDecision(
-                ts=now_iso(),
+                ts=utc_iso(),
                 session_id=session_id,
                 tool_name=call.name,
                 decision=decision.kind,
@@ -445,7 +445,7 @@ def _dispatch(
     _emit(
         event_writer,
         ToolResultEvent(
-            ts=now_iso(),
+            ts=utc_iso(),
             session_id=session_id,
             tool_call_id=call.id,
             name=call.name,

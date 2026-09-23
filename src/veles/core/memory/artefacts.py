@@ -24,12 +24,12 @@ Never write user-content (`wiki/`) paths from this module.
 
 from __future__ import annotations
 
-import datetime as _dt
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from veles.core.slug import normalize_slug
+from veles.core.timeutil import utc_iso
 
 if TYPE_CHECKING:
     from veles.core.project import Project
@@ -59,10 +59,6 @@ class ProposalInfo:
     path: Path
 
 
-def _now_iso_z() -> str:
-    return _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def memory_log_path(project: Project) -> Path:
     return project.memory_dir / _LOG_FILE
 
@@ -88,7 +84,7 @@ def append_memory_log(project: Project, *, op: str, summary: str) -> None:
     `LOG.md` keeps *content* ops only (ingest, wiki_write_page).
     """
     project.memory_dir.mkdir(parents=True, exist_ok=True)
-    entry = f"## [{_now_iso_z()}] {op}\n   {summary}\n\n"
+    entry = f"## [{utc_iso()}] {op}\n   {summary}\n\n"
     with memory_log_path(project).open("a", encoding="utf-8") as f:
         f.write(entry)
 

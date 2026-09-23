@@ -26,7 +26,6 @@ System-level config (defaults shared across projects) lives separately at
 
 from __future__ import annotations
 
-import datetime as _dt
 import os
 import re
 import sys
@@ -37,6 +36,7 @@ from pathlib import Path
 
 from veles.core.io_utils import atomic_write_text, dump_toml
 from veles.core.safety import scan_for_injection
+from veles.core.timeutil import utc_iso
 
 _STATE_DIR = ".veles"
 _PROJECT_TOML = "project.toml"
@@ -310,10 +310,9 @@ def _write_project_toml(
     schema_version: int = _SCHEMA_VERSION,
     layout_name: str = "llm-wiki",
 ) -> None:
-    iso = _dt.datetime.fromtimestamp(created_at, tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     project = {
         "name": name,
-        "created_at": iso,
+        "created_at": utc_iso(created_at),
         "created_at_epoch": created_at,
         "schema_version": schema_version,
         "layout": layout_name,

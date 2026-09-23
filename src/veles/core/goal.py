@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from veles.core.io_utils import atomic_write_text
+from veles.core.timeutil import utc_iso
 
 GOALS_DIRNAME = "goals"
 
@@ -140,10 +141,6 @@ class Goal:
     interview_summary: str = ""
 
 
-def _now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
 def goals_dir(state_dir: Path) -> Path:
     return state_dir / GOALS_DIRNAME
 
@@ -163,7 +160,7 @@ def create_goal(
     """Persist a new Goal and return it. Raises ValueError on empty objective."""
     if not objective.strip():
         raise ValueError("goal objective cannot be empty")
-    now = _now_iso()
+    now = utc_iso()
     goal = Goal(
         id=uuid.uuid4().hex[:12],
         objective=objective.strip(),
@@ -228,7 +225,7 @@ def append_checkpoint(
     if goal.status not in ("active", "paused"):
         raise ValueError(f"cannot append to goal in status {goal.status!r}")
     entry = CheckpointEntry(
-        ts=_now_iso(),
+        ts=utc_iso(),
         description=description,
         evidence_ref=evidence_ref,
         metrics=dict(metrics or {}),
@@ -237,7 +234,7 @@ def append_checkpoint(
     if advance_step:
         goal.steps_done += 1
     goal.cost_spent_usd += cost_usd
-    goal.updated_at = _now_iso()
+    goal.updated_at = utc_iso()
     _write(state_dir, goal)
     return goal
 
@@ -258,12 +255,12 @@ def complete(state_dir: Path, goal_id: str, *, evidence: str | None = None) -> G
     if evidence:
         goal.progress.append(
             CheckpointEntry(
-                ts=_now_iso(),
+                ts=utc_iso(),
                 description=f"done: {evidence}",
             )
         )
     goal.status = "completed"
-    goal.completed_at = _now_iso()
+    goal.completed_at = utc_iso()
     goal.updated_at = goal.completed_at
     _write(state_dir, goal)
     return goal
@@ -274,9 +271,9 @@ def cancel(state_dir: Path, goal_id: str, *, reason: str = "") -> Goal:
     if goal.status == "completed":
         raise ValueError(f"goal {goal_id} is already completed")
     if reason:
-        goal.progress.append(CheckpointEntry(ts=_now_iso(), description=f"cancelled: {reason}"))
+        goal.progress.append(CheckpointEntry(ts=utc_iso(), description=f"cancelled: {reason}"))
     goal.status = "cancelled"
-    goal.updated_at = _now_iso()
+    goal.updated_at = utc_iso()
     _write(state_dir, goal)
     return goal
 
@@ -303,7 +300,7 @@ def update_fsm(
         goal.interview_summary = interview_summary
     if objective is not None:
         goal.objective = objective
-    goal.updated_at = _now_iso()
+    goal.updated_at = utc_iso()
     _write(state_dir, goal)
     return goal
 
@@ -342,7 +339,7 @@ def _transition(
     if goal.status not in from_:
         raise ValueError(f"cannot transition goal {goal_id} from {goal.status!r} to {target!r}")
     goal.status = target
-    goal.updated_at = _now_iso()
+    goal.updated_at = utc_iso()
     _write(state_dir, goal)
     return goal
 
@@ -391,13 +388,13 @@ def _from_dict(raw: dict[str, Any]) -> Goal:
 
 
 def _seconds_since_iso(iso: str) -> int:
-    """Seconds between now (UTC) and `iso` (UTC, written by `_now_iso`).
+    """Seconds between now (UTC) and `iso` (UTC, written by `utc_iso`).
 
     `time.mktime` interprets the struct_tm as *local* time, so on any
     non-UTC host it would add the timezone offset and inflate the
     elapsed value (a fresh goal in Moscow could "exhaust" max_wall_time
     immediately). `calendar.timegm` interprets struct_tm as UTC, which
-    matches what `_now_iso` writes.
+    matches what `utc_iso` writes.
     """
     import calendar
 

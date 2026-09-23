@@ -28,7 +28,6 @@ trigger.
 
 from __future__ import annotations
 
-import datetime as _dt
 import time
 from dataclasses import dataclass
 
@@ -41,6 +40,7 @@ from veles.core.memory.artefacts import (
 )
 from veles.core.project import Project
 from veles.core.skills import Skill, discover_skills, user_skills_dir
+from veles.core.timeutil import utc_iso
 
 _DEFAULT_MIN_USES = 10
 _DEFAULT_MIN_SUCCESS_RATE = 0.7
@@ -107,7 +107,7 @@ def proposal_slug(skill_name: str) -> str:
 def _render_proposal(candidate: PromoteCandidate) -> tuple[str, str]:
     skill = candidate.skill
     title = f"Promote skill: {skill.name}"
-    when = _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    when = utc_iso()
     lines = [
         f"# {title}",
         "",

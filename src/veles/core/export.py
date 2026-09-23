@@ -45,6 +45,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from veles.core.project import Project, load_project
+from veles.core.timeutil import utc_iso
 
 _VELES_BUNDLE_VERSION = "0.0.1"
 _BUNDLE_SCHEMA_VERSION = 1
@@ -163,7 +164,7 @@ def _export(project: Project, bundle_path: Path, *, mode: str) -> None:
     manifest = ExportManifest(
         veles_version=_VELES_BUNDLE_VERSION,
         schema_version=_BUNDLE_SCHEMA_VERSION,
-        exported_at=_dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        exported_at=utc_iso(),
         mode=mode,
         project_name=project.name,
     )

@@ -39,7 +39,6 @@ not via wiki FTS recall.
 
 from __future__ import annotations
 
-import datetime as _dt
 import re
 import time
 from dataclasses import dataclass
@@ -53,6 +52,7 @@ from veles.core.memory.artefacts import (
     write_proposal,
 )
 from veles.core.project import Project
+from veles.core.timeutil import utc_iso
 
 if TYPE_CHECKING:
     from veles.modules.wiki.wiki import WikiPageInfo
@@ -211,7 +211,7 @@ def _render_proposal(cluster: Cluster) -> tuple[str, str]:
     lines = [
         f"# {title}",
         "",
-        f"**Generated:** {_dt.datetime.now(tz=_dt.UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}",
+        f"**Generated:** {utc_iso()}",
         f"**Cohesion score:** {cluster.score:.2f}",
         "",
         cluster.rationale,

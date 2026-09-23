@@ -38,7 +38,6 @@ follow-up human/agent review owns the merge decisions.
 
 from __future__ import annotations
 
-import datetime as _dt
 import logging
 import time
 from contextlib import contextmanager
@@ -53,6 +52,7 @@ from veles.core.memory.artefacts import append_memory_log, write_proposal
 from veles.core.memory.eligibility import eligible_sql
 from veles.core.memory.store import local_connection, transaction
 from veles.core.slug import now_timestamp_slug
+from veles.core.timeutil import utc_iso
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -557,7 +557,7 @@ def _step_dedup(project: Project, result: DreamResult, *, dry_run: bool) -> None
     body_lines = [
         "# Dream: duplicate-skill clusters",
         "",
-        f"_Generated: {_now_iso()}_",
+        f"_Generated: {utc_iso()}_",
         f"_Mode: {mode}_",
         "",
     ]
@@ -680,7 +680,7 @@ def _step_consolidate(
         project,
         slug=slug,
         title="Dream: consolidation proposals",
-        content=f"# Dream: consolidation proposals\n\n_Generated: {_now_iso()}_\n\n{text}\n",
+        content=f"# Dream: consolidation proposals\n\n_Generated: {utc_iso()}_\n\n{text}\n",
     )
     result.consolidated = True
     result.consolidation_path = str(page_path)
@@ -778,10 +778,6 @@ def _step_proactive_events(
     finally:
         store.close()
     append_memory_log(project, op="dream_proactive", summary=f"{len(events)} event(s) materialised")
-
-
-def _now_iso() -> str:
-    return _dt.datetime.now(tz=_dt.UTC).isoformat()
 
 
 __all__ = [

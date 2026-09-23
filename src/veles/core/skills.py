@@ -21,7 +21,6 @@ M6 can swap to pyyaml if real YAML is required.
 from __future__ import annotations
 
 import contextlib
-import datetime as _dt
 import json
 import logging
 import threading
@@ -30,6 +29,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from veles.core.timeutil import utc_iso
 from veles.core.tools.registry import Registry, ToolEntry
 
 logger = logging.getLogger(__name__)
@@ -346,9 +346,7 @@ def _apply_db_telemetry(project: Project, skills: list[Skill]) -> None:
                 skill.success_count = t.success_count
                 skill.error_count = t.error_count
                 if t.last_used_at:
-                    skill.last_used = _dt.datetime.fromtimestamp(
-                        float(t.last_used_at), tz=_dt.UTC
-                    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    skill.last_used = utc_iso(float(t.last_used_at))
     except Exception:  # pragma: no cover - never block skill discovery
         logger.debug("skill telemetry overlay failed", exc_info=True)
 
@@ -532,7 +530,7 @@ def bump_telemetry(skill: Skill, *, success: bool) -> None:
     # In-memory counters stay correct for the caller that just invoked the
     # skill, without touching the file. `discover_skills` refreshes them from
     # the database on the next load.
-    now_iso = _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now_iso = utc_iso()
     skill.use_count += 1
     skill.last_used = now_iso
     if success:

@@ -17,11 +17,12 @@ Audit query is just `cat <project>/.veles/approvals/*.json | jq ...`.
 from __future__ import annotations
 
 import json
-import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+
+from veles.core.timeutil import utc_iso
 
 APPROVALS_DIRNAME = "approvals"
 
@@ -96,7 +97,7 @@ def record_approval(
         approval_id=approval_id,
         tool_name=tool_name,
         action=action or f"dispatch {tool_name}",
-        decided_at=_now_iso(),
+        decided_at=utc_iso(),
         rule=rule,
         approver="autopilot" if via_autopilot else "user",
         via_autopilot=via_autopilot,
@@ -136,7 +137,3 @@ def list_approvals(state_dir: Path) -> list[dict[str, Any]]:
             continue
     out.sort(key=lambda r: r.get("decided_at", ""))
     return out
-
-
-def _now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())

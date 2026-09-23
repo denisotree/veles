@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -104,10 +103,6 @@ def _tool_name(tool: dict[str, Any]) -> str:
     if "function" in tool and isinstance(tool["function"], dict):
         return str(tool["function"].get("name", ""))
     return str(tool.get("name", ""))
-
-
-def now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 class TraceWriter(RotatingJsonl):

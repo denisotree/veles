@@ -81,6 +81,7 @@ from veles.core.stall_guard import STALL_NUDGE, TOKEN_WARN_NUDGE, StallGuard
 
 # M156: streaming response consumer extracted to `stream_consumer.py`.
 from veles.core.stream_consumer import consume_stream
+from veles.core.timeutil import utc_iso
 
 # M156: tool dispatch + permission/approval pipeline extracted to
 # `tool_dispatch.py`. Re-imported here both for the Agent loop's own use
@@ -102,7 +103,6 @@ from veles.core.trace import (
     TraceWriter,
     hash_text,
     hash_tools,
-    now_iso,
     trace_path_for_project,
 )
 
@@ -335,7 +335,7 @@ class Agent:
             # existing handling.
             self._emit_event(
                 ErrorEvent(
-                    ts=now_iso(),
+                    ts=utc_iso(),
                     session_id=self._session_id,
                     where="agent.run",
                     error_type=type(exc).__name__,
@@ -520,7 +520,7 @@ class Agent:
             # no text, so a chars/4 estimate over text deltas would read 0.
             self._emit_event(
                 RoundUsageEvent(
-                    ts=now_iso(),
+                    ts=utc_iso(),
                     session_id=self._session_id,
                     prompt_tokens=getattr(response.usage, "prompt_tokens", 0),
                     completion_tokens=getattr(response.usage, "completion_tokens", 0),
@@ -682,7 +682,7 @@ class Agent:
         user_message = Message(role="user", content=user_msg)
         history.append(user_message)
         self._persist(user_message)
-        self._emit_event(UserMessageEvent(ts=now_iso(), session_id=self._session_id, text=user_msg))
+        self._emit_event(UserMessageEvent(ts=utc_iso(), session_id=self._session_id, text=user_msg))
         return history
 
     def _request_completion(
@@ -741,7 +741,7 @@ class Agent:
         self._persist(assistant_message)
         self._emit_event(
             AssistantMessageEvent(
-                ts=now_iso(),
+                ts=utc_iso(),
                 session_id=self._session_id,
                 text=response.text,
                 tool_call_count=len(response.tool_calls),
@@ -788,7 +788,7 @@ class Agent:
         self._persist(assistant_message)
         self._emit_event(
             AssistantMessageEvent(
-                ts=now_iso(),
+                ts=utc_iso(),
                 session_id=self._session_id,
                 text=response.text,
                 tool_call_count=len(parsed_calls),
@@ -968,7 +968,7 @@ class Agent:
         record = TraceRecord(
             request_id=uuid.uuid4().hex[:12],
             session_id=self._session_id,
-            ts=now_iso(),
+            ts=utc_iso(),
             provider=getattr(self._provider, "name", type(self._provider).__name__),
             model=self._model,
             system_prompt_hash=hash_text(self._system_prompt),

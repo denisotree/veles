@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from veles.core.timeutil import utc_iso as now_iso
 from veles.core.trace import (
     DEFAULT_MAX_BYTES,
     TraceRecord,
@@ -12,7 +13,6 @@ from veles.core.trace import (
     cache_fragmentation_alert,
     hash_text,
     hash_tools,
-    now_iso,
     read_records,
     trace_path_for_project,
 )
@@ -241,12 +241,13 @@ def test_trace_path_for_project(tmp_path: Path) -> None:
     assert trace_path_for_project(state) == state / "traces.jsonl"
 
 
-# ---------- now_iso shape sanity ----------
+# ---------- utc_iso shape sanity ----------
 
 
-def test_now_iso_format() -> None:
+def test_utc_iso_format() -> None:
     s = now_iso()
     # YYYY-MM-DDTHH:MM:SSZ
     assert len(s) == 20
     assert s.endswith("Z")
     assert s[10] == "T"
+    assert now_iso(0) == "1970-01-01T00:00:00Z"

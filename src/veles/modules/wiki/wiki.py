@@ -28,7 +28,6 @@ write rewrites it.
 
 from __future__ import annotations
 
-import datetime as _dt
 import logging
 import sqlite3
 from dataclasses import dataclass
@@ -38,6 +37,7 @@ from veles.core.fts import escape_query
 from veles.core.io_utils import load_optional_toml
 from veles.core.safety import scan_for_injection
 from veles.core.slug import normalize_slug as _normalize_slug
+from veles.core.timeutil import utc_iso
 
 logger = logging.getLogger(__name__)
 
@@ -168,10 +168,6 @@ class WikiPageInfo:
     slug: str
     title: str
     summary: str
-
-
-def _now_iso_z() -> str:
-    return _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _extract_title_and_summary(content: str, fallback: str) -> tuple[str, str]:
@@ -344,7 +340,7 @@ class Wiki:
     def update_index(self) -> None:
         self.ensure_layout()
         pages = self.list_pages()
-        lines: list[str] = ["# INDEX", "", f"Updated: {_now_iso_z()}", ""]
+        lines: list[str] = ["# INDEX", "", f"Updated: {utc_iso()}", ""]
         if not pages:
             lines.append("_(no pages yet)_")
         else:
@@ -375,7 +371,7 @@ class Wiki:
     def append_log(self, *, op: str, summary: str) -> None:
         self._root.mkdir(parents=True, exist_ok=True)
         log_path = self._root / _LOG_FILE
-        entry = f"## [{_now_iso_z()}] {op}\n   {summary}\n\n"
+        entry = f"## [{utc_iso()}] {op}\n   {summary}\n\n"
         with log_path.open("a", encoding="utf-8") as f:
             f.write(entry)
 

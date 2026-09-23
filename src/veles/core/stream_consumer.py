@@ -21,7 +21,7 @@ from veles.core.provider import (
     StreamEnd,
     TextDelta,
 )
-from veles.core.trace import now_iso
+from veles.core.timeutil import utc_iso
 
 
 def consume_stream(
@@ -59,7 +59,7 @@ def consume_stream(
             if event.text:
                 emit_event(
                     ThinkingDelta(
-                        ts=now_iso(),
+                        ts=utc_iso(),
                         session_id=session_id,
                         text=event.text,
                     )
