@@ -13,25 +13,12 @@ than in `telegram.py`) lets the gateway file stay focused on transport
 + buffering, and lets future channels (Slack, web) share the same
 handler set.
 
-What's wired up now (M116.1):
-- `/help` — list commands
-- `/start`, `/reset` — gateway already owns these (greeting / clear
-  session_map). Kept handler-less so the existing flow stays
-  authoritative.
-- `/session` — print active session_id from session_map
-- `/status` — snapshot: session, project_root, whitelist size
-- `/tokens`, `/context` — placeholder until daemon exposes per-session
-  usage via the client API (deferred to M116.next; the commands exist
-  in the menu so the surface area matches TUI).
-
-What's deferred (M116.next sub-tasks):
-- `/model`, `/mode`, `/history`, `/save`, `/wiki` — need to mutate
-  daemon state through a not-yet-existing client API.
-- `/goal`, `/dream` — long-running modes; need channel-side progress
-  rendering plus a daemon API.
-- Inline keyboards for clarification questions (`FreeformAnswer`
-  mirror of M115.4) — separate sub-task once a manager-spawned
-  worker actually emits a clarification event.
+Handled here: `/help`, `/session`, `/status`, `/mode` (a button picker),
+`/goal` (start, status, cancel, resume), `/dream`, `/insights`, `/rules`, and
+the `/tokens` / `/context` placeholders (the daemon does not expose
+per-session usage yet). `/start` and `/reset` stay with the gateway, which
+owns the greeting and the chat's session map. The model is fixed at daemon
+launch, so there is no `/model`.
 """
 
 from __future__ import annotations
@@ -41,7 +28,7 @@ import contextlib
 import html
 import re
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from veles.channels.telegram import TelegramGateway
@@ -132,7 +119,7 @@ async def _cmd_goal(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     continues one that stopped. The daemon answers all of it (`get_session` /
     `cancel_goal`), so a gateway without the project's files works too."""
     arg = args.strip()
-    client: Any = gateway.daemon_client
+    client = gateway.daemon_client
     session_id = gateway.session_map.get(chat_key)
     goal = None
     if session_id:
@@ -210,7 +197,7 @@ async def _cmd_mode(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     if not session_id:
         return "<i>send a message first to start a session — then /mode can switch its mode.</i>"
 
-    client: Any = gateway.daemon_client
+    client = gateway.daemon_client
     try:
         current = (await client.get_session(session_id)).get("mode")
     except Exception:
@@ -344,7 +331,7 @@ async def _cmd_dream(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     update is handled in its own task, so the wait blocks nothing else."""
     del chat_key, args
     try:
-        result = await gateway.daemon_client.run_dream()  # type: ignore[attr-defined]
+        result = await gateway.daemon_client.run_dream()
     except Exception as exc:
         return f"could not run dream: {html.escape(str(exc))}"
     lines = [f"<b>dream</b> — {html.escape(str(result.get('summary', 'done')))}"]

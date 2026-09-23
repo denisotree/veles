@@ -852,9 +852,7 @@ class TelegramGateway:
                 return
             mode = parts[1]
             try:
-                await self.daemon_client.update_session(  # type: ignore[attr-defined]
-                    session_id, mode=mode
-                )
+                await self.daemon_client.update_session(session_id, mode=mode)
             except (DaemonClientError, AttributeError, ValueError) as exc:
                 await self._answer_callback_query(callback_id, text=f"could not set mode: {exc}")
                 return
