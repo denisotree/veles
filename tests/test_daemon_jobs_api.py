@@ -109,6 +109,26 @@ def app(
     return make_app(state)
 
 
+async def test_dream_run_ignores_a_non_object_body(aiohttp_client, app, good_token: str) -> None:
+    """A JSON array body used to pass the parse guard and 500 on `body.get`."""
+    from veles.core.dreaming import DreamResult
+
+    seen: list[bool] = []
+
+    class _Runner:
+        async def force_run(self, *, include_consolidation: bool = True) -> DreamResult:
+            seen.append(include_consolidation)
+            return DreamResult(notes=[])
+
+    app["state"].dream_runner = _Runner()
+    client = await aiohttp_client(app)
+    resp = await client.post(
+        "/v1/dream/run", json=[1, 2], headers={"Authorization": f"Bearer {good_token}"}
+    )
+    assert resp.status == 200
+    assert seen == [True]
+
+
 async def test_post_jobs_creates(aiohttp_client, app, good_token: str) -> None:
     client = await aiohttp_client(app)
     resp = await client.post(

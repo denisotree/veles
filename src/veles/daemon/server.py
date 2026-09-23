@@ -761,9 +761,11 @@ async def _handle_dream_run(request: web.Request) -> web.Response:
     state: DaemonState = request.app["state"]
     if state.dream_runner is None:
         return web.json_response({"error": "dream-runner not enabled"}, status=503)
-    body: dict[str, Any] = {}
+    body: Any = {}
     with contextlib.suppress(Exception):
         body = await request.json()
+    if not isinstance(body, dict):  # a JSON array/number body is not an error-500
+        body = {}
     include_consolidation = bool(body.get("include_consolidation", True))
     force_fn = getattr(state.dream_runner, "force_run", None)
     if not callable(force_fn):
