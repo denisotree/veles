@@ -2,10 +2,10 @@
 proposals, NL-routing and self-doc refresh.
 
 Hosts the per-session curator (`_curate_one_session`), the pass-coordinator
-(`_run_curator_pass`), the M28 continuous triggers (`_maybe_run_idle_curator`,
-`_maybe_run_post_turn_curator`), the M31 insight extractor
-(`_maybe_run_insight_extractor`), and shared helpers used by `tests/test_curator.py`
-(`_truncate_session_messages`, `_render_message`).
+(`_run_curator_pass`) and the post-turn `_maybe_*` steps. Every step follows one
+shape: an eligibility gate, an optional throttle (`_ran_recently` / `_stamp`),
+then the work inside `_logged_skip`, so a failure becomes a LOG.md line and
+never reaches the user's turn.
 
 `_curate_one_session` uses the run-loop helpers of `runtime/assembly.py`,
 imported inside the function so a test's patch on that module applies.
@@ -21,6 +21,7 @@ import dataclasses
 import datetime as _dt
 import sys
 import time
+from collections.abc import Iterator
 
 from veles.core.agent import Agent
 from veles.core.curator import (
@@ -38,6 +39,7 @@ from veles.core.curator import (
 from veles.core.curator_state import load as load_curator_state
 from veles.core.curator_state import save_atomic as save_curator_state
 from veles.core.insight_extractor import make_insight_extractor
+from veles.core.io_utils import read_fresh_json, write_stamped_json
 from veles.core.memory import SessionInfo, SessionStore
 from veles.core.memory.artefacts import append_memory_log
 from veles.core.project import Project
@@ -45,24 +47,39 @@ from veles.core.provider import Message
 from veles.core.routing import route
 from veles.modules.wiki.wiki import Wiki
 
-# ---- CLI-only state file constants ----
-# These remain in CLI because they describe argparse-driven state files
-# scoped to the `veles run` invocation. Domain-level curator constants
-# (CURATE_TOOLS, CURATOR_IDLE_LIMIT, etc.) live in `core/curator.py`.
-
-# M62: subproject proposer rerun cadence — 7d between automatic refreshes
-# of `.veles/memory/proposals/`. The detector is cheap (~tens of ms), but
-# we still avoid hammering it on every `veles run` so proposal pages
-# don't churn their mtimes (the freshness window keys on mtime).
+# Subproject proposer rerun cadence — 7d between automatic refreshes of
+# `.veles/memory/proposals/`. The detector is cheap (~tens of ms), but
+# proposal pages must not churn their mtimes (the freshness window keys on
+# mtime). Skill promote suggestions use the same cadence for the same reason.
 _PROPOSER_IDLE_THRESHOLD_SEC = 7 * 24 * 3600
 _PROPOSER_STATE_FILE = "proposer.state.json"
-# M61: skill auto-promote suggestion also uses a 7-day cadence so
-# `.veles/memory/proposals/promote-*.md` mtimes stay stable.
 _PROMOTE_SUGGEST_IDLE_THRESHOLD_SEC = 7 * 24 * 3600
 _PROMOTE_SUGGEST_STATE_FILE = "promote_suggest.state.json"
+_SELF_DOC_IDLE_SEC = 3600  # refresh at most once per hour
+_SELF_DOC_STATE_FILE = "self-doc.state.json"
 # Poison-pill guard: consecutive curation failures before a session is
 # abandoned (cursor advances past it) instead of blocking the queue forever.
 _CURATE_MAX_ATTEMPTS = 3
+
+
+@contextlib.contextmanager
+def _logged_skip(project: Project, op: str, what: str) -> Iterator[None]:
+    """Run a learning step whose failure must never reach the user's turn:
+    an exception is recorded as an `op` line in LOG.md and swallowed."""
+    try:
+        yield
+    except Exception as exc:
+        with contextlib.suppress(Exception):
+            append_memory_log(project, op=op, summary=f"{what}: {type(exc).__name__}: {exc}")
+
+
+def _ran_recently(project: Project, state_file: str, interval_s: float) -> bool:
+    """True when the step that owns `state_file` stamped it less than `interval_s` ago."""
+    return read_fresh_json(project.state_dir / state_file, max_age_s=interval_s) is not None
+
+
+def _stamp(project: Project, state_file: str) -> None:
+    write_stamped_json(project.state_dir / state_file, {})
 
 
 def _run_curator_pass(
@@ -211,14 +228,8 @@ def _maybe_run_idle_curator(args: argparse.Namespace, project: Project) -> None:
         f"running pass over up to {_CURATOR_IDLE_LIMIT} session(s)>",
         file=sys.stderr,
     )
-    try:
+    with _logged_skip(project, "curate-skip", "idle curator failed"):
         _run_curator_pass(args, project, max_sessions=_CURATOR_IDLE_LIMIT, mode_label="idle")
-    except Exception as exc:
-        append_memory_log(
-            project,
-            op="curate-skip",
-            summary=f"idle curator failed: {type(exc).__name__}: {exc}",
-        )
 
 
 def _maybe_run_post_turn_curator(args: argparse.Namespace, project: Project) -> None:
@@ -229,23 +240,14 @@ def _maybe_run_post_turn_curator(args: argparse.Namespace, project: Project) -> 
     session it just produced."""
     if not _continuous_curator_eligible(args):
         return
-    try:
+    with _logged_skip(project, "curate-skip", "post-turn curator failed"):
         _run_curator_pass(
             args, project, max_sessions=_CURATOR_POSTRUN_LIMIT, mode_label="post-turn"
         )
-    except Exception as exc:
-        append_memory_log(
-            project,
-            op="curate-skip",
-            summary=f"post-turn curator failed: {type(exc).__name__}: {exc}",
-        )
-    # M121d: surface any newly-emerged skill suggestions from the
-    # pattern detector into the `insights` table. The next `/save`
-    # / TUI insights list picks them up. Best-effort; never blocks
-    # the user's turn even if memory.db is locked.
+    # Surface newly-emerged skill suggestions from the pattern detector into
+    # the `insights` table, then a cheap throttled dream pass (no LLM
+    # consolidation). Neither may block the user's turn.
     _maybe_surface_skill_suggestions(project)
-    # M76 post-turn dream — cheap-only (no consolidation), throttled to
-    # once per `_POST_TURN_DEFAULT_INTERVAL_SEC`. Never blocks the run.
     _maybe_run_post_turn_dream(args, project)
 
 
@@ -257,23 +259,14 @@ def _maybe_surface_skill_suggestions(project: Project) -> None:
     insight rows. Failure logs and continues so a sqlite lock or
     a missing table doesn't break the user's turn.
     """
-    try:
-        from veles.core.skill_suggester import surface_skill_suggestions
-    except ImportError:
-        return
-    try:
-        from veles.core.memory.store import local_connection
+    from veles.core.memory.store import local_connection
+    from veles.core.skill_suggester import surface_skill_suggestions
 
-        with local_connection(project) as conn:
-            surface_skill_suggestions(conn)
-    except Exception as exc:
-        # Same posture as the curator-skip log: don't fail the turn.
-        with contextlib.suppress(Exception):
-            append_memory_log(
-                project,
-                op="skill-suggest-skip",
-                summary=f"{type(exc).__name__}: {exc}",
-            )
+    with (
+        _logged_skip(project, "skill-suggest-skip", "skill suggestions failed"),
+        local_connection(project) as conn,
+    ):
+        surface_skill_suggestions(conn)
 
     # Embedding setup-hint: when semantic recall is not actually available,
     # write a one-time setup hint into `insights` so the user discovers the
@@ -286,14 +279,12 @@ def _maybe_surface_skill_suggestions(project: Project) -> None:
     # one), so an API key alone leaves recall keyword-only — while autodetect
     # happily returns a cloud adapter, which used to silence this hint in
     # exactly the setup that needed it.
-    try:
+    with contextlib.suppress(Exception):
         from veles.core.embedding_notice import maybe_surface_embedding_setup_hint
         from veles.modules.embedding import get_local_embedding_adapter
 
         if get_local_embedding_adapter() is None:
             maybe_surface_embedding_setup_hint(project)
-    except Exception:
-        pass
 
 
 def _maybe_run_post_turn_dream(args: argparse.Namespace, project: Project) -> None:
@@ -310,18 +301,12 @@ def _maybe_run_post_turn_dream(args: argparse.Namespace, project: Project) -> No
     now = time.time()
     if now - state.last_post_turn_dream_at < _POST_TURN_DEFAULT_INTERVAL_SEC:
         return
-    try:
+    with _logged_skip(project, "dream-skip", "post-turn dream failed"):
         dream_cycle(
             project,
             include_consolidation=False,
-            skip_insights=True,  # insight extractor already runs from cli/_curator
+            skip_insights=True,  # the insight extractor runs as its own post-turn step
             now=now,
-        )
-    except Exception as exc:
-        append_memory_log(
-            project,
-            op="dream-skip",
-            summary=f"post-turn dream failed: {type(exc).__name__}: {exc}",
         )
 
 
@@ -350,44 +335,16 @@ def _maybe_run_subproject_proposer(args: argparse.Namespace, project: Project) -
     if not wiki_enabled(project):
         return
 
-    state_path = project.state_dir / _PROPOSER_STATE_FILE
-    last_ran = _read_proposer_state(state_path)
-    now = time.time()
-    if now - last_ran < _PROPOSER_IDLE_THRESHOLD_SEC:
+    if _ran_recently(project, _PROPOSER_STATE_FILE, _PROPOSER_IDLE_THRESHOLD_SEC):
         return
 
     from veles.core.subproject_proposer import detect_clusters, write_proposals
 
-    try:
+    with _logged_skip(project, "proposer-skip", "subproject proposer failed"):
         clusters = detect_clusters(project)
         if clusters:
             write_proposals(project, clusters)
-    except Exception as exc:
-        append_memory_log(
-            project,
-            op="proposer-skip",
-            summary=f"subproject proposer failed: {type(exc).__name__}: {exc}",
-        )
-        return
-    _write_proposer_state(state_path, now)
-
-
-def _read_proposer_state(path) -> float:
-    import json
-
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return 0.0
-    last = data.get("last_ran_at") if isinstance(data, dict) else None
-    return float(last) if isinstance(last, int | float) else 0.0
-
-
-def _write_proposer_state(path, ts: float) -> None:
-    import json
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"last_ran_at": ts}) + "\n", encoding="utf-8")
+        _stamp(project, _PROPOSER_STATE_FILE)
 
 
 def _maybe_suggest_promotions(args: argparse.Namespace, project: Project) -> None:
@@ -407,28 +364,15 @@ def _maybe_suggest_promotions(args: argparse.Namespace, project: Project) -> Non
         return
     if getattr(args, "no_suggest_promote", False):
         return
-    state_path = project.state_dir / _PROMOTE_SUGGEST_STATE_FILE
-    last_ran = _read_proposer_state(state_path)
-    now = time.time()
-    if now - last_ran < _PROMOTE_SUGGEST_IDLE_THRESHOLD_SEC:
+    if _ran_recently(project, _PROMOTE_SUGGEST_STATE_FILE, _PROMOTE_SUGGEST_IDLE_THRESHOLD_SEC):
         return
-    try:
-        from veles.core.skill_promotion import (
-            find_promote_candidates,
-            write_promote_proposals,
-        )
+    from veles.core.skill_promotion import find_promote_candidates, write_promote_proposals
 
+    with _logged_skip(project, "promote-suggest-skip", "skill promote-suggester failed"):
         candidates = find_promote_candidates(project)
         if candidates:
             write_promote_proposals(project, candidates)
-    except Exception as exc:
-        append_memory_log(
-            project,
-            op="promote-suggest-skip",
-            summary=f"skill promote-suggester failed: {type(exc).__name__}: {exc}",
-        )
-        return
-    _write_proposer_state(state_path, now)
+        _stamp(project, _PROMOTE_SUGGEST_STATE_FILE)
 
 
 def _maybe_refresh_nl_routing(args: argparse.Namespace, project: Project) -> None:
@@ -472,25 +416,9 @@ def _maybe_refresh_nl_routing(args: argparse.Namespace, project: Project) -> Non
         return
     if not has_api_key(routed_provider):
         return
-    try:
-        provider = make_provider(routed_provider)
-    except Exception as exc:
-        append_memory_log(
-            project,
-            op="route-refresh-skip",
-            summary=f"failed to build provider {routed_provider!r}: {exc}",
-        )
-        return
-
-    try:
-        extractor = make_nl_extractor(provider=provider, model=routed_model)
+    with _logged_skip(project, "route-refresh-skip", "nl routing refresh failed"):
+        extractor = make_nl_extractor(provider=make_provider(routed_provider), model=routed_model)
         refresh_nl_routing(project, agents_md, extractor=extractor)
-    except Exception as exc:
-        append_memory_log(
-            project,
-            op="route-refresh-skip",
-            summary=f"nl routing refresh failed: {type(exc).__name__}: {exc}",
-        )
 
 
 def _maybe_run_insight_extractor(
@@ -522,19 +450,13 @@ def _maybe_run_insight_extractor(
         return
     explicit_model = getattr(args, "compressor_model", None)
     model = explicit_model or routed_model
-    try:
+    with _logged_skip(project, "insight-skip", "insight extraction failed"):
         extractor = make_insight_extractor(
             provider=make_provider(routed_provider, model=model),
             model=model,
             project=project,
         )
         extractor(history, session_id)
-    except Exception as exc:
-        append_memory_log(
-            project,
-            op="insight-skip",
-            summary=f"insight extraction failed: {type(exc).__name__}: {exc}",
-        )
 
 
 def _curate_one_session(
@@ -642,31 +564,16 @@ def _curate_one_session(
     return bool({"wiki_write_page", "memory_save_insight"} & result.invoked_tools)
 
 
-_SELF_DOC_IDLE_SEC = 3600  # refresh at most once per hour
-
-
 def _maybe_refresh_self_doc(project: Project) -> None:
-    """Refresh wiki/self-doc/overview.md if stale (> 1h since last refresh).
+    """Refresh wiki/self-doc/overview.md at most once per `_SELF_DOC_IDLE_SEC`.
 
-    Runs silently; all failures are swallowed so a broken sub-component
-    never surfaces to the user during `veles run`.
+    Silent: a failure is swallowed so a broken sub-component never surfaces to
+    the user during `veles run`.
     """
-    import json
-    import time
-
-    state_path = project.state_dir / "self-doc.state.json"
-    now = time.time()
-    if state_path.is_file():
-        try:
-            data = json.loads(state_path.read_text(encoding="utf-8"))
-            if now - float(data.get("refreshed_at", 0)) < _SELF_DOC_IDLE_SEC:
-                return
-        except Exception:
-            pass
-    try:
+    if _ran_recently(project, _SELF_DOC_STATE_FILE, _SELF_DOC_IDLE_SEC):
+        return
+    with contextlib.suppress(Exception):
         from veles.core.self_doc import refresh_self_doc
 
         refresh_self_doc(project)
-        state_path.write_text(json.dumps({"refreshed_at": now}), encoding="utf-8")
-    except Exception:
-        pass
+        _stamp(project, _SELF_DOC_STATE_FILE)
