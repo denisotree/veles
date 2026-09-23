@@ -55,6 +55,25 @@ def test_list_sorted_by_last_used_desc(map_path: Path) -> None:
     assert keys == ["c", "b", "a"]
 
 
+def test_two_maps_on_one_file_see_each_others_writes(map_path: Path) -> None:
+    """The daemon gateway holds one map for its lifetime; the delivery binder and
+    `veles channel reset-session` open their own. None may lose the others' writes."""
+    gateway = SessionMap.load(map_path)
+    gateway.set("chat-a", "s-a")
+
+    binder = SessionMap.load(map_path)
+    binder.set("chat-b", "s-b")  # a proactive delivery binds a new chat
+    assert gateway.get("chat-b") == "s-b"  # the reply reuses it, not a 2nd session
+
+    gateway.set("chat-a", "s-a2")  # the gateway's next write keeps chat-b
+    assert SessionMap.load(map_path).get("chat-b") == "s-b"
+
+    SessionMap.load(map_path).reset("chat-a")  # CLI reset-session
+    assert gateway.get("chat-a") is None
+    gateway.set("chat-c", "s-c")
+    assert SessionMap.load(map_path).get("chat-a") is None
+
+
 def test_load_permissive_on_corrupt_json(map_path: Path) -> None:
     map_path.write_text("not json", encoding="utf-8")
     m = SessionMap.load(map_path)
