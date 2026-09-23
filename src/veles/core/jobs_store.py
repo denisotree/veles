@@ -100,6 +100,31 @@ class JobRecord:
     kind: str = "prompt"
     params: dict | None = None
 
+    def to_dict(self) -> dict[str, object]:
+        """The JSON shape `veles job list --json` and `GET /v1/jobs` both return."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "prompt": self.prompt,
+            "schedule": {
+                "kind": self.schedule.kind,
+                "expr": self.schedule.expr,
+                "display": self.schedule.display(),
+            },
+            "repeat_times": self.repeat_times,
+            "repeat_completed": self.repeat_completed,
+            "context_from": self.context_from,
+            "deliver_to": self.deliver_to,
+            "enabled": self.enabled,
+            "state": self.state,
+            "created_at": self.created_at,
+            "next_run_at": self.next_run_at,
+            "last_run_at": self.last_run_at,
+            "last_status": self.last_status,
+            "last_error": self.last_error,
+            "last_output_path": self.last_output_path,
+        }
+
 
 @dataclass(slots=True, frozen=True)
 class JobRunRecord:

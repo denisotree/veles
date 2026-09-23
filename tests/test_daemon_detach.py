@@ -150,11 +150,10 @@ def test_detach_path_default_calls_spawn(
 
     monkeypatch.setattr(spawn_mod, "spawn_daemon", fake_spawn)
     # Pretend our fake child pid is alive (no actual process exists).
-    # M153: `_detach_and_report` lives in (and resolves `_process_alive`
-    # from) `daemon_lifecycle`, so patch the canonical module.
+    # `_detach_and_report` resolves `is_alive` from `daemon_lifecycle`'s namespace.
     from veles.cli.commands import daemon_lifecycle as lifecycle_mod
 
-    monkeypatch.setattr(lifecycle_mod, "_process_alive", lambda pid: pid == fake_child_pid)
+    monkeypatch.setattr(lifecycle_mod, "is_alive", lambda pid: pid == fake_child_pid)
     monkeypatch.setattr("veles.cli._ensure_api_key", lambda provider, project=None: True)
 
     try:

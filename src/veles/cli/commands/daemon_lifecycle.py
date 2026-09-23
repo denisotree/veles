@@ -18,22 +18,14 @@ import signal
 import sys
 import time
 
+from veles.core.defaults import DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT
 from veles.daemon.logging import setup_daemon_logging as _setup_daemon_logging
-from veles.daemon.paths import (
-    daemon_log_path,
-)
-from veles.daemon.paths import (
-    info_path as _info_path,
-)
-from veles.daemon.paths import (
-    instance_info_path as _instance_info_path,
-)
-from veles.daemon.paths import (
-    instance_pid_path as _instance_pid_path,
-)
-from veles.daemon.paths import (
-    pid_path as _pid_path,
-)
+from veles.daemon.paths import daemon_log_path, read_pid
+from veles.daemon.paths import info_path as _info_path
+from veles.daemon.paths import instance_info_path as _instance_info_path
+from veles.daemon.paths import instance_pid_path as _instance_pid_path
+from veles.daemon.paths import pid_path as _pid_path
+from veles.daemon.registry import is_alive
 
 
 def _bootstrap_daemon(project, *, name: str | None = None) -> None:
@@ -136,11 +128,8 @@ def _write_pid_and_info(state, args, project, *, pid_path, info_path) -> int:
     1 when another daemon already holds the pid file."""
     pid_path.parent.mkdir(parents=True, exist_ok=True)
     if pid_path.is_file():
-        try:
-            other_pid = int(pid_path.read_text(encoding="utf-8").strip() or "0")
-        except ValueError:
-            other_pid = 0
-        if other_pid and _process_alive(other_pid):
+        other_pid = read_pid(pid_path)
+        if other_pid and is_alive(other_pid):
             print(
                 f"error: daemon already running with pid {other_pid} (see {pid_path}).",
                 file=sys.stderr,
@@ -248,11 +237,8 @@ def _detach_and_report(
     pid_path, info_path = _resolve_instance_paths(project, name)
     log_slug = _instance_log_slug(project, name)
     if pid_path.is_file():
-        try:
-            other = int(pid_path.read_text(encoding="utf-8").strip() or "0")
-        except ValueError:
-            other = 0
-        if other and _process_alive(other):
+        other = read_pid(pid_path)
+        if other and is_alive(other):
             print(
                 f"error: daemon already running with pid {other} (see {pid_path}).",
                 file=sys.stderr,
@@ -275,11 +261,8 @@ def _detach_and_report(
     child_pid: int | None = None
     while time.time() < deadline:
         if pid_path.is_file():
-            try:
-                written = int(pid_path.read_text(encoding="utf-8").strip() or "0")
-            except ValueError:
-                written = 0
-            if written and written != os.getpid() and _process_alive(written):
+            written = read_pid(pid_path)
+            if written and written != os.getpid() and is_alive(written):
                 child_pid = written
                 break
         if proc.poll() is not None:
@@ -307,9 +290,9 @@ def _detach_and_report(
     imposter_pid: int | None = None
     while time.time() < deadline:
         # `proc.poll()` reaps our direct child (a dead-but-unreaped zombie still
-        # passes the kill(pid, 0) probe); `_process_alive` covers a pid-file pid
+        # passes the kill(pid, 0) probe); `is_alive` covers a pid-file pid
         # that isn't our Popen child.
-        if proc.poll() is not None or not _process_alive(child_pid):
+        if proc.poll() is not None or not is_alive(child_pid):
             print(
                 f"error: daemon (pid {child_pid}) died while starting up. Recent log:",
                 file=sys.stderr,
@@ -404,16 +387,12 @@ def _restart_named_session(args: argparse.Namespace, name: str) -> int:
         print("error: no Veles project found here.", file=sys.stderr)
         return 2
     pid_path, _info = _resolve_instance_paths(project, name)
-    if pid_path.is_file():
-        try:
-            pid = int(pid_path.read_text(encoding="utf-8").strip() or "0")
-        except (OSError, ValueError):
-            pid = 0
-        if pid and _process_alive(pid):
-            _graceful_stop(pid, timeout=5.0)
+    pid = read_pid(pid_path)
+    if pid and is_alive(pid):
+        _graceful_stop(pid, timeout=5.0)
     block = get_daemon_session_config(load_project_config(project), name)
-    host = str(block.get("host") or "127.0.0.1")
-    port = int(block.get("port") or 8765)
+    host = str(block.get("host") or DEFAULT_DAEMON_HOST)
+    port = int(block.get("port") or DEFAULT_DAEMON_PORT)
     proc = spawn_daemon(
         project_root=project.root,
         host=host,
@@ -462,18 +441,6 @@ def _graceful_stop(pid: int, *, timeout: float = 10.0) -> bool:
             return True
         time.sleep(0.05)
     return False
-
-
-def _process_alive(pid: int) -> bool:
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
 
 
 def _resolve_instance_paths(project, name: str | None):

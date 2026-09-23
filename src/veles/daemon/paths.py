@@ -16,6 +16,15 @@ from pathlib import Path
 from veles.core.user_paths import user_home, user_logs_dir
 
 
+def read_pid(path: Path) -> int | None:
+    """The pid a daemon pid file holds, or None when it is missing, unreadable or 0."""
+    try:
+        pid = int(path.read_text(encoding="utf-8").strip() or "0")
+    except (OSError, ValueError):
+        return None
+    return pid or None
+
+
 def pid_path(slug: str) -> Path:
     """`~/.veles/daemon-<slug>.pid` — per-project single-instance lock (M209).
 
@@ -66,4 +75,5 @@ __all__ = [
     "instance_log_path",
     "instance_pid_path",
     "pid_path",
+    "read_pid",
 ]

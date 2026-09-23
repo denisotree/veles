@@ -30,6 +30,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from veles.core.defaults import DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT
 from veles.core.i18n import t
 from veles.core.project import Project, ProjectAlreadyExists, init_project, load_project
 from veles.core.project_config import (
@@ -328,8 +329,8 @@ class DaemonModeStep:
         host = await ctx.app.push_screen_wait(
             InputScreen(
                 title=self.title,
-                prompt="Daemon host (Enter for 127.0.0.1)",
-                default="127.0.0.1",
+                prompt=f"Daemon host (Enter for {DEFAULT_DAEMON_HOST})",
+                default=DEFAULT_DAEMON_HOST,
             )
         )
         nav = _nav(host)
@@ -338,18 +339,18 @@ class DaemonModeStep:
         port = await ctx.app.push_screen_wait(
             InputScreen(
                 title=self.title,
-                prompt="Daemon port (Enter for 8765)",
-                default="8765",
+                prompt=f"Daemon port (Enter for {DEFAULT_DAEMON_PORT})",
+                default=str(DEFAULT_DAEMON_PORT),
             )
         )
         nav = _nav(port)
         if nav is not None:
             return nav
-        host_clean = host.strip() or "127.0.0.1"
+        host_clean = host.strip() or DEFAULT_DAEMON_HOST
         try:
-            port_clean = int(port.strip() or "8765")
+            port_clean = int(port.strip() or DEFAULT_DAEMON_PORT)
         except ValueError:  # a typo must not crash the wizard
-            port_clean = 8765
+            port_clean = DEFAULT_DAEMON_PORT
         ctx.answers["daemon"] = {
             "host": host_clean,
             "port": port_clean,

@@ -14,3 +14,7 @@ from __future__ import annotations
 # configured" error instead of silently using a cloud model.
 DEFAULT_MODEL = ""
 DEFAULT_PROVIDER = "openrouter"
+
+# Where a daemon binds when neither a flag nor `[daemon]` config says otherwise.
+DEFAULT_DAEMON_HOST = "127.0.0.1"
+DEFAULT_DAEMON_PORT = 8765

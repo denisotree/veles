@@ -29,6 +29,7 @@ from veles.channels.platform_registry import (
     list_platforms,
 )
 from veles.channels.session_map import SessionMap, channel_session_path
+from veles.core.defaults import DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT
 
 
 def cmd_channel(args: argparse.Namespace) -> int:
@@ -126,7 +127,11 @@ def _cmd_channel_run(args: argparse.Namespace) -> int:
     else:
         bot_token = args.bot_token or os.environ.get("TELEGRAM_BOT_TOKEN") or ""
 
-    daemon_url = args.daemon_url or os.environ.get("VELES_DAEMON_URL") or "http://127.0.0.1:8765"
+    daemon_url = (
+        args.daemon_url
+        or os.environ.get("VELES_DAEMON_URL")
+        or f"http://{DEFAULT_DAEMON_HOST}:{DEFAULT_DAEMON_PORT}"
+    )
     # M271: keychain first (`veles secret set VELES_DAEMON_TOKEN`), env second —
     # before this only the env was read, so a token stored with `veles secret`
     # was never used.

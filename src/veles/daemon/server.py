@@ -600,31 +600,6 @@ def _require_jobs_store(state: DaemonState):
     return getattr(jr, "_store", None)
 
 
-def _job_to_dict(rec) -> dict[str, Any]:
-    return {
-        "id": rec.id,
-        "name": rec.name,
-        "prompt": rec.prompt,
-        "schedule": {
-            "kind": rec.schedule.kind,
-            "expr": rec.schedule.expr,
-            "display": rec.schedule.display(),
-        },
-        "repeat_times": rec.repeat_times,
-        "repeat_completed": rec.repeat_completed,
-        "context_from": rec.context_from,
-        "deliver_to": rec.deliver_to,
-        "enabled": rec.enabled,
-        "state": rec.state,
-        "created_at": rec.created_at,
-        "next_run_at": rec.next_run_at,
-        "last_run_at": rec.last_run_at,
-        "last_status": rec.last_status,
-        "last_error": rec.last_error,
-        "last_output_path": rec.last_output_path,
-    }
-
-
 async def _handle_create_job(request: web.Request) -> web.Response:
     state: DaemonState = request.app["state"]
     store = _require_jobs_store(state)
@@ -648,7 +623,7 @@ async def _handle_create_job(request: web.Request) -> web.Response:
         )
     except ValueError as exc:
         return web.json_response({"error": str(exc)}, status=400)
-    return web.json_response(_job_to_dict(rec), status=201)
+    return web.json_response(rec.to_dict(), status=201)
 
 
 async def _handle_list_jobs(request: web.Request) -> web.Response:
@@ -658,7 +633,7 @@ async def _handle_list_jobs(request: web.Request) -> web.Response:
         return web.json_response({"jobs": []})
     include_disabled = request.query.get("include_disabled", "1") != "0"
     return web.json_response(
-        {"jobs": [_job_to_dict(r) for r in store.list_jobs(include_disabled=include_disabled)]}
+        {"jobs": [r.to_dict() for r in store.list_jobs(include_disabled=include_disabled)]}
     )
 
 
@@ -670,7 +645,7 @@ async def _handle_get_job(request: web.Request) -> web.Response:
     rec = store.get_job(request.match_info["job_id"])
     if rec is None:
         return web.json_response({"error": "not found"}, status=404)
-    return web.json_response(_job_to_dict(rec))
+    return web.json_response(rec.to_dict())
 
 
 async def _handle_update_job(request: web.Request) -> web.Response:
@@ -691,7 +666,7 @@ async def _handle_update_job(request: web.Request) -> web.Response:
     if not ok:
         return web.json_response({"error": "not found"}, status=404)
     rec = store.get_job(request.match_info["job_id"])
-    return web.json_response(_job_to_dict(rec))
+    return web.json_response(rec.to_dict())
 
 
 async def _handle_delete_job(request: web.Request) -> web.Response:
