@@ -8,15 +8,10 @@ import pytest
 
 from tests.conftest import StubProvider
 from veles.core.context import reset_active_project, set_active_project
+from veles.core.frontmatter import parse_frontmatter, render_frontmatter
 from veles.core.project import init_project
 from veles.core.provider import ProviderResponse, TokenUsage
-from veles.core.skills import (
-    bump_telemetry,
-    discover_skills,
-    make_skill_tool,
-    parse_frontmatter,
-    render_frontmatter,
-)
+from veles.core.skills import bump_telemetry, discover_skills, make_skill_tool
 from veles.core.tools.registry import Registry, ToolEntry
 
 

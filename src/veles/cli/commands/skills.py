@@ -16,7 +16,8 @@ from veles.core.skill_install import (
     promote_skill,
     remove_skill,
 )
-from veles.core.skills import discover_skills, user_skills_dir
+from veles.core.skills import discover_skills
+from veles.core.user_paths import user_skills_dir
 
 
 def cmd_skill(args: argparse.Namespace, project: Project) -> int:

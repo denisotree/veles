@@ -10,12 +10,8 @@ single `input: str` parameter), Veles spawns a fresh `Agent` whose
 tools filtered to `skill.tools`. The sub-agent runs to completion; its final
 text becomes the tool result.
 
-Use_count and last_used live in the same SKILL.md frontmatter and are bumped
-atomically (temp-file + replace) after each successful invocation.
-
-The frontmatter parser is intentionally a flat-key subset of YAML — strings,
-ints, bools, null, simple lists. No external dependency, no nested structures.
-M6 can swap to pyyaml if real YAML is required.
+Usage telemetry is recorded in the project's memory.db (`bump_telemetry`) and
+overlaid on every load; the frontmatter itself is parsed by `core/frontmatter.py`.
 """
 
 from __future__ import annotations
@@ -28,8 +24,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from veles.core.frontmatter import parse_frontmatter
 from veles.core.timeutil import utc_iso
 from veles.core.tools.registry import Registry, ToolEntry
+from veles.core.user_paths import user_skills_dir
 
 logger = logging.getLogger(__name__)
 
@@ -67,142 +65,7 @@ class Skill:
     extends: str | None = None
 
 
-# ---------- frontmatter parser ----------
-
-
-def parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
-    """Return (frontmatter_dict, body). Returns ({}, text) if no frontmatter.
-
-    Supports flat key-value pairs plus a single nesting level: a top-level key
-    whose value is empty opens a list-of-dicts context; subsequent indented
-    `- key: value` lines become list items (each a dict), and further indented
-    `key: value` lines fill the most recent dict.
-    """
-    lines = text.split("\n")
-    if not lines or lines[0].strip() != "---":
-        return {}, text
-    fm: dict[str, Any] = {}
-    body_start: int | None = None
-    current_list_key: str | None = None
-    current_dict: dict[str, Any] | None = None
-
-    for i in range(1, len(lines)):
-        raw_line = lines[i]
-        if raw_line.strip() == "---":
-            body_start = i + 1
-            break
-        stripped_full = raw_line.strip()
-        if not stripped_full:
-            continue
-        indent = len(raw_line) - len(raw_line.lstrip())
-        stripped = raw_line.lstrip()
-
-        if indent == 0:
-            current_list_key = None
-            current_dict = None
-            if ":" not in stripped:
-                continue
-            key, _, raw_val = stripped.partition(":")
-            key = key.strip()
-            raw_val = raw_val.strip()
-            if not raw_val:
-                # Open a list-of-dicts context for the next indented lines.
-                current_list_key = key
-                fm[key] = []
-                continue
-            fm[key] = _coerce_value(raw_val)
-            continue
-
-        if current_list_key is None:
-            continue
-        if stripped.startswith("- "):
-            current_dict = {}
-            fm[current_list_key].append(current_dict)
-            rest = stripped[2:].strip()
-            if rest and ":" in rest:
-                k, _, v = rest.partition(":")
-                current_dict[k.strip()] = _coerce_value(v.strip())
-        elif current_dict is not None and ":" in stripped:
-            k, _, v = stripped.partition(":")
-            current_dict[k.strip()] = _coerce_value(v.strip())
-
-    if body_start is None:
-        return {}, text
-    body = "\n".join(lines[body_start:]).lstrip("\n")
-    return fm, body
-
-
-def render_frontmatter(fm: dict[str, Any], body: str) -> str:
-    """Return canonical SKILL.md text with `---`-delimited frontmatter.
-
-    Lists-of-dicts render as YAML-ish indented blocks; everything else stays
-    on one line.
-    """
-    out = ["---"]
-    for key, value in fm.items():
-        if isinstance(value, list) and value and all(isinstance(v, dict) for v in value):
-            out.append(f"{key}:")
-            for item in value:
-                first = True
-                for k, v in item.items():
-                    prefix = "  - " if first else "    "
-                    out.append(f"{prefix}{k}: {_format_value(v)}")
-                    first = False
-            continue
-        out.append(f"{key}: {_format_value(value)}")
-    out.append("---")
-    out.append("")
-    out.append(body.lstrip("\n"))
-    return "\n".join(out)
-
-
-def _coerce_value(raw: str) -> Any:
-    if raw.startswith("[") and raw.endswith("]"):
-        inner = raw[1:-1]
-        items = [item.strip() for item in inner.split(",") if item.strip()]
-        return [_coerce_scalar(it) for it in items]
-    return _coerce_scalar(raw)
-
-
-def _coerce_scalar(raw: str) -> Any:
-    s = raw.strip()
-    if not s:
-        return ""
-    lower = s.lower()
-    if lower == "null":
-        return None
-    if lower in ("true", "false"):
-        return lower == "true"
-    if s.lstrip("-").isdigit():
-        return int(s)
-    if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
-        return s[1:-1]
-    return s
-
-
-def _format_value(value: Any) -> str:
-    if value is None:
-        return "null"
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, list):
-        return "[" + ", ".join(_format_value(v) for v in value) + "]"
-    return str(value)
-
-
 # ---------- discovery ----------
-
-
-def user_skills_dir() -> Path:
-    """User-global skills directory. `VELES_USER_HOME` env overrides `~`.
-
-    M40 introduces `~/.veles/skills/` as a peer of the project-local
-    `<project>/.veles/skills/`. On name collision project wins; see
-    `discover_skills`.
-    """
-    from veles.core.user_paths import user_skills_dir as _path
-
-    return _path()
 
 
 # M158-followup: optional TTL memo for `discover_skills` (daemon-only — see
@@ -473,31 +336,18 @@ def _record_skill_use_in_db(skill: Skill, *, success: bool) -> None:
 
 
 def bump_telemetry(skill: Skill, *, success: bool) -> None:
-    """Atomically bump use_count + outcome counter in SKILL.md.
+    """Record one invocation of `skill` as a `skill_uses` row in memory.db.
 
-    `use_count` counts every invocation; `success_count` increments only on
-    `stopped_reason == "completed"`, `error_count` on exception or any
-    non-completed terminal state. Future curator (M28) ranks duplicates
-    by the derived `success_rate = success_count / use_count`.
+    `use_count` counts every invocation; `success_count` only
+    `stopped_reason == "completed"`, `error_count` an exception or any other
+    terminal state. Promotion and dedup rank by `success_count / use_count`.
 
-    Concurrent invocations from the parent process and one or more MCP
-    children can race on this read-modify-write — a sidecar flock at
-    `<SKILL.md>.lock` serialises every bumper across threads and
-    processes (M30).
+    Telemetry lives in the database, never in SKILL.md: builtin and layout-pack
+    skills sit inside the installed package, and rewriting their frontmatter
+    mutated the distribution (a dirty checkout, site-packages edits, nothing
+    recorded on a read-only install). Counters a SKILL.md still carries are
+    read on load only as a seed when the database has none.
     """
-    # M244: telemetry is runtime state and belongs in the project's memory.db,
-    # not in the skill's own source file.
-    #
-    # `builtin` and layout-pack skills live INSIDE the installed package, so the
-    # frontmatter rewrite below was mutating the distribution itself: a pip
-    # install writes `use_count:` into site-packages, a git checkout gets a
-    # dirty tree, and a read-only install cannot record anything at all.
-    # Observed live 2026-09-01 — a run in a `~/.tmp` sandbox modified two
-    # SKILL.md files inside the veles repo and left `.lock` files behind.
-    #
-    # `skill_uses` + `skill_telemetry()` (M121) already model this correctly as
-    # append-only rows with aggregate reads; they were written and never wired
-    # up, so the file counters were a duplicate of a better mechanism.
     _record_skill_use_in_db(skill, success=success)
 
     # In-memory counters stay correct for the caller that just invoked the

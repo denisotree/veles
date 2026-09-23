@@ -38,8 +38,9 @@ from veles.core.memory.artefacts import (
     write_proposal,
 )
 from veles.core.project import Project
-from veles.core.skills import Skill, discover_skills, user_skills_dir
+from veles.core.skills import Skill, discover_skills
 from veles.core.timeutil import utc_iso
+from veles.core.user_paths import user_skills_dir
 
 _DEFAULT_MIN_USES = 10
 _DEFAULT_MIN_SUCCESS_RATE = 0.7

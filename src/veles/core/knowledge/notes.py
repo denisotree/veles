@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from veles.core.skills import parse_frontmatter
+from veles.core.frontmatter import parse_frontmatter
 
 # Notes ship inside the package, next to this module's parent:
 # src/veles/knowledge/notes/*.md

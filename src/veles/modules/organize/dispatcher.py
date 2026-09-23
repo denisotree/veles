@@ -13,9 +13,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from veles.core.frontmatter import parse_frontmatter
 from veles.core.layout.discovery import find_layout
 from veles.core.project import Project
-from veles.core.skills import parse_frontmatter
 
 
 @dataclass(frozen=True, slots=True)

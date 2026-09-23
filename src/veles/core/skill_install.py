@@ -18,16 +18,11 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+from veles.core.frontmatter import parse_frontmatter, render_frontmatter
 from veles.core.project import Project
-from veles.core.skills import (
-    _SKILL_FILENAME,
-    Skill,
-    discover_skills,
-    parse_frontmatter,
-    render_frontmatter,
-    user_skills_dir,
-)
+from veles.core.skills import _SKILL_FILENAME, Skill, discover_skills
 from veles.core.source_install import derive_name, install_tree
+from veles.core.user_paths import user_skills_dir
 
 
 class SkillInstallError(RuntimeError):
