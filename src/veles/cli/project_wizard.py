@@ -29,6 +29,7 @@ from collections.abc import Callable
 from contextvars import ContextVar, Token
 from pathlib import Path
 
+from veles.cli.wizard import _ask_choice, _default_prompter
 from veles.core.i18n import t
 from veles.core.project import Project, ProjectAlreadyExists, init_project
 from veles.core.project_config import (
@@ -203,28 +204,6 @@ def _ask_yes_no(prompter: Prompter, prompt: str, *, default: bool) -> bool:
     if not ans:
         return default
     return ans in ("y", "yes")
-
-
-def _ask_choice(prompter: Prompter, prompt: str, choices: tuple[str, ...], *, default: str) -> str:
-    while True:
-        ans = prompter(f"{prompt} [{'/'.join(choices)}]", default).strip().lower()
-        if not ans:
-            return default
-        if ans in choices:
-            return ans
-        print(f"  ! '{ans}' is not one of {choices}; try again.", file=sys.stderr)
-
-
-def _default_prompter(prompt: str, default: str | None) -> str:
-    if not sys.stdin.isatty():
-        return default or ""
-    label = f"  {prompt}"
-    if default is not None:
-        label = f"{label} [default: {default}]"
-    try:
-        return input(f"{label}: ")
-    except EOFError:
-        return default or ""
 
 
 def maybe_run_project_wizard(args: argparse.Namespace, cwd: Path) -> Project | None:
