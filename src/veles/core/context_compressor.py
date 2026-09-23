@@ -280,9 +280,8 @@ def make_default_compressor(
     # couple every importer of compression utilities to that heavy
     # module, and Agent annotates its compressor parameter, so a cycle
     # is one careless import away.
-    from veles.core.agent import Agent
+    from veles.core.agent import run_oneshot
     from veles.core.memory.artefacts import append_memory_log, write_session_summary
-    from veles.core.tools.registry import Registry
 
     def _compress(history: list[Message], session_id: str | None) -> list[Message]:
         sid = session_id or "session"
@@ -362,21 +361,15 @@ def make_default_compressor(
             logger.info("compressor summary-cache-hit session=%s", sid)
             summary = cached_summary
         else:
-            sub_agent = Agent(
-                provider=provider,
-                registry=Registry(),
-                model=model,
-                max_iterations=1,
-                system_prompt=sub_prompt,
-                max_tokens=cfg.max_summary_tokens,
-            )
             # If the summariser blows up (rate-limit, network, an unforeseen
             # context-limit), don't let it take down the main run — fall
             # back to a placeholder summary and still drop the middle from
             # the live history. The main provider getting a small history
             # is strictly better than crashing.
             try:
-                result = sub_agent.run(rendered)
+                result = run_oneshot(
+                    provider, model, sub_prompt, rendered, max_tokens=cfg.max_summary_tokens
+                )
                 summary = (result.text or "").strip() or "_(empty summary)_"
                 if getattr(result, "stopped_reason", None) == "budget_exhausted":
                     logger.info(

@@ -644,24 +644,17 @@ def _step_consolidate(
     *,
     dry_run: bool,
 ) -> None:
-    from veles.core.agent import Agent
-    from veles.core.tools.registry import Registry
+    from veles.core.agent import run_oneshot
 
     snippets = _collect_insight_snippets(project, limit=_CONSOLIDATION_INSIGHTS_LIMIT)
     if not snippets:
         result.notes.append("consolidation skipped: no insights to consolidate")
         return
 
-    sub = Agent(
-        provider=provider,
-        registry=Registry(),
-        model=model,
-        max_iterations=1,
-        system_prompt=_CONSOLIDATE_PROMPT,
-        max_tokens=2048,
-    )
     try:
-        run_result = sub.run("\n\n".join(snippets))
+        run_result = run_oneshot(
+            provider, model, _CONSOLIDATE_PROMPT, "\n\n".join(snippets), max_tokens=2048
+        )
     except Exception as exc:
         result.notes.append(f"consolidation sub-agent failed: {exc}")
         return

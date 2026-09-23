@@ -998,3 +998,25 @@ class Agent:
     def _log(self, msg: str) -> None:
         if self._verbose:
             print(msg, file=sys.stderr, flush=True)
+
+
+def run_oneshot(
+    provider: Provider,
+    model: str,
+    system_prompt: str,
+    text: str,
+    *,
+    max_tokens: int | None = None,
+) -> RunResult:
+    """One tool-less, single-round sub-agent call: summarise, classify, judge.
+
+    Exceptions propagate — each caller decides what a failed side call means."""
+    agent = Agent(
+        provider=provider,
+        registry=Registry(),
+        model=model,
+        max_iterations=1,
+        system_prompt=system_prompt,
+        max_tokens=max_tokens,
+    )
+    return agent.run(text)

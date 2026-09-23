@@ -216,8 +216,7 @@ def make_nl_extractor(*, provider, model: str):
     failure the function returns `[]` so a flaky parse never blocks
     the parent run.
     """
-    from veles.core.agent import Agent
-    from veles.core.tools.registry import Registry
+    from veles.core.agent import run_oneshot
 
     def _extract(agents_md_text: str) -> list[_NLEntry]:
         hints = find_routing_hints(agents_md_text)
@@ -225,15 +224,7 @@ def make_nl_extractor(*, provider, model: str):
             return []
         snippet = "\n\n".join(hints)[:4_000]
         try:
-            sub = Agent(
-                provider=provider,
-                registry=Registry(),
-                model=model,
-                max_iterations=1,
-                system_prompt=_SYSTEM_PROMPT,
-                max_tokens=512,
-            )
-            result = sub.run(snippet)
+            result = run_oneshot(provider, model, _SYSTEM_PROMPT, snippet, max_tokens=512)
         except Exception:
             return []
         return parse_extractor_output(result.text or "")

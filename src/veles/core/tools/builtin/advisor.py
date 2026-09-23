@@ -69,11 +69,10 @@ def call_advisor(input_text: str, *, system_prompt: str | None = None) -> str:
     sentinel string on any error so the caller can decide how to handle
     it (treat as off-track, abort the FSM, etc.).
     """
-    from veles.core.agent import Agent
+    from veles.core.agent import run_oneshot
     from veles.core.context import current_project, strict_json_mode
     from veles.core.provider_factory import has_api_key, make_provider
     from veles.core.routing import route
-    from veles.core.tools.registry import Registry
 
     project = current_project()
     if project is None:
@@ -91,13 +90,6 @@ def call_advisor(input_text: str, *, system_prompt: str | None = None) -> str:
     except Exception as exc:
         return f"<advisor unavailable: failed to build {provider_name!r}: {exc}>"
 
-    sub_agent = Agent(
-        provider=provider,
-        registry=Registry(),
-        model=model,
-        max_iterations=1,
-        system_prompt=system_prompt or _ADVISOR_SYSTEM_PROMPT,
-    )
     # M239: every caller of this function parses the reply as a JSON object —
     # `parse_verdict` here, `verify._parse_judge`, GoalMode's
     # `parse_check_verdict` — and all three degrade to a neutral verdict on a
@@ -106,7 +98,9 @@ def call_advisor(input_text: str, *, system_prompt: str | None = None) -> str:
     # cloud adapters ignore the flag.
     try:
         with strict_json_mode():
-            result = sub_agent.run(input_text)
+            result = run_oneshot(
+                provider, model, system_prompt or _ADVISOR_SYSTEM_PROMPT, input_text
+            )
     except Exception as exc:
         return f"<advisor failed: {type(exc).__name__}: {exc}>"
     return result.text or ""

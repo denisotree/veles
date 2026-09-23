@@ -189,22 +189,13 @@ def make_insight_extractor(
     via stderr but doesn't abort the remaining triggers — partial
     extraction is better than total loss.
     """
-    from veles.core.agent import Agent
+    from veles.core.agent import run_oneshot
     from veles.core.memory.artefacts import append_memory_log
     from veles.core.tools.builtin.memory_save import save_insight_row
-    from veles.core.tools.registry import Registry
 
     def _extract_one(prompt: str, snippet: str) -> tuple[str, str] | None:
-        sub = Agent(
-            provider=provider,
-            registry=Registry(),
-            model=model,
-            max_iterations=1,
-            system_prompt=prompt,
-            max_tokens=512,
-        )
         try:
-            result = sub.run(snippet)
+            result = run_oneshot(provider, model, prompt, snippet, max_tokens=512)
         except Exception:
             return None
         return _parse_extractor_output(result.text or "")
