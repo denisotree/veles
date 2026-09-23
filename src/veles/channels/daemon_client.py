@@ -143,6 +143,14 @@ class DaemonClient:
         ) as resp:
             return await _read_json(resp)
 
+    async def cancel_goal(self, session_id: str) -> dict[str, Any]:
+        """DELETE /v1/sessions/{id}/goal — cancel the chat's goal (M280b);
+        `{"cancelled": null}` when it had none."""
+        async with self.session.delete(
+            f"{self._base}/v1/sessions/{session_id}/goal", headers=self._auth
+        ) as resp:
+            return await _read_json(resp)
+
     async def stream_events(self, run_id: str) -> AsyncIterator[dict[str, Any]]:
         """Yield parsed JSON events from `WS /v1/runs/{run_id}/events`."""
         ws_url = self._base.replace("http://", "ws://", 1).replace("https://", "wss://", 1)

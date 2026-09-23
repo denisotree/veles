@@ -214,6 +214,25 @@ _CONFIRM_YES_PREFIXES: tuple[str, ...] = (
 _CONFIRM_YES_EXACT: frozenset[str] = frozenset({"y", "yes!", "go", "go!", "+"})
 
 
+def _ended_meanwhile(ctx: ModeContext, goal_id: str, result: Any) -> bool:
+    """True — and the turn is closed — when the goal stopped being active while
+    a step or a check was running: someone cancelled it (`/goal cancel` in a
+    chat, `veles goal cancel` in another terminal). Writing the step's
+    checkpoint then raised "cannot append to goal in status 'cancelled'" and
+    the turn died with an error (live-found in M280b)."""
+    from veles.core.goal import read_goal
+
+    goal = read_goal(ctx.project.state_dir, goal_id)
+    if goal is not None and goal.status == "active":
+        return False
+    status = goal.status if goal is not None else "gone"
+    ctx.state.active_goal_id = None
+    ctx.state.mode = "auto"  # type: ignore[assignment]
+    ctx.post(SystemLine(text=f"[goal {goal_id} {status} meanwhile — stopping; mode → auto]"))
+    ctx.post(TurnDone(result=result))
+    return True
+
+
 def _last_execute_checkpoint(goal) -> Any | None:
     """The most recent EXECUTE checkpoint, identified by its `metrics`.
 
@@ -607,6 +626,8 @@ class GoalMode:
         # empty `text` after doing all the work through tools (the reason
         # `RunResult.invoked_tools` exists at all, agent.py). Without the tool
         # list an empty `outcome` is indistinguishable from a failed step.
+        if _ended_meanwhile(ctx, goal.id, result):
+            return
         append_checkpoint(
             ctx.project.state_dir,
             goal.id,
@@ -715,6 +736,10 @@ class GoalMode:
             ctx.post(TurnDone(result=RunResult(text=raw, iterations=0, stopped_reason="synthetic")))
             return
         verdict, reason = parse_check_verdict(raw)
+        if _ended_meanwhile(
+            ctx, goal.id, RunResult(text="", iterations=0, stopped_reason="synthetic")
+        ):
+            return
         append_checkpoint(
             ctx.project.state_dir,
             goal.id,

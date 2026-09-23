@@ -66,6 +66,7 @@ def make_app(state: DaemonState) -> web.Application:
     app.router.add_get("/v1/sessions/{session_id}", _handle_get_session)
     app.router.add_delete("/v1/sessions/{session_id}", _handle_delete_session)
     app.router.add_patch("/v1/sessions/{session_id}", _handle_patch_session)
+    app.router.add_delete("/v1/sessions/{session_id}/goal", _handle_cancel_session_goal)
     # M75 jobs API
     app.router.add_post("/v1/jobs", _handle_create_job)
     app.router.add_get("/v1/jobs", _handle_list_jobs)
@@ -509,6 +510,8 @@ async def _handle_get_session(request: web.Request) -> web.Response:
             "messages": history,
             # M280: the session's agent mode (PATCH below); "default" = never switched.
             "mode": state.chat_mode(session_id).mode or "default",
+            # M280b: the goal this chat is running (null when none), for `/goal`.
+            "goal": state.chat_goal(session_id),
         }
     )
 
@@ -520,6 +523,16 @@ async def _handle_delete_session(request: web.Request) -> web.Response:
     if not deleted:
         return web.json_response({"error": f"session {session_id!r} not found"}, status=404)
     return web.json_response({"deleted": True, "session_id": session_id})
+
+
+async def _handle_cancel_session_goal(request: web.Request) -> web.Response:
+    """DELETE /v1/sessions/{session_id}/goal — cancel the goal this chat runs
+    (Telegram `/goal cancel`); the chat returns to its default mode. A drive in
+    progress stops on its next turn. `cancelled` is null when there was none."""
+    state: DaemonState = request.app["state"]
+    session_id = request.match_info["session_id"]
+    goal = state.cancel_chat_goal(session_id, reason="cancelled from the chat")
+    return web.json_response({"session_id": session_id, "cancelled": goal})
 
 
 async def _handle_patch_session(request: web.Request) -> web.Response:

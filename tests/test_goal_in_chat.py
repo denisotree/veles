@@ -209,6 +209,104 @@ async def test_a_goal_already_running_elsewhere_is_not_driven_twice(full_goal) -
     assert read_goal(state.project.state_dir, goal_id).status == "active"
 
 
+# ---- b4: /goal status, cancel, resume ----
+
+
+async def test_goal_status_shows_the_chats_goal(full_goal) -> None:
+    gw, _, log, summary = full_goal
+    await gw._handle_update(_message("/goal create hello.txt"))
+    log.clear()
+    await gw._handle_update(_message("/goal"))
+    status = log[-1][1]
+    assert "confirm" in status and summary[:20] in status
+
+
+async def test_goal_cancel_ends_it_and_the_next_goal_starts_fresh(full_goal) -> None:
+    """After a cancel the chat is back on its default, and a new `/goal` must
+    create a new goal — GoalMode never checks status, so without the liveness
+    check it would have carried on with the cancelled one's phases."""
+    from veles.core.goal import read_goal
+
+    gw, state, log, _ = full_goal
+    await gw._handle_update(_message("/goal create hello.txt"))
+    sid = gw.session_map.get("42")
+    first = state.chat_mode(sid).active_goal_id
+    await gw._handle_update(_message("/goal cancel"))
+    assert read_goal(state.project.state_dir, first).status == "cancelled"
+    assert state.chat_mode(sid).mode is None
+    assert "Goal cancelled" in log[-1][1]
+
+    await gw._handle_update(_message("/goal write notes"))
+    second = state.chat_mode(sid).active_goal_id
+    assert second and second != first
+
+
+async def test_a_cancel_during_the_run_stops_it_after_the_current_step(
+    full_goal, monkeypatch
+) -> None:
+    """`/goal cancel` arrives while the goal drives itself (commands don't wait
+    for the chat's turn). Simulated here by the step itself cancelling, which is
+    what the drive observes either way: the status on disk."""
+    from veles.core.goal import cancel, read_goal
+
+    gw, state, log, _ = full_goal
+    await gw._handle_update(_message("/goal create hello.txt"))
+    sid = gw.session_map.get("42")
+    goal_id = state.chat_mode(sid).active_goal_id
+
+    def advisor_while_user_cancels(body, **_kw):
+        cancel(state.project.state_dir, goal_id, reason="user")
+        return '{"verdict": "step_ok_continue", "reason": "more"}'
+
+    monkeypatch.setattr("veles.core.tools.builtin.advisor.call_advisor", advisor_while_user_cancels)
+    log.clear()
+    await gw._handle_update(_message("yes"))
+    await gw._flush_buffer("42")
+    assert "Goal cancelled" in log[-1][1]
+    assert read_goal(state.project.state_dir, goal_id).status == "cancelled"
+
+
+async def test_goal_resume_continues_a_stopped_goal(full_goal, monkeypatch) -> None:
+    from veles.core.goal import read_goal
+
+    gw, state, log, _ = full_goal
+    monkeypatch.setattr(
+        "veles.core.tools.builtin.advisor.call_advisor",
+        lambda body, **_kw: "<advisor unavailable: no model>",
+    )
+    await gw._handle_update(_message("/goal create hello.txt"))
+    sid = gw.session_map.get("42")
+    goal_id = state.chat_mode(sid).active_goal_id
+    await gw._handle_update(_message("yes"))
+    await gw._flush_buffer("42")
+    assert "Goal stopped" in log[-1][1]
+
+    monkeypatch.setattr(
+        "veles.core.tools.builtin.advisor.call_advisor",
+        lambda body, **_kw: '{"verdict": "goal_reached", "reason": "done"}',
+    )
+    await gw._handle_update(_message("/goal resume"))
+    assert "Goal done" in log[-1][1]
+    assert read_goal(state.project.state_dir, goal_id).status == "completed"
+
+
+async def test_delete_session_goal_over_http(aiohttp_client, full_goal) -> None:
+    from veles.daemon.server import make_app
+
+    gw, state, _, _ = full_goal
+    state.token_store.add("default")
+    client = await aiohttp_client(make_app(state))
+    headers = {"Authorization": f"Bearer {state.token_store.list()[0].token}"}
+    resp = await client.delete("/v1/sessions/nobody/goal", headers=headers)
+    assert (await resp.json())["cancelled"] is None
+
+    await gw._handle_update(_message("/goal create hello.txt"))
+    sid = gw.session_map.get("42")
+    resp = await client.delete(f"/v1/sessions/{sid}/goal", headers=headers)
+    assert (await resp.json())["cancelled"]["id"]
+    assert state.chat_goal(sid) is None
+
+
 async def test_post_v1_runs_rejects_an_unknown_mode(aiohttp_client, tmp_path) -> None:
     from veles.daemon.server import make_app
 

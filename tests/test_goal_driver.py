@@ -125,6 +125,28 @@ def test_an_unavailable_advisor_is_not_an_off_track_verdict(project) -> None:
     assert any("cannot check the step" in line for line in lines)
 
 
+def test_a_goal_cancelled_while_a_step_runs_ends_the_drive_cleanly(project) -> None:
+    """`veles goal cancel` from another terminal (or Telegram `/goal cancel`)
+    while EXECUTE is working: writing the step's checkpoint raised "cannot
+    append to goal in status 'cancelled'" and the whole run died with an error."""
+    from veles.core.goal import cancel
+
+    goal = start_goal(project.state_dir, objective="x", done_condition="y")
+    ctx, _, _ = _ctx(project)
+    real_factory = ctx.factory
+
+    def factory(state, **kw):
+        agent = real_factory(state, **kw)
+        if agent.mode == "writing":  # the EXECUTE step: someone cancels meanwhile
+            cancel(project.state_dir, goal.id, reason="user")
+        return agent
+
+    ctx.factory = factory
+    outcome = drive_goal(ctx, goal.id)
+    assert outcome.status == "cancelled"
+    assert read_goal(project.state_dir, goal.id).status == "cancelled"
+
+
 def test_a_plan_phase_that_never_plans_is_stopped_as_stalled(project) -> None:
     """The model keeps answering PLAN without calling `create_plan`; GoalMode
     stays in PLAN by design, so only the loop can notice nothing is happening."""

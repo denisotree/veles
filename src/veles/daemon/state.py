@@ -121,6 +121,41 @@ class DaemonState:
         self.chat_modes[session_id] = current
         return current
 
+    def chat_goal(self, session_id: str | None) -> dict[str, Any] | None:
+        """M280b: the goal a chat is running, as `/goal` shows it; None when the
+        chat has none or it already ended."""
+        from veles.core.goal import read_goal
+
+        goal_id = self.chat_mode(session_id).active_goal_id
+        goal = read_goal(self.project.state_dir, goal_id) if goal_id else None
+        if goal is None or goal.status != "active":
+            return None
+        return {
+            "id": goal.id,
+            "objective": goal.objective,
+            "phase": goal.current_phase,
+            "steps_done": goal.steps_done,
+            "max_steps": goal.budget.max_steps,
+            "cost_spent_usd": goal.cost_spent_usd,
+            "max_cost_usd": goal.budget.max_cost_usd,
+        }
+
+    def cancel_chat_goal(self, session_id: str, reason: str) -> dict[str, Any] | None:
+        """Cancel the chat's goal and put the chat back on its default. A drive
+        in progress sees the status on its next turn and stops. None when there
+        was nothing to cancel."""
+        from veles.core.goal import cancel
+
+        goal = self.chat_goal(session_id)
+        if goal is None:
+            return None
+        cancel(self.project.state_dir, goal["id"], reason=reason)
+        chat = self.chat_mode(session_id)
+        chat.mode = None
+        chat.active_goal_id = None
+        self.chat_modes[session_id] = chat
+        return goal
+
     def add_run(self, handle: RunHandle) -> None:
         self.runs[handle.run_id] = handle
         self.last_activity_at = time.time()

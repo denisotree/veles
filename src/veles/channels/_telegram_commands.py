@@ -64,7 +64,7 @@ async def _cmd_help(gateway: TelegramGateway, chat_key: str, args: str) -> str:
         "/mode — switch this chat's agent mode (default / auto / planning / writing)\n"
         "/insights [category] — recent insights (curated sessions, skill suggestions)\n"
         "/rules [kind] — recent behavioral rules (preferences, dont)\n"
-        "/goal — how to run a long-running goal\n"
+        "/goal &lt;task&gt; — run a goal in this chat (/goal · /goal cancel · /goal resume)\n"
         "/dream — trigger memory consolidation pass\n"
         "/tokens — per-session token totals (work in progress)\n"
         "/context — context window vs limit (work in progress)\n\n"
@@ -125,24 +125,55 @@ async def _cmd_goal(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     same streaming, approval buttons and delivery as any message — so GoalMode
     opens with its interview; once the plan is confirmed the goal runs to its
     end within that turn. (M276 answered "not from Telegram yet": daemon turns
-    had no agent modes until M280a.)"""
-    task = args.strip()
-    if not task:
-        return (
-            "<b>/goal &lt;task&gt;</b>\n"
-            "Starts a goal in this chat: I ask what I need to know, confirm a plan "
-            "with you, then work until it is done or a budget runs out."
-        )
+    had no agent modes until M280a.)
+
+    `/goal` shows the chat's goal, `/goal cancel` cancels it at once — even
+    mid-run, since commands don't wait for the chat's turn — and `/goal resume`
+    continues one that stopped. The daemon answers all of it (`get_session` /
+    `cancel_goal`), so a gateway without the project's files works too."""
+    arg = args.strip()
+    client: Any = gateway.daemon_client
     session_id = gateway.session_map.get(chat_key)
+    goal = None
     if session_id:
-        client: Any = gateway.daemon_client
         with contextlib.suppress(Exception):
-            if (await client.get_session(session_id)).get("mode") == "goal":
-                return (
-                    "A goal is already running in this chat — answer its question, "
-                    "or /goal cancel it first."
-                )
-    await gateway._run_turn_serial(chat_key_to_int(chat_key), chat_key, task, mode="goal")
+            goal = (await client.get_session(session_id)).get("goal")
+
+    if arg.lower() == "cancel":
+        if not session_id or goal is None:
+            return "No goal is running in this chat."
+        try:
+            await client.cancel_goal(session_id)
+        except Exception as exc:
+            return f"could not cancel the goal: {html.escape(str(exc))}"
+        return "Goal cancelled. If it was working, it stops after the current step."
+    if arg.lower() == "resume":
+        if goal is None:
+            return (
+                "No goal to resume in this chat. After a daemon restart a chat forgets "
+                "its goal — <code>veles goal list</code> and <code>veles goal resume "
+                "&lt;id&gt;</code> on the host continue it."
+            )
+        await gateway._run_turn_serial(chat_key_to_int(chat_key), chat_key, "continue", mode="goal")
+        return ""
+    if not arg:
+        if goal is None:
+            return (
+                "<b>/goal &lt;task&gt;</b>\n"
+                "Starts a goal in this chat: I ask what I need to know, confirm a plan "
+                "with you, then work until it is done or a budget runs out.\n"
+                "/goal — status · /goal cancel · /goal resume"
+            )
+        return (
+            f"<b>goal</b> <code>{html.escape(goal['id'])}</code> — {html.escape(goal['phase'])}\n"
+            f"{html.escape(str(goal['objective'])[:300])}\n"
+            f"steps {goal['steps_done']}/{goal['max_steps']} · "
+            f"${goal['cost_spent_usd']:.2f}/${goal['max_cost_usd']:.2f}\n"
+            "/goal cancel · /goal resume"
+        )
+    if goal is not None:
+        return "A goal is already running in this chat — answer its question, or /goal cancel it."
+    await gateway._run_turn_serial(chat_key_to_int(chat_key), chat_key, arg, mode="goal")
     return ""
 
 
@@ -389,7 +420,7 @@ def menu_descriptors() -> list[dict[str, str]]:
             "description": "Recent insights (skill suggestions, manager reports)",
         },
         {"command": "rules", "description": "Recent behavioral rules (preferences, dont)"},
-        {"command": "goal", "description": "How to run a long-running goal"},
+        {"command": "goal", "description": "Run a goal in this chat"},
         {"command": "dream", "description": "Run a memory consolidation pass now"},
         {"command": "tokens", "description": "Token totals (WIP)"},
         {"command": "context", "description": "Context window usage (WIP)"},

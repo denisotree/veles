@@ -72,9 +72,18 @@ class InProcessRunBackend:
 
     async def get_session(self, session_id: str) -> dict[str, Any]:
         """In-process equivalent of `DaemonClient.get_session`: the session's
-        agent mode, `"default"` when never switched."""
-        mode = self._state.chat_mode(session_id).mode or "default"
-        return {"session_id": session_id, "mode": mode}
+        agent mode (`"default"` when never switched) and its goal, if any."""
+        return {
+            "session_id": session_id,
+            "mode": self._state.chat_mode(session_id).mode or "default",
+            "goal": self._state.chat_goal(session_id),
+        }
+
+    async def cancel_goal(self, session_id: str) -> dict[str, Any]:
+        """In-process equivalent of `DaemonClient.cancel_goal`: cancel the
+        chat's goal; `{"cancelled": null}` when it had none."""
+        goal = self._state.cancel_chat_goal(session_id, reason="cancelled from the chat")
+        return {"session_id": session_id, "cancelled": goal}
 
     async def update_session(self, session_id: str, *, mode: str) -> dict[str, Any]:
         """In-process equivalent of `DaemonClient.update_session` (PATCH):
