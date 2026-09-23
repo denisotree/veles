@@ -76,6 +76,13 @@ ferramentas). O modo atual aparece marcado. A escolha vale até o daemon
 reiniciar. A linha de status do modo, por exemplo *auto → plan*, aparece acima
 da resposta.
 
+`/goal <tarefa>` executa uma meta no chat. O agente pergunta o que precisa saber
+e mostra o plano que vai seguir. Quando você responde `yes`, ele trabalha sozinho
+e envia uma linha após cada passo, até a meta ser cumprida ou um orçamento
+acabar. As aprovações continuam chegando como botões. `/goal` mostra o progresso,
+`/goal cancel` para a meta após o passo atual e `/goal resume` retoma uma meta
+parada.
+
 ## Limitação multimodal
 
 Enviar uma **foto ou mensagem de voz** atualmente retorna um aviso de "não configurado".

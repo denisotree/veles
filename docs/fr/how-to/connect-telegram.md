@@ -76,6 +76,13 @@ rien) et `writing` (agit avec ses outils). Le mode actuel est coché. Le choix
 dure jusqu'au redémarrage du daemon. La ligne d'état du mode, par exemple
 *auto → plan*, s'affiche au-dessus de la réponse.
 
+`/goal <tâche>` lance un objectif dans la conversation. L'agent demande ce qu'il
+doit savoir et montre le plan qu'il va suivre. Quand vous répondez `yes`, il
+travaille seul et envoie une ligne après chaque étape, jusqu'à ce que l'objectif
+soit atteint ou qu'un budget soit épuisé. Les approbations arrivent toujours sous
+forme de boutons. `/goal` montre l'avancement, `/goal cancel` l'arrête après
+l'étape en cours et `/goal resume` reprend un objectif arrêté.
+
 ## Limitation multimodale
 
 L'envoi d'une **photo ou d'un message vocal** renvoie actuellement un avis « non

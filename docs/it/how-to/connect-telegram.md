@@ -76,6 +76,13 @@ se pianificare prima), `planning` (pianifica soltanto, non modifica nulla) e
 scelta vale fino al riavvio del daemon. La riga di stato della modalità, per
 esempio *auto → plan*, compare sopra la risposta.
 
+`/goal <attività>` avvia un obiettivo nella chat. L'agente chiede ciò che gli
+serve sapere e mostra il piano che seguirà. Quando rispondi `yes`, lavora da solo
+e invia una riga dopo ogni passo, finché l'obiettivo è raggiunto o un budget si
+esaurisce. Le approvazioni arrivano sempre come pulsanti. `/goal` mostra
+l'avanzamento, `/goal cancel` lo ferma dopo il passo corrente e `/goal resume`
+riprende un obiettivo fermato.
+
 ## Limitazione multimodale
 
 L'invio di una **foto o di un messaggio vocale** restituisce attualmente un avviso "not configured".

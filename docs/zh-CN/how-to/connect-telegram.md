@@ -68,6 +68,11 @@ veles channel remove telegram            # drop the channel binding
 （使用工具直接执行）。当前模式会打勾。所选模式在守护进程重启前有效。模式的状态行
 （例如 *auto → plan*）显示在回答上方。
 
+`/goal <任务>` 在聊天中运行一个目标。智能体会询问需要了解的信息，并展示将要执行的
+计划。你回复 `yes` 后，它会自行工作，每完成一步发送一行进度，直到目标达成或预算
+用尽。审批请求仍以按钮形式发来。`/goal` 显示进度，`/goal cancel` 在当前步骤后
+停止，`/goal resume` 继续已停止的目标。
+
 ## 多模态限制
 
 目前发送**照片或语音消息**会返回一条“未配置”的提示。Veles 定义了 `VisionAdapter` / STT 适配器协议以及一个注册表（`modules/vision.py`、`modules/stt.py`），但**没有任何具体适配器随附发布，也没有在守护进程启动时注册任何适配器**，所以图像和音频暂时不会被分析。文本聊天功能完整可用。参见[提供方参考](../reference/providers.md#multimodal-status-vision--speech-to-text)。

@@ -76,6 +76,13 @@ planificar primero), `planning` (solo planifica, no cambia nada) y `writing`
 hasta que se reinicia el daemon. La línea de estado del modo, por ejemplo
 *auto → plan*, aparece encima de la respuesta.
 
+`/goal <tarea>` ejecuta un objetivo en el chat. El agente pregunta lo que
+necesita saber y muestra el plan que seguirá. Cuando respondes `yes`, trabaja por
+su cuenta y envía una línea tras cada paso, hasta cumplir el objetivo o agotar
+un presupuesto. Las aprobaciones siguen llegando como botones. `/goal` muestra el
+progreso, `/goal cancel` lo detiene tras el paso actual y `/goal resume`
+continúa uno detenido.
+
 ## Limitación multimodal
 
 Enviar una **foto o un mensaje de voz** actualmente devuelve un aviso de "no
