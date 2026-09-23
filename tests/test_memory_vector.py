@@ -18,7 +18,6 @@ from veles.core.memory.vector import (
     EmbeddingHit,
     _reset_backend_cache,
     available_backend,
-    delete_embedding,
     ensure_embeddings_table,
     get_embedding,
     knn,
@@ -104,12 +103,6 @@ def test_upsert_empty_vector_rejected(conn) -> None:
 
 def test_get_missing_returns_none(conn) -> None:
     assert get_embedding(conn, ref_kind="skill", ref_id=99) is None
-
-
-def test_delete_returns_true_on_hit(conn) -> None:
-    upsert_embedding(conn, ref_kind="skill", ref_id=1, vec=[0.1])
-    assert delete_embedding(conn, ref_kind="skill", ref_id=1) is True
-    assert delete_embedding(conn, ref_kind="skill", ref_id=1) is False
 
 
 # ---- knn ----

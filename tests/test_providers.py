@@ -11,7 +11,6 @@ from veles.core.provider_factory import LOCAL_PROVIDERS, PROVIDER_API_KEY_ENVS
 from veles.core.providers import (
     ALL_PROVIDERS,
     ProviderSpec,
-    get_provider,
     tui_label,
 )
 
@@ -31,17 +30,6 @@ def test_every_provider_classified_somewhere() -> None:
         assert (
             spec.value in keyed or spec.value in LOCAL_PROVIDERS or spec.value in cli_delegates
         ), f"provider {spec.value!r} has no adapter category"
-
-
-def test_get_provider_returns_spec() -> None:
-    spec = get_provider("openrouter")
-    assert isinstance(spec, ProviderSpec)
-    assert spec.value == "openrouter"
-    assert spec.label == "OpenRouter"
-
-
-def test_get_provider_unknown_returns_none() -> None:
-    assert get_provider("not-a-provider") is None
 
 
 def test_tui_label_includes_tagline_when_present() -> None:

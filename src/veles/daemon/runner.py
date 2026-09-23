@@ -317,7 +317,6 @@ async def run_agent_in_background(
             )
 
     handle.state = "running"
-    handle.session_id = handle.session_id  # placeholder; filled by run if missing
     _post(
         {
             "type": "started",

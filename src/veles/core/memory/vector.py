@@ -252,15 +252,6 @@ def get_embedding(conn: sqlite3.Connection, *, ref_kind: str, ref_id: int) -> li
     return unpack(row["vec_blob"])
 
 
-def delete_embedding(conn: sqlite3.Connection, *, ref_kind: str, ref_id: int) -> bool:
-    ensure_embeddings_table(conn)
-    cur = conn.execute(
-        "DELETE FROM embeddings_blob WHERE ref_kind = ? AND ref_id = ?",
-        (ref_kind, ref_id),
-    )
-    return cur.rowcount > 0
-
-
 # ---------- k-NN ----------
 
 
@@ -406,7 +397,6 @@ __all__ = [
     "EmbeddingHit",
     "available_backend",
     "cosine_similarity",
-    "delete_embedding",
     "ensure_embeddings_table",
     "get_embedding",
     "knn",

@@ -92,10 +92,6 @@ class DaemonClient:
         ) as resp:
             return await _read_json(resp)
 
-    async def get_run(self, run_id: str) -> dict[str, Any]:
-        async with self.session.get(f"{self._base}/v1/runs/{run_id}", headers=self._auth) as resp:
-            return await _read_json(resp)
-
     async def submit_prompt_answer(
         self, run_id: str, prompt_id: str, choice: str
     ) -> dict[str, Any]:

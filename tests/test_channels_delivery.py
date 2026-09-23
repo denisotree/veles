@@ -85,19 +85,7 @@ async def test_local_without_sink_reports_no_handler():
     assert "no local_sink" in str(info["reason"])
 
 
-async def test_origin_handler_called():
-    captured: list[str] = []
-
-    async def handler(text: str) -> None:
-        captured.append(text)
-
-    router = DeliveryRouter(origin_handler=handler)
-    info = await router.deliver("origin", "ping")
-    assert info["delivered"] is True
-    assert captured == ["ping"]
-
-
-async def test_origin_without_handler_raises():
+async def test_unresolved_origin_raises():
     router = DeliveryRouter()
     with pytest.raises(DeliveryError):
         await router.deliver("origin", "ping")

@@ -10,8 +10,9 @@ get no tools at all and run blind. This module lets the agent present tools as
 Two halves:
   - `render_tools_prompt(schemas)` — a system-prompt addendum describing each
     tool and the exact fenced syntax to call it.
-  - `parse_tool_calls(text)` — extract ```veles-tool blocks from a response,
-    decode name + arguments, return ToolCall objects.
+  - `parse_tool_calls_with_errors(text)` — extract ```veles-tool blocks from a
+    response, decode name + arguments, return ToolCall objects plus the
+    blocks that failed to parse.
 
 A dedicated `veles-tool` fence (not ```bash```) with a JSON body keeps the
 call channel unambiguous and prevents an illustrative code block from looking
@@ -21,8 +22,8 @@ FOOTGUN — guarded by the *caller*: fenced parsing must run ONLY when the
 provider lacks native tool calling. A native model may write an illustrative
 ```bash``` (or even ```veles-tool```) block in prose; parsing that as a real
 call would execute an example. `Agent` gates this on
-`provider.supports_tools is False` (M143); never call `parse_tool_calls` on a
-native model's output.
+`provider.supports_tools is False` (M143); never parse a native model's
+output this way.
 """
 
 from __future__ import annotations
@@ -109,16 +110,6 @@ def render_tools_prompt(schemas: list[dict]) -> str:
             arg_sig = ""
         lines.append(f"- {name}({arg_sig}) — {desc}" if desc else f"- {name}({arg_sig})")
     return "\n".join(lines)
-
-
-def parse_tool_calls(text: str) -> list[ToolCall]:
-    """Extract tool calls from a non-native model's response text.
-
-    Thin wrapper over `parse_tool_calls_with_errors` for callers that don't
-    care about the parse diagnostics.
-    """
-    calls, _errors = parse_tool_calls_with_errors(text)
-    return calls
 
 
 # Snippet cap for parse-error reports — long enough to show the broken value,
@@ -216,7 +207,7 @@ class FencedToolScrubber:
     verbatim dumps `{"name": …}` JSON and dangling ``` fences into the chat
     (observed live 2026-07-08, ollama qwen3.5:9b). The agent wraps
     `on_text_delta` with this scrubber per provider round, so the user sees
-    prose only while `parse_tool_calls` still reads the full raw text.
+    prose only while the parser still reads the full raw text.
 
     Streaming-safe: holds back text that might be the start of a fence until
     it can be classified. Normal code fences (```python …) pass through

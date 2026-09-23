@@ -10,8 +10,6 @@ telemetry that survives across runs. Functions here:
   into the catalogue row, resolving `extends` name → `base_skill_id`.
 - `record_skill_use(conn, name, ok, latency_ms)` appends a `skill_uses`
   row so use_count / success_rate become aggregate queries.
-- `inheritance_chain(conn, name)` walks the parent pointers via the
-  same recursive-CTE pattern as tools.
 - `resolve_inheritance(skill, by_name)` (pure Python, no DB) merges a
   Skill with its parents — child's tools / parameters override base
   ones at the same name, body is concatenated parent → child.
@@ -235,32 +233,6 @@ def skill_telemetry(conn: sqlite3.Connection, name: str) -> SkillTelemetry:
     )
 
 
-def inheritance_chain(conn: sqlite3.Connection, name: str) -> list[SkillRecord]:
-    """Walk the `name → base_skill_id` chain (recursive CTE, depth ≤ 10).
-    Returns chain in descent order: `name` at index 0, its base at 1,
-    grandparent at 2, ..."""
-    rows = conn.execute(
-        """
-        WITH RECURSIVE chain(id, name, scope, base_skill_id,
-                             description, file_path, depth) AS (
-            SELECT id, name, scope, base_skill_id,
-                   description, file_path, 0
-            FROM skills WHERE name = ?
-            UNION ALL
-            SELECT s.id, s.name, s.scope, s.base_skill_id,
-                   s.description, s.file_path, c.depth + 1
-            FROM skills s
-            JOIN chain c ON s.id = c.base_skill_id
-            WHERE c.depth < 10
-        )
-        SELECT id, name, scope, base_skill_id, description, file_path
-        FROM chain ORDER BY depth
-        """,
-        (name,),
-    ).fetchall()
-    return [_row_to_record(r) for r in rows]
-
-
 # ---------- pure-Python inheritance resolver ----------
 
 
@@ -386,7 +358,6 @@ __all__ = [
     "SkillTelemetry",
     "get_skill",
     "get_skill_tool_refs",
-    "inheritance_chain",
     "list_skills",
     "record_skill_use",
     "resolve_inheritance",

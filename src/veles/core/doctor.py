@@ -732,9 +732,6 @@ def _check_approval_audit(project: Project | None) -> CheckResult:
 # ---- runner ----
 
 
-CheckFn = Callable[[], CheckResult] | Callable[[Project | None], CheckResult]
-
-
 def run_all(project: Project | None) -> DoctorReport:
     """Run every check in fixed order; return aggregated report."""
     no_arg: list[Callable[[], CheckResult]] = [

@@ -10,7 +10,6 @@ from veles.core.memory import SessionStore
 from veles.core.skills import Skill
 from veles.core.skills_persistence import (
     get_skill,
-    inheritance_chain,
     list_skills,
     record_skill_use,
     resolve_inheritance,
@@ -148,27 +147,6 @@ def test_telemetry_zero_when_never_used(conn) -> None:
     t = skill_telemetry(conn, "alpha")
     assert t.use_count == 0
     assert t.success_rate == 0.0
-
-
-# ---- inheritance_chain ----
-
-
-def test_chain_returns_three_levels(conn) -> None:
-    upsert_skill(conn, _skill("root"))
-    upsert_skill(conn, _skill("mid", extends="root"))
-    upsert_skill(conn, _skill("leaf", extends="mid"))
-    chain = inheritance_chain(conn, "leaf")
-    assert [r.name for r in chain] == ["leaf", "mid", "root"]
-
-
-def test_chain_unknown_name_empty(conn) -> None:
-    assert inheritance_chain(conn, "ghost") == []
-
-
-def test_chain_single_node_when_no_parent(conn) -> None:
-    upsert_skill(conn, _skill("solo"))
-    chain = inheritance_chain(conn, "solo")
-    assert [r.name for r in chain] == ["solo"]
 
 
 # ---- resolve_inheritance (pure Python) ----

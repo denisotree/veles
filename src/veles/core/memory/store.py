@@ -43,27 +43,14 @@ if TYPE_CHECKING:
 
 
 @runtime_checkable
-class LocalBackedStore(Protocol):
-    """A store that still has a local SQLite file behind it (M264c).
-
-    Every backend has one, including `RemoteStore`: sessions, turns, tool and
-    skill telemetry, the project-tree cache and the embedding blobs are all
-    per-installation state that no remote memory engine has a notion of. The
-    work that touches them is SQLite-specific by nature, not by accident, and
-    widening `MemoryStore` to cover it would describe operations a remote
-    backend can never implement.
-
-    So those call sites ask for `raw()` instead — which, unlike the reach into
-    `store._conn` it replaces, says out loud that the caller has stepped
-    outside the port and why it is allowed to.
-    """
-
-    def raw(self) -> sqlite3.Connection: ...
-
-
-@runtime_checkable
 class MemoryStore(Protocol):
-    """One project's (one tenant's) memory, wherever it lives."""
+    """One project's (one tenant's) memory, wherever it lives.
+
+    Every backend also keeps a local SQLite file, including `RemoteStore`:
+    sessions, turns, telemetry, the project-tree cache and embedding blobs are
+    per-installation state no remote engine has a notion of (M264c). That work
+    goes through each backend's `raw()` rather than widening this port with
+    operations a remote backend can never implement."""
 
     async def search_insights(self, query: str, *, limit: int) -> list[InsightHit]: ...
 
@@ -133,12 +120,6 @@ class SqliteStore:
         the ~90 reach-throughs this replaces said nothing at all."""
         return self._sync._conn
 
-    @property
-    def sync(self) -> SessionStore:
-        """Escape hatch for synchronous call sites not yet ported. Temporary by
-        construction: it disappears as the remaining sites move onto the port."""
-        return self._sync
-
 
 class RemoteStore:
     """Learned facts from an external engine, conversation state still local.
@@ -202,10 +183,6 @@ class RemoteStore:
         """The local file, which a remote backend still has: telemetry,
         sessions and the embedding blobs never leave the machine."""
         return self._local.raw()
-
-    @property
-    def sync(self) -> SessionStore:
-        return self._local.sync
 
 
 @contextmanager
@@ -325,7 +302,6 @@ def _configured_backend(project: Project) -> str:
 
 
 __all__ = [
-    "LocalBackedStore",
     "MemoryStore",
     "RemoteStore",
     "SqliteStore",

@@ -85,18 +85,6 @@ def get_active_locale() -> str:
     return _active
 
 
-def available_locales() -> list[str]:
-    """Sorted list of locale names discovered across built-in + user dirs."""
-    names: set[str] = set()
-    for root in _locale_dirs():
-        if not root.is_dir():
-            continue
-        for path in root.glob("*.toml"):
-            names.add(path.stem)
-    names.add(_DEFAULT_LOCALE)  # always present even if file missing
-    return sorted(names)
-
-
 def reset_for_tests() -> None:
     """Clear the in-memory cache + active-locale flag so test isolation
     is straightforward. Not part of the runtime API."""
@@ -148,7 +136,6 @@ def _locale_dirs() -> list[Path]:
 
 
 __all__ = [
-    "available_locales",
     "get_active_locale",
     "reset_for_tests",
     "set_active_locale",

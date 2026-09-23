@@ -63,31 +63,30 @@ _SKIP_EXACT = {"main", "run"}
 # A decorator that registers the function elsewhere (the registry calls it).
 _REGISTERING_DECORATORS = ("tool", "property", "hook", "setter", "command")
 
+# M295 (2026-09-23) deleted the ten dead entries; every one left is test-only
+# by design, with its reason.
 _BASELINE = frozenset(
     {
-        "available_locales",
-        # Kept on purpose (reviewed 2026-09-22): an observation hook that lets
-        # tests read state from outside instead of reaching into `_active_state`.
-        # Test-only by design, not by neglect.
+        # An observation hook that lets tests read state from outside instead
+        # of reaching into `_active_state` (reviewed 2026-09-22).
         "current_state",
-        "delete_embedding",
+        # The `ok` / `error` / `denied` ToolResult constructors are one API;
+        # production builds denials elsewhere, tests build them through this.
         "denied",
-        "event_decision_str",
-        "find_parent_project",
+        # Read halves of persistence APIs whose write halves are wired: tests
+        # read back what production wrote.
         "get_embedding",
-        "get_provider",
         "get_skill",
         "get_skill_tool_refs",
-        "list_completed",
         "list_skills",
-        "parse_plan_ref",
-        "parse_tool_calls",
+        # Injection seams for the interactive wizards, like the `reset_` hooks.
         "set_project_wizard_prompter",
         "set_wizard_prompter",
+        # Validates curated knowledge notes' `related` refs — the check lives
+        # in the knowledge freshness test.
         "skeleton_ref_index",
-        "stable_text",
+        # Test cleanup for the platform registry, like the `reset_` hooks.
         "unregister_platform",
-        "update_status",
     }
 )
 

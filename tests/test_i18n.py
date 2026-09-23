@@ -80,20 +80,6 @@ def test_env_var_overrides_explicit_locale(monkeypatch: pytest.MonkeyPatch):
     assert i18n.t("project_wizard.ask_initialize").startswith("Инициализировать")
 
 
-def test_available_locales_includes_builtin_and_user(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
-    user_root = tmp_path / ".veles" / "locales"
-    user_root.mkdir(parents=True)
-    (user_root / "de.toml").write_text('[x]\ny = "z"\n', encoding="utf-8")
-    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path))
-    i18n.reset_for_tests()
-    locales = i18n.available_locales()
-    assert "en" in locales
-    assert "ru" in locales
-    assert "de" in locales
-
-
 def test_unknown_locale_falls_back_to_english_per_lookup():
     """When the active locale isn't on disk, every lookup transparently
     falls through to EN — no crash."""

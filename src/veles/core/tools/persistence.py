@@ -302,36 +302,6 @@ def telemetry_batch(conn: sqlite3.Connection, names: list[str]) -> dict[str, Too
     return out
 
 
-def inheritance_chain(conn: sqlite3.Connection, name: str) -> list[ToolRecord]:
-    """Walk `name → base_tool_id` chain via recursive CTE. Returns the
-    chain in descent order: index 0 is `name`, index 1 is its base, etc.
-
-    Returns an empty list when `name` doesn't exist. Cycles (shouldn't
-    happen, but defence in depth) are clipped at depth 10 by the CTE.
-    """
-    rows = conn.execute(
-        """
-        WITH RECURSIVE chain(id, name, scope, origin, base_tool_id,
-                             description, manifest_json, depth) AS (
-            SELECT id, name, scope, origin, base_tool_id,
-                   description, manifest_json, 0
-            FROM tools WHERE name = ?
-            UNION ALL
-            SELECT t.id, t.name, t.scope, t.origin, t.base_tool_id,
-                   t.description, t.manifest_json, c.depth + 1
-            FROM tools t
-            JOIN chain c ON t.id = c.base_tool_id
-            WHERE c.depth < 10
-        )
-        SELECT id, name, scope, origin, base_tool_id,
-               description, manifest_json
-        FROM chain ORDER BY depth
-        """,
-        (name,),
-    ).fetchall()
-    return [_row_to_record(r) for r in rows]
-
-
 # ---------- internals ----------
 
 
@@ -356,7 +326,6 @@ __all__ = [
     "ToolRecord",
     "ToolTelemetry",
     "get_tool",
-    "inheritance_chain",
     "list_tools",
     "record_use",
     "telemetry",

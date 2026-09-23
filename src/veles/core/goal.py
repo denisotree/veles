@@ -37,7 +37,6 @@ GoalStatus = Literal[
     "active",
     "paused",
     "completed",
-    "blocked",
     "cancelled",
 ]
 

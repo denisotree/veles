@@ -15,7 +15,6 @@ from veles.core.project import (
 )
 from veles.core.subproject import (
     Subproject,
-    find_parent_project,
     init_subproject,
     load_subprojects,
     register_subproject,
@@ -108,33 +107,6 @@ def test_unregister_removes_entry(tmp_path: Path) -> None:
 def test_unregister_unknown_returns_false(tmp_path: Path) -> None:
     project = _make_root(tmp_path)
     assert unregister_subproject(project, "ghost") is False
-
-
-# ---------- find_parent_project ----------
-
-
-def test_find_parent_returns_ancestor_project(tmp_path: Path) -> None:
-    parent = _make_root(tmp_path, name="myorg")
-    child = init_project(parent.root / "frontend", name="frontend")
-    found = find_parent_project(child)
-    assert found is not None
-    assert found.root == parent.root
-
-
-def test_find_parent_returns_none_for_top_level(tmp_path: Path) -> None:
-    parent = _make_root(tmp_path)
-    assert find_parent_project(parent) is None
-
-
-def test_find_parent_skips_non_veles_intermediate(tmp_path: Path) -> None:
-    """Non-Veles directories between child and ancestor are skipped."""
-    parent = init_project(tmp_path / "myorg", name="myorg")
-    intermediate = parent.root / "services" / "api"
-    intermediate.mkdir(parents=True)
-    child = init_project(intermediate / "auth", name="auth")
-    found = find_parent_project(child)
-    assert found is not None
-    assert found.root == parent.root
 
 
 # ---------- init_subproject ----------

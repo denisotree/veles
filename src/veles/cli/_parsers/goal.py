@@ -17,7 +17,7 @@ def register(sub: argparse._SubParsersAction) -> None:
     g_list = goal_sub.add_parser("list", help="List goals (optionally filter by status).")
     g_list.add_argument(
         "--status",
-        choices=("active", "paused", "completed", "blocked", "cancelled"),
+        choices=("active", "paused", "completed", "cancelled"),
         default=None,
         help="Only show goals in this status.",
     )

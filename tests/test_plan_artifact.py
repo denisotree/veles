@@ -15,13 +15,10 @@ from veles.core.plan_artifact import (
     completed_dir,
     create_plan,
     list_active,
-    list_completed,
     mark_done,
-    parse_plan_ref,
     plan_ref,
     plans_dir,
     read_plan,
-    update_status,
 )
 
 # ---------- path helpers + plan_ref scheme ----------
@@ -33,16 +30,8 @@ def test_plans_dir_layout(tmp_path: Path) -> None:
     assert completed_dir(tmp_path).name == PLANS_COMPLETED_SUBDIR
 
 
-def test_plan_ref_round_trip() -> None:
-    ref = plan_ref("abc123")
-    assert ref == "artifact://veles/plans/abc123"
-    assert parse_plan_ref(ref) == "abc123"
-
-
-def test_parse_plan_ref_rejects_garbage() -> None:
-    assert parse_plan_ref("artifact://veles/sessions/x") is None
-    assert parse_plan_ref("not a ref") is None
-    assert parse_plan_ref("artifact://veles/plans/has-dash") is None
+def test_plan_ref_scheme() -> None:
+    assert plan_ref("abc123") == "artifact://veles/plans/abc123"
 
 
 # ---------- create / read ----------
@@ -123,20 +112,8 @@ def test_list_active_excludes_completed(tmp_path: Path) -> None:
     mark_done(tmp_path, b.id)
     active = list_active(tmp_path)
     assert [p.id for p in active] == [a.id]
-    completed = list_completed(tmp_path)
-    assert [p.id for p in completed] == [b.id]
-
-
-def test_update_status_transitions(tmp_path: Path) -> None:
-    plan = create_plan(tmp_path, objective="x")
-    assert plan.status == "draft"
-    p2 = update_status(tmp_path, plan.id, status="approved")
-    assert p2.status == "approved"
-    p3 = update_status(tmp_path, plan.id, status="executing")
-    assert p3.status == "executing"
-    reloaded = read_plan(tmp_path, plan.id)
-    assert reloaded is not None
-    assert reloaded.status == "executing"
+    done = read_plan(tmp_path, b.id)
+    assert done is not None and done.status == "completed"
 
 
 def test_mark_done_moves_to_completed_dir(tmp_path: Path) -> None:

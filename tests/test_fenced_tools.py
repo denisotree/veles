@@ -25,11 +25,15 @@ from veles.core.agent import Agent
 from veles.core.fenced_tools import (
     FENCED_RESULT_HEADER,
     FENCED_SENTINEL,
-    parse_tool_calls,
+    parse_tool_calls_with_errors,
     render_tools_prompt,
 )
-from veles.core.provider import ProviderResponse, TokenUsage
+from veles.core.provider import ProviderResponse, TokenUsage, ToolCall
 from veles.core.tools.registry import Registry, ToolEntry
+
+
+def parse_tool_calls(text: str) -> list[ToolCall]:
+    return parse_tool_calls_with_errors(text)[0]
 
 
 def _usage() -> TokenUsage:

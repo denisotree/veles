@@ -8,7 +8,7 @@ from __future__ import annotations
 import re as _re
 from pathlib import Path
 
-from veles.channels.display import DisplayTier, truncate_for_tier
+from veles.core.text import cut_with_note
 
 _TELEGRAM_API = "https://api.telegram.org"
 _LONG_POLL_TIMEOUT = 30
@@ -18,11 +18,12 @@ _LONG_POLL_TIMEOUT = 30
 _POLL_RETRY_INITIAL = 2.0
 _POLL_RETRY_MAX = 60.0
 _PLACEHOLDER_TEXT = "..."
-_TELEGRAM_TIER = DisplayTier.HIGH
+# Bot API limit is 4096 characters; the margin absorbs entity expansion.
+_MAX_MESSAGE_CHARS = 4000
 
 
 def _truncate(text: str) -> str:
-    return truncate_for_tier(text, _TELEGRAM_TIER)
+    return cut_with_note(text, _MAX_MESSAGE_CHARS, "...")
 
 
 # Tool-name substring → i18n ack key. The first match wins, so order by

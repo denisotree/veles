@@ -11,10 +11,8 @@ from veles.core.memory import SessionStore
 from veles.core.risk import RiskClass
 from veles.core.tool_result import DEFAULT_MAX_RESULT_CHARS
 from veles.core.tools.persistence import (
-    ToolRecord,
     ToolTelemetry,
     get_tool,
-    inheritance_chain,
     list_tools,
     record_use,
     telemetry,
@@ -264,33 +262,3 @@ def test_telemetry_batch_one_query(conn) -> None:
     assert out["b"].use_count == 1
     # `c` doesn't exist in tools — batch returns zero record uniformly.
     assert out["c"].use_count == 0
-
-
-# ---- inheritance_chain ----
-
-
-def test_inheritance_chain_walks_base_pointers(conn) -> None:
-    upsert_tool(conn, _entry("io_base"))
-    upsert_tool(conn, _entry("file_io"), base_tool_name="io_base")
-    upsert_tool(conn, _entry("typed_writer"), base_tool_name="file_io")
-
-    chain = inheritance_chain(conn, "typed_writer")
-    names = [r.name for r in chain]
-    assert names == ["typed_writer", "file_io", "io_base"]
-
-
-def test_inheritance_chain_single_node_when_no_parent(conn) -> None:
-    upsert_tool(conn, _entry("standalone"))
-    chain = inheritance_chain(conn, "standalone")
-    assert [r.name for r in chain] == ["standalone"]
-
-
-def test_inheritance_chain_unknown_name_returns_empty(conn) -> None:
-    assert inheritance_chain(conn, "never_made") == []
-
-
-def test_inheritance_chain_types_are_records(conn) -> None:
-    upsert_tool(conn, _entry("base"))
-    upsert_tool(conn, _entry("child"), base_tool_name="base")
-    chain = inheritance_chain(conn, "child")
-    assert all(isinstance(r, ToolRecord) for r in chain)

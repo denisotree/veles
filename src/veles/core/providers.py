@@ -49,14 +49,6 @@ ALL_PROVIDERS: tuple[ProviderSpec, ...] = (
 PROVIDER_VALUES: tuple[str, ...] = tuple(p.value for p in ALL_PROVIDERS)
 
 
-def get_provider(value: str) -> ProviderSpec | None:
-    """Return the spec for `value`, or None if unknown."""
-    for spec in ALL_PROVIDERS:
-        if spec.value == value:
-            return spec
-    return None
-
-
 def tui_label(spec: ProviderSpec) -> str:
     """Render the label TUI first-run wizard expects: '<name> (<tagline>)'
     when a tagline exists, plain `label` otherwise."""
@@ -69,6 +61,5 @@ __all__ = [
     "ALL_PROVIDERS",
     "PROVIDER_VALUES",
     "ProviderSpec",
-    "get_provider",
     "tui_label",
 ]

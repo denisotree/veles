@@ -20,8 +20,6 @@ Resolution rules:
 - `find_project_root(cwd)` returns the *nearest* enclosing project, so
   cd-ing into `myorg/frontend/src` makes `frontend` the active project
   even though `myorg` is also one.
-- `find_parent_project(p)` walks up from `p.root.parent` to find the
-  enclosing project, if any. Returns `None` for top-level projects.
 - `load_subprojects(p)` reads the registry only — the file-system is NOT
   scanned for unregistered `.veles/` directories. A child initialised
   outside `init_subproject` stays invisible until explicit register.
@@ -42,9 +40,7 @@ from veles.core.io_utils import atomic_write_text
 from veles.core.project import (
     Project,
     ProjectAlreadyExists,
-    find_project_root,
     init_project,
-    load_project,
 )
 
 _SUBPROJECTS_FILENAME = "subprojects.json"
@@ -112,21 +108,6 @@ def unregister_subproject(project: Project, slug: str) -> bool:
 def resolve_subproject_path(project: Project, sub: Subproject) -> Path:
     """Resolve a subproject's `path` field against the parent root."""
     return (project.root / sub.path).resolve()
-
-
-def find_parent_project(project: Project) -> Project | None:
-    """Walk up from `project.root.parent` looking for an enclosing project.
-
-    Returns the closest ancestor project, or `None` for top-level projects
-    (no enclosing `.veles/project.toml` above this root).
-    """
-    parent_dir = project.root.parent
-    if parent_dir == project.root:
-        return None
-    parent_root = find_project_root(parent_dir)
-    if parent_root is None:
-        return None
-    return load_project(parent_root)
 
 
 def init_subproject(
