@@ -312,6 +312,12 @@ class TelegramGateway:
             )
             return
 
+        # M284: while the agent waits on a question (`ask_user`), the next text is
+        # its answer — not a new turn, which would queue behind the waiting one
+        # and let the question time out.
+        if text and await self._answer_open_question(chat_id, text):
+            return
+
         kind = _classify(message)
         if kind is _Kind.IGNORED:
             return  # photo-only / voice / sticker — silently dropped, as before
@@ -679,11 +685,18 @@ class TelegramGateway:
         else:
             kind = "approval"
         short_codes, buttons, short_to_key = _build_buttons(prompt_id, kind, options)
-        if not buttons:
+        if not buttons and kind != "clarification":
             return
         body = _format_prompt_body(kind, event)
-        reply_markup = {"inline_keyboard": [buttons]}
-        sent = await self._send_message(chat_id, body, reply_markup=reply_markup)
+        if kind == "clarification":
+            # M284: an agent's question — options (free-form labels, often long)
+            # one per row; none at all is fine, the reply is typed.
+            markup = {"inline_keyboard": [[b] for b in buttons]} if buttons else None
+            sent = await self._send_message(chat_id, body, reply_markup=markup)
+        else:
+            sent = await self._send_message(
+                chat_id, body, reply_markup={"inline_keyboard": [buttons]}
+            )
         message_id = sent.get("message_id")
         if not isinstance(message_id, int):
             return
@@ -693,8 +706,33 @@ class TelegramGateway:
             message_id=message_id,
             kind=kind,
             short_to_key=short_to_key,
+            question=str(event.get("question") or ""),
+            labels={
+                str(o["key"]): str(o["label"])
+                for o in options
+                if isinstance(o, dict) and "key" in o and "label" in o
+            },
         )
         del short_codes  # unused after building the keyboard row
+
+    async def _answer_open_question(self, chat_id: int, text: str) -> bool:
+        """M284: hand `text` to the agent's open question in this chat, if one
+        is waiting; True when it was taken as the answer. A question that
+        already timed out (the daemon refuses) lets the text through as an
+        ordinary message."""
+        for prompt_id, pending in list(self._pending_prompts.items()):
+            if pending.kind != "clarification" or pending.chat_id != chat_id:
+                continue
+            try:
+                await self.daemon_client.submit_prompt_answer(pending.run_id, prompt_id, text)
+            except Exception as exc:
+                # Timed out or already answered — the daemon's `prompt_resolved`
+                # clears it; here the text simply becomes a normal message.
+                self._pending_prompts.pop(prompt_id, None)
+                logger.info("telegram: question %s no longer open: %s", prompt_id, exc)
+                return False
+            return True  # `prompt_resolved` edits the question message
+        return False
 
     async def _finalise_prompt_message(self, event: dict[str, Any]) -> None:
         """`prompt_resolved` — strip the buttons on the original prompt
@@ -709,13 +747,18 @@ class TelegramGateway:
             return
         choice = event.get("choice")
         reason = event.get("reason")
+        if pending.kind == "clarification" and isinstance(choice, str):
+            choice = (pending.labels or {}).get(choice, choice)  # option key → its label
         if reason == "timeout":
             tail = "⌛ timed out"
         elif isinstance(choice, str):
             tail = f"✓ {escape_html(choice)}"
         else:
             tail = "✓ resolved"
-        body = f"<i>{escape_html(pending.kind)} resolved</i> · {tail}"
+        if pending.kind == "clarification":
+            body = f"❓ {escape_html(pending.question)}\n{tail}"
+        else:
+            body = f"<i>{escape_html(pending.kind)} resolved</i> · {tail}"
         # `reply_markup={}` (no `inline_keyboard`) is how the Bot API
         # removes a previously-set keyboard.
         await self._edit_message(

@@ -395,7 +395,7 @@ async def _handle_resolve_prompt(request: web.Request) -> web.Response:
     pending = handle.pending_prompts.pop(prompt_id, None)
     if pending is None:
         return web.json_response({"error": f"prompt {prompt_id!r} not pending"}, status=404)
-    if choice not in pending.valid_choices:
+    if not pending.accepts(choice):
         # Put it back so a follow-up POST with the right key can still resolve.
         handle.pending_prompts[prompt_id] = pending
         return web.json_response(

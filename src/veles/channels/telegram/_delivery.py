@@ -150,7 +150,12 @@ class TelegramDelivery:
                                 await gw._send_message(chat_id, f"<i>{escape_html(note)}</i>")
                         else:
                             notices.append(note)
-                elif kind in ("trust_prompt", "approval_prompt", "critical_prompt"):
+                elif kind in (
+                    "trust_prompt",
+                    "approval_prompt",
+                    "critical_prompt",
+                    "clarification_prompt",  # M284: the agent's ask_user
+                ):
                     await gw._post_prompt(chat_id, run_id, event)
                 elif kind == "prompt_resolved":
                     await gw._finalise_prompt_message(event)

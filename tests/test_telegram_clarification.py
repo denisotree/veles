@@ -173,12 +173,13 @@ async def test_post_prompt_renders_clarification_keyboard(
     method, payload = sends[0]
     assert method == "sendMessage"
     assert "Which env?" in payload["text"]
-    # Inline keyboard wired
+    # Inline keyboard wired — one option per row (M284: an agent's options are
+    # free-form labels, often too long to share a row).
     kb = payload["reply_markup"]["inline_keyboard"]
-    assert len(kb) == 1
-    row = kb[0]
-    assert [b["text"] for b in row] == ["Staging", "Production", "Type my own"]
-    assert all(b["callback_data"].startswith("v:c1:") for b in row)
+    buttons = [row[0] for row in kb]
+    assert all(len(row) == 1 for row in kb)
+    assert [b["text"] for b in buttons] == ["Staging", "Production", "Type my own"]
+    assert all(b["callback_data"].startswith("v:c1:") for b in buttons)
     # Pending registry holds the mapping for the inbound callback
     assert "c1" in gateway._pending_prompts
     pending = gateway._pending_prompts["c1"]

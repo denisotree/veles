@@ -294,8 +294,63 @@ def make_critical_confirmer(
     return confirmer
 
 
+def make_question_prompter(
+    handle: RunHandle,
+    loop: asyncio.AbstractEventLoop,
+    *,
+    timeout: float = DEFAULT_PROMPT_TIMEOUT_SECONDS,
+):
+    """M284: route the agent's `ask_user` to the chat — the daemon returned
+    "no human available" for every question, so an agent working in a chat
+    could never ask for a detail only the user has.
+
+    Emits a `clarification_prompt` (the event the Telegram gateway already
+    renders, which nothing produced until now): the options, if any, become
+    buttons, and any text the user types in reply is taken as the answer
+    (`free_text`). Returns the chosen option's label, the typed answer, or
+    None on timeout — `ask_user` then tells the agent to proceed on its best
+    assumption, exactly as before."""
+
+    def prompter(question: str, options: list[str] | None = None) -> str | None:
+        prompt_id = _make_prompt_id()
+        choices = list(options or [])
+        keys = tuple(str(i) for i in range(len(choices)))
+        pending = PendingPrompt(
+            kind="clarification",
+            tool="ask_user",
+            valid_choices=keys,
+            free_text=True,
+        )
+        handle.pending_prompts[prompt_id] = pending
+        loop.call_soon_threadsafe(
+            handle.append_event,
+            {
+                "type": "clarification_prompt",
+                "prompt_id": prompt_id,
+                "question": question,
+                "options": [{"key": k, "label": c} for k, c in zip(keys, choices, strict=True)],
+            },
+        )
+        try:
+            answer = pending.future.result(timeout=timeout)
+        except _FuturesTimeout:
+            logger.info("question %s timed out after %.0fs → no answer", prompt_id, timeout)
+            handle.pending_prompts.pop(prompt_id, None)
+            loop.call_soon_threadsafe(
+                handle.append_event,
+                {"type": "prompt_resolved", "prompt_id": prompt_id, "reason": "timeout"},
+            )
+            return None
+        if answer in keys:
+            return choices[int(answer)]
+        return answer.strip() or None
+
+    return prompter
+
+
 __all__ = [
     "DEFAULT_PROMPT_TIMEOUT_SECONDS",
     "make_critical_confirmer",
+    "make_question_prompter",
     "make_unified_prompter",
 ]

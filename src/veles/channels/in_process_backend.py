@@ -127,7 +127,7 @@ class InProcessRunBackend:
         pending = handle.pending_prompts.pop(prompt_id, None)
         if pending is None:
             raise LookupError(f"prompt {prompt_id!r} not pending on run {run_id!r}")
-        if choice not in pending.valid_choices:
+        if not pending.accepts(choice):
             # Restore so a follow-up call with a valid key can resolve.
             handle.pending_prompts[prompt_id] = pending
             raise ValueError(f"choice {choice!r} not valid for {pending.kind} prompt")
