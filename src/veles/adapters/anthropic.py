@@ -81,18 +81,8 @@ class AnthropicProvider:
         model: str,
         max_tokens: int = 4096,
     ) -> ProviderResponse:
-        system, native_messages = _split_system_and_messages(messages)
-        kwargs: dict[str, Any] = {
-            "model": model,
-            "max_tokens": max_tokens,
-            "messages": native_messages,
-        }
-        if system is not None:
-            kwargs["system"] = system
-        if tools:
-            kwargs["tools"] = _convert_tools(tools)
-        response = self._client.messages.create(**kwargs)
-        return _convert_response(response)
+        kwargs = _request_kwargs(messages, tools, model=model, max_tokens=max_tokens)
+        return _convert_response(self._client.messages.create(**kwargs))
 
     def stream_message(
         self,
@@ -102,37 +92,19 @@ class AnthropicProvider:
         model: str,
         max_tokens: int = 4096,
     ) -> Iterator[StreamEvent]:
-        system, native_messages = _split_system_and_messages(messages)
-        kwargs: dict[str, Any] = {
-            "model": model,
-            "max_tokens": max_tokens,
-            "messages": native_messages,
-            "stream": True,
-        }
-        if system is not None:
-            kwargs["system"] = system
-        if tools:
-            kwargs["tools"] = _convert_tools(tools)
+        kwargs = _request_kwargs(messages, tools, model=model, max_tokens=max_tokens)
+        kwargs["stream"] = True
 
         text_buffer = ""
         current_tool: dict[str, Any] | None = None
         tool_acc: list[dict[str, Any]] = []
         stop_reason: str | None = None
-        prompt_tokens = 0
-        completion_tokens = 0
-        cache_read_tokens = 0
-        cache_creation_tokens = 0
+        usage = TokenUsage()
 
         for event in self._client.messages.create(**kwargs):
             et = getattr(event, "type", None)
             if et == "message_start":
-                msg = getattr(event, "message", None)
-                mu = getattr(msg, "usage", None) if msg is not None else None
-                if mu is not None:
-                    prompt_tokens = getattr(mu, "input_tokens", 0) or 0
-                    completion_tokens = getattr(mu, "output_tokens", 0) or 0
-                    cache_read_tokens = getattr(mu, "cache_read_input_tokens", 0) or 0
-                    cache_creation_tokens = getattr(mu, "cache_creation_input_tokens", 0) or 0
+                usage = _usage_from(getattr(getattr(event, "message", None), "usage", None))
             elif et == "content_block_start":
                 block = getattr(event, "content_block", None)
                 btype = getattr(block, "type", None)
@@ -170,20 +142,14 @@ class AnthropicProvider:
                 if ev_usage is not None:
                     out_tokens = getattr(ev_usage, "output_tokens", None)
                     if out_tokens is not None:
-                        completion_tokens = out_tokens or 0
+                        usage.completion_tokens = out_tokens or 0
 
         tool_calls: list[ToolCall] = []
         for tc in tool_acc:
             args = decode_tool_args(tc["arguments"])
             tool_calls.append(ToolCall(id=tc["id"], name=tc["name"], arguments=args))
 
-        usage = TokenUsage(
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=prompt_tokens + completion_tokens,
-            cache_read_tokens=cache_read_tokens,
-            cache_creation_tokens=cache_creation_tokens,
-        )
+        usage.total_tokens = usage.prompt_tokens + usage.completion_tokens
         yield StreamEnd(
             response=ProviderResponse(
                 text=text_buffer or None,
@@ -193,6 +159,34 @@ class AnthropicProvider:
                 raw=None,
             )
         )
+
+
+def _request_kwargs(
+    messages: list[Message], tools: list[dict[str, Any]] | None, *, model: str, max_tokens: int
+) -> dict[str, Any]:
+    """`messages.create` arguments shared by the plain and the streaming call."""
+    system, native_messages = _split_system_and_messages(messages)
+    kwargs: dict[str, Any] = {"model": model, "max_tokens": max_tokens, "messages": native_messages}
+    if system is not None:
+        kwargs["system"] = system
+    if tools:
+        kwargs["tools"] = _convert_tools(tools)
+    return kwargs
+
+
+def _usage_from(usage_obj: Any) -> TokenUsage:
+    """Anthropic `usage` (on a response or a `message_start` event) as TokenUsage."""
+    if usage_obj is None:
+        return TokenUsage()
+    prompt = getattr(usage_obj, "input_tokens", 0) or 0
+    completion = getattr(usage_obj, "output_tokens", 0) or 0
+    return TokenUsage(
+        prompt_tokens=prompt,
+        completion_tokens=completion,
+        total_tokens=prompt + completion,
+        cache_read_tokens=getattr(usage_obj, "cache_read_input_tokens", 0) or 0,
+        cache_creation_tokens=getattr(usage_obj, "cache_creation_input_tokens", 0) or 0,
+    )
 
 
 def _split_system_and_messages(
@@ -285,23 +279,10 @@ def _convert_response(response: Any) -> ProviderResponse:
                 )
             )
     text = "\n".join(p for p in text_parts if p) or None
-    usage_obj = getattr(response, "usage", None)
-    prompt_tokens = getattr(usage_obj, "input_tokens", 0) or 0 if usage_obj else 0
-    completion_tokens = getattr(usage_obj, "output_tokens", 0) or 0 if usage_obj else 0
-    cache_read_tokens = getattr(usage_obj, "cache_read_input_tokens", 0) or 0 if usage_obj else 0
-    cache_creation_tokens = (
-        getattr(usage_obj, "cache_creation_input_tokens", 0) or 0 if usage_obj else 0
-    )
     return ProviderResponse(
         text=text,
         tool_calls=tool_calls,
-        usage=TokenUsage(
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=prompt_tokens + completion_tokens,
-            cache_read_tokens=cache_read_tokens,
-            cache_creation_tokens=cache_creation_tokens,
-        ),
+        usage=_usage_from(getattr(response, "usage", None)),
         finish_reason=getattr(response, "stop_reason", None),
         raw=response,
     )

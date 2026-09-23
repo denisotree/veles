@@ -21,7 +21,6 @@ from openai import OpenAI
 from veles.core.openai_wire import CloudOpenAIProvider
 
 _OPENAI_BASE_URL = "https://api.openai.com/v1"
-_API_KEY_ENV = "OPENAI_API_KEY"
 
 
 class OpenAIProvider(CloudOpenAIProvider):
