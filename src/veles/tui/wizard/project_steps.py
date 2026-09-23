@@ -346,7 +346,10 @@ class DaemonModeStep:
         if nav is not None:
             return nav
         host_clean = host.strip() or "127.0.0.1"
-        port_clean = int(port.strip() or "8765")
+        try:
+            port_clean = int(port.strip() or "8765")
+        except ValueError:  # a typo must not crash the wizard
+            port_clean = 8765
         ctx.answers["daemon"] = {
             "host": host_clean,
             "port": port_clean,
