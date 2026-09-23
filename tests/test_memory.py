@@ -184,7 +184,7 @@ def test_session_exists_true_for_created_false_for_missing(
 
 def test_user_version_matches_schema_version(store: SessionStore) -> None:
     """M58 bumped the schema from v1 to v2 (turns_fts FTS5 + triggers)."""
-    from veles.core.memory import _SCHEMA_VERSION
+    from veles.core.memory.schema import SCHEMA_VERSION as _SCHEMA_VERSION
 
     v = store._conn.execute("PRAGMA user_version").fetchone()[0]
     assert v == _SCHEMA_VERSION

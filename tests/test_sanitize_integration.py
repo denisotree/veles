@@ -16,9 +16,10 @@ from pathlib import Path
 import pytest
 
 from veles.core.context import reset_active_project, set_active_project
-from veles.core.memory import Message, SessionStore
+from veles.core.memory import SessionStore
 from veles.core.path_guard import SandboxViolation, resolve_safe
 from veles.core.project import init_project
+from veles.core.provider import Message
 from veles.core.sanitize import loader as sanitize_loader
 from veles.core.tools.builtin.write_file import write_file
 
