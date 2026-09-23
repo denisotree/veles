@@ -182,7 +182,7 @@ def test_unapproved_tool_file_warns_on_stderr(project: Project, capsys) -> None:
     lastResort stderr handler makes the visibility accidental, and it vanishes
     as soon as an embedder configures logging.
     """
-    from veles.cli._runtime import _load_skills
+    from veles.runtime.assembly import _load_skills
 
     tools_dir = project.state_dir / "tools"
     tools_dir.mkdir(parents=True, exist_ok=True)

@@ -18,10 +18,10 @@ from pathlib import Path
 
 import pytest
 
-from veles.cli._curator import _CURATE_TOOLS
 from veles.core.context import reset_active_project, set_active_project
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
+from veles.runtime.learning import _CURATE_TOOLS
 
 
 @pytest.fixture()
@@ -56,7 +56,7 @@ def test_curate_prompt_instructs_memory_save_insight(project) -> None:
     """The curator system prompt must explicitly tell the agent to
     call memory_save_insight after writing the wiki page. Without
     this instruction the agent skips the SQL mirror."""
-    from veles.cli._curator import _curate_one_session
+    from veles.runtime.learning import _curate_one_session
 
     # We can't run _curate_one_session without an LLM, but we can
     # capture the system prompt by patching the Agent constructor.
@@ -78,7 +78,7 @@ def test_curate_prompt_instructs_memory_save_insight(project) -> None:
             )
 
     import veles.cli as cli_mod
-    import veles.cli._curator as curator_mod
+    import veles.runtime.learning as curator_mod
     from veles.core.memory import SessionInfo
 
     store = SessionStore(project.memory_db_path)

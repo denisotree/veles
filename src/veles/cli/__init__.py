@@ -11,35 +11,6 @@ import sys
 from pathlib import Path
 
 from veles.cli._agent_builder import build_command_agent
-
-# Per-verb command modules (M46). Re-exported under their old private
-# names for backward compatibility with tests that monkey-patch
-# `veles.cli._cmd_*`. Each cmd_* function lives in its own module under
-# `veles.cli.commands.*` so adding new verbs in Tier-gamma (M47 wizard,
-# M48 TUI, M51 daemon, M52 channels) doesn't bloat this file.
-from veles.cli._curator import (
-    _CURATE_CHARS_LIMIT,
-    _CURATE_QUIET_WINDOW_SEC,
-    _CURATE_TOOLS,
-    _CURATE_TURN_LIMIT,
-    _CURATOR_IDLE_LIMIT,
-    _CURATOR_IDLE_THRESHOLD_SEC,
-    _CURATOR_POSTRUN_LIMIT,
-    _PROPOSER_IDLE_THRESHOLD_SEC,
-    _SELF_DOC_IDLE_SEC,
-    _continuous_curator_eligible,
-    _curate_one_session,
-    _CuratorPassResult,
-    _maybe_refresh_nl_routing,
-    _maybe_refresh_self_doc,
-    _maybe_run_idle_curator,
-    _maybe_run_insight_extractor,
-    _maybe_run_post_turn_curator,
-    _maybe_run_subproject_proposer,
-    _maybe_suggest_promotions,
-    _run_curator_pass,
-    _truncate_session_messages,
-)
 from veles.cli._parsers import build_parser as _build_parser
 from veles.cli._parsers._common import (
     DEFAULT_COMPRESS_THRESHOLD_TOKENS,
@@ -57,28 +28,6 @@ from veles.cli._project import (
     _register_project,
     _resolve_active_project,
     _touch_active_project,
-)
-from veles.cli._runtime import (
-    _INDEX_INJECTION_CAP,
-    _INGEST_TOOLS,
-    _PLANNING_TOOLS,
-    _RECALL_BLOCK_CHARS_CAP,
-    _RECALL_LIMIT,
-    _RUN_TOOLS,
-    _budget_scope,
-    _build_compressor,
-    _build_run_system_prompt,
-    _load_index_md,
-    _load_skills,
-    _make_tool_aware_provider,
-    _maybe_apply_project_slash_prefix,
-    _print_run_summary,
-    _proposals_block,
-    _qualify_for_provider,
-    _recall_block,
-    _run_agent_streaming_aware,
-    build_compressor,
-    build_run_system_prompt,
 )
 from veles.cli.commands.add import cmd_add as _cmd_add
 from veles.cli.commands.autopilot import cmd_autopilot as _cmd_autopilot
@@ -126,6 +75,57 @@ from veles.core.modules import (
 from veles.core.provider_factory import PROVIDER_API_KEY_ENVS as _PROVIDER_API_KEY_ENVS
 from veles.core.provider_factory import has_api_key as _has_api_key_for_provider
 from veles.core.provider_factory import make_provider as _make_provider
+from veles.runtime.assembly import (
+    _INDEX_INJECTION_CAP,
+    _INGEST_TOOLS,
+    _PLANNING_TOOLS,
+    _RECALL_BLOCK_CHARS_CAP,
+    _RECALL_LIMIT,
+    _RUN_TOOLS,
+    _budget_scope,
+    _build_compressor,
+    _build_run_system_prompt,
+    _load_index_md,
+    _load_skills,
+    _make_tool_aware_provider,
+    _maybe_apply_project_slash_prefix,
+    _print_run_summary,
+    _proposals_block,
+    _qualify_for_provider,
+    _recall_block,
+    _run_agent_streaming_aware,
+    build_compressor,
+    build_run_system_prompt,
+)
+
+# Per-verb command modules (M46). Re-exported under their old private
+# names for backward compatibility with tests that monkey-patch
+# `veles.cli._cmd_*`. Each cmd_* function lives in its own module under
+# `veles.cli.commands.*` so adding new verbs in Tier-gamma (M47 wizard,
+# M48 TUI, M51 daemon, M52 channels) doesn't bloat this file.
+from veles.runtime.learning import (
+    _CURATE_CHARS_LIMIT,
+    _CURATE_QUIET_WINDOW_SEC,
+    _CURATE_TOOLS,
+    _CURATE_TURN_LIMIT,
+    _CURATOR_IDLE_LIMIT,
+    _CURATOR_IDLE_THRESHOLD_SEC,
+    _CURATOR_POSTRUN_LIMIT,
+    _PROPOSER_IDLE_THRESHOLD_SEC,
+    _SELF_DOC_IDLE_SEC,
+    _continuous_curator_eligible,
+    _curate_one_session,
+    _CuratorPassResult,
+    _maybe_refresh_nl_routing,
+    _maybe_refresh_self_doc,
+    _maybe_run_idle_curator,
+    _maybe_run_insight_extractor,
+    _maybe_run_post_turn_curator,
+    _maybe_run_subproject_proposer,
+    _maybe_suggest_promotions,
+    _run_curator_pass,
+    _truncate_session_messages,
+)
 
 # Parser defaults + helpers live in veles.cli._parsers._common (M77). Re-imported
 # above under their historical names so tests that monkey-patch or import

@@ -45,7 +45,7 @@ def ingest_system_prompt(
     the retired single-page `INGEST_SYSTEM_PROMPT`. The result is qualified for
     the provider's MCP tool namespace (claude-cli/gemini-cli)."""
     from veles.cli import _qualify_for_provider
-    from veles.cli._runtime import build_run_system_prompt
+    from veles.runtime.assembly import build_run_system_prompt
 
     base = build_run_system_prompt(project, prompt="ingest a source into the wiki")
     if not base:

@@ -176,7 +176,7 @@ def test_bare_veles_add_errors_cleanly(bare_project: Project, capsys) -> None:
 
 
 def test_bare_system_prompt_has_no_wiki_blocks(bare_project: Project) -> None:
-    from veles.cli._runtime import build_run_system_prompt
+    from veles.runtime.assembly import build_run_system_prompt
 
     prompt = build_run_system_prompt(bare_project, prompt="what do we know?")
     assert prompt is not None
@@ -202,7 +202,7 @@ def test_bare_subproject_proposer_is_noop(bare_project: Project) -> None:
     non-wiki layout it must return cleanly without constructing a Wiki."""
     import argparse
 
-    from veles.cli._curator import _maybe_run_subproject_proposer
+    from veles.runtime.learning import _maybe_run_subproject_proposer
 
     args = argparse.Namespace(
         continuous_curator=True,

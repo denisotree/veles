@@ -156,7 +156,7 @@ def test_factory_propagates_the_model(project_with, monkeypatch) -> None:
 def test_skill_runtime_propagates_the_model(project_with, monkeypatch) -> None:
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     project = project_with(None)
-    from veles.cli._runtime import _make_tool_aware_provider
+    from veles.runtime.assembly import _make_tool_aware_provider
 
     provider = _make_tool_aware_provider("openrouter", project, skill_model=SLOW)
     assert provider._client.timeout == 450.0

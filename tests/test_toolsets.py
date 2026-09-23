@@ -131,7 +131,7 @@ def test_non_list_tools_raises(tmp_path: Path) -> None:
 
 
 def test_runtime_module_aliases_match_toolsets() -> None:
-    from veles.cli._runtime import _INGEST_TOOLS, _RUN_TOOLS
+    from veles.runtime.assembly import _INGEST_TOOLS, _RUN_TOOLS
 
     assert TOOLSETS["run"] == _RUN_TOOLS
     assert TOOLSETS["ingest"] == _INGEST_TOOLS

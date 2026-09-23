@@ -184,7 +184,7 @@ def test_suggest_promote_save_writes_proposals(project, capsys) -> None:
 
 
 def test_auto_trigger_skipped_on_resume(project, monkeypatch) -> None:
-    from veles.cli._curator import _maybe_suggest_promotions
+    from veles.runtime.learning import _maybe_suggest_promotions
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
     _write_skill(project, "winner", use_count=20, success_count=18)
@@ -196,7 +196,7 @@ def test_auto_trigger_skipped_on_resume(project, monkeypatch) -> None:
 
 
 def test_auto_trigger_skipped_by_flag(project, monkeypatch) -> None:
-    from veles.cli._curator import _maybe_suggest_promotions
+    from veles.runtime.learning import _maybe_suggest_promotions
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
     _write_skill(project, "winner", use_count=20, success_count=18)
@@ -208,7 +208,7 @@ def test_auto_trigger_skipped_by_flag(project, monkeypatch) -> None:
 
 
 def test_auto_trigger_writes_proposals_on_first_call(project, monkeypatch) -> None:
-    from veles.cli._curator import _maybe_suggest_promotions
+    from veles.runtime.learning import _maybe_suggest_promotions
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
     _write_skill(project, "winner", use_count=20, success_count=18)
@@ -221,7 +221,7 @@ def test_auto_trigger_writes_proposals_on_first_call(project, monkeypatch) -> No
 
 
 def test_auto_trigger_idle_threshold_skips_second_call(project, monkeypatch) -> None:
-    from veles.cli._curator import _maybe_suggest_promotions
+    from veles.runtime.learning import _maybe_suggest_promotions
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
     _write_skill(project, "winner", use_count=20, success_count=18)

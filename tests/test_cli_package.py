@@ -25,11 +25,7 @@ _COMMAND_MODULES = (
     "subprojects",
 )
 
-_HELPER_MODULES = (
-    "_curator",
-    "_project",
-    "_runtime",
-)
+_HELPER_MODULES = ("_project",)
 
 
 def test_cli_package_loads() -> None:

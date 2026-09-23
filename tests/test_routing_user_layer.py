@@ -161,7 +161,7 @@ def test_compressor_builds_on_local_provider_base(tmp_path: Path) -> None:
     providers, so the route is NOT disabled. Without this, M125 would
     turn the user's 404 into a silently-disabled compressor instead of a
     working local one."""
-    from veles.cli._runtime import build_compressor
+    from veles.runtime.assembly import build_compressor
 
     project = init_project(tmp_path / "p", name="p")
     save_project_config(project, {"engine": {"provider": "ollama", "model": "qwen3:4b-instruct"}})
