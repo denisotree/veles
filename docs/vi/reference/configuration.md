@@ -109,6 +109,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[permissions]` | Chính sách quyền theo từng tool (phạm vi dự án) |
 | `[daemon]` | Bind + autostart của daemon không tên/"default" |
 | `[daemon.<name>]` | Một session daemon có tên (model/provider/host/port/mode riêng) |
+| `[goal]` | Ngân sách của một mục tiêu mới — `max_steps` (30), `max_cost_usd` (5.0), `max_wall_time_s` (3600); các flag của `veles goal start` được ưu tiên |
 | `[channels.<type>]` | Một channel do daemon không tên phục vụ (ví dụ `telegram`) |
 | `[daemon.<name>.channels.<type>]` | Một channel gắn với một session daemon có tên |
 | `[mcp.servers.<name>]` | Một máy chủ MCP bên ngoài (nguồn tool) |

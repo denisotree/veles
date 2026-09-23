@@ -106,6 +106,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[permissions]` | 按 tool 的权限策略（项目作用域） |
 | `[daemon]` | 未命名/"默认" daemon 的绑定地址 + 自动启动 |
 | `[daemon.<name>]` | 一个具名 daemon session（拥有自己的 model/provider/host/port/mode） |
+| `[goal]` | 新目标的预算 — `max_steps`（30）、`max_cost_usd`（5.0）、`max_wall_time_s`（3600）；`veles goal start` 的参数优先 |
 | `[channels.<type>]` | 由未命名 daemon 提供服务的 channel（例如 `telegram`） |
 | `[daemon.<name>.channels.<type>]` | 绑定到某个具名 daemon session 的 channel |
 | `[mcp.servers.<name>]` | 一个外部 MCP 服务器（tool 来源） |

@@ -109,6 +109,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[permissions]` | प्रति-tool permission policy (project scope) |
 | `[daemon]` | unnamed/"default" daemon का bind + autostart |
 | `[daemon.<name>]` | एक नामित daemon session (अपना model/provider/host/port/mode) |
+| `[goal]` | नए goal का बजट — `max_steps` (30), `max_cost_usd` (5.0), `max_wall_time_s` (3600); `veles goal start` के flags इसे बदल देते हैं |
 | `[channels.<type>]` | unnamed daemon द्वारा served एक channel (जैसे `telegram`) |
 | `[daemon.<name>.channels.<type>]` | किसी नामित daemon session से bound एक channel |
 | `[mcp.servers.<name>]` | एक बाहरी MCP server (tool source) |

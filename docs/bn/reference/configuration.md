@@ -109,6 +109,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[permissions]` | পার-টুল পারমিশন পলিসি (প্রজেক্ট স্কোপ) |
 | `[daemon]` | unnamed/"default" ডিমনের bind + autostart |
 | `[daemon.<name>]` | একটি নামকৃত ডিমন সেশন (নিজস্ব model/provider/host/port/mode) |
+| `[goal]` | নতুন লক্ষ্যের বাজেট — `max_steps` (30), `max_cost_usd` (5.0), `max_wall_time_s` (3600); `veles goal start`-এর ফ্ল্যাগ এটিকে ছাপিয়ে যায় |
 | `[channels.<type>]` | unnamed ডিমন দ্বারা পরিবেশিত একটি চ্যানেল (যেমন `telegram`) |
 | `[daemon.<name>.channels.<type>]` | একটি নামকৃত ডিমন সেশনে বাইন্ড করা একটি চ্যানেল |
 | `[mcp.servers.<name>]` | একটি এক্সটার্নাল MCP সার্ভার (টুল সোর্স) |

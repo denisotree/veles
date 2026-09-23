@@ -106,6 +106,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[permissions]` | ツールごとのパーミッションポリシー（プロジェクトスコープ） |
 | `[daemon]` | 無名/「デフォルト」デーモンのバインド + 自動起動 |
 | `[daemon.<name>]` | 名前付きデーモンセッション（独自の model/provider/host/port/mode） |
+| `[goal]` | 新しい目標の予算 — `max_steps`（30）、`max_cost_usd`（5.0）、`max_wall_time_s`（3600）。`veles goal start` のフラグが優先 |
 | `[channels.<type>]` | 無名デーモンが提供するチャンネル（例: `telegram`） |
 | `[daemon.<name>.channels.<type>]` | 名前付きデーモンセッションにバインドされたチャンネル |
 | `[mcp.servers.<name>]` | 外部 MCP サーバー（ツールソース） |

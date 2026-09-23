@@ -109,6 +109,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[permissions]` | Política de permisos por herramienta (ámbito de proyecto) |
 | `[daemon]` | Bind + autoarranque del daemon sin nombre/"por defecto" |
 | `[daemon.<name>]` | Una sesión de daemon con nombre (modelo/proveedor/host/puerto/modo propios) |
+| `[goal]` | El presupuesto de un objetivo nuevo — `max_steps` (30), `max_cost_usd` (5.0), `max_wall_time_s` (3600); los flags de `veles goal start` lo sustituyen |
 | `[channels.<type>]` | Un canal servido por el daemon sin nombre (p. ej. `telegram`) |
 | `[daemon.<name>.channels.<type>]` | Un canal vinculado a una sesión de daemon con nombre |
 | `[mcp.servers.<name>]` | Un servidor MCP externo (fuente de herramientas) |

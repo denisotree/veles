@@ -303,6 +303,7 @@ class GoalMode:
             cancel,
             complete,
             create_goal,
+            default_budget,
             read_goal,
             update_fsm,
         )
@@ -322,6 +323,7 @@ class GoalMode:
                 state_dir,
                 objective="(in interview; awaiting clarification)",
                 done_condition="",
+                budget=default_budget(ctx.project),  # M283: `[goal]` in config.toml
             )
             ctx.state.active_goal_id = goal.id
             ctx.post(SystemLine(text=f"[goal mode active — goal {goal.id} in interview]"))

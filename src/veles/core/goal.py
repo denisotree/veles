@@ -69,6 +69,40 @@ class GoalBudget:
     max_wall_time_s: int = 3600
 
 
+def default_budget(project: Any) -> GoalBudget:
+    """A new goal's budget: `[goal]` in the project's `config.toml`
+    (`max_steps`, `max_cost_usd`, `max_wall_time_s`), each falling back to
+    `GoalBudget`'s own default. M283: before, only `veles goal start` flags
+    could change it — a goal from the REPL or a chat always got 30 / $5 / 1 h.
+    A value that is not a positive number is ignored with a warning, never
+    fatal: a typo must not stop a goal from starting."""
+    import logging
+
+    from veles.core.project_config import get_section, load_project_config
+
+    section = get_section(load_project_config(project), "goal")
+    base = GoalBudget()
+    values: dict[str, Any] = {}
+    for key, kind in (("max_steps", int), ("max_cost_usd", float), ("max_wall_time_s", int)):
+        raw = section.get(key)
+        if raw is None:
+            continue
+        try:
+            value = kind(raw)
+        except (TypeError, ValueError):
+            value = 0
+        if isinstance(raw, bool) or value <= 0:
+            logging.getLogger(__name__).warning(
+                "[goal] %s=%r is not a positive number — using %s",
+                key,
+                raw,
+                getattr(base, key),
+            )
+            continue
+        values[key] = value
+    return GoalBudget(**values)
+
+
 @dataclass(slots=True)
 class CheckpointEntry:
     """One unit of progress. Append-only inside the Goal."""

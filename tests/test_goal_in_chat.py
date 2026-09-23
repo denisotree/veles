@@ -357,6 +357,65 @@ def test_a_corrupt_chat_modes_file_starts_empty(tmp_path) -> None:
     assert loaded["s1"].mode is None and loaded["s1"].active_goal_id == "g1"
 
 
+# ---- M283: `[goal]` in config.toml sets a new goal's budget ----
+
+
+def _write_goal_config(project, body: str) -> None:
+    (project.state_dir / "config.toml").write_text(f"[goal]\n{body}\n", encoding="utf-8")
+
+
+async def test_a_chat_goal_takes_the_projects_goal_budget(full_goal) -> None:
+    """A goal from the REPL or a chat got 30 / $5 / 1 h whatever the project
+    wanted; only `veles goal start` flags could change it."""
+    from veles.core.goal import read_goal
+
+    gw, state, _, _ = full_goal
+    _write_goal_config(state.project, "max_steps = 7\nmax_cost_usd = 0.5")
+    await gw._handle_update(_message("/goal create hello.txt"))
+    goal = read_goal(
+        state.project.state_dir, state.chat_mode(gw.session_map.get("42")).active_goal_id
+    )
+    assert (goal.budget.max_steps, goal.budget.max_cost_usd) == (7, 0.5)
+    assert goal.budget.max_wall_time_s == 3600  # not set → built-in default
+
+
+def test_a_bad_goal_setting_is_ignored_not_fatal(tmp_path, caplog) -> None:
+    from veles.core.goal import GoalBudget, default_budget
+
+    project = init_project(tmp_path / "p", name="p")
+    _write_goal_config(project, 'max_steps = "lots"\nmax_cost_usd = -1\nmax_wall_time_s = 60')
+    with caplog.at_level("WARNING"):
+        budget = default_budget(project)
+    assert budget == GoalBudget(max_wall_time_s=60)
+    assert "max_steps" in caplog.text and "max_cost_usd" in caplog.text
+
+
+def test_cli_flags_override_the_project_budget_one_by_one(tmp_path, monkeypatch) -> None:
+    import argparse
+
+    from veles.cli.commands.goal import _start
+    from veles.core.goal import list_goals
+
+    project = init_project(tmp_path / "p", name="p")
+    _write_goal_config(project, "max_steps = 7\nmax_cost_usd = 0.5")
+    monkeypatch.setattr("veles.cli.commands.goal._drive", lambda *a, **k: 0)
+    args = argparse.Namespace(
+        objective="x",
+        done_when="y",
+        scope=None,
+        max_steps=3,  # given → wins
+        max_cost_usd=None,  # omitted → [goal]
+        max_wall_time_s=None,  # omitted, not in [goal] → built-in
+    )
+    assert _start(args, project) == 0
+    (goal,) = list_goals(project.state_dir)
+    assert (goal.budget.max_steps, goal.budget.max_cost_usd, goal.budget.max_wall_time_s) == (
+        3,
+        0.5,
+        3600,
+    )
+
+
 async def test_post_v1_runs_rejects_an_unknown_mode(aiohttp_client, tmp_path) -> None:
     from veles.daemon.server import make_app
 

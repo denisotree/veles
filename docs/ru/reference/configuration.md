@@ -109,6 +109,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[permissions]` | Политика прав по инструментам (область проекта) |
 | `[daemon]` | Привязка + автозапуск неименованного/«default» демона |
 | `[daemon.<name>]` | Именованная сессия демона (собственные model/provider/host/port/mode) |
+| `[goal]` | Бюджет новой цели — `max_steps` (30), `max_cost_usd` (5.0), `max_wall_time_s` (3600); флаги `veles goal start` его перекрывают |
 | `[channels.<type>]` | Канал, обслуживаемый неименованным демоном (например, `telegram`) |
 | `[daemon.<name>.channels.<type>]` | Канал, привязанный к именованной сессии демона |
 | `[mcp.servers.<name>]` | Внешний MCP-сервер (источник инструментов) |
