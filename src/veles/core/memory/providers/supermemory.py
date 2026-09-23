@@ -20,10 +20,10 @@ Config source (`~/.veles/config.toml`):
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from typing import Any
 
+from veles.core.log_util import warn_once
 from veles.core.memory.router import RecallHit
 from veles.core.text import ellipsize
 
@@ -40,12 +40,12 @@ class SupermemoryProvider:
         try:
             from supermemory import Supermemory  # type: ignore[import-not-found]
         except ImportError:
-            _warn_once("supermemory not installed; skipping Supermemory recall")
+            warn_once("supermemory not installed; skipping Supermemory recall")
             return []
         try:
             client = Supermemory(api_key=self.api_key)
         except Exception as exc:
-            _warn_once(f"Supermemory client init failed: {type(exc).__name__}: {exc}")
+            warn_once(f"Supermemory client init failed: {type(exc).__name__}: {exc}")
             return []
         response = self._search(client, query, limit)
         if response is None:
@@ -65,9 +65,9 @@ class SupermemoryProvider:
             except TypeError:
                 continue  # try next keyword
             except Exception as exc:
-                _warn_once(f"Supermemory recall failed: {type(exc).__name__}: {exc}")
+                warn_once(f"Supermemory recall failed: {type(exc).__name__}: {exc}")
                 return None
-        _warn_once("Supermemory.search rejected both `q=` and `query=`; SDK changed shape")
+        warn_once("Supermemory.search rejected both `q=` and `query=`; SDK changed shape")
         return None
 
 
@@ -94,16 +94,6 @@ def _to_recall_hit(item: dict[str, Any]) -> RecallHit:
         summary=summary or "(no summary)",
         score=score,
     )
-
-
-_warned: set[str] = set()
-
-
-def _warn_once(msg: str) -> None:
-    if msg in _warned:
-        return
-    _warned.add(msg)
-    print(f"warning: {msg}", file=sys.stderr)
 
 
 __all__ = ["SupermemoryProvider"]

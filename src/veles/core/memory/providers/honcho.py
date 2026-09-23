@@ -15,10 +15,10 @@ verbose mode):
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from typing import Any
 
+from veles.core.log_util import warn_once
 from veles.core.memory.router import RecallHit
 from veles.core.text import ellipsize
 
@@ -46,7 +46,7 @@ class HonchoMemoryProvider:
         try:
             from honcho_ai import Honcho  # type: ignore[import-not-found]
         except ImportError:
-            _warn_once("honcho-ai not installed; skipping Honcho recall")
+            warn_once("honcho-ai not installed; skipping Honcho recall")
             return []
         try:
             client = (
@@ -61,7 +61,7 @@ class HonchoMemoryProvider:
                 limit=limit,
             )
         except Exception as exc:
-            _warn_once(f"Honcho recall failed: {type(exc).__name__}: {exc}")
+            warn_once(f"Honcho recall failed: {type(exc).__name__}: {exc}")
             return []
         return [_to_recall_hit(item) for item in _iter_items(response)]
 
@@ -91,16 +91,6 @@ def _to_recall_hit(item: dict[str, Any]) -> RecallHit:
         summary=summary or "(no summary)",
         score=score,
     )
-
-
-_warned: set[str] = set()
-
-
-def _warn_once(msg: str) -> None:
-    if msg in _warned:
-        return
-    _warned.add(msg)
-    print(f"warning: {msg}", file=sys.stderr)
 
 
 __all__ = ["HonchoMemoryProvider"]

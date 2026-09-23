@@ -8,7 +8,16 @@ stays in the daemon layer (it needs `daemon.paths`).
 
 from __future__ import annotations
 
+import functools
+import sys
+
 DEFAULT_TRUNCATE_CHARS = 2000
+
+
+@functools.cache
+def warn_once(msg: str) -> None:
+    """Print `warning: <msg>` to stderr the first time this exact message is seen."""
+    print(f"warning: {msg}", file=sys.stderr)
 
 
 def truncate_for_log(text: object, cap: int = DEFAULT_TRUNCATE_CHARS) -> str:
