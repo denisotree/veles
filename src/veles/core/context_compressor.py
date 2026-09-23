@@ -23,7 +23,7 @@ summary). Caching summaries across resumes is M30+.
 
 Two surfaces:
 - Pure utilities (`estimate_tokens`, `needs_compression`,
-  `find_safe_boundaries`, `render_middle_for_summary`,
+  `find_safe_boundaries`, `render_transcript`,
   `apply_compression`) deterministic and testable in isolation.
 - `make_default_compressor(...)` returns a `HistoryCompressor` callable
   that wraps the utilities with a sub-Agent summariser + memory-artefact
@@ -128,8 +128,8 @@ def find_safe_boundaries(history: list[Message], cfg: CompressionConfig) -> tupl
     return head_end, tail_start
 
 
-def render_middle_for_summary(middle: list[Message]) -> str:
-    """Serialise dropped turns as plain text for the summariser prompt."""
+def render_transcript(middle: list[Message]) -> str:
+    """Serialise turns as plain text for a side-call prompt (summariser, extractor)."""
     blocks: list[str] = []
     for m in middle:
         tag = m.role
@@ -321,13 +321,13 @@ def make_default_compressor(
         # session has a 200k-token middle, the sub-agent posts that to
         # the same provider, and the run dies with the same "prompt is
         # too long" error the compressor was meant to prevent.
-        rendered = render_middle_for_summary(middle)
+        rendered = render_transcript(middle)
         rendered_tokens = count_tokens(rendered)
         if rendered_tokens > cfg.max_summariser_input_tokens:
             original_len = len(middle)
             while middle and rendered_tokens > cfg.max_summariser_input_tokens:
                 middle = middle[1:]
-                rendered = render_middle_for_summary(middle)
+                rendered = render_transcript(middle)
                 rendered_tokens = count_tokens(rendered)
             logger.info(
                 "compressor summariser-input-truncated session=%s "

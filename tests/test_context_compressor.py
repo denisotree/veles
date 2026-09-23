@@ -2,7 +2,7 @@
 
 Tests the deterministic surfaces (`estimate_tokens`,
 `needs_compression`, `find_safe_boundaries`,
-`render_middle_for_summary`, `apply_compression`) plus an Agent
+`render_transcript`, `apply_compression`) plus an Agent
 integration with a stub compressor that confirms the callable is
 invoked before each provider request and the truncated history
 reaches the provider.
@@ -19,7 +19,7 @@ from veles.core.context_compressor import (
     estimate_tokens,
     find_safe_boundaries,
     needs_compression,
-    render_middle_for_summary,
+    render_transcript,
 )
 from veles.core.provider import (
     Message,
@@ -128,12 +128,12 @@ def test_find_safe_boundaries_skips_tool_messages_in_tail() -> None:
     assert tail_start == 5
 
 
-# ---- render_middle_for_summary ----
+# ---- render_transcript ----
 
 
 def test_render_middle_includes_role_and_content() -> None:
     middle = [_msg("user", "hello"), _msg("assistant", "hi there")]
-    rendered = render_middle_for_summary(middle)
+    rendered = render_transcript(middle)
     assert "# user" in rendered
     assert "hello" in rendered
     assert "# assistant" in rendered
@@ -143,14 +143,14 @@ def test_render_middle_includes_role_and_content() -> None:
 def test_render_middle_serialises_tool_calls() -> None:
     tc = ToolCall(id="c1", name="echo", arguments={"text": "hi"})
     middle = [_msg("assistant", "", tool_calls=[tc])]
-    rendered = render_middle_for_summary(middle)
+    rendered = render_transcript(middle)
     assert "echo(" in rendered
     assert "hi" in rendered
 
 
 def test_render_middle_marks_tool_role_with_call_id() -> None:
     middle = [_msg("tool", "result", tool_call_id="c42")]
-    rendered = render_middle_for_summary(middle)
+    rendered = render_transcript(middle)
     assert "# tool[c42]" in rendered
 
 

@@ -40,6 +40,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from veles.core.context_compressor import render_transcript
 from veles.core.provider import Message
 from veles.core.slug import normalize_slug as _normalize_slug
 
@@ -114,20 +115,6 @@ def find_recovery_triggers(history: list[Message]) -> list[_RecoveryTrigger]:
         out.append(_RecoveryTrigger(error_idx=i, window_start=start, window_end=end))
         last_emitted = i
     return out
-
-
-def _render_window(history: list[Message], start: int, end: int) -> str:
-    blocks: list[str] = []
-    for m in history[start:end]:
-        tag = m.role
-        if m.role == "tool" and m.tool_call_id:
-            tag = f"tool[{m.tool_call_id}]"
-        body = m.content or ""
-        if m.tool_calls:
-            calls = ", ".join(f"{tc.name}({tc.arguments})" for tc in m.tool_calls)
-            body = (body + "\n" if body else "") + f"<calls: {calls}>"
-        blocks.append(f"# {tag}\n{body}")
-    return "\n\n".join(blocks)
 
 
 _REMEMBER_PROMPT = (
@@ -254,7 +241,7 @@ def make_insight_extractor(
             window_end = min(len(history), trig.user_idx + 2)
             written += _persist_one(
                 prompt=_REMEMBER_PROMPT,
-                snippet=_render_window(history, window_start, window_end),
+                snippet=render_transcript(history[window_start:window_end]),
                 slug_id=slug_id,
                 trigger_label="remember-trigger",
                 # User explicitly asked to remember this → user-asserted.
@@ -265,7 +252,7 @@ def make_insight_extractor(
         for rtrig in triggers_recovery:
             written += _persist_one(
                 prompt=_RECOVERY_PROMPT,
-                snippet=_render_window(history, rtrig.window_start, rtrig.window_end),
+                snippet=render_transcript(history[rtrig.window_start : rtrig.window_end]),
                 slug_id=slug_id,
                 trigger_label="recovery-trigger",
                 # Heuristically inferred from a tool-error window → lower trust.
