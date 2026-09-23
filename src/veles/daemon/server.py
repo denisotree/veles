@@ -972,9 +972,13 @@ def build_state(
     """Convenience constructor used by both CLI and tests.
 
     M127: the daemon's model/provider are fixed at launch from config and
-    nothing per-session is rehydrated from the store, so `/v1/health`
-    `active_model` always reflects the configured model. Chat modes (M280)
-    start empty too — every chat on its default after a restart."""
+    nothing about models is rehydrated from the store, so `/v1/health`
+    `active_model` always reflects the configured model. Chat modes and their
+    goals (M280/M282) ARE reloaded: a restart must not make a chat forget the
+    goal it is running."""
+    from veles.daemon.state import chat_modes_file, load_chat_modes
+
+    path = chat_modes_file(project, session_name)
     return DaemonState(
         project=project,
         store=store,
@@ -984,4 +988,6 @@ def build_state(
         provider=provider,
         default_model=default_model,
         session_name=session_name,
+        chat_modes=load_chat_modes(path),
+        chat_modes_path=path,
     )

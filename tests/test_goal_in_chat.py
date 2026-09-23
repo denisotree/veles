@@ -310,6 +310,53 @@ async def test_delete_session_goal_over_http(aiohttp_client, full_goal) -> None:
     assert state.chat_goal(sid) is None
 
 
+# ---- M282: a restart does not make a chat forget its goal ----
+
+
+async def test_a_restarted_daemon_still_knows_the_chats_goal(full_goal) -> None:
+    """The chat's mode and goal were in memory only: after a restart `/goal`
+    said "no goal" and `/goal resume` pointed at the host. `build_state`
+    reloads them from `chat_modes.json`."""
+    gw, state, log, _ = full_goal
+    await gw._handle_update(_message("/goal create hello.txt"))  # → confirm
+    sid = gw.session_map.get("42")
+    goal_id = state.chat_mode(sid).active_goal_id
+
+    restarted = build_state(
+        project=state.project,
+        store=state.store,
+        token_store=state.token_store,
+        agent_factory=state.agent_factory,
+        default_model="stub/model",
+    )
+    assert restarted.chat_mode(sid).mode == "goal"
+    assert restarted.chat_mode(sid).active_goal_id == goal_id
+
+    gw.daemon_client = InProcessRunBackend(restarted)
+    await gw._handle_update(_message("yes"))  # the restarted daemon finishes it
+    await gw._flush_buffer("42")
+    assert "Goal done" in log[-1][1]
+    # …and forgets it once it is over, on disk too.
+    again = build_state(
+        project=state.project,
+        store=state.store,
+        token_store=state.token_store,
+        agent_factory=state.agent_factory,
+    )
+    assert again.chat_mode(sid).active_goal_id is None
+
+
+def test_a_corrupt_chat_modes_file_starts_empty(tmp_path) -> None:
+    from veles.daemon.state import load_chat_modes
+
+    path = tmp_path / "chat_modes.json"
+    path.write_text("{not json", encoding="utf-8")
+    assert load_chat_modes(path) == {}
+    path.write_text('{"s1": {"mode": "turbo", "active_goal_id": "g1"}}', encoding="utf-8")
+    loaded = load_chat_modes(path)
+    assert loaded["s1"].mode is None and loaded["s1"].active_goal_id == "g1"
+
+
 async def test_post_v1_runs_rejects_an_unknown_mode(aiohttp_client, tmp_path) -> None:
     from veles.daemon.server import make_app
 

@@ -106,6 +106,7 @@ def make_mode_turn(state: DaemonState, *, session_id: str, prompt: str) -> TurnF
         chat.active_goal_id = app.active_goal_id
         if app.mode != mode_name:
             chat.mode = None if app.mode == "auto" else app.mode
+        state.save_chat_modes()  # M282: a goal started or ended in this turn
 
         if outcome is not None:
             return RunResult(

@@ -14,8 +14,10 @@ loosely (Any) so this module avoids the import cycle.
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
 
 from veles.core.memory import SessionStore
@@ -35,13 +37,44 @@ class ChatModeState:
 
     `mode=None` is the chat's default: the daemon's plain single-agent turn,
     exactly as before M280 (the user chose to keep it rather than route every
-    message through AutoMode's classifier). In memory only: after a daemon
-    restart a chat is back on its default; a goal stays on disk.
+    message through AutoMode's classifier). M282: kept on disk
+    (`chat_modes_path`) so a restart does not make a chat forget its goal.
     """
 
     mode: str | None = None
     last_mode_in_session: str | None = None
     active_goal_id: str | None = None
+
+
+# Sessions are touched from several worker threads (a mode turn writes its state
+# back from the thread it ran in); one lock keeps each save a consistent snapshot.
+_SAVE_LOCK = threading.Lock()
+
+
+def chat_modes_file(project: Project, session_name: str | None) -> Path:
+    """Where a daemon keeps its chats' modes. Per named daemon, like its chat
+    session maps, so two daemons on one project never overwrite each other."""
+    suffix = f"-{session_name}" if session_name else ""
+    return project.state_dir / f"chat_modes{suffix}.json"
+
+
+def load_chat_modes(path: Path) -> dict[str, ChatModeState]:
+    """Permissive: a missing or corrupt file means no chat has a mode yet."""
+    from veles.core.io_utils import load_optional_json
+
+    raw = load_optional_json(path, default={})
+    out: dict[str, ChatModeState] = {}
+    if not isinstance(raw, dict):
+        return out
+    for session_id, fields in raw.items():
+        if not isinstance(fields, dict):
+            continue
+        out[str(session_id)] = ChatModeState(
+            mode=fields.get("mode") if fields.get("mode") in CHAT_MODES else None,
+            last_mode_in_session=fields.get("last_mode_in_session"),
+            active_goal_id=fields.get("active_goal_id"),
+        )
+    return out
 
 
 @dataclass(slots=True)
@@ -94,6 +127,8 @@ class DaemonState:
     # `session_overrides`, whose model/provider fields M127 had already
     # forbidden and whose mode nothing ever read.
     chat_modes: dict[str, ChatModeState] = field(default_factory=dict)
+    # M282: where `chat_modes` is saved; None keeps them in memory (tests).
+    chat_modes_path: Path | None = None
     # M204: `factory(*, system_prompt, tools) -> Agent` installed around every
     # daemon turn so delegate/wiki_add can spawn scoped sub-agents (this used
     # to be REPL-only). Built by `_attach_background_runners`, capped at [run].
@@ -119,7 +154,24 @@ class DaemonState:
         current = self.chat_mode(session_id)
         current.mode = mode
         self.chat_modes[session_id] = current
+        self.save_chat_modes()
         return current
+
+    def save_chat_modes(self) -> None:
+        """Persist every chat's mode state (M282). Call after any change — a
+        switch, a goal starting or ending in a turn, a cancel. Chats back on
+        their default with no goal are dropped from the file."""
+        if self.chat_modes_path is None:
+            return
+        from veles.core.io_utils import atomic_write_json
+
+        with _SAVE_LOCK:
+            snapshot = {
+                sid: asdict(chat)
+                for sid, chat in list(self.chat_modes.items())
+                if chat.mode is not None or chat.active_goal_id is not None
+            }
+            atomic_write_json(self.chat_modes_path, snapshot)
 
     def chat_goal(self, session_id: str | None) -> dict[str, Any] | None:
         """M280b: the goal a chat is running, as `/goal` shows it; None when the
@@ -154,6 +206,7 @@ class DaemonState:
         chat.mode = None
         chat.active_goal_id = None
         self.chat_modes[session_id] = chat
+        self.save_chat_modes()
         return goal
 
     def add_run(self, handle: RunHandle) -> None:

@@ -159,6 +159,7 @@ def _session_for_mode_turn(state: DaemonState, session_id: str) -> str:
     moved = state.chat_modes.pop(session_id, None)
     if moved is not None:
         state.chat_modes[fresh] = moved
+        state.save_chat_modes()
     return fresh
 
 
