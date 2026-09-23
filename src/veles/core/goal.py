@@ -252,6 +252,7 @@ def update_fsm(
     phase: GoalPhase | None = None,
     plan_id: str | None = None,
     interview_summary: str | None = None,
+    objective: str | None = None,
 ) -> Goal:
     """Patch the GoalMode-FSM fields on a Goal. Only the kwargs passed
     are written; everything else is preserved. `plan_id` accepts an
@@ -264,6 +265,8 @@ def update_fsm(
         goal.plan_id = plan_id or None
     if interview_summary is not None:
         goal.interview_summary = interview_summary
+    if objective is not None:
+        goal.objective = objective
     goal.updated_at = _now_iso()
     _write(state_dir, goal)
     return goal

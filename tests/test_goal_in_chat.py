@@ -102,6 +102,113 @@ async def test_goal_without_a_task_explains_itself(chat, calls) -> None:
     assert any("/goal &lt;task&gt;" in s for s in sent)
 
 
+# ---- b2/b3: after the plan is confirmed the goal runs to its end ----
+
+
+@pytest.fixture()
+def full_goal(tmp_path, monkeypatch):
+    """A chat whose agents play every GoalMode phase: the interview agrees on
+    the goal, planning persists a plan (as the `create_plan` tool does), the
+    executor does the step, the advisor (CHECK) says done."""
+    from veles.core.plan_artifact import create_plan
+
+    project = init_project(tmp_path / "proj", name="proj")
+    store = SessionStore(project.memory_db_path)
+    summary = "Create hello.txt containing hi. Done when hello.txt exists with hi."
+
+    def factory(session_id, *, prompt=None, mode=None, extra_system=None, toolless=False):
+        if toolless:
+            reply = f"<ready>{summary}</ready>"
+        elif mode == "planning":
+            create_plan(project.state_dir, objective="hello", steps=["write hello.txt"])
+            reply = "plan ready"
+        else:
+            reply = "wrote hello.txt"
+        return _Agent(session_id=session_id, reply=reply)
+
+    monkeypatch.setattr(
+        "veles.core.tools.builtin.advisor.call_advisor",
+        lambda body, **_kw: '{"verdict": "goal_reached", "reason": "hello.txt exists"}',
+    )
+    state = build_state(
+        project=project,
+        store=store,
+        token_store=TokenStore.load(tmp_path / "t.json"),
+        agent_factory=factory,
+        default_model="stub/model",
+    )
+    log: list[tuple[str, str]] = []
+
+    async def fake_send(method, payload):
+        if payload.get("text"):
+            log.append((method, payload["text"]))
+        return {"message_id": 1, "chat": payload.get("chat_id")}
+
+    smap = SessionMap.load(tmp_path / "tg.json")
+    gw = TelegramGateway(bot_token="X", daemon_client=InProcessRunBackend(state), session_map=smap)
+    gw._telegram_send = fake_send  # type: ignore[method-assign]
+    yield gw, state, log, summary
+    store.close()
+
+
+async def test_confirming_the_plan_runs_the_goal_to_done_in_the_same_turn(full_goal) -> None:
+    from veles.core.goal import read_goal
+
+    gw, state, log, summary = full_goal
+    await gw._handle_update(_message("/goal create hello.txt"))  # interview → confirm
+    sid = gw.session_map.get("42")
+    goal_id = state.chat_mode(sid).active_goal_id
+    # The agreed summary became the goal's objective — not the placeholder.
+    assert read_goal(state.project.state_dir, goal_id).objective == summary
+
+    log.clear()
+    await gw._handle_update(_message("yes"))
+    await gw._flush_buffer("42")
+
+    texts = [text for _, text in log]
+    final = texts[-1]
+    assert "Goal done" in final
+    progress = [t for t in texts[:-1] if t.startswith("<i>goal")]
+    assert progress, f"no live progress before the result: {texts}"
+    assert read_goal(state.project.state_dir, goal_id).status == "completed"
+    assert state.chat_mode(sid).mode is None  # the chat is back on its default
+
+
+async def test_a_goal_already_running_elsewhere_is_not_driven_twice(full_goal) -> None:
+    import asyncio
+
+    from veles.core.file_lock import file_lock
+    from veles.core.goal import goals_dir, read_goal
+
+    gw, state, log, _ = full_goal
+    await gw._handle_update(_message("/goal create hello.txt"))
+    sid = gw.session_map.get("42")
+    goal_id = state.chat_mode(sid).active_goal_id
+    lock = goals_dir(state.project.state_dir) / f"{goal_id}.lock"
+    held = asyncio.Event()
+    release = asyncio.Event()
+
+    def hold() -> None:  # another holder of the lock, as `veles goal resume` would be
+        with file_lock(lock):
+            asyncio.run_coroutine_threadsafe(_set(held), loop)
+            fut = asyncio.run_coroutine_threadsafe(release.wait(), loop)
+            fut.result()
+
+    async def _set(ev):
+        ev.set()
+
+    loop = asyncio.get_running_loop()
+    holder = loop.run_in_executor(None, hold)
+    await held.wait()
+    log.clear()
+    await gw._handle_update(_message("yes"))
+    await gw._flush_buffer("42")
+    release.set()
+    await holder
+    assert any("already running elsewhere" in text for _, text in log)
+    assert read_goal(state.project.state_dir, goal_id).status == "active"
+
+
 async def test_post_v1_runs_rejects_an_unknown_mode(aiohttp_client, tmp_path) -> None:
     from veles.daemon.server import make_app
 

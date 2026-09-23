@@ -55,6 +55,7 @@ def make_mode_turn(state: DaemonState, *, session_id: str, prompt: str) -> TurnF
 
         streamed: list[str] = []
         done: list[RunResult] = []
+        driving = [False]  # set while a goal runs on its own (M280b)
 
         def text(delta: str) -> None:
             streamed.append(delta)
@@ -66,7 +67,9 @@ def make_mode_turn(state: DaemonState, *, session_id: str, prompt: str) -> TurnF
             elif isinstance(msg, ChatDelta):
                 text(msg.text)
             elif isinstance(msg, SystemLine):
-                post_event({"type": "notice", "text": msg.text})
+                # While a goal drives itself the turn lasts minutes: its phase
+                # lines are progress, which a channel shows as they happen.
+                post_event({"type": "notice", "text": msg.text, "live": driving[0]})
             elif isinstance(msg, AgentError):
                 raise msg.exc
 
@@ -89,12 +92,17 @@ def make_mode_turn(state: DaemonState, *, session_id: str, prompt: str) -> TurnF
         )
         mode_name = app.mode
         get_mode(mode_name).run_turn(prompt, ctx)
+        outcome = _drive_if_ready(state, ctx, driving) if mode_name == "goal" else None
 
         chat.last_mode_in_session = app.last_mode_in_session
         chat.active_goal_id = app.active_goal_id
         if app.mode != mode_name:
             chat.mode = None if app.mode == "auto" else app.mode
 
+        if outcome is not None:
+            return RunResult(
+                text=outcome, iterations=0, stopped_reason="synthetic", session_id=session_id
+            )
         if not done:
             raise RuntimeError(f"agent mode {mode_name!r} ended the turn without a result")
         result = done[-1]
@@ -110,6 +118,44 @@ def make_mode_turn(state: DaemonState, *, session_id: str, prompt: str) -> TurnF
         return result
 
     return turn
+
+
+def _drive_if_ready(state: DaemonState, ctx: Any, driving: list[bool]) -> str | None:
+    """Run the chat's goal to an end if this turn left it in a phase that needs
+    no one — plan, execute, check. That is right after the user confirms the
+    plan, and also any later message to a goal that stopped (stalled, turn cap)
+    — which is how a chat resumes one. Interview and confirm are conversation,
+    so those turns just answer. Returns the text that ends the turn, or None.
+
+    Inside the run, not in the background (the user's choice): approval
+    prompts reach the chat as buttons only while a run is being streamed. The
+    goal's lock (M276) keeps a `veles goal resume` on the host and this chat
+    from driving one goal twice."""
+    from veles.core.file_lock import LockHeld, file_lock
+    from veles.core.goal import goals_dir, read_goal
+    from veles.core.modes.goal_driver import drive_goal
+
+    goal_id = ctx.state.active_goal_id
+    goal = read_goal(state.project.state_dir, goal_id) if goal_id else None
+    if goal is None or goal.status != "active" or goal.current_phase not in _AUTONOMOUS:
+        return None
+    try:
+        with file_lock(goals_dir(state.project.state_dir) / f"{goal_id}.lock", blocking=False):
+            driving[0] = True
+            try:
+                outcome = drive_goal(ctx, goal_id)
+            finally:
+                driving[0] = False
+    except LockHeld:
+        return "This goal is already running elsewhere (e.g. `veles goal` on the host)."
+    if outcome.completed:
+        return f"✅ Goal done — {outcome.reason}"
+    if outcome.status == "cancelled":
+        return f"Goal cancelled — {outcome.reason}"
+    return f"Goal stopped — {outcome.reason}. Send /goal resume to continue it."
+
+
+_AUTONOMOUS = ("plan", "execute", "check")
 
 
 __all__ = ["make_mode_turn"]

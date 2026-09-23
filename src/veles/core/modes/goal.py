@@ -399,11 +399,17 @@ class GoalMode:
 
         summary = parse_ready_marker(result.text or "")
         if summary:
+            # The summary IS the agreed objective (the interview prompt asks for
+            # objective + done condition + constraints). Without this the goal
+            # kept its "(in interview; …)" placeholder for life: CHECK judged
+            # every step against a placeholder and an empty done condition, and
+            # `veles goal list` showed the placeholder (live-found in M280b).
             update_fsm(
                 ctx.project.state_dir,
                 goal.id,
                 phase="confirm",
                 interview_summary=summary,
+                objective=summary,
             )
             ctx.post(SystemLine(text="[goal: interview complete → confirm next]"))
             # M185: surface the ack instruction in the SAME turn. The
@@ -692,7 +698,8 @@ class GoalMode:
         last_step = step_cp.description if step_cp else "(no progress yet)"
         check_input = (
             f"Goal objective: {goal.objective}\n"
-            f"Done condition: {goal.done_condition}\n"
+            # An interviewed goal's summary carries its done condition.
+            f"Done condition: {goal.done_condition or '(as stated in the objective)'}\n"
             f"Plan: {plan_body}\n"
             f"Last executed step: {last_step}\n"
             f"{_render_step_outcome(step_cp)}"
