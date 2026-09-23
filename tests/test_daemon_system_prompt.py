@@ -18,7 +18,7 @@ from tests.conftest import StubProvider
 from veles.core.context import reset_active_project, set_active_project
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
-from veles.daemon.agent_factory import _make_agent_factory
+from veles.daemon.agent_factory import make_agent_factory
 
 
 def _build_args() -> argparse.Namespace:
@@ -64,7 +64,7 @@ def test_fresh_session_injects_agents_md(tmp_path: Path, monkeypatch) -> None:
         store = SessionStore(project.memory_db_path)
         captured = _install_factory_stubs(monkeypatch)
 
-        factory = _make_agent_factory(_build_args(), project=project, store=store)
+        factory = make_agent_factory(_build_args(), project=project, store=store)
         factory(None, prompt="hello")
 
         sp = captured.get("system_prompt") or ""
@@ -113,7 +113,7 @@ def test_daemon_system_prompt_isolates_subproject(tmp_path: Path, monkeypatch) -
             ],
         )
 
-        factory = _make_agent_factory(_build_args(), project=project, store=store)
+        factory = make_agent_factory(_build_args(), project=project, store=store)
         factory(None, prompt="опиши текущий проект")
 
         sp = captured.get("system_prompt") or ""
@@ -148,7 +148,7 @@ def test_resumed_session_builds_system_prompt(tmp_path: Path, monkeypatch) -> No
         sid = store.create_session()
         captured = _install_factory_stubs(monkeypatch)
 
-        factory = _make_agent_factory(_build_args(), project=project, store=store)
+        factory = make_agent_factory(_build_args(), project=project, store=store)
         factory(sid, prompt="follow-up")
         sp = captured.get("system_prompt")
         assert isinstance(sp, str) and sp

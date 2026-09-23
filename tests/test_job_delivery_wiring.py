@@ -7,7 +7,7 @@ deliverer, so a job's `deliver_to` was silently dropped. These tests
 pin the three seams that close the loop:
 
 1. `TelegramGateway.deliver(...)` renders + sends to a chat.
-2. `_attach_background_runners` builds a router and hands it to JobRunner.
+2. `attach_background_runners` builds a router and hands it to JobRunner.
 3. `start_channel_runners` registers each gateway's `deliver` on the
    router, so `deliver_to = "telegram:<chat>"` reaches the gateway.
 """
@@ -24,8 +24,8 @@ from veles.channels.telegram import TelegramGateway
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.core.secrets import delete_provider_key, set_provider_key
-from veles.daemon.agent_factory import _attach_background_runners
 from veles.daemon.auth import TokenStore
+from veles.daemon.background import attach_background_runners
 from veles.daemon.channels import start_channel_runners
 from veles.daemon.state import DaemonState
 
@@ -93,7 +93,7 @@ async def test_gateway_deliver_accepts_thread_id(tmp_path: Path) -> None:
     assert sends and sends[0][1]["chat_id"] == 7
 
 
-# ---- 2. _attach_background_runners wires a router ----
+# ---- 2. attach_background_runners wires a router ----
 
 
 def test_attach_wires_delivery_router_into_job_runner(tmp_path: Path) -> None:
@@ -102,7 +102,7 @@ def test_attach_wires_delivery_router_into_job_runner(tmp_path: Path) -> None:
     def factory(session_id):  # pragma: no cover
         raise AssertionError
 
-    jobs_store = _attach_background_runners(state, state.project, factory, "anthropic")
+    jobs_store = attach_background_runners(state, state.project, factory, "anthropic")
     try:
         assert state.delivery_router is not None
         # The router the daemon stored is the one the JobRunner will use.
@@ -125,11 +125,11 @@ class _JobAgent:
 
 
 def _wired_state_with_chat(tmp_path: Path, *, deliverer):
-    """The daemon's own wiring (`_attach_background_runners`) plus a fake
+    """The daemon's own wiring (`attach_background_runners`) plus a fake
     Telegram deliverer on the router it built — the production path from a
     due job to a chat, with only the network call replaced."""
     state = _make_state(tmp_path)
-    jobs_store = _attach_background_runners(
+    jobs_store = attach_background_runners(
         state, state.project, lambda _sid: _JobAgent("Summary: 1) db ok 2) disk 91%"), "anthropic"
     )
     state.delivery_router.register_deliverer("telegram", deliverer)

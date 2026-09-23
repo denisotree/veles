@@ -4,7 +4,7 @@ Audit prerequisite: `set_subagent_factory` was wired only in the REPL, so a
 daemon/channel/job agent could not `delegate` or run `wiki_add` (its per-file
 sub-agent loop needs a factory). Two pieces:
 
-- `_make_scoped_subagent_factory(args, project=…, store=…, toolset=…)` — a
+- `make_scoped_subagent_factory(args, project=…, store=…, toolset=…)` — a
   `factory(*, system_prompt, tools)` whose registry is CAPPED at the named
   toolset (an ingest worker can never get `run_shell`/`fetch_url` — B1);
 - `run_agent_in_background(..., subagent_factory=…)` installs it around the
@@ -21,7 +21,7 @@ from pathlib import Path
 from veles.core.context import reset_active_project, set_active_project
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
-from veles.daemon.agent_factory import _make_scoped_subagent_factory
+from veles.daemon.agent_factory import make_scoped_subagent_factory
 from veles.daemon.runner import new_run_handle, run_agent_in_background
 
 
@@ -63,7 +63,7 @@ def test_scoped_factory_caps_tools_at_the_toolset(tmp_path: Path, monkeypatch) -
         store = SessionStore(project.memory_db_path)
         captured: dict = {}
         _patched_cli(monkeypatch, captured)
-        factory = _make_scoped_subagent_factory(
+        factory = make_scoped_subagent_factory(
             _args(), project=project, store=store, toolset="ingest"
         )
         # A worker asking for run_shell/fetch_url must NOT get them (B1) —
@@ -78,7 +78,7 @@ def test_scoped_factory_caps_tools_at_the_toolset(tmp_path: Path, monkeypatch) -
 
 def test_worker_factories_use_the_named_daemon_model(tmp_path: Path, monkeypatch) -> None:
     """A named daemon's `[daemon.<name>] model` reaches its workers, not only its chat."""
-    from veles.daemon.agent_factory import _make_worker_agent_factory
+    from veles.daemon.agent_factory import make_worker_agent_factory
 
     project = init_project(tmp_path, name=None, force=False)
     (project.state_dir / "config.toml").write_text(
@@ -90,16 +90,14 @@ def test_worker_factories_use_the_named_daemon_model(tmp_path: Path, monkeypatch
         store = SessionStore(project.memory_db_path)
         captured: dict = {}
         _patched_cli(monkeypatch, captured)
-        scoped = _make_scoped_subagent_factory(
+        scoped = make_scoped_subagent_factory(
             args, project=project, store=store, toolset="ingest", daemon_session="bot"
         )
         scoped(system_prompt="SP", tools=None)
         assert captured["model"] == "named/model"
 
         captured.clear()
-        worker = _make_worker_agent_factory(
-            args, project=project, store=store, daemon_session="bot"
-        )
+        worker = make_worker_agent_factory(args, project=project, store=store, daemon_session="bot")
         worker(system_prompt="SP")
         assert captured["model"] == "named/model"
     finally:
@@ -113,7 +111,7 @@ def test_scoped_factory_defaults_to_the_full_toolset(tmp_path: Path, monkeypatch
         store = SessionStore(project.memory_db_path)
         captured: dict = {}
         _patched_cli(monkeypatch, captured)
-        factory = _make_scoped_subagent_factory(
+        factory = make_scoped_subagent_factory(
             _args(), project=project, store=store, toolset="ingest"
         )
         factory(system_prompt="SP", tools=None)

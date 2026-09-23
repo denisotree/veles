@@ -82,14 +82,14 @@ async def test_post_v1_runs_starts_turns_through_start_turn(
 
 @pytest.fixture()
 def real_build(state, monkeypatch):
-    """The daemon's real per-turn build (`_build_agent_for_turn`: system prompt
+    """The daemon's real per-turn build (`build_agent_for_turn`: system prompt
     with memory recall, skills, session probe) — only the network provider and
     the compressor are stubbed."""
     import argparse
 
     import veles.core.provider_factory as pf_mod
     import veles.runtime.run as run_mod
-    from veles.daemon.agent_factory import _make_agent_factory
+    from veles.daemon.agent_factory import make_agent_factory
 
     class _Provider:
         name = "stub"
@@ -99,7 +99,7 @@ def real_build(state, monkeypatch):
     monkeypatch.setattr(pf_mod, "make_provider", lambda *a, **k: _Provider())
     monkeypatch.setattr(run_mod, "build_compressor", lambda *a, **k: None)
     monkeypatch.setenv("OPENROUTER_API_KEY", "unused-in-this-test")
-    state.agent_factory = _make_agent_factory(
+    state.agent_factory = make_agent_factory(
         argparse.Namespace(model="stub/model"), project=state.project, store=state.store
     )
 

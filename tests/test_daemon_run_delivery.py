@@ -8,7 +8,7 @@ and let the existing DeliveryRouter push it.
 
 Fixtures mirror `tests/test_daemon_server.py`. Note `build_state` deliberately
 leaves `delivery_router` unset — production wires it in
-`daemon/agent_factory.py::_attach_background_runners` — so the delivery tests
+`daemon/background.py::attach_background_runners` — so the delivery tests
 attach a router to the state directly, the idiom from
 `tests/test_job_delivery_wiring.py`.
 """

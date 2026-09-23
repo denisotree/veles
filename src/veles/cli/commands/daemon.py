@@ -23,10 +23,9 @@ same `_resolve_active_project` helper used by every other verb.
 M153 decomposition: this module keeps only the `cmd_daemon` dispatcher
 and the thin `_cmd_daemon_*` verb handlers. The moved clusters:
 
-- agent-factory runtime wiring (`_FactorySettings`,
-  `_factory_settings_from_args`, `_build_agent_for_turn`,
-  `_make_agent_factory`, `_make_worker_agent_factory`,
-  `_make_post_turn_hook`) → `veles.daemon.agent_factory`;
+- building agents for turns (`FactorySettings`, `make_agent_factory`, the
+  post-turn and verify hooks, …) → `veles.daemon.agent_factory`, and the
+  job/reminder/dream runners → `veles.daemon.background`;
 - process/lifecycle helpers (pid/info sidecars, registry, detach,
   graceful stop, instance paths, named-session marking) →
   `veles.cli.commands.daemon_lifecycle`;
@@ -64,13 +63,13 @@ from veles.cli.commands.daemon_lifecycle import (
 from veles.cli.commands.daemon_tokens import _cmd_daemon_token, _initialise_token_store
 from veles.core.defaults import DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT
 from veles.daemon.agent_factory import (
-    _attach_background_runners,
-    _factory_settings_from_args,
-    _make_agent_factory,
-    _make_post_turn_hook,
-    _make_verify_hook,
-    _make_worker_agent_factory,
+    factory_settings_from_args,
+    make_agent_factory,
+    make_post_turn_hook,
+    make_verify_hook,
+    make_worker_agent_factory,
 )
+from veles.daemon.background import attach_background_runners
 from veles.daemon.paths import daemon_log_path, read_pid
 from veles.daemon.registry import is_alive
 
@@ -225,13 +224,13 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     token_store = _initialise_token_store()
 
     store = SessionStore(project.memory_db_path)
-    worker_agent_factory = _make_worker_agent_factory(
+    worker_agent_factory = make_worker_agent_factory(
         args, project=project, store=store, daemon_session=name
     )
     # M126: build state first (with a placeholder) so the agent factory
     # closure can capture it for per-session override lookup. Replace
     # the factory immediately after.
-    settings_for_health = _factory_settings_from_args(args, project, daemon_session=name)
+    settings_for_health = factory_settings_from_args(args, project, daemon_session=name)
     state = build_state(
         project=project,
         store=store,
@@ -241,14 +240,14 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
         default_model=settings_for_health.model,
         session_name=name,
     )
-    agent_factory = _make_agent_factory(
+    agent_factory = make_agent_factory(
         args, project=project, store=store, state=state, daemon_session=name
     )
     state.agent_factory = agent_factory
-    state.post_turn_hook = _make_post_turn_hook(args, project)
-    state.verify_hook = _make_verify_hook(args, project=project, store=store, daemon_session=name)
+    state.post_turn_hook = make_post_turn_hook(args, project)
+    state.verify_hook = make_verify_hook(args, project=project, store=store, daemon_session=name)
     state.worker_agent_factory = worker_agent_factory
-    jobs_store = _attach_background_runners(
+    jobs_store = attach_background_runners(
         state, project, agent_factory, provider_name, args=args, store=store
     )
 

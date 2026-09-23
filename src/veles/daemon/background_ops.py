@@ -54,9 +54,9 @@ def _scoped_factory_for(
     args: argparse.Namespace, project, store, toolset: str, *, daemon_session: str | None
 ):
     """Seam for tests: build the toolset-capped sub-agent factory."""
-    from veles.daemon.agent_factory import _make_scoped_subagent_factory
+    from veles.daemon.agent_factory import make_scoped_subagent_factory
 
-    return _make_scoped_subagent_factory(
+    return make_scoped_subagent_factory(
         args, project=project, store=store, toolset=toolset, daemon_session=daemon_session
     )
 

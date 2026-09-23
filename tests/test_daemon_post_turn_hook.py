@@ -12,7 +12,7 @@ from typing import ClassVar
 
 import veles.runtime.learning as learning_mod
 from veles.core.project import init_project
-from veles.daemon.agent_factory import _make_post_turn_hook
+from veles.daemon.agent_factory import make_post_turn_hook
 
 
 def _stub_args() -> argparse.Namespace:
@@ -36,7 +36,7 @@ def test_post_turn_hook_fires_every_step(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(learning_mod, "_maybe_refresh_nl_routing", _track("routing"))
     monkeypatch.setattr(learning_mod, "_maybe_refresh_self_doc", _track("self_doc"))
 
-    hook = _make_post_turn_hook(_stub_args(), project)
+    hook = make_post_turn_hook(_stub_args(), project)
 
     class _FakeResult:
         history: ClassVar[list] = []
@@ -69,7 +69,7 @@ def test_post_turn_hook_keeps_going_when_one_step_fails(
     monkeypatch.setattr(learning_mod, "_maybe_refresh_nl_routing", _ok("routing"))
     monkeypatch.setattr(learning_mod, "_maybe_refresh_self_doc", _ok("self_doc"))
 
-    hook = _make_post_turn_hook(_stub_args(), project)
+    hook = make_post_turn_hook(_stub_args(), project)
 
     class _FakeResult:
         history: ClassVar[list] = []
@@ -95,7 +95,7 @@ def test_post_turn_hook_resolves_provider_from_project_config(tmp_path: Path) ->
     )
     args = argparse.Namespace(provider=None, model=None)
 
-    _make_post_turn_hook(args, project)
+    make_post_turn_hook(args, project)
 
     assert args.provider == "ollama"
 
@@ -109,7 +109,7 @@ def test_post_turn_hook_keeps_explicit_provider(tmp_path: Path) -> None:
     )
     args = argparse.Namespace(provider="anthropic", model=None)
 
-    _make_post_turn_hook(args, project)
+    make_post_turn_hook(args, project)
 
     assert args.provider == "anthropic"
 

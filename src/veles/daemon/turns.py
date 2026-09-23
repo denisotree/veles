@@ -160,7 +160,7 @@ def _session_for_mode_turn(state: DaemonState, session_id: str) -> str:
     a mode builds several agents per turn and none may mint its own.
 
     A channel's map can outlive a session row (DB reset), as
-    `_build_agent_for_turn` handles on the default path: a stale id gets a
+    `build_agent_for_turn` handles on the default path: a stale id gets a
     fresh session, and the chat's mode moves with it instead of being lost."""
     if state.store.session_exists(session_id):
         return session_id

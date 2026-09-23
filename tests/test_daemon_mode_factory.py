@@ -16,10 +16,10 @@ import pytest
 from veles.core.memory import SessionStore
 from veles.core.modes import get_mode
 from veles.core.project import init_project
-from veles.daemon.agent_factory import _build_agent_for_turn, _FactorySettings
+from veles.daemon.agent_factory import FactorySettings, build_agent_for_turn
 from veles.runtime.registry import PLANNING_TOOLS, RUN_TOOLS
 
-_SETTINGS = _FactorySettings(
+_SETTINGS = FactorySettings(
     provider_name="openrouter",
     model="stub/model",
     max_iterations=3,
@@ -35,7 +35,7 @@ _SETTINGS = _FactorySettings(
 
 @pytest.fixture()
 def build(tmp_path: Path, monkeypatch):
-    """`_build_agent_for_turn` with the provider, skills and Agent stubbed;
+    """`build_agent_for_turn` with the provider, skills and Agent stubbed;
     returns (build_fn, captured Agent kwargs, toolsets asked of _load_skills)."""
     import veles.core.agent as agent_mod
     import veles.core.provider_factory as pf_mod
@@ -64,7 +64,7 @@ def build(tmp_path: Path, monkeypatch):
 
     def _build(**kw):
         sid = store.create_session()
-        _build_agent_for_turn(
+        build_agent_for_turn(
             _SETTINGS, project=project, store=store, session_id=sid, prompt="hi", **kw
         )
         return sid
