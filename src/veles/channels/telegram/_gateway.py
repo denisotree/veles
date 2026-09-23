@@ -66,6 +66,7 @@ from veles.channels.telegram._buffer import (
     _is_relayed,
     _Kind,
 )
+from veles.channels.telegram._commands import dispatch, menu_descriptors, parse_command
 from veles.channels.telegram._delivery import TelegramDelivery
 from veles.channels.telegram._forwarded import (
     _forward_header,
@@ -178,8 +179,6 @@ class TelegramGateway:
             await self.stop()
 
     async def _publish_command_menu(self) -> None:
-        from veles.channels._telegram_commands import menu_descriptors
-
         await self._call("setMyCommands", {"commands": menu_descriptors()})
 
     async def stop(self) -> None:
@@ -268,9 +267,7 @@ class TelegramGateway:
         chat_key = str(chat_id)
 
         # `/`-commands bypass the aggregator — instant, no buffer. The
-        # dispatcher in `_telegram_commands.py` returns ready-to-send HTML.
-        from veles.channels._telegram_commands import dispatch, parse_command
-
+        # dispatcher in `_commands.py` returns ready-to-send HTML.
         text = (message.get("text") or "").strip()
         parsed = parse_command(text)
         if parsed is not None:
