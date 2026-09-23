@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import contextlib
 import datetime as dt
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from veles.cli.repl.slash.registry import SlashContext, SlashRegistry, SlashResult
 from veles.core.text import first_heading
@@ -443,6 +444,32 @@ def _status(line: str, ctx: SlashContext) -> SlashResult:
 # ---------------- /insights ----------------
 
 
+def _filter_and_limit(line: str, default_limit: int = 10) -> tuple[str | None, int]:
+    """`/insights` and `/rules` arguments: `[<filter>|all] [<N>]`."""
+    parts = (line or "").strip().split()
+    if not parts:
+        return None, default_limit
+    first = parts[0].lower()
+    limit = _parse_int(parts[1], default_limit) if len(parts) > 1 else default_limit
+    return (None if first == "all" else first), limit
+
+
+def _query_memory(ctx: SlashContext, command: str, fetch: Callable[[Any], list]) -> Any:
+    """Run `fetch(connection)` against the project's memory store; a store
+    that won't open comes back as the command's error result."""
+    from veles.core.memory import aio
+    from veles.core.memory.store import open_store
+
+    try:
+        store = open_store(ctx.project)
+    except Exception as exc:
+        return SlashResult.err(f"{command}: cannot open memory.db: {exc}")
+    try:
+        return fetch(store.raw())
+    finally:
+        aio.submit(store.close())
+
+
 def _insights(line: str, ctx: SlashContext) -> SlashResult:
     """Show recent rows from the M119 `insights` table.
 
@@ -458,31 +485,14 @@ def _insights(line: str, ctx: SlashContext) -> SlashResult:
     Default shows 10 most recent across all categories. `/insights
     <category>` filters to one. `/insights all <N>` shows up to N rows.
     """
-    from veles.core.memory import aio
     from veles.core.memory.inspect import recent_insights
-    from veles.core.memory.store import open_store
 
-    parts = (line or "").strip().split()
-    category_filter: str | None = None
-    limit = 10
-    if parts:
-        first = parts[0].lower()
-        if first == "all":
-            if len(parts) > 1:
-                limit = _parse_int(parts[1], limit)
-        else:
-            category_filter = first
-            if len(parts) > 1:
-                limit = _parse_int(parts[1], limit)
-
-    try:
-        store = open_store(ctx.project)
-    except Exception as exc:
-        return SlashResult.err(f"/insights: cannot open memory.db: {exc}")
-    try:
-        rows = recent_insights(store.raw(), category=category_filter, limit=limit)
-    finally:
-        aio.submit(store.close())
+    category_filter, limit = _filter_and_limit(line)
+    rows = _query_memory(
+        ctx, "/insights", lambda c: recent_insights(c, category=category_filter, limit=limit)
+    )
+    if isinstance(rows, SlashResult):
+        return rows
 
     if not rows:
         scope = f"category {category_filter!r}" if category_filter else "any category"
@@ -521,31 +531,12 @@ def _rules(line: str, ctx: SlashContext) -> SlashResult:
     filters to one of `format`, `do`, `dont`, `preference`.
     `/rules all <N>` shows up to N rows.
     """
-    from veles.core.memory import aio
     from veles.core.memory.inspect import recent_rules
-    from veles.core.memory.store import open_store
 
-    parts = (line or "").strip().split()
-    kind_filter: str | None = None
-    limit = 10
-    if parts:
-        first = parts[0].lower()
-        if first == "all":
-            if len(parts) > 1:
-                limit = _parse_int(parts[1], limit)
-        else:
-            kind_filter = first
-            if len(parts) > 1:
-                limit = _parse_int(parts[1], limit)
-
-    try:
-        store = open_store(ctx.project)
-    except Exception as exc:
-        return SlashResult.err(f"/rules: cannot open memory.db: {exc}")
-    try:
-        rows = recent_rules(store.raw(), kind=kind_filter, limit=limit)
-    finally:
-        aio.submit(store.close())
+    kind_filter, limit = _filter_and_limit(line)
+    rows = _query_memory(ctx, "/rules", lambda c: recent_rules(c, kind=kind_filter, limit=limit))
+    if isinstance(rows, SlashResult):
+        return rows
 
     if not rows:
         scope = f"kind {kind_filter!r}" if kind_filter else "any kind"

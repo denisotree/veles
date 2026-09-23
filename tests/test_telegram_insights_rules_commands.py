@@ -77,6 +77,15 @@ async def test_insights_lists_rows(session_map, project) -> None:
     assert "curated-session" in reply
 
 
+async def test_insights_escape_html_in_titles(session_map, project) -> None:
+    """The reply is sent as Telegram HTML; a raw `<` in a title used to break it."""
+    gateway = _make_gateway(session_map, project.root)
+    _seed_insight(project, title="use <b> for List<int>", category="x", ts=time.time())
+    reply = await dispatch(gateway, "42", "insights", "")
+    assert reply is not None
+    assert "use &lt;b&gt; for List&lt;int&gt;" in reply
+
+
 async def test_insights_empty_friendly_message(session_map, project) -> None:
     gateway = _make_gateway(session_map, project.root)
     reply = await dispatch(gateway, "42", "insights", "")

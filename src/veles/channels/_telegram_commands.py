@@ -252,84 +252,86 @@ def _resolve_project(gateway: TelegramGateway):
         return None
 
 
-async def _cmd_insights(gateway: TelegramGateway, chat_key: str, args: str) -> str:
-    """List recent rows from the M119 `insights` table — mirrors the
-    TUI `/insights` slash. Optional category filter as the first arg."""
-    del chat_key
-    from veles.core.memory.inspect import recent_insights
+async def _memory_rows(
+    gateway: TelegramGateway, what: str, args: str, fetch: Callable[..., list]
+) -> tuple[str | None, list] | str:
+    """Parse `[<filter>|all] [<N>]`, then `fetch(conn, filter, limit)` against the
+    project's memory store. Returns `(filter, rows)`, or the reply text when
+    there is no project or the store won't open."""
     from veles.core.memory.store import open_store
 
     parts = args.strip().split()
-    category_filter = parts[0].lower() if parts else None
+    shown_filter = parts[0].lower() if parts else None
     limit = 10
     if len(parts) > 1:
         with contextlib.suppress(ValueError):
             limit = max(1, min(50, int(parts[1])))
-
     project = _resolve_project(gateway)
     if project is None:
-        return "<i>no active project — cannot query insights</i>"
-    category = category_filter if category_filter and category_filter != "all" else None
+        return f"<i>no active project — cannot query {what}</i>"
+    query_filter = shown_filter if shown_filter and shown_filter != "all" else None
     try:
         store = open_store(project)
     except Exception as exc:
-        return f"could not open memory.db: {exc}"
+        return f"could not open memory.db: {html.escape(str(exc))}"
     try:
         # These handlers already run on the gateway's event loop, so they await
         # the port directly — `aio.submit` refuses to block a running loop, and
         # the read itself goes to a thread rather than stalling every other
         # chat while SQLite works.
-        rows = await asyncio.to_thread(recent_insights, store.raw(), category=category, limit=limit)
+        rows = await asyncio.to_thread(fetch, store.raw(), query_filter, limit)
     finally:
         await store.close()
+    return shown_filter, rows
+
+
+async def _cmd_insights(gateway: TelegramGateway, chat_key: str, args: str) -> str:
+    """List recent rows from the `insights` table — mirrors the REPL
+    `/insights`. Optional category filter as the first arg."""
+    del chat_key
+    from veles.core.memory.inspect import recent_insights
+
+    found = await _memory_rows(
+        gateway, "insights", args, lambda c, f, n: recent_insights(c, category=f, limit=n)
+    )
+    if isinstance(found, str):
+        return found
+    category_filter, rows = found
     if not rows:
         scope = f"category={category_filter}" if category_filter else "any category"
-        return f"<i>no insights yet ({scope}).</i>"
+        return f"<i>no insights yet ({html.escape(scope)}).</i>"
     out = [f"<b>Insights (latest {len(rows)})</b>", ""]
     for r in rows:
-        cat = r.category or "—"
-        title = r.title or "(no title)"
-        hidden = f" <i>(hidden: {r.hidden_reason or 'unspecified'})</i>" if r.hidden else ""
+        cat = html.escape(r.category or "—")
+        title = html.escape(r.title or "(no title)")
+        reason = html.escape(r.hidden_reason or "unspecified")
+        hidden = f" <i>(hidden: {reason})</i>" if r.hidden else ""
         out.append(f"• [<code>{cat}</code>] {title}{hidden}")
     return "\n".join(out)
 
 
 async def _cmd_rules(gateway: TelegramGateway, chat_key: str, args: str) -> str:
-    """List recent rows from the M119 `rules` table — mirrors the TUI
-    `/rules` slash. Optional kind filter as the first arg."""
+    """List recent rows from the `rules` table — mirrors the REPL `/rules`.
+    Optional kind filter as the first arg."""
     del chat_key
     from veles.core.memory.inspect import recent_rules
-    from veles.core.memory.store import open_store
 
-    parts = args.strip().split()
-    kind_filter = parts[0].lower() if parts else None
-    limit = 10
-    if len(parts) > 1:
-        with contextlib.suppress(ValueError):
-            limit = max(1, min(50, int(parts[1])))
-
-    project = _resolve_project(gateway)
-    if project is None:
-        return "<i>no active project — cannot query rules</i>"
-    kind = kind_filter if kind_filter and kind_filter != "all" else None
-    try:
-        store = open_store(project)
-    except Exception as exc:
-        return f"could not open memory.db: {exc}"
-    try:
-        rows = await asyncio.to_thread(recent_rules, store.raw(), kind=kind, limit=limit)
-    finally:
-        await store.close()
+    found = await _memory_rows(
+        gateway, "rules", args, lambda c, f, n: recent_rules(c, kind=f, limit=n)
+    )
+    if isinstance(found, str):
+        return found
+    kind_filter, rows = found
     if not rows:
         scope = f"kind={kind_filter}" if kind_filter else "any kind"
-        return f"<i>no rules yet ({scope}).</i>"
+        return f"<i>no rules yet ({html.escape(scope)}).</i>"
     out = [f"<b>Rules (latest {len(rows)})</b>", ""]
     for r in rows:
-        kind = r.kind or "—"
+        kind = html.escape(r.kind or "—")
         body = (r.body or "").strip()
         if len(body) > 100:
             body = body[:97] + "…"
-        out.append(f"• [<code>{kind}</code>] {body}")
+        out.append(f"• [<code>{kind}</code>] {html.escape(body)}")
     return "\n".join(out)
 
 
