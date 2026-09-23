@@ -17,12 +17,30 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import os
 import tempfile
+import tomllib
 from pathlib import Path
 from typing import Any, TypeVar
 
 T = TypeVar("T")
+logger = logging.getLogger(__name__)
+
+
+def load_optional_toml(path: Path) -> dict[str, Any]:
+    """Parse a TOML file; missing, unreadable or malformed → `{}`. Never raises.
+
+    A malformed file is logged: somebody edited it and wants to know why their
+    change had no effect."""
+    if not path.is_file():
+        return {}
+    try:
+        with path.open("rb") as fh:
+            return tomllib.load(fh)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        logger.warning("%s ignored: %s", path, exc)
+        return {}
 
 
 def load_optional_json[T](path: Path, *, default: T | None = None) -> Any | T | None:

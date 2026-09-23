@@ -88,11 +88,11 @@ def test_loader_broken_toml_logged_and_skipped(monkeypatch, tmp_path: Path, capl
     loader_mod.clear_cache()
     import logging
 
-    with caplog.at_level(logging.WARNING, logger="veles.core.sanitize.loader"):
+    with caplog.at_level(logging.WARNING, logger="veles.core.io_utils"):
         rs = loader_mod.load_rules(None)
     # No crash — just builtins survive.
     assert "home_dir" in [r.name for r in rs]
-    assert any("cannot read" in m for m in caplog.messages)
+    assert any("sanitize.toml ignored" in m for m in caplog.messages)
 
 
 def test_loader_cache_keyed_by_project(monkeypatch, tmp_path: Path) -> None:

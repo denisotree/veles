@@ -47,12 +47,11 @@ import hashlib
 import json
 import re
 import time
-import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from veles.core.io_utils import atomic_write_text
+from veles.core.io_utils import atomic_write_text, load_optional_toml
 from veles.core.project import Project
 from veles.core.routing.ensemble import KNOWN_TASKS, RoutingConfig, parse_spec
 
@@ -264,17 +263,7 @@ def nl_state_path(project: Project) -> Path:
 
 def load_nl_routing_config(project: Project) -> RoutingConfig:
     """Permissive parse of `routing.nl.toml`. Missing / corrupt → empty."""
-    path = nl_routing_path(project)
-    if not path.is_file():
-        return RoutingConfig()
-    try:
-        with path.open("rb") as fh:
-            data = tomllib.load(fh)
-    except (OSError, tomllib.TOMLDecodeError):
-        return RoutingConfig()
-    if not isinstance(data, dict):
-        return RoutingConfig()
-    routing = data.get("routing")
+    routing = load_optional_toml(nl_routing_path(project)).get("routing")
     if not isinstance(routing, dict):
         return RoutingConfig()
     tasks_raw = routing.get("tasks")

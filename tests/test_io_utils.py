@@ -57,6 +57,18 @@ def test_atomic_write_with_mode(tmp_path: Path) -> None:
     assert perms == 0o600
 
 
+def test_load_optional_toml_is_permissive(tmp_path: Path) -> None:
+    from veles.core.io_utils import load_optional_toml
+
+    good = tmp_path / "good.toml"
+    good.write_text('[a]\nb = "c"\n', encoding="utf-8")
+    bad = tmp_path / "bad.toml"
+    bad.write_text("not = valid[", encoding="utf-8")
+    assert load_optional_toml(good) == {"a": {"b": "c"}}
+    assert load_optional_toml(bad) == {}
+    assert load_optional_toml(tmp_path / "missing.toml") == {}
+
+
 def test_atomic_write_text_failure_keeps_previous_file(tmp_path: Path, monkeypatch) -> None:
     """A write that dies before the rename leaves the old file whole and no tmp behind."""
     import os

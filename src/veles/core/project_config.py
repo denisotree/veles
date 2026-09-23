@@ -29,10 +29,10 @@ produces (string/bool/int/list-of-scalars, one level of nesting).
 
 from __future__ import annotations
 
-import tomllib
 from pathlib import Path
 from typing import Any
 
+from veles.core.io_utils import load_optional_toml
 from veles.core.project import Project
 
 _CONFIG_FILENAME = "config.toml"
@@ -54,14 +54,7 @@ def _load_config_from_path(path: Path) -> dict[str, Any]:
     callers prefer `load_project_config(project)`. Exposed so the
     daemon picker (which has a `project_path` string, not a `Project`)
     can read `[engine] model` without paying to construct a Project."""
-    if not path.is_file():
-        return {}
-    try:
-        with path.open("rb") as fh:
-            data = tomllib.load(fh)
-    except (OSError, tomllib.TOMLDecodeError):
-        return {}
-    return data if isinstance(data, dict) else {}
+    return load_optional_toml(path)
 
 
 def read_provider_model_at(project_root: Path) -> str | None:

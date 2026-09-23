@@ -25,12 +25,11 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import tomllib
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from veles.core.io_utils import atomic_write_text
+from veles.core.io_utils import atomic_write_text, load_optional_toml
 from veles.core.project_config import _emit_toml
 
 logger = logging.getLogger(__name__)
@@ -65,17 +64,7 @@ def load_user_config(path: Path | None = None) -> UserConfig | None:
     """Return the saved config, or None if the file is missing / corrupt /
     malformed. Permissive: any failure falls back to None so the wizard
     can re-run on next launch instead of crashing the CLI."""
-    p = path or user_config_path()
-    if not p.is_file():
-        return None
-    try:
-        with p.open("rb") as fh:
-            data = tomllib.load(fh)
-    except (OSError, tomllib.TOMLDecodeError):
-        return None
-    if not isinstance(data, dict):
-        return None
-    user_section = data.get("user")
+    user_section = load_optional_toml(path or user_config_path()).get("user")
     if not isinstance(user_section, dict):
         return None
     lang = user_section.get("language")
@@ -165,17 +154,7 @@ def read_user_config_raw(path: Path | None = None) -> dict[str, Any]:
     Malformed files log at WARNING level so a typo doesn't silently
     disable a user's `[permissions]` overrides, but the caller still
     falls back to builtin defaults rather than refuse to run."""
-
-    p = path or user_config_path()
-    if not p.is_file():
-        return {}
-    try:
-        with p.open("rb") as fh:
-            data = tomllib.load(fh)
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        logger.warning("user config %s ignored: %s", p, exc)
-        return {}
-    return data if isinstance(data, dict) else {}
+    return load_optional_toml(path or user_config_path())
 
 
 def get_user_section(*path: str) -> dict[str, Any]:

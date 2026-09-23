@@ -35,6 +35,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from veles.core.fts import escape_query
+from veles.core.io_utils import load_optional_toml
 from veles.core.safety import scan_for_injection
 from veles.core.slug import normalize_slug as _normalize_slug
 
@@ -87,17 +88,7 @@ def normalize_category(name: str) -> str | None:
 
 def read_project_categories(root: Path) -> list[str]:
     """The project-local category declarations (`.veles/wiki.toml`). Best-effort."""
-    path = project_categories_path(root)
-    if not path.is_file():
-        return []
-    try:
-        import tomllib
-
-        with path.open("rb") as fh:
-            data = tomllib.load(fh)
-    except Exception:
-        return []
-    cats = data.get("categories")
+    cats = load_optional_toml(project_categories_path(root)).get("categories")
     if not isinstance(cats, list):
         return []
     out: list[str] = []
@@ -154,16 +145,11 @@ def _resolve_wiki_categories(root: Path) -> tuple[str, ...]:
                 resolved.append(c)
 
     try:
-        import tomllib
-
         name = "llm-wiki"
-        proj_toml = root / ".veles" / "project.toml"
-        if proj_toml.is_file():
-            with proj_toml.open("rb") as fh:
-                data = tomllib.load(fh)
-            n = (data.get("project") or {}).get("layout")
-            if isinstance(n, str) and n.strip():
-                name = n.strip()
+        data = load_optional_toml(root / ".veles" / "project.toml")
+        n = (data.get("project") or {}).get("layout")
+        if isinstance(n, str) and n.strip():
+            name = n.strip()
         from veles.core.layout.discovery import find_layout
 
         pack = find_layout(name, project=None)
