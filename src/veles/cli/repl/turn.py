@@ -100,7 +100,7 @@ def _repl_turn_system_prompt(
     )
     if base:
         sys_chunks.append(base)
-    if mode.system_block.strip():
+    if mode is not None and mode.system_block.strip():
         sys_chunks.append(mode.system_block.strip())
     if extra_system and extra_system.strip():
         # A phase prompt is driving this turn (goal mode's own FSM, which is

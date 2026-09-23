@@ -84,8 +84,11 @@ def _build_runtime(args: argparse.Namespace, project: Project):
         # M191: `query` (the raw user prompt, passed by the mode) drives the
         # per-turn `<memory-context>` recall — empty before M191, so the REPL
         # never recalled project memory.
+        # A toolless turn (GoalMode's interview) carries its own phase prompt;
+        # the planning block would have it tell the user to "/mode writing",
+        # which in a goal is exactly wrong (live-seen in M280b).
         system_prompt = _repl_turn_system_prompt(
-            args, project, mode=mode, query=query, extra_system=extra_system
+            args, project, mode=None if toolless else mode, query=query, extra_system=extra_system
         )
         # M241b: `toolless` hands the turn an EMPTY registry. GoalMode's
         # INTERVIEW phase asks the user one clarifying question per turn and
