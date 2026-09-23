@@ -1,6 +1,6 @@
 """M230 — a long free-text query must not silently retrieve nothing.
 
-Recall is keyed on the raw prompt (`cli/_runtime.py`), and `_fts_escape_query`
+Recall is keyed on the raw prompt (`runtime/prompt.py`), and `_fts_escape_query`
 quoted every token and joined them with FTS5's implicit AND. That demands one
 stored row contain *every* token of the query, so a paragraph — or a pasted
 alert payload, where timestamps, ids and metric values never recur — matched

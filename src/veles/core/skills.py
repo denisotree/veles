@@ -232,7 +232,7 @@ def discover_skills(
     The `include_layout` toggle defaults False to preserve the M40 era
     contract (discover_skills returns only on-disk user-or-project
     skills). Runtime call sites that build the agent's tool surface
-    (`cli/_runtime.py::_load_skills`, daemon factory) pass
+    (`runtime/registry.py::load_skills`, daemon factory) pass
     `include_layout=True` so the pack-shipped `ingest` / `query` /
     `lint` skills materialise as callable tools. Tests that pre-date
     M117b can keep the default and continue to see an empty list on

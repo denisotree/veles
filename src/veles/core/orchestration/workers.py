@@ -3,9 +3,8 @@ plan-with-checkboxes, mini-report persistence.
 
 `spawn(role, prompt, agent_factory)` builds an isolated sub-Agent
 that runs the worker prompt with a role-specific system prompt and
-returns the text result. The factory is injected so this module
-stays decoupled from `cli/_runtime.py::make_agent` (so tests can
-hand in a stub factory).
+returns the text result. The factory is injected so this module stays
+decoupled from how a front end builds agents (and tests can hand in a stub).
 
 M122b adds `spawn_parallel(specs, agent_factory)` — given a list of
 `(role, prompt[, kwargs])` tuples, dispatches each worker on its own
@@ -101,9 +100,7 @@ class WorkerHandle:
     tokens_out: int = 0
 
 
-# `AgentFactory` here matches the shape used by `cli/_runtime.py`,
-# which takes a state-like object and returns an Agent. For the
-# orchestration MVP we accept anything callable that returns an Agent
+# For the orchestration MVP we accept anything callable that returns an Agent
 # instance and let tests inject stubs.
 AgentFactory = Callable[..., "Agent"]
 

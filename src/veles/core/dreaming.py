@@ -187,7 +187,7 @@ def _persist_dream_state(
     # scratch silently wiped `failed_attempts` (live 2026-07-08) — the
     # curator's give-up-after-3 poison-pill counter reset every dream, so one
     # persistently failing session blocked the curation queue forever. Mirror
-    # bug of the dream-cursor reset fixed in `cli/_curator.py`.
+    # bug of the dream-cursor reset fixed in `runtime/learning.py`.
     new_state = replace(
         state,
         last_post_turn_dream_at=at if not include_consolidation else state.last_post_turn_dream_at,

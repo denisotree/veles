@@ -174,7 +174,7 @@ def measure(project, probes: list[Probe], *, rows: int, vectors: bool) -> SizeRe
     )
 
 
-# The production cap on the rendered block (`cli/_runtime.py`). B2 reports
+# The production cap on the rendered block (`runtime/prompt.py`). B2 reports
 # against the real number, not a stress value: "truncation loses it" means
 # nothing if the budget was invented to make it true.
 _PROD_BLOCK_CHARS = 4_000

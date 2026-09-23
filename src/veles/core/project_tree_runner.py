@@ -5,12 +5,10 @@ on an unchanged tree is cheap (one stat per entry, zero writes). That
 makes "scan on every `veles run` boot" affordable — we don't need a
 filesystem watcher, just a thin call site here.
 
-`scan_project_tree(project)` is the public seam. Callers:
-- `init_project` (M118c): one full scan right after the skeleton lands
-  so the cache isn't empty on first `veles run`.
-- `cli/_runtime.py::_make_agent_for_run` (M118b): re-scan on every
-  agent bootstrap. Fast on warm trees; produces fresh `project_tree`
-  rows for `relevant()` to query.
+`scan_project_tree(project)` is the public seam. Its one caller today is
+`init_project`, which runs a full scan right after the skeleton lands so the
+cache isn't empty on the first `veles run`. The per-run re-scan this module
+was written for is not wired: the agent-build path that called it is gone.
 
 Errors are caught and logged — a partially-readable tree shouldn't
 abort the agent's startup. The Scanner itself already swallows
