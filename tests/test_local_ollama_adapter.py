@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from veles.adapters.local._base import _to_openai_message
 from veles.adapters.local.ollama import OllamaProvider
+from veles.core.openai_wire import to_openai_message as _to_openai_message
 from veles.core.provider import Message, ToolCall
 
 # ---------- mock OpenAI client ----------

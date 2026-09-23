@@ -545,3 +545,16 @@ def extract_usage_with_cache(usage_obj: Any) -> TokenUsage:
     usage = _base_usage(usage_obj)
     usage.cache_read_tokens = getattr(details, "cached_tokens", 0) or 0 if details else 0
     return usage
+
+
+class CloudOpenAIProvider(OpenAICompatibleProvider):
+    """A hosted OpenAI-wire endpoint (OpenAI, OpenRouter): prompt-cache hints go
+    out as `cache_control` blocks and cached-token counts come back in usage."""
+
+    def _prepare_messages(self, messages: list[Message], model: str) -> list[dict[str, Any]]:
+        from veles.core.cache_hints import apply_cache_hints
+
+        return apply_cache_hints([to_openai_message(m) for m in messages], model)
+
+    def _extract_usage(self, usage_obj: Any) -> TokenUsage:
+        return extract_usage_with_cache(usage_obj)

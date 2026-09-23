@@ -29,14 +29,7 @@ import httpx
 from openai import OpenAI
 
 from veles.core.context import expects_strict_json
-from veles.core.openai_wire import (
-    OpenAICompatibleProvider,
-    json_mode_enabled,
-    to_openai_message,
-)
-
-# Re-export for tests that import the function from this module.
-_to_openai_message = to_openai_message
+from veles.core.openai_wire import OpenAICompatibleProvider, json_mode_enabled
 
 
 class _OpenAICompatibleBase(OpenAICompatibleProvider):
