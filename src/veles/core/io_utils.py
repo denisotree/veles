@@ -42,18 +42,22 @@ def load_optional_json[T](path: Path, *, default: T | None = None) -> Any | T | 
 
 
 def atomic_write_json(path: Path, data: Any, *, mode: int | None = None) -> None:
-    """Write `data` as JSON to `path` via tmpfile + `os.replace` so a
-    crash mid-write leaves the previous good file intact. Caller owns
-    parent directory creation.
+    """Write `data` as compact JSON to `path` atomically (see `atomic_write_text`)."""
+    atomic_write_text(path, json.dumps(data) + "\n", mode=mode)
+
+
+def atomic_write_text(path: Path, text: str, *, mode: int | None = None) -> None:
+    """Write `text` to `path` via tmpfile + `os.replace`, so a crash mid-write
+    leaves the previous good file intact and a concurrent reader never sees a
+    half-written one. Creates the parent directory.
 
     `mode`, if given, is applied to the final file via `os.chmod` —
     useful for token files that need 0600."""
-    body = json.dumps(data) + "\n"
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(body)
+            fh.write(text)
         os.replace(tmp_name, path)
     except Exception:
         # Best-effort cleanup if the tmpfile lingered.

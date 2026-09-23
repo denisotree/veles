@@ -39,6 +39,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
 
+from veles.core.io_utils import atomic_write_text
+
 PLANS_DIRNAME = "plans"
 PLANS_ACTIVE_SUBDIR = "active"
 PLANS_COMPLETED_SUBDIR = "completed"
@@ -210,9 +212,7 @@ def mark_done(
 
 def _write(state_dir: Path, plan: PlanArtifact, *, completed: bool) -> None:
     target_dir = completed_dir(state_dir) if completed else active_dir(state_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-    path = target_dir / f"{plan.id}.md"
-    path.write_text(_to_markdown(plan), encoding="utf-8")
+    atomic_write_text(target_dir / f"{plan.id}.md", _to_markdown(plan))
 
 
 def _require(state_dir: Path, plan_id: str) -> PlanArtifact:

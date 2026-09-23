@@ -28,6 +28,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
+from veles.core.io_utils import atomic_write_text
+
 GOALS_DIRNAME = "goals"
 
 GoalStatus = Literal[
@@ -346,9 +348,10 @@ def _transition(
 
 
 def _write(state_dir: Path, goal: Goal) -> None:
-    path = _goal_path(state_dir, goal.id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(asdict(goal), ensure_ascii=False, indent=2), encoding="utf-8")
+    # Atomic: the REPL, the goal driver and `veles goal pause/cancel` read this
+    # file concurrently, and a half-written one reads as "goal missing".
+    text = json.dumps(asdict(goal), ensure_ascii=False, indent=2)
+    atomic_write_text(_goal_path(state_dir, goal.id), text)
 
 
 def _from_dict(raw: dict[str, Any]) -> Goal:

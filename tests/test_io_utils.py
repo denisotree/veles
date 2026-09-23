@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from veles.core.io_utils import atomic_write_json, load_optional_json
+from veles.core.io_utils import atomic_write_json, atomic_write_text, load_optional_json
 
 
 def test_load_missing_returns_default(tmp_path: Path) -> None:
@@ -55,3 +55,26 @@ def test_atomic_write_with_mode(tmp_path: Path) -> None:
     atomic_write_json(p, {"token": "x"}, mode=0o600)
     perms = stat.S_IMODE(os.stat(p).st_mode)
     assert perms == 0o600
+
+
+def test_atomic_write_text_failure_keeps_previous_file(tmp_path: Path, monkeypatch) -> None:
+    """A write that dies before the rename leaves the old file whole and no tmp behind."""
+    import os
+
+    import pytest
+
+    from veles.core.goal import create_goal, goals_dir, read_goal
+
+    goal = create_goal(tmp_path, objective="ship it")
+    gdir = goals_dir(tmp_path)
+
+    def boom(*_a, **_k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(os, "replace", boom)
+    with pytest.raises(OSError):
+        atomic_write_text(gdir / f"{goal.id}.json", "{half")
+    monkeypatch.undo()
+
+    assert read_goal(tmp_path, goal.id) == goal
+    assert not list(gdir.glob("*.tmp"))
