@@ -31,35 +31,12 @@ from openai import OpenAI
 from veles.core.context import expects_strict_json
 from veles.core.openai_wire import (
     OpenAICompatibleProvider,
+    json_mode_enabled,
     to_openai_message,
 )
 
 # Re-export for tests that import the function from this module.
 _to_openai_message = to_openai_message
-
-# M239 self-heal, mirroring `cache_hints.disable_tool_tail`: `response_format`
-# is a bonus, so a backend that rejects it must degrade instead of failing the
-# turn. `VELES_LOCAL_JSON_MODE=0` disables it up front; the first 400 naming the
-# parameter disables it for the rest of the process and the request is retried.
-_JSON_MODE_ENABLED: bool = os.environ.get("VELES_LOCAL_JSON_MODE", "1").strip().lower() not in (
-    "0",
-    "false",
-    "no",
-)
-
-
-def json_mode_enabled() -> bool:
-    return _JSON_MODE_ENABLED
-
-
-def disable_json_mode() -> None:
-    global _JSON_MODE_ENABLED
-    _JSON_MODE_ENABLED = False
-
-
-def _reset_json_mode_for_tests() -> None:
-    global _JSON_MODE_ENABLED
-    _JSON_MODE_ENABLED = True
 
 
 class _OpenAICompatibleBase(OpenAICompatibleProvider):

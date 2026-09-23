@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from collections.abc import Iterator
 from typing import Any
 
@@ -69,27 +70,39 @@ _ERROR_BODY_LIMIT = 500
 logger = logging.getLogger(__name__)
 
 
-def _is_cache_control_error(exc: Exception) -> bool:
-    """True for an upstream 400 that rejected our `cache_control` hint — the
-    signal to self-heal by dropping the M220 tool-tail breakpoint and retrying.
-    Matches on the error body so it fires only for the cache-hint rejection,
-    not any other 400."""
+# JSON mode (`response_format`, M239) for local backends is a bonus, so a backend
+# that rejects it must degrade instead of failing the turn — the same self-heal
+# as `cache_hints.disable_tool_tail`. `VELES_LOCAL_JSON_MODE=0` turns it off up
+# front; the first 400 naming the parameter turns it off for the process.
+_json_mode_disabled = False
+
+
+def json_mode_enabled() -> bool:
+    if _json_mode_disabled:
+        return False
+    flag = os.environ.get("VELES_LOCAL_JSON_MODE", "1").strip().lower()
+    return flag not in ("0", "false", "no")
+
+
+def disable_json_mode() -> None:
+    global _json_mode_disabled
+    _json_mode_disabled = True
+
+
+def _reset_json_mode_for_tests() -> None:
+    global _json_mode_disabled
+    _json_mode_disabled = False
+
+
+def _is_400_about(exc: Exception, parameter: str) -> bool:
+    """True for an upstream 400 whose body names `parameter` — the signal that
+    it rejected one of our optional hints (`cache_control`, `response_format`)
+    and not something else, so the hint can be dropped and the call retried."""
     if not isinstance(exc, APIStatusError):
         return False
     if getattr(exc, "status_code", None) != 400:
         return False
-    return "cache_control" in str(exc).lower()
-
-
-def _is_response_format_error(exc: Exception) -> bool:
-    """True for an upstream 400 that rejected our M239 `response_format` hint.
-    Matches on the error body so it fires only for that rejection, not any
-    other 400 — a llama.cpp build without JSON-schema support, say."""
-    if not isinstance(exc, APIStatusError):
-        return False
-    if getattr(exc, "status_code", None) != 400:
-        return False
-    return "response_format" in str(exc).lower()
+    return parameter in str(exc).lower()
 
 
 def to_openai_message(m: Message) -> dict[str, Any]:
@@ -289,13 +302,9 @@ class OpenAICompatibleProvider:
         base = str(getattr(self._client, "base_url", "") or "").rstrip("/")
         if isinstance(exc, APITimeoutError | httpx.TimeoutException):
             return ProviderTimeout(str(exc) or f"{name} request timed out")
-        if isinstance(exc, httpx.TransportError):
-            # Non-timeout transport failure surfacing raw from a stream
-            # iteration (M246). Same shape as APIConnectionError below.
-            hint = self._connection_error_hint()
-            msg = f"cannot reach {name} at {base or '<unknown>'}"
-            return ProviderUnavailable(f"{msg} — {hint}" if hint else msg)
-        if isinstance(exc, APIConnectionError):
+        # A non-timeout transport failure can surface raw from a stream iteration
+        # (M246) instead of wrapped by the SDK; both mean the endpoint is unreachable.
+        if isinstance(exc, APIConnectionError | httpx.TransportError):
             hint = self._connection_error_hint()
             msg = f"cannot reach {name} at {base or '<unknown>'}"
             return ProviderUnavailable(f"{msg} — {hint}" if hint else msg)
@@ -329,9 +338,7 @@ class OpenAICompatibleProvider:
         except _TRANSLATED_OPENAI_ERRORS as exc:
             from veles.core.cache_hints import disable_tool_tail, tool_tail_enabled
 
-            if "response_format" in kwargs and _is_response_format_error(exc):
-                from veles.adapters.local._base import disable_json_mode
-
+            if "response_format" in kwargs and _is_400_about(exc, "response_format"):
                 disable_json_mode()
                 logger.warning(
                     "response_format rejected; disabled local JSON mode and "
@@ -343,7 +350,7 @@ class OpenAICompatibleProvider:
                     return self._client.chat.completions.create(**retry)
                 except _TRANSLATED_OPENAI_ERRORS as exc2:
                     raise self._translate_openai_error(exc2) from exc2
-            if tool_tail_enabled() and _is_cache_control_error(exc):
+            if tool_tail_enabled() and _is_400_about(exc, "cache_control"):
                 disable_tool_tail()
                 logger.warning(
                     "cache_control rejected on the tool tail; disabled tool-tail "
@@ -357,14 +364,15 @@ class OpenAICompatibleProvider:
                     raise self._translate_openai_error(exc2) from exc2
             raise self._translate_openai_error(exc) from exc
 
-    def create_message(
+    def _request_kwargs(
         self,
         messages: list[Message],
-        tools: list[dict[str, Any]] | None = None,
+        tools: list[dict[str, Any]] | None,
         *,
         model: str,
-        max_tokens: int = 4096,
-    ) -> ProviderResponse:
+        max_tokens: int,
+    ) -> dict[str, Any]:
+        """The `chat.completions.create` arguments shared by both call styles."""
         kwargs: dict[str, Any] = {
             "model": model,
             "messages": self._prepare_messages(messages, model),
@@ -374,6 +382,17 @@ class OpenAICompatibleProvider:
             kwargs["tools"] = tools
             kwargs["tool_choice"] = "auto"
         kwargs.update(self._request_options(model))
+        return kwargs
+
+    def create_message(
+        self,
+        messages: list[Message],
+        tools: list[dict[str, Any]] | None = None,
+        *,
+        model: str,
+        max_tokens: int = 4096,
+    ) -> ProviderResponse:
+        kwargs = self._request_kwargs(messages, tools, model=model, max_tokens=max_tokens)
         completion = self._call_create(kwargs, messages, model)
         choice = completion.choices[0]
         msg = choice.message
@@ -395,16 +414,8 @@ class OpenAICompatibleProvider:
         model: str,
         max_tokens: int = 4096,
     ) -> Iterator[StreamEvent]:
-        kwargs: dict[str, Any] = {
-            "model": model,
-            "messages": self._prepare_messages(messages, model),
-            self._max_tokens_kwarg(model): max_tokens,
-            "stream": True,
-        }
-        if tools and self.supports_tools:
-            kwargs["tools"] = tools
-            kwargs["tool_choice"] = "auto"
-        kwargs.update(self._request_options(model))
+        kwargs = self._request_kwargs(messages, tools, model=model, max_tokens=max_tokens)
+        kwargs["stream"] = True
 
         text_buffer = ""
         tool_calls_acc: dict[int, dict[str, Any]] = {}
