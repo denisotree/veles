@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from veles.core.agent import Agent
+from veles.cli._agent_builder import make_worker_factory
 from veles.core.project import Project
 from veles.core.trust import trust_auto_allow
 
@@ -64,23 +64,13 @@ def cmd_research(args: argparse.Namespace, project: Project) -> int:
     # multi-fetch explorer can overflow the model context. Same compressor the
     # single-agent / manager run paths use.
     compressor = _build_compressor(args, project, provider)
-
-    def factory(**kwargs):
-        worker_system = kwargs.get("system_prompt") or ""
-        full_system = (
-            f"{base_system}\n\n---\n\n{worker_system}"
-            if base_system and worker_system
-            else (worker_system or base_system)
-        )
-        return Agent(
-            provider=provider,
-            registry=research_registry,
-            model=args.model,
-            max_iterations=args.max_iterations,
-            system_prompt=full_system,
-            verbose=args.verbose,
-            compressor=compressor,
-        )
+    factory = make_worker_factory(
+        args,
+        provider=provider,
+        registry=research_registry,
+        base_system=base_system,
+        compressor=compressor,
+    )
 
     planner = make_llm_planner(provider, args.model, max_subquestions=args.max_subquestions)
 

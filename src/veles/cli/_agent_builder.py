@@ -95,3 +95,35 @@ def build_command_agent(
         compressor=compressor,
         plan_mode=plan_mode,
     )
+
+
+def make_worker_factory(
+    args: argparse.Namespace,
+    *,
+    provider: Provider,
+    registry: Registry,
+    base_system: str,
+    compressor: Callable | None,
+) -> Callable[..., Agent]:
+    """A `factory(system_prompt=…)` for orchestration workers (manager spawn,
+    research explorers): each worker gets the base system prompt with its
+    role prompt appended, so it keeps the project context."""
+
+    def factory(**kwargs: object) -> Agent:
+        worker_system = str(kwargs.get("system_prompt") or "")
+        full_system = (
+            f"{base_system}\n\n---\n\n{worker_system}"
+            if base_system and worker_system
+            else (worker_system or base_system)
+        )
+        return Agent(
+            provider=provider,
+            registry=registry,
+            model=args.model,
+            max_iterations=args.max_iterations,
+            system_prompt=full_system,
+            verbose=args.verbose,
+            compressor=compressor,
+        )
+
+    return factory
