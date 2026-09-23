@@ -8,9 +8,11 @@ import sys
 from veles.core.project import Project
 
 
-def cmd_self_doc(args: argparse.Namespace, project: Project | None) -> int:
+def cmd_self_doc(args: argparse.Namespace) -> int:
+    from veles.cli._project import require_project
+
+    project = require_project(args)
     if project is None:
-        print("error: no Veles project found", file=sys.stderr)
         return 2
     sub = getattr(args, "self_doc_cmd", None) or "refresh"
     if sub == "refresh":
