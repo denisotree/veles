@@ -32,6 +32,8 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
+from veles.core.memory.vector import cosine_similarity
+
 # Directory names that are always skipped, regardless of `.gitignore`.
 # Tuned to dev workflows where the cache would otherwise spend 90% of
 # its time hashing virtualenv internals.
@@ -431,7 +433,7 @@ def relevant_semantic(conn: sqlite3.Connection, query: str, *, limit: int = 10) 
 
     _prune_cached_embeddings(conn, model, signatures)
     scored = [
-        (_cosine(query_vec, cached[sig]), entry)
+        (cosine_similarity(query_vec, cached[sig]), entry)
         for sig, entry in zip(signatures, entries, strict=True)
     ]
     scored.sort(key=lambda x: (-x[0], x[1].rel_path))
@@ -494,22 +496,6 @@ def _entry_signature(entry: TreeEntry) -> str:
     scales linearly in entry count, not in file size."""
     tag = entry.semantic_tag or "untagged"
     return f"{entry.kind} {tag}: {entry.rel_path.replace('/', ' ')}"
-
-
-def _cosine(a: list[float], b: list[float]) -> float:
-    """Cosine similarity in [-1, 1]. Pure Python — same shape as
-    the fallback in `memory_vector._cosine_distance` but returns
-    *similarity* (higher is better) so the sort key is `-score`."""
-    import math
-
-    if not a or not b or len(a) != len(b):
-        return 0.0
-    dot = math.fsum(x * y for x, y in zip(a, b, strict=False))
-    na = math.sqrt(math.fsum(x * x for x in a))
-    nb = math.sqrt(math.fsum(x * x for x in b))
-    if na == 0.0 or nb == 0.0:
-        return 0.0
-    return dot / (na * nb)
 
 
 __all__ = [

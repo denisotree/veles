@@ -375,21 +375,30 @@ def _knn_python(
     return hits[:limit]
 
 
-def _cosine_distance(a: list[float], b: list[float]) -> float:
-    """1 - cosine_similarity, stabilised with `math.fsum`."""
-    if len(a) != len(b):
-        return 2.0  # max cosine distance
+def cosine_similarity(a: list[float], b: list[float]) -> float:
+    """Cosine similarity in [-1, 1], stabilised with `math.fsum`. Empty,
+    length-mismatched or zero-norm inputs → 0.0 (no signal)."""
+    if not a or not b or len(a) != len(b):
+        return 0.0
     dot = math.fsum(x * y for x, y in zip(a, b, strict=False))
     na = math.sqrt(math.fsum(x * x for x in a))
     nb = math.sqrt(math.fsum(x * x for x in b))
     if na == 0.0 or nb == 0.0:
-        return 1.0
-    return 1.0 - (dot / (na * nb))
+        return 0.0
+    return dot / (na * nb)
+
+
+def _cosine_distance(a: list[float], b: list[float]) -> float:
+    """1 - cosine similarity; a length mismatch is the maximum distance."""
+    if len(a) != len(b):
+        return 2.0
+    return 1.0 - cosine_similarity(a, b)
 
 
 __all__ = [
     "EmbeddingHit",
     "available_backend",
+    "cosine_similarity",
     "delete_embedding",
     "ensure_embeddings_table",
     "get_embedding",

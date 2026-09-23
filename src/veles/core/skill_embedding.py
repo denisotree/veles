@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -215,15 +214,3 @@ def compute_skill_vectors(
         if project is not None:
             save_cache(project, model=provider.model, vectors=cache)
     return name_to_vector
-
-
-def cosine_similarity(a: list[float], b: list[float]) -> float:
-    """Cosine similarity ∈ [-1, 1]. Zero-norm inputs → 0.0 (no signal)."""
-    if not a or not b or len(a) != len(b):
-        return 0.0
-    dot = sum(x * y for x, y in zip(a, b, strict=False))
-    norm_a = math.sqrt(sum(x * x for x in a))
-    norm_b = math.sqrt(sum(y * y for y in b))
-    if norm_a == 0.0 or norm_b == 0.0:
-        return 0.0
-    return dot / (norm_a * norm_b)
