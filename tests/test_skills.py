@@ -11,7 +11,8 @@ from veles.core.context import reset_active_project, set_active_project
 from veles.core.frontmatter import parse_frontmatter, render_frontmatter
 from veles.core.project import init_project
 from veles.core.provider import ProviderResponse, TokenUsage
-from veles.core.skills import bump_telemetry, discover_skills, make_skill_tool
+from veles.core.skill_tool import make_skill_tool
+from veles.core.skills import bump_telemetry, discover_skills
 from veles.core.tools.registry import Registry, ToolEntry
 
 
@@ -505,7 +506,7 @@ def test_skill_stack_pops_on_success(tmp_path: Path) -> None:
 
 import json as _json  # noqa: E402
 
-from veles.core.skills import _build_param_schema, _yaml_type_to_json  # noqa: E402
+from veles.core.skill_tool import _build_param_schema, _yaml_type_to_json  # noqa: E402
 
 
 def test_parse_frontmatter_with_parameters_list() -> None:

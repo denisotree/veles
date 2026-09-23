@@ -1,14 +1,10 @@
-"""Skills — per-project parametrized sub-agents.
+"""Skills — per-project parametrized sub-agents: discovery and telemetry.
 
-A skill is a directory under `<project>/.veles/skills/<name>/` containing a
+A skill is a directory under `<project>/.veles/skills/<name>/` (or the user's
+`~/.veles/skills/`, a layout pack, or the bundled builtins) containing a
 `SKILL.md` file. The frontmatter declares the skill's identity and tool budget;
-the body is the system prompt for a disposable sub-agent.
-
-When the top-level agent calls a skill (it appears as a registered tool with a
-single `input: str` parameter), Veles spawns a fresh `Agent` whose
-`system_prompt` is the skill body and whose registry is the parent's builtin
-tools filtered to `skill.tools`. The sub-agent runs to completion; its final
-text becomes the tool result.
+the body is the system prompt for a disposable sub-agent, which
+`core/skill_tool.py` turns into a callable tool.
 
 Usage telemetry is recorded in the project's memory.db (`bump_telemetry`) and
 overlaid on every load; the frontmatter itself is parsed by `core/frontmatter.py`.
@@ -16,7 +12,6 @@ overlaid on every load; the frontmatter itself is parsed by `core/frontmatter.py
 
 from __future__ import annotations
 
-import json
 import logging
 import threading
 import time
@@ -26,22 +21,17 @@ from typing import TYPE_CHECKING, Any
 
 from veles.core.frontmatter import parse_frontmatter
 from veles.core.timeutil import utc_iso
-from veles.core.tools.registry import Registry, ToolEntry
 from veles.core.user_paths import user_skills_dir
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from veles.core.project import Project
-    from veles.core.provider import Provider
 
 
 _SKILL_FILENAME = "SKILL.md"
 _DEFAULT_TOOLS: list[str] = []
 _DEFAULT_MAX_ITERATIONS = 10
-_MAX_SKILL_DEPTH = 5
 
 
 @dataclass(slots=True)
@@ -361,180 +351,3 @@ def bump_telemetry(skill: Skill, *, success: bool) -> None:
     else:
         skill.error_count += 1
         skill.last_error_at = now_iso
-
-
-# ---------- tool factory ----------
-
-
-def make_skill_tool(
-    skill: Skill,
-    *,
-    provider: Provider,
-    model: str,
-    base_registry: Registry,
-) -> ToolEntry:
-    """Build a ToolEntry that, when invoked, runs the skill as a sub-agent.
-
-    `base_registry` is the registry the skill's sub-agent will subset its tools
-    from. Subset selection is deferred to invocation time so that cross-skill
-    composition works: when `_load_skills` later registers other skills into
-    the same `base_registry`, they become available to skills whose
-    `frontmatter.tools` whitelist names them.
-    """
-    handler = _make_skill_handler(
-        skill=skill, provider=provider, model=model, base_registry=base_registry
-    )
-    parameter_schema = _build_param_schema(skill.parameters)
-    return ToolEntry(
-        name=skill.name,
-        description=skill.description,
-        parameter_schema=parameter_schema,
-        handler=handler,
-        is_async=False,
-    )
-
-
-_TYPE_MAP = {
-    "string": "string",
-    "str": "string",
-    "int": "integer",
-    "integer": "integer",
-    "bool": "boolean",
-    "boolean": "boolean",
-    "float": "number",
-    "number": "number",
-}
-
-
-def _yaml_type_to_json(t: str) -> str:
-    return _TYPE_MAP.get(t.lower(), "string")
-
-
-def _build_param_schema(parameters: list[dict[str, Any]]) -> dict[str, Any]:
-    """Generate a JSON Schema (OpenAI tool params) from a skill's parameters list.
-
-    Empty list → fallback to the legacy `{input: string}` shape.
-    Otherwise: each parameter contributes a typed property; `required` is
-    populated from explicit `required: true` or from the absence of `default`.
-    """
-    if not parameters:
-        return {
-            "type": "object",
-            "properties": {
-                "input": {
-                    "type": "string",
-                    "description": (
-                        "User input passed to the skill as the first user message."
-                        " Optional — empty string means run the skill's default flow."
-                    ),
-                }
-            },
-        }
-    properties: dict[str, Any] = {}
-    required: list[str] = []
-    for p in parameters:
-        name = str(p.get("name") or "").strip()
-        if not name:
-            continue
-        type_str = str(p.get("type") or "string")
-        prop: dict[str, Any] = {"type": _yaml_type_to_json(type_str)}
-        if "description" in p:
-            prop["description"] = str(p["description"])
-        if "default" in p:
-            prop["default"] = p["default"]
-        properties[name] = prop
-        is_required = p.get("required")
-        if is_required is True:
-            required.append(name)
-        elif is_required is False:
-            pass
-        elif "default" not in p:
-            required.append(name)
-    schema: dict[str, Any] = {"type": "object", "properties": properties}
-    if required:
-        schema["required"] = required
-    return schema
-
-
-def _check_skill_recursion(skill_name: str, stack: tuple[str, ...]) -> str | None:
-    """Return a `<error: ...>` string when the skill would recurse or exceed depth."""
-    if skill_name in stack:
-        return f"<error: skill cycle detected: {' -> '.join((*stack, skill_name))}>"
-    if len(stack) >= _MAX_SKILL_DEPTH:
-        chain = " -> ".join((*stack, skill_name))
-        return f"<error: skill depth limit ({_MAX_SKILL_DEPTH}) exceeded: {chain}>"
-    return None
-
-
-def _resolve_skill_invocation(skill: Skill, kwargs: dict[str, Any]) -> tuple[str, str]:
-    """Map the model's kwargs onto (system_prompt_body, user_message).
-
-    Two modes:
-    - Legacy (no `parameters` declared): `body` stays as authored, `user_msg`
-      is the `input` kwarg verbatim.
-    - Typed (`parameters` declared): every `{name}` placeholder in the body is
-      substituted with the kwarg; surviving kwargs are JSON-serialised into
-      `user_msg` so the sub-agent can still see them.
-    """
-    if not skill.parameters:
-        user_msg = str(kwargs["input"]) if kwargs.get("input") else "Run the workflow."
-        return skill.body, user_msg
-
-    body = skill.body
-    leftover: dict[str, Any] = {}
-    for name, value in kwargs.items():
-        placeholder = "{" + name + "}"
-        if placeholder in body:
-            body = body.replace(placeholder, str(value))
-        else:
-            leftover[name] = value
-    user_msg = json.dumps(leftover, ensure_ascii=False) if leftover else "Run the workflow."
-    return body, user_msg
-
-
-def _make_skill_handler(
-    *,
-    skill: Skill,
-    provider: Provider,
-    model: str,
-    base_registry: Registry,
-) -> Callable[..., str]:
-    # Lazy import to avoid a hard import cycle (agent imports memory; skills
-    # belong to the same core layer but are above agent in dependency order).
-    from veles.core.agent import Agent
-    from veles.core.context import (
-        current_skill_stack,
-        push_skill_stack,
-        reset_skill_stack,
-    )
-
-    def handler(**kwargs: Any) -> str:
-        recursion_error = _check_skill_recursion(skill.name, current_skill_stack())
-        if recursion_error is not None:
-            return recursion_error
-
-        body, user_msg = _resolve_skill_invocation(skill, kwargs)
-
-        # Defer subset to invocation: by now `base_registry` contains every
-        # other skill registered in the same _load_skills pass.
-        sub_registry = base_registry.subset(skill.tools)
-        token = push_skill_stack(skill.name)
-        try:
-            sub_agent = Agent(
-                provider=provider,
-                registry=sub_registry,
-                model=model,
-                max_iterations=skill.max_iterations,
-                system_prompt=body,
-            )
-            try:
-                result = sub_agent.run(user_msg)
-            except Exception:
-                bump_telemetry(skill, success=False)
-                raise
-            bump_telemetry(skill, success=result.stopped_reason == "completed")
-            return result.text
-        finally:
-            reset_skill_stack(token)
-
-    return handler

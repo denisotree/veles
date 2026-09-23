@@ -16,7 +16,8 @@ import sys
 from veles.core.project import Project
 from veles.core.provider import Provider
 from veles.core.provider_factory import make_provider
-from veles.core.skills import discover_skills, make_skill_tool
+from veles.core.skill_tool import make_skill_tool
+from veles.core.skills import discover_skills
 from veles.core.tools import registry
 from veles.core.tools.registry import Registry
 from veles.core.tools.toolsets import TOOLSETS
