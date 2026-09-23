@@ -96,9 +96,7 @@ from veles.daemon.agent_factory import (  # noqa: F401 (re-export)
 # call sites + plugin imports working.
 from veles.daemon.auth import TokenStore, _default_tokens_path  # noqa: F401 (re-export)
 from veles.daemon.logging import setup_daemon_logging as _setup_daemon_logging  # noqa: F401
-from veles.daemon.paths import (  # noqa: F401 (re-export)
-    daemon_log_path,
-)
+from veles.daemon.paths import daemon_log_path
 
 
 def cmd_daemon(args: argparse.Namespace) -> int:
@@ -652,10 +650,9 @@ def _cmd_daemon_list(args: argparse.Namespace) -> int:
 
 
 def _cmd_daemon_restart(args: argparse.Namespace) -> int:
-    """`veles daemon <id> restart` — stop the running daemon, then start
-    a fresh one at the same host/port. Implementation: send SIGTERM via
-    `_cmd_daemon_stop_by_slug`, wait briefly, then spawn `veles daemon
-    start` in a detached subprocess so the current command can return.
+    """`veles daemon <id> restart` — stop the running daemon (SIGTERM, then
+    SIGKILL), then respawn it detached at the same host/port, logging to its
+    own log file.
 
     With `--name` it operates on this project's named session instead of
     the cross-project registry."""
@@ -664,6 +661,7 @@ def _cmd_daemon_restart(args: argparse.Namespace) -> int:
         return _restart_named_session(args, name)
 
     from veles.daemon.registry import DaemonRegistry, is_alive
+    from veles.daemon.spawn import spawn_daemon
 
     slug = _resolve_target_slug(args)
     if slug is None:
@@ -673,43 +671,17 @@ def _cmd_daemon_restart(args: argparse.Namespace) -> int:
     if entry is None:
         print(f"error: no daemon named {slug!r} in registry.", file=sys.stderr)
         return 1
-    # Stop phase.
-    if is_alive(entry.pid):
-        try:
-            os.kill(entry.pid, signal.SIGTERM)
-        except OSError as exc:
-            print(f"error: failed to signal pid {entry.pid}: {exc}", file=sys.stderr)
-            return 1
-        # Wait up to 5s for the pid to disappear.
-        for _ in range(50):
-            if not is_alive(entry.pid):
-                break
-            time.sleep(0.1)
-    # Start phase — spawn in background. We use `subprocess.Popen` with
-    # `start_new_session=True` so it survives the current shell exit.
-    import subprocess
-
-    cmd = [
-        sys.executable,
-        "-m",
-        "veles",
-        "daemon",
-        "start",
-        "--host",
-        entry.host,
-        "--port",
-        str(entry.port),
-    ]
-    try:
-        proc = subprocess.Popen(
-            cmd,
-            cwd=entry.project_path,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
-    except OSError as exc:
-        print(f"error: failed to spawn restart: {exc}", file=sys.stderr)
+    if is_alive(entry.pid) and not _graceful_stop(entry.pid, timeout=5.0):
+        print(f"error: daemon pid {entry.pid} did not stop.", file=sys.stderr)
+        return 1
+    proc = spawn_daemon(
+        project_root=entry.project_path,
+        host=entry.host,
+        port=entry.port,
+        log_path=daemon_log_path(entry.project_name),
+    )
+    if proc is None:
+        print("error: failed to respawn daemon.", file=sys.stderr)
         return 1
     print(f"restarted daemon {slug!r} (new pid {proc.pid}).")
     return 0
