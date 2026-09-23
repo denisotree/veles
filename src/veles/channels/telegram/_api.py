@@ -4,11 +4,10 @@
 generic `call` POST, the sendMessage / editMessageText /
 answerCallbackQuery / sendChatAction wrappers, and file download.
 
-Test-compat invariant: every method routes back through the *gateway*
-(`self._gw._call`, `self._gw._telegram_send`, `self._gw._http`) so
-instance-level stubs (`gateway._telegram_send = ...`) and class-level
-patches on `TelegramGateway` keep working — the collaborator never
-caches its own reference to the transport."""
+Every method routes back through the *gateway* (`self._gw._call`,
+`self._gw._telegram_send`, `self._gw._http`) so a stubbed
+`gateway._telegram_send` intercepts it — the collaborator never caches
+its own reference to the transport."""
 
 from __future__ import annotations
 
@@ -73,20 +72,24 @@ class TelegramApi:
             payload["link_preview_options"] = link_preview_options
         if reply_parameters is not None:
             payload["reply_parameters"] = reply_parameters
+        return await self._call_with_plain_fallback("sendMessage", payload, text)
+
+    async def _call_with_plain_fallback(
+        self, method: str, payload: dict[str, Any], text: str
+    ) -> dict[str, Any]:
+        """Call `method`; when Telegram rejects the HTML (a parse error), retry
+        once as plain text with the tags stripped. Other failures raise."""
         try:
-            return await self._gw._call("sendMessage", payload)
+            return await self._gw._call(method, payload)
         except RuntimeError as exc:
-            if parse_mode is not None and _is_parse_error(exc):
-                logger.warning(
-                    "telegram sendMessage parse error (%s) — retrying as plain text: %.200s",
-                    exc,
-                    text,
-                )
-                fallback = dict(payload)
-                fallback.pop("parse_mode", None)
-                fallback["text"] = _truncate(_html_to_plain(text))
-                return await self._gw._call("sendMessage", fallback)
-            raise
+            if "parse_mode" not in payload or not _is_parse_error(exc):
+                raise
+            logger.warning(
+                "telegram %s parse error (%s) — retrying as plain text: %.200s", method, exc, text
+            )
+            fallback = {k: v for k, v in payload.items() if k != "parse_mode"}
+            fallback["text"] = _truncate(_html_to_plain(text))
+            return await self._gw._call(method, fallback)
 
     async def edit_message(
         self,
@@ -97,7 +100,9 @@ class TelegramApi:
         reply_markup: dict[str, Any] | None = None,
         parse_mode: str | None = "HTML",
         link_preview_options: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
+        """Edit a message; None when Telegram refused the edit (message gone,
+        too old, unchanged) so callers can tell a real edit from a no-op."""
         payload: dict[str, Any] = {
             "chat_id": chat_id,
             "message_id": message_id,
@@ -110,24 +115,10 @@ class TelegramApi:
         if link_preview_options is not None:
             payload["link_preview_options"] = link_preview_options
         try:
-            return await self._gw._call("editMessageText", payload)
+            return await self._call_with_plain_fallback("editMessageText", payload, text)
         except RuntimeError as exc:
-            if parse_mode is not None and _is_parse_error(exc):
-                logger.warning(
-                    "telegram editMessageText parse error (%s) — retrying as plain text: %.200s",
-                    exc,
-                    text,
-                )
-                fallback = dict(payload)
-                fallback.pop("parse_mode", None)
-                fallback["text"] = _truncate(_html_to_plain(text))
-                try:
-                    return await self._gw._call("editMessageText", fallback)
-                except RuntimeError as retry_exc:
-                    logger.debug("editMessageText retry failed (ignored): %s", retry_exc)
-                    return {}
-            logger.debug("editMessageText failed (ignored): %s", exc)
-            return {}
+            logger.debug("editMessageText failed: %s", exc)
+            return None
 
     async def answer_callback_query(self, callback_id: str, *, text: str | None = None) -> None:
         payload: dict[str, Any] = {"callback_query_id": callback_id}

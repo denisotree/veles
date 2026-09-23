@@ -228,7 +228,7 @@ class TelegramMedia:
                     f"📎 <b>Download failed:</b> {escape_html(str(exc))}",
                 )
             return None
-        saved = gw._persist_attachment(name, data)
+        saved = self.persist_attachment(name, data)
         if isinstance(ack_id, int):
             await gw._edit_message(
                 chat_id,

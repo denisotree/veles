@@ -264,16 +264,19 @@ async def test_every_menu_command_is_dispatchable() -> None:
     entry with no handler is a button that does nothing."""
     from veles.channels._telegram_commands import _HANDLERS, menu_descriptors
 
-    gateway_owned = {"start", "reset"}
     published = {d["command"] for d in menu_descriptors()}
-    assert published - (set(_HANDLERS) | gateway_owned) == set()
+    assert published - set(_HANDLERS) == set()
     assert {"goal", "dream"} <= published
 
 
 async def test_dispatch_unknown_command_returns_none(session_map: SessionMap) -> None:
-    """`start`/`reset` are gateway-owned — dispatch returns None so the
-    gateway's existing flow handles them. Same for truly unknown commands."""
     gateway = _make_gateway(session_map)
-    assert await dispatch(gateway, "42", "start", "") is None
-    assert await dispatch(gateway, "42", "reset", "") is None
     assert await dispatch(gateway, "42", "foobar", "") is None
+
+
+async def test_reset_forgets_the_chat_session(session_map: SessionMap) -> None:
+    gateway = _make_gateway(session_map)
+    session_map.set("42", "sess-1")
+    assert await dispatch(gateway, "42", "reset", "") == "History cleared."
+    assert session_map.get("42") is None
+    assert await dispatch(gateway, "42", "reset", "") == "History is already empty."

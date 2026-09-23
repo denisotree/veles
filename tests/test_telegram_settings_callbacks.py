@@ -192,7 +192,7 @@ async def test_v_prefix_still_routes_to_trust_prompt_handler(
 ) -> None:
     """The callback dispatcher must not break the existing
     trust/approval flow (v: prefix)."""
-    from veles.channels.telegram import _PendingTelegramPrompt
+    from veles.channels.telegram._prompts import _PendingTelegramPrompt
 
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway, client = _make_gateway(session_map, sends)

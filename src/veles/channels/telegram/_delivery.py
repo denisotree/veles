@@ -7,10 +7,9 @@ refresh loop and the manager-plan notice. The orchestration itself
 (`_run_turn`, `_typing_indicator` task lifecycle) stays in the gateway
 — task spawning and cancellation are untouched by the split.
 
-Test-compat invariant: all Telegram and daemon I/O goes back through
-the gateway (`self._gw._send_message`, `self._gw._post_prompt`,
-`self._gw.daemon_client`, ...) so instance-level stubs and class-level
-patches on `TelegramGateway` keep working."""
+All Telegram and daemon I/O goes back through the gateway
+(`self._gw._send_message`, `self._gw._post_prompt`,
+`self._gw.daemon_client`, ...) so a stubbed transport sees it."""
 
 from __future__ import annotations
 
@@ -164,7 +163,7 @@ class TelegramDelivery:
                     # the writer's text lands. Best-effort — never
                     # break the turn if the send fails.
                     with contextlib.suppress(Exception):
-                        await gw._send_manager_plan_notice(chat_id, event)
+                        await self.send_manager_plan_notice(chat_id, event)
         except DaemonClientError as exc:
             error = str(exc)
         return _TurnOutcome(
@@ -184,10 +183,12 @@ class TelegramDelivery:
         from veles.core.i18n import t
 
         try:
-            await self._gw._edit_message(chat_id, message_id, t(ack_key_for_tool(str(tool_name))))
-            return True
+            edited = await self._gw._edit_message(
+                chat_id, message_id, t(ack_key_for_tool(str(tool_name)))
+            )
         except Exception:
             return False
+        return edited is not None
 
     async def deliver(
         self,
@@ -222,17 +223,11 @@ class TelegramDelivery:
         copy_markup = (
             None if outcome.error or len(chunks) != 1 else copy_button_markup(outcome.text)
         )
-        if outcome.acked:
-            # The placeholder already shows the "on it" ack — keep it as the
-            # progress line and deliver the answer as fresh message(s), so the
-            # user gets the spec'd "accepted → final" two-message experience.
-            await gw._send_message(
-                chat_id, chunks[0], link_preview_options=_NO_LINK_PREVIEW, reply_markup=copy_markup
-            )
-            for chunk in chunks[1:]:
-                await gw._send_message(chat_id, chunk, link_preview_options=_NO_LINK_PREVIEW)
-        else:
-            # No ack shown: the "..." holder becomes the answer's first chunk.
+        # With an ack shown, the placeholder stays as the progress line and the
+        # answer arrives as fresh message(s) — the "accepted → final" pair.
+        # Otherwise the "..." holder becomes the answer's first chunk; if
+        # Telegram refuses that edit, the chunk is sent fresh so it isn't lost.
+        edited = not outcome.acked and (
             await gw._edit_message(
                 chat_id,
                 message_id,
@@ -240,14 +235,28 @@ class TelegramDelivery:
                 link_preview_options=_NO_LINK_PREVIEW,
                 reply_markup=copy_markup,
             )
-            for extra in chunks[1:]:
-                await gw._send_message(chat_id, extra, link_preview_options=_NO_LINK_PREVIEW)
+            is not None
+        )
+        await self.send_chunks(chat_id, chunks[1:] if edited else chunks, reply_markup=copy_markup)
         # Persist the chat→session mapping whenever we learned a session id —
         # including on error. The session was already created and the user
         # turn stored before any failure, so the next message must continue
         # that same session, not open a fresh (empty) one.
         if outcome.session_id:
             gw.session_map.set(chat_key, outcome.session_id)
+
+    async def send_chunks(
+        self, chat_id: int, chunks: list[str], *, reply_markup: dict[str, Any] | None = None
+    ) -> None:
+        """Send pre-split HTML chunks in order, link previews off.
+        `reply_markup` rides on the first chunk only."""
+        for i, chunk in enumerate(chunks):
+            await self._gw._send_message(
+                chat_id,
+                chunk,
+                link_preview_options=_NO_LINK_PREVIEW,
+                reply_markup=reply_markup if i == 0 else None,
+            )
 
     async def typing_loop(self, chat_id: int) -> None:
         """Re-send `sendChatAction "typing"` every 4 seconds until cancelled.
@@ -261,7 +270,7 @@ class TelegramDelivery:
         try:
             while True:
                 with contextlib.suppress(Exception):
-                    await gw._send_chat_action(chat_id, "typing")
+                    await gw._api.send_chat_action(chat_id, "typing")
                 await asyncio.sleep(4.0)
         except asyncio.CancelledError:
             raise

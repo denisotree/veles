@@ -7,21 +7,17 @@ gives us direct control over rate-limit handling.
 
 M155 decomposition: the gateway keeps the lifecycle (poll loop, task
 spawning, buffers/debounce, update routing, prompt/callback state) and
-delegates the rest to three collaborators, each holding a back-
-reference to the gateway so instance/class-level stubs on
-`TelegramGateway` keep working:
+delegates the rest to three collaborators, called directly:
 
-  - `_api.py` (`TelegramApi`) — raw Bot-API I/O: `_call`,
-    `_send_message`, `_edit_message`, `_answer_callback_query`,
-    `_send_chat_action`, `_download_telegram_file`.
-  - `_media.py` (`TelegramMedia`) — `_transcribe_voice`,
-    `_describe_photo`, `_save_telegram_document`, `_persist_attachment`.
-  - `_delivery.py` (`TelegramDelivery`) — `_send_placeholder`,
-    `_drain_stream`, `_deliver`, `_typing_loop`,
-    `_send_manager_plan_notice` (+ the `_TurnOutcome` dataclass).
+  - `_api.py` (`TelegramApi`) — raw Bot-API I/O.
+  - `_media.py` (`TelegramMedia`) — voice, photo and document intake.
+  - `_delivery.py` (`TelegramDelivery`) — placeholder, event-stream
+    drain, final delivery, typing loop (+ the `_TurnOutcome` dataclass).
 
-Every delegated name survives on the gateway as a thin async delegate
-with an identical signature.
+The collaborators hold a back-reference to the gateway and send through
+its `_call` / `_send_message` / `_edit_message` / `_download_telegram_file`
+seams, so a stubbed `_telegram_send` (or a class-level patch of those
+four) intercepts all Telegram traffic.
 
 Long-polling loop:
 
@@ -37,9 +33,6 @@ Per-update flow:
     Buffer text_delta. Edit Telegram message every 500ms or every 200 chars.
     On `completed`: final edit with full text + flush session_id back.
     On `error`: edit with "<error: ...>".
-
-`/start` and `/reset` shortcuts: `/start` shows a greeting; `/reset`
-forgets the chat's session mapping so the next message starts fresh.
 
 Rate-limit safety: editMessageText is the cheap path (no global cap
 per chat); we still cooldown 500ms between edits to avoid hammering.
@@ -73,7 +66,7 @@ from veles.channels.telegram._buffer import (
     _is_relayed,
     _Kind,
 )
-from veles.channels.telegram._delivery import TelegramDelivery, _TurnOutcome
+from veles.channels.telegram._delivery import TelegramDelivery
 from veles.channels.telegram._forwarded import (
     _forward_header,
     _has_forward,
@@ -274,28 +267,14 @@ class TelegramGateway:
             return
         chat_key = str(chat_id)
 
-        # `/`-commands bypass the aggregator — instant, no buffer.
-        # `/start` and `/reset` are owned by the gateway flow (they
-        # mutate session_map directly); every other slash-command is
-        # handled by the M116.1 dispatcher in `_telegram_commands.py`,
-        # which returns ready-to-send HTML and never touches gateway
-        # state.
+        # `/`-commands bypass the aggregator — instant, no buffer. The
+        # dispatcher in `_telegram_commands.py` returns ready-to-send HTML.
         from veles.channels._telegram_commands import dispatch, parse_command
 
         text = (message.get("text") or "").strip()
         parsed = parse_command(text)
         if parsed is not None:
             cmd, args = parsed
-            if cmd == "start":
-                await self._send_message(chat_id, t("telegram.start_greeting"))
-                return
-            if cmd == "reset":
-                removed = self.session_map.reset(chat_key)
-                await self._send_message(
-                    chat_id,
-                    t("telegram.history_cleared") if removed else t("telegram.history_empty"),
-                )
-                return
             reply = await dispatch(self, chat_key, cmd, args)
             if reply is not None:
                 # Empty string = handler already sent its own message
@@ -412,50 +391,32 @@ class TelegramGateway:
         parts: list[str] = []
         attachments: list[Path] = []
         for message in messages:
-            # Forwarded media takes the branch of its kind below, so the
-            # `↪️ Forwarded from …` attribution the text path renders has to
-            # be added here — otherwise a relayed photo reads as the user's
-            # own, and the agent answers as if they took it.
-            head = _forward_header(message)
             doc = message.get("document")
-            if isinstance(doc, dict):
-                saved = await self._save_telegram_document(chat_id, doc)
-                if saved is not None:
-                    if head:
-                        parts.append(head)
-                    attachments.append(saved)
-                caption = (message.get("caption") or "").strip()
-                if caption:
-                    parts.append(caption)
-                continue
             voice = message.get("voice") or message.get("audio")
-            if isinstance(voice, dict):
-                transcript = await self._transcribe_voice(chat_id, voice)
-                if transcript is not None:
-                    if head:
-                        parts.append(head)
-                    parts.append(transcript)
-                caption = (message.get("caption") or "").strip()
-                if caption:
-                    parts.append(caption)
-                continue
             photo = message.get("photo")
-            if isinstance(photo, list) and photo:
-                description = await self._describe_photo(chat_id, photo)
-                if description is not None:
-                    if head:
-                        parts.append(head)
-                    parts.append(description)
-                caption = (message.get("caption") or "").strip()
-                if caption:
-                    parts.append(caption)
+            content: str | None = None
+            if isinstance(doc, dict):
+                saved = await self._media.save_telegram_document(chat_id, doc)
+                if saved is not None:
+                    attachments.append(saved)
+                    content = ""
+            elif isinstance(voice, dict):
+                content = await self._media.transcribe_voice(chat_id, voice)
+            elif isinstance(photo, list) and photo:
+                content = await self._media.describe_photo(chat_id, photo)
+            else:
+                if _has_forward(message):
+                    parts.append(_render_forwarded(message))
+                elif text := (message.get("text") or "").strip():
+                    parts.append(text)
                 continue
-            if _has_forward(message):
-                parts.append(_render_forwarded(message))
-                continue
-            text = (message.get("text") or "").strip()
-            if text:
-                parts.append(text)
+            # Media skips the text path's forward rendering, so the
+            # `↪️ Forwarded from …` attribution is added here — otherwise a
+            # relayed photo reads as the user's own.
+            if content is not None:
+                parts.extend(p for p in (_forward_header(message), content) if p)
+            if caption := (message.get("caption") or "").strip():
+                parts.append(caption)
         if not parts and not attachments:
             return
         prompt = _build_combined_prompt(parts, attachments, self.project_root)
@@ -491,20 +452,12 @@ class TelegramGateway:
             # "queued" messages; fall back to text when there's no message
             # to react to.
             if trigger_id is not None:
-                await self._set_reaction(chat_id, trigger_id, "👀")
+                await self._api.set_message_reaction(chat_id, trigger_id, "👀")
             else:
                 with contextlib.suppress(Exception):
                     await self._send_message(chat_id, t("telegram.ack_queued"))
         async with lock:
             await self._run_turn(chat_id, chat_key, prompt, reply_to=reply_to, mode=mode)
-
-    # ---- media (delegates → TelegramMedia, M155) ----
-
-    async def _transcribe_voice(self, chat_id: int, voice: dict[str, Any]) -> str | None:
-        return await self._media.transcribe_voice(chat_id, voice)
-
-    async def _describe_photo(self, chat_id: int, photo: list[dict[str, Any]]) -> str | None:
-        return await self._media.describe_photo(chat_id, photo)
 
     async def _run_turn(
         self,
@@ -523,12 +476,12 @@ class TelegramGateway:
         run_id = await self._submit_or_report(chat_id, chat_key, text, mode=mode)
         if run_id is None:
             return
-        message_id = await self._send_placeholder(chat_id, reply_to=reply_to)
+        message_id = await self._delivery.send_placeholder(chat_id, reply_to=reply_to)
         if message_id is None:
             return
         async with self._typing_indicator(chat_id):
-            outcome = await self._drain_stream(run_id, chat_id, message_id)
-        await self._deliver(chat_id, chat_key, message_id, outcome)
+            outcome = await self._delivery.drain_stream(run_id, chat_id, message_id)
+        await self._delivery.deliver(chat_id, chat_key, message_id, outcome)
 
     async def _submit_or_report(
         self, chat_id: int, chat_key: str, text: str, *, mode: str | None = None
@@ -552,15 +505,12 @@ class TelegramGateway:
             return None
         return run_id
 
-    async def _send_placeholder(self, chat_id: int, *, reply_to: int | None = None) -> int | None:
-        return await self._delivery.send_placeholder(chat_id, reply_to=reply_to)
-
     @contextlib.asynccontextmanager
     async def _typing_indicator(self, chat_id: int):
         """Async context manager: starts a typing-loop background task,
         cancels it on exit (success or exception). Errors inside the
         loop are swallowed — the indicator is advisory."""
-        task = asyncio.create_task(self._typing_loop(chat_id))
+        task = asyncio.create_task(self._delivery.typing_loop(chat_id))
         try:
             yield
         finally:
@@ -568,27 +518,7 @@ class TelegramGateway:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
-    async def _drain_stream(
-        self, run_id: str, chat_id: int, message_id: int | None = None
-    ) -> _TurnOutcome:
-        return await self._delivery.drain_stream(run_id, chat_id, message_id)
-
-    async def _deliver(
-        self,
-        chat_id: int,
-        chat_key: str,
-        message_id: int,
-        outcome: _TurnOutcome,
-    ) -> None:
-        await self._delivery.deliver(chat_id, chat_key, message_id, outcome)
-
-    async def _typing_loop(self, chat_id: int) -> None:
-        await self._delivery.typing_loop(chat_id)
-
-    # ---- Telegram wrappers ----
-
-    async def _send_manager_plan_notice(self, chat_id: int, event: dict[str, Any]) -> None:
-        await self._delivery.send_manager_plan_notice(chat_id, event)
+    # ---- Telegram I/O seams (collaborators and tests route through these) ----
 
     async def _send_message(
         self,
@@ -618,7 +548,7 @@ class TelegramGateway:
         reply_markup: dict[str, Any] | None = None,
         parse_mode: str | None = "HTML",
         link_preview_options: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         return await self._api.edit_message(
             chat_id,
             message_id,
@@ -627,12 +557,6 @@ class TelegramGateway:
             parse_mode=parse_mode,
             link_preview_options=link_preview_options,
         )
-
-    async def _set_reaction(self, chat_id: int, message_id: int, emoji: str) -> None:
-        await self._api.set_message_reaction(chat_id, message_id, emoji)
-
-    async def _answer_callback_query(self, callback_id: str, *, text: str | None = None) -> None:
-        await self._api.answer_callback_query(callback_id, text=text)
 
     async def deliver(self, chat_id: str, text: str, thread_id: str | None = None) -> None:
         """M165: outbound delivery entry point for the `DeliveryRouter`.
@@ -651,10 +575,8 @@ class TelegramGateway:
         )
 
         del thread_id  # forum topics unsupported for direct delivery (M165)
-        for chunk in split_telegram_html(markdown_to_telegram_html(text or "")):
-            await self._send_message(
-                int(chat_id), chunk, link_preview_options={"is_disabled": True}
-            )
+        chunks = split_telegram_html(markdown_to_telegram_html(text or ""))
+        await self._delivery.send_chunks(int(chat_id), chunks)
 
     # M127: `_refresh_daemon_health` / `_get_daemon_provider` /
     # `_get_active_model_for` were removed with the Telegram `/model`
@@ -781,7 +703,7 @@ class TelegramGateway:
         # text messages.
         msg = {"from": callback.get("from") or {}}
         if not self._is_allowed(msg):
-            await self._answer_callback_query(callback_id, text="not allowed")
+            await self._api.answer_callback_query(callback_id, text="not allowed")
             return
 
         parts = data.split(":", 2)
@@ -790,25 +712,25 @@ class TelegramGateway:
         if kind == "v":
             # Existing trust/approval flow
             if len(parts) != 3:
-                await self._answer_callback_query(callback_id)
+                await self._api.answer_callback_query(callback_id)
                 return
             prompt_id, short = parts[1], parts[2]
             pending = self._pending_prompts.get(prompt_id)
             if pending is None:
-                await self._answer_callback_query(
+                await self._api.answer_callback_query(
                     callback_id, text="this prompt has already closed"
                 )
                 return
             full_key = pending.short_to_key.get(short)
             if full_key is None:
-                await self._answer_callback_query(callback_id, text="unknown choice")
+                await self._api.answer_callback_query(callback_id, text="unknown choice")
                 return
             try:
                 await self.daemon_client.submit_prompt_answer(pending.run_id, prompt_id, full_key)
             except DaemonClientError as exc:
-                await self._answer_callback_query(callback_id, text=f"daemon error: {exc}")
+                await self._api.answer_callback_query(callback_id, text=f"daemon error: {exc}")
                 return
-            await self._answer_callback_query(callback_id, text="✓")
+            await self._api.answer_callback_query(callback_id, text="✓")
             return
 
         if kind == "mo":
@@ -818,7 +740,7 @@ class TelegramGateway:
             return
 
         # Unknown prefix — silently dismiss spinner
-        await self._answer_callback_query(callback_id)
+        await self._api.answer_callback_query(callback_id)
 
     async def _handle_settings_callback(
         self,
@@ -833,12 +755,12 @@ class TelegramGateway:
         chat = callback.get("message", {}).get("chat") or {}
         chat_id = chat.get("id")
         if not isinstance(chat_id, int):
-            await self._answer_callback_query(callback_id, text="missing chat")
+            await self._api.answer_callback_query(callback_id, text="missing chat")
             return
         chat_key = str(chat_id)
         session_id = self.session_map.get(chat_key)
         if not session_id:
-            await self._answer_callback_query(
+            await self._api.answer_callback_query(
                 callback_id,
                 text="send a message first to start a session",
             )
@@ -848,22 +770,24 @@ class TelegramGateway:
             # `mo:<mode>` — one of `_MODE_CHOICES` (default/auto/planning/writing);
             # the daemon validates it (unknown → 400 / ValueError).
             if len(parts) < 2 or not parts[1]:
-                await self._answer_callback_query(callback_id, text="bad payload")
+                await self._api.answer_callback_query(callback_id, text="bad payload")
                 return
             mode = parts[1]
             try:
                 await self.daemon_client.update_session(session_id, mode=mode)
             except (DaemonClientError, AttributeError, ValueError) as exc:
-                await self._answer_callback_query(callback_id, text=f"could not set mode: {exc}")
+                await self._api.answer_callback_query(
+                    callback_id, text=f"could not set mode: {exc}"
+                )
                 return
-            await self._answer_callback_query(callback_id, text=f"✓ mode → {mode}")
+            await self._api.answer_callback_query(callback_id, text=f"✓ mode → {mode}")
             return
 
         # M127: only `mo:` (mode) reaches here now. The `/model` picker
         # branch (`m:`) and its pagination/cancel handlers
         # (`_handle_model_page_callback`, `_handle_model_cancel_callback`)
         # were removed — model/provider are fixed at daemon launch.
-        await self._answer_callback_query(callback_id)
+        await self._api.answer_callback_query(callback_id)
 
     def _is_allowed(self, message: dict[str, Any]) -> bool:
         """Return True iff the sender is on the whitelist (or the whitelist is empty).
@@ -887,16 +811,5 @@ class TelegramGateway:
                 return True
         return False
 
-    async def _send_chat_action(self, chat_id: int, action: str) -> None:
-        await self._api.send_chat_action(chat_id, action)
-
-    # ---- attachment download / persist (DOC-3) ----
-
     async def _download_telegram_file(self, file_id: str, expected_size: int) -> bytes:
         return await self._api.download_telegram_file(file_id, expected_size)
-
-    def _persist_attachment(self, name: str, data: bytes) -> Path:
-        return self._media.persist_attachment(name, data)
-
-    async def _save_telegram_document(self, chat_id: int, document: dict[str, Any]) -> Path | None:
-        return await self._media.save_telegram_document(chat_id, document)

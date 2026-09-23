@@ -55,7 +55,7 @@ async def test_manager_plan_event_renders_chat_notice(session_map: SessionMap) -
             {"role": "writer", "status": "in_progress", "session_id": None, "rationale": "…"},
         ],
     }
-    await gateway._send_manager_plan_notice(42, event)
+    await gateway._delivery.send_manager_plan_notice(42, event)
 
     # One sendMessage call with both roles surfaced
     messages = [p for m, p in sends if m == "sendMessage"]
@@ -74,7 +74,7 @@ async def test_manager_plan_event_with_empty_steps_silent(
     'Decomposing into 0 workers' — just no-op."""
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(session_map, sends)
-    await gateway._send_manager_plan_notice(42, {"type": "manager_plan", "steps": []})
+    await gateway._delivery.send_manager_plan_notice(42, {"type": "manager_plan", "steps": []})
     assert [m for m, _ in sends if m == "sendMessage"] == []
 
 
@@ -85,7 +85,7 @@ async def test_manager_plan_handles_missing_role_field(
     notice is suppressed entirely."""
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(session_map, sends)
-    await gateway._send_manager_plan_notice(
+    await gateway._delivery.send_manager_plan_notice(
         42,
         {"type": "manager_plan", "steps": [{"rationale": "lone"}, {"rationale": "items"}]},
     )
@@ -105,7 +105,7 @@ async def test_manager_plan_html_escaped(session_map: SessionMap) -> None:
         "type": "manager_plan",
         "steps": [{"role": "<weird>", "status": "done"}],
     }
-    await gateway._send_manager_plan_notice(42, event)
+    await gateway._delivery.send_manager_plan_notice(42, event)
     text = next(p["text"] for m, p in sends if m == "sendMessage")
     assert "&lt;weird&gt;" in text
     assert "<weird>" not in text  # raw form must be gone

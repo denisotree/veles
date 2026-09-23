@@ -13,11 +13,10 @@ than in `telegram.py`) lets the gateway file stay focused on transport
 + buffering, and lets future channels (Slack, web) share the same
 handler set.
 
-Handled here: `/help`, `/session`, `/status`, `/mode` (a button picker),
-`/goal` (start, status, cancel, resume), `/dream`, `/insights`, `/rules`, and
-the `/tokens` / `/context` placeholders (the daemon does not expose
-per-session usage yet). `/start` and `/reset` stay with the gateway, which
-owns the greeting and the chat's session map. The model is fixed at daemon
+Handled here: `/start`, `/reset`, `/help`, `/session`, `/status`, `/mode`
+(a button picker), `/goal` (start, status, cancel, resume), `/dream`,
+`/insights`, `/rules`, and the `/tokens` / `/context` placeholders (the
+daemon does not expose per-session usage yet). The model is fixed at daemon
 launch, so there is no `/model`.
 """
 
@@ -57,6 +56,22 @@ async def _cmd_help(gateway: TelegramGateway, chat_key: str, args: str) -> str:
         "/context — context window vs limit (work in progress)\n\n"
         "Just send a message to chat with the agent."
     )
+
+
+async def _cmd_start(gateway: TelegramGateway, chat_key: str, args: str) -> str:
+    from veles.core.i18n import t
+
+    del gateway, chat_key, args
+    return t("telegram.start_greeting")
+
+
+async def _cmd_reset(gateway: TelegramGateway, chat_key: str, args: str) -> str:
+    """Forget the chat's session so the next message starts fresh."""
+    from veles.core.i18n import t
+
+    del args
+    removed = gateway.session_map.reset(chat_key)
+    return t("telegram.history_cleared") if removed else t("telegram.history_empty")
 
 
 async def _cmd_session(gateway: TelegramGateway, chat_key: str, args: str) -> str:
@@ -342,6 +357,8 @@ async def _cmd_dream(gateway: TelegramGateway, chat_key: str, args: str) -> str:
 # Mapping cmd-without-slash → handler. Lookup is exact (no aliases yet).
 _HANDLERS: dict[str, CommandHandler] = {
     "help": _cmd_help,
+    "start": _cmd_start,
+    "reset": _cmd_reset,
     "session": _cmd_session,
     "status": _cmd_status,
     "tokens": _cmd_tokens_placeholder,
@@ -386,9 +403,8 @@ def parse_command(text: str) -> tuple[str, str] | None:
 
 
 async def dispatch(gateway: TelegramGateway, chat_key: str, cmd: str, args: str) -> str | None:
-    """Run the handler for `cmd`. Returns the reply text or `None` if
-    the command isn't owned by this dispatcher (`/start` and `/reset`
-    are owned by the gateway itself and return `None` here)."""
+    """Run the handler for `cmd`. Returns the reply text, or `None` for an
+    unknown command."""
     handler = _HANDLERS.get(cmd)
     if handler is None:
         return None
