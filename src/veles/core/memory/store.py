@@ -240,6 +240,19 @@ def local_connection(project: Project) -> Iterator[sqlite3.Connection]:
         store.close()
 
 
+@contextmanager
+def transaction(conn: sqlite3.Connection) -> Iterator[None]:
+    """One write transaction on an autocommit connection (what `local_connection`
+    yields): every statement in the body commits together or not at all."""
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        yield
+    except BaseException:
+        conn.rollback()
+        raise
+    conn.commit()
+
+
 def open_store(project: Project) -> MemoryStore:
     """Open the memory store for `project` — the single place a backend is
     chosen.
@@ -289,4 +302,5 @@ __all__ = [
     "SqliteStore",
     "local_connection",
     "open_store",
+    "transaction",
 ]
