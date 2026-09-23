@@ -160,14 +160,14 @@ def _assistant_turns(store: SessionStore, session_id: str | None) -> list[str]:
 async def test_a_delivered_answer_is_in_the_chat_session(aiohttp_client, state, app, auth):
     """Without it, "tell me more about point 2" reached a chat agent with no
     record of having sent anything — the M273 class, on `POST /v1/runs`."""
-    from veles.daemon.server import _channel_session_map
+    from veles.daemon.channels import channel_session_map
 
     async def fake(chat_id, text, thread_id):
         pass
 
     _attach_router(state, fake)
     chat_session = state.store.create_session()
-    _channel_session_map(state, "telegram").set("42", chat_session)  # as the gateway writes it
+    channel_session_map(state, "telegram").set("42", chat_session)  # as the gateway writes it
     client = await aiohttp_client(app)
 
     resp = await client.post(
@@ -180,7 +180,7 @@ async def test_a_delivered_answer_is_in_the_chat_session(aiohttp_client, state, 
 async def test_a_run_in_the_chats_own_session_is_not_recorded_twice(
     aiohttp_client, state, app, auth
 ):
-    from veles.daemon.server import _channel_session_map
+    from veles.daemon.channels import channel_session_map
 
     delivered: list[str] = []
 
@@ -189,7 +189,7 @@ async def test_a_run_in_the_chats_own_session_is_not_recorded_twice(
 
     _attach_router(state, fake)
     chat_session = state.store.create_session()
-    _channel_session_map(state, "telegram").set("42", chat_session)
+    channel_session_map(state, "telegram").set("42", chat_session)
     client = await aiohttp_client(app)
 
     resp = await client.post(

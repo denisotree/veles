@@ -640,7 +640,7 @@ class TelegramGateway:
         Send `text` (agent Markdown, e.g. a scheduled job's report or a
         reminder) to `chat_id`, rendered through the Telegram-allowed HTML
         subset like a normal turn. Registered onto the daemon's router by
-        `_start_channel_runners`, so `deliver_to = "telegram:<chat>"` jobs
+        `start_channel_runners`, so `deliver_to = "telegram:<chat>"` jobs
         actually reach the user instead of only landing in `.veles/jobs/`.
 
         `thread_id` (forum topics) is accepted to satisfy the

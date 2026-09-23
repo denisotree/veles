@@ -62,7 +62,7 @@ def _attach_background_runners(
 
     # M165: build the router NOW (runner construction) but leave it empty —
     # platform deliverers are registered later, once channels actually start
-    # (`server._start_channel_runners`). The router is mutable, so a job that
+    # (`channels.start_channel_runners`). The router is mutable, so a job that
     # fires before its channel is up just hits "no deliverer wired" (logged,
     # best-effort) rather than losing the wiring. `local`-target output is
     # already persisted under `.veles/jobs/`; the sink only echoes it to the log.

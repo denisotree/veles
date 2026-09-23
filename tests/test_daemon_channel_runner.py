@@ -1,4 +1,4 @@
-"""Daemon-side `_start_channel_runners` reads `.veles/config.toml` and
+"""Daemon-side `start_channel_runners` reads `.veles/config.toml` and
 spawns in-process channel gateways. We mock the TelegramGateway's
 network surface (`_telegram_send` + getUpdates returning []) so the
 test loop exits cleanly.
@@ -14,7 +14,7 @@ from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.core.secrets import set_provider_key
 from veles.daemon.auth import TokenStore
-from veles.daemon.server import _start_channel_runners
+from veles.daemon.channels import start_channel_runners
 from veles.daemon.state import DaemonState
 
 
@@ -42,7 +42,7 @@ def _write_config(project, body: str) -> None:
 
 
 def test_no_config_means_no_channel_runners(state: DaemonState) -> None:
-    _start_channel_runners(state)
+    start_channel_runners(state)
     assert state.channel_runners == []
     assert state.channel_tasks == []
 
@@ -52,7 +52,7 @@ def test_disabled_telegram_skipped(state: DaemonState) -> None:
         state.project,
         "[channels.telegram]\nenabled = false\nwhitelist = []\n",
     )
-    _start_channel_runners(state)
+    start_channel_runners(state)
     assert state.channel_runners == []
 
 
@@ -64,7 +64,7 @@ def test_enabled_but_no_token_skipped(state: DaemonState, caplog) -> None:
         '[channels.telegram]\nenabled = true\nwhitelist = ["@foo"]\n',
     )
     with caplog.at_level(logging.WARNING, logger="veles.daemon.server"):
-        _start_channel_runners(state)
+        start_channel_runners(state)
     assert state.channel_runners == []
     # M110: warning now lands in the logger (and the daemon log file),
     # not on stderr — that's how the picker's log view will surface it.
@@ -92,7 +92,7 @@ async def test_enabled_with_keychain_token_starts_gateway(state: DaemonState, mo
     monkeypatch.setattr(tg_mod.TelegramGateway, "start", fake_start)
     monkeypatch.setattr(tg_mod.TelegramGateway, "stop", fake_stop)
 
-    _start_channel_runners(state)
+    start_channel_runners(state)
     assert len(state.channel_runners) == 1
     gateway = state.channel_runners[0]
     assert gateway.bot_token == "tok-test"
@@ -125,7 +125,7 @@ async def test_legacy_chat_id_promoted_to_whitelist(state: DaemonState, monkeypa
 
     monkeypatch.setattr(tg_mod.TelegramGateway, "start", fake_start)
 
-    _start_channel_runners(state)
+    start_channel_runners(state)
     assert state.channel_runners[0].whitelist == ("555",)
 
     import asyncio
