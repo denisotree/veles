@@ -34,6 +34,7 @@ from veles.core.fts import escape_query
 from veles.core.io_utils import open_sqlite
 from veles.core.memory.eligibility import eligible_sql
 from veles.core.provider import Message, ToolCall
+from veles.core.text import ellipsize
 
 logger = logging.getLogger(__name__)
 
@@ -356,9 +357,7 @@ def _session_title(text: str) -> str:
     for line in text.splitlines():
         line = " ".join(line.split())
         if line:
-            if len(line) > _SESSION_TITLE_MAX:
-                return line[: _SESSION_TITLE_MAX - 1].rstrip() + "…"
-            return line
+            return ellipsize(line, _SESSION_TITLE_MAX)
     return ""
 
 

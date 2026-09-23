@@ -19,6 +19,7 @@ import datetime as dt
 from typing import TYPE_CHECKING
 
 from veles.cli.repl.slash.registry import SlashContext, SlashRegistry, SlashResult
+from veles.core.text import first_heading
 
 if TYPE_CHECKING:
     from veles.core.project import Project
@@ -34,18 +35,6 @@ def _parse_int(text: str, default: int) -> int:
         return max(1, int(text.split()[0]))
     except ValueError:
         return default
-
-
-def _title_from_text(text: str) -> str:
-    """First markdown heading (or first non-empty line, trimmed)."""
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            continue
-        if stripped.startswith("#"):
-            return stripped.lstrip("# ").strip()
-        return stripped[:80]
-    return ""
 
 
 def _fmt_ts(ts: float) -> str:
@@ -156,7 +145,7 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
     last = ctx.state.last_assistant_text
     if not last or not last.strip():
         return SlashResult.err("/save: nothing to save yet (no assistant response in this run)")
-    title = _title_from_text(last) or slug.replace("-", " ").title()
+    title = first_heading(last) or slug.replace("-", " ").title()
 
     # On layouts without the wiki engine (bare/notes), there is no
     # `wiki/queries/` to write to — keep the reply as a memory insight

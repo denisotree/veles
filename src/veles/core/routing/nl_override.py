@@ -54,6 +54,7 @@ from typing import Any
 from veles.core.io_utils import atomic_write_text, dump_toml, load_optional_toml
 from veles.core.project import Project
 from veles.core.routing.ensemble import KNOWN_TASKS, RoutingConfig, parse_spec
+from veles.core.text import strip_code_fence
 
 _NL_TOML_FILENAME = "routing.nl.toml"
 _NL_STATE_FILENAME = "routing.nl.state.json"
@@ -170,16 +171,6 @@ _VALID_NL_PROVIDERS = frozenset(
 )
 
 
-def _strip_code_fence(text: str) -> str:
-    """Drop a leading ```lang line and trailing ``` from an LLM reply, if present."""
-    if not text.startswith("```"):
-        return text
-    text = re.sub(r"^```[a-zA-Z]*\s*", "", text)
-    if text.endswith("```"):
-        text = text[: -len("```")]
-    return text.strip()
-
-
 def _coerce_nl_entry(entry: Any, valid_tasks: set[str]) -> _NLEntry | None:
     """Validate one extractor JSON entry; return None on any defect."""
     if not isinstance(entry, dict):
@@ -204,7 +195,7 @@ def parse_extractor_output(raw: str) -> list[_NLEntry]:
     task, unknown provider, empty model) are skipped silently so one
     noisy entry doesn't void the whole batch.
     """
-    text = _strip_code_fence((raw or "").strip())
+    text = strip_code_fence(raw or "")
     try:
         data = json.loads(text)
     except json.JSONDecodeError:

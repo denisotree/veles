@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from veles.core.path_guard import resolve_safe
 from veles.core.risk import RiskClass
+from veles.core.text import cut_with_note
 from veles.core.tools.registry import tool
 from veles.core.vision.adapter import DEFAULT_PROMPT as _DEFAULT_DESCRIBE_PROMPT
 from veles.core.vision.backends import OCRUnavailable, describe, detect_mime, ocr_bytes
@@ -110,7 +111,4 @@ def image_describe(path: str, prompt: str = _DEFAULT_DESCRIBE_PROMPT) -> str:
 
 
 def _truncate(text: str) -> str:
-    if len(text) <= _VISION_OUTPUT_CAP:
-        return text
-    suffix = f"\n\n<truncated at {_VISION_OUTPUT_CAP} chars>"
-    return text[: _VISION_OUTPUT_CAP - len(suffix)] + suffix
+    return cut_with_note(text, _VISION_OUTPUT_CAP, f"\n\n<truncated at {_VISION_OUTPUT_CAP} chars>")

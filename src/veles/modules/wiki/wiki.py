@@ -37,6 +37,7 @@ from veles.core.fts import escape_query
 from veles.core.io_utils import load_optional_toml
 from veles.core.safety import scan_for_injection
 from veles.core.slug import normalize_slug as _normalize_slug
+from veles.core.text import title_and_summary
 from veles.core.timeutil import utc_iso
 
 logger = logging.getLogger(__name__)
@@ -170,31 +171,6 @@ class WikiPageInfo:
     summary: str
 
 
-def _extract_title_and_summary(content: str, fallback: str) -> tuple[str, str]:
-    """Pull H1 line and first paragraph from markdown content."""
-    title = fallback
-    summary_lines: list[str] = []
-    seen_h1 = False
-    for line in content.splitlines():
-        stripped = line.strip()
-        if not seen_h1 and stripped.startswith("# "):
-            title = stripped[2:].strip() or fallback
-            seen_h1 = True
-            continue
-        if seen_h1 and stripped:
-            if stripped.startswith("#"):
-                if summary_lines:
-                    break
-                continue
-            summary_lines.append(stripped)
-            if sum(len(s) for s in summary_lines) >= _SUMMARY_CHAR_CAP:
-                break
-    summary = " ".join(summary_lines).strip()
-    if len(summary) > _SUMMARY_CHAR_CAP:
-        summary = summary[: _SUMMARY_CHAR_CAP - 1].rstrip() + "…"
-    return title, summary
-
-
 class Wiki:
     def __init__(self, root: Path | str, *, categories: tuple[str, ...] | None = None) -> None:
         self._root = Path(root)
@@ -306,7 +282,7 @@ class Wiki:
                 nested_cat = md.parent.relative_to(wiki_base).as_posix()
                 slug = md.stem
                 content = md.read_text(encoding="utf-8", errors="replace")
-                title, summary = _extract_title_and_summary(content, fallback=slug)
+                title, summary = title_and_summary(content, fallback=slug)
                 pages.append(
                     WikiPageInfo(
                         rel_path=f"{_WIKI_DIR}/{nested_cat}/{md.name}",

@@ -10,7 +10,8 @@ import pytest
 
 from veles.core.context import set_active_project
 from veles.core.project import init_project
-from veles.modules.wiki.tools import _infer_title_from_text, _kebab
+from veles.core.text import first_heading
+from veles.modules.wiki.tools import _kebab
 
 
 def _project(tmp_path: Path):
@@ -19,12 +20,12 @@ def _project(tmp_path: Path):
 
 def test_infer_title_picks_first_heading() -> None:
     body = "# Title\n\nbody text"
-    assert _infer_title_from_text(body) == "Title"
+    assert first_heading(body) == "Title"
 
 
 def test_infer_title_falls_back_to_first_line() -> None:
     body = "Just a plain line\n\nmore"
-    assert _infer_title_from_text(body) == "Just a plain line"
+    assert first_heading(body) == "Just a plain line"
 
 
 def test_kebab_slugifies() -> None:

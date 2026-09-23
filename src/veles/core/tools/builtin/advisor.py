@@ -36,6 +36,7 @@ import json
 from dataclasses import dataclass, field
 
 from veles.core.risk import RiskClass
+from veles.core.text import strip_code_fence
 from veles.core.tools.registry import tool
 
 _ADVISOR_SYSTEM_PROMPT = (
@@ -134,15 +135,7 @@ def parse_verdict(raw: str) -> Verdict:
     invalid input rather than raising — the parent agent should always
     receive a usable signal.
     """
-    text = raw.strip()
-    if text.startswith("```"):
-        # Strip an opening fence (```json or ```) and a closing one if present.
-        first_newline = text.find("\n")
-        if first_newline != -1:
-            text = text[first_newline + 1 :]
-        if text.rstrip().endswith("```"):
-            text = text.rstrip()[: -len("```")]
-        text = text.strip()
+    text = strip_code_fence(raw)
     if not text:
         return Verdict(ok=False, concerns=["advisor returned an empty response"])
     try:

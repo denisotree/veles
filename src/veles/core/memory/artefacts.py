@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from veles.core.slug import normalize_slug
+from veles.core.text import title_and_summary
 from veles.core.timeutil import utc_iso
 
 if TYPE_CHECKING:
@@ -127,31 +128,6 @@ def list_proposals(project: Project) -> list[ProposalInfo]:
             content = md.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        title, summary = _title_and_summary(content, fallback=md.stem)
+        title, summary = title_and_summary(content, fallback=md.stem)
         out.append(ProposalInfo(slug=md.stem, title=title, summary=summary, path=md))
     return out
-
-
-def _title_and_summary(content: str, fallback: str) -> tuple[str, str]:
-    """H1 line + first paragraph, capped — mirrors the wiki page parser."""
-    title = fallback
-    summary_lines: list[str] = []
-    seen_h1 = False
-    for line in content.splitlines():
-        stripped = line.strip()
-        if not seen_h1 and stripped.startswith("# "):
-            title = stripped[2:].strip() or fallback
-            seen_h1 = True
-            continue
-        if seen_h1 and stripped:
-            if stripped.startswith("#"):
-                if summary_lines:
-                    break
-                continue
-            summary_lines.append(stripped)
-            if sum(len(s) for s in summary_lines) >= _SUMMARY_CHAR_CAP:
-                break
-    summary = " ".join(summary_lines).strip()
-    if len(summary) > _SUMMARY_CHAR_CAP:
-        summary = summary[: _SUMMARY_CHAR_CAP - 1].rstrip() + "…"
-    return title, summary

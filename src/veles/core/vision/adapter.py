@@ -29,6 +29,7 @@ import logging
 from dataclasses import dataclass
 
 from veles.core.project import Project
+from veles.core.text import cut_with_note
 from veles.core.vision.backends import OCRUnavailable, describe, ocr_bytes
 from veles.modules.vision import VisionError
 
@@ -179,10 +180,7 @@ def install_vision_adapter(project: Project) -> RoutedVisionAdapter | None:
 
 
 def _truncate(text: str) -> str:
-    if len(text) <= _OUTPUT_CAP:
-        return text
-    suffix = f"\n\n<truncated at {_OUTPUT_CAP} chars>"
-    return text[: _OUTPUT_CAP - len(suffix)] + suffix
+    return cut_with_note(text, _OUTPUT_CAP, f"\n\n<truncated at {_OUTPUT_CAP} chars>")
 
 
 __all__ = [

@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from veles.core.memory.router import RecallHit
+from veles.core.text import ellipsize
 
 _SUMMARY_CAP = 200
 
@@ -65,9 +66,7 @@ def _iter_items(response: Any) -> list[dict[str, Any]]:
 def _to_recall_hit(item: dict[str, Any]) -> RecallHit:
     mem_id = str(item.get("id") or item.get("memory_id") or "mem0:unknown")
     memory = str(item.get("memory") or item.get("text") or "")
-    summary = memory.strip().replace("\n", " ")
-    if len(summary) > _SUMMARY_CAP:
-        summary = summary[: _SUMMARY_CAP - 1].rstrip() + "…"
+    summary = ellipsize(memory, _SUMMARY_CAP)
     score = float(item.get("score", 0.0) or 0.0)
     return RecallHit(
         rel_path=f"mem0:{mem_id}",

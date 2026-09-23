@@ -44,6 +44,7 @@ from typing import Any, Literal
 
 from veles.core.agent_events import SystemLine, TurnDone
 from veles.core.modes.base import Mode, ModeContext
+from veles.core.text import strip_code_fence
 
 # ---- system prompts per phase ----
 
@@ -149,14 +150,7 @@ def parse_check_verdict(raw: str) -> tuple[Verdict, str]:
     """Decode the advisor's JSON verdict. Defaults to `step_off_track`
     on any parse failure so a malformed advisor reply triggers a
     re-plan rather than silently advancing or completing."""
-    text = (raw or "").strip()
-    if text.startswith("```"):
-        nl = text.find("\n")
-        if nl != -1:
-            text = text[nl + 1 :]
-        if text.rstrip().endswith("```"):
-            text = text.rstrip()[: -len("```")]
-        text = text.strip()
+    text = strip_code_fence(raw or "")
     try:
         data = json.loads(text)
     except json.JSONDecodeError:

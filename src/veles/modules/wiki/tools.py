@@ -17,6 +17,7 @@ import contextlib
 
 from veles.core.context import current_project
 from veles.core.risk import RiskClass
+from veles.core.text import first_heading
 from veles.core.tools.registry import tool
 from veles.modules.wiki.wiki import Wiki
 
@@ -212,7 +213,7 @@ def wiki_ingest(
         from veles.core.tools.builtin.read_file import read_file
 
         text = read_file(source)
-    inferred_title = title or _infer_title_from_text(text) or source.rsplit("/", 1)[-1]
+    inferred_title = title or first_heading(text) or source.rsplit("/", 1)[-1]
     inferred_slug = slug or _kebab(inferred_title)
     if not inferred_slug:
         return "<error: could not derive slug from source>"
@@ -378,17 +379,6 @@ def _ingest_worker_tools() -> list[str]:
     if parent:
         return [t for t in base if t in parent]
     return base
-
-
-def _infer_title_from_text(text: str) -> str | None:
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            continue
-        if stripped.startswith("#"):
-            return stripped.lstrip("# ").strip()
-        return stripped[:80]
-    return None
 
 
 def _kebab(value: str) -> str:
