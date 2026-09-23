@@ -30,7 +30,6 @@ Side-effects:
 from __future__ import annotations
 
 import argparse
-import datetime as _dt
 import shutil
 import sys
 from dataclasses import dataclass
@@ -38,6 +37,7 @@ from pathlib import Path
 
 from veles.core.memory.store import local_connection
 from veles.core.project import Project
+from veles.core.timeutil import local_stamp
 from veles.core.tools.persistence import (
     ToolTelemetry,
     get_tool,
@@ -61,7 +61,7 @@ class LiveTool:
 def _live_tools(project: Project, conn) -> tuple[list[LiveTool], tuple[Path, ...]]:
     """Build the agent's builtin + file-based toolset and report it.
 
-    Mirrors `cli/_runtime.py::_load_skills` for the parts that need no
+    Mirrors `runtime/registry.py::load_skills` for the parts that need no
     provider: the layout's content engines decide which builtins exist, then
     file-based project/user tools load on top.
 
@@ -226,7 +226,7 @@ def _format_table(records: list[LiveTool], tele: dict[str, ToolTelemetry]) -> st
     rows = [header, "-" * len(header)]
     for r in records:
         t = tele[r.name]
-        last = _fmt_ts(t.last_used_at) if t.last_used_at else "—"
+        last = local_stamp(t.last_used_at) if t.last_used_at else "—"
         rate = f"{t.success_rate * 100:.0f}%" if t.use_count else "—"
         rows.append(
             f"{r.name:<{name_w}}  "
@@ -237,10 +237,6 @@ def _format_table(records: list[LiveTool], tele: dict[str, ToolTelemetry]) -> st
             f"{last}"
         )
     return "\n".join(rows)
-
-
-def _fmt_ts(ts: float) -> str:
-    return _dt.datetime.fromtimestamp(ts, tz=_dt.UTC).strftime("%Y-%m-%d %H:%M")
 
 
 # ---------- show ----------
@@ -281,7 +277,7 @@ def _cmd_show(args: argparse.Namespace, project: Project) -> int:
     if t.use_count:
         print(f"success_rate:  {t.success_rate * 100:.1f}%")
     if t.last_used_at:
-        print(f"last_used_at:  {_fmt_ts(t.last_used_at)}")
+        print(f"last_used_at:  {local_stamp(t.last_used_at)}")
     if t.avg_latency_ms is not None:
         print(f"avg_latency:   {t.avg_latency_ms:.0f}ms")
     return 0

@@ -13,13 +13,9 @@ import typing
 
 import pytest
 
-from veles.cli.commands.repl import (
-    _handle_slash,
-    _make_turn_callbacks,
-    _render_answer,
-    _update_state_after_turn,
-)
+from veles.cli.repl.render import _make_turn_callbacks, _render_answer
 from veles.cli.repl.slash import build_default_registry
+from veles.cli.repl.turn import _handle_slash, _update_state_after_turn
 from veles.core.agent import RunResult, UsageSnapshot
 from veles.core.session_state import AppState
 
@@ -68,7 +64,7 @@ def test_settled_status_shows_mode_tokens_cache_only() -> None:
     """The quiet bottom bar: mode + settled token/cache stats ONLY. Session id
     and provider/model are deliberately dropped (banner + /status carry those),
     per the user's "bottom bar = mode + tokens + cache" split."""
-    from veles.cli.commands.repl import _settled_status
+    from veles.cli.repl.terminal import _settled_status
 
     state = _state()
     state.session_id = "sess1234"
@@ -91,7 +87,7 @@ def test_behaviour_block_forbids_deferred_work() -> None:
     report back, then stop with no tool calls" failure mode — the turn ends the
     instant the model returns no tool calls, so there is no "later". Keep the
     ask_user carve-out intact (pausing to ask is still allowed)."""
-    from veles.cli.commands.repl import _REPL_BEHAVIOUR_BLOCK
+    from veles.cli.repl.turn import _REPL_BEHAVIOUR_BLOCK
 
     low = _REPL_BEHAVIOUR_BLOCK.lower()
     assert "there is no 'later'" in low  # names the failure mode
@@ -102,7 +98,7 @@ def test_behaviour_block_forbids_deferred_work() -> None:
 def test_turn_callbacks_route_meta_to_sink() -> None:
     """With an on_meta sink, stream chunks / mode switches / tool calls flow to
     the live HUD instead of printing inline."""
-    from veles.cli.commands.repl import _make_turn_callbacks, _resolve_theme
+    from veles.cli.commands.repl import _resolve_theme
     from veles.core.agent_events import SystemLine
 
     meta: list[tuple[str, str]] = []
@@ -346,7 +342,7 @@ def test_expanded_hud_shows_done_tool_status_and_duration(tmp_path) -> None:
     """A tool call that started and completed shows a done/failed marker plus
     its elapsed duration in the expanded HUD, fed through the SAME on_event
     path the real turn callbacks use (tool_call then tool_result)."""
-    from veles.cli.commands.repl import _make_turn_callbacks
+    from veles.cli.repl.render import _make_turn_callbacks
 
     app, store = _build_app(tmp_path)
     try:
@@ -382,7 +378,7 @@ def test_expanded_hud_shows_done_tool_status_and_duration(tmp_path) -> None:
 def test_expanded_hud_shows_running_tool_with_no_end_time(tmp_path) -> None:
     """A tool call with no matching result yet renders a running indicator,
     not a done/failed one."""
-    from veles.cli.commands.repl import _make_turn_callbacks
+    from veles.cli.repl.render import _make_turn_callbacks
 
     app, store = _build_app(tmp_path)
     try:
@@ -414,7 +410,7 @@ def test_expanded_hud_shows_running_tool_with_no_end_time(tmp_path) -> None:
 
 def test_expanded_hud_shows_failed_tool_status(tmp_path) -> None:
     """A tool_result carrying an error marks the row failed, not done."""
-    from veles.cli.commands.repl import _make_turn_callbacks
+    from veles.cli.repl.render import _make_turn_callbacks
 
     app, store = _build_app(tmp_path)
     try:
@@ -748,7 +744,7 @@ def test_kitty_sequences_remap_and_binding(tmp_path) -> None:
 
 
 def test_filter_models_substring_case_insensitive() -> None:
-    from veles.cli.commands.repl import _filter_models
+    from veles.cli.repl.pickers.helpers import _filter_models
 
     models = ["openrouter/anthropic/claude", "openai/gpt-4o", "google/gemini"]
     assert _filter_models(models, "") == models  # empty → all
@@ -825,8 +821,8 @@ def test_model_picker_move_wraps_and_cancel_closes(tmp_path) -> None:
 
 
 def test_print_model_list_fallback(monkeypatch, capsys: pytest.CaptureFixture[str]) -> None:
-    from veles.cli.commands.repl import _print_model_list
     from veles.cli.repl import model_fetcher as _model_fetcher
+    from veles.cli.repl.pickers.helpers import _print_model_list
 
     class _ML:
         models: typing.ClassVar = ["openai/gpt-4o", "anthropic/claude"]
@@ -861,40 +857,21 @@ def test_cancel_generation_stops_and_restores_request(tmp_path) -> None:
         store.close()
 
 
-def test_suspend_live_pauses_and_resumes_active_live() -> None:
-    from veles.cli.commands import repl as repl_mod
-
-    class _FakeLive:
-        def __init__(self) -> None:
-            self.events: list[str] = []
-
-        def stop(self) -> None:
-            self.events.append("stop")
-
-        def start(self, refresh: bool = False) -> None:
-            self.events.append("start")
-
-    fake = _FakeLive()
-    repl_mod._ACTIVE_LIVE = fake
-    try:
-        with repl_mod._suspend_live():
-            assert fake.events == ["stop"]  # paused for the nested prompt
-        assert fake.events == ["stop", "start"]  # resumed after
-    finally:
-        repl_mod._ACTIVE_LIVE = None
-
-
 def test_ask_repl_skips_without_tty(monkeypatch) -> None:
-    from veles.cli.commands import repl as repl_mod
+    import sys
 
-    monkeypatch.setattr(repl_mod.sys.stdin, "isatty", lambda: False)
-    theme = repl_mod._resolve_theme(_state())
+    from veles.cli.repl.simple import _ask_repl
+    from veles.cli.repl.terminal import _resolve_theme
+
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
+    theme = _resolve_theme(_state())
     # No interactive TTY → None so the agent proceeds on its best assumption.
-    assert repl_mod._ask_repl(_console(), theme, "pick?", ["a", "b"]) is None
+    assert _ask_repl(_console(), theme, "pick?", ["a", "b"]) is None
 
 
 def test_render_edit_diff(capsys: pytest.CaptureFixture[str]) -> None:
-    from veles.cli.commands.repl import _render_edit_diff, _resolve_theme
+    from veles.cli.commands.repl import _resolve_theme
+    from veles.cli.repl.render import _render_edit_diff
 
     _render_edit_diff(
         _console(),
@@ -909,7 +886,7 @@ def test_render_edit_diff(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 def test_split_blocks() -> None:
-    from veles.cli.commands.repl import _split_blocks
+    from veles.cli.repl.render import _split_blocks
 
     # a completed paragraph flushes; the next (unterminated) one stays buffered
     blocks, rem = _split_blocks("para one\n\npara two")

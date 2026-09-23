@@ -4,8 +4,7 @@ A blocking `PromptSession.prompt()` loop kept as a safety net for
 terminals where the live inline Application misbehaves. Includes the
 prompt-session builder, the inline arrow-key choice picker + free-text
 prompter used to answer the agent's `ask_user` questions, and the main
-loop. Imports from the lower leaves (`terminal`, `turn`); reaches
-`_suspend_live` (which stays in `repl.py`) via a function-local import.
+loop. Imports from the lower leaves (`terminal`, `turn`).
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from __future__ import annotations
 import sys
 import time
 
-from veles.cli.repl.terminal import _CTRL_C_EXIT_WINDOW_S, _settled_status
+from veles.cli.repl.terminal import _CTRL_C_EXIT_WINDOW_S, _settled_status, _slash_completer
 from veles.cli.repl.turn import (
     _handle_slash,
     _run_mode_turn,
@@ -29,22 +28,10 @@ def _make_prompt_session(project: Project, registry, state):
     a status bottom-toolbar, Shift+Tab to cycle mode. Plain prompt mode — no
     alternate screen, no mouse capture."""
     from prompt_toolkit import PromptSession
-    from prompt_toolkit.completion import Completer, Completion
     from prompt_toolkit.history import FileHistory
     from prompt_toolkit.key_binding import KeyBindings
 
     from veles.core.modes import next_mode
-
-    extra = ("/sessions", "/errors")
-
-    class _SlashCompleter(Completer):
-        def get_completions(self, document, complete_event):
-            text = document.text_before_cursor
-            if not text.startswith("/") or " " in text:
-                return
-            for name in [*registry.names(), *extra]:
-                if name.startswith(text):
-                    yield Completion(name, start_position=-len(text))
 
     def _toolbar():
         return f" {_settled_status(state)} · Shift+Tab mode · /help · Ctrl+D exit "
@@ -59,7 +46,7 @@ def _make_prompt_session(project: Project, registry, state):
     hist_path = project.state_dir / "repl_history"
     return PromptSession(
         history=FileHistory(str(hist_path)),
-        completer=_SlashCompleter(),
+        completer=_slash_completer(registry),
         complete_while_typing=True,
         key_bindings=kb,
         bottom_toolbar=_toolbar,
@@ -152,17 +139,12 @@ def _ask_repl(console, theme, question: str, options: list[str] | None):
     """Question prompter for the REPL: an interactive picker when the agent
     offers options, a free-text line otherwise. Returns None when there's no
     interactive TTY so the agent proceeds on its best assumption."""
-    from veles.cli.commands.repl import _suspend_live
-
     if not sys.stdin.isatty():
         return None
-    # A turn's status-bar Live (if any) owns the terminal — pause it so the
-    # picker's prompt_toolkit Application can take over, then resume.
-    with _suspend_live():
-        if options:
-            return _choice_picker(theme, question, options)
-        console.print(f"\n[agent] {question}", style=theme.accent, markup=False)
-        return _free_text(theme)
+    if options:
+        return _choice_picker(theme, question, options)
+    console.print(f"\n[agent] {question}", style=theme.accent, markup=False)
+    return _free_text(theme)
 
 
 def _run_simple_repl(

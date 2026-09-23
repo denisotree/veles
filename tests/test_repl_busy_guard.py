@@ -29,8 +29,9 @@ import asyncio
 
 import pytest
 
-from veles.cli.commands.repl import _console, _handle_slash, _ReplApp, _resolve_theme
+from veles.cli.commands.repl import _console, _ReplApp, _resolve_theme
 from veles.cli.repl.slash import build_default_registry
+from veles.cli.repl.turn import _handle_slash
 from veles.core.session_state import AppState
 
 

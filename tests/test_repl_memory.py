@@ -17,7 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from veles.cli.commands.repl import _repl_turn_system_prompt
+from veles.cli.repl.turn import _repl_turn_system_prompt
 from veles.core.memory import SessionStore
 from veles.core.modes import get_mode
 from veles.core.project import init_project
@@ -90,7 +90,7 @@ def test_repl_post_turn_hooks_fire_insight_and_curator(
     insight extraction + post-turn curation (dream rides inside) — run, so the
     flagship REPL actually builds project memory (it ran none before M191)."""
     import veles.runtime.learning as cli
-    from veles.cli.commands.repl import _run_repl_post_turn_hooks
+    from veles.cli.repl.turn import _run_repl_post_turn_hooks
     from veles.core.agent import RunResult
 
     calls: list[tuple] = []
@@ -115,7 +115,7 @@ def test_repl_post_turn_hooks_skip_when_turn_produced_no_result(
     """A cancelled/errored turn yields no RunResult — memory processing must be
     skipped, not fed a None result."""
     import veles.runtime.learning as cli
-    from veles.cli.commands.repl import _run_repl_post_turn_hooks
+    from veles.cli.repl.turn import _run_repl_post_turn_hooks
 
     calls: list[tuple] = []
     monkeypatch.setattr(
@@ -137,7 +137,7 @@ def test_repl_post_turn_hooks_skip_cancelled_turn(
     """A user-cancelled turn (Ctrl+C) has no meaningful content — memory upkeep
     must skip it, not distil a half-finished interruption into an insight."""
     import veles.runtime.learning as cli
-    from veles.cli.commands.repl import _run_repl_post_turn_hooks
+    from veles.cli.repl.turn import _run_repl_post_turn_hooks
 
     calls: list[tuple] = []
     monkeypatch.setattr(

@@ -1,23 +1,21 @@
 """Terminal-facing leaf helpers for the inline REPL.
 
-The lowest layer of the `cli/repl/` stack: rich `Console` construction,
-theme resolution, token/timestamp formatting, the startup banner, the
-resume recap, the `/help` table, and the kitty keyboard-protocol
-enable/disable sequences. No dependency on any other `cli/repl` module at
-module scope — everything above imports FROM here (the base of the import
-DAG). The one cross-reference, `_print_resume_recap` → `_render_answer`,
-is a function-local import to avoid a terminal↔turn module cycle.
+The lower layer of the `cli/repl/` stack: rich `Console` construction,
+theme resolution, token formatting, the startup banner, the resume recap,
+and the kitty keyboard-protocol enable/disable sequences. Its only `cli/repl`
+dependency is the leaf `render`; everything else imports FROM here.
 """
 
 from __future__ import annotations
 
-import datetime as _dt
 import sys
 import time
 from contextlib import contextmanager
 
 from prompt_toolkit.application import run_in_terminal
 from prompt_toolkit.patch_stdout import StdoutProxy
+
+from veles.cli.repl.render import _render_answer
 
 # Window inside which a second Ctrl+C at the prompt is treated as exit.
 _CTRL_C_EXIT_WINDOW_S = 1.5
@@ -134,6 +132,25 @@ def _register_kitty_sequences() -> None:
             seqs[f"\x1b[{ord(ch)};5u"] = ctrl
 
 
+def _slash_completer(registry, *, paused=lambda: False):
+    """Completes `/command` names from the slash registry — the one completer
+    both REPL loops use. `paused()` true (e.g. a picker owns the input) → none."""
+    from prompt_toolkit.completion import Completer, Completion
+
+    class _SlashCompleter(Completer):
+        def get_completions(self, document, complete_event):
+            if paused():
+                return
+            text = document.text_before_cursor
+            if not text.startswith("/") or " " in text:
+                return
+            for name in registry.names():
+                if name.startswith(text):
+                    yield Completion(name, start_position=-len(text))
+
+    return _SlashCompleter()
+
+
 def _console():
     from rich.console import Console
 
@@ -142,10 +159,6 @@ def _console():
     # file, so it writes to the *current* sys.stdout — i.e. the proxy while the
     # Application runs, so background/streamed output lands above the input box.
     return Console(force_terminal=True)
-
-
-def _fmt_ts(ts: float) -> str:
-    return _dt.datetime.fromtimestamp(ts, tz=_dt.UTC).astimezone().strftime("%Y-%m-%d %H:%M")
 
 
 def _resolve_theme(state):
@@ -221,8 +234,6 @@ def _print_resume_recap(console, theme, store, session_id: str) -> None:
     copy). It used to clamp to the last 4 messages × 600 chars — live
     2026-07-09 that cut a long answer to a stub ending in […], losing the
     content the user came back for. Best-effort."""
-    from veles.cli.commands.repl import _render_answer
-
     try:
         msgs = store.load_messages(session_id)
     except Exception:
@@ -238,37 +249,3 @@ def _print_resume_recap(console, theme, store, session_id: str) -> None:
         else:
             _render_answer(console, body)
     console.print()
-
-
-def _print_repl_help(console) -> None:
-    from rich.table import Table
-
-    t = Table(show_header=False, box=None, padding=(0, 2))
-    t.add_column(style="cyan", no_wrap=True)
-    t.add_column(style="white")
-    rows = [
-        ("/help", "show this help"),
-        ("/mode [name]", "show/set mode (auto·planning·writing·goal); Shift+Tab cycles"),
-        ("/model [id]", "show or set the active model"),
-        ("/theme [name]", "show or set the active TUI theme"),
-        ("/sessions", "list recent sessions and resume one"),
-        ("/history [N]", "list recent sessions"),
-        ("/tokens · /context", "token totals · context vs model window"),
-        ("/status", "model/mode/session/provider snapshot"),
-        ("/save <slug>", "save the last answer to the wiki"),
-        ("/insights · /rules", "recent learned insights / behavioural rules"),
-        ("/errors", "errors from this session, plus earlier runs in the last 24h"),
-        ("/clear", "start a fresh session"),
-        ("/quit", "exit (or Ctrl+D)"),
-    ]
-    for cmd, desc in rows:
-        t.add_row(cmd, desc)
-    console.print(t)
-    console.print(
-        "  [dim]@ file picker · Ctrl+I/Ctrl+O inspector · Ctrl+X Ctrl+E $EDITOR · "
-        "Ctrl+V paste image · Shift+Tab cycle mode[/dim]"
-    )
-    console.print(
-        "  [dim]copy: select with the mouse and press ⌘C (macOS) / Ctrl+Shift+C (Linux) — "
-        "native terminal copy.[/dim]\n"
-    )

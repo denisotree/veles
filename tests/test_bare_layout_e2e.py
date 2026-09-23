@@ -230,7 +230,7 @@ def test_wiki_slash_not_registered_on_bare(bare_project: Project, tmp_path: Path
 
 
 def test_bare_help_omits_wiki(bare_project: Project) -> None:
-    from veles.cli.repl.slash.builtin import _help
+    from veles.cli.repl.slash import build_default_registry
     from veles.cli.repl.slash.registry import SlashContext
     from veles.core.memory import SessionStore
     from veles.core.session_state import AppState
@@ -239,9 +239,10 @@ def test_bare_help_omits_wiki(bare_project: Project) -> None:
     store = SessionStore(bare_project.memory_db_path)
     try:
         ctx = SlashContext(state=state, project=bare_project, store=store)
-        out = _help("", ctx)
+        out = build_default_registry(project=bare_project).dispatch("/help", ctx)
     finally:
         store.close()
+    assert out is not None
     assert "/wiki" not in out.text
     assert "project memory" in out.text  # /save wording reflects no-wiki
 
