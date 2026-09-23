@@ -54,9 +54,9 @@ class _StubProvider:
 
 
 def test_wiki_tools_dropped_when_engine_off(nowiki_project: Project) -> None:
-    from veles.runtime.assembly import _RUN_TOOLS, _load_skills
+    from veles.runtime.registry import RUN_TOOLS, load_skills
 
-    reg = _load_skills(nowiki_project, _RUN_TOOLS, provider=_StubProvider(), model="m")
+    reg = load_skills(nowiki_project, RUN_TOOLS, provider=_StubProvider(), model="m")
     names = set(reg.list_names())
     assert not any(n.startswith("wiki_") for n in names)
     assert "read_file" in names
@@ -64,9 +64,9 @@ def test_wiki_tools_dropped_when_engine_off(nowiki_project: Project) -> None:
 
 
 def test_wiki_tools_present_when_engine_on(wiki_project: Project) -> None:
-    from veles.runtime.assembly import _RUN_TOOLS, _load_skills
+    from veles.runtime.registry import RUN_TOOLS, load_skills
 
-    reg = _load_skills(wiki_project, _RUN_TOOLS, provider=_StubProvider(), model="m")
+    reg = load_skills(wiki_project, RUN_TOOLS, provider=_StubProvider(), model="m")
     names = set(reg.list_names())
     assert "wiki_search" in names
     assert "wiki_write_page" in names
@@ -83,7 +83,7 @@ def test_engine_wiki_toolset_declared() -> None:
 
 
 def test_prompt_has_no_wiki_blocks_when_engine_off(nowiki_project: Project) -> None:
-    from veles.runtime.assembly import build_run_system_prompt
+    from veles.runtime.prompt import build_run_system_prompt
 
     prompt = build_run_system_prompt(nowiki_project, prompt="anything")
     assert prompt is not None
@@ -92,7 +92,7 @@ def test_prompt_has_no_wiki_blocks_when_engine_off(nowiki_project: Project) -> N
 
 
 def test_prompt_injects_context_file_when_engine_on(wiki_project: Project) -> None:
-    from veles.runtime.assembly import build_run_system_prompt
+    from veles.runtime.prompt import build_run_system_prompt
 
     (wiki_project.root / "INDEX.md").write_text(
         "# INDEX\n\n- [page](wiki/concepts/page.md)\n", encoding="utf-8"
@@ -106,7 +106,7 @@ def test_prompt_injects_context_file_when_engine_on(wiki_project: Project) -> No
 def test_workspace_block_lists_root_and_wiki_tree_when_engine_on(wiki_project: Project) -> None:
     """The model must SEE the real folder names (the fix for guessing at
     `-- Daily --/` and wrongly concluding nothing exists)."""
-    from veles.runtime.assembly import build_run_system_prompt
+    from veles.runtime.prompt import build_run_system_prompt
 
     # A source folder at the root + a page in the canonical wiki tree.
     (wiki_project.root / "-- Daily --").mkdir()
@@ -124,7 +124,7 @@ def test_workspace_block_lists_root_and_wiki_tree_when_engine_on(wiki_project: P
 
 
 def test_workspace_block_absent_when_engine_off(nowiki_project: Project) -> None:
-    from veles.runtime.assembly import build_run_system_prompt
+    from veles.runtime.prompt import build_run_system_prompt
 
     (nowiki_project.root / "-- Daily --").mkdir()
     prompt = build_run_system_prompt(nowiki_project, prompt="anything")

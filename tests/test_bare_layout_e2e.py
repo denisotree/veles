@@ -176,7 +176,7 @@ def test_bare_veles_add_errors_cleanly(bare_project: Project, capsys) -> None:
 
 
 def test_bare_system_prompt_has_no_wiki_blocks(bare_project: Project) -> None:
-    from veles.runtime.assembly import build_run_system_prompt
+    from veles.runtime.prompt import build_run_system_prompt
 
     prompt = build_run_system_prompt(bare_project, prompt="what do we know?")
     assert prompt is not None

@@ -35,9 +35,10 @@ def _build_runtime(args: argparse.Namespace, project: Project):
     )
     from veles.core.model_windows import default_hard_ceiling_for
     from veles.core.modes import get_mode
-    from veles.core.provider_factory import make_provider as _make_provider
+    from veles.core.provider_factory import make_provider
     from veles.core.session_state import AppState
-    from veles.runtime.assembly import _PLANNING_TOOLS, _RUN_TOOLS, _build_compressor, _load_skills
+    from veles.runtime.registry import PLANNING_TOOLS, RUN_TOOLS, load_skills
+    from veles.runtime.run import compressor_from_args
 
     args.provider = resolve_effective_provider(args, project)
     try:
@@ -56,11 +57,11 @@ def _build_runtime(args: argparse.Namespace, project: Project):
     # 2026-07-08) while `veles run`/curator already used native calls. NOTE:
     # detection is bound to the STARTUP model — an in-session /model switch
     # keeps the provider instance (pre-existing behaviour).
-    provider = _make_provider(args.provider, model=args.model)
-    compressor = _build_compressor(args, project, provider)
+    provider = make_provider(args.provider, model=args.model)
+    compressor = compressor_from_args(args, project, provider)
     registries = {
-        "writing": _load_skills(project, _RUN_TOOLS, provider=provider, model=args.model),
-        "planning": _load_skills(project, _PLANNING_TOOLS, provider=provider, model=args.model),
+        "writing": load_skills(project, RUN_TOOLS, provider=provider, model=args.model),
+        "planning": load_skills(project, PLANNING_TOOLS, provider=provider, model=args.model),
     }
     store = SessionStore(project.memory_db_path)
 

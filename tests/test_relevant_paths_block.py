@@ -9,7 +9,7 @@ from pathlib import Path
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.core.project_tree import ensure_table
-from veles.runtime.assembly import _relevant_paths_block, build_run_system_prompt
+from veles.runtime.prompt import _relevant_paths_block, build_run_system_prompt
 
 
 def _seed_tree(project, rows: list[tuple[str, str, str]]) -> None:

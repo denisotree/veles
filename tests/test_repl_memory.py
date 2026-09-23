@@ -1,7 +1,7 @@
 """M191 — the default REPL must inject per-turn project-memory recall.
 
 The inline REPL's Agent factory used to build the system prompt with an empty
-recall query (`_build_run_system_prompt(args, project)` reads `args.prompt`,
+recall query (`system_prompt_from_args(args, project)` reads `args.prompt`,
 which the REPL parser never sets), so `<memory-context>` was never injected —
 "never forgets" was false in the flagship UX. These tests pin the turn-prompt
 assembly seam: given a recall query that matches stored memory, the assembled

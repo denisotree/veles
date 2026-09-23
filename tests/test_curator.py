@@ -1,7 +1,7 @@
 """Unit tests for the `veles curate` command logic.
 
-Avoids real LLM calls by monkey-patching `_run_agent_streaming_aware` on
-`veles.runtime.assembly`. The curator's contract — cursor advancement,
+Avoids real LLM calls by monkey-patching `run_agent_streaming_aware` on
+`veles.runtime.run`. The curator's contract — cursor advancement,
 quiet-window filter, failure-stops-batch — is asserted on observable
 state files and store cursors, not internal call counts.
 """
@@ -126,16 +126,16 @@ def test_curate_one_session_advances_on_completed(
     assert session is not None
 
     monkeypatch.setattr(
-        "veles.runtime.assembly._run_agent_streaming_aware", lambda *a, **kw: _make_completed()
+        "veles.runtime.run.run_agent_streaming_aware", lambda *a, **kw: _make_completed()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._make_tool_aware_provider", lambda *a, **kw: _stub_provider()
+        "veles.runtime.registry.make_tool_aware_provider", lambda *a, **kw: _stub_provider()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._load_skills",
+        "veles.runtime.registry.load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
     )
-    monkeypatch.setattr("veles.runtime.assembly._qualify_for_provider", lambda p, *a, **kw: p)
+    monkeypatch.setattr("veles.runtime.registry.qualify_for_provider", lambda p, *a, **kw: p)
 
     ok = _curate_one_session(store, session, _make_args(), project)
     assert ok is True
@@ -166,15 +166,15 @@ def test_curate_one_session_empty_final_text_counts_as_success_when_persisted(
         )
         return result, TokenBudget(limit=0)
 
-    monkeypatch.setattr("veles.runtime.assembly._run_agent_streaming_aware", _empty_but_persisted)
+    monkeypatch.setattr("veles.runtime.run.run_agent_streaming_aware", _empty_but_persisted)
     monkeypatch.setattr(
-        "veles.runtime.assembly._make_tool_aware_provider", lambda *a, **kw: _stub_provider()
+        "veles.runtime.registry.make_tool_aware_provider", lambda *a, **kw: _stub_provider()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._load_skills",
+        "veles.runtime.registry.load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
     )
-    monkeypatch.setattr("veles.runtime.assembly._qualify_for_provider", lambda p, *a, **kw: p)
+    monkeypatch.setattr("veles.runtime.registry.qualify_for_provider", lambda p, *a, **kw: p)
 
     ok = _curate_one_session(store, session, _make_args(), project)
     assert ok is True
@@ -205,15 +205,15 @@ def test_curate_one_session_uses_own_budget_and_runs_silently(
         seen["emit_output"] = kw.get("emit_output")
         return _make_completed()
 
-    monkeypatch.setattr("veles.runtime.assembly._run_agent_streaming_aware", _capture)
+    monkeypatch.setattr("veles.runtime.run.run_agent_streaming_aware", _capture)
     monkeypatch.setattr(
-        "veles.runtime.assembly._make_tool_aware_provider", lambda *a, **kw: _stub_provider()
+        "veles.runtime.registry.make_tool_aware_provider", lambda *a, **kw: _stub_provider()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._load_skills",
+        "veles.runtime.registry.load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
     )
-    monkeypatch.setattr("veles.runtime.assembly._qualify_for_provider", lambda p, *a, **kw: p)
+    monkeypatch.setattr("veles.runtime.registry.qualify_for_provider", lambda p, *a, **kw: p)
 
     caller_args = _make_args(max_tokens_total=100)
     ok = _curate_one_session(store, session, caller_args, project)
@@ -246,17 +246,15 @@ def test_curate_one_session_budget_exhausted_after_persist_counts_as_success(
         )
         return result, TokenBudget(limit=100_000)
 
+    monkeypatch.setattr("veles.runtime.run.run_agent_streaming_aware", _exhausted_but_persisted)
     monkeypatch.setattr(
-        "veles.runtime.assembly._run_agent_streaming_aware", _exhausted_but_persisted
+        "veles.runtime.registry.make_tool_aware_provider", lambda *a, **kw: _stub_provider()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._make_tool_aware_provider", lambda *a, **kw: _stub_provider()
-    )
-    monkeypatch.setattr(
-        "veles.runtime.assembly._load_skills",
+        "veles.runtime.registry.load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
     )
-    monkeypatch.setattr("veles.runtime.assembly._qualify_for_provider", lambda p, *a, **kw: p)
+    monkeypatch.setattr("veles.runtime.registry.qualify_for_provider", lambda p, *a, **kw: p)
 
     ok = _curate_one_session(store, session, _make_args(), project)
     assert ok is True
@@ -277,15 +275,15 @@ def test_curate_one_session_empty_without_persist_tools_still_fails(
     def _empty_no_tools(*a: Any, **kw: Any) -> tuple[RunResult, TokenBudget]:
         return RunResult(text="", iterations=1, stopped_reason="empty"), TokenBudget(limit=0)
 
-    monkeypatch.setattr("veles.runtime.assembly._run_agent_streaming_aware", _empty_no_tools)
+    monkeypatch.setattr("veles.runtime.run.run_agent_streaming_aware", _empty_no_tools)
     monkeypatch.setattr(
-        "veles.runtime.assembly._make_tool_aware_provider", lambda *a, **kw: _stub_provider()
+        "veles.runtime.registry.make_tool_aware_provider", lambda *a, **kw: _stub_provider()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._load_skills",
+        "veles.runtime.registry.load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
     )
-    monkeypatch.setattr("veles.runtime.assembly._qualify_for_provider", lambda p, *a, **kw: p)
+    monkeypatch.setattr("veles.runtime.registry.qualify_for_provider", lambda p, *a, **kw: p)
 
     ok = _curate_one_session(store, session, _make_args(), project)
     assert ok is False
@@ -302,16 +300,16 @@ def test_curate_one_session_returns_false_on_max_iterations(
     assert session is not None
 
     monkeypatch.setattr(
-        "veles.runtime.assembly._run_agent_streaming_aware", lambda *a, **kw: _make_failed()
+        "veles.runtime.run.run_agent_streaming_aware", lambda *a, **kw: _make_failed()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._make_tool_aware_provider", lambda *a, **kw: _stub_provider()
+        "veles.runtime.registry.make_tool_aware_provider", lambda *a, **kw: _stub_provider()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._load_skills",
+        "veles.runtime.registry.load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
     )
-    monkeypatch.setattr("veles.runtime.assembly._qualify_for_provider", lambda p, *a, **kw: p)
+    monkeypatch.setattr("veles.runtime.registry.qualify_for_provider", lambda p, *a, **kw: p)
 
     ok = _curate_one_session(store, session, _make_args(), project)
     assert ok is False
@@ -340,16 +338,16 @@ def test_cmd_curate_skips_quiet_window(
     store.close()
 
     monkeypatch.setattr(
-        "veles.runtime.assembly._run_agent_streaming_aware", lambda *a, **kw: _make_completed()
+        "veles.runtime.run.run_agent_streaming_aware", lambda *a, **kw: _make_completed()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._make_tool_aware_provider", lambda *a, **kw: _stub_provider()
+        "veles.runtime.registry.make_tool_aware_provider", lambda *a, **kw: _stub_provider()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._load_skills",
+        "veles.runtime.registry.load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
     )
-    monkeypatch.setattr("veles.runtime.assembly._qualify_for_provider", lambda p, *a, **kw: p)
+    monkeypatch.setattr("veles.runtime.registry.qualify_for_provider", lambda p, *a, **kw: p)
 
     rc = _cmd_curate(_make_args(), project)
     assert rc == 0
@@ -369,16 +367,16 @@ def test_cmd_curate_advances_state_on_success(
     store.close()
 
     monkeypatch.setattr(
-        "veles.runtime.assembly._run_agent_streaming_aware", lambda *a, **kw: _make_completed()
+        "veles.runtime.run.run_agent_streaming_aware", lambda *a, **kw: _make_completed()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._make_tool_aware_provider", lambda *a, **kw: _stub_provider()
+        "veles.runtime.registry.make_tool_aware_provider", lambda *a, **kw: _stub_provider()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._load_skills",
+        "veles.runtime.registry.load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
     )
-    monkeypatch.setattr("veles.runtime.assembly._qualify_for_provider", lambda p, *a, **kw: p)
+    monkeypatch.setattr("veles.runtime.registry.qualify_for_provider", lambda p, *a, **kw: p)
 
     rc = _cmd_curate(_make_args(), project)
     assert rc == 0
@@ -416,15 +414,15 @@ def test_cmd_curate_failure_stops_batch_and_does_not_advance(
             return _make_completed()
         return _make_failed()
 
-    monkeypatch.setattr("veles.runtime.assembly._run_agent_streaming_aware", fake)
+    monkeypatch.setattr("veles.runtime.run.run_agent_streaming_aware", fake)
     monkeypatch.setattr(
-        "veles.runtime.assembly._make_tool_aware_provider", lambda *a, **kw: _stub_provider()
+        "veles.runtime.registry.make_tool_aware_provider", lambda *a, **kw: _stub_provider()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._load_skills",
+        "veles.runtime.registry.load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
     )
-    monkeypatch.setattr("veles.runtime.assembly._qualify_for_provider", lambda p, *a, **kw: p)
+    monkeypatch.setattr("veles.runtime.registry.qualify_for_provider", lambda p, *a, **kw: p)
 
     rc = _cmd_curate(_make_args(), project)
     assert rc == 0
@@ -452,15 +450,15 @@ def test_persistently_failing_session_is_skipped_after_three_attempts(
         calls["n"] += 1
         return _make_failed()
 
-    monkeypatch.setattr("veles.runtime.assembly._run_agent_streaming_aware", always_fail)
+    monkeypatch.setattr("veles.runtime.run.run_agent_streaming_aware", always_fail)
     monkeypatch.setattr(
-        "veles.runtime.assembly._make_tool_aware_provider", lambda *a, **kw: _stub_provider()
+        "veles.runtime.registry.make_tool_aware_provider", lambda *a, **kw: _stub_provider()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._load_skills",
+        "veles.runtime.registry.load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
     )
-    monkeypatch.setattr("veles.runtime.assembly._qualify_for_provider", lambda p, *a, **kw: p)
+    monkeypatch.setattr("veles.runtime.registry.qualify_for_provider", lambda p, *a, **kw: p)
 
     for _ in range(3):
         _cmd_curate(_make_args(), project)
@@ -500,16 +498,16 @@ def test_cmd_curate_state_json_format(tmp_path: Path, monkeypatch: pytest.Monkey
     store.close()
 
     monkeypatch.setattr(
-        "veles.runtime.assembly._run_agent_streaming_aware", lambda *a, **kw: _make_completed()
+        "veles.runtime.run.run_agent_streaming_aware", lambda *a, **kw: _make_completed()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._make_tool_aware_provider", lambda *a, **kw: _stub_provider()
+        "veles.runtime.registry.make_tool_aware_provider", lambda *a, **kw: _stub_provider()
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._load_skills",
+        "veles.runtime.registry.load_skills",
         lambda project, base, *, provider, model: _empty_registry(),
     )
-    monkeypatch.setattr("veles.runtime.assembly._qualify_for_provider", lambda p, *a, **kw: p)
+    monkeypatch.setattr("veles.runtime.registry.qualify_for_provider", lambda p, *a, **kw: p)
 
     _cmd_curate(_make_args(), project)
     raw = (project.state_dir / "curator.state.json").read_text(encoding="utf-8")

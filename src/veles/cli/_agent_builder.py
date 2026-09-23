@@ -9,8 +9,8 @@ points where the two commands actually differ (toolset, provider
 bridging, compressor presence, prompt source, session persistence).
 
 Monkeypatch contract: every helper is looked up on its owning module at call
-time (`veles.runtime.assembly`, `veles.core.provider_factory`,
-`veles.cli._console`), so tests patch it there.
+time (`veles.runtime.registry`, `veles.runtime.run`,
+`veles.core.provider_factory`, `veles.cli._console`), so tests patch it there.
 """
 
 from __future__ import annotations
@@ -41,33 +41,34 @@ def build_command_agent(
 ) -> Agent | None:
     """Build the Agent every agent-driven CLI verb constructs by hand.
 
-    Returns ``None`` (after `_ensure_api_key` printed its error) when
+    Returns ``None`` (after `ensure_api_key` printed its error) when
     ``check_api_key`` is set and no key is reachable for ``args.provider``
     — callers translate that to exit code 2. Commands that already gate
     the key earlier in their flow (e.g. `cmd_run` checks before the
     manager path / idle curator) pass ``check_api_key=False``.
 
-    - ``tool_aware``: build the provider via `_make_tool_aware_provider`
-      (MCP-bridged for cli-delegates) instead of `_make_provider`.
+    - ``tool_aware``: build the provider via `make_tool_aware_provider`
+      (MCP-bridged for cli-delegates) instead of `make_provider`.
     - ``system_prompt``: a ready string, or a callable taking the built
       provider (for prompts that need provider-specific tool
-      qualification, e.g. ingest's `_qualify_for_provider`).
+      qualification, e.g. ingest's `qualify_for_provider`).
     - ``with_compressor``: build the routed history compressor
-      (`_build_compressor`); off for short single-task runs like ingest.
+      (`compressor_from_args`); off for short single-task runs like ingest.
     - ``registry``: pre-built tool registry; default loads project
-      skills on top of ``tools`` via `_load_skills`.
+      skills on top of ``tools`` via `load_skills`.
     """
     # Helpers are looked up on their owning modules at call time, so a test's
     # `monkeypatch.setattr` on that module is picked up.
     from veles.cli import _console
     from veles.core import provider_factory
-    from veles.runtime import assembly
+    from veles.runtime import registry as run_registry
+    from veles.runtime import run
 
     if check_api_key and not _console.ensure_api_key(args.provider):
         return None
 
     if tool_aware:
-        provider = assembly._make_tool_aware_provider(
+        provider = run_registry.make_tool_aware_provider(
             args.provider, project, skill_model=args.model
         )
     else:
@@ -76,10 +77,10 @@ def build_command_agent(
     if callable(system_prompt):
         system_prompt = system_prompt(provider)
 
-    compressor = assembly._build_compressor(args, project, provider) if with_compressor else None
+    compressor = run.compressor_from_args(args, project, provider) if with_compressor else None
 
     if registry is None:
-        registry = assembly._load_skills(project, tools, provider=provider, model=args.model)
+        registry = run_registry.load_skills(project, tools, provider=provider, model=args.model)
 
     return Agent(
         provider=provider,

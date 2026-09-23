@@ -52,14 +52,14 @@ def test_returns_wired_agent(project, monkeypatch: pytest.MonkeyPatch) -> None:
         "veles.core.provider_factory.make_provider", lambda name, model=None: stub_provider
     )
     monkeypatch.setattr(
-        "veles.runtime.assembly._build_compressor", lambda args, proj, prov: sentinel_compressor
+        "veles.runtime.run.compressor_from_args", lambda args, proj, prov: sentinel_compressor
     )
 
     def fake_load_skills(proj, tools, *, provider, model):
         load_calls.append({"tools": tools, "provider": provider, "model": model})
         return sentinel_registry
 
-    monkeypatch.setattr("veles.runtime.assembly._load_skills", fake_load_skills)
+    monkeypatch.setattr("veles.runtime.registry.load_skills", fake_load_skills)
 
     agent = build_command_agent(
         _args(),
@@ -103,7 +103,7 @@ def test_missing_api_key_returns_none(
 
     monkeypatch.setattr("veles.cli._console.ensure_api_key", fake_ensure)
     monkeypatch.setattr("veles.core.provider_factory.make_provider", boom)
-    monkeypatch.setattr("veles.runtime.assembly._load_skills", boom)
+    monkeypatch.setattr("veles.runtime.registry.load_skills", boom)
 
     agent = build_command_agent(_args(provider="openrouter"), project, tools=("read_file",))
 
@@ -121,7 +121,7 @@ def test_check_api_key_false_skips_gate(project, monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(
         "veles.core.provider_factory.make_provider", lambda name, model=None: StubProvider()
     )
-    monkeypatch.setattr("veles.runtime.assembly._load_skills", lambda *a, **kw: object())
+    monkeypatch.setattr("veles.runtime.registry.load_skills", lambda *a, **kw: object())
 
     agent = build_command_agent(_args(), project, tools=("read_file",), check_api_key=False)
     assert isinstance(agent, Agent)
@@ -139,7 +139,7 @@ def test_monkeypatch_contract_is_lazy(project, monkeypatch: pytest.MonkeyPatch) 
 
     monkeypatch.setattr("veles.cli._console.ensure_api_key", lambda *a, **kw: True)
     monkeypatch.setattr("veles.core.provider_factory.make_provider", recording_make_provider)
-    monkeypatch.setattr("veles.runtime.assembly._load_skills", lambda *a, **kw: object())
+    monkeypatch.setattr("veles.runtime.registry.load_skills", lambda *a, **kw: object())
 
     agent = build_command_agent(_args(provider="openrouter"), project, tools=())
     assert isinstance(agent, Agent)
@@ -160,14 +160,14 @@ def test_tool_aware_provider_and_callable_system_prompt(
         return stub_provider
 
     monkeypatch.setattr("veles.cli._console.ensure_api_key", lambda *a, **kw: True)
-    monkeypatch.setattr("veles.runtime.assembly._make_tool_aware_provider", fake_bridge)
+    monkeypatch.setattr("veles.runtime.registry.make_tool_aware_provider", fake_bridge)
     monkeypatch.setattr(
         "veles.core.provider_factory.make_provider",
         lambda name: (_ for _ in ()).throw(
             AssertionError("tool_aware=True must not use _make_provider")
         ),
     )
-    monkeypatch.setattr("veles.runtime.assembly._load_skills", lambda *a, **kw: object())
+    monkeypatch.setattr("veles.runtime.registry.load_skills", lambda *a, **kw: object())
 
     def make_prompt(provider):
         prompt_saw.append(provider)

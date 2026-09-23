@@ -28,10 +28,10 @@ def _refresh(project: Project) -> int:
     import veles.core.tools.builtin  # noqa: F401
     from veles.core.self_doc import refresh_self_doc
     from veles.core.tools.registry import registry as _tool_registry
-    from veles.runtime.assembly import _RUN_TOOLS
+    from veles.runtime.registry import RUN_TOOLS
 
     tools: list[tuple[str, str]] = []
-    for name in _RUN_TOOLS:
+    for name in RUN_TOOLS:
         try:
             entry = _tool_registry.get(name)
             tools.append((name, entry.description or ""))

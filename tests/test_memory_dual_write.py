@@ -293,7 +293,7 @@ def test_remote_backend_serves_the_recall_path(tmp_path: Path, monkeypatch) -> N
     configured, constructed, and then quietly bypassed on the one path it
     exists for.
     """
-    from veles.runtime.assembly import _recall_block
+    from veles.runtime.prompt import _recall_block
 
     class _Engine(_Recorder):
         def recall(self, query: str, *, limit: int) -> list[RecallHit]:

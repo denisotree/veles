@@ -79,9 +79,9 @@ def test_manager_path_activates_with_flag(
 
     monkeypatch.setattr("veles.core.orchestration.decompose_and_run", fake_decompose)
     monkeypatch.setattr("veles.core.provider_factory.make_provider", lambda _: MagicMock())
-    monkeypatch.setattr("veles.runtime.assembly._build_compressor", lambda *a, **kw: None)
-    monkeypatch.setattr("veles.runtime.assembly._build_run_system_prompt", lambda *a, **kw: "base")
-    monkeypatch.setattr("veles.runtime.assembly._load_skills", lambda *a, **kw: MagicMock())
+    monkeypatch.setattr("veles.runtime.run.compressor_from_args", lambda *a, **kw: None)
+    monkeypatch.setattr("veles.runtime.prompt.system_prompt_from_args", lambda *a, **kw: "base")
+    monkeypatch.setattr("veles.runtime.registry.load_skills", lambda *a, **kw: MagicMock())
 
     result = _maybe_run_via_manager(args, project)
     assert result is True
@@ -111,9 +111,9 @@ def test_manager_path_activates_via_env(
         lambda *a, **kw: fake_result,
     )
     monkeypatch.setattr("veles.core.provider_factory.make_provider", lambda _: MagicMock())
-    monkeypatch.setattr("veles.runtime.assembly._build_compressor", lambda *a, **kw: None)
-    monkeypatch.setattr("veles.runtime.assembly._build_run_system_prompt", lambda *a, **kw: "base")
-    monkeypatch.setattr("veles.runtime.assembly._load_skills", lambda *a, **kw: MagicMock())
+    monkeypatch.setattr("veles.runtime.run.compressor_from_args", lambda *a, **kw: None)
+    monkeypatch.setattr("veles.runtime.prompt.system_prompt_from_args", lambda *a, **kw: "base")
+    monkeypatch.setattr("veles.runtime.registry.load_skills", lambda *a, **kw: MagicMock())
 
     assert _maybe_run_via_manager(args, project) is True
 
@@ -142,9 +142,9 @@ def test_manager_failure_returns_false_so_caller_falls_back(
         lambda *a, **kw: failed_result,
     )
     monkeypatch.setattr("veles.core.provider_factory.make_provider", lambda _: MagicMock())
-    monkeypatch.setattr("veles.runtime.assembly._build_compressor", lambda *a, **kw: None)
-    monkeypatch.setattr("veles.runtime.assembly._build_run_system_prompt", lambda *a, **kw: "base")
-    monkeypatch.setattr("veles.runtime.assembly._load_skills", lambda *a, **kw: MagicMock())
+    monkeypatch.setattr("veles.runtime.run.compressor_from_args", lambda *a, **kw: None)
+    monkeypatch.setattr("veles.runtime.prompt.system_prompt_from_args", lambda *a, **kw: "base")
+    monkeypatch.setattr("veles.runtime.registry.load_skills", lambda *a, **kw: MagicMock())
 
     assert _maybe_run_via_manager(args, project) is False
 

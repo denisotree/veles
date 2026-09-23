@@ -12,7 +12,8 @@ from pathlib import Path
 
 import veles.core.agent as agent_mod
 import veles.core.provider_factory as pf_mod
-import veles.runtime.assembly as asm_mod
+import veles.runtime.registry as registry_mod
+import veles.runtime.run as run_mod
 from tests.conftest import StubProvider
 from veles.core.context import reset_active_project, set_active_project
 from veles.core.memory import SessionStore
@@ -47,8 +48,8 @@ def _install_factory_stubs(monkeypatch) -> dict:
         "make_provider",
         lambda *_a, **_kw: StubProvider(supports_tools=False, supports_streaming=True),
     )
-    monkeypatch.setattr(asm_mod, "_load_skills", lambda *_a, **_kw: Registry())
-    monkeypatch.setattr(asm_mod, "build_compressor", lambda *_a, **_kw: None)
+    monkeypatch.setattr(registry_mod, "load_skills", lambda *_a, **_kw: Registry())
+    monkeypatch.setattr(run_mod, "build_compressor", lambda *_a, **_kw: None)
     monkeypatch.setattr(agent_mod, "Agent", _StubAgent)
     return captured
 

@@ -6,8 +6,8 @@ assembler, the `AgentFactory` closures (`_make_agent_factory`,
 `_make_worker_agent_factory`), the post-turn learning-loop hook
 (`_make_post_turn_hook`) and the JobRunner/DreamRunner wiring
 (`_attach_background_runners`). This belongs with `daemon/runner.py` — it is
-server runtime, not CLI plumbing. It never imports `veles.cli`: the run
-assembly and learning hooks come from `veles.runtime`, the provider from
+server runtime, not CLI plumbing. It never imports `veles.cli`: the prompt,
+tools, compressor and learning hooks come from `veles.runtime`, the provider from
 `veles.core.provider_factory`. Those are imported lazily inside each function
 so tests can patch them on their owning module at call time.
 """
@@ -373,13 +373,9 @@ def _build_agent_for_turn(
     from veles.core.agent import Agent
     from veles.core.provider_factory import make_provider
     from veles.core.tools.registry import Registry
-    from veles.runtime.assembly import (
-        _PLANNING_TOOLS,
-        _RUN_TOOLS,
-        _load_skills,
-        build_compressor,
-        build_run_system_prompt,
-    )
+    from veles.runtime.prompt import build_run_system_prompt
+    from veles.runtime.registry import PLANNING_TOOLS, RUN_TOOLS, load_skills
+    from veles.runtime.run import build_compressor
 
     if provider is None:
         provider = make_provider(settings.provider_name, settings.model)
@@ -387,12 +383,12 @@ def _build_agent_for_turn(
     if toolless:
         registry = Registry()
     else:
-        registry = _load_skills(
+        registry = load_skills(
             project,
             # M204: `tools` narrows the surface for scoped sub-agents (e.g. the
             # [ingest] set for background ingest workers — no run_shell/fetch_url,
             # B1). Default stays the full run surface; planning gets its own.
-            tools if tools is not None else (_PLANNING_TOOLS if is_planning else _RUN_TOOLS),
+            tools if tools is not None else (PLANNING_TOOLS if is_planning else RUN_TOOLS),
             provider=provider,
             model=settings.model,
             skills_cache_ttl=settings.skills_cache_ttl,
@@ -510,7 +506,7 @@ def _make_agent_factory(
     def _reused_provider_and_compressor():
         if "provider" not in reused:
             from veles.core.provider_factory import make_provider
-            from veles.runtime.assembly import build_compressor
+            from veles.runtime.run import build_compressor
 
             provider = make_provider(settings.provider_name)
             hard_ceiling, summariser_input = _effective_ceilings(settings)

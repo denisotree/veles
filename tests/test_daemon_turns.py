@@ -88,7 +88,7 @@ def real_build(state, monkeypatch):
     import argparse
 
     import veles.core.provider_factory as pf_mod
-    import veles.runtime.assembly as asm_mod
+    import veles.runtime.run as run_mod
     from veles.daemon.agent_factory import _make_agent_factory
 
     class _Provider:
@@ -97,7 +97,7 @@ def real_build(state, monkeypatch):
         supports_streaming = False
 
     monkeypatch.setattr(pf_mod, "make_provider", lambda *a, **k: _Provider())
-    monkeypatch.setattr(asm_mod, "build_compressor", lambda *a, **k: None)
+    monkeypatch.setattr(run_mod, "build_compressor", lambda *a, **k: None)
     monkeypatch.setenv("OPENROUTER_API_KEY", "unused-in-this-test")
     state.agent_factory = _make_agent_factory(
         argparse.Namespace(model="stub/model"), project=state.project, store=state.store

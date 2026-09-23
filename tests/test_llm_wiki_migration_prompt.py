@@ -42,7 +42,7 @@ def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def test_llm_wiki_run_prompt_contains_migration_behaviour(
     isolated_home: Path, tmp_path: Path
 ) -> None:
-    from veles.runtime.assembly import build_run_system_prompt
+    from veles.runtime.prompt import build_run_system_prompt
 
     project = init_project(tmp_path / "proj", name="proj")
 
@@ -61,7 +61,7 @@ def test_llm_wiki_prompt_declares_migration_and_log_patch_rules(
 ) -> None:
     """The prompt must actually encode the three moves the spec calls for:
     raw -> sources/, article -> wiki page, log -> merge-or-create."""
-    from veles.runtime.assembly import _load_layout_prompt
+    from veles.runtime.prompt import _load_layout_prompt
 
     project = init_project(tmp_path / "proj", name="proj")
 
@@ -126,7 +126,7 @@ def test_behaviour_prompt_covers_multi_topic_extraction(
     """M203: one source may be ABOUT several distinct topics (a diary day →
     concept + entities). The prompt must tell the model to extract topics and
     fan out — page identity is the TOPIC, never the filename/date."""
-    from veles.runtime.assembly import _load_layout_prompt
+    from veles.runtime.prompt import _load_layout_prompt
 
     project = init_project(tmp_path / "proj", name="proj")
     text = _load_layout_prompt(project)
@@ -142,7 +142,7 @@ def test_behaviour_prompt_covers_multi_topic_extraction(
 def test_behaviour_prompt_covers_valueless_source(isolated_home: Path, tmp_path: Path) -> None:
     """M203 case (e): a valueless source (empty/boilerplate/dup) yields no
     page and is archived, not deleted."""
-    from veles.runtime.assembly import _load_layout_prompt
+    from veles.runtime.prompt import _load_layout_prompt
 
     project = init_project(tmp_path / "proj", name="proj")
     text = _load_layout_prompt(project)

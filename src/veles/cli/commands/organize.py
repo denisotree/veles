@@ -65,7 +65,7 @@ def cmd_organize(args: argparse.Namespace, project: Project) -> int:
     """Entry point for `veles organize`. Returns a process exit code."""
     from veles.cli._agent_builder import build_command_agent
     from veles.cli._console import ensure_api_key
-    from veles.runtime.assembly import _print_run_summary, _run_agent_streaming_aware
+    from veles.runtime.run import print_run_summary, run_agent_streaming_aware
 
     resolved = resolve_operation(project, _OP_NAME)
     if resolved is None:
@@ -117,10 +117,10 @@ def cmd_organize(args: argparse.Namespace, project: Project) -> int:
     if agent is None:
         return 2
 
-    result, budget = _run_agent_streaming_aware(
+    result, budget = run_agent_streaming_aware(
         agent, _user_message(project, scope=scope, apply=apply), args, project=project
     )
-    _print_run_summary(args, result, budget)
+    print_run_summary(args, result, budget)
 
     if not apply:
         slug = f"organize-{int(time.time())}"

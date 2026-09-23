@@ -89,7 +89,7 @@ def _repl_turn_system_prompt(
     recall (matches `veles run` with no prompt), so batch/mode-less callers
     keep the cache-stable stable-only prefix.
     """
-    from veles.runtime.assembly import build_run_system_prompt
+    from veles.runtime.prompt import build_run_system_prompt
 
     sys_chunks: list[str] = []
     base = build_run_system_prompt(

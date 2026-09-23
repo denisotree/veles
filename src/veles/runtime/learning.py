@@ -7,8 +7,8 @@ shape: an eligibility gate, an optional throttle (`_ran_recently` / `_stamp`),
 then the work inside `_logged_skip`, so a failure becomes a LOG.md line and
 never reaches the user's turn.
 
-`_curate_one_session` uses the run-loop helpers of `runtime/assembly.py`,
-imported inside the function so a test's patch on that module applies.
+`_curate_one_session` uses `runtime/registry.py` and `runtime/run.py`, imported
+inside the function so a test's patch on those modules applies.
 Shared by the CLI (`veles run`, `veles curate`, the REPL) and the daemon's
 post-turn hook.
 """
@@ -465,15 +465,10 @@ def _curate_one_session(
     args: argparse.Namespace,
     project: Project,
 ) -> bool:
-    # Imported at call time so a test's patch on `veles.runtime.assembly` applies.
+    # Imported at call time so a test's patch on the owning module applies.
     from veles.core.layout.engines import wiki_enabled
-    from veles.runtime.assembly import (
-        _load_skills,
-        _make_tool_aware_provider,
-        _print_run_summary,
-        _qualify_for_provider,
-        _run_agent_streaming_aware,
-    )
+    from veles.runtime.registry import load_skills, make_tool_aware_provider, qualify_for_provider
+    from veles.runtime.run import print_run_summary, run_agent_streaming_aware
 
     messages = store.load_messages(session.id)
     serialized = _truncate_session_messages(messages, _CURATE_TURN_LIMIT, _CURATE_CHARS_LIMIT)
@@ -527,11 +522,11 @@ def _curate_one_session(
         "Session turns (chronological):\n"
         f"{serialized}"
     )
-    provider = _make_tool_aware_provider(args.provider, project, skill_model=args.model)
-    system_prompt = _qualify_for_provider(system_prompt, provider, _CURATE_TOOLS)
+    provider = make_tool_aware_provider(args.provider, project, skill_model=args.model)
+    system_prompt = qualify_for_provider(system_prompt, provider, _CURATE_TOOLS)
     agent = Agent(
         provider=provider,
-        registry=_load_skills(project, _CURATE_TOOLS, provider=provider, model=args.model),
+        registry=load_skills(project, _CURATE_TOOLS, provider=provider, model=args.model),
         model=args.model,
         max_iterations=args.max_iterations,
         system_prompt=system_prompt,
@@ -544,7 +539,7 @@ def _curate_one_session(
     # e.g. "<budget exhausted: …>", used to print straight into the chat).
     curate_args = argparse.Namespace(**vars(args))
     curate_args.max_tokens_total = _CURATE_TOKEN_BUDGET
-    result, budget = _run_agent_streaming_aware(
+    result, budget = run_agent_streaming_aware(
         agent,
         f"Curate session {session.id}.",
         curate_args,
@@ -552,7 +547,7 @@ def _curate_one_session(
         emit_output=False,
     )
     if args.verbose:
-        _print_run_summary(curate_args, result, budget)
+        print_run_summary(curate_args, result, budget)
     if result.stopped_reason == "completed":
         return True
     # Live 2026-07-08 (ollama qwen3.5:9b): a thinking model does all the

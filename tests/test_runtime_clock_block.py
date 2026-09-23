@@ -23,7 +23,7 @@ def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 def test_clock_block_always_present(project) -> None:
-    from veles.runtime.assembly import build_run_system_prompt
+    from veles.runtime.prompt import build_run_system_prompt
 
     before = _dt.datetime.now(tz=_dt.UTC)
     prompt = build_run_system_prompt(project, prompt="remind me tomorrow")
@@ -40,7 +40,7 @@ def test_clock_block_is_volatile_not_stable(project) -> None:
     """The clock must sit AFTER the cache breakpoint — a per-minute timestamp
     in the stable prefix would fragment the prompt cache every turn."""
     from veles.core.cache_hints import CACHE_BREAKPOINT_SENTINEL
-    from veles.runtime.assembly import build_run_system_prompt
+    from veles.runtime.prompt import build_run_system_prompt
 
     prompt = build_run_system_prompt(project, prompt="hi")
     assert prompt is not None

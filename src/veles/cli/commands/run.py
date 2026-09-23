@@ -47,11 +47,9 @@ def _build_escalator(args, project, adv_provider, adv_model, store):
     advisor-tier model with the full run tool surface. None when the advisor
     agent can't be built (e.g. missing API key)."""
     from veles.cli._agent_builder import build_command_agent
-    from veles.runtime.assembly import (
-        _RUN_TOOLS,
-        _build_run_system_prompt,
-        _run_agent_streaming_aware,
-    )
+    from veles.runtime.prompt import system_prompt_from_args
+    from veles.runtime.registry import RUN_TOOLS
+    from veles.runtime.run import run_agent_streaming_aware
 
     esc_args = argparse.Namespace(**vars(args))
     esc_args.provider = adv_provider
@@ -63,8 +61,8 @@ def _build_escalator(args, project, adv_provider, adv_model, store):
         esc_agent = build_command_agent(
             esc_args,
             project,
-            tools=_RUN_TOOLS,
-            system_prompt=_build_run_system_prompt(esc_args, project),
+            tools=RUN_TOOLS,
+            system_prompt=system_prompt_from_args(esc_args, project),
             check_api_key=True,
             tool_aware=tool_aware,
             with_compressor=True,
@@ -73,7 +71,7 @@ def _build_escalator(args, project, adv_provider, adv_model, store):
         )
         if esc_agent is None:
             return None
-        esc_result, _ = _run_agent_streaming_aware(
+        esc_result, _ = run_agent_streaming_aware(
             esc_agent, prompt, esc_args, project=project, emit_output=False
         )
         return esc_result
@@ -171,18 +169,15 @@ def _maybe_run_via_manager(args: argparse.Namespace, project: Project) -> bool:
     # Build an agent factory that closes over the existing
     # provider / model / registry plumbing. Sub-agents see the
     # same tool surface as the direct agent would.
-    from veles.core.provider_factory import make_provider as _make_provider
-    from veles.runtime.assembly import (
-        _RUN_TOOLS,
-        _build_compressor,
-        _build_run_system_prompt,
-        _load_skills,
-    )
+    from veles.core.provider_factory import make_provider
+    from veles.runtime.prompt import system_prompt_from_args
+    from veles.runtime.registry import RUN_TOOLS, load_skills
+    from veles.runtime.run import compressor_from_args
 
-    provider = _make_provider(args.provider)
-    base_system = _build_run_system_prompt(args, project)
-    compressor = _build_compressor(args, project, provider)
-    registry = _load_skills(project, _RUN_TOOLS, provider=provider, model=args.model)
+    provider = make_provider(args.provider)
+    base_system = system_prompt_from_args(args, project)
+    compressor = compressor_from_args(args, project, provider)
+    registry = load_skills(project, RUN_TOOLS, provider=provider, model=args.model)
     factory = make_worker_factory(
         args, provider=provider, registry=registry, base_system=base_system, compressor=compressor
     )
@@ -209,13 +204,6 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
         resolve_effective_model,
         resolve_effective_provider,
     )
-    from veles.runtime.assembly import (
-        _RUN_TOOLS,
-        _build_run_system_prompt,
-        _maybe_apply_project_slash_prefix,
-        _print_run_summary,
-        _run_agent_streaming_aware,
-    )
     from veles.runtime.learning import (
         _maybe_refresh_nl_routing,
         _maybe_refresh_self_doc,
@@ -225,6 +213,9 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
         _maybe_run_subproject_proposer,
         _maybe_suggest_promotions,
     )
+    from veles.runtime.prompt import apply_project_slash_prefix, system_prompt_from_args
+    from veles.runtime.registry import RUN_TOOLS
+    from veles.runtime.run import print_run_summary, run_agent_streaming_aware
 
     # M165: resolve provider + model from config (explicit flag → project
     # `[engine]` → user defaults) instead of letting the bare argparse
@@ -240,7 +231,7 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
     if not ensure_api_key(args.provider):
         return 2
 
-    project, args.prompt = _maybe_apply_project_slash_prefix(project, args.prompt)
+    project, args.prompt = apply_project_slash_prefix(project, args.prompt)
     _touch_active_project(project)
 
     # M122f: explicit-opt-in manager-spawn dispatch — `--manager` flag or
@@ -263,7 +254,7 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
             system_prompt: str | None = None
         else:
             session_id = None
-            system_prompt = _build_run_system_prompt(args, project)
+            system_prompt = system_prompt_from_args(args, project)
 
         # M152: shared construction spine. `check_api_key=False` — the key
         # was already gated at the top of cmd_run (before the manager path
@@ -271,7 +262,7 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
         agent = build_command_agent(
             args,
             project,
-            tools=_RUN_TOOLS,
+            tools=RUN_TOOLS,
             system_prompt=system_prompt,
             check_api_key=False,
             with_compressor=True,
@@ -284,7 +275,7 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
         # (base or escalated) is printed once below.
         verify_on = _verify_enabled(args)
         try:
-            result, budget = _run_agent_streaming_aware(
+            result, budget = run_agent_streaming_aware(
                 agent, args.prompt, args, emit_output=not verify_on
             )
         except ProviderError as exc:
@@ -298,7 +289,7 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
             result = _maybe_verify_and_escalate(args, project, result, store)
             print(result.text)
         print(f"<session={result.session_id}>", file=sys.stderr)
-        _print_run_summary(args, result, budget)
+        print_run_summary(args, result, budget)
         rc = EXIT_BY_REASON.get(result.stopped_reason, 1)
     finally:
         store.close()

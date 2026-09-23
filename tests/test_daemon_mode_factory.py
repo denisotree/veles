@@ -17,7 +17,7 @@ from veles.core.memory import SessionStore
 from veles.core.modes import get_mode
 from veles.core.project import init_project
 from veles.daemon.agent_factory import _build_agent_for_turn, _FactorySettings
-from veles.runtime.assembly import _PLANNING_TOOLS, _RUN_TOOLS
+from veles.runtime.registry import PLANNING_TOOLS, RUN_TOOLS
 
 _SETTINGS = _FactorySettings(
     provider_name="openrouter",
@@ -39,7 +39,9 @@ def build(tmp_path: Path, monkeypatch):
     returns (build_fn, captured Agent kwargs, toolsets asked of _load_skills)."""
     import veles.core.agent as agent_mod
     import veles.core.provider_factory as pf_mod
-    import veles.runtime.assembly as asm_mod
+    import veles.runtime.prompt as prompt_mod
+    import veles.runtime.registry as registry_mod
+    import veles.runtime.run as run_mod
 
     project = init_project(tmp_path, name=None, force=False)
     store = SessionStore(project.memory_db_path)
@@ -55,9 +57,9 @@ def build(tmp_path: Path, monkeypatch):
             captured.update(kwargs)
 
     monkeypatch.setattr(pf_mod, "make_provider", lambda *a, **k: object())
-    monkeypatch.setattr(asm_mod, "_load_skills", fake_load_skills)
-    monkeypatch.setattr(asm_mod, "build_run_system_prompt", lambda *a, **k: "BASE")
-    monkeypatch.setattr(asm_mod, "build_compressor", lambda *a, **k: None)
+    monkeypatch.setattr(registry_mod, "load_skills", fake_load_skills)
+    monkeypatch.setattr(prompt_mod, "build_run_system_prompt", lambda *a, **k: "BASE")
+    monkeypatch.setattr(run_mod, "build_compressor", lambda *a, **k: None)
     monkeypatch.setattr(agent_mod, "Agent", _StubAgent)
 
     def _build(**kw):
@@ -74,7 +76,7 @@ def build(tmp_path: Path, monkeypatch):
 def test_default_is_unchanged(build) -> None:
     _build, captured, toolsets, _ = build
     _build()
-    assert toolsets == [tuple(_RUN_TOOLS)]
+    assert toolsets == [tuple(RUN_TOOLS)]
     assert captured["plan_mode"] is False
     assert captured["system_prompt"] == "BASE"
 
@@ -82,8 +84,8 @@ def test_default_is_unchanged(build) -> None:
 def test_planning_gets_the_read_only_toolset_and_plan_mode(build) -> None:
     _build, captured, toolsets, _ = build
     _build(mode="planning")
-    assert toolsets == [tuple(_PLANNING_TOOLS)]
-    assert "write_file" not in _PLANNING_TOOLS  # the point of the toolset
+    assert toolsets == [tuple(PLANNING_TOOLS)]
+    assert "write_file" not in PLANNING_TOOLS  # the point of the toolset
     assert captured["plan_mode"] is True
     block = get_mode("planning").system_block.strip()
     assert block and block in str(captured["system_prompt"])
@@ -92,7 +94,7 @@ def test_planning_gets_the_read_only_toolset_and_plan_mode(build) -> None:
 def test_writing_keeps_the_full_toolset(build) -> None:
     _build, captured, toolsets, _ = build
     _build(mode="writing")
-    assert toolsets == [tuple(_RUN_TOOLS)]
+    assert toolsets == [tuple(RUN_TOOLS)]
     assert captured["plan_mode"] is False
 
 

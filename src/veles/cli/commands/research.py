@@ -28,9 +28,10 @@ def cmd_research(args: argparse.Namespace, project: Project) -> int:
         make_llm_planner,
         run_deep_research,
     )
-    from veles.core.provider_factory import make_provider as _make_provider
+    from veles.core.provider_factory import make_provider
     from veles.core.tools import registry as builtin_registry
-    from veles.runtime.assembly import _budget_scope, _build_compressor, build_run_system_prompt
+    from veles.runtime.prompt import build_run_system_prompt
+    from veles.runtime.run import budget_scope, compressor_from_args
 
     question = (getattr(args, "question", "") or "").strip()
     if not question:
@@ -40,7 +41,7 @@ def cmd_research(args: argparse.Namespace, project: Project) -> int:
     if not ensure_api_key(args.provider):
         return 2
 
-    provider = _make_provider(args.provider)
+    provider = make_provider(args.provider)
     base_system = build_run_system_prompt(
         project, prompt=question, include_agents_md=True, include_index=True
     )
@@ -58,7 +59,7 @@ def cmd_research(args: argparse.Namespace, project: Project) -> int:
     # Each explorer fans out web_search/fetch_url calls; without a compressor a
     # multi-fetch explorer can overflow the model context. Same compressor the
     # single-agent / manager run paths use.
-    compressor = _build_compressor(args, project, provider)
+    compressor = compressor_from_args(args, project, provider)
     factory = make_worker_factory(
         args,
         provider=provider,
@@ -75,7 +76,7 @@ def cmd_research(args: argparse.Namespace, project: Project) -> int:
     # `--max-tokens-total` cap shared across the planner, every explorer, and
     # the writer. `spawn_parallel` copies the context into worker threads, so
     # both the budget and the trust override reach every explorer.
-    with trust_auto_allow(), _budget_scope(args, project=project):
+    with trust_auto_allow(), budget_scope(args, project=project):
         result = run_deep_research(
             question,
             agent_factory=factory,

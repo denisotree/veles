@@ -97,6 +97,6 @@ def test_create_plan_is_registered_as_draft_only() -> None:
 def test_create_plan_in_planning_toolset() -> None:
     """The planning toolset must surface `create_plan` so the model
     sees its schema and knows it can deliver a plan from this mode."""
-    from veles.runtime.assembly import _PLANNING_TOOLS
+    from veles.runtime.registry import PLANNING_TOOLS
 
-    assert "create_plan" in _PLANNING_TOOLS
+    assert "create_plan" in PLANNING_TOOLS
