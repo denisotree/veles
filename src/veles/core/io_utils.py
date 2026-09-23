@@ -19,6 +19,7 @@ import contextlib
 import json
 import logging
 import os
+import sqlite3
 import tempfile
 import tomllib
 from pathlib import Path
@@ -125,6 +126,27 @@ def prune_rotated(path: Path, *, keep: int) -> list[Path]:
     return removed
 
 
+def open_sqlite(db_path: Path | str) -> sqlite3.Connection:
+    """Open a project SQLite file the way every store needs it.
+
+    Autocommit (`isolation_level=None`, group writes with an explicit BEGIN),
+    shareable across threads, `sqlite3.Row` rows, foreign keys on; for a file,
+    WAL plus a 5 s busy timeout — the CLI and the daemon write the same
+    memory.db, and SQLite's default timeout of 0 turns every overlap into an
+    immediate "database is locked". `":memory:"` works for tests."""
+    target = str(db_path)
+    if target != ":memory:":
+        Path(target).parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(target, check_same_thread=False, isolation_level=None)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    if target != ":memory:":
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
+        conn.execute("PRAGMA busy_timeout = 5000")
+    return conn
+
+
 def dump_toml(data: dict[str, Any]) -> str:
     """Emit nested tables to TOML at arbitrary depth; string / bool / int / float /
     list-of-scalars values. The one TOML writer (stdlib `tomllib` only reads).
@@ -175,5 +197,6 @@ __all__ = [
     "dump_toml",
     "load_optional_json",
     "load_optional_toml",
+    "open_sqlite",
     "prune_rotated",
 ]

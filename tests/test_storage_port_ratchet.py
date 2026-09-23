@@ -117,16 +117,14 @@ def test_connection_reach_through_does_not_grow() -> None:
     )
 
 
-# Raw `sqlite3.connect(...)`: only the stores that own a connection, plus three
-# deliberate readers — `memory_query` (a `query_only` sandbox for agent SQL), the
-# wiki FTS index (its own database file), and two read-only probes. A new raw
-# connection to memory.db skips `busy_timeout`, so a write through it fails with
-# "database is locked" the moment the daemon is writing — use `local_connection`.
+# Raw `sqlite3.connect(...)`: only `io_utils.open_sqlite` (every store opens its
+# connection there), plus deliberate readers — `memory_query` (a `query_only`
+# sandbox for agent SQL), the wiki FTS index (its own database file), and two
+# read-only probes. A new raw connection to memory.db skips `busy_timeout`, so a
+# write through it fails with "database is locked" the moment the daemon is
+# writing — use `local_connection` or `open_sqlite`.
 _RAW_CONNECT_ALLOWED = {
-    "core/jobs_store.py",
-    "core/tasks_store.py",
-    "core/runtime_sessions.py",
-    "core/proactive/delivery_log.py",
+    "core/io_utils.py",
     "core/tools/builtin/memory_query.py",
     "modules/wiki/wiki.py",
     "core/doctor.py",

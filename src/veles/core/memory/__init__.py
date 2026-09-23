@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from veles.core.fts import escape_query
+from veles.core.io_utils import open_sqlite
 from veles.core.memory.eligibility import eligible_sql
 from veles.core.provider import Message, ToolCall
 
@@ -363,32 +364,11 @@ def _session_title(text: str) -> str:
 
 class SessionStore:
     def __init__(self, db_path: Path | str) -> None:
-        self._path: Path | str = ":memory:" if db_path == ":memory:" else Path(db_path)
-        if isinstance(self._path, Path):
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            target = str(self._path)
-        else:
-            target = self._path
-        self._conn = sqlite3.connect(
-            target,
-            check_same_thread=False,
-            isolation_level=None,
-        )
-        self._conn.row_factory = sqlite3.Row
+        self._conn = open_sqlite(db_path)
         self._init_schema()
 
     def _init_schema(self) -> None:
         c = self._conn
-        c.execute("PRAGMA foreign_keys = ON")
-        if self._path != ":memory:":
-            c.execute("PRAGMA journal_mode = WAL")
-            c.execute("PRAGMA synchronous = NORMAL")
-            # M108: SQLite defaults to busy_timeout=0, so concurrent
-            # writers (e.g. the CLI and the daemon both touching the
-            # same memory.db) immediately raise OperationalError on
-            # contention. 5s gives WAL room to checkpoint without
-            # surfacing transient locks as user-visible failures.
-            c.execute("PRAGMA busy_timeout = 5000")
         c.executescript(_SCHEMA_SQL)
         # M127-removal: the per-session model-override table was retired in
         # M127 (model/provider fixed at daemon launch). Nothing reads it

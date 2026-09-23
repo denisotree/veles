@@ -15,10 +15,11 @@ surface — the sweep loop lives in `ReminderRunner`, not here.
 
 from __future__ import annotations
 
-import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
+
+from veles.core.io_utils import open_sqlite
 
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS proactive_deliveries (
@@ -47,17 +48,7 @@ class DeliveryLog:
     """Append-only audit of proactive delivery attempts."""
 
     def __init__(self, db_path: Path | str) -> None:
-        self._path: Path | str = ":memory:" if db_path == ":memory:" else Path(db_path)
-        if isinstance(self._path, Path):
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            target = str(self._path)
-        else:
-            target = self._path
-        self._conn = sqlite3.connect(target, check_same_thread=False, isolation_level=None)
-        self._conn.row_factory = sqlite3.Row
-        if self._path != ":memory:":
-            self._conn.execute("PRAGMA journal_mode = WAL")
-            self._conn.execute("PRAGMA synchronous = NORMAL")
+        self._conn = open_sqlite(db_path)
         self._conn.executescript(_SCHEMA_SQL)
 
     def record(

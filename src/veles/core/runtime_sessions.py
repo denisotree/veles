@@ -27,6 +27,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from veles.core.io_utils import open_sqlite
+
 VALID_KINDS = ("daemon", "tui")
 VALID_STATUS = ("created", "running", "stopped", "error")
 
@@ -110,20 +112,8 @@ class RuntimeSessionStore:
     """CRUD + lifecycle over the `runtime_sessions` table (one per project)."""
 
     def __init__(self, db_path: Path | str) -> None:
-        self._path: Path | str = ":memory:" if db_path == ":memory:" else Path(db_path)
-        if isinstance(self._path, Path):
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            target = str(self._path)
-        else:
-            target = self._path
-        self._conn = sqlite3.connect(target, check_same_thread=False, isolation_level=None)
-        self._conn.row_factory = sqlite3.Row
-        c = self._conn
-        if self._path != ":memory:":
-            c.execute("PRAGMA journal_mode = WAL")
-            c.execute("PRAGMA synchronous = NORMAL")
-            c.execute("PRAGMA busy_timeout = 5000")
-        c.executescript(_SCHEMA_SQL)
+        self._conn = open_sqlite(db_path)
+        self._conn.executescript(_SCHEMA_SQL)
 
     # ---- CRUD ----
 

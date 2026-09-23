@@ -25,6 +25,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from veles.core.io_utils import open_sqlite
 from veles.core.job_schedule import Schedule, initial_next_run, parse_schedule
 
 _JOBS_SCHEMA_SQL = """
@@ -149,26 +150,11 @@ class JobsStore:
     """CRUD + lifecycle ops over the jobs / job_runs tables."""
 
     def __init__(self, db_path: Path | str) -> None:
-        self._path: Path | str = ":memory:" if db_path == ":memory:" else Path(db_path)
-        if isinstance(self._path, Path):
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            target = str(self._path)
-        else:
-            target = self._path
-        self._conn = sqlite3.connect(
-            target,
-            check_same_thread=False,
-            isolation_level=None,
-        )
-        self._conn.row_factory = sqlite3.Row
+        self._conn = open_sqlite(db_path)
         self._init_schema()
 
     def _init_schema(self) -> None:
         c = self._conn
-        c.execute("PRAGMA foreign_keys = ON")
-        if self._path != ":memory:":
-            c.execute("PRAGMA journal_mode = WAL")
-            c.execute("PRAGMA synchronous = NORMAL")
         c.executescript(_JOBS_SCHEMA_SQL)
         # v3 → v4 (M204): CREATE TABLE IF NOT EXISTS doesn't touch an existing
         # v3 table, so add the structured-kind columns in place.
