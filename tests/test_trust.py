@@ -125,6 +125,34 @@ def test_auto_allow_env_short_circuits(monkeypatch: pytest.MonkeyPatch) -> None:
     assert evaluate_trust("run_shell") == TrustDecision(allowed=True, reason="auto-allow")
 
 
+def test_scoped_auto_allow_does_not_leak_to_other_contexts() -> None:
+    """A research job's override must not auto-allow a turn running beside it."""
+    import threading
+    from contextvars import copy_context
+
+    from veles.core.trust import trust_auto_allow
+
+    seen: dict[str, str] = {}
+
+    def probe(key: str) -> None:
+        seen[key] = evaluate_trust("run_shell").reason
+
+    with trust_auto_allow():
+        probe("inside")
+        copied = threading.Thread(target=copy_context().run, args=(probe, "copied"))
+        fresh = threading.Thread(target=probe, args=("fresh",))  # a concurrent turn
+        copied.start()
+        fresh.start()
+        copied.join()
+        fresh.join()
+    probe("after")
+
+    assert seen["inside"] == "auto-allow"
+    assert seen["copied"] == "auto-allow"
+    assert seen["fresh"] != "auto-allow"
+    assert seen["after"] != "auto-allow"
+
+
 def test_user_scope_grant_is_silent_allow() -> None:
     from veles.core.trust_store import user_trust_path
 

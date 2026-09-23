@@ -111,9 +111,9 @@ def make_research_kind_handler(args: argparse.Namespace, *, project, store):
     read + network + wiki-read only — explorers never mutate state). The
     background context has no interactive user for trust prompts, so the run
     pre-authorises trust the same way `veles research` does (the user opted
-    into web research by asking for it).
+    into web research by asking for it) — scoped to this job's context only.
     """
-    import os
+    from veles.core.trust import trust_auto_allow
 
     factory = _scoped_factory_for(args, project, store, "research")
 
@@ -129,9 +129,7 @@ def make_research_kind_handler(args: argparse.Namespace, *, project, store):
         if not question:
             raise ValueError("research job has no question")
         cap = int(params.get("max_subquestions") or 4)
-        prev = os.environ.get("VELES_TRUST_AUTO_ALLOW")
-        os.environ["VELES_TRUST_AUTO_ALLOW"] = "1"
-        try:
+        with trust_auto_allow():
             result = run_deep_research(
                 question,
                 agent_factory=factory,
@@ -139,11 +137,6 @@ def make_research_kind_handler(args: argparse.Namespace, *, project, store):
                 max_subquestions=cap,
                 factory_kwargs={"tools": list(RESEARCH_EXPLORER_TOOLS)},
             )
-        finally:
-            if prev is None:
-                os.environ.pop("VELES_TRUST_AUTO_ALLOW", None)
-            else:
-                os.environ["VELES_TRUST_AUTO_ALLOW"] = prev
         if result.error:
             raise RuntimeError(f"research failed: {result.error}")
         return result.final_text or "(research produced no report)"

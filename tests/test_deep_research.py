@@ -187,8 +187,12 @@ def test_cmd_research_prints_report_and_manages_trust_env(tmp_path, monkeypatch,
     seen_env: dict = {}
 
     def fake_run(question, *, agent_factory, planner, max_subquestions, **_):
-        # The command must pre-authorise trust while research runs.
+        from veles.core.trust import evaluate_trust
+
+        # The command must pre-authorise trust while research runs — in its own
+        # context, without touching the process environment.
         seen_env["during"] = os.environ.get("VELES_TRUST_AUTO_ALLOW")
+        seen_env["decision"] = evaluate_trust("fetch_url").reason
         return ManagerRunResult(
             final_text="THE REPORT", handles=(), plan=WorkerPlan(objective=question)
         )
@@ -213,5 +217,6 @@ def test_cmd_research_prints_report_and_manages_trust_env(tmp_path, monkeypatch,
 
     assert rc == 0
     assert "THE REPORT" in capsys.readouterr().out
-    assert seen_env["during"] == "1"  # trust pre-authorised during the run
-    assert "VELES_TRUST_AUTO_ALLOW" not in os.environ  # restored (was unset) after
+    assert seen_env["decision"] == "auto-allow"  # trust pre-authorised during the run
+    assert seen_env["during"] is None  # …without a process-wide env flip
+    assert "VELES_TRUST_AUTO_ALLOW" not in os.environ
