@@ -38,6 +38,31 @@ from veles.tui.wizard.step import (
 )
 
 
+async def prompt_host_port(
+    ctx: WizardContext, title: str, *, host: str, port: int
+) -> tuple[str, int] | WizardOutcome:
+    """Ask for the daemon host and port, defaulting to `host`/`port`. A blank
+    answer keeps the default and a non-numeric port falls back to it (a typo
+    must not crash the wizard). Returns the navigation outcome on back/cancel."""
+    host_raw = await ctx.app.push_screen_wait(
+        InputScreen(title, prompt=f"Daemon host (Enter for {host})", default=host)
+    )
+    nav = _nav(host_raw)
+    if nav is not None:
+        return nav
+    port_raw = await ctx.app.push_screen_wait(
+        InputScreen(title, prompt=f"Daemon port (Enter for {port})", default=str(port))
+    )
+    nav = _nav(port_raw)
+    if nav is not None:
+        return nav
+    try:
+        port_clean = int((port_raw or "").strip() or port)
+    except ValueError:
+        port_clean = port
+    return (host_raw or "").strip() or host, port_clean
+
+
 @dataclass
 class DaemonBindStep:
     project: Project
@@ -48,31 +73,10 @@ class DaemonBindStep:
     title: str = "Start daemon"
 
     async def run(self, ctx: WizardContext) -> WizardOutcome:
-        host = await ctx.app.push_screen_wait(
-            InputScreen(
-                self.title,
-                prompt=f"Daemon host (Enter for {self.host})",
-                default=self.host,
-            )
-        )
-        nav = _nav(host)
-        if nav is not None:
-            return nav
-        port_raw = await ctx.app.push_screen_wait(
-            InputScreen(
-                self.title,
-                prompt=f"Daemon port (Enter for {self.port})",
-                default=str(self.port),
-            )
-        )
-        nav = _nav(port_raw)
-        if nav is not None:
-            return nav
-        host_clean = (host or "").strip() or self.host
-        try:
-            port_clean = int((port_raw or "").strip() or self.port)
-        except ValueError:
-            port_clean = self.port
+        answer = await prompt_host_port(ctx, self.title, host=self.host, port=self.port)
+        if isinstance(answer, WizardOutcome):
+            return answer
+        host_clean, port_clean = answer
         ctx.answers["daemon_bind"] = {"host": host_clean, "port": port_clean}
         cfg = _load_project_toml(self.project)
         block = cfg.setdefault("daemon", {})
@@ -93,8 +97,7 @@ class DaemonChannelStep:
     title: str = "Channel"
 
     async def run(self, ctx: WizardContext) -> WizardOutcome:
-        from veles.cli.channel_wizard import apply_channel
-        from veles.tui.wizard.channel_flow import collect_channel_via_modals
+        from veles.tui.wizard.channel_flow import add_channel_via_modals
 
         wants = await ctx.app.push_screen_wait(
             ConfirmScreen(
@@ -111,27 +114,9 @@ class DaemonChannelStep:
         if not wants:
             ctx.answers["channel"] = None
             return WizardOutcome.SKIP
-        collected = await collect_channel_via_modals(ctx.app, title="Add channel")
-        if collected is None:
-            ctx.answers["channel"] = None
-            return WizardOutcome.NEXT
-        channel, secrets, config_fields = collected
-        try:
-            apply_channel(
-                self.project,
-                session=self.session,
-                channel=channel,
-                secrets=secrets,
-                config_fields=config_fields,
-            )
-            status = "saved"
-        except Exception as exc:  # keychain unavailable etc. — report, don't crash.
-            status = f"failed: {type(exc).__name__}: {exc}"
-        ctx.answers["channel"] = {
-            "channel": channel,
-            "config_fields": config_fields,
-            "status": status,
-        }
+        ctx.answers["channel"] = await add_channel_via_modals(
+            ctx.app, self.project, session=self.session
+        )
         return WizardOutcome.NEXT
 
 
