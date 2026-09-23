@@ -178,6 +178,7 @@ def make_on_op_finished(state):
             return
         notify_text = f"Background {job.kind} finished. {summary}"
         depth = int((job.params or {}).get("resume_depth", 0))
+        slot = None
         try:
             slot = chat_session_slot(state, target)
             session_id = slot[0].get(slot[1]) if slot else None
@@ -204,6 +205,14 @@ def make_on_op_finished(state):
         # Off the event loop: the build runs memory recall, which the M264
         # bridge refuses to do on a running loop (see `daemon/turns.py`).
         agent = await asyncio.to_thread(state.agent_factory, session_id, prompt=seed)
+        # A stale mapped id makes the factory allocate a fresh session (as for a
+        # chat turn, `daemon/turns.py`): run, lock and record under that one,
+        # and re-point the chat so its next message continues it.
+        fresh = getattr(agent, "session_id", None)
+        if fresh and fresh != session_id:
+            session_id = fresh
+            if slot is not None:
+                slot[0].set(slot[1], fresh)
         handle = new_run_handle(session_id=session_id)
         state.add_run(handle)
         loop = asyncio.get_running_loop()
