@@ -130,6 +130,8 @@ files = [
     "src/veles/core/history_repair.py",
     "src/veles/core/plan_artifact.py",
     "src/veles/core/approval_prompter.py",
+    "src/veles/core/agent.py",
+    "src/veles/core/tool_dispatch.py",
     "src/veles/daemon/logging.py",
 ]
 

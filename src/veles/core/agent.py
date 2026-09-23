@@ -17,6 +17,7 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any, Literal
 
 from veles.core.agent_state import (
     AgentState,
@@ -31,6 +32,7 @@ from veles.core.agent_state import (
 )
 from veles.core.cancel import TurnCancelled, current_cancel_token, run_cancellable
 from veles.core.context import (
+    TokenBudget,
     current_budget,
     current_project,
     reset_current_session_id,
@@ -75,28 +77,13 @@ from veles.core.provider import (
     Message,
     Provider,
     ProviderResponse,
+    TokenUsage,
     ToolCall,
 )
 from veles.core.stall_guard import STALL_NUDGE, TOKEN_WARN_NUDGE, StallGuard
-
-# M156: streaming response consumer extracted to `stream_consumer.py`.
 from veles.core.stream_consumer import consume_stream
 from veles.core.timeutil import utc_iso
-
-# M156: tool dispatch + permission/approval pipeline extracted to
-# `tool_dispatch.py`. Re-imported here both for the Agent loop's own use
-# (`_dispatch`, `_emit`) and as back-compat re-exports — tests import these
-# names from `veles.core.agent` and may patch them on this module; the loop
-# resolves them via this module's globals, so such patches keep working.
-from veles.core.tool_dispatch import (  # noqa: F401
-    _audit_autopilot_dispatch,
-    _dispatch,
-    _emit,
-    _emit_tool_refusal,
-    _invoke_tool_safely,
-    _persist_approval_if_grant,
-    _run_approval_prompt,
-)
+from veles.core.tool_dispatch import _dispatch, _emit
 from veles.core.tools.registry import Registry
 from veles.core.trace import (
     TraceRecord,
@@ -148,7 +135,7 @@ class UsageSnapshot:
     # turn ends with no text, was the budget eaten by reasoning?
     reasoning_tokens: int = 0
 
-    def add(self, usage) -> None:
+    def add(self, usage: TokenUsage) -> None:
         prompt = getattr(usage, "prompt_tokens", 0)
         self.prompt_tokens += prompt
         self.completion_tokens += getattr(usage, "completion_tokens", 0)
@@ -161,12 +148,25 @@ class UsageSnapshot:
             self.last_prompt_tokens = prompt
 
 
+# Why a run ended. `truncated`: the answer hit the completion-token cap (M254).
+# `synthetic`: a mode (GoalMode) reporting a step that ran no agent turn.
+StopReason = Literal[
+    "completed",
+    "max_iterations",
+    "empty",
+    "truncated",
+    "cancelled",
+    "budget_exhausted",
+    "synthetic",
+]
+
+
 @dataclass(slots=True)
 class RunResult:
     text: str
     iterations: int
     history: list[Message] = field(default_factory=list)
-    stopped_reason: str = "completed"  # completed | max_iterations | empty
+    stopped_reason: StopReason = "completed"
     session_id: str | None = None
     usage: UsageSnapshot = field(default_factory=UsageSnapshot)
     # Names of every tool the run dispatched. Lets callers judge success by
@@ -174,6 +174,32 @@ class RunResult:
     # thinking local model routinely ends with empty content after doing all
     # the tool work (seen live 2026-07-08, ollama qwen3.5:9b).
     invoked_tools: frozenset[str] = frozenset()
+
+
+@dataclass(slots=True)
+class _Turn:
+    """Mutable state of one `Agent.run` — what the loop's phases share."""
+
+    history: list[Message]
+    fenced: bool  # tools presented as `veles-tool` text blocks (M143)
+    tools: list[dict[str, Any]] | None  # native schemas for the provider; None when fenced
+    stall_guard: StallGuard
+    usage: UsageSnapshot = field(default_factory=UsageSnapshot)
+    invoked: set[str] = field(default_factory=set)
+    force_answer: bool = False  # withhold tools for the next round only
+    token_warned: bool = False
+    parse_nudges: int = 0
+    empty_nudges: int = 0
+
+
+def _scrubbed(sink: Callable[[str], None], scrubber: FencedToolScrubber) -> Callable[[str], None]:
+    """Wrap a display callback so `veles-tool` fences never reach it."""
+
+    def feed(chunk: str) -> None:
+        if cleaned := scrubber.feed(chunk):
+            sink(cleaned)
+
+    return feed
 
 
 class ManagerNeverWritesError(RuntimeError):
@@ -210,12 +236,14 @@ class Agent:
         trace_writer: TraceWriter | None = None,
         event_writer: EventWriter | None = None,
         plan_mode: bool = False,
-        role: str | None = None,
+        role: Literal["manager"] | None = None,
         stall_repeat_limit: int | None = 3,
         token_warn_threshold: int | None = 500_000,
         fenced_tools: bool = True,
     ) -> None:
-        self._provider = provider
+        # Public: modes that need a direct provider call (AutoMode classifier,
+        # GoalMode advisor / CONFIRM message) use it without running the loop.
+        self.provider = provider
         self._registry = registry
         self._model = model
         # M122c: orchestration role (VISION §5.3). Default None = a normal
@@ -234,10 +262,6 @@ class Agent:
         # threshold, drops oldest non-system turns until under. Set
         # `None` to disable (legacy callers without a configured limit).
         self._hard_ceiling_tokens = hard_ceiling_tokens
-        # Public handle for Modes that need a direct provider call
-        # (AutoMode classifier, GoalMode advisor / CONFIRM message)
-        # without running the full agent loop and polluting SessionStore.
-        self.provider = provider
         # M68 / M69: per-call trace + typed event log. Caller-provided writers
         # take precedence; otherwise we auto-attach when an active project is
         # set so plain `veles run` emits both files without extra wiring.
@@ -357,6 +381,53 @@ class Agent:
         *,
         on_text_delta: Callable[[str], None] | None = None,
     ) -> RunResult:
+        """The turn loop, one iteration per provider round:
+        fit history → request → record → answer-or-nudge / run tools."""
+        turn = self._start_turn(user_msg)
+        cancel = current_cancel_token()
+        for iteration in range(1, self._max_iterations + 1):
+            # Cancellation checkpoint between rounds, so a stop requested during
+            # tool dispatch is honoured before the next provider call.
+            if cancel is not None:
+                cancel.check()
+            budget = current_budget()
+            if budget is not None and budget.exhausted:
+                text = f"<budget exhausted: {budget.consumed}/{budget.limit} tokens>"
+                return self._result(turn, text, iteration - 1, "budget_exhausted")
+
+            self._fit_history(turn)
+            fire_hook(
+                "pre_turn",
+                turn=iteration,
+                session_id=self._session_id,
+                user_msg=user_msg,
+                history_len=len(turn.history),
+            )
+            self._log(f"-> turn {iteration}: requesting completion")
+            response = self._request_round(turn, on_text_delta, budget)
+            calls, parse_errors = self._record_round(turn, response)
+            fire_hook(
+                "post_turn",
+                turn=iteration,
+                response_text=response.text or "",
+                tool_call_count=len(calls),
+                tokens_used=response.usage.total_tokens,
+            )
+            if not calls:
+                result = self._answer_or_nudge(turn, response, parse_errors, iteration)
+                if result is not None:
+                    return result
+                continue
+            self._run_tools(turn, calls, parse_errors)
+
+        self._log("-> max_iterations reached")
+        last_text = next(
+            (m.content for m in reversed(turn.history) if m.role == "assistant" and m.content),
+            "",
+        )
+        return self._result(turn, last_text, self._max_iterations, "max_iterations")
+
+    def _start_turn(self, user_msg: str) -> _Turn:
         schemas = self._registry.list_schemas()
         # M143: when the provider can't call tools natively, present them as
         # fenced `veles-tool` text blocks and parse calls back out of prose.
@@ -366,322 +437,238 @@ class Agent:
             self._fenced_tools
             and fenced_tools_enabled_by_env()
             and bool(schemas)
-            and not getattr(self._provider, "supports_tools", True)
+            and not getattr(self.provider, "supports_tools", True)
         )
         if fenced and FENCED_SENTINEL not in (self._system_prompt or ""):
             addendum = render_tools_prompt(schemas)
             self._system_prompt = (
                 f"{self._system_prompt}\n\n{addendum}" if self._system_prompt else addendum
             )
-
-        history = self._open_session(user_msg)
-        tools = schemas or None
-        # In fenced mode the provider never receives native schemas (it would
-        # ignore them); the tool surface lives in the system prompt instead.
-        tools_for_provider = None if fenced else tools
-        # M79: accumulate token usage across the iterations of one run so
-        # the TUI can render it on the status bar.
-        usage_acc = UsageSnapshot()
-
-        cancel = current_cancel_token()
-
-        # M144: detect the only stall the Veles loop can fall into — the same
-        # tool call repeated round after round — and force a single tool-free
-        # answer round when it trips. `force_answer` withholds tools for the
-        # next provider call only.
-        stall_guard = StallGuard(
-            repeat_limit=self._stall_repeat_limit,
-            # Per-call guard (re-reading the same file all turn) rides the same
-            # on/off knob — disabling the stall guard disables both signals.
-            call_repeat_limit=7 if self._stall_repeat_limit else None,
+        return _Turn(
+            history=self._open_session(user_msg),
+            fenced=fenced,
+            # Fenced: the provider never receives native schemas (it would
+            # ignore them); the tool surface lives in the system prompt.
+            tools=None if fenced else (schemas or None),
+            # M144: the only stall the loop can fall into is the same tool call
+            # repeated round after round. The per-call guard (re-reading one
+            # file all turn) rides the same on/off knob.
+            stall_guard=StallGuard(
+                repeat_limit=self._stall_repeat_limit,
+                call_repeat_limit=7 if self._stall_repeat_limit else None,
+            ),
         )
-        force_answer = False
-        token_warned = False
-        invoked: set[str] = set()
-        # Live 2026-07-08 (ollama qwen3.5:9b): small local models emit broken
-        # JSON in veles-tool fences constantly. A round whose block parses to
-        # ZERO calls used to be treated as the final answer — the turn died
-        # silently mid-task. Feed the parse errors back (bounded, so a model
-        # stuck on garbage can't loop forever).
-        parse_nudges = 0
-        # M214 (B2): a turn that would end with NO tool calls and EMPTY text
-        # (e.g. a tool-only round the model didn't close with an answer) leaves
-        # the channel placeholder stuck at "...". Force ONE tool-free answer
-        # round before giving up, once per turn.
-        empty_nudges = 0
 
-        for iteration in range(1, self._max_iterations + 1):
-            # Cooperative cancellation checkpoint #1: between iterations,
-            # so a stop requested during tool dispatch (or a non-streaming
-            # `create_message`) is honoured before the next provider call.
-            if cancel is not None:
-                cancel.check()
+    def _fit_history(self, turn: _Turn) -> None:
+        """Compress, then — if the compressor still left too much (silent skip,
+        summariser failure, missing API key) — drop the oldest non-system turns
+        until the history fits, so the provider never rejects the prompt as too
+        long. The ceiling check is O(chars) per round, deliberately uncached
+        (audited M149–M157)."""
+        if self._compressor is not None:
+            turn.history = self._compressor(turn.history, self._session_id)
+        if self._hard_ceiling_tokens is None:
+            return
+        from veles.core.context_compressor import emergency_truncate, estimate_tokens
 
-            budget = current_budget()
-            if budget is not None and budget.exhausted:
-                return self._finalize(
-                    RunResult(
-                        text=f"<budget exhausted: {budget.consumed}/{budget.limit} tokens>",
-                        iterations=iteration - 1,
-                        history=history,
-                        stopped_reason="budget_exhausted",
-                        session_id=self._session_id,
-                        usage=usage_acc,
-                        invoked_tools=frozenset(invoked),
-                    )
-                )
+        current = estimate_tokens(turn.history)
+        if current <= self._hard_ceiling_tokens:
+            return
+        turn.history, dropped = emergency_truncate(
+            turn.history, target_tokens=self._hard_ceiling_tokens
+        )
+        if dropped:
+            logger.warning(
+                "emergency-truncated session=%s tokens_before=%d "
+                "tokens_after=%d dropped_turns=%d ceiling=%d",
+                self._session_id,
+                current,
+                estimate_tokens(turn.history),
+                dropped,
+                self._hard_ceiling_tokens,
+            )
 
-            if self._compressor is not None:
-                history = self._compressor(history, self._session_id)
+    def _request_round(
+        self,
+        turn: _Turn,
+        on_text_delta: Callable[[str], None] | None,
+        budget: TokenBudget | None,
+    ) -> ProviderResponse:
+        """One provider round: pick the tools, repair the history, stream or
+        call, and account the usage."""
+        # A tripped guard or an empty-answer nudge withholds tools for exactly
+        # this round. (Fenced mode already sends none; the nudge text forces it.)
+        tools = None if turn.force_answer else turn.tools
+        turn.force_answer = False
+        # Compression / truncation / resume / an adapter quirk can split a
+        # tool_call from its result, which providers reject. Synthesize a
+        # placeholder for an unanswered call and drop an orphaned result.
+        turn.history = repair_tool_pairing(turn.history)
 
-            # Last-line defence: if the compressor returned a still-
-            # too-large history (silent skip, summariser failure,
-            # missing API key), drop oldest non-system turns until we
-            # fit under the model's context window. Prevents the
-            # provider from raising "prompt is too long" at runtime.
-            # NOTE: the estimate_tokens ceiling check below is O(chars) over
-            # the whole history each iteration — deliberately uncached
-            # (audited M149-M157, decided no cache).
-            if self._hard_ceiling_tokens is not None:
-                from veles.core.context_compressor import (
-                    emergency_truncate,
-                    estimate_tokens,
-                )
-
-                current = estimate_tokens(history)
-                if current > self._hard_ceiling_tokens:
-                    new_history, dropped = emergency_truncate(
-                        history, target_tokens=self._hard_ceiling_tokens
-                    )
-                    if dropped:
-                        import logging as _logging
-
-                        _logging.getLogger(__name__).warning(
-                            "emergency-truncated session=%s tokens_before=%d "
-                            "tokens_after=%d dropped_turns=%d ceiling=%d",
-                            self._session_id,
-                            current,
-                            estimate_tokens(new_history),
-                            dropped,
-                            self._hard_ceiling_tokens,
-                        )
-                    history = new_history
-
-            fire_hook(
-                "pre_turn",
-                turn=iteration,
+        # M143: in fenced mode the raw stream IS the tool-call channel — scrub
+        # ```veles-tool blocks from the DISPLAY deltas so the chat shows prose
+        # only (the full text is still parsed). Fences never span rounds.
+        delta = on_text_delta
+        scrubber: FencedToolScrubber | None = None
+        if turn.fenced and on_text_delta is not None:
+            scrubber = FencedToolScrubber()
+            delta = _scrubbed(on_text_delta, scrubber)
+        response = self._request_completion(
+            history=turn.history, tools=tools, on_text_delta=delta, budget=budget
+        )
+        if scrubber is not None and on_text_delta is not None and (tail := scrubber.finalize()):
+            on_text_delta(tail)
+        turn.usage.add(response.usage)
+        # Real per-round usage for live HUDs: a tool-call-only round streams no
+        # text, so a chars/4 estimate over text deltas would read 0.
+        usage = response.usage
+        self._emit_event(
+            RoundUsageEvent(
+                ts=utc_iso(),
                 session_id=self._session_id,
-                user_msg=user_msg,
-                history_len=len(history),
+                prompt_tokens=getattr(usage, "prompt_tokens", 0),
+                completion_tokens=getattr(usage, "completion_tokens", 0),
+                total_tokens=getattr(usage, "total_tokens", 0),
+                cumulative_completion=turn.usage.completion_tokens,
+                cumulative_total=turn.usage.total_tokens,
+                cache_read_tokens=getattr(usage, "cache_read_tokens", 0),
+                cache_creation_tokens=getattr(usage, "cache_creation_tokens", 0),
             )
-            self._log(f"-> turn {iteration}: requesting completion")
-
-            # M144: a tripped stall guard withholds tools for exactly one
-            # round, forcing the model to answer instead of looping the same
-            # dead call. The flag is consumed here. (In fenced mode the
-            # provider already sees tools=None; the nudge message does the
-            # forcing there.)
-            round_tools = None if force_answer else tools_for_provider
-            force_answer = False
-
-            # Last-line consistency guard before the wire: compression /
-            # truncation / a resumed session / a provider translation quirk can
-            # split a tool_call from its result, which providers reject with
-            # "No tool output found for function call ...". Synthesize a
-            # placeholder for any unanswered call and drop any orphaned result.
-            history = repair_tool_pairing(history)
-
-            # M143 follow-up: in fenced mode the raw stream IS the tool-call
-            # channel — scrub ```veles-tool blocks out of the DISPLAY deltas so
-            # the chat shows prose only (the full raw text is still parsed for
-            # calls below). Fresh scrubber per round; fences never span rounds.
-            round_delta = on_text_delta
-            round_scrubber = None
-            if fenced and on_text_delta is not None:
-                round_scrubber = FencedToolScrubber()
-
-                def round_delta(chunk: str, _cb=on_text_delta, _scrub=round_scrubber) -> None:  # type: ignore[misc]
-                    cleaned = _scrub.feed(chunk)
-                    if cleaned:
-                        _cb(cleaned)
-
-            response = self._request_completion(
-                history=history,
-                tools=round_tools,
-                on_text_delta=round_delta,
-                budget=budget,
-            )
-            if round_scrubber is not None and on_text_delta is not None:
-                tail = round_scrubber.finalize()
-                if tail:
-                    on_text_delta(tail)
-            usage_acc.add(response.usage)
-            # Real per-round usage for live HUDs: a tool-call-only round streams
-            # no text, so a chars/4 estimate over text deltas would read 0.
-            self._emit_event(
-                RoundUsageEvent(
-                    ts=utc_iso(),
-                    session_id=self._session_id,
-                    prompt_tokens=getattr(response.usage, "prompt_tokens", 0),
-                    completion_tokens=getattr(response.usage, "completion_tokens", 0),
-                    total_tokens=getattr(response.usage, "total_tokens", 0),
-                    cumulative_completion=usage_acc.completion_tokens,
-                    cumulative_total=usage_acc.total_tokens,
-                    cache_read_tokens=getattr(response.usage, "cache_read_tokens", 0),
-                    cache_creation_tokens=getattr(response.usage, "cache_creation_tokens", 0),
-                )
-            )
-
-            # M143: in fenced mode the model expresses tool calls as text, so
-            # parse them out of the response and record the assistant turn
-            # WITHOUT native tool_calls (keeps the wire plain on resend). The
-            # native path is unchanged.
-            parse_errors: list[str] = []
-            if fenced:
-                effective_calls, parse_errors = parse_tool_calls_with_errors(response.text or "")
-                self._record_fenced_assistant(response, effective_calls, history)
-            else:
-                self._record_assistant_response(response, history)
-                effective_calls = response.tool_calls
-
-            fire_hook(
-                "post_turn",
-                turn=iteration,
-                response_text=response.text or "",
-                tool_call_count=len(effective_calls),
-                tokens_used=response.usage.total_tokens,
-            )
-
-            if not effective_calls:
-                # Fenced garbage round: the model TRIED to call tools but
-                # nothing parsed. Ending the turn here (the pre-fix behaviour)
-                # silently killed it mid-task — feed the parse errors back and
-                # let the model re-emit, up to _PARSE_NUDGE_LIMIT per run.
-                if parse_errors and parse_nudges < _PARSE_NUDGE_LIMIT:
-                    parse_nudges += 1
-                    self._log(
-                        f"-> fenced block parsed to 0 calls "
-                        f"(nudge {parse_nudges}/{_PARSE_NUDGE_LIMIT}); feeding errors back"
-                    )
-                    nudge = Message(role="user", content=render_parse_errors(parse_errors))
-                    history.append(nudge)
-                    self._persist(nudge)
-                    continue
-                final_text = response.text or ""
-                # M214 (B2): don't finalize an EMPTY answer on the first try —
-                # force a tool-free round so the model actually speaks, rather
-                # than leaving a channel turn blank.
-                #
-                # M254 splits the two causes of an empty answer, which need
-                # opposite handling and used to get the same one:
-                #
-                #   finish_reason="length" — the completion budget ran out. For a
-                #     reasoning model the visible answer is the tail of the
-                #     budget, so it is the part that gets cut. Re-asking with the
-                #     SAME budget is provably useless: the retry hits the same
-                #     wall, and silently burns another full thinking round. Report
-                #     it instead, so the cap is raised rather than guessed at.
-                #   finish_reason="stop" — the model finished and said nothing.
-                #     Here a nudge is the right tool, and one is not always
-                #     enough (the original report), so it is bounded like the
-                #     fenced parse nudge rather than fixed at a single try.
-                truncated = not final_text and response.finish_reason == "length"
-                if not final_text and not truncated and empty_nudges < _EMPTY_ANSWER_NUDGE_LIMIT:
-                    empty_nudges += 1
-                    force_answer = True
-                    self._log(
-                        f"-> empty answer: forcing a tool-free answer round "
-                        f"(nudge {empty_nudges}/{_EMPTY_ANSWER_NUDGE_LIMIT})"
-                    )
-                    nudge = Message(role="user", content=EMPTY_ANSWER_NUDGE)
-                    history.append(nudge)
-                    self._persist(nudge)
-                    continue
-                if truncated:
-                    self._log(
-                        f"-> empty answer: response hit the token cap "
-                        f"({usage_acc.completion_tokens} completion tokens, "
-                        f"{usage_acc.reasoning_tokens} of them reasoning) — "
-                        "raise --max-tokens or the model's budget"
-                    )
-                if final_text:
-                    reason = "completed"
-                elif truncated:
-                    reason = "truncated"
-                else:
-                    reason = "empty"
-                return self._finalize(
-                    RunResult(
-                        text=final_text,
-                        iterations=iteration,
-                        history=history,
-                        stopped_reason=reason,
-                        session_id=self._session_id,
-                        usage=usage_acc,
-                        invoked_tools=frozenset(invoked),
-                    )
-                )
-
-            if fenced:
-                self._dispatch_fenced_calls(effective_calls, history, parse_errors=parse_errors)
-            else:
-                self._dispatch_tool_calls(response, history)
-            invoked.update(call.name for call in effective_calls)
-
-            # M144: with the repeated tool's results now in history (so the
-            # assistant→tool message pairing stays valid for the next call),
-            # check for a stall. If tripped, inject a nudge and force the next
-            # round to run tool-free so the model must answer.
-            if stall_guard.record(effective_calls):
-                self._log("-> stall detected: forcing a tool-free answer round")
-                force_answer = True
-                nudge = Message(role="user", content=STALL_NUDGE)
-                history.append(nudge)
-                self._persist(nudge)
-
-            # Soft token-budget heads-up: once the turn crosses the threshold,
-            # tell the model ONCE it has burned a lot of tokens so it stops if it
-            # is looping. Unlike the stall guard this does NOT withhold tools — a
-            # genuinely progressing long turn keeps going.
-            if (
-                not token_warned
-                and self._token_warn_threshold is not None
-                and usage_acc.total_tokens >= self._token_warn_threshold
-            ):
-                token_warned = True
-                self._log(f"-> turn crossed {usage_acc.total_tokens} tokens; nudging")
-                warn = Message(
-                    role="user",
-                    content=TOKEN_WARN_NUDGE.format(tokens=usage_acc.total_tokens),
-                )
-                history.append(warn)
-                self._persist(warn)
-
-        self._log("-> max_iterations reached")
-        last_text = next(
-            (m.content for m in reversed(history) if m.role == "assistant" and m.content),
-            "",
         )
+        return response
+
+    def _record_round(
+        self, turn: _Turn, response: ProviderResponse
+    ) -> tuple[list[ToolCall], list[str]]:
+        """Record the assistant turn; return the calls to run and, in fenced
+        mode, the blocks that failed to parse.
+
+        Fenced (M143): calls are parsed out of the text and the turn is stored
+        WITHOUT native tool_calls, so it resends as plain text to a non-tool
+        server and resume can't leak a native tool-call shape."""
+        if turn.fenced:
+            calls, errors = parse_tool_calls_with_errors(response.text or "")
+            stored: list[ToolCall] = []
+        else:
+            calls, errors = list(response.tool_calls), []
+            stored = calls
+        self._append(
+            turn.history, Message(role="assistant", content=response.text, tool_calls=stored)
+        )
+        self._emit_event(
+            AssistantMessageEvent(
+                ts=utc_iso(),
+                session_id=self._session_id,
+                text=response.text,
+                tool_call_count=len(calls),
+                finish_reason=response.finish_reason,
+            )
+        )
+        return calls, errors
+
+    def _answer_or_nudge(
+        self,
+        turn: _Turn,
+        response: ProviderResponse,
+        parse_errors: list[str],
+        iteration: int,
+    ) -> RunResult | None:
+        """A round with no tool calls: the final answer, or None after a nudge
+        that gives the model another round."""
+        # Fenced garbage round: the model TRIED to call tools but nothing parsed
+        # (small local models emit broken JSON constantly). Ending the turn here
+        # silently killed it mid-task — feed the errors back, bounded.
+        if parse_errors and turn.parse_nudges < _PARSE_NUDGE_LIMIT:
+            turn.parse_nudges += 1
+            self._log(
+                f"-> fenced block parsed to 0 calls "
+                f"(nudge {turn.parse_nudges}/{_PARSE_NUDGE_LIMIT}); feeding errors back"
+            )
+            self._append(
+                turn.history, Message(role="user", content=render_parse_errors(parse_errors))
+            )
+            return None
+        text = response.text or ""
+        if text:
+            return self._result(turn, text, iteration, "completed")
+        # M254: an empty answer has two causes that need opposite handling.
+        #   finish_reason="length" — the completion budget ran out, and for a
+        #     reasoning model the visible answer is the part that gets cut.
+        #     Re-asking with the SAME budget hits the same wall, so report it
+        #     and let the cap be raised.
+        #   anything else — the model finished and said nothing. Nudge it with
+        #     a tool-free round (M214), bounded like the parse nudge.
+        if response.finish_reason == "length":
+            self._log(
+                f"-> empty answer: response hit the token cap "
+                f"({turn.usage.completion_tokens} completion tokens, "
+                f"{turn.usage.reasoning_tokens} of them reasoning) — "
+                "raise --max-tokens or the model's budget"
+            )
+            return self._result(turn, "", iteration, "truncated")
+        if turn.empty_nudges < _EMPTY_ANSWER_NUDGE_LIMIT:
+            turn.empty_nudges += 1
+            turn.force_answer = True
+            self._log(
+                f"-> empty answer: forcing a tool-free answer round "
+                f"(nudge {turn.empty_nudges}/{_EMPTY_ANSWER_NUDGE_LIMIT})"
+            )
+            self._append(turn.history, Message(role="user", content=EMPTY_ANSWER_NUDGE))
+            return None
+        return self._result(turn, "", iteration, "empty")
+
+    def _run_tools(self, turn: _Turn, calls: list[ToolCall], parse_errors: list[str]) -> None:
+        """Dispatch the round's calls, then the two guards that watch the turn."""
+        if turn.fenced:
+            self._dispatch_fenced_calls(calls, turn.history, parse_errors=parse_errors)
+        else:
+            self._dispatch_tool_calls(calls, turn.history)
+        turn.invoked.update(call.name for call in calls)
+
+        # M144: with the results in history (so the call→result pairing stays
+        # valid), a repeated call trips the stall guard: nudge, and force the
+        # next round tool-free so the model must answer.
+        if turn.stall_guard.record(calls):
+            self._log("-> stall detected: forcing a tool-free answer round")
+            turn.force_answer = True
+            self._append(turn.history, Message(role="user", content=STALL_NUDGE))
+
+        # A one-time heads-up once the turn has burned a lot of tokens, so a
+        # looping turn stops. Unlike the stall guard it does NOT withhold tools
+        # — a genuinely progressing long turn keeps going.
+        total = turn.usage.total_tokens
+        threshold = self._token_warn_threshold
+        if not turn.token_warned and threshold is not None and total >= threshold:
+            turn.token_warned = True
+            self._log(f"-> turn crossed {total} tokens; nudging")
+            self._append(
+                turn.history,
+                Message(role="user", content=TOKEN_WARN_NUDGE.format(tokens=total)),
+            )
+
+    def _result(self, turn: _Turn, text: str, iterations: int, reason: StopReason) -> RunResult:
         return self._finalize(
             RunResult(
-                text=last_text or "",
-                iterations=self._max_iterations,
-                history=history,
-                stopped_reason="max_iterations",
+                text=text,
+                iterations=iterations,
+                history=turn.history,
+                stopped_reason=reason,
                 session_id=self._session_id,
-                usage=usage_acc,
-                invoked_tools=frozenset(invoked),
+                usage=turn.usage,
+                invoked_tools=frozenset(turn.invoked),
             )
         )
+
+    def _append(self, history: list[Message], message: Message) -> None:
+        history.append(message)
+        self._persist(message)
 
     def _open_session(self, user_msg: str) -> list[Message]:
         """Bootstrap history, append + persist the user turn, fire session hooks."""
         was_resume = self._session_id is not None
         history = self._bootstrap_history()
         fire_hook("on_session_start", session_id=self._session_id, is_resume=was_resume)
-        user_message = Message(role="user", content=user_msg)
-        history.append(user_message)
-        self._persist(user_message)
+        self._append(history, Message(role="user", content=user_msg))
         self._emit_event(UserMessageEvent(ts=utc_iso(), session_id=self._session_id, text=user_msg))
         return history
 
@@ -689,16 +676,23 @@ class Agent:
         self,
         *,
         history: list[Message],
-        tools: list[dict] | None,
+        tools: list[dict[str, Any]] | None,
         on_text_delta: Callable[[str], None] | None,
-        budget,
+        budget: TokenBudget | None,
     ) -> ProviderResponse:
         """One LLM round-trip: stream or one-shot, with trace + budget bookkeeping."""
         call_started = time.monotonic()
         ttft_ms = 0
         if on_text_delta is not None:
-            response, ttft_ms = self._consume_stream_timed(
-                history=history, tools=tools, on_text_delta=on_text_delta
+            response, ttft_ms = consume_stream(
+                self.provider,
+                history=history,
+                tools=tools,
+                model=self._model,
+                max_tokens=self._max_tokens,
+                on_text_delta=on_text_delta,
+                emit_event=self._emit_event,
+                session_id=self._session_id,
             )
         else:
             # Run the blocking provider call so a cancel (Ctrl+C / Esc) unwinds
@@ -707,7 +701,7 @@ class Agent:
             # call already in flight. Workers inherit the token (copy_context),
             # so this makes parallel delegation cancellable too.
             response = run_cancellable(
-                lambda: self._provider.create_message(
+                lambda: self.provider.create_message(
                     history,
                     tools=tools,
                     model=self._model,
@@ -728,73 +722,30 @@ class Agent:
             response.text = scrub_text(response.text)
         return response
 
-    def _record_assistant_response(
-        self, response: ProviderResponse, history: list[Message]
-    ) -> None:
-        """Append the assistant turn, persist it, emit AssistantMessage."""
-        assistant_message = Message(
-            role="assistant",
-            content=response.text,
-            tool_calls=list(response.tool_calls),
-        )
-        history.append(assistant_message)
-        self._persist(assistant_message)
-        self._emit_event(
-            AssistantMessageEvent(
-                ts=utc_iso(),
-                session_id=self._session_id,
-                text=response.text,
-                tool_call_count=len(response.tool_calls),
-                finish_reason=response.finish_reason,
-            )
+    def _dispatch_one(self, call: ToolCall) -> Message:
+        project = current_project()
+        state_dir = project.state_dir if project is not None else None
+        return _dispatch(
+            self._registry,
+            call,
+            log=self._log,
+            event_writer=self._event_writer,
+            event_listener=self._event_listener,
+            session_id=self._session_id,
+            artifact_dir=state_dir,
+            approval_dir=state_dir,
         )
 
-    def _dispatch_tool_calls(self, response: ProviderResponse, history: list[Message]) -> None:
+    def _dispatch_tool_calls(self, calls: list[ToolCall], history: list[Message]) -> None:
         """Dispatch every tool the model asked for, appending tool-role messages."""
-        project = current_project()
-        artifact_dir = project.state_dir if project is not None else None
-        approval_dir = project.state_dir if project is not None else None
-        for call in response.tool_calls:
-            tool_message = _dispatch(
-                self._registry,
-                call,
-                log=self._log,
-                event_writer=self._event_writer,
-                event_listener=self._event_listener,
-                session_id=self._session_id,
-                artifact_dir=artifact_dir,
-                approval_dir=approval_dir,
-            )
+        for call in calls:
+            tool_message = self._dispatch_one(call)
             # M238: blank the earlier result of an identical deterministic read
             # before appending the fresh one, so the stale copy stops competing
             # with it for attention. In-session only — see the note in
             # `_dispatch_fenced_calls`.
             supersede_native(history, call.name, call.arguments)
-            history.append(tool_message)
-            self._persist(tool_message)
-
-    def _record_fenced_assistant(
-        self,
-        response: ProviderResponse,
-        parsed_calls: list[ToolCall],
-        history: list[Message],
-    ) -> None:
-        """M143: record the assistant turn for the fenced path. Keeps the raw
-        text (which contains the `veles-tool` blocks) but stores NO native
-        tool_calls — so the message serialises as plain text when resent to a
-        non-tool server, and resume can't leak a native tool-call shape."""
-        assistant_message = Message(role="assistant", content=response.text, tool_calls=[])
-        history.append(assistant_message)
-        self._persist(assistant_message)
-        self._emit_event(
-            AssistantMessageEvent(
-                ts=utc_iso(),
-                session_id=self._session_id,
-                text=response.text,
-                tool_call_count=len(parsed_calls),
-                finish_reason=response.finish_reason,
-            )
-        )
+            self._append(history, tool_message)
 
     def _dispatch_fenced_calls(
         self,
@@ -812,21 +763,9 @@ class Agent:
         (live 2026-07-08, ollama qwen3.5:9b — broken JSON among valid calls).
         Reported alongside the results so the model can re-emit the dropped
         calls instead of silently losing them."""
-        project = current_project()
-        artifact_dir = project.state_dir if project is not None else None
-        approval_dir = project.state_dir if project is not None else None
         chunks: list[str] = []
         for call in calls:
-            tool_message = _dispatch(
-                self._registry,
-                call,
-                log=self._log,
-                event_writer=self._event_writer,
-                event_listener=self._event_listener,
-                session_id=self._session_id,
-                artifact_dir=artifact_dir,
-                approval_dir=approval_dir,
-            )
+            tool_message = self._dispatch_one(call)
             # M238: the tag makes this chunk findable later — fenced mode keeps
             # no arguments in the history, so without it a repeated identical
             # read cannot be matched to the chunk it supersedes.
@@ -841,12 +780,8 @@ class Agent:
             chunks.append(f"[{call.name} {tag}]\n{tool_message.content or ''}")
         if parse_errors:
             chunks.append(render_parse_errors(parse_errors))
-        combined = Message(
-            role="user",
-            content=f"{FENCED_RESULT_HEADER}\n\n" + "\n\n".join(chunks),
-        )
-        history.append(combined)
-        self._persist(combined)
+        combined = f"{FENCED_RESULT_HEADER}\n\n" + "\n\n".join(chunks)
+        self._append(history, Message(role="user", content=combined))
 
     def _finalize(self, result: RunResult) -> RunResult:
         fire_hook(
@@ -872,19 +807,19 @@ class Agent:
         # — that's the `veles run --resume` flow where the user wants
         # the original context back verbatim.
         if self._session_id is not None and self._store is not None:
-            history = self._store.load_messages(self._session_id)
+            loaded = self._store.load_messages(self._session_id)
             # M245: the store is a complete archive (curator/insights mine it),
             # so duplicate reads come back verbatim and re-introduce exactly the
             # contradictions M238 removed at dispatch time. Prune the view, not
             # the record.
-            supersede_loaded_history(history, FENCED_RESULT_HEADER)
+            supersede_loaded_history(loaded, FENCED_RESULT_HEADER)
             if self._system_prompt:
                 fresh = Message(role="system", content=self._system_prompt)
-                if history and history[0].role == "system":
-                    history[0] = fresh
+                if loaded and loaded[0].role == "system":
+                    loaded[0] = fresh
                 else:
-                    history.insert(0, fresh)
-            return history
+                    loaded.insert(0, fresh)
+            return loaded
 
         # Fresh path with persistence: create a session and persist system prompt.
         if self._store is not None and self._session_id is None:
@@ -895,53 +830,19 @@ class Agent:
 
         history: list[Message] = []
         if self._system_prompt:
-            sys_msg = Message(role="system", content=self._system_prompt)
-            history.append(sys_msg)
-            self._persist(sys_msg)
+            self._append(history, Message(role="system", content=self._system_prompt))
         return history
 
     def _persist(self, message: Message) -> None:
         if self._store is not None and self._session_id is not None:
             self._store.append_turn(self._session_id, message)
 
-    def _consume_stream(
-        self,
-        *,
-        history: list[Message],
-        tools: list[dict] | None,
-        on_text_delta: Callable[[str], None],
-    ) -> ProviderResponse:
-        response, _ = self._consume_stream_timed(
-            history=history, tools=tools, on_text_delta=on_text_delta
-        )
-        return response
-
-    def _consume_stream_timed(
-        self,
-        *,
-        history: list[Message],
-        tools: list[dict] | None,
-        on_text_delta: Callable[[str], None],
-    ) -> tuple[ProviderResponse, int]:
-        """Thin delegate — body extracted to `stream_consumer.consume_stream`
-        (M156). Returns (response, time-to-first-token in ms)."""
-        return consume_stream(
-            self._provider,
-            history=history,
-            tools=tools,
-            model=self._model,
-            max_tokens=self._max_tokens,
-            on_text_delta=on_text_delta,
-            emit_event=self._emit_event,
-            session_id=self._session_id,
-        )
-
-    def _emit_event(self, event) -> None:
+    def _emit_event(self, event: Event) -> None:
         """Self-side companion to module-level `_emit` — uses our writer and
         the per-run listener (if any) installed by `run()`."""
         _emit(self._event_writer, event, self._event_listener)
 
-    def _request_extra(self) -> dict:
+    def _request_extra(self) -> dict[str, Any]:
         """The `[engine.request.<provider>]` passthrough in force for this call
         (M250), for the trace. Best-effort: a provider that doesn't speak the
         OpenAI wire format has no such section, and tracing must never break a
@@ -949,7 +850,7 @@ class Agent:
         try:
             from veles.core.openai_wire import request_body_overrides
 
-            name = getattr(self._provider, "name", "")
+            name = getattr(self.provider, "name", "")
             return request_body_overrides(name) if name else {}
         except Exception:  # pragma: no cover - trace enrichment is never load-bearing
             return {}
@@ -958,7 +859,7 @@ class Agent:
         self,
         *,
         response: ProviderResponse,
-        tools: list[dict] | None,
+        tools: list[dict[str, Any]] | None,
         ttft_ms: int,
         total_latency_ms: int,
     ) -> None:
@@ -969,7 +870,7 @@ class Agent:
             request_id=uuid.uuid4().hex[:12],
             session_id=self._session_id,
             ts=utc_iso(),
-            provider=getattr(self._provider, "name", type(self._provider).__name__),
+            provider=getattr(self.provider, "name", type(self.provider).__name__),
             model=self._model,
             system_prompt_hash=hash_text(self._system_prompt),
             tool_bundle_hash=hash_tools(tools),

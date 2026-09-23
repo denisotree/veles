@@ -11,6 +11,7 @@ import contextlib
 import logging
 import time
 from collections.abc import Callable
+from pathlib import Path
 
 from veles.core.agent_state import record_invocation
 from veles.core.approval import record_approval
@@ -30,6 +31,7 @@ from veles.core.events import (
 )
 from veles.core.log_util import truncate_for_log
 from veles.core.modules import VetoResult, fire_hook
+from veles.core.permission import Decision
 from veles.core.permission import evaluate as evaluate_permission
 from veles.core.provider import Message, ToolCall
 from veles.core.timeutil import utc_iso
@@ -77,13 +79,13 @@ def _emit_tool_refusal(
 
 def _run_approval_prompt(
     call: ToolCall,
-    decision,
-    entry,
+    decision: Decision,
+    entry: ToolEntry,
     *,
     event_writer: EventWriter | None,
     event_listener: Callable[[Event], None] | None,
     session_id: str | None,
-):
+) -> Decision:
     """Pause the loop, ask the user, return an upgraded `Decision`.
 
     M71 follow-up: `approval_required` is interactive — flip state to
@@ -102,7 +104,6 @@ def _run_approval_prompt(
         set_state as _set_state,
     )
     from veles.core.approval_prompter import ask_for_approval
-    from veles.core.permission import Decision as _Decision
 
     _emit(
         event_writer,
@@ -130,7 +131,7 @@ def _run_approval_prompt(
         ),
         event_listener,
     )
-    return _Decision(
+    return Decision(
         kind="allow" if answer.approved else "deny",
         rule="approval_prompt",
         reason=(
@@ -143,7 +144,7 @@ def _invoke_tool_safely(
     registry: Registry,
     call: ToolCall,
     *,
-    artifact_dir,
+    artifact_dir: Path | None,
 ) -> tuple[str, str | None]:
     """Run the tool, stamping the per-session invocation set first.
 
@@ -197,10 +198,10 @@ def _record_tool_use_in_db(
 
 
 def _persist_approval_if_grant(
-    decision,
+    decision: Decision,
     call: ToolCall,
     *,
-    approval_dir,
+    approval_dir: Path | None,
     session_id: str | None,
 ) -> None:
     """M73: durable approval record for user-facing grants only.
@@ -259,19 +260,18 @@ def _dispatch(
     registry: Registry,
     call: ToolCall,
     *,
-    log,
+    log: Callable[[str], None],
     event_writer: EventWriter | None = None,
     event_listener: Callable[[Event], None] | None = None,
     session_id: str | None = None,
-    artifact_dir=None,
-    approval_dir=None,
+    artifact_dir: Path | None = None,
+    approval_dir: Path | None = None,
 ) -> Message:
     log(f"   tool {call.name}({call.arguments})")
     # File-backed daemon log: every tool call surfaces by name and args
     # (truncated) so debugging from `~/.veles/logs/daemon-*.log` is
     # tractable without replaying the full event-stream JSONL.
-    with contextlib.suppress(Exception):
-        logger.info("tool.call name=%s args=%s", call.name, truncate_for_log(call.arguments))
+    logger.info("tool.call name=%s args=%s", call.name, truncate_for_log(call.arguments))
     _emit(
         event_writer,
         ToolCallEvent(
@@ -284,9 +284,9 @@ def _dispatch(
         event_listener,
     )
 
-    veto: VetoResult | None = fire_hook("pre_tool_call", name=call.name, arguments=call.arguments)
-    if veto is not None:
-        log(f"   vetoed by module {veto.module_name!r}: {veto.reason}")
+    def refuse(rule: str, reason: str, refusal_text: str, error_msg: str) -> Message:
+        """Deny event + the standard refusal aftermath, for a call that never
+        reached a permission decision (module veto, unknown tool)."""
         _emit(
             event_writer,
             PermissionDecision(
@@ -294,95 +294,82 @@ def _dispatch(
                 session_id=session_id,
                 tool_name=call.name,
                 decision="deny",
-                rule="module_veto",
-                reason=f"{veto.module_name}: {veto.reason}",
-            ),
-            event_listener,
-        )
-        return _emit_tool_refusal(
-            call,
-            refusal_text=f"<vetoed by module {veto.module_name!r}: {veto.reason}>",
-            error_msg=f"vetoed by {veto.module_name}: {veto.reason}",
-            event_writer=event_writer,
-            event_listener=event_listener,
-            session_id=session_id,
-        )
-
-    try:
-        entry = registry.get(call.name)
-    except KeyError:
-        entry = None
-
-    if entry is None:
-        # The model called a tool that isn't in the active registry. Without
-        # this guard, `_invoke_tool_safely` → `registry.dispatch` would raise
-        # `KeyError("unknown tool 'X'")` and feed the model a cryptic
-        # `<error: KeyError: ...>` it can't act on — which in practice makes it
-        # invent an authoritative-but-false explanation. Return a helpful
-        # refusal instead, distinguishing "exists in another mode" from
-        # "no such tool" and listing what *is* available here.
-        refusal_text = _unknown_tool_refusal_text(call.name, registry)
-        log(f"   refused: unknown tool {call.name!r} (not in active toolset)")
-        _emit(
-            event_writer,
-            PermissionDecision(
-                ts=utc_iso(),
-                session_id=session_id,
-                tool_name=call.name,
-                decision="deny",
-                rule="unknown_tool",
-                reason=f"{call.name!r} not in active toolset",
+                rule=rule,
+                reason=reason,
             ),
             event_listener,
         )
         return _emit_tool_refusal(
             call,
             refusal_text=refusal_text,
-            error_msg=f"unknown tool {call.name!r}",
+            error_msg=error_msg,
             event_writer=event_writer,
             event_listener=event_listener,
             session_id=session_id,
         )
 
-    via_autopilot = False
-    if entry is not None:
-        decision = evaluate_permission(entry, call.arguments)
-        if decision.kind == "approval_required":
-            decision = _run_approval_prompt(
-                call,
-                decision,
-                entry,
-                event_writer=event_writer,
-                event_listener=event_listener,
-                session_id=session_id,
-            )
-        # Emit the permission event for every tool — even allow-by-default —
-        # so the typed event log carries full coverage for M70 eval grading.
-        _emit(
-            event_writer,
-            PermissionDecision(
-                ts=utc_iso(),
-                session_id=session_id,
-                tool_name=call.name,
-                decision=decision.kind,
-                rule=decision.rule,
-                reason=decision.reason,
-                via_autopilot=decision.via_autopilot,
-            ),
-            event_listener,
+    veto: VetoResult | None = fire_hook("pre_tool_call", name=call.name, arguments=call.arguments)
+    if veto is not None:
+        log(f"   vetoed by module {veto.module_name!r}: {veto.reason}")
+        return refuse(
+            "module_veto",
+            f"{veto.module_name}: {veto.reason}",
+            f"<vetoed by module {veto.module_name!r}: {veto.reason}>",
+            f"vetoed by {veto.module_name}: {veto.reason}",
         )
-        _persist_approval_if_grant(decision, call, approval_dir=approval_dir, session_id=session_id)
-        if not decision.allowed:
-            log(f"   refused by {decision.rule}: {decision.reason}")
-            return _emit_tool_refusal(
-                call,
-                refusal_text=f"<refused by {decision.rule}: {decision.reason}>",
-                error_msg=f"refused by {decision.rule}: {decision.reason}",
-                event_writer=event_writer,
-                event_listener=event_listener,
-                session_id=session_id,
-            )
-        via_autopilot = decision.via_autopilot
+
+    try:
+        entry = registry.get(call.name)
+    except KeyError:
+        # The model called a tool that isn't in the active registry. Letting
+        # `registry.dispatch` raise would feed it a cryptic `<error: KeyError>`
+        # it can't act on — in practice it then invents a false explanation.
+        # Refuse helpfully instead: "exists in another mode" vs "no such tool",
+        # plus what *is* available here.
+        log(f"   refused: unknown tool {call.name!r} (not in active toolset)")
+        return refuse(
+            "unknown_tool",
+            f"{call.name!r} not in active toolset",
+            _unknown_tool_refusal_text(call.name, registry),
+            f"unknown tool {call.name!r}",
+        )
+
+    decision = evaluate_permission(entry, call.arguments)
+    if decision.kind == "approval_required":
+        decision = _run_approval_prompt(
+            call,
+            decision,
+            entry,
+            event_writer=event_writer,
+            event_listener=event_listener,
+            session_id=session_id,
+        )
+    # Emit the permission event for every tool — even allow-by-default —
+    # so the typed event log carries full coverage for M70 eval grading.
+    _emit(
+        event_writer,
+        PermissionDecision(
+            ts=utc_iso(),
+            session_id=session_id,
+            tool_name=call.name,
+            decision=decision.kind,
+            rule=decision.rule,
+            reason=decision.reason,
+            via_autopilot=decision.via_autopilot,
+        ),
+        event_listener,
+    )
+    _persist_approval_if_grant(decision, call, approval_dir=approval_dir, session_id=session_id)
+    if not decision.allowed:
+        log(f"   refused by {decision.rule}: {decision.reason}")
+        return _emit_tool_refusal(
+            call,
+            refusal_text=f"<refused by {decision.rule}: {decision.reason}>",
+            error_msg=f"refused by {decision.rule}: {decision.reason}",
+            event_writer=event_writer,
+            event_listener=event_listener,
+            session_id=session_id,
+        )
 
     started = time.monotonic()
     output, error = _invoke_tool_safely(registry, call, artifact_dir=artifact_dir)
@@ -395,18 +382,11 @@ def _dispatch(
         error_kind=error.split(":", 1)[0] if error else None,
         session_id=session_id,
     )
-    try:
-        if error:
-            logger.warning("tool.error name=%s err=%s", call.name, error)
-        else:
-            logger.info(
-                "tool.result name=%s preview=%s",
-                call.name,
-                truncate_for_log(output),
-            )
-    except Exception:
-        pass
-    if via_autopilot or (entry is not None and _egress_under_autopilot(entry)):
+    if error:
+        logger.warning("tool.error name=%s err=%s", call.name, error)
+    else:
+        logger.info("tool.result name=%s preview=%s", call.name, truncate_for_log(output))
+    if decision.via_autopilot or _egress_under_autopilot(entry):
         # M200: `via_autopilot` covers trust-ladder tools the autopilot window
         # auto-allowed. `_egress_under_autopilot` adds the allow-policy network
         # tools (fetch_url/web_search) that skip the ladder — under autopilot
@@ -436,7 +416,7 @@ def _dispatch(
 
 def _emit(
     writer: EventWriter | None,
-    event,
+    event: Event,
     listener: Callable[[Event], None] | None = None,
 ) -> None:
     """Best-effort event fan-out.
@@ -479,12 +459,10 @@ def _audit_autopilot_dispatch(tool_name: str, error: str | None) -> None:
     project = current_project()
     if project is None:
         return
-    try:
-        from veles.core.memory.artefacts import append_memory_log
+    from veles.core.memory.artefacts import append_memory_log
 
-        summary = f"sensitive tool {tool_name!r} dispatched"
-        if error is not None:
-            summary += f" (failed: {error})"
+    summary = f"sensitive tool {tool_name!r} dispatched"
+    if error is not None:
+        summary += f" (failed: {error})"
+    with contextlib.suppress(Exception):
         append_memory_log(project, op=f"autopilot-{tool_name}", summary=summary)
-    except Exception:
-        pass

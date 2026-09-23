@@ -71,7 +71,7 @@ def test_returns_wired_agent(project, monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     assert isinstance(agent, Agent)
-    assert agent._provider is stub_provider
+    assert agent.provider is stub_provider
     assert agent._registry is sentinel_registry
     assert agent._system_prompt == "SYS"
     assert agent._compressor is sentinel_compressor
@@ -182,7 +182,7 @@ def test_tool_aware_provider_and_callable_system_prompt(
     )
 
     assert isinstance(agent, Agent)
-    assert agent._provider is stub_provider
+    assert agent.provider is stub_provider
     assert agent._system_prompt == "QUALIFIED"
     assert prompt_saw == [stub_provider]
     assert bridge_calls == [{"name": "openrouter", "skill_model": "test/model"}]
