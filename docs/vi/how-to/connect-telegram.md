@@ -82,6 +82,10 @@ và gửi một dòng sau mỗi bước, cho đến khi đạt mục tiêu hoặ
 phê duyệt vẫn đến dưới dạng nút bấm. `/goal` cho xem tiến độ, `/goal cancel` dừng
 sau bước hiện tại, còn `/goal resume` tiếp tục một mục tiêu đã dừng.
 
+Khi agent cần một chi tiết mà chỉ bạn biết, nó sẽ hỏi trong cuộc trò chuyện.
+Chạm vào một câu trả lời gợi ý hoặc tự nhập câu trả lời. Nếu bạn không trả lời
+trong năm phút, nó tiếp tục theo giả định hợp lý nhất và nói rõ đã giả định gì.
+
 ## Hạn chế đa phương thức (multimodal)
 
 Việc gửi một **ảnh hoặc tin nhắn thoại** hiện trả về thông báo "not configured".

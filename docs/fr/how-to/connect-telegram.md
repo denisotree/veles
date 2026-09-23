@@ -83,6 +83,11 @@ soit atteint ou qu'un budget soit épuisé. Les approbations arrivent toujours s
 forme de boutons. `/goal` montre l'avancement, `/goal cancel` l'arrête après
 l'étape en cours et `/goal resume` reprend un objectif arrêté.
 
+Quand l'agent a besoin d'un détail que vous seul pouvez donner, il pose la
+question dans la conversation. Touchez une des réponses proposées ou écrivez la
+vôtre. Sans réponse sous cinq minutes, il continue sur sa meilleure hypothèse et
+indique laquelle.
+
 ## Limitation multimodale
 
 L'envoi d'une **photo ou d'un message vocal** renvoie actuellement un avis « non

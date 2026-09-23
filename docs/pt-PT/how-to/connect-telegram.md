@@ -83,6 +83,10 @@ esgotar. As aprovações continuam a chegar como botões. `/goal` mostra o
 progresso, `/goal cancel` para o objetivo após o passo atual e `/goal resume`
 retoma um objetivo parado.
 
+Quando o agente precisa de um detalhe que só você pode dar, pergunta na
+conversa. Toque numa das respostas sugeridas ou escreva a sua. Sem resposta em
+cinco minutos, segue com a melhor suposição e diz qual foi.
+
 ## Limitação multimodal
 
 Enviar uma **foto ou mensagem de voz** devolve atualmente um aviso de "não

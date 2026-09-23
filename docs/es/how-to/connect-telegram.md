@@ -83,6 +83,10 @@ un presupuesto. Las aprobaciones siguen llegando como botones. `/goal` muestra e
 progreso, `/goal cancel` lo detiene tras el paso actual y `/goal resume`
 continúa uno detenido.
 
+Cuando el agente necesita un dato que solo tú puedes dar, pregunta en el chat.
+Toca una de las respuestas sugeridas o escribe la tuya. Si no respondes en cinco
+minutos, sigue con su mejor suposición y dice qué supuso.
+
 ## Limitación multimodal
 
 Enviar una **foto o un mensaje de voz** actualmente devuelve un aviso de "no

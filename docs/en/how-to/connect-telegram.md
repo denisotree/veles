@@ -82,6 +82,10 @@ runs out. Approval prompts still arrive as buttons. `/goal` shows the goal's
 progress, `/goal cancel` stops it after the current step, and `/goal resume`
 continues one that stopped.
 
+When the agent needs a detail only you can give, it asks in the chat. Tap one
+of the suggested answers or type your own. If you don't answer within five
+minutes, it goes ahead on its best assumption and says what it assumed.
+
 ## Multimodal limitation
 
 Sending a **photo or voice message** currently returns a "not configured" notice.

@@ -83,6 +83,10 @@ esaurisce. Le approvazioni arrivano sempre come pulsanti. `/goal` mostra
 l'avanzamento, `/goal cancel` lo ferma dopo il passo corrente e `/goal resume`
 riprende un obiettivo fermato.
 
+Quando l'agente ha bisogno di un dettaglio che solo tu puoi dare, lo chiede
+nella chat. Tocca una delle risposte suggerite o scrivi la tua. Se non rispondi
+entro cinque minuti, procede con la sua ipotesi migliore e dice quale.
+
 ## Limitazione multimodale
 
 L'invio di una **foto o di un messaggio vocale** restituisce attualmente un avviso "not configured".

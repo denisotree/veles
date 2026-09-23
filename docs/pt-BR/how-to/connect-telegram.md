@@ -83,6 +83,10 @@ acabar. As aprovações continuam chegando como botões. `/goal` mostra o progre
 `/goal cancel` para a meta após o passo atual e `/goal resume` retoma uma meta
 parada.
 
+Quando o agente precisa de um detalhe que só você pode dar, ele pergunta no
+chat. Toque em uma das respostas sugeridas ou escreva a sua. Se você não
+responder em cinco minutos, ele segue com a melhor suposição e diz qual foi.
+
 ## Limitação multimodal
 
 Enviar uma **foto ou mensagem de voz** atualmente retorna um aviso de "não configurado".

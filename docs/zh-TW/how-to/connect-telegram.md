@@ -79,6 +79,9 @@ veles channel remove telegram            # drop the channel binding
 用盡。審核請求仍以按鈕形式送達。`/goal` 顯示進度，`/goal cancel` 在目前步驟後
 停止，`/goal resume` 繼續已停止的目標。
 
+當智能體需要只有你能提供的資訊時，它會在聊天中提問。點選一個建議的回答，或輸入你
+自己的回答。如果五分鐘內沒有回覆，它會依最合理的假設繼續，並說明做了什麼假設。
+
 ## 多模態限制
 
 傳送**照片或語音訊息**目前會回傳一則「not configured」通知。

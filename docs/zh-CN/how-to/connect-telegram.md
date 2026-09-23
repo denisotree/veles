@@ -73,6 +73,9 @@ veles channel remove telegram            # drop the channel binding
 用尽。审批请求仍以按钮形式发来。`/goal` 显示进度，`/goal cancel` 在当前步骤后
 停止，`/goal resume` 继续已停止的目标。
 
+当智能体需要只有你能提供的信息时，它会在聊天中提问。点选一个建议的回答，或输入你
+自己的回答。如果五分钟内没有回复，它会按最合理的假设继续，并说明做了什么假设。
+
 ## 多模态限制
 
 目前发送**照片或语音消息**会返回一条“未配置”的提示。Veles 定义了 `VisionAdapter` / STT 适配器协议以及一个注册表（`modules/vision.py`、`modules/stt.py`），但**没有任何具体适配器随附发布，也没有在守护进程启动时注册任何适配器**，所以图像和音频暂时不会被分析。文本聊天功能完整可用。参见[提供方参考](../reference/providers.md#multimodal-status-vision--speech-to-text)。
