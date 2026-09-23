@@ -236,10 +236,8 @@ def _factory_settings_from_args(
     # `cli_model or cfg_model or DEFAULT_MODEL` skipped the user layer, so
     # a daemon in a project that has no own `[engine]` booted on
     # `DEFAULT_MODEL` (anthropic/claude-sonnet-4.6) even when the user had
-    # picked ollama at user scope — a provider/model mismatch. The daemon
-    # parser sets `--provider`/`--model` defaults to None, so an absent
-    # flag correctly defers to the cascade rather than counting as
-    # explicit.
+    # picked ollama at user scope — a provider/model mismatch. An absent
+    # `--provider`/`--model` defers to the cascade (see `model_resolver`).
     provider_name = resolve_effective_provider(args, project, daemon_session=daemon_session)
     # M165: a daemon must not boot on a silent cloud fallback — fail clearly
     # when no model is configured anywhere.
