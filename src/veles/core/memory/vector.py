@@ -123,7 +123,14 @@ def ensure_embeddings_table(conn: sqlite3.Connection) -> None:
     The M263a JSON→float32 upgrade lives here rather than in SessionStore's
     `PRAGMA user_version` chain for the same reason: this table is outside the
     versioned schema, so a version bump would claim to describe a table half
-    the databases do not have."""
+    the databases do not have.
+
+    It runs on every `knn` — the per-turn recall path — so the common case (the
+    table exists and is converted) is one PRAGMA; `executescript`, which also
+    commits any transaction the caller has open, runs only when needed."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(embeddings_blob)").fetchall()}
+    if "vec_blob" in cols and "vec_json" not in cols:
+        return
     conn.executescript(_SCHEMA_BLOB_SQL)
     _migrate_json_vectors(conn)
 
