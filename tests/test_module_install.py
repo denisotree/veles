@@ -9,12 +9,12 @@ import pytest
 from veles.core.module_install import (
     ModuleInstallError,
     ModuleNotFoundError,
-    _derive_name,
-    _is_git_url,
     install_module_from_source,
     remove_module,
 )
+from veles.core.module_install import derive_module_name as _derive_name
 from veles.core.project import init_project
+from veles.core.source_install import is_git_url as _is_git_url
 
 
 def _make_module_fixture(

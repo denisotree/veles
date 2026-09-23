@@ -10,8 +10,8 @@ from veles.core.project import Project
 from veles.core.skill_install import (
     SkillInstallError,
     SkillNotFoundError,
-    _derive_name,
     demote_skill,
+    derive_skill_name,
     install_skill_from_source,
     promote_skill,
     remove_skill,
@@ -141,7 +141,7 @@ def _show(project: Project, name: str) -> int:
 def _add(args: argparse.Namespace, project: Project) -> int:
     scope = args.scope
     target_dir = user_skills_dir() if scope == "user" else project.skills_dir
-    target_name = args.name or _derive_name(args.source)
+    target_name = args.name or derive_skill_name(args.source)
     target = target_dir / target_name
     summary = (
         f"Source: {args.source}\n"

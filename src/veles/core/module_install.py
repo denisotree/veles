@@ -1,18 +1,13 @@
 """Install / remove plugins from git URLs or local directories.
 
-Mirrors `core/skill_install.py` (M23): same git-clone / shutil.copytree
-flow, same rollback-on-failure contract. The validator is different —
-we parse `module.toml` and confirm the entrypoint file exists, instead
-of running the skill discovery pipeline.
+Cloning, copying and rollback are `core/source_install.py`, shared with skill
+installation; what is module-specific is the validation — `module.toml` must
+parse and its entrypoint file must exist.
 """
 
 from __future__ import annotations
 
-import os
-import re
 import shutil
-import subprocess
-from pathlib import Path
 
 from veles.core.module_manifest import (
     ManifestError,
@@ -21,7 +16,7 @@ from veles.core.module_manifest import (
 )
 from veles.core.modules import ModuleHandle, discover_modules
 from veles.core.project import Project
-from veles.core.slug import normalize_slug as _normalize_slug
+from veles.core.source_install import derive_name, install_tree
 
 
 class ModuleInstallError(RuntimeError):
@@ -32,21 +27,11 @@ class ModuleNotFoundError(RuntimeError):
     pass
 
 
-_GIT_URL_RE = re.compile(r"^(git@|git://|ssh://|https?://)")
-_GIT_TIMEOUT_SEC = 300
 _MANIFEST_FILENAME = "module.toml"
 
 
-def _is_git_url(source: str) -> bool:
-    return bool(_GIT_URL_RE.match(source)) or source.endswith(".git")
-
-
-def _derive_name(source: str) -> str:
-    if _is_git_url(source):
-        last = source.rstrip("/").split("/")[-1]
-        last = last.removesuffix(".git")
-        return _normalize_slug(last) or "installed-module"
-    return Path(source).resolve().name
+def derive_module_name(source: str) -> str:
+    return derive_name(source, fallback="installed-module")
 
 
 def install_module_from_source(
@@ -56,22 +41,9 @@ def install_module_from_source(
 
     Cleans up the partially-installed directory on any failure.
     """
-    name = name_override or _derive_name(source)
-    target = project.modules_dir / name
-    if target.exists() and any(target.iterdir()):
-        raise ModuleInstallError(
-            f"target directory {target} already exists and is non-empty; "
-            "remove the existing module first"
-        )
-    target.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        if _is_git_url(source):
-            _git_clone(source, target)
-        else:
-            src_path = Path(source).resolve()
-            if not src_path.is_dir():
-                raise ModuleInstallError(f"source {source!r} is neither a git URL nor a directory")
-            shutil.copytree(src_path, target, symlinks=False)
+    target = project.modules_dir / (name_override or derive_module_name(source))
+
+    def validate() -> ModuleHandle:
         manifest_path = target / _MANIFEST_FILENAME
         if not manifest_path.is_file():
             raise ModuleInstallError(f"installed source has no {_MANIFEST_FILENAME} at {target}")
@@ -89,28 +61,8 @@ def install_module_from_source(
                 f"check that [module].name == {manifest.name!r}"
             )
         return match
-    except Exception:
-        shutil.rmtree(target, ignore_errors=True)
-        raise
 
-
-def _git_clone(url: str, target: Path) -> None:
-    if shutil.which("git") is None:
-        raise ModuleInstallError("git executable not found in PATH")
-    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
-    try:
-        subprocess.run(
-            ["git", "clone", "--depth", "1", url, str(target)],
-            check=True,
-            capture_output=True,
-            timeout=_GIT_TIMEOUT_SEC,
-            env=env,
-        )
-    except subprocess.CalledProcessError as exc:
-        msg = exc.stderr.decode("utf-8", "replace").strip() if exc.stderr else "(no stderr)"
-        raise ModuleInstallError(f"git clone failed: {msg}") from exc
-    except subprocess.TimeoutExpired as exc:
-        raise ModuleInstallError(f"git clone timed out after {_GIT_TIMEOUT_SEC}s") from exc
+    return install_tree(source, target, validate=validate, error=ModuleInstallError)
 
 
 def remove_module(name: str, *, project: Project) -> None:
