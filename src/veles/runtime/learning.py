@@ -1,4 +1,5 @@
-"""Curator + insight extractor (M21 / M28 / M31) — extracted in M46 final.
+"""Post-turn learning: the curator and its continuous triggers, insight extraction,
+proposals, NL-routing and self-doc refresh.
 
 Hosts the per-session curator (`_curate_one_session`), the pass-coordinator
 (`_run_curator_pass`), the M28 continuous triggers (`_maybe_run_idle_curator`,
@@ -6,17 +7,10 @@ Hosts the per-session curator (`_curate_one_session`), the pass-coordinator
 (`_maybe_run_insight_extractor`), and shared helpers used by `tests/test_curator.py`
 (`_truncate_session_messages`, `_render_message`).
 
-`_curate_one_session` and the `_maybe_run_*` triggers depend on run-loop
-helpers (`_make_tool_aware_provider`, `_load_skills`, `_qualify_for_provider`,
-`_run_agent_streaming_aware`, `_print_run_summary`) plus the API-key check
-(`_has_api_key_for_provider`). To keep `monkeypatch.setattr("veles.cli._foo",
-fake)` effective for tests, those references are looked up via lazy imports
-from `veles.cli` *inside* the function bodies — the patched attribute is
-visible at call time. The same applies to `_run_curator_pass`, which itself
-gets patched in idle / post-turn tests.
-
-`cli/__init__.py` re-exports every `_<name>` so existing test imports
-(`from veles.cli import _curate_one_session`) keep working.
+`_curate_one_session` uses the run-loop helpers of `runtime/assembly.py`,
+imported inside the function so a test's patch on that module applies.
+Shared by the CLI (`veles run`, `veles curate`, the REPL) and the daemon's
+post-turn hook.
 """
 
 from __future__ import annotations
@@ -217,13 +211,8 @@ def _maybe_run_idle_curator(args: argparse.Namespace, project: Project) -> None:
         f"running pass over up to {_CURATOR_IDLE_LIMIT} session(s)>",
         file=sys.stderr,
     )
-    # Lazy lookup so monkey-patches at `veles.cli._run_curator_pass` win.
-    from veles.cli import _run_curator_pass as _patched_run_curator_pass
-
     try:
-        _patched_run_curator_pass(
-            args, project, max_sessions=_CURATOR_IDLE_LIMIT, mode_label="idle"
-        )
+        _run_curator_pass(args, project, max_sessions=_CURATOR_IDLE_LIMIT, mode_label="idle")
     except Exception as exc:
         append_memory_log(
             project,
@@ -240,11 +229,8 @@ def _maybe_run_post_turn_curator(args: argparse.Namespace, project: Project) -> 
     session it just produced."""
     if not _continuous_curator_eligible(args):
         return
-    # Lazy lookup so monkey-patches at `veles.cli._run_curator_pass` win.
-    from veles.cli import _run_curator_pass as _patched_run_curator_pass
-
     try:
-        _patched_run_curator_pass(
+        _run_curator_pass(
             args, project, max_sessions=_CURATOR_POSTRUN_LIMIT, mode_label="post-turn"
         )
     except Exception as exc:
@@ -477,17 +463,17 @@ def _maybe_refresh_nl_routing(args: argparse.Namespace, project: Project) -> Non
     if agents_md_sha256(agents_md) == load_nl_state(project).agents_md_sha256:
         return
 
-    from veles.cli import _has_api_key_for_provider, _make_provider
     from veles.core.model_resolver import ConfigurationError
+    from veles.core.provider_factory import has_api_key, make_provider
 
     try:
         routed_provider, routed_model = route("default", project)
     except ConfigurationError:
         return
-    if not _has_api_key_for_provider(routed_provider):
+    if not has_api_key(routed_provider):
         return
     try:
-        provider = _make_provider(routed_provider)
+        provider = make_provider(routed_provider)
     except Exception as exc:
         append_memory_log(
             project,
@@ -557,15 +543,15 @@ def _curate_one_session(
     args: argparse.Namespace,
     project: Project,
 ) -> bool:
-    # Lazy imports so monkey-patches at `veles.cli._<helper>` win.
-    from veles.cli import (
+    # Imported at call time so a test's patch on `veles.runtime.assembly` applies.
+    from veles.core.layout.engines import wiki_enabled
+    from veles.runtime.assembly import (
         _load_skills,
         _make_tool_aware_provider,
         _print_run_summary,
         _qualify_for_provider,
         _run_agent_streaming_aware,
     )
-    from veles.core.layout.engines import wiki_enabled
 
     messages = store.load_messages(session.id)
     serialized = _truncate_session_messages(messages, _CURATE_TURN_LIMIT, _CURATE_CHARS_LIMIT)

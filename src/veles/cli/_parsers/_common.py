@@ -10,19 +10,17 @@ from __future__ import annotations
 
 import argparse
 
-# DEFAULT_MODEL/DEFAULT_PROVIDER live in veles.core.defaults so core.model_resolver
-# can import them without reaching up into veles.cli (M194); re-exported here so the
-# argparse wiring below and existing `from ..._common import DEFAULT_*` sites keep working.
-from veles.core.defaults import DEFAULT_MODEL, DEFAULT_PROVIDER
+# The defaults live in veles.core.defaults so the runtime and the daemon can read
+# them without importing the CLI; the argparse wiring below uses them.
+from veles.core.defaults import (
+    DEFAULT_COMPRESS_THRESHOLD_TOKENS,
+    DEFAULT_COMPRESSOR_MODEL,
+    DEFAULT_MAX_ITERATIONS,
+    DEFAULT_MAX_TOKENS_TOTAL,
+    DEFAULT_MODEL,
+    DEFAULT_PROVIDER,
+)
 
-# A high runaway backstop, NOT a task budget. A turn may make as many tool calls
-# as the work needs; the real "am I stuck?" stop is the StallGuard (M144, repeats
-# of the same tool-call signature → forced answer round) plus the token budget.
-# 30 used to cut off legitimate long jobs (a big migration) mid-task.
-DEFAULT_MAX_ITERATIONS = 1000
-DEFAULT_MAX_TOKENS_TOTAL = 100_000
-DEFAULT_COMPRESSOR_MODEL = "anthropic/claude-haiku-4.5"
-DEFAULT_COMPRESS_THRESHOLD_TOKENS = 50_000
 PROVIDER_CHOICES = (
     "openrouter",
     "anthropic",

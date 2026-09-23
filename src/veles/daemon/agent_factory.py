@@ -6,13 +6,10 @@ assembler, the `AgentFactory` closures (`_make_agent_factory`,
 `_make_worker_agent_factory`), the post-turn learning-loop hook
 (`_make_post_turn_hook`) and the JobRunner/DreamRunner wiring
 (`_attach_background_runners`). This belongs with `daemon/runner.py` — it is
-server runtime, not CLI plumbing — but every helper still resolves its
-`veles.cli` dependencies lazily inside the function body, both to avoid
-a `daemon → cli` import cycle and to preserve the monkeypatch contract
-tests rely on (patching `veles.cli._make_provider` etc. at call time).
-
-All names are re-exported from `veles.cli.commands.daemon` for
-backwards compatibility with historic import sites.
+server runtime, not CLI plumbing. It never imports `veles.cli`: the run
+assembly and learning hooks come from `veles.runtime`, the provider from
+`veles.core.provider_factory`. Those are imported lazily inside each function
+so tests can patch them on their owning module at call time.
 """
 
 from __future__ import annotations
@@ -38,7 +35,6 @@ def _attach_background_runners(
     daemon-wide sub-agent factory (`state.subagent_factory`, capped at [run])
     that makes delegate/wiki_add usable in daemon turns at all."""
     from veles.channels.delivery import DeliveryRouter
-    from veles.cli import _make_provider as _make_provider_for_dream
     from veles.core.dream_runner import DreamRunner
     from veles.core.job_runner import JobRunner
     from veles.core.jobs_store import JobsStore
@@ -142,7 +138,9 @@ def _attach_background_runners(
     )
 
     def _provider_for_dream():
-        return _make_provider_for_dream(dream_provider_name)
+        from veles.core.provider_factory import make_provider
+
+        return make_provider(dream_provider_name)
 
     def _history_loader():
         from veles.core.curator_state import load as _load_curator
@@ -225,10 +223,7 @@ class _FactorySettings:
 def _factory_settings_from_args(
     args: argparse.Namespace, project, *, daemon_session: str | None = None
 ) -> _FactorySettings:
-    from veles.cli import (
-        DEFAULT_COMPRESS_THRESHOLD_TOKENS,
-        DEFAULT_MAX_ITERATIONS,
-    )
+    from veles.core.defaults import DEFAULT_COMPRESS_THRESHOLD_TOKENS, DEFAULT_MAX_ITERATIONS
     from veles.core.model_resolver import (
         ensure_model_configured,
         resolve_effective_model,
@@ -375,19 +370,19 @@ def _build_agent_for_turn(
     `_make_worker_agent_factory` for manager-spawn sub-agents so
     workers see the project AGENTS.md plus their role-specific
     instructions."""
-    from veles.cli import (
+    from veles.core.agent import Agent
+    from veles.core.provider_factory import make_provider
+    from veles.core.tools.registry import Registry
+    from veles.runtime.assembly import (
         _PLANNING_TOOLS,
         _RUN_TOOLS,
         _load_skills,
-        _make_provider,
         build_compressor,
         build_run_system_prompt,
     )
-    from veles.core.agent import Agent
-    from veles.core.tools.registry import Registry
 
     if provider is None:
-        provider = _make_provider(settings.provider_name, settings.model)
+        provider = make_provider(settings.provider_name, settings.model)
     is_planning = mode == "planning"
     if toolless:
         registry = Registry()
@@ -505,18 +500,19 @@ def _make_agent_factory(
 
     factory_logger = logging.getLogger("veles.daemon.agent_factory")
 
-    # First-turn-lazy, then reused. `_make_provider` / `build_compressor` are
-    # resolved via `veles.cli` at call time to honour the monkeypatch contract
-    # (tests patch `veles.cli._make_provider` etc.). A concurrent first-turn
+    # First-turn-lazy, then reused. `make_provider` / `build_compressor` are
+    # imported at call time so tests can patch them on their owning modules.
+    # A concurrent first-turn
     # race would at worst build a second (equivalent) provider that the dict
     # write supersedes — harmless, so no lock.
     reused: dict[str, object] = {}
 
     def _reused_provider_and_compressor():
         if "provider" not in reused:
-            from veles.cli import _make_provider, build_compressor
+            from veles.core.provider_factory import make_provider
+            from veles.runtime.assembly import build_compressor
 
-            provider = _make_provider(settings.provider_name)
+            provider = make_provider(settings.provider_name)
             hard_ceiling, summariser_input = _effective_ceilings(settings)
             reused["provider"] = provider
             reused["compressor"] = build_compressor(
@@ -664,7 +660,7 @@ def _make_post_turn_hook(args: argparse.Namespace, project):
     if not getattr(args, "provider", None):
         args.provider = resolve_effective_provider(args, project)
 
-    from veles.cli import (
+    from veles.runtime.learning import (
         _maybe_refresh_nl_routing,
         _maybe_refresh_self_doc,
         _maybe_run_insight_extractor,

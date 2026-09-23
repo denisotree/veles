@@ -231,13 +231,14 @@ def test_build_agent_for_turn_uses_settings_model(tmp_path: Path, monkeypatch) -
             def __init__(self, **kwargs):
                 captured.update(kwargs)
 
-        import veles.cli as cli_mod
         import veles.core.agent as agent_mod
+        import veles.core.provider_factory as pf_mod
+        import veles.runtime.assembly as asm_mod
 
-        monkeypatch.setattr(cli_mod, "_make_provider", _fake_provider)
-        monkeypatch.setattr(cli_mod, "_load_skills", _fake_load_skills)
-        monkeypatch.setattr(cli_mod, "build_run_system_prompt", _fake_build_run_system_prompt)
-        monkeypatch.setattr(cli_mod, "build_compressor", _fake_build_compressor)
+        monkeypatch.setattr(pf_mod, "make_provider", _fake_provider)
+        monkeypatch.setattr(asm_mod, "_load_skills", _fake_load_skills)
+        monkeypatch.setattr(asm_mod, "build_run_system_prompt", _fake_build_run_system_prompt)
+        monkeypatch.setattr(asm_mod, "build_compressor", _fake_build_compressor)
         monkeypatch.setattr(agent_mod, "Agent", _StubAgent)
 
         settings = _FactorySettings(
@@ -284,17 +285,18 @@ def test_build_agent_for_turn_reallocates_stale_session_id(tmp_path: Path, monke
             def __init__(self, **kwargs):
                 captured.update(kwargs)
 
-        import veles.cli as cli_mod
         import veles.core.agent as agent_mod
+        import veles.core.provider_factory as pf_mod
+        import veles.runtime.assembly as asm_mod
 
-        monkeypatch.setattr(cli_mod, "_make_provider", lambda name, model=None: _StubProvider())
+        monkeypatch.setattr(pf_mod, "make_provider", lambda name, model=None: _StubProvider())
         monkeypatch.setattr(
-            cli_mod, "_load_skills", lambda p, t, *, provider, model, **_kw: object()
+            asm_mod, "_load_skills", lambda p, t, *, provider, model, **_kw: object()
         )
         monkeypatch.setattr(
-            cli_mod, "build_run_system_prompt", lambda p, *, prompt="", **_kw: "STUB"
+            asm_mod, "build_run_system_prompt", lambda p, *, prompt="", **_kw: "STUB"
         )
-        monkeypatch.setattr(cli_mod, "build_compressor", lambda p, prov, **_kw: None)
+        monkeypatch.setattr(asm_mod, "build_compressor", lambda p, prov, **_kw: None)
         monkeypatch.setattr(agent_mod, "Agent", _StubAgent)
 
         settings = _FactorySettings(
@@ -351,8 +353,9 @@ def test_make_agent_factory_reuses_provider_and_compressor_across_turns(
             def __init__(self, **kwargs):
                 models_seen.append(kwargs.get("model"))
 
-        import veles.cli as cli_mod
         import veles.core.agent as agent_mod
+        import veles.core.provider_factory as pf_mod
+        import veles.runtime.assembly as asm_mod
 
         def _count_provider(name, model=None):
             provider_builds["n"] += 1
@@ -362,13 +365,13 @@ def test_make_agent_factory_reuses_provider_and_compressor_across_turns(
             compressor_builds["n"] += 1
             return None
 
-        monkeypatch.setattr(cli_mod, "_make_provider", _count_provider)
-        monkeypatch.setattr(cli_mod, "build_compressor", _count_compressor)
+        monkeypatch.setattr(pf_mod, "make_provider", _count_provider)
+        monkeypatch.setattr(asm_mod, "build_compressor", _count_compressor)
         monkeypatch.setattr(
-            cli_mod, "_load_skills", lambda p, t, *, provider, model, **_kw: object()
+            asm_mod, "_load_skills", lambda p, t, *, provider, model, **_kw: object()
         )
         monkeypatch.setattr(
-            cli_mod, "build_run_system_prompt", lambda p, *, prompt="", **_kw: "STUB"
+            asm_mod, "build_run_system_prompt", lambda p, *, prompt="", **_kw: "STUB"
         )
         monkeypatch.setattr(agent_mod, "Agent", _StubAgent)
 

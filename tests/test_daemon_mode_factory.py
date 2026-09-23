@@ -13,11 +13,11 @@ from pathlib import Path
 
 import pytest
 
-from veles.cli import _PLANNING_TOOLS, _RUN_TOOLS
-from veles.cli.commands.daemon import _build_agent_for_turn, _FactorySettings
 from veles.core.memory import SessionStore
 from veles.core.modes import get_mode
 from veles.core.project import init_project
+from veles.daemon.agent_factory import _build_agent_for_turn, _FactorySettings
+from veles.runtime.assembly import _PLANNING_TOOLS, _RUN_TOOLS
 
 _SETTINGS = _FactorySettings(
     provider_name="openrouter",
@@ -37,8 +37,9 @@ _SETTINGS = _FactorySettings(
 def build(tmp_path: Path, monkeypatch):
     """`_build_agent_for_turn` with the provider, skills and Agent stubbed;
     returns (build_fn, captured Agent kwargs, toolsets asked of _load_skills)."""
-    import veles.cli as cli_mod
     import veles.core.agent as agent_mod
+    import veles.core.provider_factory as pf_mod
+    import veles.runtime.assembly as asm_mod
 
     project = init_project(tmp_path, name=None, force=False)
     store = SessionStore(project.memory_db_path)
@@ -53,10 +54,10 @@ def build(tmp_path: Path, monkeypatch):
         def __init__(self, **kwargs):
             captured.update(kwargs)
 
-    monkeypatch.setattr(cli_mod, "_make_provider", lambda *a, **k: object())
-    monkeypatch.setattr(cli_mod, "_load_skills", fake_load_skills)
-    monkeypatch.setattr(cli_mod, "build_run_system_prompt", lambda *a, **k: "BASE")
-    monkeypatch.setattr(cli_mod, "build_compressor", lambda *a, **k: None)
+    monkeypatch.setattr(pf_mod, "make_provider", lambda *a, **k: object())
+    monkeypatch.setattr(asm_mod, "_load_skills", fake_load_skills)
+    monkeypatch.setattr(asm_mod, "build_run_system_prompt", lambda *a, **k: "BASE")
+    monkeypatch.setattr(asm_mod, "build_compressor", lambda *a, **k: None)
     monkeypatch.setattr(agent_mod, "Agent", _StubAgent)
 
     def _build(**kw):

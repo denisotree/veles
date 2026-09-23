@@ -1,9 +1,8 @@
-"""Entry-point default provider/model ids.
+"""Entry-point defaults: provider/model ids, loop budgets, compression, daemon bind.
 
-Kept in `veles.core` so `core.model_resolver` does not import from
-`veles.cli` (M194 — core must not reach up into the CLI layer). Re-exported
-by `veles.cli._parsers._common` so the argparse `default=...` wiring and
-existing imports keep working unchanged.
+Kept in `veles.core` so the core, the runtime and the daemon can read them
+without importing the CLI. `veles.cli._parsers._common` wires them into the
+argparse `default=...` values.
 """
 
 from __future__ import annotations
@@ -14,6 +13,14 @@ from __future__ import annotations
 # configured" error instead of silently using a cloud model.
 DEFAULT_MODEL = ""
 DEFAULT_PROVIDER = "openrouter"
+
+# A high runaway backstop, NOT a task budget. A turn may make as many tool calls
+# as the work needs; the real "am I stuck?" stop is the StallGuard (repeats of
+# the same tool-call signature → forced answer round) plus the token budget.
+DEFAULT_MAX_ITERATIONS = 1000
+DEFAULT_MAX_TOKENS_TOTAL = 100_000
+DEFAULT_COMPRESSOR_MODEL = "anthropic/claude-haiku-4.5"
+DEFAULT_COMPRESS_THRESHOLD_TOKENS = 50_000
 
 # Where a daemon binds when neither a flag nor `[daemon]` config says otherwise.
 DEFAULT_DAEMON_HOST = "127.0.0.1"

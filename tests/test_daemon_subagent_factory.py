@@ -26,8 +26,9 @@ from veles.daemon.runner import new_run_handle, run_agent_in_background
 
 
 def _patched_cli(monkeypatch, captured: dict):
-    import veles.cli as cli_mod
     import veles.core.agent as agent_mod
+    import veles.core.provider_factory as pf_mod
+    import veles.runtime.assembly as asm_mod
 
     class _StubProvider:
         pass
@@ -36,14 +37,14 @@ def _patched_cli(monkeypatch, captured: dict):
         def __init__(self, **kwargs):
             captured.update(kwargs)
 
-    monkeypatch.setattr(cli_mod, "_make_provider", lambda name, model=None: _StubProvider())
+    monkeypatch.setattr(pf_mod, "make_provider", lambda name, model=None: _StubProvider())
     monkeypatch.setattr(
-        cli_mod,
+        asm_mod,
         "_load_skills",
         lambda p, t, *, provider, model, **_kw: captured.__setitem__("tools", tuple(t)) or object(),
     )
-    monkeypatch.setattr(cli_mod, "build_run_system_prompt", lambda p, *, prompt="", **_kw: "STUB")
-    monkeypatch.setattr(cli_mod, "build_compressor", lambda p, prov, **_kw: None)
+    monkeypatch.setattr(asm_mod, "build_run_system_prompt", lambda p, *, prompt="", **_kw: "STUB")
+    monkeypatch.setattr(asm_mod, "build_compressor", lambda p, prov, **_kw: None)
     monkeypatch.setattr(agent_mod, "Agent", _StubAgent)
 
 

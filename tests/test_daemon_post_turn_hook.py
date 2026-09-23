@@ -10,9 +10,9 @@ import argparse
 from pathlib import Path
 from typing import ClassVar
 
-import veles.cli as cli_mod
-from veles.cli.commands.daemon import _make_post_turn_hook
+import veles.runtime.learning as learning_mod
 from veles.core.project import init_project
+from veles.daemon.agent_factory import _make_post_turn_hook
 
 
 def _stub_args() -> argparse.Namespace:
@@ -29,12 +29,12 @@ def test_post_turn_hook_fires_every_step(tmp_path: Path, monkeypatch) -> None:
 
         return _fn
 
-    monkeypatch.setattr(cli_mod, "_maybe_run_insight_extractor", _track("insight"))
-    monkeypatch.setattr(cli_mod, "_maybe_run_post_turn_curator", _track("curator"))
-    monkeypatch.setattr(cli_mod, "_maybe_run_subproject_proposer", _track("proposer"))
-    monkeypatch.setattr(cli_mod, "_maybe_suggest_promotions", _track("promotions"))
-    monkeypatch.setattr(cli_mod, "_maybe_refresh_nl_routing", _track("routing"))
-    monkeypatch.setattr(cli_mod, "_maybe_refresh_self_doc", _track("self_doc"))
+    monkeypatch.setattr(learning_mod, "_maybe_run_insight_extractor", _track("insight"))
+    monkeypatch.setattr(learning_mod, "_maybe_run_post_turn_curator", _track("curator"))
+    monkeypatch.setattr(learning_mod, "_maybe_run_subproject_proposer", _track("proposer"))
+    monkeypatch.setattr(learning_mod, "_maybe_suggest_promotions", _track("promotions"))
+    monkeypatch.setattr(learning_mod, "_maybe_refresh_nl_routing", _track("routing"))
+    monkeypatch.setattr(learning_mod, "_maybe_refresh_self_doc", _track("self_doc"))
 
     hook = _make_post_turn_hook(_stub_args(), project)
 
@@ -62,12 +62,12 @@ def test_post_turn_hook_keeps_going_when_one_step_fails(
     def _raise(*_a, **_kw):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(cli_mod, "_maybe_run_insight_extractor", _raise)
-    monkeypatch.setattr(cli_mod, "_maybe_run_post_turn_curator", _ok("curator"))
-    monkeypatch.setattr(cli_mod, "_maybe_run_subproject_proposer", _ok("proposer"))
-    monkeypatch.setattr(cli_mod, "_maybe_suggest_promotions", _ok("promotions"))
-    monkeypatch.setattr(cli_mod, "_maybe_refresh_nl_routing", _ok("routing"))
-    monkeypatch.setattr(cli_mod, "_maybe_refresh_self_doc", _ok("self_doc"))
+    monkeypatch.setattr(learning_mod, "_maybe_run_insight_extractor", _raise)
+    monkeypatch.setattr(learning_mod, "_maybe_run_post_turn_curator", _ok("curator"))
+    monkeypatch.setattr(learning_mod, "_maybe_run_subproject_proposer", _ok("proposer"))
+    monkeypatch.setattr(learning_mod, "_maybe_suggest_promotions", _ok("promotions"))
+    monkeypatch.setattr(learning_mod, "_maybe_refresh_nl_routing", _ok("routing"))
+    monkeypatch.setattr(learning_mod, "_maybe_refresh_self_doc", _ok("self_doc"))
 
     hook = _make_post_turn_hook(_stub_args(), project)
 

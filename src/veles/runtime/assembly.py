@@ -1,7 +1,7 @@
-"""Run-loop infrastructure shared by every agent-driven CLI verb (M46 final).
+"""Run-loop infrastructure shared by every front end that runs an agent.
 
-Houses the helpers that `_cmd_run`, `_cmd_ingest`, `_cmd_query`, `_cmd_lint`
-and the curator's `_curate_one_session` all use to:
+The CLI verbs (`run`, `add`, `research`, …), the REPL, the daemon and the
+curator (`runtime/learning.py`) all use it to:
 
 - Compose the system prompt with AGENTS.md + INDEX.md + memory recall
   + cache-control breakpoint (`_build_run_system_prompt`).
@@ -18,10 +18,8 @@ and the curator's `_curate_one_session` all use to:
 - Manage the cumulative `TokenBudget` ContextVar across cli-delegate
   hops via `<project>/.veles/budget.state.json` (`_budget_scope`).
 
-`cli/__init__.py` re-exports every `_<name>` so `monkeypatch.setattr(
-"veles.cli._<helper>", fake)` continues to work — call sites in
-extracted command bodies use lazy `from veles.cli import _foo` imports
-to pick up the patched attribute at call time.
+Callers import these helpers inside the function that uses them, so a test
+that patches `veles.runtime.assembly.<name>` reaches every caller.
 """
 
 from __future__ import annotations
@@ -45,6 +43,7 @@ from veles.core.context_compressor import (
     CompressionConfig,
     make_default_compressor,
 )
+from veles.core.defaults import DEFAULT_COMPRESS_THRESHOLD_TOKENS
 from veles.core.memory.injector import build_memory_context_block, build_proposals_block
 from veles.core.memory.router import MemoryRouter
 from veles.core.project import (
@@ -77,8 +76,6 @@ _RECALL_BLOCK_CHARS_CAP = 4_000
 _RUN_TOOLS = _TOOLSETS["run"]
 _INGEST_TOOLS = _TOOLSETS["ingest"]
 _PLANNING_TOOLS = _TOOLSETS["planning"]
-
-_DEFAULT_COMPRESS_THRESHOLD_TOKENS = 50_000
 
 
 # ---- system prompt assembly ----
@@ -514,7 +511,7 @@ def build_compressor(
     *,
     no_compress: bool = False,
     compressor_model: str | None = None,
-    compress_threshold_tokens: int = _DEFAULT_COMPRESS_THRESHOLD_TOKENS,
+    compress_threshold_tokens: int = DEFAULT_COMPRESS_THRESHOLD_TOKENS,
     max_summariser_input_tokens: int | None = None,
     hard_ceiling_tokens: int | None = None,
 ):
@@ -581,7 +578,7 @@ def _build_compressor(args: argparse.Namespace, project: Project, provider: Prov
         no_compress=bool(getattr(args, "no_compress", False)),
         compressor_model=getattr(args, "compressor_model", None),
         compress_threshold_tokens=int(
-            getattr(args, "compress_threshold_tokens", _DEFAULT_COMPRESS_THRESHOLD_TOKENS)
+            getattr(args, "compress_threshold_tokens", DEFAULT_COMPRESS_THRESHOLD_TOKENS)
         ),
     )
 
@@ -754,8 +751,6 @@ def _make_tool_aware_provider(
         return GeminiCLIProvider(mcp_settings_dir=project.root)
     # Every other provider runs plain HTTP chat and gets Veles tools through the
     # standard tool-call path; the model lets local backends detect tool support.
-    from veles.core.provider_factory import make_provider
-
     return make_provider(name, model=skill_model)
 
 
