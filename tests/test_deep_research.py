@@ -197,10 +197,10 @@ def test_cmd_research_prints_report_and_manages_trust_env(tmp_path, monkeypatch,
             final_text="THE REPORT", handles=(), plan=WorkerPlan(objective=question)
         )
 
-    monkeypatch.setattr("veles.cli.build_run_system_prompt", lambda *a, **k: "base")
+    monkeypatch.setattr("veles.runtime.assembly.build_run_system_prompt", lambda *a, **k: "base")
     monkeypatch.setattr("veles.core.orchestration.research.run_deep_research", fake_run)
     # ollama isn't in the API-key env set, so _ensure_api_key isn't consulted.
-    monkeypatch.setattr("veles.cli._make_provider", lambda name: _ListProvider())
+    monkeypatch.setattr("veles.core.provider_factory.make_provider", lambda name: _ListProvider())
     monkeypatch.delenv("VELES_TRUST_AUTO_ALLOW", raising=False)
 
     from veles.cli.commands.research import cmd_research

@@ -77,7 +77,7 @@ def test_curate_prompt_instructs_memory_save_insight(project) -> None:
                 session_id="x",
             )
 
-    import veles.cli as cli_mod
+    import veles.runtime.assembly as cli_mod
     import veles.runtime.learning as curator_mod
     from veles.core.memory import SessionInfo
 

@@ -62,7 +62,7 @@ def test_build_runtime_passes_model_for_tool_autodetect(project, monkeypatch) ->
         seen["model"] = model
         return StubProvider(name=name)
 
-    monkeypatch.setattr("veles.cli._make_provider", _fake_make_provider)
+    monkeypatch.setattr("veles.core.provider_factory.make_provider", _fake_make_provider)
     _state, _factory, store, _subf = _build_runtime(_args(), project)
     store.close()
     assert seen["name"] == "ollama"

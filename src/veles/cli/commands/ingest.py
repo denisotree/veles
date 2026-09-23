@@ -44,8 +44,7 @@ def ingest_system_prompt(
     injected — the same prompt a `veles run` migration turn gets — instead of
     the retired single-page `INGEST_SYSTEM_PROMPT`. The result is qualified for
     the provider's MCP tool namespace (claude-cli/gemini-cli)."""
-    from veles.cli import _qualify_for_provider
-    from veles.runtime.assembly import build_run_system_prompt
+    from veles.runtime.assembly import _qualify_for_provider, build_run_system_prompt
 
     base = build_run_system_prompt(project, prompt="ingest a source into the wiki")
     if not base:
@@ -98,13 +97,12 @@ def _run_batch_ingest_cli(args: argparse.Namespace, project: Project, *, source:
 
 def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) -> int:
     """Ingest runner used by `cmd_add` (read a source → write a wiki page)."""
-    from veles.cli import (
+    from veles.cli._agent_builder import build_command_agent
+    from veles.cli._console import ensure_api_key
+    from veles.runtime.assembly import (
         _INGEST_TOOLS,
-        _PROVIDER_API_KEY_ENVS,
-        _ensure_api_key,
         _print_run_summary,
         _run_agent_streaming_aware,
-        build_command_agent,
     )
 
     # M162: ingest is a wiki-engine operation — the active layout pack
@@ -120,7 +118,7 @@ def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) 
         )
         return 2
 
-    if args.provider in _PROVIDER_API_KEY_ENVS and not _ensure_api_key(args.provider):
+    if not ensure_api_key(args.provider):
         return 2
     Wiki(project.wiki_root).ensure_layout()
     # M152: shared construction spine. The key was already gated above

@@ -20,7 +20,7 @@ from typing import Any, cast
 
 import pytest
 
-import veles.cli as cli
+import veles.cli._agent_builder as cli
 from veles.cli.commands.run import EXIT_BY_REASON, cmd_run
 from veles.core.project import Project, init_project
 from veles.core.provider import ProviderError

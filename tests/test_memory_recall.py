@@ -192,7 +192,7 @@ def _run_args(prompt: str = "test prompt") -> argparse.Namespace:
 
 
 def test_prompt_includes_memory_context_when_wiki_has_matches(tmp_path: Path) -> None:
-    from veles.cli import _build_run_system_prompt
+    from veles.runtime.assembly import _build_run_system_prompt
 
     project = init_project(tmp_path, name="t")
     _seed_wiki(
@@ -209,7 +209,7 @@ def test_prompt_includes_memory_context_when_wiki_has_matches(tmp_path: Path) ->
 
 
 def test_prompt_no_memory_context_when_wiki_empty(tmp_path: Path) -> None:
-    from veles.cli import _build_run_system_prompt
+    from veles.runtime.assembly import _build_run_system_prompt
 
     project = init_project(tmp_path, name="t")
     args = _run_args(prompt="anything")
@@ -221,7 +221,7 @@ def test_prompt_no_memory_context_when_wiki_empty(tmp_path: Path) -> None:
 
 
 def test_prompt_skips_recall_with_empty_prompt(tmp_path: Path) -> None:
-    from veles.cli import _build_run_system_prompt
+    from veles.runtime.assembly import _build_run_system_prompt
 
     project = init_project(tmp_path, name="t")
     _seed_wiki(project.root, [("concepts", "x", "X", "body keyword")])

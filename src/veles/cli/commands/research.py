@@ -22,27 +22,22 @@ from veles.core.trust import trust_auto_allow
 
 
 def cmd_research(args: argparse.Namespace, project: Project) -> int:
-    from veles.cli import (
-        _PROVIDER_API_KEY_ENVS,
-        _budget_scope,
-        _build_compressor,
-        _ensure_api_key,
-        _make_provider,
-        build_run_system_prompt,
-    )
+    from veles.cli._console import ensure_api_key
     from veles.core.orchestration.research import (
         RESEARCH_EXPLORER_TOOLS,
         make_llm_planner,
         run_deep_research,
     )
+    from veles.core.provider_factory import make_provider as _make_provider
     from veles.core.tools import registry as builtin_registry
+    from veles.runtime.assembly import _budget_scope, _build_compressor, build_run_system_prompt
 
     question = (getattr(args, "question", "") or "").strip()
     if not question:
         sys.stderr.write("error: a research question is required\n")
         return 2
 
-    if args.provider in _PROVIDER_API_KEY_ENVS and not _ensure_api_key(args.provider):
+    if not ensure_api_key(args.provider):
         return 2
 
     provider = _make_provider(args.provider)

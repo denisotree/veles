@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from veles.cli import _build_parser
+from veles.cli._parsers import build_parser as _build_parser
 from veles.cli._parsers._common import (
     DEFAULT_MAX_ITERATIONS,
     DEFAULT_MAX_TOKENS_TOTAL,

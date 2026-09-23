@@ -1,7 +1,7 @@
 """Unit tests for the `veles curate` command logic.
 
-Avoids real LLM calls by monkey-patching `_run_agent_streaming_aware` at
-the cli.py module level. The curator's contract — cursor advancement,
+Avoids real LLM calls by monkey-patching `_run_agent_streaming_aware` on
+`veles.runtime.assembly`. The curator's contract — cursor advancement,
 quiet-window filter, failure-stops-batch — is asserted on observable
 state files and store cursors, not internal call counts.
 """
@@ -15,25 +15,25 @@ from typing import Any
 
 import pytest
 
-from veles.cli import (
-    _CURATE_QUIET_WINDOW_SEC,
-    _CURATOR_IDLE_THRESHOLD_SEC,
-    _cmd_curate,
-    _continuous_curator_eligible,
-    _curate_one_session,
-    _maybe_run_idle_curator,
-    _maybe_run_post_turn_curator,
-    _render_message,
-    _truncate_session_messages,
-)
+from veles.cli.commands.curate import cmd_curate as _cmd_curate
 from veles.core.agent import RunResult
 from veles.core.context import TokenBudget
+from veles.core.curator import _render_message
 from veles.core.curator_state import CuratorState
 from veles.core.curator_state import load as load_curator_state
 from veles.core.curator_state import save_atomic as save_curator_state
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.core.provider import Message, ToolCall
+from veles.runtime.learning import (
+    _CURATE_QUIET_WINDOW_SEC,
+    _CURATOR_IDLE_THRESHOLD_SEC,
+    _continuous_curator_eligible,
+    _curate_one_session,
+    _maybe_run_idle_curator,
+    _maybe_run_post_turn_curator,
+    _truncate_session_messages,
+)
 
 
 def _make_args(provider: str = "openrouter", **overrides: Any) -> Any:

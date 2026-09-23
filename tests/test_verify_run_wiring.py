@@ -159,7 +159,8 @@ def test_fail_with_same_advisor_model_warns_and_keeps_base(monkeypatch, capsys):
 def test_build_escalator_runs_on_advisor_route_and_returns_result(monkeypatch):
     """Exercise the REAL _build_escalator: it must build the agent on the
     advisor provider/model with the run toolset and run it buffered."""
-    import veles.cli as cli
+    import veles.cli._agent_builder as builder
+    import veles.runtime.assembly as assembly
 
     stub_result = _FakeResult("STRONGER ANSWER", session_id="esc")
     captured = {}
@@ -175,8 +176,8 @@ def test_build_escalator_runs_on_advisor_route_and_returns_result(monkeypatch):
         captured["tool_aware"] = kw.get("tool_aware")
         return _StubAgent()
 
-    monkeypatch.setattr(cli, "build_command_agent", fake_build)
-    monkeypatch.setattr(cli, "_build_run_system_prompt", lambda a, p: "")
+    monkeypatch.setattr(builder, "build_command_agent", fake_build)
+    monkeypatch.setattr(assembly, "_build_run_system_prompt", lambda a, p: "")
 
     esc = _build_escalator(_args(), object(), "claude-cli", "sonnet", store=None)
     out = esc("redo this")
@@ -189,7 +190,8 @@ def test_build_escalator_runs_on_advisor_route_and_returns_result(monkeypatch):
 
 
 def test_build_escalator_tool_aware_false_for_direct_provider(monkeypatch):
-    import veles.cli as cli
+    import veles.cli._agent_builder as builder
+    import veles.runtime.assembly as assembly
 
     captured = {}
 
@@ -201,8 +203,8 @@ def test_build_escalator_tool_aware_false_for_direct_provider(monkeypatch):
         captured["tool_aware"] = kw.get("tool_aware")
         return _StubAgent()
 
-    monkeypatch.setattr(cli, "build_command_agent", fake_build)
-    monkeypatch.setattr(cli, "_build_run_system_prompt", lambda a, p: "")
+    monkeypatch.setattr(builder, "build_command_agent", fake_build)
+    monkeypatch.setattr(assembly, "_build_run_system_prompt", lambda a, p: "")
 
     _build_escalator(_args(), object(), "anthropic", "claude-x", store=None)("p")
     assert captured["tool_aware"] is False
@@ -211,10 +213,11 @@ def test_build_escalator_tool_aware_false_for_direct_provider(monkeypatch):
 def test_build_escalator_returns_none_when_agent_unbuildable(monkeypatch):
     """Missing key etc. → build_command_agent returns None → escalator None,
     which the caller treats as 'no escalation route' (keeps the base answer)."""
-    import veles.cli as cli
+    import veles.cli._agent_builder as builder
+    import veles.runtime.assembly as assembly
 
-    monkeypatch.setattr(cli, "build_command_agent", lambda *a, **k: None)
-    monkeypatch.setattr(cli, "_build_run_system_prompt", lambda a, p: "")
+    monkeypatch.setattr(builder, "build_command_agent", lambda *a, **k: None)
+    monkeypatch.setattr(assembly, "_build_run_system_prompt", lambda a, p: "")
 
     esc = _build_escalator(_args(), object(), "claude-cli", "sonnet", store=None)
     assert esc("p") is None
@@ -224,7 +227,7 @@ def test_build_escalator_returns_none_when_agent_unbuildable(monkeypatch):
 
 
 def test_emit_output_false_suppresses_print(capsys):
-    from veles.cli import _run_agent_streaming_aware
+    from veles.runtime.assembly import _run_agent_streaming_aware
 
     class _StubAgent:
         def run(self, prompt, on_text_delta=None, event_listener=None):

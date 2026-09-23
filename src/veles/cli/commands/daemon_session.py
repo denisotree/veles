@@ -34,7 +34,7 @@ def cmd_daemon_session(args: argparse.Namespace) -> int:
 
 
 def _resolve_project(args: argparse.Namespace):
-    from veles.cli import _resolve_active_project
+    from veles.cli._project import _resolve_active_project
 
     project = _resolve_active_project(args)
     if project is None:

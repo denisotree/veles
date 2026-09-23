@@ -36,7 +36,7 @@ def _bootstrap_daemon(project, *, name: str | None = None) -> None:
     routes its diagnostics into `~/.veles/logs/daemon-<slug>.log`. For a
     named session the slug is `<project>-<name>` so each instance gets
     its own log file (`instance_log_path`)."""
-    from veles.cli import _load_project_modules
+    from veles.cli._project import _load_project_modules
     from veles.core.context import set_active_project
     from veles.core.modules import set_module_registry
 
@@ -365,7 +365,7 @@ def _stop_status_paths(args: argparse.Namespace):
     unnamed-daemon paths (per-slug since M209 — stop/status address THIS
     project's daemon; other projects' daemons are managed via `veles
     daemon list/restart/delete`). Returns None outside a project."""
-    from veles.cli import _resolve_active_project
+    from veles.cli._project import _resolve_active_project
 
     project = _resolve_active_project(args)
     if project is None:
@@ -378,7 +378,7 @@ def _restart_named_session(args: argparse.Namespace, name: str) -> int:
     """`veles daemon restart --name <name>` — stop this project's named
     session (per-instance pid) and respawn it from its `[daemon.<name>]`
     block. Project-local; does not touch the M97 cross-project registry."""
-    from veles.cli import _resolve_active_project
+    from veles.cli._project import _resolve_active_project
     from veles.core.project_config import get_daemon_session_config, load_project_config
     from veles.daemon.spawn import spawn_daemon
 

@@ -96,11 +96,8 @@ def _merge_with_curated(live: list[str], provider: str) -> list[str]:
 def _try_live(provider: str) -> list[str] | None:
     """Build adapter and call `list_models()`. Returns `None` on any
     failure (missing key, no method, network/auth error)."""
-    try:
-        from veles.cli import _make_provider
-    except Exception as exc:  # pragma: no cover — import path is stable
-        _logger.debug("model fetcher: cannot import _make_provider: %s", exc)
-        return None
+    from veles.core.provider_factory import make_provider as _make_provider
+
     try:
         adapter = _make_provider(provider)
     except Exception as exc:

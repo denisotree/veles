@@ -167,7 +167,7 @@ def _add(args: argparse.Namespace, project: Project) -> int:
 
 
 def _remove(args: argparse.Namespace, project: Project) -> int:
-    from veles.cli import _confirm  # back-import (deferred)
+    from veles.cli._console import confirm as _confirm
 
     scope = args.scope
     target_dir = user_skills_dir() if scope == "user" else project.skills_dir
@@ -208,7 +208,7 @@ def _promote(args: argparse.Namespace, project: Project) -> int:
 
 
 def _demote(args: argparse.Namespace, project: Project) -> int:
-    from veles.cli import _confirm  # back-import (deferred)
+    from veles.cli._console import confirm as _confirm
 
     target = project.skills_dir / args.name
     if not args.yes and not _confirm(

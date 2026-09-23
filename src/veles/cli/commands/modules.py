@@ -75,10 +75,10 @@ def _add(args: argparse.Namespace, project: Project) -> int:
 
 
 def _remove(args: argparse.Namespace, project: Project) -> int:
-    from veles.cli import _confirm  # back-import (deferred)
+    from veles.cli._console import confirm
 
     target = project.modules_dir / args.name
-    if not args.yes and not _confirm(f"Remove module {args.name!r} ({target})? [y/N]"):
+    if not args.yes and not confirm(f"Remove module {args.name!r} ({target})? [y/N]"):
         print("<aborted>", file=sys.stderr)
         return 1
     try:

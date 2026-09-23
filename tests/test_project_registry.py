@@ -206,7 +206,7 @@ def test_load_skips_malformed_entries(monkeypatch: pytest.MonkeyPatch, tmp_path:
 
 
 def test_slash_prefix_switches_project(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    from veles.cli import _maybe_apply_project_slash_prefix
+    from veles.runtime.assembly import _maybe_apply_project_slash_prefix
 
     path = _registry_path(monkeypatch, tmp_path)
     target = init_project(tmp_path / "target", name="target")
@@ -225,7 +225,7 @@ def test_slash_prefix_switches_project(monkeypatch: pytest.MonkeyPatch, tmp_path
 def test_slash_prefix_passthrough_when_no_match(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from veles.cli import _maybe_apply_project_slash_prefix
+    from veles.runtime.assembly import _maybe_apply_project_slash_prefix
 
     _registry_path(monkeypatch, tmp_path)
     cwd_proj = init_project(tmp_path / "cwd", name="cwd")
@@ -239,7 +239,7 @@ def test_slash_prefix_unknown_slug_warns_and_keeps_cwd(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    from veles.cli import _maybe_apply_project_slash_prefix
+    from veles.runtime.assembly import _maybe_apply_project_slash_prefix
 
     _registry_path(monkeypatch, tmp_path)
     cwd_proj = init_project(tmp_path / "cwd", name="cwd")
@@ -253,7 +253,7 @@ def test_slash_prefix_unknown_slug_warns_and_keeps_cwd(
 def test_slash_prefix_match_with_no_rest_uses_placeholder(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from veles.cli import _maybe_apply_project_slash_prefix
+    from veles.runtime.assembly import _maybe_apply_project_slash_prefix
 
     path = _registry_path(monkeypatch, tmp_path)
     target = init_project(tmp_path / "target", name="target")

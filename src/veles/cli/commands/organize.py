@@ -63,13 +63,9 @@ def _user_message(project: Project, *, scope: str | None, apply: bool) -> str:
 
 def cmd_organize(args: argparse.Namespace, project: Project) -> int:
     """Entry point for `veles organize`. Returns a process exit code."""
-    from veles.cli import (
-        _PROVIDER_API_KEY_ENVS,
-        _ensure_api_key,
-        _print_run_summary,
-        _run_agent_streaming_aware,
-        build_command_agent,
-    )
+    from veles.cli._agent_builder import build_command_agent
+    from veles.cli._console import ensure_api_key
+    from veles.runtime.assembly import _print_run_summary, _run_agent_streaming_aware
 
     resolved = resolve_operation(project, _OP_NAME)
     if resolved is None:
@@ -83,7 +79,7 @@ def cmd_organize(args: argparse.Namespace, project: Project) -> int:
         )
         return 2
 
-    if args.provider in _PROVIDER_API_KEY_ENVS and not _ensure_api_key(args.provider):
+    if not ensure_api_key(args.provider):
         return 2
 
     apply = bool(getattr(args, "apply", False))

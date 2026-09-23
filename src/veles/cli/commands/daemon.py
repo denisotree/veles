@@ -151,7 +151,8 @@ def _warn_on_security_config_typos(project) -> None:
 
 
 def _cmd_daemon_start(args: argparse.Namespace) -> int:
-    from veles.cli import _ensure_api_key, _resolve_active_project
+    from veles.cli._console import ensure_api_key as _ensure_api_key
+    from veles.cli._project import _resolve_active_project
     from veles.core.memory import SessionStore
     from veles.daemon.server import build_state, make_app
 
@@ -598,7 +599,7 @@ def _cmd_daemon_picker(args: argparse.Namespace) -> int:
     # Resolve the project from cwd (best-effort) so the picker can also show
     # this project's runtime sessions (named daemons + the kind=tui row);
     # None just hides that section (M138-followup).
-    from veles.cli import _resolve_active_project
+    from veles.cli._project import _resolve_active_project
 
     project = _resolve_active_project(args)
     # Disable Textual mouse-mode so the terminal handles drag-to-select +
@@ -688,7 +689,7 @@ def _cmd_daemon_delete(args: argparse.Namespace) -> int:
     then remove from the registry. Does NOT delete the project's
     `.veles/` data — that's the user's content. Use `--yes`/`-y` to
     skip the prompt for scripted use (CI, ansible)."""
-    from veles.cli import _confirm
+    from veles.cli._console import confirm as _confirm
     from veles.daemon.registry import DaemonRegistry
 
     slug = _resolve_target_slug(args)

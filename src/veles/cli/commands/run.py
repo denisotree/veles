@@ -46,11 +46,11 @@ def _build_escalator(args, project, adv_provider, adv_model, store):
     """Return `escalator(prompt) -> RunResult` that re-runs the prompt on the
     advisor-tier model with the full run tool surface. None when the advisor
     agent can't be built (e.g. missing API key)."""
-    from veles.cli import (
+    from veles.cli._agent_builder import build_command_agent
+    from veles.runtime.assembly import (
         _RUN_TOOLS,
         _build_run_system_prompt,
         _run_agent_streaming_aware,
-        build_command_agent,
     )
 
     esc_args = argparse.Namespace(**vars(args))
@@ -171,12 +171,12 @@ def _maybe_run_via_manager(args: argparse.Namespace, project: Project) -> bool:
     # Build an agent factory that closes over the existing
     # provider / model / registry plumbing. Sub-agents see the
     # same tool surface as the direct agent would.
-    from veles.cli import (
+    from veles.core.provider_factory import make_provider as _make_provider
+    from veles.runtime.assembly import (
         _RUN_TOOLS,
         _build_compressor,
         _build_run_system_prompt,
         _load_skills,
-        _make_provider,
     )
 
     provider = _make_provider(args.provider)
@@ -199,13 +199,24 @@ def _maybe_run_via_manager(args: argparse.Namespace, project: Project) -> bool:
 
 
 def cmd_run(args: argparse.Namespace, project: Project) -> int:
-    # Lazy imports so monkey-patches at `veles.cli._<helper>` win at call time.
-    from veles.cli import (
-        _PROVIDER_API_KEY_ENVS,
+    # Lazy imports so monkey-patches on the owning modules win at call time.
+    from veles.cli._agent_builder import build_command_agent
+    from veles.cli._console import ensure_api_key
+    from veles.cli._project import _touch_active_project
+    from veles.core.model_resolver import (
+        ConfigurationError,
+        ensure_model_configured,
+        resolve_effective_model,
+        resolve_effective_provider,
+    )
+    from veles.runtime.assembly import (
         _RUN_TOOLS,
         _build_run_system_prompt,
-        _ensure_api_key,
         _maybe_apply_project_slash_prefix,
+        _print_run_summary,
+        _run_agent_streaming_aware,
+    )
+    from veles.runtime.learning import (
         _maybe_refresh_nl_routing,
         _maybe_refresh_self_doc,
         _maybe_run_idle_curator,
@@ -213,16 +224,6 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
         _maybe_run_post_turn_curator,
         _maybe_run_subproject_proposer,
         _maybe_suggest_promotions,
-        _print_run_summary,
-        _run_agent_streaming_aware,
-        _touch_active_project,
-        build_command_agent,
-    )
-    from veles.core.model_resolver import (
-        ConfigurationError,
-        ensure_model_configured,
-        resolve_effective_model,
-        resolve_effective_provider,
     )
 
     # M165: resolve provider + model from config (explicit flag → project
@@ -236,7 +237,7 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    if args.provider in _PROVIDER_API_KEY_ENVS and not _ensure_api_key(args.provider):
+    if not ensure_api_key(args.provider):
         return 2
 
     project, args.prompt = _maybe_apply_project_slash_prefix(project, args.prompt)

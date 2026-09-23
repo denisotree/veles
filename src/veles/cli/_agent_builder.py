@@ -8,11 +8,9 @@ compressor → load project skills into a tool registry → construct the
 points where the two commands actually differ (toolset, provider
 bridging, compressor presence, prompt source, session persistence).
 
-Monkeypatch contract: every helper is resolved lazily off the
-`veles.cli` package (`cli._make_provider`, `cli._load_skills`, ...) so
-`monkeypatch.setattr("veles.cli._<helper>", fake)` keeps winning at
-call time — same contract the extracted command bodies follow (see the
-note in `cli/_runtime.py`).
+Monkeypatch contract: every helper is looked up on its owning module at call
+time (`veles.runtime.assembly`, `veles.core.provider_factory`,
+`veles.cli._console`), so tests patch it there.
 """
 
 from __future__ import annotations
@@ -59,29 +57,29 @@ def build_command_agent(
     - ``registry``: pre-built tool registry; default loads project
       skills on top of ``tools`` via `_load_skills`.
     """
-    # Lazy package import so `monkeypatch.setattr("veles.cli._<helper>", ...)`
-    # is picked up at call time, not at module-import time.
-    import veles.cli as cli
+    # Helpers are looked up on their owning modules at call time, so a test's
+    # `monkeypatch.setattr` on that module is picked up.
+    from veles.cli import _console
+    from veles.core import provider_factory
+    from veles.runtime import assembly
 
-    if (
-        check_api_key
-        and args.provider in cli._PROVIDER_API_KEY_ENVS
-        and not cli._ensure_api_key(args.provider)
-    ):
+    if check_api_key and not _console.ensure_api_key(args.provider):
         return None
 
     if tool_aware:
-        provider = cli._make_tool_aware_provider(args.provider, project, skill_model=args.model)
+        provider = assembly._make_tool_aware_provider(
+            args.provider, project, skill_model=args.model
+        )
     else:
-        provider = cli._make_provider(args.provider, args.model)
+        provider = provider_factory.make_provider(args.provider, args.model)
 
     if callable(system_prompt):
         system_prompt = system_prompt(provider)
 
-    compressor = cli._build_compressor(args, project, provider) if with_compressor else None
+    compressor = assembly._build_compressor(args, project, provider) if with_compressor else None
 
     if registry is None:
-        registry = cli._load_skills(project, tools, provider=provider, model=args.model)
+        registry = assembly._load_skills(project, tools, provider=provider, model=args.model)
 
     return Agent(
         provider=provider,

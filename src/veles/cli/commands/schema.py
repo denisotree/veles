@@ -14,7 +14,7 @@ from veles.core.project import Project
 
 def cmd_schema_dispatch(args: argparse.Namespace) -> int:
     """Both subcommands need an active project; resolve it lazily."""
-    from veles.cli import _resolve_active_project  # back-import (deferred)
+    from veles.cli._project import _resolve_active_project
 
     project = _resolve_active_project(args)
     if project is None:

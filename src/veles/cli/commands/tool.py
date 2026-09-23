@@ -168,7 +168,7 @@ def _cmd_approve(args: argparse.Namespace, project: Project) -> int:
         print(f"\n===== {f} =====")
         print(f.read_text())
         print("=" * (len(str(f)) + 12))
-        from veles.cli import _confirm
+        from veles.cli._console import confirm as _confirm
 
         if not getattr(args, "yes", False) and not _confirm(
             f"Approve '{f.name}' to execute its code at load? [y/N]"
@@ -317,7 +317,7 @@ def _cmd_promote(args: argparse.Namespace, project: Project) -> int:
         )
         return 1
 
-    from veles.cli import _confirm
+    from veles.cli._console import confirm as _confirm
 
     if not args.yes and not _confirm(
         f"Move {src} → {dst} (tool '{name}' becomes user-global)? [y/N]"

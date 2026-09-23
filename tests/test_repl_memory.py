@@ -89,7 +89,7 @@ def test_repl_post_turn_hooks_fire_insight_and_curator(
     """M191: after a REPL turn the same learning-loop hooks `veles run` fires —
     insight extraction + post-turn curation (dream rides inside) — run, so the
     flagship REPL actually builds project memory (it ran none before M191)."""
-    import veles.cli as cli
+    import veles.runtime.learning as cli
     from veles.cli.commands.repl import _run_repl_post_turn_hooks
     from veles.core.agent import RunResult
 
@@ -114,7 +114,7 @@ def test_repl_post_turn_hooks_skip_when_turn_produced_no_result(
 ) -> None:
     """A cancelled/errored turn yields no RunResult — memory processing must be
     skipped, not fed a None result."""
-    import veles.cli as cli
+    import veles.runtime.learning as cli
     from veles.cli.commands.repl import _run_repl_post_turn_hooks
 
     calls: list[tuple] = []
@@ -136,7 +136,7 @@ def test_repl_post_turn_hooks_skip_cancelled_turn(
 ) -> None:
     """A user-cancelled turn (Ctrl+C) has no meaningful content — memory upkeep
     must skip it, not distil a half-finished interruption into an insight."""
-    import veles.cli as cli
+    import veles.runtime.learning as cli
     from veles.cli.commands.repl import _run_repl_post_turn_hooks
 
     calls: list[tuple] = []

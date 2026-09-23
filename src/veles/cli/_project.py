@@ -1,11 +1,7 @@
 """Project lifecycle helpers used by every CLI verb.
 
-Extracted from `cli/__init__.py` in M46 final. These helpers don't
-depend on the agent loop and have no internal cross-references, so the
-module is a pure leaf that's safe to import from any command body.
-
-`cli/__init__.py` re-exports each `_<name>` for backward compatibility
-with `from veles.cli import _foo` and `monkeypatch.setattr("veles.cli._foo", ...)`.
+These helpers don't depend on the agent loop, so the module is a leaf that is
+safe to import from any command body.
 """
 
 from __future__ import annotations

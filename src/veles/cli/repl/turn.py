@@ -89,7 +89,7 @@ def _repl_turn_system_prompt(
     recall (matches `veles run` with no prompt), so batch/mode-less callers
     keep the cache-stable stable-only prefix.
     """
-    from veles.cli import build_run_system_prompt
+    from veles.runtime.assembly import build_run_system_prompt
 
     sys_chunks: list[str] = []
     base = build_run_system_prompt(
@@ -124,7 +124,10 @@ def _run_repl_post_turn_hooks(args: argparse.Namespace, project: Project, result
     """
     if result is None or getattr(result, "stopped_reason", "") == "cancelled":
         return
-    from veles.cli import _maybe_run_insight_extractor, _maybe_run_post_turn_curator
+    from veles.runtime.learning import (
+        _maybe_run_insight_extractor,
+        _maybe_run_post_turn_curator,
+    )
 
     _maybe_run_insight_extractor(args, project, result.history, result.session_id)
     _maybe_run_post_turn_curator(args, project)
