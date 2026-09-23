@@ -1,33 +1,25 @@
-"""Daemon HTTP + WebSocket server (M51).
+"""Daemon HTTP + WebSocket server.
 
-aiohttp app exposing six endpoints under `/v1/`:
+`make_app` registers the `/v1/` API: health and status, runs (submit, list,
+read, stream events over a WebSocket, answer a pending prompt), sessions
+(list, read, delete, set mode, cancel goal), and — from `routes_jobs.py` — the
+scheduler's jobs and the dream runner. `make_app(...).router.routes()` is the
+authoritative list.
 
-    GET  /v1/health                           → unauth, status probe
-    POST /v1/runs                             → submit a prompt → run_id
-                                                (optional `deliver_to` pushes the
-                                                 answer to a DeliveryRouter target)
-    GET  /v1/runs                             → list run summaries (no answer text)
-    GET  /v1/runs/{run_id}                    → single run + `final_text`
-    WS   /v1/runs/{run_id}/events             → stream events
-    GET  /v1/sessions                         → list sessions
-    GET  /v1/sessions/{id}                    → session detail (history)
-    DELETE /v1/sessions/{id}                  → delete a session
-
-Every endpoint except `/v1/health` is gated by
-`bearer_auth_middleware`. The token store is reloaded on every request
-so out-of-band token CRUD propagates without a restart.
+Every endpoint except `/v1/health` is gated by `bearer_auth_middleware`. The
+token store is reloaded on every request so out-of-band token CRUD propagates
+without a restart. Channel gateways hosted by the daemon start from
+`channels.py`.
 
 The app accepts an `AgentFactory` callable so tests can inject stub
-providers without touching the network. Production CLI wires the
-factory to construct an `Agent` via the existing `_make_provider` +
-runtime helpers — see `cli/commands/daemon.py`.
+providers without touching the network; production wires it in
+`daemon/agent_factory.py`.
 """
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import logging
 import os
 import time
@@ -39,6 +31,8 @@ from aiohttp import WSMsgType, web
 from veles import __version__
 from veles.daemon.auth import TokenStore, bearer_auth_middleware
 from veles.daemon.channels import chat_session_slot, start_channel_runners
+from veles.daemon.http_util import json_object, runner_status
+from veles.daemon.routes_jobs import add_job_routes
 from veles.daemon.runner import (
     AgentFactory,
 )
@@ -68,38 +62,8 @@ def make_app(state: DaemonState) -> web.Application:
     app.router.add_delete("/v1/sessions/{session_id}", _handle_delete_session)
     app.router.add_patch("/v1/sessions/{session_id}", _handle_patch_session)
     app.router.add_delete("/v1/sessions/{session_id}/goal", _handle_cancel_session_goal)
-    # M75 jobs API
-    app.router.add_post("/v1/jobs", _handle_create_job)
-    app.router.add_get("/v1/jobs", _handle_list_jobs)
-    app.router.add_get("/v1/jobs/{job_id}", _handle_get_job)
-    app.router.add_patch("/v1/jobs/{job_id}", _handle_update_job)
-    app.router.add_delete("/v1/jobs/{job_id}", _handle_delete_job)
-    app.router.add_post("/v1/jobs/{job_id}/trigger", _handle_trigger_job)
-    app.router.add_get("/v1/jobs/{job_id}/runs", _handle_list_job_runs)
-    # M76 dream API
-    app.router.add_get("/v1/dream/status", _handle_dream_status)
-    app.router.add_post("/v1/dream/run", _handle_dream_run)
+    add_job_routes(app)
     return app
-
-
-async def _json_object(request: web.Request) -> dict[str, Any] | web.Response:
-    """The request body as a JSON object, or the 400 response to return."""
-    try:
-        body = await request.json()
-    except (json.JSONDecodeError, ValueError):
-        return web.json_response({"error": "body must be JSON"}, status=400)
-    if not isinstance(body, dict):
-        return web.json_response({"error": "body must be a JSON object"}, status=400)
-    return body
-
-
-def _runner_status(runner: Any) -> dict[str, Any] | None:
-    """A background runner's `status()`, `{"enabled": True}` when it has none,
-    None when the runner is not wired."""
-    if runner is None:
-        return None
-    status_fn = getattr(runner, "status", None)
-    return status_fn() if callable(status_fn) else {"enabled": True}
 
 
 async def _handle_health(request: web.Request) -> web.Response:
@@ -154,8 +118,8 @@ async def _handle_status(request: web.Request) -> web.Response:
                 "total": len(runs),
                 "active": active,
             },
-            "jobs": _runner_status(state.job_runner),
-            "dream": _runner_status(state.dream_runner),
+            "jobs": runner_status(state.job_runner),
+            "dream": runner_status(state.dream_runner),
             # The docstring has always promised channels here; surface the
             # actually-running set (M158-followup — was omitted before).
             "channels": list(state.active_channels),
@@ -247,7 +211,7 @@ def _resolve_deliver_to(raw: Any, origin: str | None) -> tuple[str | None, str |
 
 async def _handle_create_run(request: web.Request) -> web.Response:
     state: DaemonState = request.app["state"]
-    body = await _json_object(request)
+    body = await json_object(request)
     if isinstance(body, web.Response):
         return body
     prompt = body.get("prompt")
@@ -391,7 +355,7 @@ async def _handle_resolve_prompt(request: web.Request) -> web.Response:
     handle = state.get_run(run_id)
     if handle is None:
         return web.json_response({"error": f"run {run_id!r} not found"}, status=404)
-    body = await _json_object(request)
+    body = await json_object(request)
     if isinstance(body, web.Response):
         return body
     choice = body.get("choice")
@@ -528,7 +492,7 @@ async def _handle_patch_session(request: web.Request) -> web.Response:
     """
     state: DaemonState = request.app["state"]
     session_id = request.match_info["session_id"]
-    body = await _json_object(request)
+    body = await json_object(request)
     if isinstance(body, web.Response):
         return body
 
@@ -563,157 +527,6 @@ async def _handle_patch_session(request: web.Request) -> web.Response:
 
 
 _SENTINEL = object()
-
-
-# ---- jobs handlers (M75) ----
-
-
-def _require_jobs_store(state: DaemonState):
-    jr = state.job_runner
-    if jr is None:
-        return None
-    return getattr(jr, "_store", None)
-
-
-def _jobs_store_or_503(request: web.Request) -> Any:
-    """The scheduler's jobs store, or the 503 response when none is running."""
-    store = _require_jobs_store(request.app["state"])
-    if store is None:
-        return web.json_response({"error": "scheduler not enabled on this daemon"}, status=503)
-    return store
-
-
-async def _handle_create_job(request: web.Request) -> web.Response:
-    store = _jobs_store_or_503(request)
-    if isinstance(store, web.Response):
-        return store
-    body = await _json_object(request)
-    if isinstance(body, web.Response):
-        return body
-    try:
-        rec = store.add_job(
-            name=str(body.get("name") or ""),
-            prompt=str(body.get("prompt") or ""),
-            schedule_expr=str(body.get("schedule") or ""),
-            repeat_times=body.get("repeat_times"),
-            context_from=body.get("context_from"),
-            deliver_to=body.get("deliver_to"),
-            enabled=bool(body.get("enabled", True)),
-        )
-    except ValueError as exc:
-        return web.json_response({"error": str(exc)}, status=400)
-    return web.json_response(rec.to_dict(), status=201)
-
-
-async def _handle_list_jobs(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    store = _require_jobs_store(state)
-    if store is None:
-        return web.json_response({"jobs": []})
-    include_disabled = request.query.get("include_disabled", "1") != "0"
-    return web.json_response(
-        {"jobs": [r.to_dict() for r in store.list_jobs(include_disabled=include_disabled)]}
-    )
-
-
-async def _handle_get_job(request: web.Request) -> web.Response:
-    store = _jobs_store_or_503(request)
-    if isinstance(store, web.Response):
-        return store
-    rec = store.get_job(request.match_info["job_id"])
-    if rec is None:
-        return web.json_response({"error": "not found"}, status=404)
-    return web.json_response(rec.to_dict())
-
-
-async def _handle_update_job(request: web.Request) -> web.Response:
-    store = _jobs_store_or_503(request)
-    if isinstance(store, web.Response):
-        return store
-    body = await _json_object(request)
-    if isinstance(body, web.Response):
-        return body
-    try:
-        ok = store.update_job(request.match_info["job_id"], **body)
-    except ValueError as exc:
-        return web.json_response({"error": str(exc)}, status=400)
-    if not ok:
-        return web.json_response({"error": "not found"}, status=404)
-    rec = store.get_job(request.match_info["job_id"])
-    return web.json_response(rec.to_dict())
-
-
-async def _handle_delete_job(request: web.Request) -> web.Response:
-    store = _jobs_store_or_503(request)
-    if isinstance(store, web.Response):
-        return store
-    if not store.delete_job(request.match_info["job_id"]):
-        return web.json_response({"error": "not found"}, status=404)
-    return web.json_response({"deleted": True})
-
-
-async def _handle_trigger_job(request: web.Request) -> web.Response:
-    store = _jobs_store_or_503(request)
-    if isinstance(store, web.Response):
-        return store
-    if not store.trigger_job(request.match_info["job_id"]):
-        return web.json_response({"error": "not found"}, status=404)
-    return web.json_response({"triggered": True})
-
-
-async def _handle_list_job_runs(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    store = _require_jobs_store(state)
-    if store is None:
-        return web.json_response({"runs": []})
-    limit_raw = request.query.get("limit", "20")
-    try:
-        limit = max(1, min(int(limit_raw), 200))
-    except ValueError:
-        return web.json_response({"error": "'limit' must be an integer"}, status=400)
-    runs = store.list_runs(request.match_info["job_id"], limit=limit)
-    return web.json_response(
-        {
-            "runs": [
-                {
-                    "run_id": r.run_id,
-                    "job_id": r.job_id,
-                    "started_at": r.started_at,
-                    "finished_at": r.finished_at,
-                    "status": r.status,
-                    "iterations": r.iterations,
-                    "output_path": r.output_path,
-                    "error": r.error,
-                }
-                for r in runs
-            ]
-        }
-    )
-
-
-# ---- dream handlers (M76) ----
-
-
-async def _handle_dream_status(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    return web.json_response(_runner_status(state.dream_runner) or {"enabled": False})
-
-
-async def _handle_dream_run(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    if state.dream_runner is None:
-        return web.json_response({"error": "dream-runner not enabled"}, status=503)
-    body: Any = {}
-    with contextlib.suppress(Exception):
-        body = await request.json()
-    if not isinstance(body, dict):  # a JSON array/number body is not an error-500
-        body = {}
-    include_consolidation = bool(body.get("include_consolidation", True))
-    force_fn = getattr(state.dream_runner, "force_run", None)
-    if not callable(force_fn):
-        return web.json_response({"error": "dream-runner missing force_run"}, status=500)
-    result = await force_fn(include_consolidation=include_consolidation)
-    return web.json_response({"summary": result.summary(), "notes": result.notes})
 
 
 async def _start_background_runners(app: web.Application) -> None:
