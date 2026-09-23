@@ -21,6 +21,7 @@ import logging
 import os
 import sqlite3
 import tempfile
+import time
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
@@ -150,6 +151,61 @@ def prune_rotated(path: Path, *, keep: int) -> list[Path]:
     return removed
 
 
+class RotatingJsonl:
+    """Append JSON objects to a JSONL file with size-bounded rotation.
+
+    When the next line would push the file past `max_bytes`, it is renamed to
+    `<name>.<unix_ts>` (plus a counter if two rotations land in one second) and
+    all but the newest `keep_rotated` siblings are deleted (`0` keeps them all).
+    Write errors propagate — the caller decides whether a broken log may stop it.
+    """
+
+    def __init__(self, path: Path, *, max_bytes: int, keep_rotated: int) -> None:
+        self._path = path
+        self._max_bytes = max_bytes
+        self._keep_rotated = keep_rotated
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    def append(self, obj: Any) -> None:
+        data = (json.dumps(obj, separators=(",", ":")) + "\n").encode("utf-8")
+        if self._path.exists() and self._path.stat().st_size + len(data) > self._max_bytes:
+            self._rotate()
+        with self._path.open("ab") as f:
+            f.write(data)
+
+    def _rotate(self) -> None:
+        ts = int(time.time())
+        target = self._path.with_name(f"{self._path.name}.{ts}")
+        n = 1
+        while target.exists():
+            target = self._path.with_name(f"{self._path.name}.{ts}.{n}")
+            n += 1
+        os.replace(self._path, target)
+        prune_rotated(self._path, keep=self._keep_rotated)
+
+
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    """Every JSON line of `path`; blank and malformed lines are skipped (a crash
+    mid-write must not poison the whole file). Missing file → `[]`."""
+    if not path.exists():
+        return []
+    out: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                out.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return out
+
+
 def open_sqlite(db_path: Path | str) -> sqlite3.Connection:
     """Open a project SQLite file the way every store needs it.
 
@@ -216,6 +272,7 @@ def _emit_value(v: Any) -> str:
 
 
 __all__ = [
+    "RotatingJsonl",
     "atomic_write_json",
     "atomic_write_text",
     "dump_toml",
@@ -224,5 +281,6 @@ __all__ = [
     "open_sqlite",
     "prune_rotated",
     "read_fresh_json",
+    "read_jsonl",
     "write_stamped_json",
 ]

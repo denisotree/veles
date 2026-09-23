@@ -21,15 +21,13 @@ values rather than crash (forward-compatibility).
 
 from __future__ import annotations
 
-import json
-import os
 import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from veles.core.io_utils import prune_rotated
+from veles.core.io_utils import RotatingJsonl, read_jsonl
 
 DEFAULT_MAX_BYTES = 50 * 1024 * 1024
 # How many rotated siblings survive a rotation (M257).
@@ -234,13 +232,11 @@ Event = (
 # ---- writer (mirrors core/trace.py for consistency) ----
 
 
-class EventWriter:
-    """Append `Event`s to a JSONL file with size-bounded rotation.
+class EventWriter(RotatingJsonl):
+    """Append `Event`s to `events.jsonl`, rotated by size (see `RotatingJsonl`).
 
-    Same rotation strategy as `TraceWriter`: rotate by total file size, then
-    keep only the newest `keep_rotated` siblings. Failure to write is the caller's problem
-    — we don't swallow exceptions here; the agent loop catches them so a
-    broken event log never kills a run, but unit tests can still see them.
+    Write errors propagate: the agent loop catches them so a broken event log
+    never kills a run, but unit tests can still see them.
     """
 
     def __init__(
@@ -250,32 +246,10 @@ class EventWriter:
         max_bytes: int = DEFAULT_MAX_BYTES,
         keep_rotated: int = DEFAULT_KEEP_ROTATED,
     ) -> None:
-        self._path = path
-        self._max_bytes = max_bytes
-        self._keep_rotated = keep_rotated
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-
-    @property
-    def path(self) -> Path:
-        return self._path
+        super().__init__(path, max_bytes=max_bytes, keep_rotated=keep_rotated)
 
     def write(self, event: Event) -> None:
-        line = json.dumps(asdict(event), separators=(",", ":")) + "\n"
-        data = line.encode("utf-8")
-        if self._path.exists() and self._path.stat().st_size + len(data) > self._max_bytes:
-            self._rotate()
-        with self._path.open("ab") as f:
-            f.write(data)
-
-    def _rotate(self) -> None:
-        ts = int(time.time())
-        target = self._path.with_name(f"{self._path.name}.{ts}")
-        n = 1
-        while target.exists():
-            target = self._path.with_name(f"{self._path.name}.{ts}.{n}")
-            n += 1
-        os.replace(self._path, target)
-        prune_rotated(self._path, keep=self._keep_rotated)
+        self.append(asdict(event))
 
 
 def events_path_for_project(state_dir: Path) -> Path:
@@ -290,19 +264,7 @@ def read_events(path: Path) -> list[dict[str, Any]]:
     doesn't trip a reader on legacy files. Callers that want strong typing
     should filter by `type` and cast.
     """
-    if not path.exists():
-        return []
-    out: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                out.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-    return out
+    return read_jsonl(path)
 
 
 def filter_events(events: list[dict[str, Any]], *, type_: str) -> list[dict[str, Any]]:
