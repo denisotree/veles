@@ -55,16 +55,13 @@ from veles.daemon.registry import (
 
 # Data/formatting helpers live in `_daemon_picker_data`. Names unused here are
 # re-exported for the test suites that import them from this module
-# (tests/tui/test_daemon_picker.py, test_daemon_row_formatter.py,
+# (tests/tui/test_daemon_picker.py, test_daemon_entry_model.py,
 # test_daemon_tree_model.py, tests/test_daemon_picker_channel_nofocus.py).
 from veles.tui.screens._daemon_picker_data import (
     DaemonNode,
-    DaemonRowFormatter,  # noqa: F401 — re-export for tests
     _enabled_channel_names,  # noqa: F401 — re-export for tests
     _entry_channels,  # noqa: F401 — re-export for tests
     _entry_model,  # noqa: F401 — re-export for tests
-    _fmt_model,  # noqa: F401 — re-export for tests
-    _fmt_runtime_row,  # noqa: F401 — re-export for tests
     _fmt_uptime,  # noqa: F401 — re-export for tests
     _live_active_model,  # noqa: F401 — re-export for tests
     _live_channels,  # noqa: F401 — re-export for tests
@@ -74,7 +71,6 @@ from veles.tui.screens._daemon_picker_data import (
     daemon_node_label,
     runtime_session_action,
     runtime_session_records,  # noqa: F401 — re-export for tests
-    runtime_session_rows,  # noqa: F401 — re-export for tests
     soft_delete_runtime,
     spawn_daemon_node,
 )

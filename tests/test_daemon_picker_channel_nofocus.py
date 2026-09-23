@@ -65,12 +65,11 @@ async def test_add_channel_to_focused_registry_daemon(tmp_path, monkeypatch):
     assert get_section(cfg, "channels", "telegram").get("enabled") is True
     assert get_provider_key("telegram", project=project.name) == "tok123"
     # The daemon row now surfaces the channel (the user's "I can't tell" gap):
-    # `_entry_channels` reads it and the formatter renders a `chans=…` suffix.
-    from veles.tui.screens.daemon_picker import DaemonRowFormatter, _entry_channels
+    # `_entry_channels` reads it and the tree shows it as a channel leaf.
+    from veles.tui.screens.daemon_picker import _entry_channels
 
     entry = DaemonRegistry.load().get("mind-palace")
     assert _entry_channels(entry) == ["telegram"]
-    assert "telegram" in DaemonRowFormatter.render(entry, 0.0, channels=["telegram"])
 
 
 async def test_add_channel_failure_does_not_crash(tmp_path, monkeypatch):
