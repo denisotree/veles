@@ -160,6 +160,9 @@ async def test_confirming_the_plan_runs_the_goal_to_done_in_the_same_turn(full_g
     goal_id = state.chat_mode(sid).active_goal_id
     # The agreed summary became the goal's objective — not the placeholder.
     assert read_goal(state.project.state_dir, goal_id).objective == summary
+    # The chat is asked to confirm the summary, without the FSM's marker.
+    assert any(summary in text for _, text in log)
+    assert not any("ready&gt;" in text or "<ready>" in text for _, text in log)
 
     log.clear()
     await gw._handle_update(_message("yes"))

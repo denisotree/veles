@@ -69,7 +69,10 @@ def make_mode_turn(state: DaemonState, *, session_id: str, prompt: str) -> TurnF
             elif isinstance(msg, SystemLine):
                 # While a goal drives itself the turn lasts minutes: its phase
                 # lines are progress, which a channel shows as they happen.
-                post_event({"type": "notice", "text": msg.text, "live": driving[0]})
+                # GoalMode's lines say "mode → auto" (true in the REPL); a chat
+                # goes back to its own default instead (see the write-back below).
+                note = msg.text.replace("mode → auto", "back to the chat's default mode")
+                post_event({"type": "notice", "text": note, "live": driving[0]})
             elif isinstance(msg, AgentError):
                 raise msg.exc
 
@@ -113,13 +116,14 @@ def make_mode_turn(state: DaemonState, *, session_id: str, prompt: str) -> TurnF
         result = done[-1]
         if result.stopped_reason == "synthetic":
             return RunResult(
-                text="".join(streamed),
+                text=_for_the_chat("".join(streamed)),
                 iterations=0,
                 stopped_reason="synthetic",
                 session_id=session_id,
             )
         if result.session_id is None:
             result.session_id = session_id
+        result.text = _for_the_chat(result.text)
         return result
 
     return turn
@@ -170,6 +174,16 @@ def _drive_if_ready(
 
 
 _AUTONOMOUS = ("plan", "execute", "check")
+
+
+def _for_the_chat(text: str) -> str:
+    """GoalMode's interview ends with `<ready>summary</ready>` — a marker for
+    the FSM, not for the reader. A chat showed it verbatim, escaped
+    (`&lt;ready&gt;…`, live-seen in M280b); the summary itself is what the
+    user is asked to confirm, so it stays."""
+    from veles.core.modes.goal import _READY_RE
+
+    return _READY_RE.sub(lambda m: m.group(1).strip(), text or "")
 
 
 def _live_goal(state: DaemonState, goal_id: str | None) -> str | None:
