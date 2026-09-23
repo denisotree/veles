@@ -10,10 +10,10 @@ import asyncio
 
 import pytest
 
-from veles.channels.in_process_backend import InProcessRunBackend
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.daemon.auth import TokenStore
+from veles.daemon.in_process_backend import InProcessRunBackend
 from veles.daemon.state import DaemonState
 
 
@@ -154,7 +154,7 @@ async def test_update_session_switches_the_mode(tmp_path, caplog) -> None:
     turn reads (M280), and the daemon log records it for operators."""
     state = _build_state(tmp_path)
     backend = InProcessRunBackend(state)
-    with caplog.at_level("INFO", logger="veles.channels.in_process_backend"):
+    with caplog.at_level("INFO", logger="veles.daemon.in_process_backend"):
         payload = await backend.update_session("sess-x", mode="planning")
     assert payload == {"session_id": "sess-x", "mode": "planning"}
     assert state.chat_mode("sess-x").mode == "planning"

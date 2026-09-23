@@ -8,7 +8,7 @@ from veles.channels.protocols import RunBackend
 
 def test_in_process_backend_conforms() -> None:
     """`InProcessRunBackend` satisfies the RunBackend protocol."""
-    from veles.channels.in_process_backend import InProcessRunBackend
+    from veles.daemon.in_process_backend import InProcessRunBackend
 
     # The protocol is `runtime_checkable`, so isinstance works against
     # the class definition (structural typing).

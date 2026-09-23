@@ -1,7 +1,7 @@
 """Start one agent turn on the daemon — the single entry both front doors share.
 
 `POST /v1/runs` (`server.py::_handle_create_run`) and the in-process channel
-backend (`channels/in_process_backend.py::submit_run`) each carried their own
+backend (`daemon/in_process_backend.py::submit_run`) each carried their own
 copy of "manager gate → build agent → run in background", and the copies had
 already drifted. M280 routes agent modes through here, so there has to be one
 place to route them.

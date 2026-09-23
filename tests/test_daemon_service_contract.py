@@ -70,7 +70,7 @@ def _types(events: list[dict]) -> list[str]:
 async def test_http_stream_and_in_process_backend_deliver_the_same_events(
     aiohttp_client, tmp_path
 ) -> None:
-    from veles.channels.in_process_backend import InProcessRunBackend
+    from veles.daemon.in_process_backend import InProcessRunBackend
 
     state, token = _state(tmp_path, lambda sid, *, prompt=None: _Agent())
     client = await aiohttp_client(make_app(state))
@@ -98,7 +98,7 @@ async def test_http_stream_and_in_process_backend_deliver_the_same_events(
 
 
 async def test_a_reader_leaving_mid_run_does_not_stop_the_run(tmp_path) -> None:
-    from veles.channels.in_process_backend import InProcessRunBackend
+    from veles.daemon.in_process_backend import InProcessRunBackend
 
     gate = threading.Event()
     state, _token = _state(tmp_path, lambda sid, *, prompt=None: _Agent(gate))

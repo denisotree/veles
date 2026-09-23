@@ -30,7 +30,7 @@ import contextlib
 import logging
 import secrets
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -108,6 +108,42 @@ class RunHandle:
         self.events.append(event)
         self.event_added.set()
         self.event_added.clear()
+
+    async def iter_events(self) -> AsyncIterator[dict[str, Any]]:
+        """Every event of this run in order, from the first — a late reader gets
+        the replay — ending with the terminal `completed`/`error` event."""
+        cursor = 0
+        while True:
+            while cursor < len(self.events):
+                event = self.events[cursor]
+                cursor += 1
+                yield event
+                if event.get("type") in ("completed", "error"):
+                    return
+            if self.done.is_set():
+                # The terminal event is appended via call_soon_threadsafe just
+                # before `done` is set, so it may still be queued: drain pending
+                # callbacks once before concluding there is nothing left.
+                await asyncio.sleep(0)
+                if cursor >= len(self.events):
+                    return
+                continue
+            await self.event_added.wait()
+
+    def resolve_prompt(self, prompt_id: str, choice: str) -> None:
+        """Answer a pending permission prompt or question.
+
+        Raises `LookupError` when `prompt_id` is not pending (answered, timed
+        out or never asked) and `ValueError` when `choice` is not one this
+        prompt accepts — the prompt then stays pending for a valid answer."""
+        pending = self.pending_prompts.pop(prompt_id, None)
+        if pending is None:
+            raise LookupError(f"prompt {prompt_id!r} not pending")
+        if not pending.accepts(choice):
+            self.pending_prompts[prompt_id] = pending
+            raise ValueError(f"choice {choice!r} not valid for {pending.kind} prompt")
+        pending.future.set_result(choice)
+        self.append_event({"type": "prompt_resolved", "prompt_id": prompt_id, "choice": choice})
 
 
 # M234. Bounded so a hung send cannot outlive the shutdown drain, which waits

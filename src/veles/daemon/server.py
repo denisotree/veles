@@ -392,21 +392,14 @@ async def _handle_resolve_prompt(request: web.Request) -> web.Response:
     choice = body.get("choice")
     if not isinstance(choice, str) or not choice:
         return web.json_response({"error": "'choice' (non-empty string) required"}, status=400)
-    pending = handle.pending_prompts.pop(prompt_id, None)
-    if pending is None:
-        return web.json_response({"error": f"prompt {prompt_id!r} not pending"}, status=404)
-    if not pending.accepts(choice):
-        # Put it back so a follow-up POST with the right key can still resolve.
-        handle.pending_prompts[prompt_id] = pending
-        return web.json_response(
-            {
-                "error": f"choice {choice!r} not valid for {pending.kind} prompt",
-                "valid_choices": list(pending.valid_choices),
-            },
-            status=409,
-        )
-    pending.future.set_result(choice)
-    handle.append_event({"type": "prompt_resolved", "prompt_id": prompt_id, "choice": choice})
+    try:
+        handle.resolve_prompt(prompt_id, choice)
+    except LookupError as exc:
+        return web.json_response({"error": str(exc)}, status=404)
+    except ValueError as exc:
+        # The prompt stays pending, so a follow-up POST with a valid key resolves it.
+        valid = handle.pending_prompts[prompt_id].valid_choices
+        return web.json_response({"error": str(exc), "valid_choices": list(valid)}, status=409)
     return web.json_response({"accepted": True, "choice": choice})
 
 
@@ -420,29 +413,9 @@ async def _handle_run_events_ws(request: web.Request) -> web.StreamResponse:
     ws = web.WebSocketResponse(heartbeat=15.0)
     await ws.prepare(request)
 
-    cursor = 0
     try:
-        while True:
-            while cursor < len(handle.events):
-                event = handle.events[cursor]
-                cursor += 1
-                await ws.send_json(event)
-            if handle.done.is_set() and cursor >= len(handle.events):
-                # The terminal "completed"/"error" event is appended via
-                # call_soon_threadsafe immediately before `done` is set, so it
-                # may still be queued (not yet in `handle.events`). Yield once to
-                # drain pending loop callbacks, then re-check — otherwise a fast
-                # run's completion event is never delivered to this subscriber.
-                await asyncio.sleep(0)
-                if cursor >= len(handle.events):
-                    break
-                continue
-            try:
-                await asyncio.wait_for(handle.event_added.wait(), timeout=30.0)
-            except TimeoutError:
-                if handle.done.is_set() and cursor >= len(handle.events):
-                    break
-                continue
+        async for event in handle.iter_events():
+            await ws.send_json(event)
     except asyncio.CancelledError:
         pass
     finally:
@@ -887,9 +860,9 @@ def _start_channel_runners(state: DaemonState) -> None:
     unregistered platform) are skipped with a warning rather than failing
     daemon startup.
     """
-    from veles.channels.in_process_backend import InProcessRunBackend
     from veles.channels.platform_registry import ensure_builtins_registered
     from veles.core.project_config import list_channel_configs, load_project_config
+    from veles.daemon.in_process_backend import InProcessRunBackend
 
     ensure_builtins_registered()
     cfg = load_project_config(state.project)
