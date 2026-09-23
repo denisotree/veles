@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -114,9 +113,7 @@ async def start_turn(
             effective_session_id = _session_for_mode_turn(state, session_id)
             turn = make_mode_turn(state, session_id=effective_session_id, prompt=prompt)
     except Exception as exc:
-        handle.state = "failed"
-        handle.error = f"{type(exc).__name__}: {exc}"
-        handle.finished_at = time.time()
+        handle.mark_failed(f"{type(exc).__name__}: {exc}")
         raise
 
     # The real session id is known BEFORE the run starts. Adopt it on the handle

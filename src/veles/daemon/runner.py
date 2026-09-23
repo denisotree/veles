@@ -103,6 +103,21 @@ class RunHandle:
             "error": self.error,
         }
 
+    def mark_failed(self, error: str) -> None:
+        self.state = "failed"
+        self.error = error
+        self.finished_at = time.time()
+
+    def mark_completed(
+        self, *, text: str, iterations: int, stopped_reason: str | None, session_id: str | None
+    ) -> None:
+        self.state = "completed"
+        self.final_text = text
+        self.iterations = iterations
+        self.stopped_reason = stopped_reason
+        self.session_id = session_id or self.session_id
+        self.finished_at = time.time()
+
     def append_event(self, event: dict[str, Any]) -> None:
         """Append on the event loop. Wake any subscribers."""
         self.events.append(event)
@@ -177,6 +192,59 @@ async def _run_deliver_hook(
         # file): the exception text is exactly what the caller needs to see.
         handle.delivery_error = f"delivery failed: {type(exc).__name__}: {exc}"
         logging.getLogger("veles.daemon").warning("run %s delivery failed: %s", handle.run_id, exc)
+
+
+Poster = Callable[[dict[str, Any]], None]
+
+
+def _settle(handle: RunHandle, on_finished: Callable[[RunHandle], None] | None) -> None:
+    """Mark the run over: wake every reader one last time, then notify the caller."""
+    handle.done.set()
+    handle.event_added.set()
+    if on_finished is not None:
+        on_finished(handle)
+
+
+def _fail(
+    handle: RunHandle,
+    error: str,
+    post: Poster,
+    on_finished: Callable[[RunHandle], None] | None,
+    **event_fields: Any,
+) -> None:
+    """End the run as failed with an `error` event carrying `event_fields`."""
+    handle.mark_failed(error)
+    post({"type": "error", "error": error, **event_fields})
+    _settle(handle, on_finished)
+
+
+async def _complete(
+    handle: RunHandle,
+    *,
+    text: str,
+    iterations: int,
+    stopped_reason: str | None,
+    session_id: str | None,
+    post: Poster,
+    deliver_hook: Callable[[str], Awaitable[None]] | None,
+    on_finished: Callable[[RunHandle], None] | None,
+) -> None:
+    """End the run as completed: the `completed` event, the `deliver_to` push,
+    then settle — delivery before `done` so the shutdown drain covers it."""
+    handle.mark_completed(
+        text=text, iterations=iterations, stopped_reason=stopped_reason, session_id=session_id
+    )
+    post(
+        {
+            "type": "completed",
+            "stopped_reason": stopped_reason,
+            "iterations": iterations,
+            "text": text,
+            "session_id": handle.session_id,
+        }
+    )
+    await _run_deliver_hook(handle, deliver_hook)
+    _settle(handle, on_finished)
 
 
 # One turn driven by something other than a bare `agent.run` — an agent mode
@@ -329,19 +397,17 @@ async def run_agent_in_background(
         try:
             result = await asyncio.to_thread(_worker)
         except Exception as exc:
-            handle.state = "failed"
-            handle.error = f"{type(exc).__name__}: {exc}"
-            handle.finished_at = time.time()
             # Carry the session id on the error too: the session was already
             # allocated (and the user turn persisted) before the failure, so
             # the channel should keep the chat→session mapping and continue
             # the same session on the next message rather than starting fresh.
-            _post({"type": "error", "error": handle.error, "session_id": handle.session_id})
-            handle.done.set()
-            # Wake any waiting subscribers one last time.
-            handle.event_added.set()
-            if on_finished is not None:
-                on_finished(handle)
+            _fail(
+                handle,
+                f"{type(exc).__name__}: {exc}",
+                _post,
+                on_finished,
+                session_id=handle.session_id,
+            )
             return
 
         # M170b: opt-in verify→escalate before the `completed` event, so
@@ -354,39 +420,26 @@ async def run_agent_in_background(
             with contextlib.suppress(Exception):
                 result = await asyncio.to_thread(verify_hook, prompt, result)
 
-        handle.state = "completed"
-        handle.iterations = result.iterations
-        handle.stopped_reason = result.stopped_reason
-        handle.final_text = result.text
-        handle.session_id = result.session_id or handle.session_id
-        handle.finished_at = time.time()
-        # M214 (B3): make a blank-turn finalization observable. B2 already forces
-        # one answer round; reaching "empty" means the model stayed mute even
-        # after the nudge — surface it in the daemon log (the channel operators
-        # watch) instead of it vanishing silently, so #2-class regressions are
-        # visible in facts, not guessed at.
+        # A blank answer even after the answer nudge goes to the daemon log (the
+        # one channel operators watch) instead of vanishing silently.
         if result.stopped_reason == "empty":
             logging.getLogger("veles.daemon").warning(
                 "run %s finished with an EMPTY answer (session=%s, iterations=%d) — "
                 "the model produced no text even after the answer nudge",
                 handle.run_id,
-                handle.session_id,
+                result.session_id or handle.session_id,
                 result.iterations,
             )
-        _post(
-            {
-                "type": "completed",
-                "stopped_reason": result.stopped_reason,
-                "iterations": result.iterations,
-                "text": result.text,
-                "session_id": handle.session_id,
-            }
+        await _complete(
+            handle,
+            text=result.text,
+            iterations=result.iterations,
+            stopped_reason=result.stopped_reason,
+            session_id=result.session_id,
+            post=_post,
+            deliver_hook=deliver_hook,
+            on_finished=on_finished,
         )
-        await _run_deliver_hook(handle, deliver_hook)
-        handle.done.set()
-        handle.event_added.set()
-        if on_finished is not None:
-            on_finished(handle)
         if post_turn_hook is not None and not synthetic:
             # Run the learning loop off the event loop — it may hit the LLM
             # (insight extractor) and shouldn't block aiohttp request handlers.
@@ -476,14 +529,7 @@ async def run_manager_in_background(
         try:
             result = await asyncio.to_thread(_worker)
         except Exception as exc:
-            handle.state = "failed"
-            handle.error = f"manager: {type(exc).__name__}: {exc}"
-            handle.finished_at = time.time()
-            _post({"type": "error", "error": handle.error})
-            handle.done.set()
-            handle.event_added.set()
-            if on_finished is not None:
-                on_finished(handle)
+            _fail(handle, f"manager: {type(exc).__name__}: {exc}", _post, on_finished)
             return
 
         # Plan event — channels show "🧠 Decomposing into N workers..."
@@ -505,14 +551,7 @@ async def run_manager_in_background(
         )
 
         if result.error or not result.final_text:
-            handle.state = "failed"
-            handle.error = result.error or "manager produced no output"
-            handle.finished_at = time.time()
-            _post({"type": "error", "error": handle.error})
-            handle.done.set()
-            handle.event_added.set()
-            if on_finished is not None:
-                on_finished(handle)
+            _fail(handle, result.error or "manager produced no output", _post, on_finished)
             return
 
         writer_handle = result.handles[-1] if result.handles else None
@@ -544,27 +583,16 @@ async def run_manager_in_background(
         # Emit the (possibly escalated) text as one final delta + completed
         # event so channels' existing buffering machinery picks it up unchanged.
         _post({"type": "text_delta", "delta": final_text})
-
-        handle.state = "completed"
-        handle.iterations = len(result.handles)
-        handle.stopped_reason = "completed"
-        handle.final_text = final_text
-        handle.session_id = writer_session or handle.session_id
-        handle.finished_at = time.time()
-        _post(
-            {
-                "type": "completed",
-                "stopped_reason": "completed",
-                "iterations": handle.iterations,
-                "text": final_text,
-                "session_id": handle.session_id,
-            }
+        await _complete(
+            handle,
+            text=final_text,
+            iterations=len(result.handles),
+            stopped_reason="completed",
+            session_id=writer_session,
+            post=_post,
+            deliver_hook=deliver_hook,
+            on_finished=on_finished,
         )
-        await _run_deliver_hook(handle, deliver_hook)
-        handle.done.set()
-        handle.event_added.set()
-        if on_finished is not None:
-            on_finished(handle)
     finally:
         reset_origin(origin_token)
 
