@@ -18,11 +18,11 @@ from __future__ import annotations
 
 import json
 import os
-import tempfile
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from veles.core.io_utils import atomic_write_text
 from veles.core.project import Project
 from veles.core.slug import normalize_slug as _normalize_slug
 from veles.core.user_paths import user_home
@@ -123,19 +123,11 @@ class Registry:
         return bumped
 
     def save(self) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "version": _REGISTRY_VERSION,
             "projects": {slug: asdict(e) for slug, e in self._entries.items()},
         }
-        fd, tmp = tempfile.mkstemp(prefix=".registry-", dir=self._path.parent, text=True)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                json.dump(payload, fh, indent=2, sort_keys=True)
-            os.replace(tmp, self._path)
-        except Exception:
-            Path(tmp).unlink(missing_ok=True)
-            raise
+        atomic_write_text(self._path, json.dumps(payload, indent=2, sort_keys=True))
 
     @property
     def path(self) -> Path:

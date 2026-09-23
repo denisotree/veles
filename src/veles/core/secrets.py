@@ -42,6 +42,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from veles.core.io_utils import atomic_write_text
+
 _SERVICE = "veles"
 
 # M92: per-provider keychain naming. A key is stored at
@@ -82,11 +84,7 @@ def _load_index() -> dict[str, list[str]]:
 
 
 def _save_index(index: dict[str, list[str]]) -> None:
-    path = _index_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(index, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(tmp, path)
+    atomic_write_text(_index_path(), json.dumps(index, indent=2, sort_keys=True) + "\n")
 
 
 def _scoped_entry_name(provider: str, scope: str) -> str:

@@ -26,12 +26,11 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
-import os
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from veles.core.file_lock import file_lock
+from veles.core.io_utils import atomic_write_text
 
 _TRUST_FILENAME = "trust.json"
 
@@ -76,21 +75,10 @@ class TrustStore:
         return True
 
     def _save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
         body = {"tools": {name: {"granted_at": at} for name, at in sorted(self.tools.items())}}
         text = json.dumps(body, indent=2, ensure_ascii=False) + "\n"
-        lock_path = self.path.parent / (self.path.name + ".lock")
-        with file_lock(lock_path):
-            fd, tmp_name = tempfile.mkstemp(
-                prefix=self.path.name + ".", suffix=".tmp", dir=self.path.parent
-            )
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                    fh.write(text)
-                os.replace(tmp_name, self.path)
-            except Exception:
-                Path(tmp_name).unlink(missing_ok=True)
-                raise
+        with file_lock(self.path.parent / (self.path.name + ".lock")):
+            atomic_write_text(self.path, text)
 
 
 def user_trust_path() -> Path:

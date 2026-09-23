@@ -36,13 +36,12 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import os
-import tempfile
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from veles.core.io_utils import atomic_write_text
 from veles.core.project import Project
 from veles.core.skills import Skill
 
@@ -170,8 +169,6 @@ def load_cache(project: Project, *, model: str) -> dict[str, _CacheEntry]:
 
 
 def save_cache(project: Project, *, model: str, vectors: dict[str, _CacheEntry]) -> None:
-    path = cache_path(project)
-    project.state_dir.mkdir(parents=True, exist_ok=True)
     body = {
         "model": model,
         "vectors": {
@@ -179,15 +176,7 @@ def save_cache(project: Project, *, model: str, vectors: dict[str, _CacheEntry])
             for fp, entry in sorted(vectors.items())
         },
     }
-    text = json.dumps(body, indent=2) + "\n"
-    fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(text)
-        os.replace(tmp_name, path)
-    except Exception:
-        Path(tmp_name).unlink(missing_ok=True)
-        raise
+    atomic_write_text(cache_path(project), json.dumps(body, indent=2) + "\n")
 
 
 # ---- top-level driver ----

@@ -20,13 +20,12 @@ through SessionSource. M52 flat-string usage continues to work.
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from veles.core.file_lock import file_lock
+from veles.core.io_utils import atomic_write_text
 
 
 @dataclass(slots=True, frozen=True)
@@ -126,17 +125,8 @@ class SessionMap:
         return m
 
     def save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {"sessions": self.entries}
-        text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
-        fd, tmp = tempfile.mkstemp(prefix=self.path.name + ".", suffix=".tmp", dir=self.path.parent)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                fh.write(text)
-            os.replace(tmp, self.path)
-        except Exception:
-            Path(tmp).unlink(missing_ok=True)
-            raise
+        atomic_write_text(self.path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
     # Several maps share one file: the daemon gateway keeps one for its lifetime,
     # the delivery binder and `veles channel reset-session` open their own. So

@@ -16,11 +16,10 @@ from __future__ import annotations
 
 import contextlib
 import json
-import os
-import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from veles.core.io_utils import atomic_write_text
 from veles.core.project import Project
 
 _FILENAME = "tui_state.json"
@@ -70,18 +69,10 @@ def save_tui_state(state_dir: Path, state: TuiPersistentState) -> None:
     """Atomic write via tempfile + os.replace. Best-effort: I/O errors
     bubble up so the caller can decide; in practice the TUI swallows
     them (it's a preference, not data)."""
-    state_dir.mkdir(parents=True, exist_ok=True)
-    target = tui_state_path(state_dir)
     payload = {"version": _SCHEMA_VERSION, **asdict(state)}
-    text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
-    fd, tmp_name = tempfile.mkstemp(prefix=target.name + ".", suffix=".tmp", dir=target.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(text)
-        os.replace(tmp_name, target)
-    except Exception:
-        Path(tmp_name).unlink(missing_ok=True)
-        raise
+    atomic_write_text(
+        tui_state_path(state_dir), json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    )
 
 
 def load_for_project(project: Project) -> TuiPersistentState:

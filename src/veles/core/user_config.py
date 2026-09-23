@@ -25,13 +25,12 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import os
-import tempfile
 import tomllib
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from veles.core.io_utils import atomic_write_text
 from veles.core.project_config import _emit_toml
 
 logger = logging.getLogger(__name__)
@@ -102,17 +101,7 @@ def load_user_config(path: Path | None = None) -> UserConfig | None:
 
 def save_user_config(cfg: UserConfig, path: Path | None = None) -> None:
     """Atomically write `cfg` to `~/.veles/config.toml`."""
-    target = path or user_config_path()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    text = _render_toml(cfg)
-    fd, tmp_name = tempfile.mkstemp(prefix=target.name + ".", suffix=".tmp", dir=target.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(text)
-        os.replace(tmp_name, target)
-    except Exception:
-        Path(tmp_name).unlink(missing_ok=True)
-        raise
+    atomic_write_text(path or user_config_path(), _render_toml(cfg))
 
 
 def persist_tui_theme(theme_name: str, path: Path | None = None) -> None:
@@ -140,17 +129,8 @@ def persist_tui_theme(theme_name: str, path: Path | None = None) -> None:
     user_section.setdefault("default_provider", "openrouter")
     user_section["tui_theme"] = theme_name
 
-    text = _emit_toml(data)
     with contextlib.suppress(OSError):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp_name = tempfile.mkstemp(prefix=target.name + ".", suffix=".tmp", dir=target.parent)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                fh.write(text)
-            os.replace(tmp_name, target)
-        except Exception:
-            Path(tmp_name).unlink(missing_ok=True)
-            raise
+        atomic_write_text(target, _emit_toml(data))
 
 
 def _render_toml(cfg: UserConfig) -> str:

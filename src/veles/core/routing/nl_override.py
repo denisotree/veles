@@ -45,15 +45,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
-import tempfile
 import time
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from veles.core.io_utils import atomic_write_text
 from veles.core.project import Project
 from veles.core.routing.ensemble import KNOWN_TASKS, RoutingConfig, parse_spec
 
@@ -290,17 +289,7 @@ def load_nl_routing_config(project: Project) -> RoutingConfig:
 
 def save_nl_routing_config(project: Project, config: RoutingConfig) -> None:
     """Atomic write of the NL-derived routing config."""
-    project.state_dir.mkdir(parents=True, exist_ok=True)
-    path = nl_routing_path(project)
-    text = _render_toml(config)
-    fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(text)
-        os.replace(tmp_name, path)
-    except Exception:
-        Path(tmp_name).unlink(missing_ok=True)
-        raise
+    atomic_write_text(nl_routing_path(project), _render_toml(config))
 
 
 def entries_to_routing_config(entries: list[_NLEntry]) -> RoutingConfig:
