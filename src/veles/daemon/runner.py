@@ -33,7 +33,7 @@ import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from concurrent.futures import Future
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from veles.core.agent import Agent, RunResult
 
@@ -68,11 +68,14 @@ def _make_run_id() -> str:
     return f"run-{int(time.time()):010d}-{secrets.token_hex(4)}"
 
 
+RunState = Literal["pending", "running", "completed", "failed"]
+
+
 @dataclass(slots=True)
 class RunHandle:
     run_id: str
     session_id: str | None
-    state: str = "pending"  # pending | running | completed | failed
+    state: RunState = "pending"
     started_at: float = field(default_factory=time.time)
     finished_at: float | None = None
     error: str | None = None

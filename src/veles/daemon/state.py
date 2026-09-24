@@ -5,10 +5,10 @@ Wraps the live `Project`, an open `SessionStore`, the token store, the
 by run_id. The state is constructed once per daemon and torn down on
 shutdown.
 
-M74 additions: `last_activity_at` (timestamp of the last externally-driven
-event — used by the dream idle-timer) plus optional `job_runner` /
-`dream_runner` slots populated by M75/M76. Both runner slots are typed
-loosely (Any) so this module avoids the import cycle.
+`last_activity_at` (the last externally-driven event) drives the dream
+idle-timer; the background runners fill their slots after startup. Their
+types are imported for type checking only, so this module stays free of
+import cycles.
 """
 
 from __future__ import annotations
@@ -16,18 +16,27 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, get_args
 
 from veles.core.memory import SessionStore
 from veles.core.project import Project
+from veles.core.session_state import ModeName
 from veles.daemon.auth import TokenStore
 from veles.daemon.runner import AgentFactory, RunHandle
 
+if TYPE_CHECKING:
+    from veles.channels.delivery import DeliveryRouter
+    from veles.core.agent import Agent, RunResult
+    from veles.core.dream_runner import DreamRunner
+    from veles.core.job_runner import JobRunner
+    from veles.core.reminder_runner import ReminderRunner
+
 # Agent modes a chat can be switched to (`PATCH /v1/sessions/{id}`, Telegram
 # `/mode`). "default" is not one of them: it is the absence of a choice.
-CHAT_MODES = frozenset({"auto", "planning", "writing", "goal"})
+CHAT_MODES: frozenset[str] = frozenset(get_args(ModeName))
 
 
 @dataclass(slots=True)
@@ -99,13 +108,13 @@ class DaemonState:
     # when a session has no override. Surfaced via /v1/health so
     # channels can highlight the effective model in their pickers.
     default_model: str | None = None
-    job_runner: Any | None = None  # M75 JobRunner; lazy import to avoid cycles
-    dream_runner: Any | None = None  # M76 DreamRunner
-    reminder_runner: Any | None = None  # M166 ReminderRunner — pushes due task reminders
-    # M165 DeliveryRouter: built at runner-attach time, deliverers registered
-    # when channels start, used by the JobRunner to push `deliver_to` output.
-    delivery_router: Any | None = None
-    channel_runners: list[Any] = field(default_factory=list)
+    job_runner: JobRunner | None = None
+    dream_runner: DreamRunner | None = None
+    reminder_runner: ReminderRunner | None = None  # pushes due task reminders
+    # Built at runner-attach time, deliverers registered when channels start,
+    # used by the JobRunner to push `deliver_to` output.
+    delivery_router: DeliveryRouter | None = None
+    channel_runners: list[Any] = field(default_factory=list)  # one gateway per platform
     channel_tasks: list[asyncio.Task] = field(default_factory=list)
     # Platform names of the channels that actually *started* (a declared
     # channel whose token is missing is skipped, so this can be a strict
@@ -114,14 +123,14 @@ class DaemonState:
     # really serving instead of re-deriving (and diverging) from config.
     # Kept in lockstep with `channel_runners` — cleared together on stop.
     active_channels: list[str] = field(default_factory=list)
-    post_turn_hook: Any | None = None  # Callable[[RunResult], None] — runs curator/insights/etc.
-    # M170b: Callable[[str, RunResult], RunResult] — opt-in verify→escalate run
-    # before the `completed` event. None = off (the default).
-    verify_hook: Any | None = None
-    # M124: optional `(**kwargs) -> Agent` factory used by manager-spawn
-    # in daemon path. When None, manager-mode is skipped and runs always
-    # go through the regular `agent_factory` (legacy single-agent path).
-    worker_agent_factory: Any | None = None
+    # Runs curator/insights/etc. after a turn.
+    post_turn_hook: Callable[[RunResult], None] | None = None
+    # M170b: opt-in verify→escalate run before the `completed` event.
+    verify_hook: Callable[[str, RunResult], RunResult] | None = None
+    # M124: `(**kwargs) -> Agent` factory for manager-spawn on the daemon
+    # path. When None, manager mode is skipped and runs go through the
+    # regular `agent_factory`.
+    worker_agent_factory: Callable[..., Agent] | None = None
     # M280: per-session agent mode, set via `PATCH /v1/sessions/{id}` (Telegram
     # `/mode`) and read by `daemon/turns.py::start_turn`. Replaces M126's
     # `session_overrides`, whose model/provider fields M127 had already
@@ -132,7 +141,7 @@ class DaemonState:
     # M204: `factory(*, system_prompt, tools) -> Agent` installed around every
     # daemon turn so delegate/wiki_add can spawn scoped sub-agents (this used
     # to be REPL-only). Built by `attach_background_runners`, capped at [run].
-    subagent_factory: Any | None = None
+    subagent_factory: Callable[..., Agent] | None = None
     # M204: per-session turn serializer — a background-op RESUME turn queues
     # behind a live user turn on the same session instead of racing it.
     session_locks: dict[str, asyncio.Lock] = field(default_factory=dict)
