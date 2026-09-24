@@ -105,8 +105,9 @@ def atomic_write_text(path: Path, text: str, *, mode: int | None = None) -> None
             fh.write(text)
         tmp.replace(path)
     except Exception:
-        # Best-effort cleanup if the tmpfile lingered.
-        tmp.unlink(missing_ok=True)
+        # Best-effort cleanup if the tmpfile lingered — never mask the real error.
+        with contextlib.suppress(OSError):
+            tmp.unlink()
         raise
     if mode is not None:
         with contextlib.suppress(OSError):
