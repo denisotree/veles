@@ -55,7 +55,7 @@ def memory_query(sql: str, max_rows: int = 50) -> str:
     if not stripped:
         return "<error: empty query>"
     low = stripped.lower()
-    if not (low.startswith("select") or low.startswith("with")):
+    if not (low.startswith(("select", "with"))):
         return "<error: only read-only SELECT queries are allowed>"
     max_rows = max(1, min(max_rows, 500))
 

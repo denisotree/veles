@@ -26,7 +26,6 @@ System-level config (defaults shared across projects) lives separately at
 
 from __future__ import annotations
 
-import os
 import re
 import sys
 import time
@@ -274,9 +273,7 @@ def init_project(
         from veles.core.project_tree_runner import scan_project_tree
 
         scan_project_tree(project)
-    except Exception:
-        # Init must always succeed; the cache is an optimisation,
-        # not a contract.
+    except Exception:  # noqa: S110 — init must succeed; the cache is an optimisation
         pass
 
     return project
@@ -371,7 +368,7 @@ def _ensure_symlinks(root: Path) -> None:
             )
             continue
         try:
-            os.symlink(target.name, link)  # relative symlink: AGENTS.md
+            link.symlink_to(target.name)  # relative symlink: AGENTS.md
         except OSError as exc:
             print(
                 f"warning: failed to create symlink {name} -> AGENTS.md: {exc}",

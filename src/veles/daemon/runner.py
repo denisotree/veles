@@ -259,7 +259,7 @@ TurnFn = Callable[
 ]
 
 
-async def run_agent_in_background(
+async def run_agent_in_background(  # noqa: PLR0913
     handle: RunHandle,
     *,
     agent: Agent | None = None,

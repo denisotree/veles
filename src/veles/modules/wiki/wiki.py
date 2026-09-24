@@ -154,7 +154,7 @@ def _resolve_wiki_categories(root: Path) -> tuple[str, ...]:
         pack = find_layout(name, project=None)
         if pack is not None:
             _add(pack.manifest.wiki_categories)
-    except Exception:
+    except Exception:  # noqa: S110 — an unreadable pack falls back to the core categories
         pass
     _add(read_project_categories(root))
     return tuple(resolved)

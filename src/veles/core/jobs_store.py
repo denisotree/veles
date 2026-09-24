@@ -198,7 +198,7 @@ class JobsStore:
 
     # ---- CRUD ----
 
-    def add_job(
+    def add_job(  # noqa: PLR0913
         self,
         *,
         name: str,

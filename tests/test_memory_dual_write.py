@@ -306,7 +306,7 @@ def test_remote_backend_serves_the_recall_path(tmp_path: Path, monkeypatch) -> N
     _insert(project, "local fact", "kafka consumer lag runbook")
     _use(monkeypatch, [_Engine()])
     monkeypatch.setattr(
-        "veles.core.memory.providers.builder.build_extra_providers", lambda: [], raising=False
+        "veles.core.memory.providers.builder.build_extra_providers", list, raising=False
     )
 
     block = _recall_block(project, "kafka consumer lag")

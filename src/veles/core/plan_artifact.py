@@ -86,7 +86,7 @@ def plan_ref(plan_id: str) -> str:
 # ---------- storage ----------
 
 
-def create_plan(
+def create_plan(  # noqa: PLR0913
     state_dir: Path,
     *,
     objective: str,

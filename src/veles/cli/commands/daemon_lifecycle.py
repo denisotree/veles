@@ -17,6 +17,7 @@ import os
 import signal
 import sys
 import time
+from pathlib import Path
 
 from veles.core.defaults import DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT
 from veles.daemon.logging import setup_daemon_logging as _setup_daemon_logging
@@ -80,7 +81,7 @@ def _bootstrap_daemon(project, *, name: str | None = None) -> None:
         "daemon starting in project %s at %s (cwd=%s)",
         project.name,
         project.root,
-        os.getcwd(),
+        Path.cwd(),
     )
     _install_daemon_critical_confirmer()
     print(f"daemon log: {log_path}", file=sys.stderr)

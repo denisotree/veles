@@ -59,7 +59,7 @@ class _ReplApp(
     native scroll / selection / copy are preserved.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         args,
         project,
@@ -304,7 +304,7 @@ class _ReplApp(
                 if sys.stdout.isatty():
                     self.app.output.write_raw(_KITTY_ENABLE)
                     self.app.output.flush()
-            except Exception:
+            except Exception:  # noqa: S110 — a terminal nicety, never fatal
                 pass
 
         atexit.register(_kitty_disable_keyboard)

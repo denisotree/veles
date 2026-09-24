@@ -38,7 +38,7 @@ def _default_prompter(question: str, options: list[str] | None = None) -> str | 
 
         if is_active():
             return None
-    except Exception:
+    except Exception:  # noqa: S110 — unknown autopilot state means ask the user
         pass
     print(f"\n[agent question] {question}", file=sys.stderr, flush=True)
     if options:

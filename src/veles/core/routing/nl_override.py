@@ -53,7 +53,7 @@ from typing import Any
 
 from veles.core.io_utils import atomic_write_text, dump_toml, load_optional_toml
 from veles.core.project import Project
-from veles.core.routing.ensemble import KNOWN_TASKS, RoutingConfig, parse_spec
+from veles.core.routing.ensemble import KNOWN_TASKS, RoutingConfig, filter_specs, parse_spec
 from veles.core.text import strip_code_fence
 
 _NL_TOML_FILENAME = "routing.nl.toml"
@@ -251,11 +251,7 @@ def load_nl_routing_config(project: Project) -> RoutingConfig:
     tasks_raw = routing.get("tasks")
     if not isinstance(tasks_raw, dict):
         return RoutingConfig()
-    tasks: dict[str, str] = {}
-    for name, spec in tasks_raw.items():
-        if isinstance(name, str) and isinstance(spec, str) and ":" in spec:
-            tasks[name] = spec
-    return RoutingConfig(tasks=tasks)
+    return RoutingConfig(tasks=filter_specs(tasks_raw))
 
 
 def save_nl_routing_config(project: Project, config: RoutingConfig) -> None:

@@ -155,7 +155,7 @@ class _LoggerWriter:
                 writer = getattr(self._fallback, "write", None)
                 if writer is not None:
                     writer(s)
-            except Exception:
+            except Exception:  # noqa: S110 — see above: errors here are swallowed on purpose
                 pass
             return len(s)
         self._local.active = True

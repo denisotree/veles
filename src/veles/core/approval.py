@@ -71,7 +71,7 @@ def approvals_dir(state_dir: Path) -> Path:
     return state_dir / APPROVALS_DIRNAME
 
 
-def record_approval(
+def record_approval(  # noqa: PLR0913
     state_dir: Path,
     *,
     tool_name: str,

@@ -83,7 +83,7 @@ def _ensure_autodetected() -> None:
         from veles.modules.embedding_autodetect import autodetect_embedding_adapter
 
         autodetect_embedding_adapter()
-    except Exception:
+    except Exception:  # noqa: S110 — no embedder is a supported state
         pass
 
 

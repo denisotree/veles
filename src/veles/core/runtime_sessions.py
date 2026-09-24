@@ -120,7 +120,7 @@ class RuntimeSessionStore:
 
     # ---- CRUD ----
 
-    def create(
+    def create(  # noqa: PLR0913
         self,
         name: str,
         kind: str,

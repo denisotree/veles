@@ -56,7 +56,7 @@ def outcome_from_dismiss(value: object) -> WizardOutcome | None:
       `WizardOutcome.BACK` — Esc was pressed (dismiss value is None).
       `None` — value is a real answer; the caller continues processing.
     """
-    if value == CANCEL_SENTINEL or value == [CANCEL_SENTINEL]:
+    if value in (CANCEL_SENTINEL, [CANCEL_SENTINEL]):
         return WizardOutcome.CANCEL
     if value is None:
         return WizardOutcome.BACK

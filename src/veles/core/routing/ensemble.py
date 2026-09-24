@@ -82,14 +82,14 @@ class RoutingConfig:
     tasks: dict[str, str] = field(default_factory=dict)
 
 
-def _filter_specs(raw: dict[str, Any]) -> dict[str, str]:
+def filter_specs(raw: dict[str, Any]) -> dict[str, str]:
     """Keep only `str → <provider>:<model>` entries (drop non-string keys/
     values and bare specs without a `:`)."""
-    out: dict[str, str] = {}
-    for name, spec in raw.items():
-        if isinstance(name, str) and isinstance(spec, str) and ":" in spec:
-            out[name] = spec
-    return out
+    return {
+        name: spec
+        for name, spec in raw.items()
+        if isinstance(name, str) and isinstance(spec, str) and ":" in spec
+    }
 
 
 def load_routing_config(project: Project) -> RoutingConfig:
@@ -99,7 +99,7 @@ def load_routing_config(project: Project) -> RoutingConfig:
     empty config (→ defaults) when nothing is set."""
     from veles.core.project_config import get_section, load_project_config
 
-    config_tasks = _filter_specs(get_section(load_project_config(project), "routing", "tasks"))
+    config_tasks = filter_specs(get_section(load_project_config(project), "routing", "tasks"))
     return RoutingConfig(tasks=config_tasks)
 
 

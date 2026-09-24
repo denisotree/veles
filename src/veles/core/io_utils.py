@@ -99,18 +99,18 @@ def atomic_write_text(path: Path, text: str, *, mode: int | None = None) -> None
     useful for token files that need 0600."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
+    tmp = Path(tmp_name)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(text)
-        os.replace(tmp_name, path)
+        tmp.replace(path)
     except Exception:
         # Best-effort cleanup if the tmpfile lingered.
-        with contextlib.suppress(OSError):
-            os.unlink(tmp_name)
+        tmp.unlink(missing_ok=True)
         raise
     if mode is not None:
         with contextlib.suppress(OSError):
-            os.chmod(path, mode)
+            path.chmod(mode)
 
 
 def prune_rotated(path: Path, *, keep: int) -> list[Path]:
@@ -184,7 +184,7 @@ class RotatingJsonl:
         while target.exists():
             target = self._path.with_name(f"{self._path.name}.{ts}.{n}")
             n += 1
-        os.replace(self._path, target)
+        self._path.replace(target)
         prune_rotated(self._path, keep=self._keep_rotated)
 
 
@@ -195,8 +195,8 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
         return []
     out: list[dict[str, Any]] = []
     with path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
+        for raw in f:
+            line = raw.strip()
             if not line:
                 continue
             try:

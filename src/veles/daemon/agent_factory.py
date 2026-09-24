@@ -151,7 +151,7 @@ def _effective_ceilings(settings: FactorySettings) -> tuple[int, int]:
     return hard, summariser
 
 
-def build_agent_for_turn(
+def build_agent_for_turn(  # noqa: PLR0913
     settings: FactorySettings,
     *,
     project,

@@ -117,7 +117,7 @@ def advisor_review(plan_or_decision: str) -> str:
     inform — but not replace — your own judgement.
     """
     raw = call_advisor(plan_or_decision)
-    if raw.startswith("<advisor unavailable") or raw.startswith("<advisor failed"):
+    if raw.startswith(("<advisor unavailable", "<advisor failed")):
         return raw
     return render_verdict(parse_verdict(raw))
 

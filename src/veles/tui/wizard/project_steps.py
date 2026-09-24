@@ -245,7 +245,7 @@ async def _project_api_key_flow(ctx: WizardContext, project: Project, provider: 
             default=options[0].value,
         )
     )
-    if choice is None or choice == _CANCEL_SENTINEL or choice == "skip":
+    if choice is None or choice in (_CANCEL_SENTINEL, "skip"):
         ctx.answers["project_api_key_status"] = "deferred"
         return
     if choice == "inherit":

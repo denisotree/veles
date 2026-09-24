@@ -120,8 +120,8 @@ _SESSION_COLUMNS = (
 
 def _session_title(text: str) -> str:
     """First non-blank line of `text`, whitespace collapsed, cut to one list row."""
-    for line in text.splitlines():
-        line = " ".join(line.split())
+    for raw in text.splitlines():
+        line = " ".join(raw.split())
         if line:
             return ellipsize(line, _SESSION_TITLE_MAX)
     return ""

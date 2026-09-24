@@ -30,6 +30,7 @@ import datetime as dt
 import os
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from croniter import croniter
@@ -181,7 +182,7 @@ def _host_tz() -> dt.tzinfo:
         except (ZoneInfoNotFoundError, ValueError):
             pass
     try:  # macOS/Linux: /etc/localtime -> /usr/share/zoneinfo/<Zone>
-        link = os.readlink("/etc/localtime")
+        link = str(Path("/etc/localtime").readlink())
         if "zoneinfo/" in link:
             return ZoneInfo(link.split("zoneinfo/", 1)[1])
     except (OSError, ValueError, ZoneInfoNotFoundError):
@@ -199,7 +200,7 @@ def resolve_schedule_tz(project=None) -> dt.tzinfo:
             name = get_section(load_project_config(project), "schedule").get("timezone")
             if name:
                 return ZoneInfo(str(name))
-        except Exception:  # best-effort — a bad config tz must not break scheduling
+        except Exception:  # noqa: S110 — a bad config tz must not break scheduling
             pass
     return _host_tz()
 

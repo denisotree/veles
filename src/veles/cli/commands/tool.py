@@ -212,9 +212,9 @@ def _cmd_list(args: argparse.Namespace, project: Project) -> int:
 
 
 def _format_table(records: list[LiveTool], tele: dict[str, ToolTelemetry]) -> str:
-    name_w = max(len("name"), max(len(r.name) for r in records))
-    scope_w = max(len("scope"), max(len(r.scope) for r in records))
-    origin_w = max(len("origin"), max(len(r.origin) for r in records))
+    name_w = max(len("name"), *(len(r.name) for r in records))
+    scope_w = max(len("scope"), *(len(r.scope) for r in records))
+    origin_w = max(len("origin"), *(len(r.origin) for r in records))
     header = (
         f"{'name':<{name_w}}  "
         f"{'scope':<{scope_w}}  "

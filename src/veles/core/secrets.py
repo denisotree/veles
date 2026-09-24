@@ -70,7 +70,7 @@ def _load_index() -> dict[str, list[str]]:
     if not path.is_file():
         return {}
     try:
-        with open(path, encoding="utf-8") as fh:
+        with path.open(encoding="utf-8") as fh:
             data = json.load(fh)
     except (OSError, json.JSONDecodeError):
         return {}

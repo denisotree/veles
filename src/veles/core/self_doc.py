@@ -80,7 +80,7 @@ def generate_self_doc(
         try:
             provider, model = route(task, project)
             routing[task] = f"{provider}:{model}"
-        except Exception:
+        except Exception:  # noqa: S110 — an unroutable task is just left out of the doc
             pass
 
     # --- recent insights (M161: the SQL table is canonical) ---

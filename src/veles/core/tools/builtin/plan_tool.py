@@ -23,7 +23,7 @@ from veles.core.tools.registry import tool
 
 
 @tool(risk_class=RiskClass.DRAFT_ONLY)
-def create_plan(
+def create_plan(  # noqa: PLR0913
     objective: str,
     scope: str = "",
     assumptions: list[str] | None = None,

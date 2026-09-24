@@ -593,7 +593,7 @@ def _check_symlinks(project: Project | None) -> CheckResult:
             )
             continue
         try:
-            target = os.readlink(p)
+            target = str(p.readlink())
         except OSError as exc:
             issues.append(f"{name}: {exc}")
             continue

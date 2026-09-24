@@ -47,8 +47,6 @@ async def _drive_user_wizard(
 
     app = WizardApp(steps=steps or user_wizard_steps())
     # Override run() to use the Pilot harness. Use App.run_test directly.
-    captured = {}
-
     async with app.run_test() as pilot:
         await pilot.pause()
         for k in keys:
@@ -59,8 +57,7 @@ async def _drive_user_wizard(
             if app.result is not None or app.is_running is False:
                 break
             await pilot.pause()
-        captured = dict(app.result or {})
-    return captured
+        return dict(app.result or {})
 
 
 async def test_local_provider_skips_api_key_step():

@@ -186,7 +186,7 @@ def _persist_dream_state(
     )
 
 
-def dream_cycle(
+def dream_cycle(  # noqa: PLR0913
     project: Project,
     *,
     include_consolidation: bool = False,

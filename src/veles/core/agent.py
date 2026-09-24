@@ -212,7 +212,7 @@ class ManagerNeverWritesError(RuntimeError):
 
 
 class Agent:
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         provider: Provider,
         registry: Registry,
