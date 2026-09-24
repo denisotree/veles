@@ -139,13 +139,13 @@ async def _handle_list_channels(request: web.Request) -> web.Response:
     from veles.channels.platform_registry import ensure_builtins_registered, list_platforms
     from veles.channels.session_map import (
         SessionMap,
-        _default_channels_dir,
         channel_session_path,
+        default_channels_dir,
     )
 
     ensure_builtins_registered()
     platforms = list_platforms()
-    channels_dir = _default_channels_dir()
+    channels_dir = default_channels_dir()
     out: list[dict[str, Any]] = []
     for name in platforms:
         path = channel_session_path(name)
@@ -191,7 +191,7 @@ def _resolve_deliver_to(raw: Any, origin: str | None) -> tuple[str | None, str |
     delivery time. `task_tools._resolve_target` can't be reused for this: it reads
     the `current_origin()` ContextVar, which is unset inside an HTTP handler.
     """
-    from veles.channels.delivery import DeliveryTarget
+    from veles.core.delivery_target import DeliveryTarget
 
     if raw is None:
         return None, None
@@ -229,7 +229,7 @@ async def _handle_create_run(request: web.Request) -> web.Response:
     # an agent tool call. The one production producer already conforms
     # (`telegram:{chat_id}`), so this rejects nothing that works today.
     if origin:
-        from veles.channels.delivery import DeliveryTarget
+        from veles.core.delivery_target import DeliveryTarget
 
         try:
             DeliveryTarget.parse(origin)

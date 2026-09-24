@@ -1,6 +1,6 @@
 """Curator core types and pure helpers (VISION §5.1).
 
-The curator's orchestration — the post-turn `_maybe_run_*` triggers and the
+The curator's orchestration — the post-turn `maybe_run_*` triggers and the
 curator pass — lives in `runtime/learning.py`, shared by the CLI and the
 daemon. This module holds what has no dependencies: the pass result type,
 the curate toolset and limits, and the transcript rendering."""
@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from veles.core.provider import Message
 
-_CURATE_TOOLS = (
+CURATE_TOOLS = (
     "wiki_write_page",
     "wiki_append_log",
     # M125: curator mirrors its distilled output into SQL memory tables
@@ -21,27 +21,27 @@ _CURATE_TOOLS = (
     "memory_save_rule",
 )
 
-_CURATE_DEFAULT_LIMIT = 20
-_CURATE_TURN_LIMIT = 80
-_CURATE_CHARS_LIMIT = 64_000
-_CURATE_QUIET_WINDOW_SEC = 60.0
+CURATE_DEFAULT_LIMIT = 20
+CURATE_TURN_LIMIT = 80
+CURATE_CHARS_LIMIT = 64_000
+CURATE_QUIET_WINDOW_SEC = 60.0
 # The curator's own cumulative token budget, NOT the caller's per-run
 # `--max-tokens-total` (default 100k — a cost guard for the USER'S task).
-# The curate prompt carries the serialized session (up to _CURATE_CHARS_LIMIT
+# The curate prompt carries the serialized session (up to CURATE_CHARS_LIMIT
 # chars ≈ 16-25k tokens) and re-counts against the budget every round, so a
 # normal 4-6-round curation needs ~150k; 100k killed it mid-run (live
 # 2026-07-08, ollama qwen3.5:9b). 250k covers ~10 rounds of a worst-case
 # prompt while still bounding a runaway pass on a paid provider.
-_CURATE_TOKEN_BUDGET = 250_000
+CURATE_TOKEN_BUDGET = 250_000
 
 # M28: idle curator fires at 24h gap
-_CURATOR_IDLE_THRESHOLD_SEC = 24 * 3600
-_CURATOR_IDLE_LIMIT = 5
-_CURATOR_POSTRUN_LIMIT = 1
+CURATOR_IDLE_THRESHOLD_SEC = 24 * 3600
+CURATOR_IDLE_LIMIT = 5
+CURATOR_POSTRUN_LIMIT = 1
 
 
 @dataclass(frozen=True, slots=True)
-class _CuratorPassResult:
+class CuratorPassResult:
     """Outcome of one curator pass — used by `_cmd_curate` and the
     M28 continuous triggers to drive their respective stderr output."""
 
@@ -63,7 +63,7 @@ def _render_message(m: Message) -> str:
     return " ".join(parts)
 
 
-def _truncate_session_messages(messages: list[Message], max_turns: int, max_chars: int) -> str:
+def truncate_session_messages(messages: list[Message], max_turns: int, max_chars: int) -> str:
     """Render messages as plain text with first/last truncation if too large."""
     rendered = [_render_message(m) for m in messages]
     head_keep = 4

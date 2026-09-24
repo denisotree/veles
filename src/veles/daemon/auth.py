@@ -30,7 +30,7 @@ _TOKEN_PREFIX = "vd_"
 _TOKEN_BYTES = 16
 
 
-def _default_tokens_path() -> Path:
+def default_tokens_path() -> Path:
     from veles.core.user_paths import user_home
 
     return user_home() / "daemon.tokens.json"
@@ -50,7 +50,7 @@ class TokenStore:
 
     @classmethod
     def load(cls, path: Path | None = None) -> TokenStore:
-        target = path or _default_tokens_path()
+        target = path or default_tokens_path()
         store = cls(path=target, entries=[])
         if not target.is_file():
             return store

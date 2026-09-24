@@ -182,9 +182,9 @@ def _for_the_chat(text: str) -> str:
     the FSM, not for the reader. A chat showed it verbatim, escaped
     (`&lt;ready&gt;…`, live-seen in M280b); the summary itself is what the
     user is asked to confirm, so it stays."""
-    from veles.core.modes.goal import _READY_RE
+    from veles.core.modes.goal import strip_ready_marker
 
-    return _READY_RE.sub(lambda m: m.group(1).strip(), text or "")
+    return strip_ready_marker(text)
 
 
 def _live_goal(state: DaemonState, goal_id: str | None) -> str | None:

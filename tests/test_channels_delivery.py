@@ -5,7 +5,8 @@ from __future__ import annotations
 import pytest
 
 from veles.channels import platform_registry as pr
-from veles.channels.delivery import DeliveryError, DeliveryRouter, DeliveryTarget
+from veles.channels.delivery import DeliveryError, DeliveryRouter
+from veles.core.delivery_target import DeliveryTarget
 
 
 @pytest.fixture(autouse=True)

@@ -59,7 +59,7 @@ def _resolve_target(spec: str) -> tuple[str | None, str | None]:
     chat at write time (the sweep loop has no request context to resolve it
     later). Anything failing the router grammar is rejected loudly so the
     model corrects itself now, not silently at delivery time."""
-    from veles.channels.delivery import DeliveryTarget
+    from veles.core.delivery_target import DeliveryTarget
 
     try:
         parsed = DeliveryTarget.parse(spec)

@@ -28,7 +28,7 @@ class CuratorState:
     # cadence, faster than the 6h deep dream — near-term events can't wait 6h).
     last_proactive_at: float = 0.0
     # Poison-pill guard (2026-07-08): per-session consecutive curation failures.
-    # A session failing `_CURATE_MAX_ATTEMPTS` times is skipped (cursor advances
+    # A session failing `CURATE_MAX_ATTEMPTS` times is skipped (cursor advances
     # past it) instead of blocking the whole curator queue forever.
     failed_attempts: dict[str, int] = field(default_factory=dict)
 

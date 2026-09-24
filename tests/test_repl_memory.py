@@ -95,11 +95,9 @@ def test_repl_post_turn_hooks_fire_insight_and_curator(
 
     calls: list[tuple] = []
     monkeypatch.setattr(
-        cli, "_maybe_run_insight_extractor", lambda a, p, h, s: calls.append(("insight", h, s))
+        cli, "maybe_run_insight_extractor", lambda a, p, h, s: calls.append(("insight", h, s))
     )
-    monkeypatch.setattr(
-        cli, "_maybe_run_post_turn_curator", lambda a, p: calls.append(("curator",))
-    )
+    monkeypatch.setattr(cli, "maybe_run_post_turn_curator", lambda a, p: calls.append(("curator",)))
 
     project = init_project(tmp_path, name="t")
     result = RunResult(text="ok", iterations=1, session_id="s1")
@@ -119,11 +117,9 @@ def test_repl_post_turn_hooks_skip_when_turn_produced_no_result(
 
     calls: list[tuple] = []
     monkeypatch.setattr(
-        cli, "_maybe_run_insight_extractor", lambda a, p, h, s: calls.append(("insight",))
+        cli, "maybe_run_insight_extractor", lambda a, p, h, s: calls.append(("insight",))
     )
-    monkeypatch.setattr(
-        cli, "_maybe_run_post_turn_curator", lambda a, p: calls.append(("curator",))
-    )
+    monkeypatch.setattr(cli, "maybe_run_post_turn_curator", lambda a, p: calls.append(("curator",)))
 
     project = init_project(tmp_path, name="t")
     _run_repl_post_turn_hooks(argparse.Namespace(), project, None)
@@ -141,11 +137,9 @@ def test_repl_post_turn_hooks_skip_cancelled_turn(
 
     calls: list[tuple] = []
     monkeypatch.setattr(
-        cli, "_maybe_run_insight_extractor", lambda a, p, h, s: calls.append(("insight",))
+        cli, "maybe_run_insight_extractor", lambda a, p, h, s: calls.append(("insight",))
     )
-    monkeypatch.setattr(
-        cli, "_maybe_run_post_turn_curator", lambda a, p: calls.append(("curator",))
-    )
+    monkeypatch.setattr(cli, "maybe_run_post_turn_curator", lambda a, p: calls.append(("curator",)))
 
     cancelled = SimpleNamespace(stopped_reason="cancelled", history=[], session_id="s1")
 

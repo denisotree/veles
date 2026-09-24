@@ -2,7 +2,7 @@
 only to wiki markdown.
 
 These tests verify the wiring:
-- `_CURATE_TOOLS` now includes the M125 memory_save_* tools.
+- `CURATE_TOOLS` now includes the M125 memory_save_* tools.
 - The system prompt mentions both memory_save_insight and
   memory_save_rule (the agent gets actually told to use them).
 - `_mirror_to_sql_insights` in insight_extractor uses the shared
@@ -21,7 +21,7 @@ import pytest
 from veles.core.context import reset_active_project, set_active_project
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
-from veles.runtime.learning import _CURATE_TOOLS
+from veles.runtime.learning import CURATE_TOOLS
 
 
 @pytest.fixture()
@@ -38,15 +38,15 @@ def project(tmp_path: Path):
 def test_curate_tools_include_memory_save() -> None:
     """M125: curator toolset must expose memory_save_insight AND
     memory_save_rule so the agent can land output in SQL."""
-    assert "memory_save_insight" in _CURATE_TOOLS
-    assert "memory_save_rule" in _CURATE_TOOLS
+    assert "memory_save_insight" in CURATE_TOOLS
+    assert "memory_save_rule" in CURATE_TOOLS
 
 
 def test_curate_tools_retain_legacy_wiki_writers() -> None:
     """The bridge is additive — wiki_write_page + wiki_append_log stay
     so the wiki artefact survives alongside the SQL row."""
-    assert "wiki_write_page" in _CURATE_TOOLS
-    assert "wiki_append_log" in _CURATE_TOOLS
+    assert "wiki_write_page" in CURATE_TOOLS
+    assert "wiki_append_log" in CURATE_TOOLS
 
 
 # ---- curator system prompt ----

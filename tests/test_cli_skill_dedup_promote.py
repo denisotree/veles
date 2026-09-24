@@ -184,36 +184,36 @@ def test_suggest_promote_save_writes_proposals(project, capsys) -> None:
 
 
 def test_auto_trigger_skipped_on_resume(project, monkeypatch) -> None:
-    from veles.runtime.learning import _maybe_suggest_promotions
+    from veles.runtime.learning import maybe_suggest_promotions
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
     _write_skill(project, "winner", use_count=20, success_count=18)
     args = _ns(provider="openrouter", resume="ses-x", no_suggest_promote=False)
-    _maybe_suggest_promotions(args, project)
+    maybe_suggest_promotions(args, project)
     proposals = project.memory_dir / "proposals"
     if proposals.exists():
         assert not list(proposals.iterdir())
 
 
 def test_auto_trigger_skipped_by_flag(project, monkeypatch) -> None:
-    from veles.runtime.learning import _maybe_suggest_promotions
+    from veles.runtime.learning import maybe_suggest_promotions
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
     _write_skill(project, "winner", use_count=20, success_count=18)
     args = _ns(provider="openrouter", resume=None, no_suggest_promote=True)
-    _maybe_suggest_promotions(args, project)
+    maybe_suggest_promotions(args, project)
     proposals = project.memory_dir / "proposals"
     if proposals.exists():
         assert not list(proposals.iterdir())
 
 
 def test_auto_trigger_writes_proposals_on_first_call(project, monkeypatch) -> None:
-    from veles.runtime.learning import _maybe_suggest_promotions
+    from veles.runtime.learning import maybe_suggest_promotions
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
     _write_skill(project, "winner", use_count=20, success_count=18)
     args = _ns(provider="openrouter", resume=None, no_suggest_promote=False)
-    _maybe_suggest_promotions(args, project)
+    maybe_suggest_promotions(args, project)
     page = project.memory_dir / "proposals" / "promote-winner.md"
     assert page.is_file()
     state = project.state_dir / "promote_suggest.state.json"
@@ -221,15 +221,15 @@ def test_auto_trigger_writes_proposals_on_first_call(project, monkeypatch) -> No
 
 
 def test_auto_trigger_idle_threshold_skips_second_call(project, monkeypatch) -> None:
-    from veles.runtime.learning import _maybe_suggest_promotions
+    from veles.runtime.learning import maybe_suggest_promotions
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
     _write_skill(project, "winner", use_count=20, success_count=18)
     args = _ns(provider="openrouter", resume=None, no_suggest_promote=False)
-    _maybe_suggest_promotions(args, project)
+    maybe_suggest_promotions(args, project)
     page = project.memory_dir / "proposals" / "promote-winner.md"
     first = page.stat().st_mtime
     time.sleep(0.05)
-    _maybe_suggest_promotions(args, project)
+    maybe_suggest_promotions(args, project)
     second = page.stat().st_mtime
     assert first == second  # 7-day idle threshold blocked the rerun

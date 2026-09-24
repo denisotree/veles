@@ -142,6 +142,12 @@ def parse_ready_marker(text: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
+def strip_ready_marker(text: str) -> str:
+    """`text` with `<ready>…</ready>` unwrapped to its summary — the marker is
+    for the FSM, the summary is for the reader."""
+    return _READY_RE.sub(lambda m: m.group(1).strip(), text or "")
+
+
 def parse_infeasible_marker(text: str) -> str | None:
     m = _INFEASIBLE_RE.search(text or "")
     return m.group(1).strip() if m else None

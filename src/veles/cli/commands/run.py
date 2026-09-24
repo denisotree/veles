@@ -206,13 +206,13 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
         resolve_effective_provider,
     )
     from veles.runtime.learning import (
-        _maybe_refresh_nl_routing,
-        _maybe_refresh_self_doc,
-        _maybe_run_idle_curator,
-        _maybe_run_insight_extractor,
-        _maybe_run_post_turn_curator,
-        _maybe_run_subproject_proposer,
-        _maybe_suggest_promotions,
+        maybe_refresh_nl_routing,
+        maybe_refresh_self_doc,
+        maybe_run_idle_curator,
+        maybe_run_insight_extractor,
+        maybe_run_post_turn_curator,
+        maybe_run_subproject_proposer,
+        maybe_suggest_promotions,
     )
     from veles.runtime.prompt import apply_project_slash_prefix, system_prompt_from_args
     from veles.runtime.registry import RUN_TOOLS
@@ -242,7 +242,7 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
     if _maybe_run_via_manager(args, project):
         return 0
 
-    _maybe_run_idle_curator(args, project)
+    maybe_run_idle_curator(args, project)
 
     store = SessionStore(project.memory_db_path)
     try:
@@ -294,10 +294,10 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
         rc = EXIT_BY_REASON.get(result.stopped_reason, 1)
     finally:
         store.close()
-    _maybe_run_insight_extractor(args, project, result.history, result.session_id)
-    _maybe_run_post_turn_curator(args, project)
-    _maybe_run_subproject_proposer(args, project)
-    _maybe_suggest_promotions(args, project)
-    _maybe_refresh_nl_routing(args, project)
-    _maybe_refresh_self_doc(project)
+    maybe_run_insight_extractor(args, project, result.history, result.session_id)
+    maybe_run_post_turn_curator(args, project)
+    maybe_run_subproject_proposer(args, project)
+    maybe_suggest_promotions(args, project)
+    maybe_refresh_nl_routing(args, project)
+    maybe_refresh_self_doc(project)
     return rc

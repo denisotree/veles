@@ -1,16 +1,9 @@
-"""DeliveryTarget + DeliveryRouter (M74) — route outbound messages.
+"""DeliveryRouter (M74) — route outbound messages.
 
 Used by the scheduler (M75) and any tool that wants to send a message to a
-channel chat from outside the inbound polling loop.
-
-Target syntax (parsed by `DeliveryTarget.parse`):
-
-    local                          → log-only (stderr / .veles/jobs/...).
-    origin                         → the chat that originated the request;
-                                     callers resolve it to a platform target
-                                     before delivery (the router refuses it).
-    <platform>:<chat_id>           → send to that chat on that platform.
-    <platform>:<chat_id>:<thread>  → thread-aware variant (Discord, Slack).
+channel chat from outside the inbound polling loop. Targets use the
+`core.delivery_target.DeliveryTarget` grammar; the router refuses an
+unresolved `origin`.
 
 Each running channel registers a deliverer for its platform
 (`channels.start_channel_runners`); a platform target with no deliverer
@@ -25,53 +18,13 @@ is the caller's too: the runners pass an `on_delivered` hook (M214's binder,
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
 
 from veles.channels.platform_registry import get_platform
+from veles.core.delivery_target import DeliveryTarget
 
 
 class DeliveryError(RuntimeError):
     """Raised by DeliveryRouter when a target cannot be reached."""
-
-
-@dataclass(slots=True, frozen=True)
-class DeliveryTarget:
-    """Parsed `local` | `origin` | `<platform>:<chat_id>[:<thread_id>]`."""
-
-    kind: str  # 'local' | 'origin' | 'platform'
-    platform: str | None = None
-    chat_id: str | None = None
-    thread_id: str | None = None
-
-    @classmethod
-    def parse(cls, spec: str) -> DeliveryTarget:
-        s = (spec or "").strip()
-        if not s:
-            raise ValueError("delivery target is empty")
-        if s == "local":
-            return cls(kind="local")
-        if s == "origin":
-            return cls(kind="origin")
-        parts = s.split(":", 2)
-        if len(parts) < 2 or not parts[0] or not parts[1]:
-            raise ValueError(
-                f"unrecognised delivery target {spec!r}; "
-                "expected 'local' | 'origin' | '<platform>:<chat_id>[:<thread>]'"
-            )
-        platform, chat_id = parts[0], parts[1]
-        thread_id = parts[2] if len(parts) == 3 and parts[2] else None
-        return cls(kind="platform", platform=platform, chat_id=chat_id, thread_id=thread_id)
-
-    def render(self) -> str:
-        """Inverse of parse — round-trip representation."""
-        if self.kind == "local":
-            return "local"
-        if self.kind == "origin":
-            return "origin"
-        base = f"{self.platform}:{self.chat_id}"
-        if self.thread_id:
-            return f"{base}:{self.thread_id}"
-        return base
 
 
 class DeliveryRouter:
@@ -120,6 +73,5 @@ PlatformDeliverer = Callable[[str, str, str | None], Awaitable[None]]
 __all__ = [
     "DeliveryError",
     "DeliveryRouter",
-    "DeliveryTarget",
     "PlatformDeliverer",
 ]

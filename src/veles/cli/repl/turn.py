@@ -122,12 +122,12 @@ def _run_repl_post_turn_hooks(args: argparse.Namespace, project: Project, result
     if result is None or getattr(result, "stopped_reason", "") == "cancelled":
         return
     from veles.runtime.learning import (
-        _maybe_run_insight_extractor,
-        _maybe_run_post_turn_curator,
+        maybe_run_insight_extractor,
+        maybe_run_post_turn_curator,
     )
 
-    _maybe_run_insight_extractor(args, project, result.history, result.session_id)
-    _maybe_run_post_turn_curator(args, project)
+    maybe_run_insight_extractor(args, project, result.history, result.session_id)
+    maybe_run_post_turn_curator(args, project)
 
 
 def _update_state_after_turn(state, result) -> None:

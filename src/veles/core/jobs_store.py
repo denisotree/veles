@@ -164,7 +164,7 @@ def _validate_deliver_to(spec: str | None) -> None:
     """
     if not spec:
         return
-    from veles.channels.delivery import DeliveryTarget
+    from veles.core.delivery_target import DeliveryTarget
 
     try:
         DeliveryTarget.parse(spec)

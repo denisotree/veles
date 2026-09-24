@@ -14,7 +14,7 @@ import argparse
 import sys
 import time
 
-from veles.daemon.auth import TokenStore, _default_tokens_path
+from veles.daemon.auth import TokenStore, default_tokens_path
 
 
 def _initialise_token_store() -> TokenStore:
@@ -53,7 +53,7 @@ def _cmd_daemon_token_add(args: argparse.Namespace, store: TokenStore) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(f"created token {entry.name}: {entry.token}")
-    print(f"stored in {_default_tokens_path()}")
+    print(f"stored in {default_tokens_path()}")
     return 0
 
 

@@ -22,7 +22,7 @@ from veles.core.file_lock import file_lock
 from veles.core.io_utils import atomic_write_text
 
 
-def _default_channels_dir() -> Path:
+def default_channels_dir() -> Path:
     from veles.core.user_paths import user_home
 
     return user_home() / "channels"
@@ -37,7 +37,7 @@ def chat_key_for_target(target: str) -> tuple[str, str] | None:
     Code that bound a delivery to a chat used to look up `"telegram:42"` in a
     map the gateway keys by `"42"`, so every reminder (M214) and job (M273) was
     recorded in a session the chat never read."""
-    from veles.channels.delivery import DeliveryTarget
+    from veles.core.delivery_target import DeliveryTarget
 
     try:
         parsed = DeliveryTarget.parse(target)
@@ -49,7 +49,7 @@ def chat_key_for_target(target: str) -> tuple[str, str] | None:
 
 
 def channel_session_path(channel: str, *, base_dir: Path | None = None) -> Path:
-    target = base_dir or _default_channels_dir()
+    target = base_dir or default_channels_dir()
     return target / f"{channel}-sessions.json"
 
 

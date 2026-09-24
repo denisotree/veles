@@ -202,7 +202,7 @@ def test_bare_subproject_proposer_is_noop(bare_project: Project) -> None:
     non-wiki layout it must return cleanly without constructing a Wiki."""
     import argparse
 
-    from veles.runtime.learning import _maybe_run_subproject_proposer
+    from veles.runtime.learning import maybe_run_subproject_proposer
 
     args = argparse.Namespace(
         continuous_curator=True,
@@ -211,7 +211,7 @@ def test_bare_subproject_proposer_is_noop(bare_project: Project) -> None:
         provider="openrouter",
     )
     # Must not raise (detect_clusters would build a Wiki the bare layout lacks).
-    _maybe_run_subproject_proposer(args, bare_project)
+    maybe_run_subproject_proposer(args, bare_project)
     assert not (bare_project.root / "wiki").exists()
 
 

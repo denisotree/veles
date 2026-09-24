@@ -172,7 +172,7 @@ def add_interactive_flags(parser: argparse.ArgumentParser) -> None:
 
 
 def _register_curate(sub: argparse._SubParsersAction) -> None:
-    from veles.core.curator import _CURATE_DEFAULT_LIMIT
+    from veles.core.curator import CURATE_DEFAULT_LIMIT
 
     curate = sub.add_parser(
         "curate",
@@ -184,9 +184,9 @@ def _register_curate(sub: argparse._SubParsersAction) -> None:
     curate.add_argument(
         "--limit",
         type=int,
-        default=_CURATE_DEFAULT_LIMIT,
+        default=CURATE_DEFAULT_LIMIT,
         metavar="N",
-        help=f"Max sessions to curate per run (default: {_CURATE_DEFAULT_LIMIT}).",
+        help=f"Max sessions to curate per run (default: {CURATE_DEFAULT_LIMIT}).",
     )
     add_common_run_flags(curate)
 

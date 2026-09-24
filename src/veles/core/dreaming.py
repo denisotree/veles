@@ -63,7 +63,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _DEEP_DEFAULT_INTERVAL_SEC = 6 * 3600.0
-_POST_TURN_DEFAULT_INTERVAL_SEC = 30 * 60.0
+POST_TURN_DEFAULT_INTERVAL_SEC = 30 * 60.0
 _DEEP_DEFAULT_IDLE_SEC = 600.0
 # M142: codex-style "don't process the whole corpus blindly" cap. The insight
 # step extracts from at most this many transcripts per cycle; older sessions
@@ -756,9 +756,9 @@ def _step_proactive_events(
 
 
 __all__ = [
+    "POST_TURN_DEFAULT_INTERVAL_SEC",
     "_DEEP_DEFAULT_IDLE_SEC",
     "_DEEP_DEFAULT_INTERVAL_SEC",
-    "_POST_TURN_DEFAULT_INTERVAL_SEC",
     "DreamResult",
     "dream_cycle",
     "run_proactive_extraction",
