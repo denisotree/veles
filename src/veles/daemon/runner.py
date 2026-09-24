@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from veles.core.agent import Agent, RunResult
 
 if TYPE_CHECKING:
+    from veles.core.orchestration import ManagerRunResult
     from veles.core.provider import Message
 
 
@@ -62,6 +63,12 @@ class PendingPrompt:
 
     def accepts(self, choice: str) -> bool:
         return self.free_text or choice in self.valid_choices
+
+
+def _no_human_available(question: str, options: list[str] | None = None) -> str | None:
+    """`ask_user` answer for a run no chat can answer: none, at once."""
+    del question, options
+    return None
 
 
 def _make_run_id() -> str:
@@ -385,7 +392,7 @@ async def run_agent_in_background(  # noqa: PLR0913
     from veles.daemon.channel_prompter import make_question_prompter
 
     question_token = set_question_prompter(
-        make_question_prompter(handle, loop) if ask_channel else (lambda _q, _opts=None: None)
+        make_question_prompter(handle, loop) if ask_channel else _no_human_available
     )
     turn_token = begin_trust_turn()
 
@@ -521,7 +528,7 @@ async def run_manager_in_background(
         }
     )
 
-    def _worker():
+    def _worker() -> ManagerRunResult:
         return decompose_and_run(prompt, agent_factory=worker_agent_factory)
 
     # M170c: set origin before the worker thread starts — `asyncio.to_thread`

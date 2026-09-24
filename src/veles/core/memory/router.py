@@ -24,6 +24,7 @@ import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING
 
 from veles.core.memory import InsightHit, SessionStore, TurnHit, aio
 from veles.core.memory.rerank import (
@@ -36,6 +37,9 @@ from veles.core.project import Project
 from veles.core.safety import scan_for_injection
 from veles.core.subproject import load_subprojects, resolve_subproject_path
 from veles.core.text import ellipsize
+
+if TYPE_CHECKING:
+    from veles.core.memory.store import MemoryStore
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +74,7 @@ class MemoryRouter:
         self,
         project: Project,
         *,
-        store: SessionStore | None = None,
+        store: SessionStore | MemoryStore | None = None,
         extra_providers: list[object] | None = None,
     ) -> None:
         self._project = project
@@ -329,7 +333,7 @@ class MemoryRouter:
         return [_turn_hit_to_recall(h) for h in turn_hits]
 
 
-def _as_port(store: object | None) -> object | None:
+def _as_port(store: SessionStore | MemoryStore | None) -> MemoryStore | None:
     """Accept either a `MemoryStore` or the `SessionStore` most callers still
     hold, and return the port. Wrapping rather than reopening matters: a second
     connection to the same file would be a second connection to the same file,

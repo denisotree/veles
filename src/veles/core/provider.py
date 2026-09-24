@@ -125,8 +125,11 @@ class Provider(Protocol):
     """Minimal provider surface."""
 
     name: str
-    supports_tools: bool
     supports_streaming: bool
+
+    # Read-only in the protocol: the subscription-CLI adapters compute it.
+    @property
+    def supports_tools(self) -> bool: ...
 
     def create_message(
         self,

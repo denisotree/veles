@@ -151,6 +151,17 @@ files = [
     "src/veles/core/approval_prompter.py",
     "src/veles/core/agent.py",
     "src/veles/core/tool_dispatch.py",
+    "src/veles/core/stream_consumer.py",
+    "src/veles/core/provider.py",
+    "src/veles/core/provider_factory.py",
+    "src/veles/core/frontmatter.py",
+    "src/veles/core/skill_tool.py",
+    "src/veles/core/model_metadata.py",
+    "src/veles/core/session_state.py",
+    "src/veles/core/memory/schema.py",
+    "src/veles/runtime/prompt.py",
+    "src/veles/daemon/runner.py",
+    "src/veles/daemon/http_util.py",
     "src/veles/daemon/logging.py",
 ]
 

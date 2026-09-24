@@ -9,16 +9,19 @@ daemon pump thread even when the stream stalls before yielding (M131).
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from typing import Any
 
-from veles.core.cancel import current_cancel_token
+from veles.core.cancel import CancelToken, current_cancel_token
 from veles.core.context_scrubber import MemoryContextScrubber
 from veles.core.events import Event, ThinkingDelta
 from veles.core.provider import (
+    Message,
     Provider,
     ProviderResponse,
     ReasoningDelta,
     StreamEnd,
+    StreamEvent,
     TextDelta,
 )
 from veles.core.timeutil import utc_iso
@@ -27,8 +30,8 @@ from veles.core.timeutil import utc_iso
 def consume_stream(
     provider: Provider,
     *,
-    history,
-    tools: list[dict] | None,
+    history: list[Message],
+    tools: list[dict[str, Any]] | None,
     model: str,
     max_tokens: int,
     on_text_delta: Callable[[str], None],
@@ -43,12 +46,14 @@ def consume_stream(
     """
     scrubber = MemoryContextScrubber()
     stream_started = time.monotonic()
-    state = {"response": None, "ttft_ms": 0}
+    response: ProviderResponse | None = None
+    ttft_ms = 0
 
-    def _handle(event) -> None:
+    def _handle(event: StreamEvent) -> None:
+        nonlocal response, ttft_ms
         if isinstance(event, TextDelta):
-            if state["ttft_ms"] == 0 and event.text:
-                state["ttft_ms"] = int((time.monotonic() - stream_started) * 1000)
+            if ttft_ms == 0 and event.text:
+                ttft_ms = int((time.monotonic() - stream_started) * 1000)
             cleaned = scrubber.feed(event.text)
             if cleaned:
                 on_text_delta(cleaned)
@@ -65,7 +70,7 @@ def consume_stream(
                     )
                 )
         elif isinstance(event, StreamEnd):
-            state["response"] = event.response
+            response = event.response
 
     cancel = current_cancel_token()
     stream = provider.stream_message(history, tools=tools, model=model, max_tokens=max_tokens)
@@ -79,13 +84,16 @@ def consume_stream(
     tail = scrubber.finalize()
     if tail:
         on_text_delta(tail)
-    response = state["response"]
     if response is None:
         raise RuntimeError("provider stream ended without StreamEnd event")
-    return response, state["ttft_ms"]
+    return response, ttft_ms
 
 
-def _consume_cancellable(stream, handle, cancel) -> None:
+def _consume_cancellable(
+    stream: Iterable[StreamEvent],
+    handle: Callable[[StreamEvent], None],
+    cancel: CancelToken,
+) -> None:
     """Drive a blocking provider stream so cancellation stays responsive
     even when the stream stalls *before* yielding a chunk.
 
@@ -103,16 +111,13 @@ def _consume_cancellable(stream, handle, cancel) -> None:
     import queue
     import threading
 
-    from veles.core.provider import StreamEnd as _StreamEnd
-
-    q: queue.Queue = queue.Queue(maxsize=256)
-    _sentinel = object()
+    q: queue.Queue[tuple[str, Any]] = queue.Queue(maxsize=256)
 
     def _pump() -> None:
         try:
             for event in stream:
                 q.put(("ev", event))
-            q.put(("end", _sentinel))
+            q.put(("end", None))
         except BaseException as exc:
             q.put(("err", exc))
 
@@ -133,5 +138,5 @@ def _consume_cancellable(stream, handle, cancel) -> None:
         # take priority over delivering one more buffered chunk.
         cancel.check()
         handle(payload)
-        if isinstance(payload, _StreamEnd):
+        if isinstance(payload, StreamEnd):
             return
