@@ -485,10 +485,9 @@ async def _handle_patch_session(request: web.Request) -> web.Response:
     turn of that session runs in this mode (`daemon/turns.py::start_turn`) —
     before M280 the value was stored and never read.
 
-    M127: `model` and `provider` are **fixed at daemon launch** from
-    `config.toml` (`[engine]` / `[routing.tasks]`) and can no longer be
-    changed per-session — supplying either is a 400. The Telegram `/model`
-    picker was removed; `/mode` is the only remaining per-session override.
+    `model` and `provider` are **fixed at daemon launch** from `config.toml`
+    (`[engine]` / `[routing.tasks]`) — supplying either is a 400. The mode is
+    the only per-session override.
     """
     state: DaemonState = request.app["state"]
     session_id = request.match_info["session_id"]

@@ -117,7 +117,7 @@ async def _cmd_context_placeholder(gateway: TelegramGateway, chat_key: str, args
     )
 
 
-# ---- M116b: agent modes via slash ----
+# ---- agent modes via slash ----
 
 
 async def _cmd_goal(gateway: TelegramGateway, chat_key: str, args: str) -> str:
@@ -177,11 +177,6 @@ async def _cmd_goal(gateway: TelegramGateway, chat_key: str, args: str) -> str:
         return "A goal is already running in this chat — answer its question, or /goal cancel it."
     await gateway._run_turn_serial(chat_key_to_int(chat_key), chat_key, arg, mode="goal")
     return ""
-
-
-# M127: the Telegram `/model` picker (`MODEL_PAGE_SIZE`, `_render_model_page`,
-# `_cmd_model`) was removed — model/provider are fixed at daemon launch from
-# config and can't be switched from Telegram. `/mode` keeps `chat_key_to_int`.
 
 
 def chat_key_to_int(chat_key: str) -> int:

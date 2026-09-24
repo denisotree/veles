@@ -44,15 +44,9 @@ class OpenRouterProvider(CloudOpenAIProvider):
         model: str | None = None,
         max_retries: int | None = None,
     ) -> None:
-        """M266: both client budgets are resolved here, not by the caller.
-
-        The provider is built in three places — `provider_factory`, the CLI
-        runtime, and `adapters/cli/mcp_server.py` — and only the first two
-        passed a timeout, so the MCP path ran on a flat 120s regardless of the
-        model. Resolving inside the constructor closes that hole and any fourth
-        one: `timeout` is now `None` ("decide for me") rather than a third
-        hardcoded default that silently outranked `model_budgets`.
-        """
+        """Both client budgets are resolved here, not by the caller (M266), so
+        every construction site gets the per-model timeout from
+        `model_budgets`; `timeout=None` means "decide for me"."""
         from veles.core.model_budgets import resolve_max_retries, resolve_request_timeout
         from veles.core.provider_factory import require_api_key
 

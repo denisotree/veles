@@ -181,7 +181,7 @@ def list_known_names() -> list[str]:
     )
 
 
-# ---------------- M92: scoped provider keys ----------------
+# ---------------- scoped provider keys ----------------
 
 
 def provider_for_env_name(name: str) -> str | None:

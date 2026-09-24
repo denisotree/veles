@@ -300,10 +300,9 @@ def make_agent_factory(
     and in-process backends pass the user prompt so recall is
     query-aware.
 
-    M127: model and provider are fixed at daemon launch from config
-    (`[engine]` / `[routing.tasks]`); there is no per-session model or
-    provider override anymore (the Telegram `/model` picker was removed).
-    Every turn builds with the same config-derived `settings`. The `state`
+    Model and provider are fixed at daemon launch from config
+    (`[engine]` / `[routing.tasks]`), so every turn builds with the same
+    config-derived `settings`. The `state`
     param is retained for signature stability (mode overrides, future use).
 
     M158-followup: because provider + compressor are launch-fixed (M127),

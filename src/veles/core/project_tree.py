@@ -440,7 +440,7 @@ def relevant_semantic(conn: sqlite3.Connection, query: str, *, limit: int = 10) 
     return [e for _, e in scored[:limit]]
 
 
-# ---------- M216: per-entry embedding cache ----------
+# ---------- per-entry embedding cache ----------
 
 
 def _load_cached_embeddings(

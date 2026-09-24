@@ -1,8 +1,6 @@
 """Parsers for the agent-loop verbs: init, run, add, tui, curate.
 
-(`ingest`/`query`/`lint` were deprecated aliases — M117c — and physically
-removed in M117c-removal; the canonical paths are `veles add` and
-`veles run "<skill>"` from the active layout-pack.)"""
+Query and lint are layout-pack skills (`veles run "<skill>"`), not verbs."""
 
 from __future__ import annotations
 

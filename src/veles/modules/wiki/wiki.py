@@ -47,9 +47,8 @@ _LOG_FILE = "LOG.md"
 _WIKI_DIR = "wiki"
 _SOURCES_DIR = "sources"
 _FTS_DB = "wiki_index.db"
-# M160/M161: `proposals` and `insights` removed — both are system memory
-# and live in `.veles/memory/` (core/memory/artefacts.py + the `insights`
-# SQL table), not user content.
+# Proposals and insights are system memory (`.veles/memory/` and the
+# `insights` SQL table), not wiki categories.
 # Core categories always present regardless of layout pack (curator writes
 # `sessions`, self-doc writes `self-doc`, ingest writes concepts/entities/sources).
 # M203: `sources` is NOT here. The top-level `sources/` tree holds raw,

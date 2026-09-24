@@ -398,7 +398,7 @@ def project_wizard_steps(cwd: Path) -> list:
     ]
 
 
-# ---------------- M117e: LayoutPickerStep ----------------
+# ---------------- LayoutPickerStep ----------------
 
 
 @dataclass

@@ -44,7 +44,7 @@ _AGENTS_MD = "AGENTS.md"
 _SYMLINK_TARGETS = ("CLAUDE.md", "GEMINI.md")
 # v2: wiki content moved out of `.veles/` into `<root>/wiki/`.
 # `.veles/` keeps daemon-internal state only: project.toml, memory.db,
-# registries, tmp. (The v1→v2 migrator itself was removed in M149.)
+# registries, tmp.
 _SCHEMA_VERSION = 2
 # M34: keep the constant for any external callers that imported it,
 # but produce content via agents_md_schema.default_template() so the

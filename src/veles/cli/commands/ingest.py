@@ -1,7 +1,6 @@
 """Shared ingest runner for `veles add` — read a source and write a wiki page
-via agent. M85: kernel logic lives in `veles.modules.wiki.ingest`; this file is a thin
-CLI wrapper. (The `veles ingest` deprecated alias was removed in
-M117c-removal; `cmd_add` is the only caller of `_run_ingest_cli`.)"""
+via agent. The kernel logic lives in `veles.modules.wiki.ingest`; this file is
+a thin CLI wrapper, called only by `cmd_add`."""
 
 from __future__ import annotations
 

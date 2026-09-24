@@ -20,12 +20,8 @@ turn boundaries. This module provides it; the compactor reattaches the
 artifact reference on rehydration (`collect_active_refs`, consumed by
 `context_compressor.py`). After this milestone the eval flips to a real pass.
 
-M236 correction: an earlier version of this docstring claimed "M71 hooks the
-artifact into the system prompt". It never did. System-prompt assembly lives in
-`core/context_builder.py::assemble_system_prompt` and knows nothing about plans;
-the `render_system_block` helper written for that promise had zero production
-callers for its whole life and was removed rather than left as a standing lie.
-GoalMode, the one plausible consumer, renders its own plan summary inline in
+Plans are not injected into the system prompt: `assemble_system_prompt` knows
+nothing about them. GoalMode renders its own plan summary inline in
 `_EXECUTE_SYSTEM_TEMPLATE` (`core/modes/goal.py`). What crosses the compaction
 boundary is the *reference*, not the body.
 """

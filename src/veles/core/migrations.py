@@ -14,9 +14,8 @@ Migration steps live as `_migrate_vN_to_vN1(project)` helpers and are
 dispatched by `_STEPS`. Adding a new schema bump: increment
 `_SCHEMA_VERSION` in `project.py`, append the handler here.
 
-M149: the v1 → v2 migrator (wiki out of `.veles/`) was removed — no
-pre-v2 installations exist. A project stuck below the oldest supported
-schema gets a clear log message suggesting `veles init --force`.
+A project below the oldest supported schema gets a clear log message
+suggesting `veles init --force`.
 """
 
 from __future__ import annotations

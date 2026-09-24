@@ -25,8 +25,7 @@ hard-coded `openrouter:anthropic/claude-haiku-4.5` default → 404. M125
 folds `[routing.tasks]` into `config.toml`, makes `[engine]` the base
 layer for every ensemble task, and mirrors M124-perm-unify's project →
 user → hardcoded layering (see `core/permission/policy.py::effective_policy`
-and `core/model_resolver.py`). M149 removed the pre-M125 standalone
-`routing.toml` auto-import — `config.toml` is the single source of truth.
+and `core/model_resolver.py`). `config.toml` is the single source of truth.
 
 Resolution order in `effective_route(task_type, project)` — first hit wins:
 1.  project `[routing.tasks][task_type]`        (label `project-route`)

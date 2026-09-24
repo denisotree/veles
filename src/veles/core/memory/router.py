@@ -1,24 +1,19 @@
 """Pre-turn recall of relevant project memory for system-prompt injection.
 
 The router is the single entry point Veles uses to ask "what does our
-project memory have that's relevant to this query?" — today it pulls
-from two FTS5 indices:
+project memory have that's relevant to this query?". It collects, in
+parallel and each under a deadline:
 
-1. `Wiki.search` — curated wiki pages (agent-authored summaries,
-   insights, proposals, etc). The original M22 source.
-2. `SessionStore.search_turns` — raw session turns (M58, this file's
-   extension). Lets recall surface "that command I ran yesterday"
-   without waiting for the curator to consolidate it into the wiki.
+- insights from the `insights` table (FTS, plus k-NN when embeddings exist);
+- raw session turns (`SessionStore.search_turns`), so recall can surface
+  "that command I ran yesterday" before the curator consolidates it;
+- wiki pages, only when the project's layout enables the wiki engine —
+  including registered subprojects, namespaced `<slug>:<rel_path>`;
+- Veles' own how-to notes (`about-veles`) and any extra collectors.
 
-M41 fans recall *downward* into vertical subprojects too: each
-registered child's wiki is searched with a smaller per-child cap. Hits
-from subprojects are namespaced (`<slug>:<rel_path>`, `[slug] title`)
-so the LLM can see which child a page came from.
-
-The output is a single ranked `list[RecallHit]` of length ≤ `limit`,
-interleaving wiki and turn hits one-for-one. The interleave keeps
-fresh chat content from drowning out hard-won wiki knowledge and vice
-versa. Recency / BM25-weighted merging is a future refinement.
+The output is one `list[RecallHit]` of length ≤ `limit`, ordered by
+`rerank` (relevance + recency + provenance confidence, weights from
+the project config). Recalled insights are then aged.
 """
 
 from __future__ import annotations
