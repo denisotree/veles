@@ -324,24 +324,11 @@ def evaluate(entry: ToolEntry, args: dict[str, Any]) -> Decision:
     return _policy_gate(entry, args)
 
 
-# ---- decision -> event-log discriminator ----
-
-
-def event_decision_str(d: Decision) -> str:
-    """Render `d.kind` for the typed event log.
-
-    Identity for now — kept as a function so that future log-schema tweaks
-    (e.g. collapsing `sandbox` into `allow:sandbox`) live in one place.
-    """
-    return d.kind
-
-
 __all__ = [
     "Decision",
     "DecisionKind",
     "Rule",
     "evaluate",
-    "event_decision_str",
 ]
 
 

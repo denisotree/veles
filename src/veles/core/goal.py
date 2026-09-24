@@ -26,10 +26,13 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from veles.core.io_utils import atomic_write_text
 from veles.core.timeutil import utc_iso
+
+if TYPE_CHECKING:
+    from veles.core.project import Project
 
 GOALS_DIRNAME = "goals"
 
@@ -37,7 +40,6 @@ GoalStatus = Literal[
     "active",
     "paused",
     "completed",
-    "blocked",
     "cancelled",
 ]
 
@@ -72,7 +74,7 @@ class GoalBudget:
     max_wall_time_s: int = 3600
 
 
-def default_budget(project: Any) -> GoalBudget:
+def default_budget(project: Project) -> GoalBudget:
     """A new goal's budget: `[goal]` in the project's `config.toml`
     (`max_steps`, `max_cost_usd`, `max_wall_time_s`), each falling back to
     `GoalBudget`'s own default. M283: before, only `veles goal start` flags

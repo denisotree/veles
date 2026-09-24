@@ -28,7 +28,7 @@ from veles.core.provider import Message
 
 _PLACEHOLDER = "<tool result unavailable — not recorded>"
 
-# ---- M238: supersede stale tool results ------------------------------------
+# ---- supersede stale tool results ------------------------------------------
 #
 # Read a file on turn 2, read it again on turn 9 and BOTH results stay in the
 # history — the stale one keeps competing for attention with the fresh one.

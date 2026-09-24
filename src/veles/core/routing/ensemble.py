@@ -25,8 +25,7 @@ hard-coded `openrouter:anthropic/claude-haiku-4.5` default → 404. M125
 folds `[routing.tasks]` into `config.toml`, makes `[engine]` the base
 layer for every ensemble task, and mirrors M124-perm-unify's project →
 user → hardcoded layering (see `core/permission/policy.py::effective_policy`
-and `core/model_resolver.py`). M149 removed the pre-M125 standalone
-`routing.toml` auto-import — `config.toml` is the single source of truth.
+and `core/model_resolver.py`). `config.toml` is the single source of truth.
 
 Resolution order in `effective_route(task_type, project)` — first hit wins:
 1.  project `[routing.tasks][task_type]`        (label `project-route`)
@@ -83,14 +82,14 @@ class RoutingConfig:
     tasks: dict[str, str] = field(default_factory=dict)
 
 
-def _filter_specs(raw: dict[str, Any]) -> dict[str, str]:
+def filter_specs(raw: dict[str, Any]) -> dict[str, str]:
     """Keep only `str → <provider>:<model>` entries (drop non-string keys/
     values and bare specs without a `:`)."""
-    out: dict[str, str] = {}
-    for name, spec in raw.items():
-        if isinstance(name, str) and isinstance(spec, str) and ":" in spec:
-            out[name] = spec
-    return out
+    return {
+        name: spec
+        for name, spec in raw.items()
+        if isinstance(name, str) and isinstance(spec, str) and ":" in spec
+    }
 
 
 def load_routing_config(project: Project) -> RoutingConfig:
@@ -100,7 +99,7 @@ def load_routing_config(project: Project) -> RoutingConfig:
     empty config (→ defaults) when nothing is set."""
     from veles.core.project_config import get_section, load_project_config
 
-    config_tasks = _filter_specs(get_section(load_project_config(project), "routing", "tasks"))
+    config_tasks = filter_specs(get_section(load_project_config(project), "routing", "tasks"))
     return RoutingConfig(tasks=config_tasks)
 
 

@@ -20,12 +20,8 @@ turn boundaries. This module provides it; the compactor reattaches the
 artifact reference on rehydration (`collect_active_refs`, consumed by
 `context_compressor.py`). After this milestone the eval flips to a real pass.
 
-M236 correction: an earlier version of this docstring claimed "M71 hooks the
-artifact into the system prompt". It never did. System-prompt assembly lives in
-`core/context_builder.py::assemble_system_prompt` and knows nothing about plans;
-the `render_system_block` helper written for that promise had zero production
-callers for its whole life and was removed rather than left as a standing lie.
-GoalMode, the one plausible consumer, renders its own plan summary inline in
+Plans are not injected into the system prompt: `assemble_system_prompt` knows
+nothing about them. GoalMode renders its own plan summary inline in
 `_EXECUTE_SYSTEM_TEMPLATE` (`core/modes/goal.py`). What crosses the compaction
 boundary is the *reference*, not the body.
 """
@@ -87,16 +83,10 @@ def plan_ref(plan_id: str) -> str:
     return f"artifact://veles/plans/{plan_id}"
 
 
-def parse_plan_ref(ref: str) -> str | None:
-    """Inverse of `plan_ref` — return plan_id, or None if `ref` doesn't match."""
-    m = re.fullmatch(r"artifact://veles/plans/([A-Za-z0-9]+)", ref)
-    return m.group(1) if m else None
-
-
 # ---------- storage ----------
 
 
-def create_plan(
+def create_plan(  # noqa: PLR0913
     state_dir: Path,
     *,
     objective: str,
@@ -153,34 +143,6 @@ def list_active(state_dir: Path) -> list[PlanArtifact]:
             if plan is not None:
                 out.append(plan)
     return out
-
-
-def list_completed(state_dir: Path) -> list[PlanArtifact]:
-    d = completed_dir(state_dir)
-    if not d.exists():
-        return []
-    out: list[PlanArtifact] = []
-    for f in sorted(d.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
-        if f.is_file() and f.suffix == ".md":
-            plan = _read_markdown(f)
-            if plan is not None:
-                out.append(plan)
-    return out
-
-
-def update_status(
-    state_dir: Path,
-    plan_id: str,
-    *,
-    status: PlanStatus,
-) -> PlanArtifact:
-    plan = _require(state_dir, plan_id)
-    if plan.status == status:
-        return plan
-    plan.status = status
-    plan.updated_at = utc_iso()
-    _write(state_dir, plan, completed=False)
-    return plan
 
 
 def mark_done(
@@ -372,11 +334,8 @@ __all__ = [
     "completed_dir",
     "create_plan",
     "list_active",
-    "list_completed",
     "mark_done",
-    "parse_plan_ref",
     "plan_ref",
     "plans_dir",
     "read_plan",
-    "update_status",
 ]

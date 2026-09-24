@@ -48,7 +48,7 @@ def file_lock(lock_path: Path, *, blocking: bool = True) -> Iterator[None]:
         yield
         return
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(lock_path, "w", encoding="utf-8") as fh:
+    with lock_path.open("w", encoding="utf-8") as fh:
         try:
             fcntl.flock(fh.fileno(), fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
         except BlockingIOError:

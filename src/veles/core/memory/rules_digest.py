@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 from veles.core.i18n import t
 
 if TYPE_CHECKING:
-    from veles.core.memory import RuleRow, SessionStore
+    from veles.core.memory import DigestRule, SessionStore
 
 _DEFAULT_LIMIT = 12
 _DEFAULT_CHAR_BUDGET = 1500
@@ -30,7 +30,7 @@ _DEFAULT_CHAR_BUDGET = 1500
 _GROUP_ORDER = ("preference", "dont", "do", "format")
 
 
-def _render(rows: list[RuleRow]) -> str:
+def _render(rows: list[DigestRule]) -> str:
     lines = [f"## {t('rules_digest.header')}"]
     for kind in _GROUP_ORDER:
         group = [r for r in rows if r.kind == kind]

@@ -26,6 +26,7 @@ from veles.core.modes.base import Mode, ModeContext
 from veles.core.modes.planning import PlanningMode
 from veles.core.modes.writing import WritingMode
 from veles.core.provider import Message
+from veles.core.session_state import ModeName
 
 Verdict = Literal["direct", "plan"]
 
@@ -71,7 +72,7 @@ def classify(prompt: str, provider, model: str) -> Verdict:
 
 
 class AutoMode:
-    name: str = "auto"
+    name: ModeName = "auto"
     label: str = "auto"
     # AutoMode itself doesn't tune model behaviour — its sub-Mode does.
     system_block: str = ""

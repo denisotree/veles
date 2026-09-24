@@ -151,7 +151,7 @@ def _effective_ceilings(settings: FactorySettings) -> tuple[int, int]:
     return hard, summariser
 
 
-def build_agent_for_turn(
+def build_agent_for_turn(  # noqa: PLR0913
     settings: FactorySettings,
     *,
     project,
@@ -300,10 +300,9 @@ def make_agent_factory(
     and in-process backends pass the user prompt so recall is
     query-aware.
 
-    M127: model and provider are fixed at daemon launch from config
-    (`[engine]` / `[routing.tasks]`); there is no per-session model or
-    provider override anymore (the Telegram `/model` picker was removed).
-    Every turn builds with the same config-derived `settings`. The `state`
+    Model and provider are fixed at daemon launch from config
+    (`[engine]` / `[routing.tasks]`), so every turn builds with the same
+    config-derived `settings`. The `state`
     param is retained for signature stability (mode overrides, future use).
 
     M158-followup: because provider + compressor are launch-fixed (M127),
@@ -484,22 +483,22 @@ def make_post_turn_hook(args: argparse.Namespace, project):
         args.provider = resolve_effective_provider(args, project)
 
     from veles.runtime.learning import (
-        _maybe_refresh_nl_routing,
-        _maybe_refresh_self_doc,
-        _maybe_run_insight_extractor,
-        _maybe_run_post_turn_curator,
-        _maybe_run_subproject_proposer,
-        _maybe_suggest_promotions,
+        maybe_refresh_nl_routing,
+        maybe_refresh_self_doc,
+        maybe_run_insight_extractor,
+        maybe_run_post_turn_curator,
+        maybe_run_subproject_proposer,
+        maybe_suggest_promotions,
     )
 
     def hook(result) -> None:
         for step in (
-            lambda: _maybe_run_insight_extractor(args, project, result.history, result.session_id),
-            lambda: _maybe_run_post_turn_curator(args, project),
-            lambda: _maybe_run_subproject_proposer(args, project),
-            lambda: _maybe_suggest_promotions(args, project),
-            lambda: _maybe_refresh_nl_routing(args, project),
-            lambda: _maybe_refresh_self_doc(project),
+            lambda: maybe_run_insight_extractor(args, project, result.history, result.session_id),
+            lambda: maybe_run_post_turn_curator(args, project),
+            lambda: maybe_run_subproject_proposer(args, project),
+            lambda: maybe_suggest_promotions(args, project),
+            lambda: maybe_refresh_nl_routing(args, project),
+            lambda: maybe_refresh_self_doc(project),
         ):
             try:
                 step()

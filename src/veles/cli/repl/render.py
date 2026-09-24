@@ -180,7 +180,7 @@ def _split_blocks(buf: str) -> tuple[list[str], str]:
     in_fence = False
     for line in lines:
         s = line.lstrip()
-        if s.startswith("```") or s.startswith("~~~"):
+        if s.startswith(("```", "~~~")):
             in_fence = not in_fence
             cur.append(line)
         elif line.strip() == "" and not in_fence:

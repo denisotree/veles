@@ -83,7 +83,7 @@ def _kitty_disable_keyboard() -> None:
         if sys.stdout.isatty():
             sys.stdout.write(_KITTY_DISABLE)
             sys.stdout.flush()
-    except Exception:
+    except Exception:  # noqa: S110 — a terminal nicety, never fatal
         pass
 
 

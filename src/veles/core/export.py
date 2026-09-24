@@ -84,7 +84,7 @@ class ExportError(RuntimeError):
     pass
 
 
-class ImportError(RuntimeError):
+class BundleImportError(RuntimeError):
     pass
 
 
@@ -113,12 +113,12 @@ def import_bundle(source: Path, target_dir: Path, *, force: bool = False) -> Pro
     entry whose name escapes the target dir (`..`, absolute paths).
     """
     if not source.is_file():
-        raise ImportError(f"bundle {source} not found")
+        raise BundleImportError(f"bundle {source} not found")
     target_dir = target_dir.resolve()
     state_dir = target_dir / ".veles"
     if state_dir.exists():
         if not force:
-            raise ImportError(
+            raise BundleImportError(
                 f"target {target_dir} already has a Veles project; "
                 "rerun with `--force` to overwrite, or pick an empty directory"
             )
@@ -129,22 +129,22 @@ def import_bundle(source: Path, target_dir: Path, *, force: bool = False) -> Pro
         members = tf.getmembers()
         for m in members:
             if not _is_safe_member_name(m.name):
-                raise ImportError(f"unsafe path in bundle: {m.name!r}")
+                raise BundleImportError(f"unsafe path in bundle: {m.name!r}")
         manifest = _read_manifest(tf, members)
         if manifest.schema_version != _BUNDLE_SCHEMA_VERSION:
-            raise ImportError(
+            raise BundleImportError(
                 f"unsupported bundle schema version {manifest.schema_version} "
                 f"(this Veles supports {_BUNDLE_SCHEMA_VERSION})"
             )
         if manifest.mode not in {"full", "template"}:
-            raise ImportError(f"unknown bundle mode {manifest.mode!r}")
+            raise BundleImportError(f"unknown bundle mode {manifest.mode!r}")
         for m in members:
             if m.name == _MANIFEST_FILENAME:
                 continue
             tf.extract(m, target_dir, filter="data")
 
     if not (state_dir / "project.toml").is_file():
-        raise ImportError("extracted bundle does not contain .veles/project.toml")
+        raise BundleImportError("extracted bundle does not contain .veles/project.toml")
     return load_project(target_dir)
 
 
@@ -244,16 +244,16 @@ def _is_safe_member_name(name: str) -> bool:
 def _read_manifest(tf: tarfile.TarFile, members: list[tarfile.TarInfo]) -> ExportManifest:
     member = next((m for m in members if m.name == _MANIFEST_FILENAME), None)
     if member is None:
-        raise ImportError(f"bundle missing {_MANIFEST_FILENAME}")
+        raise BundleImportError(f"bundle missing {_MANIFEST_FILENAME}")
     fh = tf.extractfile(member)
     if fh is None:
-        raise ImportError(f"could not read {_MANIFEST_FILENAME} from bundle")
+        raise BundleImportError(f"could not read {_MANIFEST_FILENAME} from bundle")
     try:
         data = json.loads(fh.read().decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise ImportError(f"invalid {_MANIFEST_FILENAME}: {exc}") from exc
+        raise BundleImportError(f"invalid {_MANIFEST_FILENAME}: {exc}") from exc
     if not isinstance(data, dict):
-        raise ImportError(f"{_MANIFEST_FILENAME} root is not an object")
+        raise BundleImportError(f"{_MANIFEST_FILENAME} root is not an object")
     try:
         return ExportManifest(
             veles_version=str(data.get("veles_version") or ""),
@@ -263,4 +263,4 @@ def _read_manifest(tf: tarfile.TarFile, members: list[tarfile.TarInfo]) -> Expor
             project_name=str(data.get("project_name") or ""),
         )
     except (TypeError, ValueError) as exc:
-        raise ImportError(f"malformed {_MANIFEST_FILENAME}: {exc}") from exc
+        raise BundleImportError(f"malformed {_MANIFEST_FILENAME}: {exc}") from exc

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "veles-ai"
-version = "0.43.0"
+version = "0.44.0"
 description = "Veles — a minimalist agent framework: clean, decomposed code, compounding per-project memory, and a modular core with optional pluggable modules."
 requires-python = ">=3.13"
 readme = "README.md"
@@ -87,12 +87,31 @@ line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
-ignore = ["N818"]  # Veles uses Python-stdlib exception naming (FileNotFoundError-style)
+select = [
+    "E", "F", "I", "N", "UP", "B", "SIM", "RUF",
+    "PIE", "PERF", "PTH", "PLW", "PLR1714", "PLR0913", "S110", "RET504",
+]
+ignore = [
+    "N818",  # Veles uses Python-stdlib exception naming (FileNotFoundError-style)
+    # Process-wide singletons (provider/adapter registries, caches) are module
+    # globals with `reset_*` test hooks by design.
+    "PLW0602",
+    "PLW0603",
+    # A filtered append loop often reads better than the comprehension it
+    # would become, and ruff has no autofix for it.
+    "PERF401",
+]
 # Intentional typography in docstrings/UI strings: en dash, multiplication
 # sign, prompt chevron. Cyrillic is NOT allowed here — bilingual parsing
 # sites carry a targeted noqa instead.
 allowed-confusables = ["–", "×", "❯"]
+
+[tool.ruff.lint.pylint]
+max-args = 8
+
+[tool.ruff.lint.per-file-ignores]
+# Tests stub signatures and build fixtures longhand on purpose.
+"tests/**" = ["PLR0913", "PERF", "PLW0108", "S110", "PTH"]
 
 [tool.ruff.format]
 docstring-code-format = true
@@ -132,6 +151,17 @@ files = [
     "src/veles/core/approval_prompter.py",
     "src/veles/core/agent.py",
     "src/veles/core/tool_dispatch.py",
+    "src/veles/core/stream_consumer.py",
+    "src/veles/core/provider.py",
+    "src/veles/core/provider_factory.py",
+    "src/veles/core/frontmatter.py",
+    "src/veles/core/skill_tool.py",
+    "src/veles/core/model_metadata.py",
+    "src/veles/core/session_state.py",
+    "src/veles/core/memory/schema.py",
+    "src/veles/runtime/prompt.py",
+    "src/veles/daemon/runner.py",
+    "src/veles/daemon/http_util.py",
     "src/veles/daemon/logging.py",
 ]
 

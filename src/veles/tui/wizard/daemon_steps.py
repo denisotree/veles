@@ -32,9 +32,7 @@ from veles.tui.wizard.screens.input import InputScreen
 from veles.tui.wizard.step import (
     WizardContext,
     WizardOutcome,
-)
-from veles.tui.wizard.step import (
-    outcome_from_dismiss as _nav,
+    outcome_from_dismiss,
 )
 
 
@@ -47,13 +45,13 @@ async def prompt_host_port(
     host_raw = await ctx.app.push_screen_wait(
         InputScreen(title, prompt=f"Daemon host (Enter for {host})", default=host)
     )
-    nav = _nav(host_raw)
+    nav = outcome_from_dismiss(host_raw)
     if nav is not None:
         return nav
     port_raw = await ctx.app.push_screen_wait(
         InputScreen(title, prompt=f"Daemon port (Enter for {port})", default=str(port))
     )
-    nav = _nav(port_raw)
+    nav = outcome_from_dismiss(port_raw)
     if nav is not None:
         return nav
     try:
@@ -108,7 +106,7 @@ class DaemonChannelStep:
                 default=False,
             )
         )
-        nav = _nav(wants)
+        nav = outcome_from_dismiss(wants)
         if nav is not None:
             return nav
         if not wants:

@@ -25,7 +25,7 @@ from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import copy_context
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from veles.core.agent import Agent
@@ -309,10 +309,10 @@ def make_session_digest_loader(
 class WorkerStep:
     """One row of the manager's plan."""
 
-    role: str
+    role: str  # a WorkerRole value, or a custom role (see WorkerRole)
     prompt: str
     rationale: str = ""
-    status: str = "pending"  # 'pending' | 'in_progress' | 'done' | 'failed'
+    status: Literal["pending", "in_progress", "done", "failed"] = "pending"
     session_id: str | None = None
     result_summary: str | None = None
 

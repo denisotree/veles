@@ -81,7 +81,7 @@ def test_step_empty_corpus_is_noop(tmp_path: Path):
     project = init_project(tmp_path, name="p")
     result = DreamResult()
     _step_proactive_events(
-        project, _FakeProvider(_reply_one()), "m", lambda: [], result, now=_NOW, dry_run=False
+        project, _FakeProvider(_reply_one()), "m", list, result, now=_NOW, dry_run=False
     )
     assert result.proactive_events == 0
     assert _dream_tasks(project) == []

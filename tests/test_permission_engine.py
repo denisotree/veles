@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from veles.core.critical_ops import reset_critical_confirmer, set_critical_confirmer
 from veles.core.permission import Decision, evaluate
-from veles.core.permission.engine import event_decision_str
 from veles.core.permission.prompt import (
     PromptAnswer,
 )
@@ -43,11 +42,6 @@ def test_decision_allowed_property() -> None:
     assert Decision(kind="allow", rule="risk_default").allowed is True
     assert Decision(kind="deny", rule="trust_ladder").allowed is False
     assert Decision(kind="approval_required", rule="risk_default").allowed is False
-
-
-def test_event_discriminator_passthrough() -> None:
-    assert event_decision_str(Decision(kind="allow", rule="risk_default")) == "allow"
-    assert event_decision_str(Decision(kind="deny", rule="trust_ladder")) == "deny"
 
 
 # ---------- read-side: allow by default ----------

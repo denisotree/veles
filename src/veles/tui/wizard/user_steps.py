@@ -26,10 +26,7 @@ from veles.tui.wizard.screens.choice import ChoiceItem
 from veles.tui.wizard.step import (
     CANCEL_SENTINEL as _CANCEL_SENTINEL,
 )
-from veles.tui.wizard.step import WizardContext, WizardOutcome
-from veles.tui.wizard.step import (
-    outcome_from_dismiss as _outcome_from_dismiss,
-)
+from veles.tui.wizard.step import WizardContext, WizardOutcome, outcome_from_dismiss
 
 # Language choices ship with the i18n module (M91); these labels are
 # canonical and don't need translation themselves.
@@ -58,7 +55,7 @@ class LanguageStep:
                 default=ctx.answers.get("language", "en"),
             )
         )
-        nav = _outcome_from_dismiss(result)
+        nav = outcome_from_dismiss(result)
         if nav is not None:
             return nav
         ctx.answers["language"] = result
@@ -82,7 +79,7 @@ class ProviderStep:
                 default=ctx.answers.get("default_provider", "openrouter"),
             )
         )
-        nav = _outcome_from_dismiss(result)
+        nav = outcome_from_dismiss(result)
         if nav is not None:
             return nav
         ctx.answers["default_provider"] = result
@@ -132,7 +129,7 @@ class ApiKeyStep:
                     default="use",
                 )
             )
-            nav = _outcome_from_dismiss(choice)
+            nav = outcome_from_dismiss(choice)
             if nav is not None:
                 return nav
             if choice == "use":
@@ -152,7 +149,7 @@ class ApiKeyStep:
                     default="env",
                 )
             )
-            nav = _outcome_from_dismiss(choice)
+            nav = outcome_from_dismiss(choice)
             if nav is not None:
                 return nav
             if choice == "env":
@@ -174,7 +171,7 @@ class ApiKeyStep:
                 password=True,
             )
         )
-        nav = _outcome_from_dismiss(entered)
+        nav = outcome_from_dismiss(entered)
         if nav is not None:
             return nav
         if not entered.strip():
@@ -263,7 +260,7 @@ class ModelStep:
             ctx.answers["default_model"] = None
             return WizardOutcome.SKIP
         result = await ctx.app.push_screen_wait(screen)
-        nav = _outcome_from_dismiss(result)
+        nav = outcome_from_dismiss(result)
         if nav is not None:
             return nav
         ctx.answers["default_model"] = result
@@ -322,7 +319,7 @@ class ThemeStep:
                 on_highlight_changed=_preview,
             )
         )
-        nav = _outcome_from_dismiss(result)
+        nav = outcome_from_dismiss(result)
         if nav is not None:
             # Roll back to whatever was active before this step.
             with contextlib.suppress(Exception):

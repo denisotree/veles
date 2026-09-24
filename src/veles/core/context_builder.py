@@ -68,14 +68,8 @@ def assemble_system_prompt(
     return inject_breakpoint(stable, separator + volatile), stable
 
 
-def stable_text(stable_parts: list[str], *, separator: str = DEFAULT_SEPARATOR) -> str:
-    """Return only the stable portion. Useful when callers already split."""
-    return separator.join(p for p in stable_parts if p)
-
-
 __all__ = [
     "CACHE_BREAKPOINT_SENTINEL",
     "DEFAULT_SEPARATOR",
     "assemble_system_prompt",
-    "stable_text",
 ]

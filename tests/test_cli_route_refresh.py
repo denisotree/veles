@@ -175,7 +175,7 @@ def test_show_manual_wins_over_nl_label(project, capsys) -> None:
 
 def test_auto_trigger_skipped_on_resume(project, monkeypatch) -> None:
     """`--resume` short-circuits the eligibility check; nl refresh stays a no-op."""
-    from veles.runtime.learning import _maybe_refresh_nl_routing
+    from veles.runtime.learning import maybe_refresh_nl_routing
 
     _write_agents_md(project, "## Routing\n\nUse haiku.\n")
     called = {"n": 0}
@@ -191,12 +191,12 @@ def test_auto_trigger_skipped_on_resume(project, monkeypatch) -> None:
     monkeypatch.setattr("veles.core.routing.make_nl_extractor", _stub_factory)
 
     args = _ns(provider="openrouter", resume="ses-x", no_route_refresh=False)
-    _maybe_refresh_nl_routing(args, project)
+    maybe_refresh_nl_routing(args, project)
     assert called["n"] == 0
 
 
 def test_auto_trigger_skipped_by_flag(project, monkeypatch) -> None:
-    from veles.runtime.learning import _maybe_refresh_nl_routing
+    from veles.runtime.learning import maybe_refresh_nl_routing
 
     _write_agents_md(project, "## Routing\n\nUse haiku.\n")
     called = {"n": 0}
@@ -211,12 +211,12 @@ def test_auto_trigger_skipped_by_flag(project, monkeypatch) -> None:
     monkeypatch.setattr("veles.core.routing.nl_override.make_nl_extractor", _stub_factory)
     monkeypatch.setattr("veles.core.routing.make_nl_extractor", _stub_factory)
     args = _ns(provider="openrouter", resume=None, no_route_refresh=True)
-    _maybe_refresh_nl_routing(args, project)
+    maybe_refresh_nl_routing(args, project)
     assert called["n"] == 0
 
 
 def test_auto_trigger_fires_on_first_run(project, monkeypatch) -> None:
-    from veles.runtime.learning import _maybe_refresh_nl_routing
+    from veles.runtime.learning import maybe_refresh_nl_routing
 
     _write_agents_md(project, "## Routing\n\nUse haiku.\n")
     captured: list[_NLEntry] = []
@@ -232,13 +232,13 @@ def test_auto_trigger_fires_on_first_run(project, monkeypatch) -> None:
     monkeypatch.setattr("veles.core.routing.make_nl_extractor", _stub_factory)
 
     args = _ns(provider="openrouter", resume=None, no_route_refresh=False)
-    _maybe_refresh_nl_routing(args, project)
+    maybe_refresh_nl_routing(args, project)
     cfg = load_nl_routing_config(project)
     assert cfg.tasks.get("compressor") == "anthropic:haiku-7"
 
 
 def test_auto_trigger_skips_when_sha_unchanged(project, monkeypatch) -> None:
-    from veles.runtime.learning import _maybe_refresh_nl_routing
+    from veles.runtime.learning import maybe_refresh_nl_routing
 
     _write_agents_md(project, "## Routing\n\nUse haiku.\n")
     calls = {"n": 0}
@@ -253,6 +253,6 @@ def test_auto_trigger_skips_when_sha_unchanged(project, monkeypatch) -> None:
     monkeypatch.setattr("veles.core.routing.nl_override.make_nl_extractor", _stub_factory)
     monkeypatch.setattr("veles.core.routing.make_nl_extractor", _stub_factory)
     args = _ns(provider="openrouter", resume=None, no_route_refresh=False)
-    _maybe_refresh_nl_routing(args, project)
-    _maybe_refresh_nl_routing(args, project)
+    maybe_refresh_nl_routing(args, project)
+    maybe_refresh_nl_routing(args, project)
     assert calls["n"] == 1

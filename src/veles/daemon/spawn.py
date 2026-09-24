@@ -58,7 +58,7 @@ def spawn_daemon(
     if log_path is not None:
         try:
             Path(log_path).parent.mkdir(parents=True, exist_ok=True)
-            log_file = open(log_path, "ab")  # noqa: SIM115 — fd is handed to the child
+            log_file = Path(log_path).open("ab")  # noqa: SIM115 — fd is handed to the child
         except OSError:
             log_file = None
     try:

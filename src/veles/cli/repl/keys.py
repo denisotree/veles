@@ -395,7 +395,7 @@ class KeysMixin:
             _kitty_disable_keyboard()
             sys.stdout.write("\x1b[?25h\r\n")  # show cursor, fresh line
             sys.stdout.flush()
-        except Exception:
+        except Exception:  # noqa: S110 — terminal restore on the way out; exit regardless
             pass
         os._exit(130)
 

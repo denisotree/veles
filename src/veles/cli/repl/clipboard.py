@@ -100,7 +100,7 @@ def paste_image(target: Path) -> bool:
             return target.exists() and target.stat().st_size > 0
         if sys.platform.startswith("linux"):
             if os.environ.get("WAYLAND_DISPLAY") and _which("wl-paste"):
-                with open(target, "wb") as fh:
+                with target.open("wb") as fh:
                     proc = subprocess.run(
                         ["wl-paste", "--type", "image/png"],
                         stdout=fh,
@@ -113,7 +113,7 @@ def paste_image(target: Path) -> bool:
                 target.unlink(missing_ok=True)
                 return False
             if _which("xclip"):
-                with open(target, "wb") as fh:
+                with target.open("wb") as fh:
                     proc = subprocess.run(
                         ["xclip", "-selection", "clipboard", "-t", "image/png", "-o"],
                         stdout=fh,

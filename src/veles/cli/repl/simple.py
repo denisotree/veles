@@ -147,7 +147,7 @@ def _ask_repl(console, theme, question: str, options: list[str] | None):
     return _free_text(theme)
 
 
-def _run_simple_repl(
+def _run_simple_repl(  # noqa: PLR0913
     args, project, state, factory, store, registry, console, theme, errors, subagent_factory=None
 ) -> None:
     """Fallback loop on the blocking `PromptSession.prompt()` (set
@@ -187,7 +187,7 @@ def _run_simple_repl(
             reset_subagent_factory(dtoken)
 
 
-def _simple_repl_loop(
+def _simple_repl_loop(  # noqa: PLR0913
     args,
     project,
     state,

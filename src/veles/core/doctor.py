@@ -593,7 +593,7 @@ def _check_symlinks(project: Project | None) -> CheckResult:
             )
             continue
         try:
-            target = os.readlink(p)
+            target = str(p.readlink())
         except OSError as exc:
             issues.append(f"{name}: {exc}")
             continue
@@ -730,9 +730,6 @@ def _check_approval_audit(project: Project | None) -> CheckResult:
 
 
 # ---- runner ----
-
-
-CheckFn = Callable[[], CheckResult] | Callable[[Project | None], CheckResult]
 
 
 def run_all(project: Project | None) -> DoctorReport:

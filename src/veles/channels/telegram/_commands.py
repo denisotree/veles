@@ -117,7 +117,7 @@ async def _cmd_context_placeholder(gateway: TelegramGateway, chat_key: str, args
     )
 
 
-# ---- M116b: agent modes via slash ----
+# ---- agent modes via slash ----
 
 
 async def _cmd_goal(gateway: TelegramGateway, chat_key: str, args: str) -> str:
@@ -177,11 +177,6 @@ async def _cmd_goal(gateway: TelegramGateway, chat_key: str, args: str) -> str:
         return "A goal is already running in this chat — answer its question, or /goal cancel it."
     await gateway._run_turn_serial(chat_key_to_int(chat_key), chat_key, arg, mode="goal")
     return ""
-
-
-# M127: the Telegram `/model` picker (`MODEL_PAGE_SIZE`, `_render_model_page`,
-# `_cmd_model`) was removed — model/provider are fixed at daemon launch from
-# config and can't be switched from Telegram. `/mode` keeps `chat_key_to_int`.
 
 
 def chat_key_to_int(chat_key: str) -> int:
@@ -291,7 +286,7 @@ async def _cmd_insights(gateway: TelegramGateway, chat_key: str, args: str) -> s
     """List recent rows from the `insights` table — mirrors the REPL
     `/insights`. Optional category filter as the first arg."""
     del chat_key
-    from veles.core.memory.inspect import recent_insights
+    from veles.core.memory.inspectors import recent_insights
 
     found = await _memory_rows(
         gateway, "insights", args, lambda c, f, n: recent_insights(c, category=f, limit=n)
@@ -316,7 +311,7 @@ async def _cmd_rules(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     """List recent rows from the `rules` table — mirrors the REPL `/rules`.
     Optional kind filter as the first arg."""
     del chat_key
-    from veles.core.memory.inspect import recent_rules
+    from veles.core.memory.inspectors import recent_rules
 
     found = await _memory_rows(
         gateway, "rules", args, lambda c, f, n: recent_rules(c, kind=f, limit=n)

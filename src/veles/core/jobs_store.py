@@ -24,7 +24,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from veles.core.io_utils import open_sqlite
 from veles.core.job_schedule import Schedule, initial_next_run, parse_schedule
@@ -92,7 +92,7 @@ class JobRecord:
     context_from: str | None
     deliver_to: str | None
     enabled: bool
-    state: str  # 'scheduled' | 'paused' | 'error' | 'done'
+    state: Literal["scheduled", "paused", "error", "done"]
     created_at: float
     next_run_at: float
     last_run_at: float | None
@@ -164,7 +164,7 @@ def _validate_deliver_to(spec: str | None) -> None:
     """
     if not spec:
         return
-    from veles.channels.delivery import DeliveryTarget
+    from veles.core.delivery_target import DeliveryTarget
 
     try:
         DeliveryTarget.parse(spec)
@@ -198,7 +198,7 @@ class JobsStore:
 
     # ---- CRUD ----
 
-    def add_job(
+    def add_job(  # noqa: PLR0913
         self,
         *,
         name: str,

@@ -9,12 +9,6 @@ Permissive load, atomic save (tempfile + `os.replace`). No file lock —
 each channel process owns its own file; concurrent writes from a
 sibling process would imply two channel instances for the same channel,
 which is unsupported.
-
-M74 extension: `SessionSource` dataclass captures richer chat context
-(platform, chat_id, user_id, thread_id, guild_id) and produces a
-deterministic string key via `.key()`. The string-keyed SessionMap is
-unchanged — gateways that want thread/guild awareness build the key
-through SessionSource. M52 flat-string usage continues to work.
 """
 
 from __future__ import annotations
@@ -28,42 +22,7 @@ from veles.core.file_lock import file_lock
 from veles.core.io_utils import atomic_write_text
 
 
-@dataclass(slots=True, frozen=True)
-class SessionSource:
-    """Rich identity of an inbound chat surface.
-
-    `platform` is the channel name as registered in the platform registry
-    (`"telegram"`, `"slack"`, …). `chat_id` is the per-platform conversation
-    identifier (Telegram chat_id, Slack channel id). `user_id` is the sender
-    (may equal chat_id in DMs). `thread_id` and `guild_id` are channel-specific
-    nesting — Slack threads, Discord guild/thread combos. `message_id` is the
-    inbound message id when available; some channels need it for edit-based
-    replies.
-
-    `.key()` is the deterministic string SessionMap stores. Including
-    thread_id keeps threads as separate sessions (a Slack thread becomes its
-    own Veles session). guild_id is informational only — Discord channel ids
-    are already globally unique.
-    """
-
-    platform: str
-    chat_id: str
-    user_id: str | None = None
-    thread_id: str | None = None
-    guild_id: str | None = None
-    message_id: str | None = None
-
-    def key(self) -> str:
-        if self.thread_id:
-            return f"{self.platform}:{self.chat_id}:{self.thread_id}"
-        return f"{self.platform}:{self.chat_id}"
-
-    def label(self) -> str:
-        """Human-readable identifier for logs / mirror headers."""
-        return self.key()
-
-
-def _default_channels_dir() -> Path:
+def default_channels_dir() -> Path:
     from veles.core.user_paths import user_home
 
     return user_home() / "channels"
@@ -78,7 +37,7 @@ def chat_key_for_target(target: str) -> tuple[str, str] | None:
     Code that bound a delivery to a chat used to look up `"telegram:42"` in a
     map the gateway keys by `"42"`, so every reminder (M214) and job (M273) was
     recorded in a session the chat never read."""
-    from veles.channels.delivery import DeliveryTarget
+    from veles.core.delivery_target import DeliveryTarget
 
     try:
         parsed = DeliveryTarget.parse(target)
@@ -90,7 +49,7 @@ def chat_key_for_target(target: str) -> tuple[str, str] | None:
 
 
 def channel_session_path(channel: str, *, base_dir: Path | None = None) -> Path:
-    target = base_dir or _default_channels_dir()
+    target = base_dir or default_channels_dir()
     return target / f"{channel}-sessions.json"
 
 

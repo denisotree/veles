@@ -149,7 +149,7 @@ def wrap_untrusted(
         # a search-result listing differently from one planted in fetched page
         # content. See `agent_state.untrusted_page_corpus`.
         record_untrusted(body, source)
-    except Exception:
+    except Exception:  # noqa: S110 — taint bookkeeping must not break a tool result
         pass
     fetched = fetched or utc_iso()
     safe_source = source.replace('"', "%22")

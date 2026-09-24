@@ -16,10 +16,10 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from veles.adapters.local._base import _OpenAICompatibleBase
+from veles.adapters.local._base import LocalOpenAIBase
 
 
-class LlamaCppProvider(_OpenAICompatibleBase):
+class LlamaCppProvider(LocalOpenAIBase):
     """Provider backed by a local llama.cpp `llama-server`."""
 
     name: str = "llamacpp"

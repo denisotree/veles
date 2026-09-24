@@ -25,7 +25,7 @@ from veles.core.provider import Provider
 from veles.core.tools.registry import Registry
 
 
-def build_command_agent(
+def build_command_agent(  # noqa: PLR0913
     args: argparse.Namespace,
     project: Project,
     *,

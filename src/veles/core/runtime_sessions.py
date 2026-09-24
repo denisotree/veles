@@ -26,11 +26,14 @@ import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal, get_args
 
 from veles.core.io_utils import open_sqlite
 
-VALID_KINDS = ("daemon", "tui")
-VALID_STATUS = ("created", "running", "stopped", "error")
+RuntimeKind = Literal["daemon", "tui"]
+RuntimeStatus = Literal["created", "running", "stopped", "error"]
+VALID_KINDS: tuple[str, ...] = get_args(RuntimeKind)
+VALID_STATUS: tuple[str, ...] = get_args(RuntimeStatus)
 
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS runtime_sessions (
@@ -63,13 +66,13 @@ CREATE INDEX IF NOT EXISTS idx_runtime_sessions_kind
 class RuntimeSessionRecord:
     id: str
     name: str
-    kind: str
+    kind: RuntimeKind
     model: str | None
     provider: str | None
     host: str | None
     port: int | None
     mode: str | None
-    status: str
+    status: RuntimeStatus
     pid: int | None
     created_at: float
     last_started_at: float | None
@@ -117,7 +120,7 @@ class RuntimeSessionStore:
 
     # ---- CRUD ----
 
-    def create(
+    def create(  # noqa: PLR0913
         self,
         name: str,
         kind: str,

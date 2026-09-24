@@ -53,7 +53,7 @@ def is_planning() -> bool:
     return _active_state.get() is AgentState.PLANNING
 
 
-# ---- M72: draft/commit invocation tracking ----------------------------------
+# ---- draft/commit invocation tracking ---------------------------------------
 #
 # The Permission Engine's `_draft_commit_rule` needs to know whether a draft
 # tool has been invoked earlier in the current session before letting its

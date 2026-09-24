@@ -33,11 +33,12 @@ import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from concurrent.futures import Future
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from veles.core.agent import Agent, RunResult
 
 if TYPE_CHECKING:
+    from veles.core.orchestration import ManagerRunResult
     from veles.core.provider import Message
 
 
@@ -64,15 +65,24 @@ class PendingPrompt:
         return self.free_text or choice in self.valid_choices
 
 
+def _no_human_available(question: str, options: list[str] | None = None) -> str | None:
+    """`ask_user` answer for a run no chat can answer: none, at once."""
+    del question, options
+    return None
+
+
 def _make_run_id() -> str:
     return f"run-{int(time.time()):010d}-{secrets.token_hex(4)}"
+
+
+RunState = Literal["pending", "running", "completed", "failed"]
 
 
 @dataclass(slots=True)
 class RunHandle:
     run_id: str
     session_id: str | None
-    state: str = "pending"  # pending | running | completed | failed
+    state: RunState = "pending"
     started_at: float = field(default_factory=time.time)
     finished_at: float | None = None
     error: str | None = None
@@ -256,7 +266,7 @@ TurnFn = Callable[
 ]
 
 
-async def run_agent_in_background(
+async def run_agent_in_background(  # noqa: PLR0913
     handle: RunHandle,
     *,
     agent: Agent | None = None,
@@ -317,7 +327,6 @@ async def run_agent_in_background(
             )
 
     handle.state = "running"
-    handle.session_id = handle.session_id  # placeholder; filled by run if missing
     _post(
         {
             "type": "started",
@@ -383,7 +392,7 @@ async def run_agent_in_background(
     from veles.daemon.channel_prompter import make_question_prompter
 
     question_token = set_question_prompter(
-        make_question_prompter(handle, loop) if ask_channel else (lambda _q, _opts=None: None)
+        make_question_prompter(handle, loop) if ask_channel else _no_human_available
     )
     turn_token = begin_trust_turn()
 
@@ -519,7 +528,7 @@ async def run_manager_in_background(
         }
     )
 
-    def _worker():
+    def _worker() -> ManagerRunResult:
         return decompose_and_run(prompt, agent_factory=worker_agent_factory)
 
     # M170c: set origin before the worker thread starts — `asyncio.to_thread`

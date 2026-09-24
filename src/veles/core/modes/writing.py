@@ -9,7 +9,13 @@ bridge with a single `TurnDone`. PreviousSession_id is mirrored back into
 from __future__ import annotations
 
 from veles.core.agent_events import TurnDone
-from veles.core.modes.base import Mode, ModeContext, wrap_mode_switch_observation
+from veles.core.modes.base import (
+    Mode,
+    ModeContext,
+    adopt_session,
+    wrap_mode_switch_observation,
+)
+from veles.core.session_state import ModeName
 
 # Injected once, into the first prompt after switching TO writing from another
 # mode. WritingMode's `system_block` is empty (the base prompt IS the writing
@@ -29,7 +35,7 @@ _SWITCH_NOTE = (
 
 
 class WritingMode:
-    name: str = "writing"
+    name: ModeName = "writing"
     label: str = "write"
     system_block: str = ""  # current default agent prompt is the writing prompt
 
@@ -52,12 +58,11 @@ class WritingMode:
             on_text_delta=ctx.on_text,
             event_listener=ctx.on_event,
         )
-        if ctx.state.session_id is None and result.session_id is not None:
-            ctx.state.session_id = result.session_id
+        adopt_session(ctx, result)
         # Record the *effective* mode that drove this turn, so the next
         # turn's mode-switch-observation check sees the truth (matters
         # for AutoMode's sub-dispatch into Writing).
-        ctx.state.last_mode_in_session = self.name  # type: ignore[assignment]
+        ctx.state.last_mode_in_session = self.name
         ctx.post(TurnDone(result))
 
 

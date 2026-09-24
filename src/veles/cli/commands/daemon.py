@@ -555,7 +555,7 @@ def _cmd_daemon_status(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---- M98: bare `veles daemon` opens a TUI picker ----
+# ---- bare `veles daemon` opens a TUI picker ----
 
 
 def _cmd_daemon_picker(args: argparse.Namespace) -> int:
@@ -585,7 +585,7 @@ def _cmd_daemon_picker(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---- M97: multi-daemon list / restart / delete ----
+# ---- multi-daemon list / restart / delete ----
 
 
 def _cmd_daemon_list(args: argparse.Namespace) -> int:

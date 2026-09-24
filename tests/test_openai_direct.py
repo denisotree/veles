@@ -60,8 +60,7 @@ class _StubChat:
         self.last_kwargs = kwargs
         if not self.completions:
             raise RuntimeError("no canned response prepared")
-        result = self.completions.pop(0)
-        return result
+        return self.completions.pop(0)
 
 
 class _StubClient:

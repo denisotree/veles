@@ -92,7 +92,7 @@ def hash_tools(tools: list[dict[str, Any]] | None) -> str:
     """
     if not tools:
         return "sha256:" + hashlib.sha256(b"[]").hexdigest()
-    sorted_tools = sorted(tools, key=lambda t: _tool_name(t))
+    sorted_tools = sorted(tools, key=_tool_name)
     canonical = json.dumps(sorted_tools, sort_keys=True, separators=(",", ":"))
     return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 

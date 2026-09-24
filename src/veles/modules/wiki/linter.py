@@ -75,8 +75,7 @@ class LintReport:
 
 
 def _title_tokens(s: str) -> set[str]:
-    out = {t for t in _TOKEN_RE.findall(s.lower()) if len(t) > 2 and t not in _STOPWORDS}
-    return out
+    return {t for t in _TOKEN_RE.findall(s.lower()) if len(t) > 2 and t not in _STOPWORDS}
 
 
 def _find_oldest_date(text: str) -> _dt.datetime | None:

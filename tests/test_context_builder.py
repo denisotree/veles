@@ -6,7 +6,6 @@ from veles.core.cache_hints import CACHE_BREAKPOINT_SENTINEL
 from veles.core.context_builder import (
     DEFAULT_SEPARATOR,
     assemble_system_prompt,
-    stable_text,
 )
 from veles.core.tools.registry import Registry, ToolEntry
 from veles.core.trace import hash_text, hash_tools
@@ -63,12 +62,6 @@ def test_stable_hash_invariant_under_volatile_change() -> None:
     _, stable_a = assemble_system_prompt(["S1", "S2"], ["V_alpha"])
     _, stable_b = assemble_system_prompt(["S1", "S2"], ["V_beta"])
     assert hash_text(stable_a) == hash_text(stable_b)
-
-
-def test_stable_text_helper() -> None:
-    assert stable_text(["a", "b"]) == "a" + DEFAULT_SEPARATOR + "b"
-    assert stable_text([]) == ""
-    assert stable_text(["", "x"]) == "x"
 
 
 # ---------- deterministic Registry.list_schemas ----------

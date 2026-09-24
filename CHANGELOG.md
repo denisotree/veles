@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.44.0] — 2026-09-24
+
+A hygiene release: dead code out, names and types that say what they mean,
+and CI locks so the structure of the last three releases holds.
+
+### Removed
+
+- `veles goal list --status blocked`: no goal was ever put in that state.
+- Unused internals: the display-tier table (Telegram truncation is unchanged),
+  the plan-artifact status helpers, the inheritance-chain queries on the skill
+  and tool catalogues, and a dozen test-only helpers.
+
+### Changed
+
+- A failed `veles import` raises `BundleImportError` instead of a class that
+  shadowed Python's built-in `ImportError`.
+
+### Internal
+
+- New CI locks: `tests/test_layering.py` (no layer imports one above it, lazy
+  imports included) and `tests/test_no_private_cross_imports.py` (no package
+  imports another's private names); both baselines may only shrink.
+- ruff enforces pathlib, loop-variable, argument-count (≤ 8), silent-except
+  and redundant-assignment rules; strict mypy covers 37 modules, up from 26.
+- Delivery-target parsing lives in `core/delivery_target.py`; the post-turn
+  learning hooks and curator limits are public names.
+- Mode names, run/job/worker/runtime-session states and model catalogue facts
+  are typed; the daemon state's runner and hook slots are no longer `Any`.
+
 ## [0.43.0] — 2026-09-23
 
 A structure release: the big modules are split along real seams, and the
@@ -1763,7 +1792,8 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v0.43.0...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v0.44.0...HEAD
+[0.44.0]: https://github.com/denisotree/veles/compare/v0.43.0...v0.44.0
 [0.43.0]: https://github.com/denisotree/veles/compare/v0.42.0...v0.43.0
 [0.42.0]: https://github.com/denisotree/veles/compare/v0.41.0...v0.42.0
 [0.41.0]: https://github.com/denisotree/veles/compare/v0.40.0...v0.41.0

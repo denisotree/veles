@@ -91,44 +91,44 @@ def test_suggest_reports_no_clusters(tmp_path: Path, capsys) -> None:
 
 
 def test_proposer_skipped_when_resume_set(project_with_cluster, monkeypatch) -> None:
-    from veles.runtime.learning import _maybe_run_subproject_proposer
+    from veles.runtime.learning import maybe_run_subproject_proposer
 
     args = _ns(provider="openrouter", resume="ses-X", no_proposer=False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "x")
-    _maybe_run_subproject_proposer(args, project_with_cluster)
+    maybe_run_subproject_proposer(args, project_with_cluster)
     proposals_dir = project_with_cluster.memory_dir / "proposals"
     if proposals_dir.exists():
         assert list(proposals_dir.iterdir()) == []
 
 
 def test_proposer_skipped_by_flag(project_with_cluster, monkeypatch) -> None:
-    from veles.runtime.learning import _maybe_run_subproject_proposer
+    from veles.runtime.learning import maybe_run_subproject_proposer
 
     args = _ns(provider="openrouter", resume=None, no_proposer=True)
     monkeypatch.setenv("OPENROUTER_API_KEY", "x")
-    _maybe_run_subproject_proposer(args, project_with_cluster)
+    maybe_run_subproject_proposer(args, project_with_cluster)
     proposals_dir = project_with_cluster.memory_dir / "proposals"
     if proposals_dir.exists():
         assert list(proposals_dir.iterdir()) == []
 
 
 def test_proposer_skipped_when_no_api_key(project_with_cluster, monkeypatch) -> None:
-    from veles.runtime.learning import _maybe_run_subproject_proposer
+    from veles.runtime.learning import maybe_run_subproject_proposer
 
     args = _ns(provider="openrouter", resume=None, no_proposer=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    _maybe_run_subproject_proposer(args, project_with_cluster)
+    maybe_run_subproject_proposer(args, project_with_cluster)
     proposals_dir = project_with_cluster.memory_dir / "proposals"
     if proposals_dir.exists():
         assert list(proposals_dir.iterdir()) == []
 
 
 def test_proposer_runs_first_time_and_writes_state(project_with_cluster, monkeypatch) -> None:
-    from veles.runtime.learning import _maybe_run_subproject_proposer
+    from veles.runtime.learning import maybe_run_subproject_proposer
 
     args = _ns(provider="openrouter", resume=None, no_proposer=False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "x")
-    _maybe_run_subproject_proposer(args, project_with_cluster)
+    maybe_run_subproject_proposer(args, project_with_cluster)
     pages = list((project_with_cluster.memory_dir / "proposals").iterdir())
     assert pages, "expected proposals to be written"
     state = project_with_cluster.state_dir / "proposer.state.json"
@@ -136,24 +136,24 @@ def test_proposer_runs_first_time_and_writes_state(project_with_cluster, monkeyp
 
 
 def test_proposer_idle_threshold_skips_second_call(project_with_cluster, monkeypatch) -> None:
-    from veles.runtime.learning import _maybe_run_subproject_proposer
+    from veles.runtime.learning import maybe_run_subproject_proposer
 
     args = _ns(provider="openrouter", resume=None, no_proposer=False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "x")
-    _maybe_run_subproject_proposer(args, project_with_cluster)
+    maybe_run_subproject_proposer(args, project_with_cluster)
     # Get mtime of first proposal page
     pages = list((project_with_cluster.memory_dir / "proposals").iterdir())
     first_mtime = pages[0].stat().st_mtime
 
     # Sleep a moment so a re-run would change mtime if it ran
     time.sleep(0.05)
-    _maybe_run_subproject_proposer(args, project_with_cluster)
+    maybe_run_subproject_proposer(args, project_with_cluster)
     second_mtime = pages[0].stat().st_mtime
     assert second_mtime == first_mtime, "second call should be no-op (idle threshold)"
 
 
 def test_proposer_logs_skip_on_detector_failure(project_with_cluster, monkeypatch, capsys) -> None:
-    from veles.runtime.learning import _maybe_run_subproject_proposer
+    from veles.runtime.learning import maybe_run_subproject_proposer
 
     args = _ns(provider="openrouter", resume=None, no_proposer=False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "x")
@@ -164,7 +164,7 @@ def test_proposer_logs_skip_on_detector_failure(project_with_cluster, monkeypatc
     import veles.core.subproject_proposer as sp
 
     monkeypatch.setattr(sp, "detect_clusters", _boom)
-    _maybe_run_subproject_proposer(args, project_with_cluster)
+    maybe_run_subproject_proposer(args, project_with_cluster)
     log = (project_with_cluster.memory_dir / "LOG.md").read_text(encoding="utf-8")
     assert "proposer-skip" in log
 

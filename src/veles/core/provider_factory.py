@@ -35,8 +35,12 @@ auto-detect.
 from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING
 
 from veles.core.provider import Provider
+
+if TYPE_CHECKING:
+    from veles.adapters.local._base import LocalOpenAIBase
 
 PROVIDER_API_KEY_ENVS: dict[str, tuple[str, ...]] = {
     "openrouter": ("OPENROUTER_API_KEY",),
@@ -75,7 +79,7 @@ def _local_tools_override() -> bool | None:
     return raw in {"1", "true", "yes", "on"}
 
 
-def _apply_local_tool_policy(provider: Provider, model: str | None) -> None:
+def _apply_local_tool_policy(provider: LocalOpenAIBase, model: str | None) -> None:
     """Set `provider.supports_tools` for a freshly-built local provider.
 
     An explicit `VELES_LOCAL_TOOLS` value wins (force on/off). Otherwise
@@ -141,7 +145,7 @@ def make_provider(name: str, model: str | None = None) -> Provider:
     if name == "ollama":
         from veles.adapters.local.ollama import OllamaProvider
 
-        prov: Provider = OllamaProvider()
+        prov: LocalOpenAIBase = OllamaProvider()
         _apply_local_tool_policy(prov, model)
         return prov
     if name == "llamacpp":

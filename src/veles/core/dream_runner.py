@@ -50,7 +50,7 @@ _PROACTIVE_DEFAULT_INTERVAL_SEC = 15 * 60.0
 
 
 class DreamRunner:
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         *,
         project: Project,

@@ -130,7 +130,7 @@ def advisor_verifier(
     if evidence:
         body += f"\nEVIDENCE (tool calls + results the agent used):\n{evidence}\n"
     raw = call_advisor(body, system_prompt=_VERIFY_SYSTEM)
-    if raw.startswith("<advisor unavailable") or raw.startswith("<advisor failed"):
+    if raw.startswith(("<advisor unavailable", "<advisor failed")):
         return VerifyVerdict.UNKNOWN, []
     return _parse_judge(raw)
 

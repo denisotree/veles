@@ -214,7 +214,7 @@ def _runtime_channels(project, record) -> list[str]:
         return []
 
 
-# ---------------- M159: project → daemons → channels tree model ----------------
+# ---------------- project → daemons → channels tree model ----------------
 #
 # The picker (rewritten onto Textual's `Tree`) renders one node per daemon with
 # its channels as leaf children, grouped into the current project's daemons and

@@ -25,10 +25,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from veles.core.agent import Agent
+    from veles.core.agent import Agent, RunResult
     from veles.core.events import Event
     from veles.core.project import Project
-    from veles.core.session_state import AppState
+    from veles.core.session_state import AppState, ModeName
 
 
 # The per-turn Agent factory. Callable with the AppState plus optional
@@ -51,7 +51,7 @@ class ModeContext:
 
 
 class Mode(Protocol):
-    name: str
+    name: ModeName
     label: str
     system_block: str
     """Mode-specific system-prompt addendum, appended to the project's
@@ -64,6 +64,12 @@ class Mode(Protocol):
         AgentError on failure) before returning. May make multiple
         `agent.run` calls; only the last RunResult is surfaced."""
         ...
+
+
+def adopt_session(ctx: ModeContext, result: RunResult) -> None:
+    """A fresh chat learns its session id from the first run that created one."""
+    if ctx.state.session_id is None and result.session_id is not None:
+        ctx.state.session_id = result.session_id
 
 
 def wrap_mode_switch_observation(prompt: str, mode_name: str, system_block: str) -> str:

@@ -26,18 +26,17 @@ Long-polling loop:
         for u in updates:
             spawn handle_update(u)
 
-Per-update flow:
+Per-message flow:
 
-    chat_id ↔ session_id from SessionMap (created lazily on first msg).
-    Show "typing" → POST /v1/runs → WS /v1/runs/{id}/events.
-    Buffer text_delta. Edit Telegram message every 500ms or every 200 chars.
-    On `completed`: final edit with full text + flush session_id back.
-    On `error`: edit with "<error: ...>".
+    Messages in a chat are buffered for a short debounce window and merged
+    into one turn. chat_id ↔ session_id comes from SessionMap.
+    Send a "..." placeholder, show "typing", submit the run, drain its events.
+    The first tool call edits the placeholder into an "on it" ack.
+    On completion the placeholder (or, after an ack, a new message) carries
+    the answer, split into chunks when long; the chat→session mapping is saved.
 
-Rate-limit safety: editMessageText is the cheap path (no global cap
-per chat); we still cooldown 500ms between edits to avoid hammering.
-Telegram's per-chat sendMessage cap is 1/sec — we only send once per
-turn (the initial placeholder), then edit it.
+Rate limits: one placeholder, at most one ack edit and one final edit per
+turn — no per-delta edits, so Telegram's per-chat caps are never approached.
 """
 
 from __future__ import annotations
@@ -119,10 +118,6 @@ class TelegramGateway:
     _offset: int = field(default=0, init=False)
     _tasks: set = field(default_factory=set, init=False)
     _pending_prompts: dict[str, _PendingTelegramPrompt] = field(default_factory=dict, init=False)
-    # M127: the Telegram `/model` picker was removed (model/provider are
-    # fixed at daemon launch), so the picker state fields
-    # (`_model_callbacks`, `_daemon_provider`, `_daemon_default_model`,
-    # `_model_refresh_pending`, `_model_list_cache`) are gone too.
     # Per-chat aggregation: forward+comment / document+comment arrive as
     # two separate updates; a debouncer merges them into one turn.
     _buffers: dict[str, _ChatBuffer] = field(default_factory=dict, init=False)
@@ -130,9 +125,8 @@ class TelegramGateway:
     # arriving while a turn runs waits on the chat's lock (FIFO) and gets
     # a "queued" ack up front. Different chats stay fully parallel.
     _chat_locks: dict[str, asyncio.Lock] = field(default_factory=dict, init=False)
-    # M155 collaborators. They hold a back-reference to the gateway and
-    # call through `self._gw.<method>` so instance/class-level stubs on
-    # the gateway keep working.
+    # Collaborators (M155). They send through the gateway's transport seams,
+    # so a stubbed `_telegram_send` sees all their traffic.
     _api: TelegramApi = field(init=False, repr=False)
     _media: TelegramMedia = field(init=False, repr=False)
     _delivery: TelegramDelivery = field(init=False, repr=False)
@@ -187,7 +181,7 @@ class TelegramGateway:
             await self._http.close()
             self._http = None
 
-    # ---- transport (delegates → TelegramApi, M155) ----
+    # ---- transport ----
 
     async def _call(self, method: str, payload: dict[str, Any]) -> dict[str, Any]:
         """POST `payload` to `api_base/<method>` and return the parsed `result` field."""
@@ -466,10 +460,7 @@ class TelegramGateway:
         mode: str | None = None,
     ) -> None:
         """Pipeline: submit_run → placeholder → drain stream with
-        typing indicator → final edit.
-
-        M108 dropped intermediate edits; M-R2.4 split the pipeline into
-        helper methods so each step is testable in isolation."""
+        typing indicator → final delivery."""
         run_id = await self._submit_or_report(chat_id, chat_key, text, mode=mode)
         if run_id is None:
             return
@@ -575,10 +566,6 @@ class TelegramGateway:
         chunks = split_telegram_html(markdown_to_telegram_html(text or ""))
         await self._delivery.send_chunks(int(chat_id), chunks)
 
-    # M127: `_refresh_daemon_health` / `_get_daemon_provider` /
-    # `_get_active_model_for` were removed with the Telegram `/model`
-    # picker — model/provider are fixed at daemon launch from config.
-
     # ---- prompt rendering / answering ----
 
     async def _post_prompt(self, chat_id: int, run_id: str, event: dict[str, Any]) -> None:
@@ -603,7 +590,7 @@ class TelegramGateway:
             kind = "critical"
         else:
             kind = "approval"
-        short_codes, buttons, short_to_key = _build_buttons(prompt_id, kind, options)
+        _, buttons, short_to_key = _build_buttons(prompt_id, kind, options)
         if not buttons and kind != "clarification":
             return
         body = _format_prompt_body(kind, event)
@@ -632,7 +619,6 @@ class TelegramGateway:
                 if isinstance(o, dict) and "key" in o and "label" in o
             },
         )
-        del short_codes  # unused after building the keyboard row
 
     async def _answer_open_question(self, chat_id: int, text: str) -> bool:
         """M284: hand `text` to the agent's open question in this chat, if one
@@ -686,9 +672,8 @@ class TelegramGateway:
 
     async def _handle_callback_query(self, callback: dict[str, Any]) -> None:
         """Inbound button tap. Parse `callback_data`, dispatch by prefix:
-        - `v:` — trust/approval prompt resolution (existing)
+        - `v:` — trust/approval prompt resolution
         - `mo:` — mode switch (Telegram /mode inline keyboard)
-        (M127: the `m:`/`mn:`/`mc:` model-picker prefixes were removed.)
 
         Dismiss the Telegram client-side spinner regardless of outcome
         so the user doesn't see a perpetual loading state."""
@@ -707,7 +692,6 @@ class TelegramGateway:
         kind = parts[0] if parts else ""
 
         if kind == "v":
-            # Existing trust/approval flow
             if len(parts) != 3:
                 await self._api.answer_callback_query(callback_id)
                 return
@@ -731,60 +715,39 @@ class TelegramGateway:
             return
 
         if kind == "mo":
-            # M127: only `/mode` (mo:) remains; the `/model` picker
-            # callbacks (m:, mn:, mc:) were removed — model is fixed.
-            await self._handle_settings_callback(callback, callback_id, kind, parts)
+            await self._handle_mode_callback(callback, callback_id, parts)
             return
 
-        # Unknown prefix — silently dismiss spinner
+        # Unknown prefix (incl. taps on an old `/model` picker) — dismiss the spinner.
         await self._api.answer_callback_query(callback_id)
 
-    async def _handle_settings_callback(
-        self,
-        callback: dict[str, Any],
-        callback_id: str,
-        kind: str,
-        parts: list[str],
+    async def _handle_mode_callback(
+        self, callback: dict[str, Any], callback_id: str, parts: list[str]
     ) -> None:
-        """Handle `/mode` button taps (`mo:<mode>`). Resolves session_id
-        from chat_id and PATCHes the daemon. (M127: the `/model` picker
-        that also routed here was removed — model is fixed at launch.)"""
+        """A `/mode` button tap (`mo:<mode>`): switch the chat's session mode.
+        The daemon validates the mode (unknown → 400 / ValueError)."""
         chat = callback.get("message", {}).get("chat") or {}
         chat_id = chat.get("id")
         if not isinstance(chat_id, int):
             await self._api.answer_callback_query(callback_id, text="missing chat")
             return
-        chat_key = str(chat_id)
-        session_id = self.session_map.get(chat_key)
+        session_id = self.session_map.get(str(chat_id))
         if not session_id:
             await self._api.answer_callback_query(
                 callback_id,
                 text="send a message first to start a session",
             )
             return
-
-        if kind == "mo":
-            # `mo:<mode>` — one of `_MODE_CHOICES` (default/auto/planning/writing);
-            # the daemon validates it (unknown → 400 / ValueError).
-            if len(parts) < 2 or not parts[1]:
-                await self._api.answer_callback_query(callback_id, text="bad payload")
-                return
-            mode = parts[1]
-            try:
-                await self.daemon_client.update_session(session_id, mode=mode)
-            except (DaemonClientError, AttributeError, ValueError) as exc:
-                await self._api.answer_callback_query(
-                    callback_id, text=f"could not set mode: {exc}"
-                )
-                return
-            await self._api.answer_callback_query(callback_id, text=f"✓ mode → {mode}")
+        if len(parts) < 2 or not parts[1]:
+            await self._api.answer_callback_query(callback_id, text="bad payload")
             return
-
-        # M127: only `mo:` (mode) reaches here now. The `/model` picker
-        # branch (`m:`) and its pagination/cancel handlers
-        # (`_handle_model_page_callback`, `_handle_model_cancel_callback`)
-        # were removed — model/provider are fixed at daemon launch.
-        await self._api.answer_callback_query(callback_id)
+        mode = parts[1]
+        try:
+            await self.daemon_client.update_session(session_id, mode=mode)
+        except (DaemonClientError, AttributeError, ValueError) as exc:
+            await self._api.answer_callback_query(callback_id, text=f"could not set mode: {exc}")
+            return
+        await self._api.answer_callback_query(callback_id, text=f"✓ mode → {mode}")
 
     def _is_allowed(self, message: dict[str, Any]) -> bool:
         """Return True iff the sender is on the whitelist (or the whitelist is empty).

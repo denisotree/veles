@@ -246,7 +246,7 @@ def apply_compression(
     return head + list(history[tail_start:])
 
 
-# ---------- M217: summariser output cache across --resume ----------
+# ---------- summariser output cache across --resume ----------
 
 
 def _summary_cache_path(project: Project) -> Path:

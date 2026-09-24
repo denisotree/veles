@@ -53,9 +53,7 @@ from veles.tui.wizard.step import (
 from veles.tui.wizard.step import (
     WizardContext,
     WizardOutcome,
-)
-from veles.tui.wizard.step import (
-    outcome_from_dismiss as _nav,
+    outcome_from_dismiss,
 )
 
 # Project picker keeps labels compact — the user has seen the tagline
@@ -99,7 +97,7 @@ class BootstrapStep:
                 default=True,
             )
         )
-        nav = _nav(result)
+        nav = outcome_from_dismiss(result)
         if nav is not None:
             return nav
         if not result:
@@ -133,7 +131,7 @@ class ProviderOverrideStep:
                 default=False,
             )
         )
-        nav = _nav(wants)
+        nav = outcome_from_dismiss(wants)
         if nav is not None:
             return nav
         if not wants:
@@ -155,7 +153,7 @@ class ProviderOverrideStep:
                 default=default_provider,
             )
         )
-        nav = _nav(picked)
+        nav = outcome_from_dismiss(picked)
         if nav is not None:
             return nav
 
@@ -247,7 +245,7 @@ async def _project_api_key_flow(ctx: WizardContext, project: Project, provider: 
             default=options[0].value,
         )
     )
-    if choice is None or choice == _CANCEL_SENTINEL or choice == "skip":
+    if choice is None or choice in (_CANCEL_SENTINEL, "skip"):
         ctx.answers["project_api_key_status"] = "deferred"
         return
     if choice == "inherit":
@@ -299,7 +297,7 @@ class DaemonModeStep:
                 default=False,
             )
         )
-        nav = _nav(wants)
+        nav = outcome_from_dismiss(wants)
         if nav is not None:
             return nav
         if not wants:
@@ -400,7 +398,7 @@ def project_wizard_steps(cwd: Path) -> list:
     ]
 
 
-# ---------------- M117e: LayoutPickerStep ----------------
+# ---------------- LayoutPickerStep ----------------
 
 
 @dataclass
@@ -443,7 +441,7 @@ class LayoutPickerStep:
                 default=LAYOUT_DEFAULT,
             )
         )
-        nav = _nav(picked)
+        nav = outcome_from_dismiss(picked)
         if nav is not None:
             return nav
         ctx.answers["layout"] = picked or LAYOUT_DEFAULT

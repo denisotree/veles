@@ -2,7 +2,7 @@
 proposals, NL-routing and self-doc refresh.
 
 Hosts the per-session curator (`_curate_one_session`), the pass-coordinator
-(`_run_curator_pass`) and the post-turn `_maybe_*` steps. Every step follows one
+(`_run_curator_pass`) and the post-turn `maybe_*` steps. Every step follows one
 shape: an eligibility gate, an optional throttle (`_ran_recently` / `_stamp`),
 then the work inside `_logged_skip`, so a failure becomes a LOG.md line and
 never reaches the user's turn.
@@ -25,16 +25,16 @@ from collections.abc import Iterator
 
 from veles.core.agent import Agent
 from veles.core.curator import (
-    _CURATE_CHARS_LIMIT,
-    _CURATE_QUIET_WINDOW_SEC,
-    _CURATE_TOKEN_BUDGET,
-    _CURATE_TOOLS,
-    _CURATE_TURN_LIMIT,
-    _CURATOR_IDLE_LIMIT,
-    _CURATOR_IDLE_THRESHOLD_SEC,
-    _CURATOR_POSTRUN_LIMIT,
-    _CuratorPassResult,
-    _truncate_session_messages,
+    CURATE_CHARS_LIMIT,
+    CURATE_QUIET_WINDOW_SEC,
+    CURATE_TOKEN_BUDGET,
+    CURATE_TOOLS,
+    CURATE_TURN_LIMIT,
+    CURATOR_IDLE_LIMIT,
+    CURATOR_IDLE_THRESHOLD_SEC,
+    CURATOR_POSTRUN_LIMIT,
+    CuratorPassResult,
+    truncate_session_messages,
 )
 from veles.core.curator_state import load as load_curator_state
 from veles.core.curator_state import save_atomic as save_curator_state
@@ -59,7 +59,7 @@ _SELF_DOC_IDLE_SEC = 3600  # refresh at most once per hour
 _SELF_DOC_STATE_FILE = "self-doc.state.json"
 # Poison-pill guard: consecutive curation failures before a session is
 # abandoned (cursor advances past it) instead of blocking the queue forever.
-_CURATE_MAX_ATTEMPTS = 3
+CURATE_MAX_ATTEMPTS = 3
 
 
 @contextlib.contextmanager
@@ -88,12 +88,12 @@ def _run_curator_pass(
     *,
     max_sessions: int,
     mode_label: str,
-) -> _CuratorPassResult:
+) -> CuratorPassResult:
     """Curate up to `max_sessions` quiet sessions newer than `last_curated_at`.
 
     Shared by `veles curate` (M21 batch entry-point) and the M28
-    continuous-trigger paths (`_maybe_run_idle_curator`,
-    `_maybe_run_post_turn_curator`). The function is silent on its own
+    continuous-trigger paths (`maybe_run_idle_curator`,
+    `maybe_run_post_turn_curator`). The function is silent on its own
     — callers print the user-facing summary so each entry-point keeps
     its existing tone.
     """
@@ -103,7 +103,7 @@ def _run_curator_pass(
         Wiki(project.wiki_root).ensure_layout()
     state_path = project.state_dir / "curator.state.json"
     state = load_curator_state(state_path)
-    cutoff = time.time() - _CURATE_QUIET_WINDOW_SEC
+    cutoff = time.time() - CURATE_QUIET_WINDOW_SEC
 
     next_cursor = state.last_curated_at
     successes = 0
@@ -116,7 +116,7 @@ def _run_curator_pass(
             if s.turn_count > 0 and s.last_activity_at < cutoff
         ]
         if not candidates:
-            return _CuratorPassResult(
+            return CuratorPassResult(
                 successes=0,
                 had_candidates=False,
                 advanced_to=state.last_curated_at,
@@ -129,10 +129,10 @@ def _run_curator_pass(
                 # session used to block the queue FOREVER — every pass retried
                 # it, failed, and stopped, so nothing behind it ever got
                 # curated. Track consecutive failures; after
-                # `_CURATE_MAX_ATTEMPTS` give up on that session and advance
+                # `CURATE_MAX_ATTEMPTS` give up on that session and advance
                 # the cursor past it.
                 attempts = failed.get(session.id, 0) + 1
-                if attempts >= _CURATE_MAX_ATTEMPTS:
+                if attempts >= CURATE_MAX_ATTEMPTS:
                     print(
                         f"<curate ({mode_label}) failed for {session.id} "
                         f"{attempts} times; giving up on it and moving on>",
@@ -172,7 +172,7 @@ def _run_curator_pass(
             op=f"curate-{mode_label}",
             summary=f"{successes} session(s) curated, cursor → {next_cursor}",
         )
-    return _CuratorPassResult(
+    return CuratorPassResult(
         successes=successes,
         had_candidates=True,
         advanced_to=next_cursor,
@@ -181,7 +181,7 @@ def _run_curator_pass(
 
 
 def _continuous_curator_eligible(args: argparse.Namespace) -> bool:
-    """Gate `_maybe_run_*` helpers. Continuous curation runs whenever the
+    """Gate `maybe_run_*` helpers. Continuous curation runs whenever the
     active provider can drive the curator sub-agents:
 
     - direct-API providers (`openrouter`/`anthropic`/`openai`/`gemini`) with
@@ -212,7 +212,7 @@ def _continuous_curator_eligible(args: argparse.Namespace) -> bool:
     return has_api_key(provider)
 
 
-def _maybe_run_idle_curator(args: argparse.Namespace, project: Project) -> None:
+def maybe_run_idle_curator(args: argparse.Namespace, project: Project) -> None:
     """Force a curator pass when the cursor is older than the idle
     threshold. Runs synchronously before the user's actual turn — the
     rationale is that a stale-by-a-day backlog signals the agent has
@@ -221,18 +221,18 @@ def _maybe_run_idle_curator(args: argparse.Namespace, project: Project) -> None:
         return
     state_path = project.state_dir / "curator.state.json"
     state = load_curator_state(state_path)
-    if time.time() - state.last_curated_at < _CURATOR_IDLE_THRESHOLD_SEC:
+    if time.time() - state.last_curated_at < CURATOR_IDLE_THRESHOLD_SEC:
         return
     print(
-        f"<idle curator: cursor stale ≥{_CURATOR_IDLE_THRESHOLD_SEC // 3600}h, "
-        f"running pass over up to {_CURATOR_IDLE_LIMIT} session(s)>",
+        f"<idle curator: cursor stale ≥{CURATOR_IDLE_THRESHOLD_SEC // 3600}h, "
+        f"running pass over up to {CURATOR_IDLE_LIMIT} session(s)>",
         file=sys.stderr,
     )
     with _logged_skip(project, "curate-skip", "idle curator failed"):
-        _run_curator_pass(args, project, max_sessions=_CURATOR_IDLE_LIMIT, mode_label="idle")
+        _run_curator_pass(args, project, max_sessions=CURATOR_IDLE_LIMIT, mode_label="idle")
 
 
-def _maybe_run_post_turn_curator(args: argparse.Namespace, project: Project) -> None:
+def maybe_run_post_turn_curator(args: argparse.Namespace, project: Project) -> None:
     """Curate one stale session right after the user's turn completes.
     Quiet-window filter (60s) means the just-finished session is *not*
     picked up — instead older quiet sessions get processed, so each
@@ -241,9 +241,7 @@ def _maybe_run_post_turn_curator(args: argparse.Namespace, project: Project) -> 
     if not _continuous_curator_eligible(args):
         return
     with _logged_skip(project, "curate-skip", "post-turn curator failed"):
-        _run_curator_pass(
-            args, project, max_sessions=_CURATOR_POSTRUN_LIMIT, mode_label="post-turn"
-        )
+        _run_curator_pass(args, project, max_sessions=CURATOR_POSTRUN_LIMIT, mode_label="post-turn")
     # Surface newly-emerged skill suggestions from the pattern detector into
     # the `insights` table, then a cheap throttled dream pass (no LLM
     # consolidation). Neither may block the user's turn.
@@ -294,12 +292,12 @@ def _maybe_run_post_turn_dream(args: argparse.Namespace, project: Project) -> No
     if not _continuous_curator_eligible(args):
         return
     from veles.core.curator_state import load as _load_state
-    from veles.core.dreaming import _POST_TURN_DEFAULT_INTERVAL_SEC, dream_cycle
+    from veles.core.dreaming import POST_TURN_DEFAULT_INTERVAL_SEC, dream_cycle
 
     state_path = project.state_dir / "curator.state.json"
     state = _load_state(state_path)
     now = time.time()
-    if now - state.last_post_turn_dream_at < _POST_TURN_DEFAULT_INTERVAL_SEC:
+    if now - state.last_post_turn_dream_at < POST_TURN_DEFAULT_INTERVAL_SEC:
         return
     with _logged_skip(project, "dream-skip", "post-turn dream failed"):
         dream_cycle(
@@ -310,7 +308,7 @@ def _maybe_run_post_turn_dream(args: argparse.Namespace, project: Project) -> No
         )
 
 
-def _maybe_run_subproject_proposer(args: argparse.Namespace, project: Project) -> None:
+def maybe_run_subproject_proposer(args: argparse.Namespace, project: Project) -> None:
     """M62 — refresh `wiki/proposals/` periodically so the agent sees fresh suggestions.
 
     Closes VISION §2.2: the agent — not the user — initiates
@@ -347,7 +345,7 @@ def _maybe_run_subproject_proposer(args: argparse.Namespace, project: Project) -
         _stamp(project, _PROPOSER_STATE_FILE)
 
 
-def _maybe_suggest_promotions(args: argparse.Namespace, project: Project) -> None:
+def maybe_suggest_promotions(args: argparse.Namespace, project: Project) -> None:
     """M61 — refresh `wiki/proposals/promote-*.md` when project skills cross the bar.
 
     Cheap path: `find_promote_candidates` reads only SKILL.md
@@ -375,7 +373,7 @@ def _maybe_suggest_promotions(args: argparse.Namespace, project: Project) -> Non
         _stamp(project, _PROMOTE_SUGGEST_STATE_FILE)
 
 
-def _maybe_refresh_nl_routing(args: argparse.Namespace, project: Project) -> None:
+def maybe_refresh_nl_routing(args: argparse.Namespace, project: Project) -> None:
     """M43b — re-parse AGENTS.md routing hints into `routing.nl.toml` when it changed.
 
     Gated by:
@@ -421,7 +419,7 @@ def _maybe_refresh_nl_routing(args: argparse.Namespace, project: Project) -> Non
         refresh_nl_routing(project, agents_md, extractor=extractor)
 
 
-def _maybe_run_insight_extractor(
+def maybe_run_insight_extractor(
     args: argparse.Namespace,
     project: Project,
     history: list[Message],
@@ -471,7 +469,7 @@ def _curate_one_session(
     from veles.runtime.run import print_run_summary, run_agent_streaming_aware
 
     messages = store.load_messages(session.id)
-    serialized = _truncate_session_messages(messages, _CURATE_TURN_LIMIT, _CURATE_CHARS_LIMIT)
+    serialized = truncate_session_messages(messages, CURATE_TURN_LIMIT, CURATE_CHARS_LIMIT)
     created_iso = _dt.datetime.fromtimestamp(session.created_at, tz=_dt.UTC).isoformat()
     # M163: the wiki-page half of curation exists only when the layout
     # pack enables the wiki engine; without it the distillation lands in
@@ -523,10 +521,10 @@ def _curate_one_session(
         f"{serialized}"
     )
     provider = make_tool_aware_provider(args.provider, project, skill_model=args.model)
-    system_prompt = qualify_for_provider(system_prompt, provider, _CURATE_TOOLS)
+    system_prompt = qualify_for_provider(system_prompt, provider, CURATE_TOOLS)
     agent = Agent(
         provider=provider,
-        registry=load_skills(project, _CURATE_TOOLS, provider=provider, model=args.model),
+        registry=load_skills(project, CURATE_TOOLS, provider=provider, model=args.model),
         model=args.model,
         max_iterations=args.max_iterations,
         system_prompt=system_prompt,
@@ -538,7 +536,7 @@ def _curate_one_session(
     # 2026-07-08) and runs silently (emit_output=False; its raw result text,
     # e.g. "<budget exhausted: …>", used to print straight into the chat).
     curate_args = argparse.Namespace(**vars(args))
-    curate_args.max_tokens_total = _CURATE_TOKEN_BUDGET
+    curate_args.max_tokens_total = CURATE_TOKEN_BUDGET
     result, budget = run_agent_streaming_aware(
         agent,
         f"Curate session {session.id}.",
@@ -559,7 +557,7 @@ def _curate_one_session(
     return bool({"wiki_write_page", "memory_save_insight"} & result.invoked_tools)
 
 
-def _maybe_refresh_self_doc(project: Project) -> None:
+def maybe_refresh_self_doc(project: Project) -> None:
     """Refresh wiki/self-doc/overview.md at most once per `_SELF_DOC_IDLE_SEC`.
 
     Silent: a failure is swallowed so a broken sub-component never surfaces to

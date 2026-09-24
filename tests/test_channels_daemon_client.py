@@ -119,13 +119,6 @@ async def test_submit_run_raises_on_401(aiohttp_client, stub_app) -> None:
     assert info.value.status == 401
 
 
-async def test_get_run_returns_summary(aiohttp_client, stub_app) -> None:
-    client = await _make_client(aiohttp_client, stub_app)
-    body = await client.get_run("run-test-1")
-    assert body["state"] == "completed"
-    assert body["stopped_reason"] == "completed"
-
-
 async def test_stream_events_yields_until_completed(aiohttp_client, stub_app) -> None:
     client = await _make_client(aiohttp_client, stub_app)
     events = []

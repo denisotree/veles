@@ -151,7 +151,7 @@ async def test_proactive_skipped_without_provider(project: Project) -> None:
         project=project,
         state=state,
         provider_factory=None,  # no provider → no proactive pass
-        proactive_history_loader=lambda: [],
+        proactive_history_loader=list,
         idle_threshold_seconds=999.0,
         proactive_interval_seconds=0.0,
     )

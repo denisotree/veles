@@ -68,10 +68,10 @@ def test_tool_naming_and_registration() -> None:
     mgr = FakeManager({"gh": [_tool("list_issues"), _tool("create_issue")]})
     reg = Registry()
     names = register_mcp_tools(reg, mgr, {"gh": _cfg("gh")})
-    assert names == ["mcp_gh_create_issue", "mcp_gh_list_issues"] or names == [
-        "mcp_gh_list_issues",
-        "mcp_gh_create_issue",
-    ]
+    assert names in (
+        ["mcp_gh_create_issue", "mcp_gh_list_issues"],
+        ["mcp_gh_list_issues", "mcp_gh_create_issue"],
+    )
     assert set(reg.list_names()) == {"mcp_gh_list_issues", "mcp_gh_create_issue"}
     entry = reg.get("mcp_gh_list_issues")
     assert entry.description.startswith("[MCP:gh]")

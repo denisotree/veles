@@ -33,18 +33,27 @@ import logging
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from veles.core.io_utils import read_fresh_json, write_stamped_json
 
 _logger = logging.getLogger(__name__)
+
+
+class ModelFacts(TypedDict):
+    """What the catalogue knows about one model (the cached JSON shape)."""
+
+    reasoning: bool  # can think when asked (`reasoning` in supported_parameters)
+    reasoning_mandatory: bool  # thinks whether asked or not
+    context_length: int | None
+
 
 _MODELS_URL = "https://openrouter.ai/api/v1/models"
 _FETCH_TIMEOUT_S = 3.0
 _CACHE_TTL_SECONDS = 24 * 60 * 60  # same as the id cache next to it
 
 # None = not looked up yet this process; {} = looked up and unavailable.
-_memo: dict[str, dict[str, Any]] | None = None
+_memo: dict[str, ModelFacts] | None = None
 
 
 def _cache_path() -> Path:
@@ -53,16 +62,11 @@ def _cache_path() -> Path:
     return user_home() / "cache" / "models" / "openrouter.meta.json"
 
 
-def _trim(payload: Any) -> dict[str, dict[str, Any]]:
-    """Keep the two fields a budget is made of, not the 2KB record per model.
-
-    Two reasoning fields, because they answer different questions.
-    `supported_parameters` contains `reasoning` when the model *can* think if
-    asked; `reasoning.mandatory` is true when it thinks whether asked or not.
-    `context_length` has no consumer yet — it is stored because it is the same
-    parsed field, and leaving it out would mean changing the cache format (and
-    invalidating every cache) the moment something asks for it."""
-    out: dict[str, dict[str, Any]] = {}
+def _trim(payload: Any) -> dict[str, ModelFacts]:
+    """Keep the fields budgets and context windows are made of, not the 2KB
+    record per model. Two reasoning fields, because they answer different
+    questions — see `ModelFacts`."""
+    out: dict[str, ModelFacts] = {}
     for entry in payload.get("data", []) if isinstance(payload, dict) else []:
         if not isinstance(entry, dict):
             continue
@@ -80,13 +84,13 @@ def _trim(payload: Any) -> dict[str, dict[str, Any]]:
     return out
 
 
-def _read_cache() -> dict[str, dict[str, Any]] | None:
+def _read_cache() -> dict[str, ModelFacts] | None:
     payload = read_fresh_json(_cache_path(), max_age_s=_CACHE_TTL_SECONDS)
     models = payload.get("models") if payload else None
     return models if isinstance(models, dict) else None
 
 
-def _write_cache(models: dict[str, dict[str, Any]]) -> None:
+def _write_cache(models: dict[str, ModelFacts]) -> None:
     """Atomic, because daemon sessions build providers concurrently and a reader
     must never see half a file (it would read as a miss and fetch again)."""
     try:
@@ -95,7 +99,7 @@ def _write_cache(models: dict[str, dict[str, Any]]) -> None:
         _logger.debug("cannot write model metadata cache %s: %s", _cache_path(), exc)
 
 
-def _fetch() -> dict[str, dict[str, Any]] | None:
+def _fetch() -> dict[str, ModelFacts] | None:
     """One bounded GET. Returns None on anything at all going wrong."""
     try:
         with urllib.request.urlopen(_MODELS_URL, timeout=_FETCH_TIMEOUT_S) as resp:
@@ -106,7 +110,7 @@ def _fetch() -> dict[str, dict[str, Any]] | None:
     return models or None
 
 
-def _catalogue() -> dict[str, dict[str, Any]]:
+def _catalogue() -> dict[str, ModelFacts]:
     global _memo
     if _memo is None:
         cached = _read_cache()
@@ -136,7 +140,7 @@ def reset_for_tests() -> None:
     _memo = None
 
 
-def model_facts(model: str | None) -> dict[str, Any] | None:
+def model_facts(model: str | None) -> ModelFacts | None:
     """Catalogue facts for `model`, or None when they cannot be established.
 
     None means "no opinion" — the caller keeps whatever it did before. That
@@ -160,4 +164,4 @@ def model_facts(model: str | None) -> dict[str, Any] | None:
     return _catalogue().get(key)
 
 
-__all__ = ["model_facts", "refresh_cache", "reset_for_tests"]
+__all__ = ["ModelFacts", "model_facts", "refresh_cache", "reset_for_tests"]

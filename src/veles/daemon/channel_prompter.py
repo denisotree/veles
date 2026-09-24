@@ -71,7 +71,7 @@ _TRUST_DECISION_BY_KEY: dict[str, str] = {
 }
 
 
-def _ask(
+def _ask(  # noqa: PLR0913
     handle: RunHandle,
     loop: asyncio.AbstractEventLoop,
     *,

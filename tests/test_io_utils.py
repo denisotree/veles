@@ -101,3 +101,20 @@ def test_atomic_write_text_failure_keeps_previous_file(tmp_path: Path, monkeypat
 
     assert read_goal(tmp_path, goal.id) == goal
     assert not list(gdir.glob("*.tmp"))
+
+
+def test_atomic_write_cleanup_failure_does_not_mask_the_write_error(tmp_path, monkeypatch):
+    """If the rename fails and removing the temp file fails too, the caller
+    must see the rename error, not the cleanup one."""
+    import pytest
+
+    def boom_replace(self, target):
+        raise ValueError("rename failed")
+
+    def boom_unlink(self, missing_ok=False):
+        raise PermissionError("cannot remove tmp")
+
+    monkeypatch.setattr(Path, "replace", boom_replace)
+    monkeypatch.setattr(Path, "unlink", boom_unlink)
+    with pytest.raises(ValueError, match="rename failed"):
+        atomic_write_text(tmp_path / "x.txt", "data")

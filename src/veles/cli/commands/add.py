@@ -1,7 +1,6 @@
 """`veles add` — read a source and route its topics into the wiki (M85, M203).
 
-The canonical (and only) name — the `veles ingest` alias was removed in
-M117c-removal. Delegates to the shared runner in `cli.commands.ingest`."""
+Delegates to the shared runner in `cli.commands.ingest`."""
 
 from __future__ import annotations
 

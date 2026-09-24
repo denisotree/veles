@@ -32,7 +32,7 @@ from veles.core.context import expects_strict_json
 from veles.core.openai_wire import OpenAICompatibleProvider, json_mode_enabled
 
 
-class _OpenAICompatibleBase(OpenAICompatibleProvider):
+class LocalOpenAIBase(OpenAICompatibleProvider):
     """Provider implementation against any OpenAI Chat Completions endpoint."""
 
     name: str = "openai-compatible"

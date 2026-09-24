@@ -287,9 +287,9 @@ def _load_gitignore(root: Path) -> list[str]:
     if not path.is_file():
         return []
     out: list[str] = []
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or line.startswith("!"):
+    for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = raw.strip()
+        if not line or line.startswith(("#", "!")):
             continue
         out.append(line)
     return out
@@ -440,7 +440,7 @@ def relevant_semantic(conn: sqlite3.Connection, query: str, *, limit: int = 10) 
     return [e for _, e in scored[:limit]]
 
 
-# ---------- M216: per-entry embedding cache ----------
+# ---------- per-entry embedding cache ----------
 
 
 def _load_cached_embeddings(

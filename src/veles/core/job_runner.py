@@ -70,7 +70,7 @@ class _StructuredOutcome:
 
 
 class JobRunner:
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         *,
         store: JobsStore,
