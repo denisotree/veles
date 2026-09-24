@@ -32,6 +32,7 @@ from veles.core.autopilot import (
     load_state,
     parse_until,
 )
+from veles.core.timeutil import utc_iso
 
 
 def cmd_autopilot(args: argparse.Namespace) -> int:
@@ -56,7 +57,7 @@ def _enable(args: argparse.Namespace) -> int:
         print("error: --until must resolve to a future point in time", file=sys.stderr)
         return 2
     activate(enabled_until)
-    iso = _dt.datetime.fromtimestamp(enabled_until, tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    iso = utc_iso(enabled_until)
     remaining = format_remaining(enabled_until - time.time())
     print(f"autopilot enabled until {iso} (in {remaining}).", file=sys.stderr)
     print(
@@ -87,6 +88,6 @@ def _status(args: argparse.Namespace) -> int:
         else:
             print("autopilot inactive.")
         return 1
-    iso = _dt.datetime.fromtimestamp(state.enabled_until, tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    iso = utc_iso(state.enabled_until)
     print(f"autopilot active until {iso} ({format_remaining(state.seconds_remaining)} left).")
     return 0

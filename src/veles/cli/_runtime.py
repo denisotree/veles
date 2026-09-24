@@ -32,7 +32,6 @@ import logging
 import sys
 from pathlib import Path
 
-from veles.adapters.openrouter import OpenRouterProvider
 from veles.core.agent import Agent
 from veles.core.budget_state import BudgetSnapshot, save_atomic
 from veles.core.budget_state import load as load_budget_snapshot
@@ -741,22 +740,6 @@ def _make_tool_aware_provider(
     `skill_model` is propagated into the MCP descriptor so the child server
     knows which OpenRouter model to use when running project skills.
     """
-    if name == "openrouter":
-        # M266: the constructor resolves the timeout and retry count itself
-        # (explicit → `[engine]` → per-model default).
-        return OpenRouterProvider(model=skill_model)
-    if name == "anthropic":
-        from veles.adapters.anthropic import AnthropicProvider
-
-        return AnthropicProvider()
-    if name == "openai":
-        from veles.adapters.openai_direct import OpenAIProvider
-
-        return OpenAIProvider()
-    if name == "gemini":
-        from veles.adapters.gemini import GeminiProvider
-
-        return GeminiProvider()
     if name == "claude-cli":
         from veles.adapters.cli.claude_cli import ClaudeCLIProvider
         from veles.adapters.cli.mcp_config import DEFAULT_SKILL_MODEL, build_mcp_config
@@ -769,16 +752,11 @@ def _make_tool_aware_provider(
 
         build_gemini_mcp_settings(project, skill_model=skill_model or DEFAULT_SKILL_MODEL)
         return GeminiCLIProvider(mcp_settings_dir=project.root)
-    if name in {"ollama", "llamacpp", "openai-compat"}:
-        # Local providers don't bridge MCP — they run plain HTTP chat, the
-        # agent loop wires Veles tools through the standard tool-call path.
-        # Pass the model so tool-call support is auto-detected from the
-        # model's capabilities (see provider_factory._apply_local_tool_policy);
-        # VELES_LOCAL_TOOLS still forces on/off when set.
-        from veles.core.provider_factory import make_provider
+    # Every other provider runs plain HTTP chat and gets Veles tools through the
+    # standard tool-call path; the model lets local backends detect tool support.
+    from veles.core.provider_factory import make_provider
 
-        return make_provider(name, model=skill_model)
-    raise ValueError(f"provider {name!r} cannot bridge tools")
+    return make_provider(name, model=skill_model)
 
 
 # ---- agent dispatch + budget ----

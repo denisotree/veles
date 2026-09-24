@@ -139,17 +139,9 @@ def make_llm_planner(
     `run_deep_research` falls back to a single explorer."""
 
     def _plan(question: str) -> list[str]:
-        from veles.core.agent import Agent
-        from veles.core.tools.registry import Registry
+        from veles.core.agent import run_oneshot
 
-        agent = Agent(
-            provider=provider,
-            registry=Registry(),  # tool-less planner
-            model=model,
-            max_iterations=1,
-            system_prompt=_PLANNER_SYSTEM,
-        )
-        result = agent.run(f"Research question: {question}")
+        result = run_oneshot(provider, model, _PLANNER_SYSTEM, f"Research question: {question}")
         return parse_subquestions(result.text, max_subquestions)
 
     return _plan

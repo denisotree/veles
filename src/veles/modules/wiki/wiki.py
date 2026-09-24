@@ -28,15 +28,17 @@ write rewrites it.
 
 from __future__ import annotations
 
-import datetime as _dt
 import logging
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
 from veles.core.fts import escape_query
+from veles.core.io_utils import load_optional_toml
 from veles.core.safety import scan_for_injection
 from veles.core.slug import normalize_slug as _normalize_slug
+from veles.core.text import title_and_summary
+from veles.core.timeutil import utc_iso
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +65,6 @@ _DEFAULT_CATEGORIES = (
     "sessions",
     "self-doc",
 )
-_SUMMARY_CHAR_CAP = 200
 
 
 def project_categories_path(root: Path) -> Path:
@@ -87,17 +88,7 @@ def normalize_category(name: str) -> str | None:
 
 def read_project_categories(root: Path) -> list[str]:
     """The project-local category declarations (`.veles/wiki.toml`). Best-effort."""
-    path = project_categories_path(root)
-    if not path.is_file():
-        return []
-    try:
-        import tomllib
-
-        with path.open("rb") as fh:
-            data = tomllib.load(fh)
-    except Exception:
-        return []
-    cats = data.get("categories")
+    cats = load_optional_toml(project_categories_path(root)).get("categories")
     if not isinstance(cats, list):
         return []
     out: list[str] = []
@@ -154,16 +145,11 @@ def _resolve_wiki_categories(root: Path) -> tuple[str, ...]:
                 resolved.append(c)
 
     try:
-        import tomllib
-
         name = "llm-wiki"
-        proj_toml = root / ".veles" / "project.toml"
-        if proj_toml.is_file():
-            with proj_toml.open("rb") as fh:
-                data = tomllib.load(fh)
-            n = (data.get("project") or {}).get("layout")
-            if isinstance(n, str) and n.strip():
-                name = n.strip()
+        data = load_optional_toml(root / ".veles" / "project.toml")
+        n = (data.get("project") or {}).get("layout")
+        if isinstance(n, str) and n.strip():
+            name = n.strip()
         from veles.core.layout.discovery import find_layout
 
         pack = find_layout(name, project=None)
@@ -182,35 +168,6 @@ class WikiPageInfo:
     slug: str
     title: str
     summary: str
-
-
-def _now_iso_z() -> str:
-    return _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _extract_title_and_summary(content: str, fallback: str) -> tuple[str, str]:
-    """Pull H1 line and first paragraph from markdown content."""
-    title = fallback
-    summary_lines: list[str] = []
-    seen_h1 = False
-    for line in content.splitlines():
-        stripped = line.strip()
-        if not seen_h1 and stripped.startswith("# "):
-            title = stripped[2:].strip() or fallback
-            seen_h1 = True
-            continue
-        if seen_h1 and stripped:
-            if stripped.startswith("#"):
-                if summary_lines:
-                    break
-                continue
-            summary_lines.append(stripped)
-            if sum(len(s) for s in summary_lines) >= _SUMMARY_CHAR_CAP:
-                break
-    summary = " ".join(summary_lines).strip()
-    if len(summary) > _SUMMARY_CHAR_CAP:
-        summary = summary[: _SUMMARY_CHAR_CAP - 1].rstrip() + "…"
-    return title, summary
 
 
 class Wiki:
@@ -324,7 +281,7 @@ class Wiki:
                 nested_cat = md.parent.relative_to(wiki_base).as_posix()
                 slug = md.stem
                 content = md.read_text(encoding="utf-8", errors="replace")
-                title, summary = _extract_title_and_summary(content, fallback=slug)
+                title, summary = title_and_summary(content, fallback=slug)
                 pages.append(
                     WikiPageInfo(
                         rel_path=f"{_WIKI_DIR}/{nested_cat}/{md.name}",
@@ -358,7 +315,7 @@ class Wiki:
     def update_index(self) -> None:
         self.ensure_layout()
         pages = self.list_pages()
-        lines: list[str] = ["# INDEX", "", f"Updated: {_now_iso_z()}", ""]
+        lines: list[str] = ["# INDEX", "", f"Updated: {utc_iso()}", ""]
         if not pages:
             lines.append("_(no pages yet)_")
         else:
@@ -389,7 +346,7 @@ class Wiki:
     def append_log(self, *, op: str, summary: str) -> None:
         self._root.mkdir(parents=True, exist_ok=True)
         log_path = self._root / _LOG_FILE
-        entry = f"## [{_now_iso_z()}] {op}\n   {summary}\n\n"
+        entry = f"## [{utc_iso()}] {op}\n   {summary}\n\n"
         with log_path.open("a", encoding="utf-8") as f:
             f.write(entry)
 

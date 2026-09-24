@@ -16,11 +16,11 @@ from veles.core.project import init_project
 from veles.core.skill_install import (
     SkillInstallError,
     SkillNotFoundError,
-    _derive_name,
-    _is_git_url,
     install_skill_from_source,
     remove_skill,
 )
+from veles.core.skill_install import derive_skill_name as _derive_name
+from veles.core.source_install import is_git_url as _is_git_url
 
 
 def _make_skill_fixture(
@@ -129,7 +129,7 @@ def test_install_from_git_invokes_subprocess(
         shutil.copytree(fixture, target)
         return subprocess.CompletedProcess(cmd, 0, b"", b"")
 
-    monkeypatch.setattr("veles.core.skill_install.subprocess.run", fake_run)
+    monkeypatch.setattr("veles.core.source_install.subprocess.run", fake_run)
     skill = install_skill_from_source(
         "https://github.com/user/cloned.git", project=project, name_override="cloned"
     )
@@ -148,7 +148,7 @@ def test_install_from_git_propagates_clone_failure(
             128, cmd, output=b"", stderr=b"fatal: Repository not found"
         )
 
-    monkeypatch.setattr("veles.core.skill_install.subprocess.run", fake_run)
+    monkeypatch.setattr("veles.core.source_install.subprocess.run", fake_run)
     with pytest.raises(SkillInstallError, match="Repository not found"):
         install_skill_from_source(
             "https://github.com/user/missing.git", project=project, name_override="missing"

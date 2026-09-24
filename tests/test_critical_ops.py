@@ -129,10 +129,7 @@ def _setup_writable_user_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     fake_home = tmp_path / "home"
     fake_home.mkdir()
     (fake_home / ".veles").mkdir()
-    monkeypatch.setattr(
-        "veles.core.path_guard.Path.home",
-        classmethod(lambda cls: fake_home),
-    )
+    monkeypatch.setenv("VELES_USER_HOME", str(fake_home))
     monkeypatch.delenv("VELES_SANDBOX_ROOTS", raising=False)
     return fake_home
 

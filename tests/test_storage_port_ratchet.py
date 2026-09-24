@@ -117,6 +117,39 @@ def test_connection_reach_through_does_not_grow() -> None:
     )
 
 
+# Raw `sqlite3.connect(...)`: only `io_utils.open_sqlite` (every store opens its
+# connection there), plus deliberate readers — `memory_query` (a `query_only`
+# sandbox for agent SQL), the wiki FTS index (its own database file), and two
+# read-only probes. A new raw connection to memory.db skips `busy_timeout`, so a
+# write through it fails with "database is locked" the moment the daemon is
+# writing — use `local_connection` or `open_sqlite`.
+_RAW_CONNECT_ALLOWED = {
+    "core/io_utils.py",
+    "core/tools/builtin/memory_query.py",
+    "modules/wiki/wiki.py",
+    "core/doctor.py",
+    "core/self_doc.py",
+}
+
+
+def test_no_new_raw_sqlite_connections() -> None:
+    offenders = set()
+    for rel, text in _iter_sources():
+        for node in ast.walk(ast.parse(text)):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "connect"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "sqlite3"
+            ):
+                offenders.add(str(rel))
+    assert offenders <= _RAW_CONNECT_ALLOWED, (
+        f"raw sqlite3.connect in {sorted(offenders - _RAW_CONNECT_ALLOWED)}; "
+        "open memory.db through `memory.store.local_connection(project)`"
+    )
+
+
 def test_ceilings_are_not_stale() -> None:
     """A ceiling far above reality stops being a ratchet. If a batch landed
     without lowering the numbers, this says so."""

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from veles.core.defaults import DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT
 from veles.core.project import Project
 from veles.core.project_config import (
     load_project_config as _load_project_toml,
@@ -41,8 +42,8 @@ from veles.tui.wizard.step import (
 class DaemonBindStep:
     project: Project
     session: str | None = None
-    host: str = "127.0.0.1"
-    port: int = 8765
+    host: str = DEFAULT_DAEMON_HOST
+    port: int = DEFAULT_DAEMON_PORT
     name: str = "daemon_bind"
     title: str = "Start daemon"
 

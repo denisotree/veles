@@ -21,6 +21,8 @@ import logging
 import re
 from typing import Any
 
+from veles.core.text import ellipsize
+
 logger = logging.getLogger(__name__)
 
 MAX_PARAMS_PER_TOOL = 16
@@ -45,10 +47,7 @@ def sanitize_text(value: Any, limit: int = MAX_TEXT_CHARS) -> str:
     Control chars and newlines become single spaces, whitespace collapses,
     and the result is capped at `limit` chars with a trailing ellipsis."""
     text = _CONTROL_CHARS_RE.sub(" ", str(value))
-    text = _WHITESPACE_RE.sub(" ", text).strip()
-    if len(text) > limit:
-        text = text[: limit - 1].rstrip() + "…"
-    return text
+    return ellipsize(_WHITESPACE_RE.sub(" ", text), limit)
 
 
 def normalize_tool_name(name: Any) -> str | None:

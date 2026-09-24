@@ -13,17 +13,16 @@ another shell propagates without a daemon restart.
 
 from __future__ import annotations
 
-import contextlib
 import json
-import os
 import secrets
-import tempfile
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from aiohttp import web
+
+from veles.core.io_utils import atomic_write_text
 
 Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
 
@@ -75,25 +74,13 @@ class TokenStore:
         return store
 
     def save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "tokens": [
                 {"name": e.name, "token": e.token, "created_at": e.created_at} for e in self.entries
             ]
         }
         text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
-        fd, tmp_name = tempfile.mkstemp(
-            prefix=self.path.name + ".", suffix=".tmp", dir=self.path.parent
-        )
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                fh.write(text)
-            os.replace(tmp_name, self.path)
-        except Exception:
-            Path(tmp_name).unlink(missing_ok=True)
-            raise
-        with contextlib.suppress(OSError):
-            os.chmod(self.path, 0o600)
+        atomic_write_text(self.path, text, mode=0o600)
 
     def add(self, name: str) -> TokenEntry:
         if any(e.name == name for e in self.entries):

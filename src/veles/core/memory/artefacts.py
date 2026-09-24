@@ -24,12 +24,14 @@ Never write user-content (`wiki/`) paths from this module.
 
 from __future__ import annotations
 
-import datetime as _dt
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from veles.core.slug import normalize_slug
+from veles.core.text import title_and_summary
+from veles.core.timeutil import utc_iso
 
 if TYPE_CHECKING:
     from veles.core.project import Project
@@ -38,7 +40,6 @@ _LOG_FILE = "LOG.md"
 _INSIGHTS_DIR = "insights"
 _SESSIONS_DIR = "sessions"
 _PROPOSALS_DIR = "proposals"
-_SUMMARY_CHAR_CAP = 200
 
 # Two writers share `proposals/`: M62 subproject clusters and M61 skill
 # promotions, told apart only by this slug prefix. Defined once, here beside the
@@ -57,10 +58,6 @@ class ProposalInfo:
     title: str
     summary: str
     path: Path
-
-
-def _now_iso_z() -> str:
-    return _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def memory_log_path(project: Project) -> Path:
@@ -88,7 +85,7 @@ def append_memory_log(project: Project, *, op: str, summary: str) -> None:
     `LOG.md` keeps *content* ops only (ingest, wiki_write_page).
     """
     project.memory_dir.mkdir(parents=True, exist_ok=True)
-    entry = f"## [{_now_iso_z()}] {op}\n   {summary}\n\n"
+    entry = f"## [{utc_iso()}] {op}\n   {summary}\n\n"
     with memory_log_path(project).open("a", encoding="utf-8") as f:
         f.write(entry)
 
@@ -121,6 +118,19 @@ def write_insight_view(project: Project, *, slug: str, title: str, body: str) ->
     return _write_page(insights_dir(project), slug=slug, title=title, content=body)
 
 
+def fresh_proposals(project: Project, *, max_age_days: int) -> list[ProposalInfo]:
+    """Proposals whose file was written within the last `max_age_days` days."""
+    cutoff = time.time() - max_age_days * 86_400
+    out: list[ProposalInfo] = []
+    for page in list_proposals(project):
+        try:
+            if page.path.stat().st_mtime >= cutoff:
+                out.append(page)
+        except OSError:
+            continue
+    return out
+
+
 def list_proposals(project: Project) -> list[ProposalInfo]:
     d = proposals_dir(project)
     if not d.is_dir():
@@ -131,31 +141,6 @@ def list_proposals(project: Project) -> list[ProposalInfo]:
             content = md.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        title, summary = _title_and_summary(content, fallback=md.stem)
+        title, summary = title_and_summary(content, fallback=md.stem)
         out.append(ProposalInfo(slug=md.stem, title=title, summary=summary, path=md))
     return out
-
-
-def _title_and_summary(content: str, fallback: str) -> tuple[str, str]:
-    """H1 line + first paragraph, capped — mirrors the wiki page parser."""
-    title = fallback
-    summary_lines: list[str] = []
-    seen_h1 = False
-    for line in content.splitlines():
-        stripped = line.strip()
-        if not seen_h1 and stripped.startswith("# "):
-            title = stripped[2:].strip() or fallback
-            seen_h1 = True
-            continue
-        if seen_h1 and stripped:
-            if stripped.startswith("#"):
-                if summary_lines:
-                    break
-                continue
-            summary_lines.append(stripped)
-            if sum(len(s) for s in summary_lines) >= _SUMMARY_CHAR_CAP:
-                break
-    summary = " ".join(summary_lines).strip()
-    if len(summary) > _SUMMARY_CHAR_CAP:
-        summary = summary[: _SUMMARY_CHAR_CAP - 1].rstrip() + "…"
-    return title, summary

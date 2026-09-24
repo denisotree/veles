@@ -35,6 +35,38 @@ def _entry(slug: str = "demo", **kw) -> DaemonEntry:
     )
 
 
+def test_registry_restart_stops_gracefully_and_respawns_with_a_log(monkeypatch) -> None:
+    """`veles daemon <id> restart` goes through the same stop/spawn as the named path:
+    SIGTERM→SIGKILL escalation and a detached child that logs to the daemon log."""
+    import argparse
+
+    import veles.cli.commands.daemon as daemon_cmd
+    import veles.daemon.spawn as spawn_mod
+
+    reg = DaemonRegistry()
+    reg.upsert(_entry("demo", project_path="/proj", project_name="demo", port=9001))
+    reg.save()
+
+    stopped: list[int] = []
+    spawned: dict = {}
+
+    class _Proc:
+        pid = 4242
+
+    monkeypatch.setattr(
+        daemon_cmd, "_graceful_stop", lambda pid, timeout: stopped.append(pid) or True
+    )
+    monkeypatch.setattr(spawn_mod, "spawn_daemon", lambda **kw: spawned.update(kw) or _Proc())
+
+    rc = daemon_cmd._cmd_daemon_restart(argparse.Namespace(target="demo", name=None))
+
+    assert rc == 0
+    assert stopped == [os.getpid()]
+    assert spawned["project_root"] == "/proj"
+    assert spawned["port"] == 9001
+    assert str(spawned["log_path"]).endswith(".log")
+
+
 def test_load_returns_empty_when_missing() -> None:
     reg = DaemonRegistry.load()
     assert reg.entries == {}

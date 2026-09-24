@@ -8,11 +8,7 @@ from __future__ import annotations
 
 import argparse
 
-from veles.cli._parsers._common import (
-    DEFAULT_COMPRESS_THRESHOLD_TOKENS,
-    DEFAULT_COMPRESSOR_MODEL,
-    add_common_run_flags,
-)
+from veles.cli._parsers._common import add_common_run_flags, add_prompt_flags
 
 
 def _register_init(sub: argparse._SubParsersAction) -> None:
@@ -62,19 +58,7 @@ def _register_run(sub: argparse._SubParsersAction) -> None:
             "enabled by VELES_VERIFY_MODE=1."
         ),
     )
-    run.add_argument(
-        "--no-agents-md",
-        action="store_true",
-        help="Skip auto-injection of AGENTS.md into the system prompt.",
-    )
-    run.add_argument(
-        "--no-index", action="store_true", help="Skip auto-injection of the wiki INDEX.md."
-    )
-    run.add_argument(
-        "--no-compress",
-        action="store_true",
-        help="Disable sliding-window context compression for this run.",
-    )
+    add_prompt_flags(run)
     run.add_argument(
         "--no-curator",
         action="store_true",
@@ -112,24 +96,6 @@ def _register_run(sub: argparse._SubParsersAction) -> None:
         help=(
             "Disable the auto-promote suggester (it normally refreshes "
             "`.veles/memory/proposals/promote-*.md` at most once every 7 days)."
-        ),
-    )
-    run.add_argument(
-        "--compressor-model",
-        default=None,
-        help=(
-            "Override the routed compressor model (default: routed via "
-            f"`veles route show`, fallback {DEFAULT_COMPRESSOR_MODEL})."
-        ),
-    )
-    run.add_argument(
-        "--compress-threshold-tokens",
-        type=int,
-        default=DEFAULT_COMPRESS_THRESHOLD_TOKENS,
-        metavar="N",
-        help=(
-            f"Estimated history token count that triggers compression "
-            f"(default: {DEFAULT_COMPRESS_THRESHOLD_TOKENS})."
         ),
     )
     run.add_argument(
@@ -204,37 +170,7 @@ def add_interactive_flags(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Resume the most recent session in this project (its last activity).",
     )
-    parser.add_argument(
-        "--no-agents-md",
-        action="store_true",
-        help="Skip auto-injection of AGENTS.md into the system prompt.",
-    )
-    parser.add_argument(
-        "--no-index", action="store_true", help="Skip auto-injection of the wiki INDEX.md."
-    )
-    parser.add_argument(
-        "--no-compress",
-        action="store_true",
-        help="Disable sliding-window context compression for this run.",
-    )
-    parser.add_argument(
-        "--compressor-model",
-        default=None,
-        help=(
-            "Override the routed compressor model (default: routed via "
-            f"`veles route show`, fallback {DEFAULT_COMPRESSOR_MODEL})."
-        ),
-    )
-    parser.add_argument(
-        "--compress-threshold-tokens",
-        type=int,
-        default=DEFAULT_COMPRESS_THRESHOLD_TOKENS,
-        metavar="N",
-        help=(
-            f"Estimated history token count that triggers compression "
-            f"(default: {DEFAULT_COMPRESS_THRESHOLD_TOKENS})."
-        ),
-    )
+    add_prompt_flags(parser, defaults=True)
 
 
 def _register_curate(sub: argparse._SubParsersAction) -> None:

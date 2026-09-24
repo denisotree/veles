@@ -20,11 +20,12 @@ through SessionSource. M52 flat-string usage continues to work.
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from veles.core.file_lock import file_lock
+from veles.core.io_utils import atomic_write_text
 
 
 @dataclass(slots=True, frozen=True)
@@ -124,19 +125,19 @@ class SessionMap:
         return m
 
     def save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {"sessions": self.entries}
-        text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
-        fd, tmp = tempfile.mkstemp(prefix=self.path.name + ".", suffix=".tmp", dir=self.path.parent)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                fh.write(text)
-            os.replace(tmp, self.path)
-        except Exception:
-            Path(tmp).unlink(missing_ok=True)
-            raise
+        atomic_write_text(self.path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+    # Several maps share one file: the daemon gateway keeps one for its lifetime,
+    # the delivery binder and `veles channel reset-session` open their own. So
+    # every read re-reads the file, and every write is a locked read-modify-write.
+
+    def _refresh(self) -> None:
+        if self.path.is_file():
+            self.entries = SessionMap.load(self.path).entries
 
     def get(self, chat_id: str) -> str | None:
+        self._refresh()
         entry = self.entries.get(chat_id)
         if not entry:
             return None
@@ -144,17 +145,22 @@ class SessionMap:
         return sid if isinstance(sid, str) else None
 
     def set(self, chat_id: str, session_id: str) -> None:
-        self.entries[chat_id] = {"session_id": session_id, "last_used_at": time.time()}
-        self.save()
+        with file_lock(self.path.with_name(self.path.name + ".lock")):
+            self._refresh()
+            self.entries[chat_id] = {"session_id": session_id, "last_used_at": time.time()}
+            self.save()
 
     def reset(self, chat_id: str) -> bool:
-        if chat_id not in self.entries:
-            return False
-        del self.entries[chat_id]
-        self.save()
-        return True
+        with file_lock(self.path.with_name(self.path.name + ".lock")):
+            self._refresh()
+            if chat_id not in self.entries:
+                return False
+            del self.entries[chat_id]
+            self.save()
+            return True
 
     def list(self) -> list[tuple[str, str, float]]:
+        self._refresh()
         out: list[tuple[str, str, float]] = []
         for key, value in self.entries.items():
             sid = value.get("session_id")

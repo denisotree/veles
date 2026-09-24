@@ -45,17 +45,16 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
-import tempfile
 import time
-import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from veles.core.io_utils import atomic_write_text, dump_toml, load_optional_toml
 from veles.core.project import Project
 from veles.core.routing.ensemble import KNOWN_TASKS, RoutingConfig, parse_spec
+from veles.core.text import strip_code_fence
 
 _NL_TOML_FILENAME = "routing.nl.toml"
 _NL_STATE_FILENAME = "routing.nl.state.json"
@@ -172,16 +171,6 @@ _VALID_NL_PROVIDERS = frozenset(
 )
 
 
-def _strip_code_fence(text: str) -> str:
-    """Drop a leading ```lang line and trailing ``` from an LLM reply, if present."""
-    if not text.startswith("```"):
-        return text
-    text = re.sub(r"^```[a-zA-Z]*\s*", "", text)
-    if text.endswith("```"):
-        text = text[: -len("```")]
-    return text.strip()
-
-
 def _coerce_nl_entry(entry: Any, valid_tasks: set[str]) -> _NLEntry | None:
     """Validate one extractor JSON entry; return None on any defect."""
     if not isinstance(entry, dict):
@@ -206,7 +195,7 @@ def parse_extractor_output(raw: str) -> list[_NLEntry]:
     task, unknown provider, empty model) are skipped silently so one
     noisy entry doesn't void the whole batch.
     """
-    text = _strip_code_fence((raw or "").strip())
+    text = strip_code_fence(raw or "")
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
@@ -227,8 +216,7 @@ def make_nl_extractor(*, provider, model: str):
     failure the function returns `[]` so a flaky parse never blocks
     the parent run.
     """
-    from veles.core.agent import Agent
-    from veles.core.tools.registry import Registry
+    from veles.core.agent import run_oneshot
 
     def _extract(agents_md_text: str) -> list[_NLEntry]:
         hints = find_routing_hints(agents_md_text)
@@ -236,15 +224,7 @@ def make_nl_extractor(*, provider, model: str):
             return []
         snippet = "\n\n".join(hints)[:4_000]
         try:
-            sub = Agent(
-                provider=provider,
-                registry=Registry(),
-                model=model,
-                max_iterations=1,
-                system_prompt=_SYSTEM_PROMPT,
-                max_tokens=512,
-            )
-            result = sub.run(snippet)
+            result = run_oneshot(provider, model, _SYSTEM_PROMPT, snippet, max_tokens=512)
         except Exception:
             return []
         return parse_extractor_output(result.text or "")
@@ -265,17 +245,7 @@ def nl_state_path(project: Project) -> Path:
 
 def load_nl_routing_config(project: Project) -> RoutingConfig:
     """Permissive parse of `routing.nl.toml`. Missing / corrupt → empty."""
-    path = nl_routing_path(project)
-    if not path.is_file():
-        return RoutingConfig()
-    try:
-        with path.open("rb") as fh:
-            data = tomllib.load(fh)
-    except (OSError, tomllib.TOMLDecodeError):
-        return RoutingConfig()
-    if not isinstance(data, dict):
-        return RoutingConfig()
-    routing = data.get("routing")
+    routing = load_optional_toml(nl_routing_path(project)).get("routing")
     if not isinstance(routing, dict):
         return RoutingConfig()
     tasks_raw = routing.get("tasks")
@@ -290,17 +260,7 @@ def load_nl_routing_config(project: Project) -> RoutingConfig:
 
 def save_nl_routing_config(project: Project, config: RoutingConfig) -> None:
     """Atomic write of the NL-derived routing config."""
-    project.state_dir.mkdir(parents=True, exist_ok=True)
-    path = nl_routing_path(project)
-    text = _render_toml(config)
-    fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(text)
-        os.replace(tmp_name, path)
-    except Exception:
-        Path(tmp_name).unlink(missing_ok=True)
-        raise
+    atomic_write_text(nl_routing_path(project), _render_toml(config))
 
 
 def entries_to_routing_config(entries: list[_NLEntry]) -> RoutingConfig:
@@ -327,13 +287,8 @@ def _render_toml(config: RoutingConfig) -> str:
         "# to regenerate. Manual overrides go in routing.toml (via `veles route set`)\n"
         "# and always take precedence over this file.\n\n"
     )
-    if not config.tasks:
-        return header + "[routing.tasks]\n"
-    lines = [header.rstrip() + "\n", "[routing.tasks]"]
-    for name in sorted(config.tasks):
-        spec = config.tasks[name].replace("\\", "\\\\").replace('"', '\\"')
-        lines.append(f'{name} = "{spec}"')
-    return "\n".join(lines) + "\n"
+    tasks = {name: config.tasks[name] for name in sorted(config.tasks)}
+    return header + dump_toml({"routing": {"tasks": tasks}})
 
 
 # ---- state file ----

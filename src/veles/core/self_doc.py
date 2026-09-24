@@ -17,6 +17,7 @@ from typing import Any
 
 from veles.core.memory.eligibility import eligible_sql
 from veles.core.project import Project
+from veles.core.timeutil import utc_iso
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,7 +161,7 @@ def _name_desc_bullet(pair: tuple[str, str | None]) -> str:
 
 def render_self_doc(report: SelfDocReport) -> str:
     """Render a `SelfDocReport` to markdown. Starts with `# Self-Documentation`."""
-    now = _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = utc_iso()
     lines: list[str] = [
         "# Self-Documentation",
         "",

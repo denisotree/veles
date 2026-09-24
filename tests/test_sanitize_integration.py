@@ -94,16 +94,9 @@ def test_write_file_outside_project_sanitizes_path(monkeypatch, tmp_path: Path) 
 
     fake_home = tmp_path / "home"
     fake_home.mkdir()
-    monkeypatch.setattr(
-        "veles.core.path_guard.Path.home",
-        classmethod(lambda cls: fake_home),
-    )
+    monkeypatch.setenv("VELES_USER_HOME", str(fake_home))
     monkeypatch.setattr(
         "veles.core.sanitize.builtin.Path.home",
-        classmethod(lambda cls: fake_home),
-    )
-    monkeypatch.setattr(
-        "veles.core.sanitize.loader.Path.home",
         classmethod(lambda cls: fake_home),
     )
     sanitize_loader.clear_cache()
@@ -128,16 +121,9 @@ def test_write_file_outside_project_sanitizes_path(monkeypatch, tmp_path: Path) 
 def test_sandbox_violation_message_strips_abs_path(monkeypatch, tmp_path: Path) -> None:
     fake_home = tmp_path / "home"
     fake_home.mkdir()
-    monkeypatch.setattr(
-        "veles.core.path_guard.Path.home",
-        classmethod(lambda cls: fake_home),
-    )
+    monkeypatch.setenv("VELES_USER_HOME", str(fake_home))
     monkeypatch.setattr(
         "veles.core.sanitize.builtin.Path.home",
-        classmethod(lambda cls: fake_home),
-    )
-    monkeypatch.setattr(
-        "veles.core.sanitize.loader.Path.home",
         classmethod(lambda cls: fake_home),
     )
     sanitize_loader.clear_cache()
@@ -175,10 +161,6 @@ def test_daemon_health_endpoint_redacts_project_root(monkeypatch, tmp_path: Path
     fake_home.mkdir()
     monkeypatch.setattr(
         "veles.core.sanitize.builtin.Path.home",
-        classmethod(lambda cls: fake_home),
-    )
-    monkeypatch.setattr(
-        "veles.core.sanitize.loader.Path.home",
         classmethod(lambda cls: fake_home),
     )
     sanitize_loader.clear_cache()

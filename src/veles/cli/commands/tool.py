@@ -168,16 +168,13 @@ def _cmd_approve(args: argparse.Namespace, project: Project) -> int:
         print(f"\n===== {f} =====")
         print(f.read_text())
         print("=" * (len(str(f)) + 12))
-        if not getattr(args, "yes", False):
-            try:
-                resp = (
-                    input(f"Approve '{f.name}' to execute its code at load? [y/N] ").strip().lower()
-                )
-            except EOFError:
-                resp = ""
-            if resp not in {"y", "yes"}:
-                print(f"skipped {f.name}")
-                continue
+        from veles.cli import _confirm
+
+        if not getattr(args, "yes", False) and not _confirm(
+            f"Approve '{f.name}' to execute its code at load? [y/N]"
+        ):
+            print(f"skipped {f.name}")
+            continue
         sha = approve(f)
         print(f"approved {f.name} ({sha[:12]}…)")
     return 0
@@ -320,15 +317,13 @@ def _cmd_promote(args: argparse.Namespace, project: Project) -> int:
         )
         return 1
 
-    if not args.yes:
-        prompt = f"Move {src} → {dst} (tool '{name}' becomes user-global)? [y/N] "
-        try:
-            response = input(prompt).strip().lower()
-        except EOFError:
-            response = ""
-        if response not in {"y", "yes"}:
-            print("aborted.")
-            return 0
+    from veles.cli import _confirm
+
+    if not args.yes and not _confirm(
+        f"Move {src} → {dst} (tool '{name}' becomes user-global)? [y/N]"
+    ):
+        print("aborted.")
+        return 0
 
     shutil.move(str(src), str(dst))
     # M199: promote is a human action on an already-reviewed tool — carry the

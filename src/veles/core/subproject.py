@@ -35,11 +35,10 @@ are M41b.
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from veles.core.io_utils import atomic_write_text
 from veles.core.project import (
     Project,
     ProjectAlreadyExists,
@@ -170,15 +169,7 @@ def init_subproject(
 
 
 def _atomic_write(project: Project, subs: list[Subproject]) -> None:
-    project.state_dir.mkdir(parents=True, exist_ok=True)
-    target = subprojects_path(project)
     body = {"subprojects": [asdict(s) for s in subs]}
-    text = json.dumps(body, indent=2, ensure_ascii=False) + "\n"
-    fd, tmp_name = tempfile.mkstemp(prefix=target.name + ".", suffix=".tmp", dir=target.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(text)
-        os.replace(tmp_name, target)
-    except Exception:
-        Path(tmp_name).unlink(missing_ok=True)
-        raise
+    atomic_write_text(
+        subprojects_path(project), json.dumps(body, indent=2, ensure_ascii=False) + "\n"
+    )

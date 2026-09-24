@@ -19,6 +19,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from veles.core.io_utils import atomic_write_text
 from veles.core.user_paths import user_home
 
 _REGISTRY_FILENAME = "daemons.json"
@@ -81,12 +82,8 @@ class DaemonRegistry:
         return cls(entries=entries)
 
     def save(self) -> None:
-        path = registry_path()
-        path.parent.mkdir(parents=True, exist_ok=True)
         payload = {"daemons": {slug: asdict(entry) for slug, entry in self.entries.items()}}
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        os.replace(tmp, path)
+        atomic_write_text(registry_path(), json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
     def list(self) -> list[DaemonEntry]:
         return [self.entries[s] for s in sorted(self.entries.keys())]

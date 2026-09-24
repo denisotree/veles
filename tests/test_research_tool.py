@@ -130,7 +130,7 @@ def test_research_kind_handler_drives_the_kernel(tmp_path: Path, monkeypatch) ->
     import veles.daemon.background_ops as bg
 
     monkeypatch.setattr(
-        bg, "_scoped_factory_for", lambda args, project, store, toolset: _factory(seen)
+        bg, "_scoped_factory_for", lambda args, project, store, toolset, **_: _factory(seen)
     )
 
     import argparse

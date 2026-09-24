@@ -106,6 +106,11 @@ _COMMON_FLAGS = [
     ["--max-tokens-total", "5"],
     ["--max-iterations", "7"],
     ["--project-root", "/tmp/p"],
+    ["--no-agents-md"],
+    ["--no-index"],
+    ["--no-compress"],
+    ["--compressor-model", "cheap/model"],
+    ["--compress-threshold-tokens", "9"],
 ]
 
 
@@ -136,6 +141,15 @@ def test_provider_explicit_marker_tracks_actual_use() -> None:
 
 def test_common_flag_survives_nested_subparser() -> None:
     assert _build_parser().parse_args(["--verbose", "job", "tick"]).verbose is True
+
+
+def test_model_and_provider_before_daemon_start_survive() -> None:
+    args = _build_parser().parse_args(
+        ["--model", "m/x", "--provider", "anthropic", "daemon", "start"]
+    )
+    assert args.model == "m/x"
+    assert args.provider == "anthropic"
+    assert args._provider_explicit is True
 
 
 def test_run_defaults_unchanged_without_flags() -> None:

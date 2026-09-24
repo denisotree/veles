@@ -27,9 +27,9 @@ import asyncio
 import logging
 import sqlite3
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from veles.core.memory import InsightHit, SessionStore, TurnHit
@@ -240,6 +240,48 @@ def local_connection(project: Project) -> Iterator[sqlite3.Connection]:
         store.close()
 
 
+def record_use_or_catalogue(
+    what: str,
+    *,
+    record: Callable[[sqlite3.Connection], int],
+    catalogue: Callable[[sqlite3.Connection], object],
+) -> None:
+    """Append one telemetry row (a tool or skill use) to the active project's memory.db.
+
+    `record` returns how many rows it wrote — 0 when the subject has no
+    catalogue row yet, which is the slow path taken once per tool/skill: then
+    `catalogue` creates the row and the use is recorded again. The retry also
+    covers a lost `UNIQUE(name)` race between two cataloguing threads, whose use
+    would otherwise be dropped. Best-effort throughout: telemetry must never
+    break the call it describes, and some contexts have no project at all."""
+    from veles.core.context import current_project
+
+    try:
+        project = current_project()
+        if project is None:
+            return
+        with local_connection(project) as conn:
+            if record(conn) == 0:
+                with suppress(Exception):  # losing the race is fine
+                    catalogue(conn)
+                record(conn)
+    except Exception:  # pragma: no cover - telemetry is never load-bearing
+        logger.debug("telemetry write failed for %s", what, exc_info=True)
+
+
+@contextmanager
+def transaction(conn: sqlite3.Connection) -> Iterator[None]:
+    """One write transaction on an autocommit connection (what `local_connection`
+    yields): every statement in the body commits together or not at all."""
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        yield
+    except BaseException:
+        conn.rollback()
+        raise
+    conn.commit()
+
+
 def open_store(project: Project) -> MemoryStore:
     """Open the memory store for `project` — the single place a backend is
     chosen.
@@ -289,4 +331,6 @@ __all__ = [
     "SqliteStore",
     "local_connection",
     "open_store",
+    "record_use_or_catalogue",
+    "transaction",
 ]

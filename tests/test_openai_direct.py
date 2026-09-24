@@ -7,7 +7,8 @@ from typing import Any
 
 import pytest
 
-from veles.adapters.openai_direct import OpenAIProvider, _to_openai_message
+from veles.adapters.openai_direct import OpenAIProvider
+from veles.core.openai_wire import to_openai_message as _to_openai_message
 from veles.core.provider import Message, ToolCall
 
 # ---------- mock OpenAI client ----------

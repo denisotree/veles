@@ -15,10 +15,7 @@ trail). Both refuse on collision at the destination.
 
 from __future__ import annotations
 
-import os
-import re
 import shutil
-import subprocess
 from pathlib import Path
 
 from veles.core.project import Project
@@ -30,7 +27,7 @@ from veles.core.skills import (
     render_frontmatter,
     user_skills_dir,
 )
-from veles.core.slug import normalize_slug as _normalize_slug
+from veles.core.source_install import derive_name, install_tree
 
 
 class SkillInstallError(RuntimeError):
@@ -41,20 +38,8 @@ class SkillNotFoundError(RuntimeError):
     pass
 
 
-_GIT_URL_RE = re.compile(r"^(git@|git://|ssh://|https?://)")
-_GIT_TIMEOUT_SEC = 300
-
-
-def _is_git_url(source: str) -> bool:
-    return bool(_GIT_URL_RE.match(source)) or source.endswith(".git")
-
-
-def _derive_name(source: str) -> str:
-    if _is_git_url(source):
-        last = source.rstrip("/").split("/")[-1]
-        last = last.removesuffix(".git")
-        return _normalize_slug(last) or "installed-skill"
-    return Path(source).resolve().name
+def derive_skill_name(source: str) -> str:
+    return derive_name(source, fallback="installed-skill")
 
 
 def install_skill_from_source(
@@ -71,23 +56,10 @@ def install_skill_from_source(
     Raises SkillInstallError on any failure; cleans up the partially-installed
     target directory.
     """
-    target_dir = _scope_dir(project, scope)
-    name = name_override or _derive_name(source)
-    target = target_dir / name
-    if target.exists() and any(target.iterdir()):
-        raise SkillInstallError(
-            f"target directory {target} already exists and is non-empty; "
-            "remove the existing skill first"
-        )
-    target.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        if _is_git_url(source):
-            _git_clone(source, target)
-        else:
-            src_path = Path(source).resolve()
-            if not src_path.is_dir():
-                raise SkillInstallError(f"source {source!r} is neither a git URL nor a directory")
-            shutil.copytree(src_path, target, symlinks=False)
+    name = name_override or derive_skill_name(source)
+    target = _scope_dir(project, scope) / name
+
+    def validate() -> Skill:
         if not (target / _SKILL_FILENAME).is_file():
             raise SkillInstallError(f"installed source has no {_SKILL_FILENAME} at {target}")
         match = next(
@@ -100,28 +72,8 @@ def install_skill_from_source(
                 f"check SKILL.md frontmatter (name='{name}', description required)"
             )
         return match
-    except Exception:
-        shutil.rmtree(target, ignore_errors=True)
-        raise
 
-
-def _git_clone(url: str, target: Path) -> None:
-    if shutil.which("git") is None:
-        raise SkillInstallError("git executable not found in PATH")
-    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
-    try:
-        subprocess.run(
-            ["git", "clone", "--depth", "1", url, str(target)],
-            check=True,
-            capture_output=True,
-            timeout=_GIT_TIMEOUT_SEC,
-            env=env,
-        )
-    except subprocess.CalledProcessError as exc:
-        msg = exc.stderr.decode("utf-8", "replace").strip() if exc.stderr else "(no stderr)"
-        raise SkillInstallError(f"git clone failed: {msg}") from exc
-    except subprocess.TimeoutExpired as exc:
-        raise SkillInstallError(f"git clone timed out after {_GIT_TIMEOUT_SEC}s") from exc
+    return install_tree(source, target, validate=validate, error=SkillInstallError)
 
 
 def remove_skill(name: str, *, project: Project, scope: str = "project") -> None:

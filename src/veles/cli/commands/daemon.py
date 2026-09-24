@@ -60,7 +60,6 @@ from veles.cli.commands.daemon_lifecycle import (  # noqa: F401 (re-export)
     _instance_log_slug,
     _mark_session_running,
     _mark_session_stopped,
-    _process_alive,
     _register_in_registry,
     _resolve_instance_paths,
     _restart_named_session,
@@ -76,6 +75,7 @@ from veles.cli.commands.daemon_tokens import (  # noqa: F401 (re-export)
     _cmd_daemon_token_remove,
     _initialise_token_store,
 )
+from veles.core.defaults import DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT
 from veles.core.user_paths import user_home as _user_home_dir  # noqa: F401 (legacy alias)
 
 # M153 re-exports — canonical home is `veles.daemon.agent_factory`.
@@ -96,9 +96,8 @@ from veles.daemon.agent_factory import (  # noqa: F401 (re-export)
 # call sites + plugin imports working.
 from veles.daemon.auth import TokenStore, _default_tokens_path  # noqa: F401 (re-export)
 from veles.daemon.logging import setup_daemon_logging as _setup_daemon_logging  # noqa: F401
-from veles.daemon.paths import (  # noqa: F401 (re-export)
-    daemon_log_path,
-)
+from veles.daemon.paths import daemon_log_path, read_pid
+from veles.daemon.registry import is_alive
 
 
 def cmd_daemon(args: argparse.Namespace) -> int:
@@ -250,7 +249,9 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     token_store = _initialise_token_store()
 
     store = SessionStore(project.memory_db_path)
-    worker_agent_factory = _make_worker_agent_factory(args, project=project, store=store)
+    worker_agent_factory = _make_worker_agent_factory(
+        args, project=project, store=store, daemon_session=name
+    )
     # M126: build state first (with a placeholder) so the agent factory
     # closure can capture it for per-session override lookup. Replace
     # the factory immediately after.
@@ -342,9 +343,6 @@ def _run_app_logged(app, *, host, port) -> None:
             "daemon crashed in run_app (host=%s port=%s)", host, port
         )
         raise
-
-
-_DEFAULT_PORT = 8765
 
 
 def _resolve_daemon_bind(args: argparse.Namespace, project, name: str | None) -> None:
@@ -445,7 +443,7 @@ def _port_is_free(host: str, port: int) -> bool:
     return True
 
 
-def _find_free_port(host: str, *, start: int = _DEFAULT_PORT, tries: int = 100) -> int:
+def _find_free_port(host: str, *, start: int = DEFAULT_DAEMON_PORT, tries: int = 100) -> int:
     """First bindable port in [start, start+tries) — the M209 multi-project
     default. Racy by nature (another process can grab the port between probe
     and bind), which is fine: the detach health-probe reports a lost race
@@ -481,11 +479,11 @@ def _maybe_run_start_wizard(args: argparse.Namespace, project, *, session: str |
     if any(isinstance(v, dict) for v in channels.values()):
         return  # a channel is already configured for this daemon
 
-    host = str(getattr(args, "host", None) or "127.0.0.1")
+    host = str(getattr(args, "host", None) or DEFAULT_DAEMON_HOST)
     try:
-        port = int(getattr(args, "port", None) or 8765)
+        port = int(getattr(args, "port", None) or DEFAULT_DAEMON_PORT)
     except (TypeError, ValueError):
-        port = 8765
+        port = DEFAULT_DAEMON_PORT
     try:
         from veles.tui.wizard.daemon_runner import run_daemon_start_wizard_tui
 
@@ -530,12 +528,11 @@ def _cmd_daemon_stop(args: argparse.Namespace) -> int:
     if not pid_path.is_file():
         print("no veles daemon pid file found.", file=sys.stderr)
         return 1
-    try:
-        pid = int(pid_path.read_text(encoding="utf-8").strip())
-    except (OSError, ValueError) as exc:
-        print(f"error: failed to read pid file {pid_path}: {exc}", file=sys.stderr)
+    pid = read_pid(pid_path)
+    if pid is None:
+        print(f"error: failed to read pid file {pid_path}", file=sys.stderr)
         return 1
-    if not _process_alive(pid):
+    if not is_alive(pid):
         print(f"daemon pid {pid} not running; removing stale pid file.", file=sys.stderr)
         pid_path.unlink(missing_ok=True)
         info_path.unlink(missing_ok=True)
@@ -557,12 +554,11 @@ def _cmd_daemon_status(args: argparse.Namespace) -> int:
     if not pid_path.is_file():
         print("not running.")
         return 1
-    try:
-        pid = int(pid_path.read_text(encoding="utf-8").strip())
-    except (OSError, ValueError):
+    pid = read_pid(pid_path)
+    if pid is None:
         print("pid file unreadable; daemon state unknown.")
         return 1
-    if not _process_alive(pid):
+    if not is_alive(pid):
         print(f"pid {pid} not alive (stale pid file at {pid_path}).")
         return 1
     info: dict[str, object] = {}
@@ -650,10 +646,9 @@ def _cmd_daemon_list(args: argparse.Namespace) -> int:
 
 
 def _cmd_daemon_restart(args: argparse.Namespace) -> int:
-    """`veles daemon <id> restart` — stop the running daemon, then start
-    a fresh one at the same host/port. Implementation: send SIGTERM via
-    `_cmd_daemon_stop_by_slug`, wait briefly, then spawn `veles daemon
-    start` in a detached subprocess so the current command can return.
+    """`veles daemon <id> restart` — stop the running daemon (SIGTERM, then
+    SIGKILL), then respawn it detached at the same host/port, logging to its
+    own log file.
 
     With `--name` it operates on this project's named session instead of
     the cross-project registry."""
@@ -661,7 +656,8 @@ def _cmd_daemon_restart(args: argparse.Namespace) -> int:
     if name:
         return _restart_named_session(args, name)
 
-    from veles.daemon.registry import DaemonRegistry, is_alive
+    from veles.daemon.registry import DaemonRegistry
+    from veles.daemon.spawn import spawn_daemon
 
     slug = _resolve_target_slug(args)
     if slug is None:
@@ -671,43 +667,17 @@ def _cmd_daemon_restart(args: argparse.Namespace) -> int:
     if entry is None:
         print(f"error: no daemon named {slug!r} in registry.", file=sys.stderr)
         return 1
-    # Stop phase.
-    if is_alive(entry.pid):
-        try:
-            os.kill(entry.pid, signal.SIGTERM)
-        except OSError as exc:
-            print(f"error: failed to signal pid {entry.pid}: {exc}", file=sys.stderr)
-            return 1
-        # Wait up to 5s for the pid to disappear.
-        for _ in range(50):
-            if not is_alive(entry.pid):
-                break
-            time.sleep(0.1)
-    # Start phase — spawn in background. We use `subprocess.Popen` with
-    # `start_new_session=True` so it survives the current shell exit.
-    import subprocess
-
-    cmd = [
-        sys.executable,
-        "-m",
-        "veles",
-        "daemon",
-        "start",
-        "--host",
-        entry.host,
-        "--port",
-        str(entry.port),
-    ]
-    try:
-        proc = subprocess.Popen(
-            cmd,
-            cwd=entry.project_path,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
-    except OSError as exc:
-        print(f"error: failed to spawn restart: {exc}", file=sys.stderr)
+    if is_alive(entry.pid) and not _graceful_stop(entry.pid, timeout=5.0):
+        print(f"error: daemon pid {entry.pid} did not stop.", file=sys.stderr)
+        return 1
+    proc = spawn_daemon(
+        project_root=entry.project_path,
+        host=entry.host,
+        port=entry.port,
+        log_path=daemon_log_path(entry.project_name),
+    )
+    if proc is None:
+        print("error: failed to respawn daemon.", file=sys.stderr)
         return 1
     print(f"restarted daemon {slug!r} (new pid {proc.pid}).")
     return 0
@@ -719,7 +689,7 @@ def _cmd_daemon_delete(args: argparse.Namespace) -> int:
     `.veles/` data — that's the user's content. Use `--yes`/`-y` to
     skip the prompt for scripted use (CI, ansible)."""
     from veles.cli import _confirm
-    from veles.daemon.registry import DaemonRegistry, is_alive
+    from veles.daemon.registry import DaemonRegistry
 
     slug = _resolve_target_slug(args)
     if slug is None:

@@ -55,6 +55,18 @@ def test_create_writes_config_and_store(tmp_path, monkeypatch):
     assert rec is not None and rec.status == "created"
 
 
+def test_project_root_flag_is_honoured_outside_the_project(tmp_path, monkeypatch):
+    project = init_project(tmp_path / "p", name="p")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    rc = cmd_daemon_session(
+        _args(daemon_session_command="create", name="api", project_root=str(project.root))
+    )
+    assert rc == 0
+    assert get_daemon_session_config(load_project_config(project), "api") is not None
+
+
 def test_create_rejects_duplicate(tmp_path, monkeypatch):
     _mk(tmp_path, monkeypatch)
     assert cmd_daemon_session(_args(daemon_session_command="create", name="api")) == 0

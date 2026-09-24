@@ -28,19 +28,18 @@ trigger.
 
 from __future__ import annotations
 
-import datetime as _dt
-import time
 from dataclasses import dataclass
 
 from veles.core.memory.artefacts import (
     PROMOTE_PROPOSAL_PREFIX,
     ProposalInfo,
     append_memory_log,
-    list_proposals,
+    fresh_proposals,
     write_proposal,
 )
 from veles.core.project import Project
 from veles.core.skills import Skill, discover_skills, user_skills_dir
+from veles.core.timeutil import utc_iso
 
 _DEFAULT_MIN_USES = 10
 _DEFAULT_MIN_SUCCESS_RATE = 0.7
@@ -107,7 +106,7 @@ def proposal_slug(skill_name: str) -> str:
 def _render_proposal(candidate: PromoteCandidate) -> tuple[str, str]:
     skill = candidate.skill
     title = f"Promote skill: {skill.name}"
-    when = _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    when = utc_iso()
     lines = [
         f"# {title}",
         "",
@@ -168,15 +167,8 @@ def recent_promote_proposals(
     Used by the system-prompt surfacing block so the agent only
     mentions promotions the user might still be interested in.
     """
-    cutoff = time.time() - max_age_days * 86_400
-    out: list[ProposalInfo] = []
-    for page in list_proposals(project):
-        if not page.slug.startswith(_PROPOSAL_SLUG_PREFIX):
-            continue
-        try:
-            mtime = page.path.stat().st_mtime
-        except OSError:
-            continue
-        if mtime >= cutoff:
-            out.append(page)
-    return out
+    return [
+        page
+        for page in fresh_proposals(project, max_age_days=max_age_days)
+        if page.slug.startswith(_PROPOSAL_SLUG_PREFIX)
+    ]

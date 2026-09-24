@@ -38,7 +38,6 @@ follow-up human/agent review owns the merge decisions.
 
 from __future__ import annotations
 
-import datetime as _dt
 import logging
 import time
 from contextlib import contextmanager
@@ -51,7 +50,9 @@ from veles.core.file_lock import file_lock
 from veles.core.memory import hide_insight
 from veles.core.memory.artefacts import append_memory_log, write_proposal
 from veles.core.memory.eligibility import eligible_sql
+from veles.core.memory.store import local_connection, transaction
 from veles.core.slug import now_timestamp_slug
+from veles.core.timeutil import utc_iso
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -455,53 +456,49 @@ def _step_insight_dedup(project: Project, result: DreamResult, *, dry_run: bool)
 
     from veles.core.text_cluster import cluster_texts
 
-    conn = sqlite3.connect(str(project.memory_db_path))
-    conn.row_factory = sqlite3.Row
     try:
-        rows = conn.execute(
-            "SELECT id, title, body, support_count,"
-            " COALESCE(last_referenced_at, created_at) AS ts"
-            " FROM insights"
-            f" WHERE {eligible_sql()}"
-            " ORDER BY created_at DESC LIMIT ?",
-            (_INSIGHT_DEDUP_LIMIT,),
-        ).fetchall()
-        if len(rows) < 2:
-            return
-        texts = [f"{r['title']} {r['body']}" for r in rows]
-        clusters = cluster_texts(texts, threshold=_INSIGHT_DEDUP_THRESHOLD)
-        result.insight_dedup_clusters = len(clusters)
-        if not clusters or dry_run:
-            return
-        for indices, _score in clusters:
-            canonical = max(indices, key=lambda i: rows[i]["ts"])
-            canonical_id = int(rows[canonical]["id"])
-            merged_support = 0
-            for i in indices:
-                if i == canonical:
-                    continue
-                if hide_insight(
-                    conn,
-                    int(rows[i]["id"]),
-                    reason="merged-duplicate",
-                    superseded_by=canonical_id,
-                ):
-                    merged_support += int(rows[i]["support_count"] or 1)
-            if merged_support:
-                # M261: the survivor inherits the evidence, not just the slot.
-                # Observing the same thing five times is a stronger fact than
-                # observing it once, and collapsing the copies used to throw
-                # that number away.
-                conn.execute(
-                    "UPDATE insights SET support_count = support_count + ? WHERE id = ?",
-                    (merged_support, canonical_id),
-                )
-        conn.commit()
+        with local_connection(project) as conn:
+            rows = conn.execute(
+                "SELECT id, title, body, support_count,"
+                " COALESCE(last_referenced_at, created_at) AS ts"
+                " FROM insights"
+                f" WHERE {eligible_sql()}"
+                " ORDER BY created_at DESC LIMIT ?",
+                (_INSIGHT_DEDUP_LIMIT,),
+            ).fetchall()
+            if len(rows) < 2:
+                return
+            texts = [f"{r['title']} {r['body']}" for r in rows]
+            clusters = cluster_texts(texts, threshold=_INSIGHT_DEDUP_THRESHOLD)
+            result.insight_dedup_clusters = len(clusters)
+            if not clusters or dry_run:
+                return
+            with transaction(conn):
+                for indices, _score in clusters:
+                    canonical = max(indices, key=lambda i: rows[i]["ts"])
+                    canonical_id = int(rows[canonical]["id"])
+                    merged_support = 0
+                    for i in indices:
+                        if i == canonical:
+                            continue
+                        if hide_insight(
+                            conn,
+                            int(rows[i]["id"]),
+                            reason="merged-duplicate",
+                            superseded_by=canonical_id,
+                        ):
+                            merged_support += int(rows[i]["support_count"] or 1)
+                    if merged_support:
+                        # The survivor inherits the evidence, not just the slot:
+                        # observing the same thing five times is a stronger fact
+                        # than observing it once.
+                        conn.execute(
+                            "UPDATE insights SET support_count = support_count + ? WHERE id = ?",
+                            (merged_support, canonical_id),
+                        )
         result.notes.append(f"insight-dedup: {len(clusters)} cluster(s) collapsed")
     except sqlite3.Error as exc:
         result.notes.append(f"insight-dedup failed: {exc}")
-    finally:
-        conn.close()
 
 
 def _step_runtime_sessions(
@@ -529,19 +526,16 @@ def _step_runtime_sessions(
     if dry_run:
         result.notes.append("runtime-sessions: fleet snapshot (dry-run, not written)")
         return
-    conn = sqlite3.connect(str(project.memory_db_path))
     try:
-        conn.execute("DELETE FROM insights WHERE category = 'daemon-fleet'")
-        conn.execute(
-            "INSERT INTO insights(title, body, category, created_at) VALUES (?, ?, ?, ?)",
-            ("daemon fleet snapshot", digest, "daemon-fleet", at),
-        )
-        conn.commit()
+        with local_connection(project) as conn, transaction(conn):
+            conn.execute("DELETE FROM insights WHERE category = 'daemon-fleet'")
+            conn.execute(
+                "INSERT INTO insights(title, body, category, created_at) VALUES (?, ?, ?, ?)",
+                ("daemon fleet snapshot", digest, "daemon-fleet", at),
+            )
     except sqlite3.Error as exc:
         result.notes.append(f"runtime-sessions write failed: {exc}")
         return
-    finally:
-        conn.close()
     result.notes.append("runtime-sessions: fleet snapshot recorded")
 
 
@@ -563,7 +557,7 @@ def _step_dedup(project: Project, result: DreamResult, *, dry_run: bool) -> None
     body_lines = [
         "# Dream: duplicate-skill clusters",
         "",
-        f"_Generated: {_now_iso()}_",
+        f"_Generated: {utc_iso()}_",
         f"_Mode: {mode}_",
         "",
     ]
@@ -630,17 +624,13 @@ def _collect_insight_snippets(project: Project, *, limit: int) -> list[str]:
     if not project.memory_db_path.is_file():
         return []
     try:
-        conn = sqlite3.connect(str(project.memory_db_path))
-        conn.row_factory = sqlite3.Row
-        try:
+        with local_connection(project) as conn:
             rows = conn.execute(
                 "SELECT title, body FROM insights"
                 f" WHERE {eligible_sql()}"
                 " ORDER BY created_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()
-        finally:
-            conn.close()
     except sqlite3.Error:
         return []
     return [f"## {r['title']}\n{r['body']}" for r in rows]
@@ -654,24 +644,17 @@ def _step_consolidate(
     *,
     dry_run: bool,
 ) -> None:
-    from veles.core.agent import Agent
-    from veles.core.tools.registry import Registry
+    from veles.core.agent import run_oneshot
 
     snippets = _collect_insight_snippets(project, limit=_CONSOLIDATION_INSIGHTS_LIMIT)
     if not snippets:
         result.notes.append("consolidation skipped: no insights to consolidate")
         return
 
-    sub = Agent(
-        provider=provider,
-        registry=Registry(),
-        model=model,
-        max_iterations=1,
-        system_prompt=_CONSOLIDATE_PROMPT,
-        max_tokens=2048,
-    )
     try:
-        run_result = sub.run("\n\n".join(snippets))
+        run_result = run_oneshot(
+            provider, model, _CONSOLIDATE_PROMPT, "\n\n".join(snippets), max_tokens=2048
+        )
     except Exception as exc:
         result.notes.append(f"consolidation sub-agent failed: {exc}")
         return
@@ -690,7 +673,7 @@ def _step_consolidate(
         project,
         slug=slug,
         title="Dream: consolidation proposals",
-        content=f"# Dream: consolidation proposals\n\n_Generated: {_now_iso()}_\n\n{text}\n",
+        content=f"# Dream: consolidation proposals\n\n_Generated: {utc_iso()}_\n\n{text}\n",
     )
     result.consolidated = True
     result.consolidation_path = str(page_path)
@@ -788,10 +771,6 @@ def _step_proactive_events(
     finally:
         store.close()
     append_memory_log(project, op="dream_proactive", summary=f"{len(events)} event(s) materialised")
-
-
-def _now_iso() -> str:
-    return _dt.datetime.now(tz=_dt.UTC).isoformat()
 
 
 __all__ = [

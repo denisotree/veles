@@ -6,7 +6,7 @@ import argparse
 import os
 import sys
 
-from veles.core.agent import Agent
+from veles.cli._agent_builder import make_worker_factory
 from veles.core.memory import SessionStore
 from veles.core.project import Project
 from veles.core.provider import ProviderError
@@ -183,26 +183,9 @@ def _maybe_run_via_manager(args: argparse.Namespace, project: Project) -> bool:
     base_system = _build_run_system_prompt(args, project)
     compressor = _build_compressor(args, project, provider)
     registry = _load_skills(project, _RUN_TOOLS, provider=provider, model=args.model)
-
-    def factory(**kwargs):
-        # `kwargs.get('system_prompt')` carries the role-specific
-        # prompt from `spawn()`. We concatenate it with the base
-        # system prompt so workers still see project context.
-        worker_system = kwargs.get("system_prompt") or ""
-        full_system = (
-            f"{base_system}\n\n---\n\n{worker_system}"
-            if base_system and worker_system
-            else (worker_system or base_system)
-        )
-        return Agent(
-            provider=provider,
-            registry=registry,
-            model=args.model,
-            max_iterations=args.max_iterations,
-            system_prompt=full_system,
-            verbose=args.verbose,
-            compressor=compressor,
-        )
+    factory = make_worker_factory(
+        args, provider=provider, registry=registry, base_system=base_system, compressor=compressor
+    )
 
     result = decompose_and_run(args.prompt, agent_factory=factory)
     if result.error or not result.final_text:

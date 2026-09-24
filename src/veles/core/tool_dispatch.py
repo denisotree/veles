@@ -32,8 +32,8 @@ from veles.core.log_util import truncate_for_log
 from veles.core.modules import VetoResult, fire_hook
 from veles.core.permission import evaluate as evaluate_permission
 from veles.core.provider import Message, ToolCall
+from veles.core.timeutil import utc_iso
 from veles.core.tools.registry import Registry, ToolEntry
-from veles.core.trace import now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ def _emit_tool_refusal(
     _emit(
         event_writer,
         ToolResultEvent(
-            ts=now_iso(),
+            ts=utc_iso(),
             session_id=session_id,
             tool_call_id=call.id,
             name=call.name,
@@ -107,7 +107,7 @@ def _run_approval_prompt(
     _emit(
         event_writer,
         ApprovalRequest(
-            ts=now_iso(),
+            ts=utc_iso(),
             session_id=session_id,
             action=f"dispatch {call.name}",
             target=call.name,
@@ -123,7 +123,7 @@ def _run_approval_prompt(
     _emit(
         event_writer,
         ApprovalResult(
-            ts=now_iso(),
+            ts=utc_iso(),
             session_id=session_id,
             action=f"dispatch {call.name}",
             status="approved" if answer.approved else "denied",
@@ -167,56 +167,33 @@ def _record_tool_use_in_db(
     error_kind: str | None,
     session_id: str | None,
 ) -> None:
-    """Append one `tool_uses` row for `entry` in the active project's memory.db.
-
-    M252: `record_use` had **no production caller at all** — only tests, one of
-    which ("e2e") called it by hand and passed, which is why nobody noticed.
-    `tool_uses` was therefore always empty, and everything reading it was dead:
-    `veles tool list`'s uses/ok% columns, `skill_pattern_detector` (M121b, the
-    "propose a skill after 3 repetitions" loop) and `skill_suggester` all query a
-    table nothing ever wrote to. VISION §5.4 promises a tool registry *with
-    telemetry*; only half of it existed.
-
-    Mirrors `core/skills.py::_record_skill_use_in_db`, which fixed the identical
-    gap for skills in M244 — including the ordering that makes it work:
-    `record_use` is a silent no-op when the tool has no catalogue row, so the
-    upsert is the slow path taken once per tool rather than on every call, and it
-    is retried after a lost `UNIQUE(name)` race so the loser's use is not
-    dropped.
+    """Append one `tool_uses` row for `entry` — what `veles tool list` and the
+    skill pattern detector read.
 
     Resolves the project through `current_project()` rather than taking the
     Agent's store, because `_dispatch` is also reached from the MCP server path,
-    where there is no Agent. Best-effort throughout: telemetry must never break a
-    tool call.
+    where there is no Agent.
 
-    **Known cost**: one SQLite open/commit/close per tool call — measured at
-    1.5 ms, which is ~98% of a no-op dispatch but noise beside the multi-second
-    model call that asked for it (20 calls a turn ≈ 30 ms). If that ever stops
-    being true, the Agent already holds `self._store` and could pass it down;
-    the MCP path would still need this fallback.
+    **Known cost**: one SQLite open/close per tool call — measured at 1.5 ms,
+    noise beside the multi-second model call that asked for it. If that ever
+    stops being true, the Agent already holds `self._store` and could pass it
+    down; the MCP path would still need this fallback.
     """
-    try:
-        project = current_project()
-        if project is None:
-            return
-        from veles.core.memory.store import local_connection
-        from veles.core.tools.persistence import record_use, upsert_tool
+    from veles.core.memory.store import record_use_or_catalogue
+    from veles.core.tools.persistence import record_use, upsert_tool
 
-        with local_connection(project) as conn:
-            kwargs = {
-                "tool_name": entry.name,
-                "ok": ok,
-                "latency_ms": latency_ms,
-                "error_kind": error_kind,
-                "session_id": session_id,
-            }
-            if record_use(conn, **kwargs) == 0:
-                with contextlib.suppress(Exception):
-                    upsert_tool(conn, entry)
-                record_use(conn, **kwargs)
-            conn.commit()
-    except Exception:  # pragma: no cover - telemetry is never load-bearing
-        logger.debug("tool telemetry write failed for %s", entry.name, exc_info=True)
+    record_use_or_catalogue(
+        f"tool {entry.name}",
+        record=lambda conn: record_use(
+            conn,
+            tool_name=entry.name,
+            ok=ok,
+            latency_ms=latency_ms,
+            error_kind=error_kind,
+            session_id=session_id,
+        ),
+        catalogue=lambda conn: upsert_tool(conn, entry),
+    )
 
 
 def _persist_approval_if_grant(
@@ -298,7 +275,7 @@ def _dispatch(
     _emit(
         event_writer,
         ToolCallEvent(
-            ts=now_iso(),
+            ts=utc_iso(),
             session_id=session_id,
             tool_call_id=call.id,
             name=call.name,
@@ -313,7 +290,7 @@ def _dispatch(
         _emit(
             event_writer,
             PermissionDecision(
-                ts=now_iso(),
+                ts=utc_iso(),
                 session_id=session_id,
                 tool_name=call.name,
                 decision="deny",
@@ -349,7 +326,7 @@ def _dispatch(
         _emit(
             event_writer,
             PermissionDecision(
-                ts=now_iso(),
+                ts=utc_iso(),
                 session_id=session_id,
                 tool_name=call.name,
                 decision="deny",
@@ -384,7 +361,7 @@ def _dispatch(
         _emit(
             event_writer,
             PermissionDecision(
-                ts=now_iso(),
+                ts=utc_iso(),
                 session_id=session_id,
                 tool_name=call.name,
                 decision=decision.kind,
@@ -445,7 +422,7 @@ def _dispatch(
     _emit(
         event_writer,
         ToolResultEvent(
-            ts=now_iso(),
+            ts=utc_iso(),
             session_id=session_id,
             tool_call_id=call.id,
             name=call.name,

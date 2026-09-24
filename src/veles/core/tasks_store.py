@@ -34,6 +34,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from veles.core.io_utils import open_sqlite
+
 _TASKS_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS tasks (
     id           TEXT PRIMARY KEY,
@@ -106,21 +108,11 @@ class TasksStore:
     """CRUD + due-reminder query over the `tasks` table."""
 
     def __init__(self, db_path: Path | str) -> None:
-        self._path: Path | str = ":memory:" if db_path == ":memory:" else Path(db_path)
-        if isinstance(self._path, Path):
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            target = str(self._path)
-        else:
-            target = self._path
-        self._conn = sqlite3.connect(target, check_same_thread=False, isolation_level=None)
-        self._conn.row_factory = sqlite3.Row
+        self._conn = open_sqlite(db_path)
         self._init_schema()
 
     def _init_schema(self) -> None:
         c = self._conn
-        if self._path != ":memory:":
-            c.execute("PRAGMA journal_mode = WAL")
-            c.execute("PRAGMA synchronous = NORMAL")
         # Bring an older table up to schema BEFORE the CREATE/INDEX script, so
         # the partial unique index on `dedup_key` can be built on a table that
         # already has the column.

@@ -36,6 +36,8 @@ from __future__ import annotations
 import enum
 import os
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from typing import Any
@@ -50,6 +52,23 @@ from veles.core.permission.prompt import current_prompter as _unified_prompter
 from veles.core.trust_store import TrustStore, user_trust_path
 
 _AUTO_ALLOW_ENV = "VELES_TRUST_AUTO_ALLOW"
+_auto_allow: ContextVar[bool] = ContextVar("veles_trust_auto_allow", default=False)
+
+
+@contextmanager
+def trust_auto_allow() -> Iterator[None]:
+    """Pre-authorise trust for this context only.
+
+    Unlike the `VELES_TRUST_AUTO_ALLOW` env var (a process-wide switch for CI
+    and MCP children), this reaches only the current context and the worker
+    threads that copy it — a daemon research job must not auto-allow a chat
+    turn running next to it.
+    """
+    token = _auto_allow.set(True)
+    try:
+        yield
+    finally:
+        _auto_allow.reset(token)
 
 
 class TrustChoice(enum.Enum):
@@ -96,7 +115,7 @@ def evaluate_trust(
     show what the agent actually wants to do; the unified prompter
     receives a `PromptRequest` with the args dict populated.
     """
-    if os.environ.get(_AUTO_ALLOW_ENV) == "1":
+    if _auto_allow.get() or os.environ.get(_AUTO_ALLOW_ENV) == "1":
         return TrustDecision(allowed=True, reason="auto-allow")
 
     user_store = TrustStore.load(user_trust_path())

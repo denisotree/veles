@@ -26,24 +26,24 @@ from __future__ import annotations
 
 import logging
 import threading
-import tomllib
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from veles.core.io_utils import load_optional_toml
 from veles.core.project import Project
 from veles.core.sanitize.builtin import builtin_rules
 from veles.core.sanitize.rule import LiteralRule, RegexRule, Rule, RuleSet
+from veles.core.user_paths import user_home
 
 logger = logging.getLogger(__name__)
 
-_GLOBAL_CONFIG_REL = Path(".veles") / "sanitize.toml"
 _PROJECT_CONFIG_REL = Path(".veles") / "sanitize.toml"
 _lock = threading.Lock()
 
 
 def _global_config_path() -> Path:
-    return Path.home() / _GLOBAL_CONFIG_REL
+    return user_home() / "sanitize.toml"
 
 
 def _project_config_path(project_root: Path) -> Path:
@@ -51,15 +51,7 @@ def _project_config_path(project_root: Path) -> Path:
 
 
 def _parse_toml_rules(path: Path) -> list[Rule]:
-    if not path.is_file():
-        return []
-    try:
-        with path.open("rb") as fh:
-            data = tomllib.load(fh)
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        logger.warning("sanitize: cannot read %s: %s", path, exc)
-        return []
-    raw_rules = data.get("rule") or []
+    raw_rules = load_optional_toml(path).get("rule") or []
     if not isinstance(raw_rules, list):
         logger.warning("sanitize: %s — `rule` must be an array of tables", path)
         return []

@@ -50,14 +50,20 @@ _RESUME_SEED = (
 )
 
 
-def _scoped_factory_for(args: argparse.Namespace, project, store, toolset: str):
+def _scoped_factory_for(
+    args: argparse.Namespace, project, store, toolset: str, *, daemon_session: str | None
+):
     """Seam for tests: build the toolset-capped sub-agent factory."""
     from veles.daemon.agent_factory import _make_scoped_subagent_factory
 
-    return _make_scoped_subagent_factory(args, project=project, store=store, toolset=toolset)
+    return _make_scoped_subagent_factory(
+        args, project=project, store=store, toolset=toolset, daemon_session=daemon_session
+    )
 
 
-def make_ingest_kind_handler(args: argparse.Namespace, *, project, store):
+def make_ingest_kind_handler(
+    args: argparse.Namespace, *, project, store, daemon_session: str | None = None
+):
     """Build the `kind="ingest"` handler for `JobRunner(kind_handlers=…)`.
 
     Runs inside a `to_thread` worker: resolves the file list, then drives the
@@ -65,7 +71,7 @@ def make_ingest_kind_handler(args: argparse.Namespace, *, project, store):
     factory (`[ingest]` toolset — no `run_shell`/`fetch_url`, B1). Returns the
     summary text used for the job output file and the notify/resume path.
     """
-    factory = _scoped_factory_for(args, project, store, "ingest")
+    factory = _scoped_factory_for(args, project, store, "ingest", daemon_session=daemon_session)
 
     def handler(job) -> str:
         from veles.modules.wiki.ingest import (
@@ -103,7 +109,9 @@ def make_ingest_kind_handler(args: argparse.Namespace, *, project, store):
     return handler
 
 
-def make_research_kind_handler(args: argparse.Namespace, *, project, store):
+def make_research_kind_handler(
+    args: argparse.Namespace, *, project, store, daemon_session: str | None = None
+):
     """Build the `kind="research"` handler (M204 Phase 4).
 
     Drives `run_deep_research` (plan → parallel explore → synthesize) with
@@ -111,11 +119,11 @@ def make_research_kind_handler(args: argparse.Namespace, *, project, store):
     read + network + wiki-read only — explorers never mutate state). The
     background context has no interactive user for trust prompts, so the run
     pre-authorises trust the same way `veles research` does (the user opted
-    into web research by asking for it).
+    into web research by asking for it) — scoped to this job's context only.
     """
-    import os
+    from veles.core.trust import trust_auto_allow
 
-    factory = _scoped_factory_for(args, project, store, "research")
+    factory = _scoped_factory_for(args, project, store, "research", daemon_session=daemon_session)
 
     def handler(job) -> str:
         from veles.core.orchestration.research import (
@@ -129,9 +137,7 @@ def make_research_kind_handler(args: argparse.Namespace, *, project, store):
         if not question:
             raise ValueError("research job has no question")
         cap = int(params.get("max_subquestions") or 4)
-        prev = os.environ.get("VELES_TRUST_AUTO_ALLOW")
-        os.environ["VELES_TRUST_AUTO_ALLOW"] = "1"
-        try:
+        with trust_auto_allow():
             result = run_deep_research(
                 question,
                 agent_factory=factory,
@@ -139,11 +145,6 @@ def make_research_kind_handler(args: argparse.Namespace, *, project, store):
                 max_subquestions=cap,
                 factory_kwargs={"tools": list(RESEARCH_EXPLORER_TOOLS)},
             )
-        finally:
-            if prev is None:
-                os.environ.pop("VELES_TRUST_AUTO_ALLOW", None)
-            else:
-                os.environ["VELES_TRUST_AUTO_ALLOW"] = prev
         if result.error:
             raise RuntimeError(f"research failed: {result.error}")
         return result.final_text or "(research produced no report)"

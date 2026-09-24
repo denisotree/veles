@@ -88,11 +88,11 @@ def test_list_goals_empty(tmp_path: Path) -> None:
 def test_list_goals_sorted_by_updated_at_desc(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # `_now_iso` has 1s granularity — freeze it instead of sleeping >1s.
+    # `utc_iso` has 1s granularity — freeze it instead of sleeping >1s.
     import veles.core.goal as goal_mod
 
     stamps = iter(["2026-01-01T00:00:00Z", "2026-01-01T00:00:01Z"])
-    monkeypatch.setattr(goal_mod, "_now_iso", lambda: next(stamps))
+    monkeypatch.setattr(goal_mod, "utc_iso", lambda: next(stamps))
     create_goal(tmp_path, objective="first")
     create_goal(tmp_path, objective="second")
     goals = list_goals(tmp_path)
@@ -227,23 +227,24 @@ def test_budget_not_exhausted_at_zero() -> None:
 
 
 def test_seconds_since_iso_treats_input_as_utc(monkeypatch) -> None:
-    """`_now_iso` writes UTC; `_seconds_since_iso` must interpret its
+    """`utc_iso` writes UTC; `_seconds_since_iso` must interpret its
     input as UTC too. Previously it used `time.mktime`, which interprets
     `struct_tm` as local time — on any non-UTC host (e.g. Europe/Moscow)
     a goal created seconds ago would appear to be hours old and trip
     the wall-time budget on the first turn.
 
-    This pins the fix: regardless of `TZ`, a goal created `_now_iso()`-
+    This pins the fix: regardless of `TZ`, a goal created `utc_iso()`-
     fresh must have an elapsed value bounded by a few seconds.
     """
     import time
 
-    from veles.core.goal import _now_iso, _seconds_since_iso
+    from veles.core.goal import _seconds_since_iso
+    from veles.core.timeutil import utc_iso
 
     monkeypatch.setenv("TZ", "Europe/Moscow")
     time.tzset()  # apply the env var change to time-conversion calls
     try:
-        elapsed = _seconds_since_iso(_now_iso())
+        elapsed = _seconds_since_iso(utc_iso())
         assert elapsed < 5, f"elapsed={elapsed}s for a just-created goal"
     finally:
         # Restore default TZ so subsequent tests aren't affected.

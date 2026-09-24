@@ -25,14 +25,11 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import os
-import tempfile
-import tomllib
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from veles.core.project_config import _emit_toml
+from veles.core.io_utils import atomic_write_text, dump_toml, load_optional_toml
 
 logger = logging.getLogger(__name__)
 
@@ -66,17 +63,7 @@ def load_user_config(path: Path | None = None) -> UserConfig | None:
     """Return the saved config, or None if the file is missing / corrupt /
     malformed. Permissive: any failure falls back to None so the wizard
     can re-run on next launch instead of crashing the CLI."""
-    p = path or user_config_path()
-    if not p.is_file():
-        return None
-    try:
-        with p.open("rb") as fh:
-            data = tomllib.load(fh)
-    except (OSError, tomllib.TOMLDecodeError):
-        return None
-    if not isinstance(data, dict):
-        return None
-    user_section = data.get("user")
+    user_section = load_optional_toml(path or user_config_path()).get("user")
     if not isinstance(user_section, dict):
         return None
     lang = user_section.get("language")
@@ -102,17 +89,7 @@ def load_user_config(path: Path | None = None) -> UserConfig | None:
 
 def save_user_config(cfg: UserConfig, path: Path | None = None) -> None:
     """Atomically write `cfg` to `~/.veles/config.toml`."""
-    target = path or user_config_path()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    text = _render_toml(cfg)
-    fd, tmp_name = tempfile.mkstemp(prefix=target.name + ".", suffix=".tmp", dir=target.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(text)
-        os.replace(tmp_name, target)
-    except Exception:
-        Path(tmp_name).unlink(missing_ok=True)
-        raise
+    atomic_write_text(path or user_config_path(), _render_toml(cfg))
 
 
 def persist_tui_theme(theme_name: str, path: Path | None = None) -> None:
@@ -140,34 +117,14 @@ def persist_tui_theme(theme_name: str, path: Path | None = None) -> None:
     user_section.setdefault("default_provider", "openrouter")
     user_section["tui_theme"] = theme_name
 
-    text = _emit_toml(data)
     with contextlib.suppress(OSError):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp_name = tempfile.mkstemp(prefix=target.name + ".", suffix=".tmp", dir=target.parent)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                fh.write(text)
-            os.replace(tmp_name, target)
-        except Exception:
-            Path(tmp_name).unlink(missing_ok=True)
-            raise
+        atomic_write_text(target, dump_toml(data))
 
 
 def _render_toml(cfg: UserConfig) -> str:
-    body = ["[user]"]
-    fields = asdict(cfg)
-    body.append(f'language = "{_escape(fields["language"])}"')
-    body.append(f'default_provider = "{_escape(fields["default_provider"])}"')
-    if fields["first_project_name"]:
-        body.append(f'first_project_name = "{_escape(fields["first_project_name"])}"')
-    body.append(f'tui_theme = "{_escape(fields["tui_theme"])}"')
-    if fields.get("default_model"):
-        body.append(f'default_model = "{_escape(fields["default_model"])}"')
-    return "\n".join(body) + "\n"
-
-
-def _escape(s: str) -> str:
-    return s.replace("\\", "\\\\").replace('"', '\\"')
+    # The optional fields are left out when unset rather than written empty.
+    user = {k: v for k, v in asdict(cfg).items() if v is not None and v != ""}
+    return dump_toml({"user": user})
 
 
 # ---- raw dict access (M124-perm-unify) ----
@@ -185,17 +142,7 @@ def read_user_config_raw(path: Path | None = None) -> dict[str, Any]:
     Malformed files log at WARNING level so a typo doesn't silently
     disable a user's `[permissions]` overrides, but the caller still
     falls back to builtin defaults rather than refuse to run."""
-
-    p = path or user_config_path()
-    if not p.is_file():
-        return {}
-    try:
-        with p.open("rb") as fh:
-            data = tomllib.load(fh)
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        logger.warning("user config %s ignored: %s", p, exc)
-        return {}
-    return data if isinstance(data, dict) else {}
+    return load_optional_toml(path or user_config_path())
 
 
 def get_user_section(*path: str) -> dict[str, Any]:

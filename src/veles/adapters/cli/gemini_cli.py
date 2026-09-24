@@ -16,29 +16,18 @@ until upstream gemini supports headless MCP (Veles M17 territory).
 
 from __future__ import annotations
 
-import shutil
-import subprocess
-import sys
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from veles.adapters.cli._common import format_messages_as_prompt
-from veles.adapters.cli._streaming import popen_jsonl
-from veles.core.provider import (
-    Message,
-    ProviderResponse,
-    StreamEnd,
-    StreamEvent,
-    TextDelta,
-    TokenUsage,
-)
+from veles.adapters.cli._common import CLIProvider, format_messages_as_prompt
+from veles.core.provider import Message, ProviderResponse, TokenUsage
 
 
-class GeminiCLIProvider:
+class GeminiCLIProvider(CLIProvider):
     name: str = "gemini-cli"
-    supports_streaming: bool = True
+    INSTALL_HINT = "Gemini CLI"
 
     def __init__(
         self,
@@ -48,29 +37,13 @@ class GeminiCLIProvider:
         extra_args: Iterable[str] = (),
         mcp_settings_dir: Path | None = None,
     ) -> None:
-        self._binary = binary
-        self._timeout = timeout
-        self._extra_args = tuple(extra_args)
+        super().__init__(
+            binary=binary, timeout=timeout, extra_args=extra_args, tools_config=mcp_settings_dir
+        )
         self._mcp_settings_dir = mcp_settings_dir
 
-    @property
-    def supports_tools(self) -> bool:
-        return self._mcp_settings_dir is not None
-
-    def _ensure_binary(self) -> None:
-        if shutil.which(self._binary) is None:
-            raise RuntimeError(
-                f"{self._binary!r} CLI not found in PATH; install Gemini CLI"
-                " or pass --provider openrouter"
-            )
-
-    def _maybe_warn_about_tools(self, tools: list[dict] | None) -> None:
-        if tools and self._mcp_settings_dir is None:
-            print(
-                f"warning: {self.name} does not support custom tools; "
-                f"ignoring {len(tools)} tool schema(s)",
-                file=sys.stderr,
-            )
+    def _new_state(self) -> _GeminiStreamState:
+        return _GeminiStreamState()
 
     def _build_cmd(self, messages: list[Message], model: str, *, stream: bool) -> list[str]:
         prompt = format_messages_as_prompt(messages)
@@ -98,50 +71,15 @@ class GeminiCLIProvider:
         max_tokens: int = 4096,
     ) -> ProviderResponse:
         del max_tokens  # gemini CLI does not expose a max_tokens knob
-        self._ensure_binary()
-        self._maybe_warn_about_tools(tools)
-        cmd = self._build_cmd(messages, model, stream=False)
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=self._timeout,
-            check=False,
-            cwd=self._cwd(),
-        )
-        if proc.returncode != 0:
-            stderr = proc.stderr.strip() or "<no stderr>"
-            raise RuntimeError(f"{self._binary} exited {proc.returncode}: {stderr}")
-        text = proc.stdout.strip()
+        self._prepare(tools)
+        stdout = self._run(self._build_cmd(messages, model, stream=False))
         return ProviderResponse(
-            text=text or None,
+            text=stdout.strip() or None,
             tool_calls=[],
             usage=TokenUsage(),
             finish_reason="stop",
-            raw=proc.stdout,
+            raw=stdout,
         )
-
-    def stream_message(
-        self,
-        messages: list[Message],
-        tools: list[dict] | None = None,
-        *,
-        model: str,
-        max_tokens: int = 4096,
-    ) -> Iterator[StreamEvent]:
-        del max_tokens
-        self._ensure_binary()
-        self._maybe_warn_about_tools(tools)
-        cmd = self._build_cmd(messages, model, stream=True)
-        state = _GeminiStreamState()
-        try:
-            for event in popen_jsonl(cmd, timeout=self._timeout, cwd=self._cwd()):
-                chunk = state.absorb(event)
-                if chunk:
-                    yield TextDelta(text=chunk)
-        except RuntimeError as exc:
-            state.error = str(exc)
-        yield StreamEnd(response=state.to_response())
 
 
 @dataclass(slots=True)
@@ -161,7 +99,7 @@ class _GeminiStreamState:
         self.accumulated += content
         return content
 
-    def to_response(self) -> ProviderResponse:
+    def to_response(self, *, raw: Any = None) -> ProviderResponse:
         text = self.accumulated
         if self.error and not text:
             text = f"<gemini-cli error: {self.error}>"

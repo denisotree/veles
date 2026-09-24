@@ -31,6 +31,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from veles.core.text import strip_code_fence
 from veles.core.tools.builtin.advisor import call_advisor
 
 # Verifier: (prompt, answer) -> (verdict, concerns). Concerns are only
@@ -103,14 +104,7 @@ def _parse_judge(raw: str) -> tuple[VerifyVerdict, list[str]]:
     escalate on the judge's own malfunction. `ok=true` → PASS, `ok=false`
     → FAIL with concerns.
     """
-    text = raw.strip()
-    if text.startswith("```"):
-        nl = text.find("\n")
-        if nl != -1:
-            text = text[nl + 1 :]
-        if text.rstrip().endswith("```"):
-            text = text.rstrip()[: -len("```")]
-        text = text.strip()
+    text = strip_code_fence(raw)
     if not text:
         return VerifyVerdict.UNKNOWN, []
     try:

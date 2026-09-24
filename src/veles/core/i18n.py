@@ -24,9 +24,10 @@ calls render against that locale.
 from __future__ import annotations
 
 import os
-import tomllib
 from collections.abc import Mapping
 from pathlib import Path
+
+from veles.core.io_utils import load_optional_toml
 
 _DEFAULT_LOCALE = "en"
 _MISSING_MARKER = "<missing: {key}>"
@@ -119,15 +120,7 @@ def _load(name: str) -> dict[str, str]:
         return cached
     merged: dict[str, str] = {}
     for root in _locale_dirs():
-        path = root / f"{name}.toml"
-        if not path.is_file():
-            continue
-        try:
-            with open(path, "rb") as fh:
-                data = tomllib.load(fh)
-        except (OSError, tomllib.TOMLDecodeError):
-            continue
-        _flatten_into(merged, data)
+        _flatten_into(merged, load_optional_toml(root / f"{name}.toml"))
     _cache[name] = merged
     return merged
 

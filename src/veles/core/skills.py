@@ -20,8 +20,6 @@ M6 can swap to pyyaml if real YAML is required.
 
 from __future__ import annotations
 
-import contextlib
-import datetime as _dt
 import json
 import logging
 import threading
@@ -30,6 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from veles.core.timeutil import utc_iso
 from veles.core.tools.registry import Registry, ToolEntry
 
 logger = logging.getLogger(__name__)
@@ -346,9 +345,7 @@ def _apply_db_telemetry(project: Project, skills: list[Skill]) -> None:
                 skill.success_count = t.success_count
                 skill.error_count = t.error_count
                 if t.last_used_at:
-                    skill.last_used = _dt.datetime.fromtimestamp(
-                        float(t.last_used_at), tz=_dt.UTC
-                    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    skill.last_used = utc_iso(float(t.last_used_at))
     except Exception:  # pragma: no cover - never block skill discovery
         logger.debug("skill telemetry overlay failed", exc_info=True)
 
@@ -464,41 +461,15 @@ def _load_skill(skill_path: Path, *, scope: str = "project") -> Skill | None:
 
 
 def _record_skill_use_in_db(skill: Skill, *, success: bool) -> None:
-    """Append one `skill_uses` row for `skill` in the active project's memory.db.
+    """Append one `skill_uses` row for `skill` in the active project's memory.db."""
+    from veles.core.memory.store import record_use_or_catalogue
+    from veles.core.skills_persistence import record_skill_use, upsert_skill
 
-    Best-effort by design: telemetry must never break a skill invocation, and
-    there is no project at all in some contexts (a bare sub-agent, a unit test).
-    `upsert_skill` runs first because `record_skill_use` is a silent no-op when
-    the skill has no catalogue row — which is every skill today, since nothing
-    ever populated the `skills` table.
-    """
-    try:
-        from veles.core.context import current_project
-
-        project = current_project()
-        if project is None:
-            return
-        from veles.core.memory.store import local_connection
-        from veles.core.skills_persistence import record_skill_use, upsert_skill
-
-        with local_connection(project) as conn:
-            # `record_skill_use` is a no-op (returns 0) when the skill has no
-            # catalogue row, so cataloguing is the slow path taken once per
-            # skill rather than on every invocation.
-            #
-            # The retry matters under concurrency: `upsert_skill` does
-            # SELECT-then-INSERT, so two threads can both miss and race, and the
-            # loser hits the UNIQUE(name) constraint. Without a second attempt
-            # its use would be silently dropped — measured as 39 of 40 recorded
-            # in the concurrency test.
-            if record_skill_use(conn, skill_name=skill.name, ok=success) == 0:
-                # Losing the race is fine — the winner's row is what we need.
-                with contextlib.suppress(Exception):
-                    upsert_skill(conn, skill)
-                record_skill_use(conn, skill_name=skill.name, ok=success)
-            conn.commit()
-    except Exception:  # pragma: no cover - telemetry is never load-bearing
-        logger.debug("skill telemetry write failed for %s", skill.name, exc_info=True)
+    record_use_or_catalogue(
+        f"skill {skill.name}",
+        record=lambda conn: record_skill_use(conn, skill_name=skill.name, ok=success),
+        catalogue=lambda conn: upsert_skill(conn, skill),
+    )
 
 
 def bump_telemetry(skill: Skill, *, success: bool) -> None:
@@ -532,7 +503,7 @@ def bump_telemetry(skill: Skill, *, success: bool) -> None:
     # In-memory counters stay correct for the caller that just invoked the
     # skill, without touching the file. `discover_skills` refreshes them from
     # the database on the next load.
-    now_iso = _dt.datetime.now(tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now_iso = utc_iso()
     skill.use_count += 1
     skill.last_used = now_iso
     if success:

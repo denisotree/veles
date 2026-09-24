@@ -26,7 +26,6 @@ System-level config (defaults shared across projects) lives separately at
 
 from __future__ import annotations
 
-import datetime as _dt
 import os
 import re
 import sys
@@ -35,7 +34,9 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+from veles.core.io_utils import atomic_write_text, dump_toml
 from veles.core.safety import scan_for_injection
+from veles.core.timeutil import utc_iso
 
 _STATE_DIR = ".veles"
 _PROJECT_TOML = "project.toml"
@@ -309,20 +310,14 @@ def _write_project_toml(
     schema_version: int = _SCHEMA_VERSION,
     layout_name: str = "llm-wiki",
 ) -> None:
-    iso = _dt.datetime.fromtimestamp(created_at, tz=_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    body = (
-        f"[project]\n"
-        f'name = "{_toml_escape(name)}"\n'
-        f'created_at = "{iso}"\n'
-        f"created_at_epoch = {created_at}\n"
-        f"schema_version = {schema_version}\n"
-        f'layout = "{_toml_escape(layout_name)}"\n'
-    )
-    path.write_text(body, encoding="utf-8")
-
-
-def _toml_escape(s: str) -> str:
-    return s.replace("\\", "\\\\").replace('"', '\\"')
+    project = {
+        "name": name,
+        "created_at": utc_iso(created_at),
+        "created_at_epoch": created_at,
+        "schema_version": schema_version,
+        "layout": layout_name,
+    }
+    atomic_write_text(path, dump_toml({"project": project}))
 
 
 def _import_existing_context_files(root: Path) -> None:

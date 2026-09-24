@@ -23,16 +23,15 @@ Schema (the wizard writes it, the daemon and TUI read it):
     chat_id   = "..."   # legacy stdin-fallback only
 
 Unknown keys are preserved on round-trip so future fields don't get
-trampled. The emitter still only understands the shape the wizard
-produces (string/bool/int/list-of-scalars, one level of nesting).
+trampled. Writes go through `io_utils.dump_toml`.
 """
 
 from __future__ import annotations
 
-import tomllib
 from pathlib import Path
 from typing import Any
 
+from veles.core.io_utils import atomic_write_text, dump_toml, load_optional_toml
 from veles.core.project import Project
 
 _CONFIG_FILENAME = "config.toml"
@@ -54,14 +53,7 @@ def _load_config_from_path(path: Path) -> dict[str, Any]:
     callers prefer `load_project_config(project)`. Exposed so the
     daemon picker (which has a `project_path` string, not a `Project`)
     can read `[engine] model` without paying to construct a Project."""
-    if not path.is_file():
-        return {}
-    try:
-        with path.open("rb") as fh:
-            data = tomllib.load(fh)
-    except (OSError, tomllib.TOMLDecodeError):
-        return {}
-    return data if isinstance(data, dict) else {}
+    return load_optional_toml(path)
 
 
 def read_provider_model_at(project_root: Path) -> str | None:
@@ -80,14 +72,13 @@ def read_provider_model_at(project_root: Path) -> str | None:
 
 
 def save_project_config(project: Project, data: dict[str, Any]) -> None:
-    """Write `data` back to disk through the minimal emitter. The state
-    directory is created if missing; the existing file is replaced.
+    """Write `data` back to disk (atomically; the state directory is created
+    if missing).
 
     Caller owns the diff: read → mutate → save. There's no merge step
     here on purpose — the wizard always reads first, the daemon never
-    writes back, so we don't need read-modify-write atomicity yet."""
-    project.state_dir.mkdir(parents=True, exist_ok=True)
-    project_config_path(project).write_text(_emit_toml(data), encoding="utf-8")
+    writes back, so we don't need read-modify-write locking yet."""
+    atomic_write_text(project_config_path(project), dump_toml(data))
 
 
 def get_section(cfg: dict[str, Any], *path: str) -> dict[str, Any]:
@@ -152,68 +143,6 @@ def list_channel_configs(
             out.append((platform, pcfg))
     out.sort(key=lambda pair: pair[0])
     return out
-
-
-# ---- minimal TOML emitter (was cli/project_wizard.py::_save_project_toml) ----
-
-
-def _emit_toml(data: dict[str, Any]) -> str:
-    """Emit nested tables to TOML at arbitrary depth; string / bool / int /
-    list-of-scalars values.
-
-    Scalar keys are emitted *before* sub-table headers (TOML requires a
-    table's own keys to precede its `[parent.child]` headers, else they'd
-    bind to the wrong table). A parent header is skipped when it carries only
-    sub-tables and no scalars — so `{routing: {tasks: {…}}}` emits a clean
-    `[routing.tasks]` without a stray empty `[routing]`, and
-    `{daemon: {api: {channels: {telegram: {…}}}}}` emits a clean
-    `[daemon.api.channels.telegram]` (M136 per-session channels)."""
-    lines: list[str] = []
-    _emit_table(data, (), lines)
-    return "\n".join(lines).strip() + "\n"
-
-
-def _emit_table(table: dict[str, Any], prefix: tuple[str, ...], lines: list[str]) -> None:
-    scalars = {k: v for k, v in table.items() if not isinstance(v, dict)}
-    subtables = {k: v for k, v in table.items() if isinstance(v, dict)}
-    if prefix:
-        # Emit this table's header when it has scalar keys, or when it has no
-        # sub-tables at all (preserve a genuinely empty `[section]`).
-        if scalars or not subtables:
-            lines.append(f"[{'.'.join(prefix)}]")
-            for k, v in scalars.items():
-                lines.append(_emit_kv(k, v))
-            lines.append("")
-    else:
-        # Root-level scalars (rare) are emitted bare, before any section.
-        for k, v in scalars.items():
-            lines.append(_emit_kv(k, v))
-    for sub_key, sub_val in subtables.items():
-        _emit_table(sub_val, (*prefix, sub_key), lines)
-
-
-def _emit_kv(k: str, v: Any) -> str:
-    if isinstance(v, bool):
-        return f"{k} = {'true' if v else 'false'}"
-    if isinstance(v, str):
-        return f"{k} = {_emit_string(v)}"
-    if isinstance(v, list):
-        items = ", ".join(_emit_scalar(item) for item in v)
-        return f"{k} = [{items}]"
-    return f"{k} = {v}"
-
-
-def _emit_string(v: str) -> str:
-    escaped = v.replace("\\", "\\\\").replace('"', '\\"')
-    return f'"{escaped}"'
-
-
-def _emit_scalar(v: Any) -> str:
-    if isinstance(v, bool):
-        return "true" if v else "false"
-    if isinstance(v, str):
-        return _emit_string(v)
-    return str(v)
 
 
 __all__ = [

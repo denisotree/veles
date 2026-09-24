@@ -24,8 +24,13 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+from veles.core.io_utils import open_sqlite
 from veles.core.job_schedule import Schedule, initial_next_run, parse_schedule
+
+if TYPE_CHECKING:
+    from veles.core.project import Project
 
 _JOBS_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -99,6 +104,31 @@ class JobRecord:
     kind: str = "prompt"
     params: dict | None = None
 
+    def to_dict(self) -> dict[str, object]:
+        """The JSON shape `veles job list --json` and `GET /v1/jobs` both return."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "prompt": self.prompt,
+            "schedule": {
+                "kind": self.schedule.kind,
+                "expr": self.schedule.expr,
+                "display": self.schedule.display(),
+            },
+            "repeat_times": self.repeat_times,
+            "repeat_completed": self.repeat_completed,
+            "context_from": self.context_from,
+            "deliver_to": self.deliver_to,
+            "enabled": self.enabled,
+            "state": self.state,
+            "created_at": self.created_at,
+            "next_run_at": self.next_run_at,
+            "last_run_at": self.last_run_at,
+            "last_status": self.last_status,
+            "last_error": self.last_error,
+            "last_output_path": self.last_output_path,
+        }
+
 
 @dataclass(slots=True, frozen=True)
 class JobRunRecord:
@@ -149,26 +179,11 @@ class JobsStore:
     """CRUD + lifecycle ops over the jobs / job_runs tables."""
 
     def __init__(self, db_path: Path | str) -> None:
-        self._path: Path | str = ":memory:" if db_path == ":memory:" else Path(db_path)
-        if isinstance(self._path, Path):
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            target = str(self._path)
-        else:
-            target = self._path
-        self._conn = sqlite3.connect(
-            target,
-            check_same_thread=False,
-            isolation_level=None,
-        )
-        self._conn.row_factory = sqlite3.Row
+        self._conn = open_sqlite(db_path)
         self._init_schema()
 
     def _init_schema(self) -> None:
         c = self._conn
-        c.execute("PRAGMA foreign_keys = ON")
-        if self._path != ":memory:":
-            c.execute("PRAGMA journal_mode = WAL")
-            c.execute("PRAGMA synchronous = NORMAL")
         c.executescript(_JOBS_SCHEMA_SQL)
         # v3 → v4 (M204): CREATE TABLE IF NOT EXISTS doesn't touch an existing
         # v3 table, so add the structured-kind columns in place.
@@ -424,4 +439,27 @@ def _row_to_job(row: sqlite3.Row) -> JobRecord:
     )
 
 
-__all__ = ["JobRecord", "JobRunRecord", "JobsStore"]
+def submit_oneshot_job(
+    project: Project, *, kind: str, name: str, params: dict, deliver_to: str
+) -> JobRecord:
+    """Queue a structured job (`kind` handled by a JobRunner kind handler) to run
+    once, now. `deliver_to` is the concrete origin the result goes back to — it
+    doubles as the chat-session key the resume path uses — and the current
+    auto-resume depth rides along in `params` as the loop guard."""
+    from veles.core.context import current_resume_depth
+
+    store = JobsStore(project.memory_db_path)
+    try:
+        return store.add_job(
+            name=name,
+            prompt="",
+            schedule_expr="once:+0s",
+            kind=kind,
+            params={**params, "resume_depth": current_resume_depth()},
+            deliver_to=deliver_to,
+        )
+    finally:
+        store.close()
+
+
+__all__ = ["JobRecord", "JobRunRecord", "JobsStore", "submit_oneshot_job"]

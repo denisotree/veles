@@ -87,16 +87,14 @@ def _stamp_synced(project: Project, ids: list[int]) -> None:
 
     if not ids:
         return
+    from veles.core.memory.store import local_connection, transaction
+
     try:
-        conn = sqlite3.connect(str(project.memory_db_path))
-        try:
-            with conn:
-                conn.executemany(
-                    "UPDATE insights SET synced_at = ? WHERE id = ?",
-                    [(time.time(), i) for i in ids],
-                )
-        finally:
-            conn.close()
+        with local_connection(project) as conn, transaction(conn):
+            conn.executemany(
+                "UPDATE insights SET synced_at = ? WHERE id = ?",
+                [(time.time(), i) for i in ids],
+            )
     except sqlite3.Error as exc:
         # The fact is stored and the engine has it; only the bookkeeping
         # failed, so the worst case is offering the same row again later.
@@ -115,18 +113,16 @@ def resync_pending(project: Project, *, limit: int = _RESYNC_BATCH) -> int:
     providers = _ingesting_providers()
     if not providers:
         return 0
+    from veles.core.memory.store import local_connection
+
     try:
-        conn = sqlite3.connect(str(project.memory_db_path))
-        conn.row_factory = sqlite3.Row
-        try:
+        with local_connection(project) as conn:
             rows = conn.execute(
                 "SELECT id, title, body FROM insights"
                 " WHERE synced_at IS NULL AND hidden_at IS NULL"
                 " ORDER BY id LIMIT ?",
                 (limit,),
             ).fetchall()
-        finally:
-            conn.close()
     except sqlite3.Error:
         return 0
 

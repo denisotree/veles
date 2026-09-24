@@ -75,6 +75,50 @@ def add_project_root_flag(p: argparse.ArgumentParser, *, defaults: bool = False)
     )
 
 
+def add_prompt_flags(p: argparse.ArgumentParser, *, defaults: bool = False) -> None:
+    """Attach the system-prompt / compression flags shared by the root parser and `run`.
+
+    Same two-level rule as `add_common_run_flags`: only the root passes
+    `defaults=True`, so `veles --no-compress run "x"` keeps the root value.
+    """
+    p.add_argument(
+        "--no-agents-md",
+        action="store_true",
+        default=_default(False, defaults=defaults),
+        help="Skip auto-injection of AGENTS.md into the system prompt.",
+    )
+    p.add_argument(
+        "--no-index",
+        action="store_true",
+        default=_default(False, defaults=defaults),
+        help="Skip auto-injection of the wiki INDEX.md.",
+    )
+    p.add_argument(
+        "--no-compress",
+        action="store_true",
+        default=_default(False, defaults=defaults),
+        help="Disable sliding-window context compression for this run.",
+    )
+    p.add_argument(
+        "--compressor-model",
+        default=_default(None, defaults=defaults),
+        help=(
+            "Override the routed compressor model (default: routed via "
+            f"`veles route show`, fallback {DEFAULT_COMPRESSOR_MODEL})."
+        ),
+    )
+    p.add_argument(
+        "--compress-threshold-tokens",
+        type=int,
+        default=_default(DEFAULT_COMPRESS_THRESHOLD_TOKENS, defaults=defaults),
+        metavar="N",
+        help=(
+            f"Estimated history token count that triggers compression "
+            f"(default: {DEFAULT_COMPRESS_THRESHOLD_TOKENS})."
+        ),
+    )
+
+
 def add_common_run_flags(p: argparse.ArgumentParser, *, defaults: bool = False) -> None:
     """Attach the shared agent-loop flags to `p`.
 

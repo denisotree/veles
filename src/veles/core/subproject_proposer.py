@@ -39,9 +39,7 @@ not via wiki FTS recall.
 
 from __future__ import annotations
 
-import datetime as _dt
 import re
-import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -49,10 +47,12 @@ from veles.core.memory.artefacts import (
     PROMOTE_PROPOSAL_PREFIX,
     ProposalInfo,
     append_memory_log,
-    list_proposals,
+    fresh_proposals,
     write_proposal,
 )
 from veles.core.project import Project
+from veles.core.text_cluster import cluster_indices
+from veles.core.timeutil import utc_iso
 
 if TYPE_CHECKING:
     from veles.modules.wiki.wiki import WikiPageInfo
@@ -135,43 +135,13 @@ def detect_clusters(
     if len(pages) < min_pages:
         return []
 
-    tokens_by_index: dict[int, set[str]] = {}
-    for i, p in enumerate(pages):
-        tokens_by_index[i] = _tokens(p.title)
-
-    parent = list(range(len(pages)))
-
-    def find(x: int) -> int:
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]
-            x = parent[x]
-        return x
-
-    def union(a: int, b: int) -> None:
-        ra, rb = find(a), find(b)
-        if ra != rb:
-            parent[ra] = rb
-
-    edges: list[tuple[int, int, float]] = []
-    for i in range(len(pages)):
-        for j in range(i + 1, len(pages)):
-            sim = _jaccard(tokens_by_index[i], tokens_by_index[j])
-            if sim >= min_similarity:
-                union(i, j)
-                edges.append((i, j, sim))
-
-    components: dict[int, list[int]] = {}
-    for i in range(len(pages)):
-        components.setdefault(find(i), []).append(i)
-
+    tokens = [_tokens(p.title) for p in pages]
     clusters: list[Cluster] = []
-    for indices in components.values():
+    for indices, score in cluster_indices(
+        len(pages), lambda i, j: _jaccard(tokens[i], tokens[j]), min_similarity
+    ):
         if len(indices) < min_pages:
             continue
-        sims = [sim for i, j, sim in edges if i in indices and j in indices]
-        if not sims:
-            continue
-        score = sum(sims) / len(sims)
         cluster_pages = sorted(pages[idx].rel_path for idx in indices)
         slug, rationale = _build_cluster_summary([pages[idx] for idx in indices])
         clusters.append(Cluster(slug=slug, pages=cluster_pages, score=score, rationale=rationale))
@@ -211,7 +181,7 @@ def _render_proposal(cluster: Cluster) -> tuple[str, str]:
     lines = [
         f"# {title}",
         "",
-        f"**Generated:** {_dt.datetime.now(tz=_dt.UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}",
+        f"**Generated:** {utc_iso()}",
         f"**Cohesion score:** {cluster.score:.2f}",
         "",
         cluster.rationale,
@@ -265,15 +235,8 @@ def recent_proposals(project: Project, *, max_age_days: int = 7) -> list[Proposa
     their own reader (`skill_promotion.recent_promote_proposals`) and their own
     accept command. Before M275 they were returned here too and rendered to the
     agent as subproject candidates."""
-    cutoff = time.time() - max_age_days * 86_400
-    out: list[ProposalInfo] = []
-    for page in list_proposals(project):
-        if page.slug.startswith(PROMOTE_PROPOSAL_PREFIX):
-            continue
-        try:
-            mtime = page.path.stat().st_mtime
-        except OSError:
-            continue
-        if mtime >= cutoff:
-            out.append(page)
-    return out
+    return [
+        page
+        for page in fresh_proposals(project, max_age_days=max_age_days)
+        if not page.slug.startswith(PROMOTE_PROPOSAL_PREFIX)
+    ]

@@ -7,21 +7,18 @@ explicitly opted into web research by running this command, trust is
 pre-authorised for the run (parallel explorers would otherwise interleave
 trust-ladder prompts, and a non-TTY run would refuse the network tools
 outright). The restricted registry means only the network class is ever
-auto-allowed — no write/exec capability reaches the workers.
-
-The `VELES_TRUST_AUTO_ALLOW` flip is process-global, so this command is
-CLI-one-shot only — not safe to call concurrently (e.g. from the daemon)
-without scoping the override differently.
+auto-allowed — no write/exec capability reaches the workers. The override is
+a context-scoped `trust_auto_allow()`, not a process-wide env flip.
 """
 
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 
-from veles.core.agent import Agent
+from veles.cli._agent_builder import make_worker_factory
 from veles.core.project import Project
+from veles.core.trust import trust_auto_allow
 
 
 def cmd_research(args: argparse.Namespace, project: Project) -> int:
@@ -67,47 +64,29 @@ def cmd_research(args: argparse.Namespace, project: Project) -> int:
     # multi-fetch explorer can overflow the model context. Same compressor the
     # single-agent / manager run paths use.
     compressor = _build_compressor(args, project, provider)
-
-    def factory(**kwargs):
-        worker_system = kwargs.get("system_prompt") or ""
-        full_system = (
-            f"{base_system}\n\n---\n\n{worker_system}"
-            if base_system and worker_system
-            else (worker_system or base_system)
-        )
-        return Agent(
-            provider=provider,
-            registry=research_registry,
-            model=args.model,
-            max_iterations=args.max_iterations,
-            system_prompt=full_system,
-            verbose=args.verbose,
-            compressor=compressor,
-        )
+    factory = make_worker_factory(
+        args,
+        provider=provider,
+        registry=research_registry,
+        base_system=base_system,
+        compressor=compressor,
+    )
 
     planner = make_llm_planner(provider, args.model, max_subquestions=args.max_subquestions)
 
     sys.stderr.write(f"researching: {question}\n")
     # The user opted into web research; pre-authorise trust for the run so the
     # parallel explorers don't interleave prompts (or get refused in a non-TTY).
-    prev = os.environ.get("VELES_TRUST_AUTO_ALLOW")
-    os.environ["VELES_TRUST_AUTO_ALLOW"] = "1"
-    try:
-        # `--max-tokens-total` cap shared across the planner, every explorer,
-        # and the writer. `spawn_parallel` propagates this budget ContextVar
-        # into the worker threads (M148 follow-up), so the cap is cumulative.
-        with _budget_scope(args, project=project):
-            result = run_deep_research(
-                question,
-                agent_factory=factory,
-                planner=planner,
-                max_subquestions=args.max_subquestions,
-            )
-    finally:
-        if prev is None:
-            os.environ.pop("VELES_TRUST_AUTO_ALLOW", None)
-        else:
-            os.environ["VELES_TRUST_AUTO_ALLOW"] = prev
+    # `--max-tokens-total` cap shared across the planner, every explorer, and
+    # the writer. `spawn_parallel` copies the context into worker threads, so
+    # both the budget and the trust override reach every explorer.
+    with trust_auto_allow(), _budget_scope(args, project=project):
+        result = run_deep_research(
+            question,
+            agent_factory=factory,
+            planner=planner,
+            max_subquestions=args.max_subquestions,
+        )
 
     if result.error or not result.final_text:
         sys.stderr.write(f"error: research failed: {result.error or 'no output'}\n")

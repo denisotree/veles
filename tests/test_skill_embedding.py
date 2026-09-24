@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
+from veles.core.memory.vector import cosine_similarity
 from veles.core.project import Project, init_project
 from veles.core.skill_embedding import (
     _CacheEntry,
     compute_skill_vectors,
-    cosine_similarity,
     load_cache,
     save_cache,
     skill_embed_text,

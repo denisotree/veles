@@ -39,6 +39,8 @@ import sqlite3
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from veles.core.memory.vector import cosine_similarity
+
 logger = logging.getLogger(__name__)
 
 
@@ -235,7 +237,7 @@ def detect_patterns_semantic(
     for i, vec in enumerate(vecs):
         placed = False
         for cluster in clusters:
-            if _cosine_sim(vec, cluster["centroid"]) >= similarity_threshold:
+            if cosine_similarity(vec, cluster["centroid"]) >= similarity_threshold:
                 cluster["members"].append(i)
                 placed = True
                 break
@@ -270,22 +272,6 @@ def detect_patterns_semantic(
 
     patterns.sort(key=lambda p: (-p.repetitions, -(p.latest_at or 0.0)))
     return patterns
-
-
-def _cosine_sim(a: list[float], b: list[float]) -> float:
-    """Cosine similarity in [-1, 1]. Same helper shape as
-    `project_tree._cosine` — kept local to avoid a cross-module
-    import for one math function."""
-    import math
-
-    if not a or not b or len(a) != len(b):
-        return 0.0
-    dot = math.fsum(x * y for x, y in zip(a, b, strict=False))
-    na = math.sqrt(math.fsum(x * x for x in a))
-    nb = math.sqrt(math.fsum(x * x for x in b))
-    if na == 0.0 or nb == 0.0:
-        return 0.0
-    return dot / (na * nb)
 
 
 __all__ = [

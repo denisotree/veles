@@ -364,3 +364,18 @@ def test_resync_builds_the_provider_list_once(tmp_path: Path, monkeypatch) -> No
     )
     assert resync_pending(project) == 5
     assert builds == 1
+
+
+def test_local_connection_waits_for_a_writer_and_transaction_rolls_back(tmp_path: Path) -> None:
+    """Writers to memory.db go through `local_connection` (busy_timeout set) and
+    group their statements with `transaction` — all or nothing."""
+    from veles.core.memory.store import local_connection, transaction
+
+    project = init_project(tmp_path / "p", name="p")
+    _insert(project, "keep", "body")
+    with local_connection(project) as conn:
+        assert conn.execute("PRAGMA busy_timeout").fetchone()[0] >= 1000
+        with pytest.raises(RuntimeError), transaction(conn):
+            conn.execute("DELETE FROM insights")
+            raise RuntimeError("boom")
+        assert conn.execute("SELECT COUNT(*) FROM insights").fetchone()[0] == 1

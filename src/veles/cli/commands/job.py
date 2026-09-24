@@ -73,7 +73,7 @@ def _cmd_list(args: argparse.Namespace, store: JobsStore) -> int:
         print("no jobs configured.")
         return 0
     if getattr(args, "json", False):
-        print(json.dumps([_job_to_json(r) for r in records], indent=2, default=str))
+        print(json.dumps([r.to_dict() for r in records], indent=2, default=str))
         return 0
     for r in records:
         nxt = time.strftime("%Y-%m-%d %H:%M", time.localtime(r.next_run_at))
@@ -88,7 +88,7 @@ def _cmd_show(args: argparse.Namespace, store: JobsStore) -> int:
     if rec is None:
         print(f"error: no job {args.id!r}", file=sys.stderr)
         return 1
-    print(json.dumps(_job_to_json(rec), indent=2, default=str))
+    print(json.dumps(rec.to_dict(), indent=2, default=str))
     return 0
 
 
@@ -186,28 +186,3 @@ def _cmd_tick(args: argparse.Namespace, store: JobsStore, project) -> int:
     for s in summaries:
         print(f"  {s.job_id}  {s.status}  {s.output_path or s.error or ''}")
     return 0
-
-
-def _job_to_json(rec) -> dict[str, object]:
-    return {
-        "id": rec.id,
-        "name": rec.name,
-        "prompt": rec.prompt,
-        "schedule": {
-            "kind": rec.schedule.kind,
-            "expr": rec.schedule.expr,
-            "display": rec.schedule.display(),
-        },
-        "repeat_times": rec.repeat_times,
-        "repeat_completed": rec.repeat_completed,
-        "context_from": rec.context_from,
-        "deliver_to": rec.deliver_to,
-        "enabled": rec.enabled,
-        "state": rec.state,
-        "created_at": rec.created_at,
-        "next_run_at": rec.next_run_at,
-        "last_run_at": rec.last_run_at,
-        "last_status": rec.last_status,
-        "last_error": rec.last_error,
-        "last_output_path": rec.last_output_path,
-    }

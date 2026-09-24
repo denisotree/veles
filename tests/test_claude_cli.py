@@ -8,11 +8,8 @@ from dataclasses import dataclass
 
 import pytest
 
-from veles.adapters.cli.claude_cli import (
-    ClaudeCLIProvider,
-    _format_messages_as_prompt,
-    _parse_stream,
-)
+from veles.adapters.cli._common import format_messages_as_prompt as _format_messages_as_prompt
+from veles.adapters.cli.claude_cli import ClaudeCLIProvider, _parse_stream
 from veles.core.provider import Message
 
 

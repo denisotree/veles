@@ -33,11 +33,13 @@ boundary is the *reference*, not the body.
 from __future__ import annotations
 
 import re
-import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
+
+from veles.core.io_utils import atomic_write_text
+from veles.core.timeutil import utc_iso
 
 PLANS_DIRNAME = "plans"
 PLANS_ACTIVE_SUBDIR = "active"
@@ -64,10 +66,6 @@ class PlanArtifact:
     updated_at: str = ""
     completed_at: str | None = None
     evidence_ref: str | None = None
-
-
-def _now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 def plans_dir(state_dir: Path) -> Path:
@@ -113,7 +111,7 @@ def create_plan(
 ) -> PlanArtifact:
     if not objective.strip():
         raise ValueError("plan objective cannot be empty")
-    now = _now_iso()
+    now = utc_iso()
     plan = PlanArtifact(
         id=uuid.uuid4().hex[:12],
         objective=objective.strip(),
@@ -179,7 +177,7 @@ def update_status(
     if plan.status == status:
         return plan
     plan.status = status
-    plan.updated_at = _now_iso()
+    plan.updated_at = utc_iso()
     _write(state_dir, plan, completed=False)
     return plan
 
@@ -194,7 +192,7 @@ def mark_done(
     pointer to whatever proves the plan was satisfied."""
     plan = _require(state_dir, plan_id)
     plan.status = "completed"
-    plan.completed_at = _now_iso()
+    plan.completed_at = utc_iso()
     plan.updated_at = plan.completed_at
     plan.evidence_ref = evidence_ref
     # Remove from active first to avoid duplicate-id collisions on filesystem.
@@ -210,9 +208,7 @@ def mark_done(
 
 def _write(state_dir: Path, plan: PlanArtifact, *, completed: bool) -> None:
     target_dir = completed_dir(state_dir) if completed else active_dir(state_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-    path = target_dir / f"{plan.id}.md"
-    path.write_text(_to_markdown(plan), encoding="utf-8")
+    atomic_write_text(target_dir / f"{plan.id}.md", _to_markdown(plan))
 
 
 def _require(state_dir: Path, plan_id: str) -> PlanArtifact:

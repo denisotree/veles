@@ -89,13 +89,20 @@ def _attach_background_runners(
             make_research_kind_handler,
         )
 
+        # Every factory resolves the model the same way the chat does — a named
+        # daemon's `[daemon.<name>] model` applies to its workers too.
+        session = state.session_name
         kind_handlers = {
-            "ingest": make_ingest_kind_handler(args, project=project, store=store),
-            "research": make_research_kind_handler(args, project=project, store=store),
+            "ingest": make_ingest_kind_handler(
+                args, project=project, store=store, daemon_session=session
+            ),
+            "research": make_research_kind_handler(
+                args, project=project, store=store, daemon_session=session
+            ),
         }
         on_op_finished = make_on_op_finished(state)
         state.subagent_factory = _make_scoped_subagent_factory(
-            args, project=project, store=store, toolset="run"
+            args, project=project, store=store, toolset="run", daemon_session=session
         )
 
     from veles.daemon.background_ops import make_proactive_binder
@@ -236,10 +243,8 @@ def _factory_settings_from_args(
     # `cli_model or cfg_model or DEFAULT_MODEL` skipped the user layer, so
     # a daemon in a project that has no own `[engine]` booted on
     # `DEFAULT_MODEL` (anthropic/claude-sonnet-4.6) even when the user had
-    # picked ollama at user scope — a provider/model mismatch. The daemon
-    # parser sets `--provider`/`--model` defaults to None, so an absent
-    # flag correctly defers to the cascade rather than counting as
-    # explicit.
+    # picked ollama at user scope — a provider/model mismatch. An absent
+    # `--provider`/`--model` defers to the cascade (see `model_resolver`).
     provider_name = resolve_effective_provider(args, project, daemon_session=daemon_session)
     # M165: a daemon must not boot on a silent cloud fallback — fail clearly
     # when no model is configured anywhere.
@@ -559,7 +564,9 @@ def _make_agent_factory(
     return factory
 
 
-def _make_worker_agent_factory(args: argparse.Namespace, *, project, store):
+def _make_worker_agent_factory(
+    args: argparse.Namespace, *, project, store, daemon_session: str | None = None
+):
     """M124: build a `(**kwargs) -> Agent` factory for manager-spawn workers.
 
     The orchestration `spawn(role, prompt, *, agent_factory, ...)`
@@ -575,7 +582,7 @@ def _make_worker_agent_factory(args: argparse.Namespace, *, project, store):
     contract preserves explorer output verbatim in the writer's
     composed prompt (see `core.orchestration.manager.decompose_and_run`).
     """
-    settings = _factory_settings_from_args(args, project)
+    settings = _factory_settings_from_args(args, project, daemon_session=daemon_session)
 
     def factory(**kwargs):
         worker_system_prompt = kwargs.get("system_prompt")
@@ -591,7 +598,14 @@ def _make_worker_agent_factory(args: argparse.Namespace, *, project, store):
     return factory
 
 
-def _make_scoped_subagent_factory(args: argparse.Namespace, *, project, store, toolset: str):
+def _make_scoped_subagent_factory(
+    args: argparse.Namespace,
+    *,
+    project,
+    store,
+    toolset: str,
+    daemon_session: str | None = None,
+):
     """M204: a `factory(*, system_prompt, tools) -> Agent` for sub-agents whose
     registry is CAPPED at the named toolset.
 
@@ -606,7 +620,7 @@ def _make_scoped_subagent_factory(args: argparse.Namespace, *, project, store, t
     """
     from veles.core.tools.toolsets import TOOLSETS
 
-    settings = _factory_settings_from_args(args, project)
+    settings = _factory_settings_from_args(args, project, daemon_session=daemon_session)
     ceiling: tuple[str, ...] = TOOLSETS[toolset]
 
     def factory(*, system_prompt: str | None = None, tools: list[str] | None = None, **_kw):

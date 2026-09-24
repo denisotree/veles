@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0] — 2026-09-23
+
+A cleanup release: shared code instead of copies, plus the defects the audit
+behind it turned up.
+
+### Fixed
+
+- Flags given before the verb were lost: `veles --no-compress run …` and
+  `veles --model X daemon start` ran without them.
+- With `VELES_USER_HOME` set, the sandbox refused writes to your user skills,
+  and the sanitize config and project registry were read from the real home.
+- While the daemon ran a background research job, every other chat turn was
+  auto-approved for sensitive tools. The pre-approval now covers the research
+  job only.
+- A goal could be reported "missing" if it was read while being saved. Goal and
+  plan files are now written atomically.
+- A chat reached first by a reminder or a delivered job got a second session on
+  its next reply, and `veles channel reset-session` could be undone by the
+  running daemon.
+- On a named daemon (`[daemon.<name>] model`), workers, sub-agents and
+  background ingest/research ran on the `[engine]` model.
+- `veles daemon <id> restart` now stops a hung daemon and logs the new one's
+  start-up to the daemon log.
+- `veles channel` and `veles daemon session` honour `--project-root`.
+- A non-numeric port in the project wizard no longer crashes it.
+- `POST /v1/dream/run` with a non-object JSON body no longer returns 500.
+- Dream and dual-write memory writes waited for a busy database instead of
+  failing with "database is locked".
+- Telegram `/insights` and `/rules` escape titles and bodies, so a `<` in a fact
+  no longer breaks the reply.
+
+### Changed
+
+- Every store opens its SQLite connection the same way (WAL, 5 s busy timeout,
+  foreign keys), and every state file is written atomically.
+- `veles` starts faster: the OpenAI SDK is no longer imported on every
+  invocation.
+
 ## [0.41.0] — 2026-09-23
 
 ### Added — goals in a Telegram chat

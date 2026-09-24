@@ -40,6 +40,7 @@ from veles.core.memory.rerank import (
 from veles.core.project import Project
 from veles.core.safety import scan_for_injection
 from veles.core.subproject import load_subprojects, resolve_subproject_path
+from veles.core.text import ellipsize
 
 logger = logging.getLogger(__name__)
 
@@ -219,9 +220,7 @@ class MemoryRouter:
 
         hits: list[RecallHit] = []
         for h in get_default_store().search(query, limit=limit):
-            summary = h.body.strip().replace("\n", " ")
-            if len(summary) > _TURN_SUMMARY_CAP:
-                summary = summary[: _TURN_SUMMARY_CAP - 1].rstrip() + "…"
+            summary = ellipsize(h.body, _TURN_SUMMARY_CAP)
             hits.append(
                 RecallHit(
                     rel_path=f"about-veles:{h.ref}",
@@ -465,9 +464,7 @@ def _scrub_recall_hit(hit: RecallHit) -> RecallHit:
 
 
 def _insight_hit_to_recall(hit: InsightHit) -> RecallHit:
-    summary = (hit.body or "").strip().replace("\n", " ")
-    if len(summary) > _TURN_SUMMARY_CAP:
-        summary = summary[: _TURN_SUMMARY_CAP - 1].rstrip() + "…"
+    summary = ellipsize(hit.body or "", _TURN_SUMMARY_CAP)
     return RecallHit(
         rel_path=f"insight:{hit.id}",
         title=hit.title,
@@ -480,9 +477,7 @@ def _insight_hit_to_recall(hit: InsightHit) -> RecallHit:
 
 def _turn_hit_to_recall(hit: TurnHit) -> RecallHit:
     when = _dt.datetime.fromtimestamp(hit.created_at, tz=_dt.UTC).strftime("%Y-%m-%d %H:%M")
-    summary = (hit.content or "").strip().replace("\n", " ")
-    if len(summary) > _TURN_SUMMARY_CAP:
-        summary = summary[: _TURN_SUMMARY_CAP - 1].rstrip() + "…"
+    summary = ellipsize(hit.content or "", _TURN_SUMMARY_CAP)
     return RecallHit(
         rel_path=f"turn:{hit.session_id}:{hit.seq}",
         title=f"[{hit.role} @ {when}]",

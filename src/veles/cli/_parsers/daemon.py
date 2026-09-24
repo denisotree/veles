@@ -32,12 +32,11 @@ def register(sub: argparse._SubParsersAction) -> None:
             "Ctrl+C terminates the daemon."
         ),
     )
+    # Cascade: explicit CLI flag > `[daemon.<name>]` > `[engine]` > user > default.
+    # "Not given" is told apart by `_provider_explicit` and the empty DEFAULT_MODEL
+    # (see `core/model_resolver.py`), so no None sentinel is needed here — one
+    # would overwrite a `--model`/`--provider` given before `daemon start`.
     add_common_run_flags(daemon_start)
-    # Cascade: explicit CLI flag > `[engine]` in <project>/.veles/config.toml
-    # > DEFAULT_MODEL/DEFAULT_PROVIDER. None sentinel lets the runtime tell
-    # "not given" apart from a string that happens to equal the hardcoded
-    # default. See `cli/commands/daemon.py::_factory_settings_from_args`.
-    daemon_start.set_defaults(model=None, provider=None)
     # Named daemon session (several per project, each with its own
     # settings/pid/log). Must already exist — declare it with
     # `veles daemon session create <name>`. Absent → legacy single daemon.

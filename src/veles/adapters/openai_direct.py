@@ -16,29 +16,14 @@ local-model adapters."""
 
 from __future__ import annotations
 
-from typing import Any
-
 from openai import OpenAI
 
-from veles.core.cache_hints import apply_cache_hints
-from veles.core.openai_wire import (
-    OpenAICompatibleProvider,
-    extract_usage_with_cache,
-    max_tokens_kwarg_for,
-    to_openai_message,
-)
-from veles.core.provider import Message, TokenUsage
+from veles.core.openai_wire import CloudOpenAIProvider
 
 _OPENAI_BASE_URL = "https://api.openai.com/v1"
-_API_KEY_ENV = "OPENAI_API_KEY"
 
 
-# Re-exported for tests that import the function from this module.
-_to_openai_message = to_openai_message
-_max_tokens_kwarg_for = max_tokens_kwarg_for
-
-
-class OpenAIProvider(OpenAICompatibleProvider):
+class OpenAIProvider(CloudOpenAIProvider):
     """Provider backed by OpenAI's native Chat Completions endpoint."""
 
     name: str = "openai"
@@ -60,9 +45,3 @@ class OpenAIProvider(OpenAICompatibleProvider):
 
         key = require_api_key("openai", explicit=api_key)
         super().__init__(client=OpenAI(api_key=key, base_url=base_url, timeout=timeout))
-
-    def _prepare_messages(self, messages: list[Message], model: str) -> list[dict[str, Any]]:
-        return apply_cache_hints([to_openai_message(m) for m in messages], model)
-
-    def _extract_usage(self, usage_obj: Any) -> TokenUsage:
-        return extract_usage_with_cache(usage_obj)

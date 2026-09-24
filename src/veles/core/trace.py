@@ -20,13 +20,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from veles.core.io_utils import prune_rotated
+from veles.core.io_utils import RotatingJsonl, read_jsonl
 
 DEFAULT_MAX_BYTES = 50 * 1024 * 1024  # 50 MB before rotation
 # How many rotated siblings survive a rotation (M257).
@@ -107,22 +105,8 @@ def _tool_name(tool: dict[str, Any]) -> str:
     return str(tool.get("name", ""))
 
 
-def now_iso() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
-class TraceWriter:
-    """Append `TraceRecord`s to a JSONL file with size-bounded rotation.
-
-    On rotation: existing file is renamed to `traces.jsonl.<unix_ts>` and a
-    fresh `traces.jsonl` starts, then all but the newest `keep_rotated` siblings
-    are deleted.
-
-    Until M257 this kept every rotated file forever, on the stated grounds that
-    "cleanup is a curator concern" — which the curator never implemented, so
-    nothing pruned them at all. `keep_rotated=0` disables the prune for a caller
-    that wants the full history.
-    """
+class TraceWriter(RotatingJsonl):
+    """Append `TraceRecord`s to `traces.jsonl`, rotated by size (see `RotatingJsonl`)."""
 
     def __init__(
         self,
@@ -131,33 +115,10 @@ class TraceWriter:
         max_bytes: int = DEFAULT_MAX_BYTES,
         keep_rotated: int = DEFAULT_KEEP_ROTATED,
     ) -> None:
-        self._path = path
-        self._max_bytes = max_bytes
-        self._keep_rotated = keep_rotated
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-
-    @property
-    def path(self) -> Path:
-        return self._path
+        super().__init__(path, max_bytes=max_bytes, keep_rotated=keep_rotated)
 
     def write(self, record: TraceRecord) -> None:
-        line = json.dumps(asdict(record), separators=(",", ":")) + "\n"
-        data = line.encode("utf-8")
-        if self._path.exists() and self._path.stat().st_size + len(data) > self._max_bytes:
-            self._rotate()
-        with self._path.open("ab") as f:
-            f.write(data)
-
-    def _rotate(self) -> None:
-        ts = int(time.time())
-        target = self._path.with_name(f"{self._path.name}.{ts}")
-        # If a rotation already happened this same second, fall back to a counter.
-        n = 1
-        while target.exists():
-            target = self._path.with_name(f"{self._path.name}.{ts}.{n}")
-            n += 1
-        os.replace(self._path, target)
-        prune_rotated(self._path, keep=self._keep_rotated)
+        self.append(asdict(record))
 
 
 def trace_path_for_project(state_dir: Path) -> Path:
@@ -171,19 +132,7 @@ def read_records(path: Path) -> list[dict[str, Any]]:
     Skips malformed lines silently (operational tolerance — partial writes
     after a crash should not poison the whole file).
     """
-    if not path.exists():
-        return []
-    out: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                out.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-    return out
+    return read_jsonl(path)
 
 
 def cache_fragmentation_alert(

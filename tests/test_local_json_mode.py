@@ -19,9 +19,9 @@ from typing import Any
 
 import pytest
 
-from veles.adapters.local._base import _reset_json_mode_for_tests, json_mode_enabled
 from veles.adapters.local.ollama import OllamaProvider
 from veles.core.context import expects_strict_json, strict_json_mode
+from veles.core.openai_wire import _reset_json_mode_for_tests, json_mode_enabled
 from veles.core.provider import Message
 
 
@@ -120,16 +120,9 @@ def test_response_format_sent_inside_strict_mode() -> None:
 
 def test_env_switch_disables_json_mode(monkeypatch) -> None:
     monkeypatch.setenv("VELES_LOCAL_JSON_MODE", "0")
-    import importlib
-
-    from veles.adapters.local import _base
-
-    importlib.reload(_base)
-    try:
-        assert _base.json_mode_enabled() is False
-    finally:
-        monkeypatch.delenv("VELES_LOCAL_JSON_MODE", raising=False)
-        importlib.reload(_base)
+    assert json_mode_enabled() is False
+    monkeypatch.delenv("VELES_LOCAL_JSON_MODE")
+    assert json_mode_enabled() is True
 
 
 # ---------- self-heal ----------

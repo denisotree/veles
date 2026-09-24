@@ -30,6 +30,7 @@ import sys
 
 from veles.core.path_guard import resolve_safe
 from veles.core.risk import RiskClass
+from veles.core.text import cut_with_note
 from veles.core.tools.registry import tool
 
 _DEFAULT_MAX_PAGES = 50
@@ -133,10 +134,8 @@ def _try_ocr(path, max_pages: int) -> str | None:
 
 
 def _truncate(text: str) -> str:
-    if len(text) <= _OUTPUT_CHAR_CAP:
-        return text
-    suffix = f"\n\n<truncated at {_OUTPUT_CHAR_CAP} chars; pass smaller max_pages for full output>"
-    return text[: _OUTPUT_CHAR_CAP - len(suffix)] + suffix
+    note = f"\n\n<truncated at {_OUTPUT_CHAR_CAP} chars; pass smaller max_pages for full output>"
+    return cut_with_note(text, _OUTPUT_CHAR_CAP, note)
 
 
 def _have_pypdf() -> bool:

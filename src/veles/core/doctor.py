@@ -24,6 +24,7 @@ from typing import Literal
 from veles.core.approval import list_approvals
 from veles.core.layout.engines import wiki_enabled
 from veles.core.project import Project
+from veles.core.timeutil import utc_iso
 from veles.core.trace import cache_fragmentation_alert, read_records, trace_path_for_project
 
 CheckStatus = Literal["ok", "warn", "error", "info"]
@@ -702,9 +703,7 @@ def _check_approval_audit(project: Project | None) -> CheckResult:
     if project is None:
         return CheckResult(name="approval_audit", status="info", message="no active project")
     records = list_approvals(project.state_dir)
-    cutoff = time.strftime(
-        "%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - _AUTOPILOT_REVIEW_WINDOW_S)
-    )
+    cutoff = utc_iso(time.time() - _AUTOPILOT_REVIEW_WINDOW_S)
     recent = [r for r in records if r.get("decided_at", "") >= cutoff]
     autopilot = [r for r in recent if r.get("via_autopilot") is True]
     if not records:

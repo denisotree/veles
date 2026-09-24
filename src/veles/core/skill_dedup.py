@@ -95,7 +95,8 @@ def find_duplicates_embedding(
     threshold: float = _DEFAULT_EMBEDDING_THRESHOLD,
 ) -> list[SkillCluster]:
     """Embedding cosine clustering. Routes through `compute_skill_vectors`."""
-    from veles.core.skill_embedding import compute_skill_vectors, cosine_similarity
+    from veles.core.memory.vector import cosine_similarity
+    from veles.core.skill_embedding import compute_skill_vectors
 
     if len(skills) < 2:
         return []

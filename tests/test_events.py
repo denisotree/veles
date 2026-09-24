@@ -22,10 +22,10 @@ from veles.core.events import (
     UserMessage,
     events_path_for_project,
     filter_events,
-    now_iso,
     read_events,
     recent_error_events,
 )
+from veles.core.timeutil import utc_iso as now_iso
 
 # ---------- type discriminators ----------
 

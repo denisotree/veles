@@ -17,14 +17,7 @@ from typing import Any
 
 from openai import OpenAI
 
-from veles.core.cache_hints import apply_cache_hints
-from veles.core.openai_wire import (
-    OpenAICompatibleProvider,
-    extract_usage_with_cache,
-    max_tokens_kwarg_for,
-    to_openai_message,
-)
-from veles.core.provider import Message, TokenUsage
+from veles.core.openai_wire import CloudOpenAIProvider
 
 _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 _DEFAULT_REFERER = "https://github.com/denisotree/veles"
@@ -33,12 +26,7 @@ _DEFAULT_TITLE = "Veles"
 _logger = logging.getLogger(__name__)
 
 
-# Re-exported for tests that import the function from this module.
-_to_openai_message = to_openai_message
-_max_tokens_kwarg_for = max_tokens_kwarg_for
-
-
-class OpenRouterProvider(OpenAICompatibleProvider):
+class OpenRouterProvider(CloudOpenAIProvider):
     """Provider backed by OpenRouter's OpenAI-compatible endpoint."""
 
     name: str = "openrouter"
@@ -101,9 +89,6 @@ class OpenRouterProvider(OpenAICompatibleProvider):
             _logger.debug("could not refresh model metadata: %s", exc)
         return [m.id for m in page]
 
-    def _prepare_messages(self, messages: list[Message], model: str) -> list[dict[str, Any]]:
-        return apply_cache_hints([to_openai_message(m) for m in messages], model)
-
     def _request_options(self, model: str) -> dict[str, Any]:
         """M224: forward the running turn's memory session id as OpenRouter's
         `session_id` sticky-routing key, so every request in a conversation pins
@@ -129,6 +114,3 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         extra.setdefault("session_id", sid[:256])
         options["extra_body"] = extra
         return options
-
-    def _extract_usage(self, usage_obj: Any) -> TokenUsage:
-        return extract_usage_with_cache(usage_obj)

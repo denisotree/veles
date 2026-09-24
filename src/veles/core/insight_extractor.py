@@ -40,6 +40,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from veles.core.context_compressor import render_transcript
 from veles.core.provider import Message
 from veles.core.slug import normalize_slug as _normalize_slug
 
@@ -116,20 +117,6 @@ def find_recovery_triggers(history: list[Message]) -> list[_RecoveryTrigger]:
     return out
 
 
-def _render_window(history: list[Message], start: int, end: int) -> str:
-    blocks: list[str] = []
-    for m in history[start:end]:
-        tag = m.role
-        if m.role == "tool" and m.tool_call_id:
-            tag = f"tool[{m.tool_call_id}]"
-        body = m.content or ""
-        if m.tool_calls:
-            calls = ", ".join(f"{tc.name}({tc.arguments})" for tc in m.tool_calls)
-            body = (body + "\n" if body else "") + f"<calls: {calls}>"
-        blocks.append(f"# {tag}\n{body}")
-    return "\n\n".join(blocks)
-
-
 _REMEMBER_PROMPT = (
     "You are extracting a durable lesson the user explicitly asked to "
     "remember. Read the conversation snippet and produce:\n\n"
@@ -189,22 +176,13 @@ def make_insight_extractor(
     via stderr but doesn't abort the remaining triggers — partial
     extraction is better than total loss.
     """
-    from veles.core.agent import Agent
+    from veles.core.agent import run_oneshot
     from veles.core.memory.artefacts import append_memory_log
     from veles.core.tools.builtin.memory_save import save_insight_row
-    from veles.core.tools.registry import Registry
 
     def _extract_one(prompt: str, snippet: str) -> tuple[str, str] | None:
-        sub = Agent(
-            provider=provider,
-            registry=Registry(),
-            model=model,
-            max_iterations=1,
-            system_prompt=prompt,
-            max_tokens=512,
-        )
         try:
-            result = sub.run(snippet)
+            result = run_oneshot(provider, model, prompt, snippet, max_tokens=512)
         except Exception:
             return None
         return _parse_extractor_output(result.text or "")
@@ -263,7 +241,7 @@ def make_insight_extractor(
             window_end = min(len(history), trig.user_idx + 2)
             written += _persist_one(
                 prompt=_REMEMBER_PROMPT,
-                snippet=_render_window(history, window_start, window_end),
+                snippet=render_transcript(history[window_start:window_end]),
                 slug_id=slug_id,
                 trigger_label="remember-trigger",
                 # User explicitly asked to remember this → user-asserted.
@@ -274,7 +252,7 @@ def make_insight_extractor(
         for rtrig in triggers_recovery:
             written += _persist_one(
                 prompt=_RECOVERY_PROMPT,
-                snippet=_render_window(history, rtrig.window_start, rtrig.window_end),
+                snippet=render_transcript(history[rtrig.window_start : rtrig.window_end]),
                 slug_id=slug_id,
                 trigger_label="recovery-trigger",
                 # Heuristically inferred from a tool-error window → lower trust.

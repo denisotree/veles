@@ -24,14 +24,13 @@ all degrade to an empty store rather than crashing the run.
 
 from __future__ import annotations
 
-import datetime as _dt
 import json
-import os
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from veles.core.file_lock import file_lock
+from veles.core.io_utils import atomic_write_text
+from veles.core.timeutil import utc_iso
 
 _TRUST_FILENAME = "trust.json"
 
@@ -66,7 +65,7 @@ class TrustStore:
         return tool_name in self.tools
 
     def grant(self, tool_name: str) -> None:
-        self.tools[tool_name] = _utc_now_iso()
+        self.tools[tool_name] = utc_iso()
         self._save()
 
     def revoke(self, tool_name: str) -> bool:
@@ -76,21 +75,10 @@ class TrustStore:
         return True
 
     def _save(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
         body = {"tools": {name: {"granted_at": at} for name, at in sorted(self.tools.items())}}
         text = json.dumps(body, indent=2, ensure_ascii=False) + "\n"
-        lock_path = self.path.parent / (self.path.name + ".lock")
-        with file_lock(lock_path):
-            fd, tmp_name = tempfile.mkstemp(
-                prefix=self.path.name + ".", suffix=".tmp", dir=self.path.parent
-            )
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                    fh.write(text)
-                os.replace(tmp_name, self.path)
-            except Exception:
-                Path(tmp_name).unlink(missing_ok=True)
-                raise
+        with file_lock(self.path.parent / (self.path.name + ".lock")):
+            atomic_write_text(self.path, text)
 
 
 def user_trust_path() -> Path:
@@ -98,7 +86,3 @@ def user_trust_path() -> Path:
     from veles.core.user_paths import user_home
 
     return user_home() / _TRUST_FILENAME
-
-
-def _utc_now_iso() -> str:
-    return _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")

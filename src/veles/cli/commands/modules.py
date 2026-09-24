@@ -9,10 +9,10 @@ from veles.core.critical_ops import confirm_critical
 from veles.core.module_install import (
     ModuleInstallError,
     ModuleNotFoundError,
+    derive_module_name,
     install_module_from_source,
     remove_module,
 )
-from veles.core.module_install import _derive_name as _derive_module_name
 from veles.core.modules import discover_modules
 from veles.core.project import Project
 
@@ -54,7 +54,7 @@ def _show(project: Project, name: str) -> int:
 
 
 def _add(args: argparse.Namespace, project: Project) -> int:
-    target_name = args.name or _derive_module_name(args.source)
+    target_name = args.name or derive_module_name(args.source)
     target = project.modules_dir / target_name
     summary = (
         f"Source: {args.source}\n"

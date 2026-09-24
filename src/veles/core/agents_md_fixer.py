@@ -69,19 +69,12 @@ def _run_sub_agent(
     Module-level so tests can monkeypatch it without patching the Agent class.
     Returns empty string on any failure (callers handle the fallback).
     """
-    from veles.core.agent import Agent
-    from veles.core.tools.registry import Registry
+    from veles.core.agent import run_oneshot
 
-    sub = Agent(
-        provider=_make_provider(provider),
-        registry=Registry(),
-        model=model,
-        max_iterations=1,
-        system_prompt=system_prompt,
-        max_tokens=max_tokens,
-    )
     try:
-        result = sub.run(user_prompt)
+        result = run_oneshot(
+            _make_provider(provider), model, system_prompt, user_prompt, max_tokens=max_tokens
+        )
     except Exception:
         return ""
     return result.text or ""

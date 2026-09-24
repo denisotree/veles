@@ -18,6 +18,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from veles.core.defaults import DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT
 from veles.core.project_config import read_provider_model_at
 from veles.daemon.registry import (
     DaemonEntry,
@@ -101,8 +102,8 @@ def runtime_session_action(project, record, action: str) -> str:
     from veles.daemon.spawn import spawn_daemon
 
     block = get_daemon_session_config(load_project_config(project), record.name)
-    host = str(block.get("host") or record.host or "127.0.0.1")
-    port = int(block.get("port") or record.port or 8765)
+    host = str(block.get("host") or record.host or DEFAULT_DAEMON_HOST)
+    port = int(block.get("port") or record.port or DEFAULT_DAEMON_PORT)
     pid = record.pid or 0
 
     def _spawn() -> bool:
@@ -526,8 +527,8 @@ def spawn_daemon_node(node: DaemonNode) -> bool:
     from veles.daemon.paths import daemon_log_path
     from veles.daemon.spawn import spawn_daemon
 
-    host = node.host or "127.0.0.1"
-    port = node.port or 8765
+    host = node.host or DEFAULT_DAEMON_HOST
+    port = node.port or DEFAULT_DAEMON_PORT
     if node.kind == "named":
         return (
             spawn_daemon(

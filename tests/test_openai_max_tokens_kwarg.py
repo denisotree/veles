@@ -4,12 +4,8 @@ pick the right kwarg per model id."""
 
 from __future__ import annotations
 
-from veles.adapters.openai_direct import (
-    _max_tokens_kwarg_for as _kwarg_direct,
-)
-from veles.adapters.openrouter import (
-    _max_tokens_kwarg_for as _kwarg_openrouter,
-)
+from veles.core.openai_wire import max_tokens_kwarg_for as _kwarg_direct
+from veles.core.openai_wire import max_tokens_kwarg_for as _kwarg_openrouter
 
 
 def test_legacy_gpt4_uses_max_tokens() -> None:

@@ -29,6 +29,7 @@ from veles.channels.platform_registry import (
     list_platforms,
 )
 from veles.channels.session_map import SessionMap, channel_session_path
+from veles.core.defaults import DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT
 
 
 def cmd_channel(args: argparse.Namespace) -> int:
@@ -50,10 +51,10 @@ def cmd_channel(args: argparse.Namespace) -> int:
     return 2
 
 
-def _resolve_project_or_error():
+def _resolve_project_or_error(args: argparse.Namespace):
     from veles.cli import _resolve_active_project
 
-    project = _resolve_active_project(argparse.Namespace())
+    project = _resolve_active_project(args)
     if project is None:
         print(
             "error: no Veles project found here. Run `veles init` first.",
@@ -66,7 +67,7 @@ def _cmd_channel_add(args: argparse.Namespace) -> int:
     """`veles channel add` — wizard to attach a channel to a daemon session."""
     from veles.cli.channel_wizard import add_channel
 
-    project = _resolve_project_or_error()
+    project = _resolve_project_or_error(args)
     if project is None:
         return 2
     return add_channel(
@@ -80,7 +81,7 @@ def _cmd_channel_remove(args: argparse.Namespace) -> int:
     """`veles channel remove <channel>` — drop a channel's config block."""
     from veles.cli.channel_wizard import remove_channel
 
-    project = _resolve_project_or_error()
+    project = _resolve_project_or_error(args)
     if project is None:
         return 2
     return remove_channel(project, args.channel, session=getattr(args, "session", None))
@@ -126,7 +127,11 @@ def _cmd_channel_run(args: argparse.Namespace) -> int:
     else:
         bot_token = args.bot_token or os.environ.get("TELEGRAM_BOT_TOKEN") or ""
 
-    daemon_url = args.daemon_url or os.environ.get("VELES_DAEMON_URL") or "http://127.0.0.1:8765"
+    daemon_url = (
+        args.daemon_url
+        or os.environ.get("VELES_DAEMON_URL")
+        or f"http://{DEFAULT_DAEMON_HOST}:{DEFAULT_DAEMON_PORT}"
+    )
     # M271: keychain first (`veles secret set VELES_DAEMON_TOKEN`), env second —
     # before this only the env was read, so a token stored with `veles secret`
     # was never used.

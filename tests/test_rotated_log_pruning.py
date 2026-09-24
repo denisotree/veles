@@ -21,7 +21,8 @@ import pytest
 
 from veles.core.events import EventWriter, UserMessage
 from veles.core.io_utils import prune_rotated
-from veles.core.trace import TraceRecord, TraceWriter, hash_text, hash_tools, now_iso
+from veles.core.timeutil import utc_iso as now_iso
+from veles.core.trace import TraceRecord, TraceWriter, hash_text, hash_tools
 
 
 def _record(request_id: str = "r1") -> TraceRecord:

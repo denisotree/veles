@@ -16,6 +16,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from veles.core.defaults import DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT
 from veles.core.project import Project
 from veles.tui.wizard.app import WizardApp
 from veles.tui.wizard.project_steps import project_wizard_steps
@@ -53,11 +54,11 @@ def _autostart_daemon(project: Project, daemon: dict) -> None:
     from veles.daemon.paths import daemon_log_path
     from veles.daemon.spawn import spawn_daemon
 
-    host = str(daemon.get("host") or "127.0.0.1")
+    host = str(daemon.get("host") or DEFAULT_DAEMON_HOST)
     try:
-        port = int(daemon.get("port") or 8765)
+        port = int(daemon.get("port") or DEFAULT_DAEMON_PORT)
     except (TypeError, ValueError):
-        port = 8765
+        port = DEFAULT_DAEMON_PORT
     proc = spawn_daemon(
         project_root=project.root, host=host, port=port, log_path=daemon_log_path(project.name)
     )

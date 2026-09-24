@@ -13,10 +13,7 @@ from veles.core.sanitize import sanitize
 def _isolate_home(monkeypatch, tmp_path: Path) -> Path:
     fake_home = tmp_path / "home"
     fake_home.mkdir()
-    monkeypatch.setattr(
-        "veles.core.sanitize.loader.Path.home",
-        classmethod(lambda cls: fake_home),
-    )
+    monkeypatch.setenv("VELES_USER_HOME", str(fake_home))
     monkeypatch.setattr(
         "veles.core.sanitize.builtin.Path.home",
         classmethod(lambda cls: fake_home),

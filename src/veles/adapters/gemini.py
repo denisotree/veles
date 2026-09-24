@@ -92,13 +92,8 @@ class GeminiProvider:
         model: str,
         max_tokens: int = 4096,
     ) -> ProviderResponse:
-        system, contents = _split_system_and_contents(messages)
-        config = _build_config(system=system, tools=tools, max_tokens=max_tokens)
-        kwargs: dict[str, Any] = {"model": model, "contents": contents}
-        if config:
-            kwargs["config"] = config
-        response = self._client.models.generate_content(**kwargs)
-        return _convert_response(response)
+        kwargs = _request_kwargs(messages, tools, model=model, max_tokens=max_tokens)
+        return _convert_response(self._client.models.generate_content(**kwargs))
 
     def stream_message(
         self,
@@ -108,11 +103,7 @@ class GeminiProvider:
         model: str,
         max_tokens: int = 4096,
     ) -> Iterator[StreamEvent]:
-        system, contents = _split_system_and_contents(messages)
-        config = _build_config(system=system, tools=tools, max_tokens=max_tokens)
-        kwargs: dict[str, Any] = {"model": model, "contents": contents}
-        if config:
-            kwargs["config"] = config
+        kwargs = _request_kwargs(messages, tools, model=model, max_tokens=max_tokens)
 
         text_buffer = ""
         tool_calls: list[ToolCall] = []
@@ -120,25 +111,13 @@ class GeminiProvider:
         finish_reason: str | None = None
 
         for chunk in self._client.models.generate_content_stream(**kwargs):
-            for cand in getattr(chunk, "candidates", None) or []:
-                content = getattr(cand, "content", None)
-                for part in getattr(content, "parts", None) or []:
-                    text = getattr(part, "text", None)
-                    if text:
-                        text_buffer += text
-                        yield TextDelta(text=text)
-                    fc = getattr(part, "function_call", None)
-                    if fc is not None:
-                        tool_calls.append(
-                            ToolCall(
-                                id=getattr(fc, "id", "") or "",
-                                name=getattr(fc, "name", "") or "",
-                                arguments=dict(getattr(fc, "args", None) or {}),
-                            )
-                        )
-                fr = getattr(cand, "finish_reason", None)
-                if fr is not None:
-                    finish_reason = str(fr)
+            texts, chunk_calls, chunk_finish = _read_candidates(chunk)
+            for text in texts:
+                text_buffer += text
+                yield TextDelta(text=text)
+            tool_calls.extend(chunk_calls)
+            if chunk_finish is not None:
+                finish_reason = chunk_finish
             usage_meta = getattr(chunk, "usage_metadata", None)
             if usage_meta is not None:
                 usage = _usage_from_meta(usage_meta)
@@ -241,16 +220,30 @@ def _convert_tools(openai_tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return convert_openai_tools(openai_tools, parameters_key="parameters")
 
 
-def _convert_response(response: Any) -> ProviderResponse:
-    text_parts: list[str] = []
+def _request_kwargs(
+    messages: list[Message], tools: list[dict[str, Any]] | None, *, model: str, max_tokens: int
+) -> dict[str, Any]:
+    """`generate_content[_stream]` arguments shared by both call styles."""
+    system, contents = _split_system_and_contents(messages)
+    config = _build_config(system=system, tools=tools, max_tokens=max_tokens)
+    kwargs: dict[str, Any] = {"model": model, "contents": contents}
+    if config:
+        kwargs["config"] = config
+    return kwargs
+
+
+def _read_candidates(obj: Any) -> tuple[list[str], list[ToolCall], str | None]:
+    """Text parts, function calls and the last finish reason of a response or a
+    stream chunk — both carry the same `candidates[].content.parts[]` shape."""
+    texts: list[str] = []
     tool_calls: list[ToolCall] = []
     finish_reason: str | None = None
-    for cand in getattr(response, "candidates", None) or []:
+    for cand in getattr(obj, "candidates", None) or []:
         content = getattr(cand, "content", None)
         for part in getattr(content, "parts", None) or []:
             text = getattr(part, "text", None)
             if text:
-                text_parts.append(text)
+                texts.append(text)
             fc = getattr(part, "function_call", None)
             if fc is not None:
                 tool_calls.append(
@@ -263,6 +256,11 @@ def _convert_response(response: Any) -> ProviderResponse:
         fr = getattr(cand, "finish_reason", None)
         if fr is not None:
             finish_reason = str(fr)
+    return texts, tool_calls, finish_reason
+
+
+def _convert_response(response: Any) -> ProviderResponse:
+    text_parts, tool_calls, finish_reason = _read_candidates(response)
     text = "\n".join(p for p in text_parts if p) or None
     usage_meta = getattr(response, "usage_metadata", None)
     usage = _usage_from_meta(usage_meta) if usage_meta else TokenUsage()
