@@ -43,7 +43,7 @@ import re
 from typing import Any, Literal
 
 from veles.core.agent_events import SystemLine, TurnDone
-from veles.core.modes.base import Mode, ModeContext
+from veles.core.modes.base import Mode, ModeContext, adopt_session
 from veles.core.session_state import ModeName
 from veles.core.text import strip_code_fence
 
@@ -209,6 +209,20 @@ _CONFIRM_YES_PREFIXES: tuple[str, ...] = (
 _CONFIRM_YES_EXACT: frozenset[str] = frozenset({"y", "yes!", "go", "go!", "+"})
 
 
+def _end_goal(ctx: ModeContext, line: str) -> None:
+    """Leave goal mode: clear the active goal, fall back to auto, say why."""
+    ctx.state.active_goal_id = None
+    ctx.state.mode = "auto"
+    ctx.post(SystemLine(text=line))
+
+
+def _synthetic_done(text: str = "") -> TurnDone:
+    """The TurnDone for a goal step that ran no agent turn of its own."""
+    from veles.core.agent import RunResult
+
+    return TurnDone(result=RunResult(text=text, iterations=0, stopped_reason="synthetic"))
+
+
 def _ended_meanwhile(ctx: ModeContext, goal_id: str, result: Any) -> bool:
     """True — and the turn is closed — when the goal stopped being active while
     a step or a check was running: someone cancelled it (`/goal cancel` in a
@@ -221,9 +235,7 @@ def _ended_meanwhile(ctx: ModeContext, goal_id: str, result: Any) -> bool:
     if goal is not None and goal.status == "active":
         return False
     status = goal.status if goal is not None else "gone"
-    ctx.state.active_goal_id = None
-    ctx.state.mode = "auto"
-    ctx.post(SystemLine(text=f"[goal {goal_id} {status} meanwhile — stopping; mode → auto]"))
+    _end_goal(ctx, f"[goal {goal_id} {status} meanwhile — stopping; mode → auto]")
     ctx.post(TurnDone(result=result))
     return True
 
@@ -292,7 +304,6 @@ class GoalMode:
 
     def run_turn(self, prompt: str, ctx: ModeContext) -> None:
         # Lazy import to avoid pulling these into core.modes module load.
-        from veles.core.agent import RunResult
         from veles.core.goal import (
             budget_exhausted,
             cancel,
@@ -329,18 +340,8 @@ class GoalMode:
             exhausted = budget_exhausted(goal)
             if exhausted:
                 cancel(state_dir, goal.id, reason=f"budget: {exhausted}")
-                ctx.state.active_goal_id = None
-                ctx.state.mode = "auto"
-                ctx.post(SystemLine(text=f"[goal {goal.id} cancelled — {exhausted}; mode → auto]"))
-                ctx.post(
-                    TurnDone(
-                        result=RunResult(
-                            text="",
-                            iterations=0,
-                            stopped_reason="synthetic",
-                        )
-                    )
-                )
+                _end_goal(ctx, f"[goal {goal.id} cancelled — {exhausted}; mode → auto]")
+                ctx.post(_synthetic_done())
                 ctx.state.last_mode_in_session = self.name
                 return
 
@@ -362,12 +363,12 @@ class GoalMode:
             ctx.post(
                 SystemLine(text="[goal already done; cycle Shift+Tab → goal to start a new one]")
             )
-            ctx.post(TurnDone(result=RunResult(text="", iterations=0, stopped_reason="synthetic")))
+            ctx.post(_synthetic_done())
         else:  # pragma: no cover - defensive
             ctx.post(SystemLine(text=f"[goal: unknown phase {phase!r}; abandoning]"))
             cancel(state_dir, goal.id, reason=f"unknown phase {phase!r}")
             ctx.state.active_goal_id = None
-            ctx.post(TurnDone(result=RunResult(text="", iterations=0, stopped_reason="synthetic")))
+            ctx.post(_synthetic_done())
 
         ctx.state.last_mode_in_session = self.name
 
@@ -410,8 +411,7 @@ class GoalMode:
             extra_system=_INTERVIEW_SYSTEM,
         )
         result = agent.run(prompt, on_text_delta=ctx.on_text, event_listener=ctx.on_event)
-        if ctx.state.session_id is None and result.session_id is not None:
-            ctx.state.session_id = result.session_id
+        adopt_session(ctx, result)
 
         summary = parse_ready_marker(result.text or "")
         if summary:
@@ -448,7 +448,6 @@ class GoalMode:
         line — the user's reply will land in the next turn's history
         normally.
         """
-        from veles.core.agent import RunResult
         from veles.core.goal import cancel, update_fsm
 
         if not prompt.strip():
@@ -460,22 +459,12 @@ class GoalMode:
         if verdict == "yes":
             update_fsm(ctx.project.state_dir, goal.id, phase="plan")
             ctx.post(SystemLine(text="[goal: confirmed → plan]"))
-            ctx.post(
-                TurnDone(
-                    result=RunResult(
-                        text="",
-                        iterations=0,
-                        stopped_reason="synthetic",
-                    )
-                )
-            )
+            ctx.post(_synthetic_done())
             return
         if verdict == "cancel":
             cancel(ctx.project.state_dir, goal.id, reason="user cancelled at confirm")
-            ctx.state.active_goal_id = None
-            ctx.state.mode = "auto"
-            ctx.post(SystemLine(text="[goal cancelled at confirm; mode → auto]"))
-            ctx.post(TurnDone(result=RunResult(text="", iterations=0, stopped_reason="synthetic")))
+            _end_goal(ctx, "[goal cancelled at confirm; mode → auto]")
+            ctx.post(_synthetic_done())
             return
         # `no` — treat as edits. Append the prompt to the summary as
         # context, return to interview for another round of questions.
@@ -498,7 +487,6 @@ class GoalMode:
         user and stop. SessionStore stays clean of this synthetic
         assistant message; the user's next reply will land in history
         normally."""
-        from veles.core.agent import RunResult
         from veles.core.agent_events import ChatDelta
         from veles.core.i18n import t
 
@@ -508,15 +496,7 @@ class GoalMode:
             + t("goal.confirm_actions")
         )
         ctx.post(ChatDelta(text=text))
-        ctx.post(
-            TurnDone(
-                result=RunResult(
-                    text=text,
-                    iterations=0,
-                    stopped_reason="synthetic",
-                )
-            )
-        )
+        ctx.post(_synthetic_done(text))
 
     def _run_plan(self, prompt: str, ctx: ModeContext, goal) -> None:
         from veles.core.goal import cancel, update_fsm
@@ -528,15 +508,12 @@ class GoalMode:
             on_text_delta=ctx.on_text,
             event_listener=ctx.on_event,
         )
-        if ctx.state.session_id is None and result.session_id is not None:
-            ctx.state.session_id = result.session_id
+        adopt_session(ctx, result)
 
         infeasible = parse_infeasible_marker(result.text or "")
         if infeasible:
             cancel(ctx.project.state_dir, goal.id, reason=f"infeasible: {infeasible}")
-            ctx.state.active_goal_id = None
-            ctx.state.mode = "auto"
-            ctx.post(SystemLine(text=f"[goal infeasible: {infeasible}; mode → auto]"))
+            _end_goal(ctx, f"[goal infeasible: {infeasible}; mode → auto]")
         else:
             # The model called `create_plan`; the latest plan_id is in
             # the `active/` directory. Pick the most recent one — the
@@ -567,9 +544,7 @@ class GoalMode:
         if plan is None or not plan.steps:
             ctx.post(SystemLine(text="[goal: plan missing or stepless; back to plan]"))
             update_fsm(ctx.project.state_dir, goal.id, phase="plan")
-            from veles.core.agent import RunResult
-
-            ctx.post(TurnDone(result=RunResult(text="", iterations=0, stopped_reason="synthetic")))
+            ctx.post(_synthetic_done())
             return
 
         step_idx = goal.steps_done  # we'll bump it via append_checkpoint
@@ -577,9 +552,7 @@ class GoalMode:
             # All steps consumed but advisor never said goal_reached;
             # punt to CHECK so the advisor can verify, or back to plan.
             update_fsm(ctx.project.state_dir, goal.id, phase="check")
-            from veles.core.agent import RunResult
-
-            ctx.post(TurnDone(result=RunResult(text="", iterations=0, stopped_reason="synthetic")))
+            ctx.post(_synthetic_done())
             return
 
         step_text = plan.steps[step_idx]
@@ -610,8 +583,7 @@ class GoalMode:
                 on_text_delta=ctx.on_text,
                 event_listener=ctx.on_event,
             )
-        if ctx.state.session_id is None and result.session_id is not None:
-            ctx.state.session_id = result.session_id
+        adopt_session(ctx, result)
 
         # M235: the checkpoint carries what the step DID, not a restatement of
         # what it was asked to do. `description` stays the human-readable label;
@@ -697,7 +669,6 @@ class GoalMode:
         *,
         call_advisor,
     ) -> None:
-        from veles.core.agent import RunResult
         from veles.core.goal import append_checkpoint, complete, update_fsm
         from veles.core.plan_artifact import mark_done as mark_plan_done
         from veles.core.plan_artifact import read_plan
@@ -730,12 +701,10 @@ class GoalMode:
             # routed). Stay in CHECK: the next turn retries, and the goal driver
             # stops a goal whose turns change nothing.
             ctx.post(SystemLine(text=f"[goal: cannot check the step — {raw.strip('<>')}]"))
-            ctx.post(TurnDone(result=RunResult(text=raw, iterations=0, stopped_reason="synthetic")))
+            ctx.post(_synthetic_done(raw))
             return
         verdict, reason = parse_check_verdict(raw)
-        if _ended_meanwhile(
-            ctx, goal.id, RunResult(text="", iterations=0, stopped_reason="synthetic")
-        ):
+        if _ended_meanwhile(ctx, goal.id, _synthetic_done().result):
             return
         append_checkpoint(
             ctx.project.state_dir,
@@ -751,9 +720,7 @@ class GoalMode:
                 with contextlib.suppress(Exception):
                     mark_plan_done(ctx.project.state_dir, goal.plan_id)
             complete(ctx.project.state_dir, goal.id, evidence=reason)
-            ctx.state.active_goal_id = None
-            ctx.state.mode = "auto"
-            ctx.post(SystemLine(text=f"[goal achieved — {reason}; mode → auto]"))
+            _end_goal(ctx, f"[goal achieved — {reason}; mode → auto]")
         elif verdict == "step_off_track":
             update_fsm(ctx.project.state_dir, goal.id, phase="plan")
             ctx.post(SystemLine(text=f"[goal: off-track ({reason}); re-planning]"))
@@ -761,7 +728,7 @@ class GoalMode:
             update_fsm(ctx.project.state_dir, goal.id, phase="execute")
             ctx.post(SystemLine(text=f"[goal: step ok ({reason}); next step]"))
 
-        ctx.post(TurnDone(result=RunResult(text=raw, iterations=0, stopped_reason="synthetic")))
+        ctx.post(_synthetic_done(raw))
 
 
 _: Mode = GoalMode()  # static protocol check
