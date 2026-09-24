@@ -95,8 +95,9 @@ def _refresh(args: argparse.Namespace, project: Project) -> int:
     state. Without it, an unchanged AGENTS.md short-circuits to the
     existing nl-state (rc=0 + a friendly "unchanged" message).
     """
-    from veles.cli import _has_api_key_for_provider, _make_provider
     from veles.core.project import load_agents_md
+    from veles.core.provider_factory import has_api_key as _has_api_key_for_provider
+    from veles.core.provider_factory import make_provider as _make_provider
     from veles.core.routing import make_nl_extractor, refresh_nl_routing, route
 
     agents_md = load_agents_md(project) or ""

@@ -6,22 +6,17 @@ import argparse
 import os
 import subprocess
 import sys
-from pathlib import Path
 
 from veles.core.agents_md_schema import validate as validate_agents_md
 from veles.core.project import Project
 
 
 def cmd_schema_dispatch(args: argparse.Namespace) -> int:
-    """Both subcommands need an active project; resolve it lazily."""
-    from veles.cli import _resolve_active_project  # back-import (deferred)
+    """Every subcommand needs an active project (no init wizard for schema edits)."""
+    from veles.cli._project import require_project
 
-    project = _resolve_active_project(args)
+    project = require_project(args)
     if project is None:
-        print(
-            f"error: no Veles project found at {Path.cwd()} or any parent.",
-            file=sys.stderr,
-        )
         return 2
     if args.schema_command == "validate":
         return _validate(project)

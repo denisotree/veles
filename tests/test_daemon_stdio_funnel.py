@@ -286,7 +286,7 @@ def test_bootstrap_daemon_installs_funnel(tmp_path: Path, monkeypatch: pytest.Mo
         root = tmp_path
 
     monkeypatch.setattr("veles.core.context.set_active_project", lambda p: None)
-    monkeypatch.setattr("veles.cli._load_project_modules", lambda p: {})
+    monkeypatch.setattr("veles.cli._project._load_project_modules", lambda p: {})
     monkeypatch.setattr("veles.core.modules.set_module_registry", lambda r: None)
     monkeypatch.setattr(lifecycle.os, "chdir", lambda p: None)
     monkeypatch.setattr("veles.core.project_config.load_project_config", lambda p: {})

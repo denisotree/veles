@@ -8,7 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from veles.core.memory import _SCHEMA_VERSION, SessionStore
+from veles.core.memory import SessionStore
+from veles.core.memory.schema import SCHEMA_VERSION as _SCHEMA_VERSION
 from veles.core.provider import Message
 
 

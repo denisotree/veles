@@ -3,9 +3,9 @@
 `evaluate(entry, args)` runs a fixed sequence of rules and returns a typed
 `Decision`. The rules, in order:
 
-  1. `module_veto`     — handled upstream in `agent._dispatch` (pre_tool_call
-                         hook). Engine doesn't see it; veto returns before
-                         we get here. Documented for completeness.
+  1. `module_veto`     — handled upstream in `tool_dispatch._dispatch`
+                         (pre_tool_call hook). Engine doesn't see it; veto
+                         returns before we get here. Documented for completeness.
   2. `planning_mode`   — denies mutation tools in planning mode (M71).
   3. `draft_commit`    — denies commit tools whose draft hasn't run (M72).
   4. `untrusted_args`  — STUB. Once source-trust labels reach the engine,
@@ -242,7 +242,7 @@ def _policy_gate(entry: ToolEntry, args: dict[str, Any]) -> Decision:
       - `"always_confirm"`    → critical-ops prompt; allow or deny.
       - `"approval_required"` → trust-ladder path when `entry.sensitive`
         (M38: 4-option scoped persistence), otherwise the
-        `approval_required` Decision that `agent._run_approval_prompt`
+        `approval_required` Decision that `tool_dispatch._run_approval_prompt`
         consumes (M71: 2-option per-call).
 
     All paths propagate the tool's args to the prompter (M124 fix:

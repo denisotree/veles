@@ -1,5 +1,5 @@
-"""M127: daemon `_make_agent_factory` always builds with the config-derived
-`_FactorySettings` — model/provider are fixed at daemon launch; nothing
+"""M127: daemon `make_agent_factory` always builds with the config-derived
+`FactorySettings` — model/provider are fixed at daemon launch; nothing
 per-session (M280: not even a chat's agent mode) changes them.
 
 Supersedes the M126 suite that asserted overrides took effect.
@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from veles.cli.commands.daemon import _make_agent_factory
+from veles.cli.commands.daemon import make_agent_factory
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.daemon.auth import TokenStore
@@ -77,8 +77,8 @@ def test_factory_uses_config_model_without_state(project, store) -> None:
         captured["settings"] = settings
         return "built"
 
-    with patch("veles.daemon.agent_factory._build_agent_for_turn", fake_build):
-        factory = _make_agent_factory(
+    with patch("veles.daemon.agent_factory.build_agent_for_turn", fake_build):
+        factory = make_agent_factory(
             _args(model="config-model", provider="ollama"),
             project=project,
             store=store,
@@ -99,8 +99,8 @@ def test_factory_ignores_stray_session_override(project, store, state) -> None:
         captured["settings"] = settings
         return "built"
 
-    with patch("veles.daemon.agent_factory._build_agent_for_turn", fake_build):
-        factory = _make_agent_factory(
+    with patch("veles.daemon.agent_factory.build_agent_for_turn", fake_build):
+        factory = make_agent_factory(
             _args(model="config-model", provider="ollama"),
             project=project,
             store=store,
@@ -122,8 +122,8 @@ def test_factory_none_session_id_uses_config_model(project, store, state, monkey
         captured["settings"] = settings
         return "built"
 
-    with patch("veles.daemon.agent_factory._build_agent_for_turn", fake_build):
-        factory = _make_agent_factory(
+    with patch("veles.daemon.agent_factory.build_agent_for_turn", fake_build):
+        factory = make_agent_factory(
             _args(model="config-model"),
             project=project,
             store=store,
@@ -141,10 +141,10 @@ def test_factory_log_line_shows_config_model_no_overridden_marker(
     state.set_chat_mode("sess-target", "planning")
 
     with patch(
-        "veles.daemon.agent_factory._build_agent_for_turn",
+        "veles.daemon.agent_factory.build_agent_for_turn",
         lambda settings, **kw: "built",
     ):
-        factory = _make_agent_factory(
+        factory = make_agent_factory(
             _args(model="config-model", provider="ollama"),
             project=project,
             store=store,

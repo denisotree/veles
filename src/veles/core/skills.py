@@ -1,26 +1,17 @@
-"""Skills — per-project parametrized sub-agents.
+"""Skills — per-project parametrized sub-agents: discovery and telemetry.
 
-A skill is a directory under `<project>/.veles/skills/<name>/` containing a
+A skill is a directory under `<project>/.veles/skills/<name>/` (or the user's
+`~/.veles/skills/`, a layout pack, or the bundled builtins) containing a
 `SKILL.md` file. The frontmatter declares the skill's identity and tool budget;
-the body is the system prompt for a disposable sub-agent.
+the body is the system prompt for a disposable sub-agent, which
+`core/skill_tool.py` turns into a callable tool.
 
-When the top-level agent calls a skill (it appears as a registered tool with a
-single `input: str` parameter), Veles spawns a fresh `Agent` whose
-`system_prompt` is the skill body and whose registry is the parent's builtin
-tools filtered to `skill.tools`. The sub-agent runs to completion; its final
-text becomes the tool result.
-
-Use_count and last_used live in the same SKILL.md frontmatter and are bumped
-atomically (temp-file + replace) after each successful invocation.
-
-The frontmatter parser is intentionally a flat-key subset of YAML — strings,
-ints, bools, null, simple lists. No external dependency, no nested structures.
-M6 can swap to pyyaml if real YAML is required.
+Usage telemetry is recorded in the project's memory.db (`bump_telemetry`) and
+overlaid on every load; the frontmatter itself is parsed by `core/frontmatter.py`.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import threading
 import time
@@ -28,22 +19,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from veles.core.frontmatter import parse_frontmatter
 from veles.core.timeutil import utc_iso
-from veles.core.tools.registry import Registry, ToolEntry
+from veles.core.user_paths import user_skills_dir
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from veles.core.project import Project
-    from veles.core.provider import Provider
 
 
 _SKILL_FILENAME = "SKILL.md"
 _DEFAULT_TOOLS: list[str] = []
 _DEFAULT_MAX_ITERATIONS = 10
-_MAX_SKILL_DEPTH = 5
 
 
 @dataclass(slots=True)
@@ -67,142 +55,7 @@ class Skill:
     extends: str | None = None
 
 
-# ---------- frontmatter parser ----------
-
-
-def parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
-    """Return (frontmatter_dict, body). Returns ({}, text) if no frontmatter.
-
-    Supports flat key-value pairs plus a single nesting level: a top-level key
-    whose value is empty opens a list-of-dicts context; subsequent indented
-    `- key: value` lines become list items (each a dict), and further indented
-    `key: value` lines fill the most recent dict.
-    """
-    lines = text.split("\n")
-    if not lines or lines[0].strip() != "---":
-        return {}, text
-    fm: dict[str, Any] = {}
-    body_start: int | None = None
-    current_list_key: str | None = None
-    current_dict: dict[str, Any] | None = None
-
-    for i in range(1, len(lines)):
-        raw_line = lines[i]
-        if raw_line.strip() == "---":
-            body_start = i + 1
-            break
-        stripped_full = raw_line.strip()
-        if not stripped_full:
-            continue
-        indent = len(raw_line) - len(raw_line.lstrip())
-        stripped = raw_line.lstrip()
-
-        if indent == 0:
-            current_list_key = None
-            current_dict = None
-            if ":" not in stripped:
-                continue
-            key, _, raw_val = stripped.partition(":")
-            key = key.strip()
-            raw_val = raw_val.strip()
-            if not raw_val:
-                # Open a list-of-dicts context for the next indented lines.
-                current_list_key = key
-                fm[key] = []
-                continue
-            fm[key] = _coerce_value(raw_val)
-            continue
-
-        if current_list_key is None:
-            continue
-        if stripped.startswith("- "):
-            current_dict = {}
-            fm[current_list_key].append(current_dict)
-            rest = stripped[2:].strip()
-            if rest and ":" in rest:
-                k, _, v = rest.partition(":")
-                current_dict[k.strip()] = _coerce_value(v.strip())
-        elif current_dict is not None and ":" in stripped:
-            k, _, v = stripped.partition(":")
-            current_dict[k.strip()] = _coerce_value(v.strip())
-
-    if body_start is None:
-        return {}, text
-    body = "\n".join(lines[body_start:]).lstrip("\n")
-    return fm, body
-
-
-def render_frontmatter(fm: dict[str, Any], body: str) -> str:
-    """Return canonical SKILL.md text with `---`-delimited frontmatter.
-
-    Lists-of-dicts render as YAML-ish indented blocks; everything else stays
-    on one line.
-    """
-    out = ["---"]
-    for key, value in fm.items():
-        if isinstance(value, list) and value and all(isinstance(v, dict) for v in value):
-            out.append(f"{key}:")
-            for item in value:
-                first = True
-                for k, v in item.items():
-                    prefix = "  - " if first else "    "
-                    out.append(f"{prefix}{k}: {_format_value(v)}")
-                    first = False
-            continue
-        out.append(f"{key}: {_format_value(value)}")
-    out.append("---")
-    out.append("")
-    out.append(body.lstrip("\n"))
-    return "\n".join(out)
-
-
-def _coerce_value(raw: str) -> Any:
-    if raw.startswith("[") and raw.endswith("]"):
-        inner = raw[1:-1]
-        items = [item.strip() for item in inner.split(",") if item.strip()]
-        return [_coerce_scalar(it) for it in items]
-    return _coerce_scalar(raw)
-
-
-def _coerce_scalar(raw: str) -> Any:
-    s = raw.strip()
-    if not s:
-        return ""
-    lower = s.lower()
-    if lower == "null":
-        return None
-    if lower in ("true", "false"):
-        return lower == "true"
-    if s.lstrip("-").isdigit():
-        return int(s)
-    if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
-        return s[1:-1]
-    return s
-
-
-def _format_value(value: Any) -> str:
-    if value is None:
-        return "null"
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, list):
-        return "[" + ", ".join(_format_value(v) for v in value) + "]"
-    return str(value)
-
-
 # ---------- discovery ----------
-
-
-def user_skills_dir() -> Path:
-    """User-global skills directory. `VELES_USER_HOME` env overrides `~`.
-
-    M40 introduces `~/.veles/skills/` as a peer of the project-local
-    `<project>/.veles/skills/`. On name collision project wins; see
-    `discover_skills`.
-    """
-    from veles.core.user_paths import user_skills_dir as _path
-
-    return _path()
 
 
 # M158-followup: optional TTL memo for `discover_skills` (daemon-only — see
@@ -232,7 +85,7 @@ def discover_skills(
     The `include_layout` toggle defaults False to preserve the M40 era
     contract (discover_skills returns only on-disk user-or-project
     skills). Runtime call sites that build the agent's tool surface
-    (`cli/_runtime.py::_load_skills`, daemon factory) pass
+    (`runtime/registry.py::load_skills`, daemon factory) pass
     `include_layout=True` so the pack-shipped `ingest` / `query` /
     `lint` skills materialise as callable tools. Tests that pre-date
     M117b can keep the default and continue to see an empty list on
@@ -473,31 +326,18 @@ def _record_skill_use_in_db(skill: Skill, *, success: bool) -> None:
 
 
 def bump_telemetry(skill: Skill, *, success: bool) -> None:
-    """Atomically bump use_count + outcome counter in SKILL.md.
+    """Record one invocation of `skill` as a `skill_uses` row in memory.db.
 
-    `use_count` counts every invocation; `success_count` increments only on
-    `stopped_reason == "completed"`, `error_count` on exception or any
-    non-completed terminal state. Future curator (M28) ranks duplicates
-    by the derived `success_rate = success_count / use_count`.
+    `use_count` counts every invocation; `success_count` only
+    `stopped_reason == "completed"`, `error_count` an exception or any other
+    terminal state. Promotion and dedup rank by `success_count / use_count`.
 
-    Concurrent invocations from the parent process and one or more MCP
-    children can race on this read-modify-write — a sidecar flock at
-    `<SKILL.md>.lock` serialises every bumper across threads and
-    processes (M30).
+    Telemetry lives in the database, never in SKILL.md: builtin and layout-pack
+    skills sit inside the installed package, and rewriting their frontmatter
+    mutated the distribution (a dirty checkout, site-packages edits, nothing
+    recorded on a read-only install). Counters a SKILL.md still carries are
+    read on load only as a seed when the database has none.
     """
-    # M244: telemetry is runtime state and belongs in the project's memory.db,
-    # not in the skill's own source file.
-    #
-    # `builtin` and layout-pack skills live INSIDE the installed package, so the
-    # frontmatter rewrite below was mutating the distribution itself: a pip
-    # install writes `use_count:` into site-packages, a git checkout gets a
-    # dirty tree, and a read-only install cannot record anything at all.
-    # Observed live 2026-09-01 — a run in a `~/.tmp` sandbox modified two
-    # SKILL.md files inside the veles repo and left `.lock` files behind.
-    #
-    # `skill_uses` + `skill_telemetry()` (M121) already model this correctly as
-    # append-only rows with aggregate reads; they were written and never wired
-    # up, so the file counters were a duplicate of a better mechanism.
     _record_skill_use_in_db(skill, success=success)
 
     # In-memory counters stay correct for the caller that just invoked the
@@ -511,180 +351,3 @@ def bump_telemetry(skill: Skill, *, success: bool) -> None:
     else:
         skill.error_count += 1
         skill.last_error_at = now_iso
-
-
-# ---------- tool factory ----------
-
-
-def make_skill_tool(
-    skill: Skill,
-    *,
-    provider: Provider,
-    model: str,
-    base_registry: Registry,
-) -> ToolEntry:
-    """Build a ToolEntry that, when invoked, runs the skill as a sub-agent.
-
-    `base_registry` is the registry the skill's sub-agent will subset its tools
-    from. Subset selection is deferred to invocation time so that cross-skill
-    composition works: when `_load_skills` later registers other skills into
-    the same `base_registry`, they become available to skills whose
-    `frontmatter.tools` whitelist names them.
-    """
-    handler = _make_skill_handler(
-        skill=skill, provider=provider, model=model, base_registry=base_registry
-    )
-    parameter_schema = _build_param_schema(skill.parameters)
-    return ToolEntry(
-        name=skill.name,
-        description=skill.description,
-        parameter_schema=parameter_schema,
-        handler=handler,
-        is_async=False,
-    )
-
-
-_TYPE_MAP = {
-    "string": "string",
-    "str": "string",
-    "int": "integer",
-    "integer": "integer",
-    "bool": "boolean",
-    "boolean": "boolean",
-    "float": "number",
-    "number": "number",
-}
-
-
-def _yaml_type_to_json(t: str) -> str:
-    return _TYPE_MAP.get(t.lower(), "string")
-
-
-def _build_param_schema(parameters: list[dict[str, Any]]) -> dict[str, Any]:
-    """Generate a JSON Schema (OpenAI tool params) from a skill's parameters list.
-
-    Empty list → fallback to the legacy `{input: string}` shape.
-    Otherwise: each parameter contributes a typed property; `required` is
-    populated from explicit `required: true` or from the absence of `default`.
-    """
-    if not parameters:
-        return {
-            "type": "object",
-            "properties": {
-                "input": {
-                    "type": "string",
-                    "description": (
-                        "User input passed to the skill as the first user message."
-                        " Optional — empty string means run the skill's default flow."
-                    ),
-                }
-            },
-        }
-    properties: dict[str, Any] = {}
-    required: list[str] = []
-    for p in parameters:
-        name = str(p.get("name") or "").strip()
-        if not name:
-            continue
-        type_str = str(p.get("type") or "string")
-        prop: dict[str, Any] = {"type": _yaml_type_to_json(type_str)}
-        if "description" in p:
-            prop["description"] = str(p["description"])
-        if "default" in p:
-            prop["default"] = p["default"]
-        properties[name] = prop
-        is_required = p.get("required")
-        if is_required is True:
-            required.append(name)
-        elif is_required is False:
-            pass
-        elif "default" not in p:
-            required.append(name)
-    schema: dict[str, Any] = {"type": "object", "properties": properties}
-    if required:
-        schema["required"] = required
-    return schema
-
-
-def _check_skill_recursion(skill_name: str, stack: tuple[str, ...]) -> str | None:
-    """Return a `<error: ...>` string when the skill would recurse or exceed depth."""
-    if skill_name in stack:
-        return f"<error: skill cycle detected: {' -> '.join((*stack, skill_name))}>"
-    if len(stack) >= _MAX_SKILL_DEPTH:
-        chain = " -> ".join((*stack, skill_name))
-        return f"<error: skill depth limit ({_MAX_SKILL_DEPTH}) exceeded: {chain}>"
-    return None
-
-
-def _resolve_skill_invocation(skill: Skill, kwargs: dict[str, Any]) -> tuple[str, str]:
-    """Map the model's kwargs onto (system_prompt_body, user_message).
-
-    Two modes:
-    - Legacy (no `parameters` declared): `body` stays as authored, `user_msg`
-      is the `input` kwarg verbatim.
-    - Typed (`parameters` declared): every `{name}` placeholder in the body is
-      substituted with the kwarg; surviving kwargs are JSON-serialised into
-      `user_msg` so the sub-agent can still see them.
-    """
-    if not skill.parameters:
-        user_msg = str(kwargs["input"]) if kwargs.get("input") else "Run the workflow."
-        return skill.body, user_msg
-
-    body = skill.body
-    leftover: dict[str, Any] = {}
-    for name, value in kwargs.items():
-        placeholder = "{" + name + "}"
-        if placeholder in body:
-            body = body.replace(placeholder, str(value))
-        else:
-            leftover[name] = value
-    user_msg = json.dumps(leftover, ensure_ascii=False) if leftover else "Run the workflow."
-    return body, user_msg
-
-
-def _make_skill_handler(
-    *,
-    skill: Skill,
-    provider: Provider,
-    model: str,
-    base_registry: Registry,
-) -> Callable[..., str]:
-    # Lazy import to avoid a hard import cycle (agent imports memory; skills
-    # belong to the same core layer but are above agent in dependency order).
-    from veles.core.agent import Agent
-    from veles.core.context import (
-        current_skill_stack,
-        push_skill_stack,
-        reset_skill_stack,
-    )
-
-    def handler(**kwargs: Any) -> str:
-        recursion_error = _check_skill_recursion(skill.name, current_skill_stack())
-        if recursion_error is not None:
-            return recursion_error
-
-        body, user_msg = _resolve_skill_invocation(skill, kwargs)
-
-        # Defer subset to invocation: by now `base_registry` contains every
-        # other skill registered in the same _load_skills pass.
-        sub_registry = base_registry.subset(skill.tools)
-        token = push_skill_stack(skill.name)
-        try:
-            sub_agent = Agent(
-                provider=provider,
-                registry=sub_registry,
-                model=model,
-                max_iterations=skill.max_iterations,
-                system_prompt=body,
-            )
-            try:
-                result = sub_agent.run(user_msg)
-            except Exception:
-                bump_telemetry(skill, success=False)
-                raise
-            bump_telemetry(skill, success=result.stopped_reason == "completed")
-            return result.text
-        finally:
-            reset_skill_stack(token)
-
-    return handler

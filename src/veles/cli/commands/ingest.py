@@ -44,13 +44,13 @@ def ingest_system_prompt(
     injected — the same prompt a `veles run` migration turn gets — instead of
     the retired single-page `INGEST_SYSTEM_PROMPT`. The result is qualified for
     the provider's MCP tool namespace (claude-cli/gemini-cli)."""
-    from veles.cli import _qualify_for_provider
-    from veles.cli._runtime import build_run_system_prompt
+    from veles.runtime.prompt import build_run_system_prompt
+    from veles.runtime.registry import qualify_for_provider
 
     base = build_run_system_prompt(project, prompt="ingest a source into the wiki")
     if not base:
         base = _INGEST_FALLBACK_PROMPT
-    return _qualify_for_provider(base, provider, tools)
+    return qualify_for_provider(base, provider, tools)
 
 
 def _run_batch_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) -> int:
@@ -98,14 +98,10 @@ def _run_batch_ingest_cli(args: argparse.Namespace, project: Project, *, source:
 
 def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) -> int:
     """Ingest runner used by `cmd_add` (read a source → write a wiki page)."""
-    from veles.cli import (
-        _INGEST_TOOLS,
-        _PROVIDER_API_KEY_ENVS,
-        _ensure_api_key,
-        _print_run_summary,
-        _run_agent_streaming_aware,
-        build_command_agent,
-    )
+    from veles.cli._agent_builder import build_command_agent
+    from veles.cli._console import ensure_api_key
+    from veles.runtime.registry import INGEST_TOOLS
+    from veles.runtime.run import print_run_summary, run_agent_streaming_aware
 
     # M162: ingest is a wiki-engine operation — the active layout pack
     # must declare it ([layout.engines] wiki = true).
@@ -120,7 +116,7 @@ def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) 
         )
         return 2
 
-    if args.provider in _PROVIDER_API_KEY_ENVS and not _ensure_api_key(args.provider):
+    if not ensure_api_key(args.provider):
         return 2
     Wiki(project.wiki_root).ensure_layout()
     # M152: shared construction spine. The key was already gated above
@@ -130,8 +126,8 @@ def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) 
     agent = build_command_agent(
         args,
         project,
-        tools=_INGEST_TOOLS,
-        system_prompt=lambda provider: ingest_system_prompt(project, provider, _INGEST_TOOLS),
+        tools=INGEST_TOOLS,
+        system_prompt=lambda provider: ingest_system_prompt(project, provider, INGEST_TOOLS),
         check_api_key=False,
         tool_aware=True,
     )
@@ -145,6 +141,6 @@ def _run_ingest_cli(args: argparse.Namespace, project: Project, *, source: str) 
         user_msg = ingest_user_message(source, content=fetch_url(source))
     else:
         user_msg = ingest_user_message(source)
-    result, budget = _run_agent_streaming_aware(agent, user_msg, args, project=project)
-    _print_run_summary(args, result, budget)
+    result, budget = run_agent_streaming_aware(agent, user_msg, args, project=project)
+    print_run_summary(args, result, budget)
     return 0 if result.stopped_reason == "completed" else 1

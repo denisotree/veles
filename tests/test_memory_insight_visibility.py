@@ -12,13 +12,11 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from veles.core.memory import (
-    _FTS_SCHEMA_SQL,
-    _SCHEMA_SQL,
-    _SCHEMA_V3_SQL,
-    _SCHEMA_VERSION,
-    SessionStore,
-)
+from veles.core.memory import SessionStore
+from veles.core.memory.schema import _SCHEMA_SQL
+from veles.core.memory.schema import FTS_SCHEMA_SQL as _FTS_SCHEMA_SQL
+from veles.core.memory.schema import SCHEMA_V3_SQL as _SCHEMA_V3_SQL
+from veles.core.memory.schema import SCHEMA_VERSION as _SCHEMA_VERSION
 
 # The v4 `insights` table is the current one minus the M258 column. Deriving it
 # by removal (rather than pasting a frozen copy of the old DDL) keeps the
@@ -26,10 +24,8 @@ from veles.core.memory import (
 # loudly if the column definition is ever reworded.
 _V5_COLUMN = (
     ",\n"
-    "    -- M258: the insight that replaced this one, or NULL while this row is\n"
-    "    -- the current one. Supersession used to be encoded as an `insight_refs`\n"
-    "    -- row, which made it indistinguishable from any other relation; see\n"
-    "    -- `eligibility.eligible_sql`. The row itself is never deleted.\n"
+    "    -- The insight that replaced this one, or NULL while this row is current.\n"
+    "    -- See `eligibility.eligible_sql`. The row itself is never deleted.\n"
     "    superseded_by      INTEGER REFERENCES insights(id) ON DELETE SET NULL"
 )
 

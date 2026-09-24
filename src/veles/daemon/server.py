@@ -1,33 +1,25 @@
-"""Daemon HTTP + WebSocket server (M51).
+"""Daemon HTTP + WebSocket server.
 
-aiohttp app exposing six endpoints under `/v1/`:
+`make_app` registers the `/v1/` API: health and status, runs (submit, list,
+read, stream events over a WebSocket, answer a pending prompt), sessions
+(list, read, delete, set mode, cancel goal), and — from `routes_jobs.py` — the
+scheduler's jobs and the dream runner. `make_app(...).router.routes()` is the
+authoritative list.
 
-    GET  /v1/health                           → unauth, status probe
-    POST /v1/runs                             → submit a prompt → run_id
-                                                (optional `deliver_to` pushes the
-                                                 answer to a DeliveryRouter target)
-    GET  /v1/runs                             → list run summaries (no answer text)
-    GET  /v1/runs/{run_id}                    → single run + `final_text`
-    WS   /v1/runs/{run_id}/events             → stream events
-    GET  /v1/sessions                         → list sessions
-    GET  /v1/sessions/{id}                    → session detail (history)
-    DELETE /v1/sessions/{id}                  → delete a session
-
-Every endpoint except `/v1/health` is gated by
-`bearer_auth_middleware`. The token store is reloaded on every request
-so out-of-band token CRUD propagates without a restart.
+Every endpoint except `/v1/health` is gated by `bearer_auth_middleware`. The
+token store is reloaded on every request so out-of-band token CRUD propagates
+without a restart. Channel gateways hosted by the daemon start from
+`channels.py`.
 
 The app accepts an `AgentFactory` callable so tests can inject stub
-providers without touching the network. Production CLI wires the
-factory to construct an `Agent` via the existing `_make_provider` +
-runtime helpers — see `cli/commands/daemon.py`.
+providers without touching the network; production wires it in
+`daemon/agent_factory.py`.
 """
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import logging
 import os
 import time
@@ -38,6 +30,9 @@ from aiohttp import WSMsgType, web
 
 from veles import __version__
 from veles.daemon.auth import TokenStore, bearer_auth_middleware
+from veles.daemon.channels import chat_session_slot, start_channel_runners
+from veles.daemon.http_util import json_object, runner_status
+from veles.daemon.routes_jobs import add_job_routes
 from veles.daemon.runner import (
     AgentFactory,
 )
@@ -67,17 +62,7 @@ def make_app(state: DaemonState) -> web.Application:
     app.router.add_delete("/v1/sessions/{session_id}", _handle_delete_session)
     app.router.add_patch("/v1/sessions/{session_id}", _handle_patch_session)
     app.router.add_delete("/v1/sessions/{session_id}/goal", _handle_cancel_session_goal)
-    # M75 jobs API
-    app.router.add_post("/v1/jobs", _handle_create_job)
-    app.router.add_get("/v1/jobs", _handle_list_jobs)
-    app.router.add_get("/v1/jobs/{job_id}", _handle_get_job)
-    app.router.add_patch("/v1/jobs/{job_id}", _handle_update_job)
-    app.router.add_delete("/v1/jobs/{job_id}", _handle_delete_job)
-    app.router.add_post("/v1/jobs/{job_id}/trigger", _handle_trigger_job)
-    app.router.add_get("/v1/jobs/{job_id}/runs", _handle_list_job_runs)
-    # M76 dream API
-    app.router.add_get("/v1/dream/status", _handle_dream_status)
-    app.router.add_post("/v1/dream/run", _handle_dream_run)
+    add_job_routes(app)
     return app
 
 
@@ -119,16 +104,6 @@ async def _handle_status(request: web.Request) -> web.Response:
     state: DaemonState = request.app["state"]
     runs = state.list_runs()
     active = sum(1 for h in runs if not h.done.is_set())
-    job_status = None
-    if state.job_runner is not None:
-        # Best-effort: any concrete JobRunner that exposes `status()` wins;
-        # otherwise we report just `enabled`.
-        status_fn = getattr(state.job_runner, "status", None)
-        job_status = status_fn() if callable(status_fn) else {"enabled": True}
-    dream_status = None
-    if state.dream_runner is not None:
-        status_fn = getattr(state.dream_runner, "status", None)
-        dream_status = status_fn() if callable(status_fn) else {"enabled": True}
     from veles.core.sanitize import sanitize
 
     return web.json_response(
@@ -143,8 +118,8 @@ async def _handle_status(request: web.Request) -> web.Response:
                 "total": len(runs),
                 "active": active,
             },
-            "jobs": job_status,
-            "dream": dream_status,
+            "jobs": runner_status(state.job_runner),
+            "dream": runner_status(state.dream_runner),
             # The docstring has always promised channels here; surface the
             # actually-running set (M158-followup — was omitted before).
             "channels": list(state.active_channels),
@@ -236,12 +211,9 @@ def _resolve_deliver_to(raw: Any, origin: str | None) -> tuple[str | None, str |
 
 async def _handle_create_run(request: web.Request) -> web.Response:
     state: DaemonState = request.app["state"]
-    try:
-        body = await request.json()
-    except (json.JSONDecodeError, ValueError):
-        return web.json_response({"error": "body must be JSON"}, status=400)
-    if not isinstance(body, dict):
-        return web.json_response({"error": "body must be a JSON object"}, status=400)
+    body = await json_object(request)
+    if isinstance(body, web.Response):
+        return body
     prompt = body.get("prompt")
     if not isinstance(prompt, str) or not prompt.strip():
         return web.json_response({"error": "'prompt' (non-empty string) required"}, status=400)
@@ -302,7 +274,7 @@ async def _handle_create_run(request: web.Request) -> web.Response:
             # that session and already holds it. Compared at delivery time: the
             # factory may have re-allocated a stale session id meanwhile.
             run = started["handle"]
-            slot = _chat_session_slot(state, target)
+            slot = chat_session_slot(state, target)
             chat_session = slot[0].get(slot[1]) if slot else None
             if run.session_id is not None and run.session_id == chat_session:
                 return
@@ -383,30 +355,20 @@ async def _handle_resolve_prompt(request: web.Request) -> web.Response:
     handle = state.get_run(run_id)
     if handle is None:
         return web.json_response({"error": f"run {run_id!r} not found"}, status=404)
-    try:
-        body = await request.json()
-    except (json.JSONDecodeError, ValueError):
-        return web.json_response({"error": "body must be JSON"}, status=400)
-    if not isinstance(body, dict):
-        return web.json_response({"error": "body must be a JSON object"}, status=400)
+    body = await json_object(request)
+    if isinstance(body, web.Response):
+        return body
     choice = body.get("choice")
     if not isinstance(choice, str) or not choice:
         return web.json_response({"error": "'choice' (non-empty string) required"}, status=400)
-    pending = handle.pending_prompts.pop(prompt_id, None)
-    if pending is None:
-        return web.json_response({"error": f"prompt {prompt_id!r} not pending"}, status=404)
-    if not pending.accepts(choice):
-        # Put it back so a follow-up POST with the right key can still resolve.
-        handle.pending_prompts[prompt_id] = pending
-        return web.json_response(
-            {
-                "error": f"choice {choice!r} not valid for {pending.kind} prompt",
-                "valid_choices": list(pending.valid_choices),
-            },
-            status=409,
-        )
-    pending.future.set_result(choice)
-    handle.append_event({"type": "prompt_resolved", "prompt_id": prompt_id, "choice": choice})
+    try:
+        handle.resolve_prompt(prompt_id, choice)
+    except LookupError as exc:
+        return web.json_response({"error": str(exc)}, status=404)
+    except ValueError as exc:
+        # The prompt stays pending, so a follow-up POST with a valid key resolves it.
+        valid = handle.pending_prompts[prompt_id].valid_choices
+        return web.json_response({"error": str(exc), "valid_choices": list(valid)}, status=409)
     return web.json_response({"accepted": True, "choice": choice})
 
 
@@ -420,29 +382,9 @@ async def _handle_run_events_ws(request: web.Request) -> web.StreamResponse:
     ws = web.WebSocketResponse(heartbeat=15.0)
     await ws.prepare(request)
 
-    cursor = 0
     try:
-        while True:
-            while cursor < len(handle.events):
-                event = handle.events[cursor]
-                cursor += 1
-                await ws.send_json(event)
-            if handle.done.is_set() and cursor >= len(handle.events):
-                # The terminal "completed"/"error" event is appended via
-                # call_soon_threadsafe immediately before `done` is set, so it
-                # may still be queued (not yet in `handle.events`). Yield once to
-                # drain pending loop callbacks, then re-check — otherwise a fast
-                # run's completion event is never delivered to this subscriber.
-                await asyncio.sleep(0)
-                if cursor >= len(handle.events):
-                    break
-                continue
-            try:
-                await asyncio.wait_for(handle.event_added.wait(), timeout=30.0)
-            except TimeoutError:
-                if handle.done.is_set() and cursor >= len(handle.events):
-                    break
-                continue
+        async for event in handle.iter_events():
+            await ws.send_json(event)
     except asyncio.CancelledError:
         pass
     finally:
@@ -550,12 +492,9 @@ async def _handle_patch_session(request: web.Request) -> web.Response:
     """
     state: DaemonState = request.app["state"]
     session_id = request.match_info["session_id"]
-    try:
-        body = await request.json()
-    except (json.JSONDecodeError, ValueError):
-        return web.json_response({"error": "body must be JSON"}, status=400)
-    if not isinstance(body, dict):
-        return web.json_response({"error": "body must be a JSON object"}, status=400)
+    body = await json_object(request)
+    if isinstance(body, web.Response):
+        return body
 
     # M127: model/provider are immutable after launch.
     if body.get("model", _SENTINEL) is not _SENTINEL or (
@@ -590,181 +529,14 @@ async def _handle_patch_session(request: web.Request) -> web.Response:
 _SENTINEL = object()
 
 
-# ---- jobs handlers (M75) ----
-
-
-def _require_jobs_store(state: DaemonState):
-    jr = state.job_runner
-    if jr is None:
-        return None
-    return getattr(jr, "_store", None)
-
-
-async def _handle_create_job(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    store = _require_jobs_store(state)
-    if store is None:
-        return web.json_response({"error": "scheduler not enabled on this daemon"}, status=503)
-    try:
-        body = await request.json()
-    except (json.JSONDecodeError, ValueError):
-        return web.json_response({"error": "body must be JSON"}, status=400)
-    if not isinstance(body, dict):
-        return web.json_response({"error": "body must be a JSON object"}, status=400)
-    try:
-        rec = store.add_job(
-            name=str(body.get("name") or ""),
-            prompt=str(body.get("prompt") or ""),
-            schedule_expr=str(body.get("schedule") or ""),
-            repeat_times=body.get("repeat_times"),
-            context_from=body.get("context_from"),
-            deliver_to=body.get("deliver_to"),
-            enabled=bool(body.get("enabled", True)),
-        )
-    except ValueError as exc:
-        return web.json_response({"error": str(exc)}, status=400)
-    return web.json_response(rec.to_dict(), status=201)
-
-
-async def _handle_list_jobs(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    store = _require_jobs_store(state)
-    if store is None:
-        return web.json_response({"jobs": []})
-    include_disabled = request.query.get("include_disabled", "1") != "0"
-    return web.json_response(
-        {"jobs": [r.to_dict() for r in store.list_jobs(include_disabled=include_disabled)]}
-    )
-
-
-async def _handle_get_job(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    store = _require_jobs_store(state)
-    if store is None:
-        return web.json_response({"error": "scheduler not enabled"}, status=503)
-    rec = store.get_job(request.match_info["job_id"])
-    if rec is None:
-        return web.json_response({"error": "not found"}, status=404)
-    return web.json_response(rec.to_dict())
-
-
-async def _handle_update_job(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    store = _require_jobs_store(state)
-    if store is None:
-        return web.json_response({"error": "scheduler not enabled"}, status=503)
-    try:
-        body = await request.json()
-    except (json.JSONDecodeError, ValueError):
-        return web.json_response({"error": "body must be JSON"}, status=400)
-    if not isinstance(body, dict):
-        return web.json_response({"error": "body must be a JSON object"}, status=400)
-    try:
-        ok = store.update_job(request.match_info["job_id"], **body)
-    except ValueError as exc:
-        return web.json_response({"error": str(exc)}, status=400)
-    if not ok:
-        return web.json_response({"error": "not found"}, status=404)
-    rec = store.get_job(request.match_info["job_id"])
-    return web.json_response(rec.to_dict())
-
-
-async def _handle_delete_job(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    store = _require_jobs_store(state)
-    if store is None:
-        return web.json_response({"error": "scheduler not enabled"}, status=503)
-    if not store.delete_job(request.match_info["job_id"]):
-        return web.json_response({"error": "not found"}, status=404)
-    return web.json_response({"deleted": True})
-
-
-async def _handle_trigger_job(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    store = _require_jobs_store(state)
-    if store is None:
-        return web.json_response({"error": "scheduler not enabled"}, status=503)
-    if not store.trigger_job(request.match_info["job_id"]):
-        return web.json_response({"error": "not found"}, status=404)
-    return web.json_response({"triggered": True})
-
-
-async def _handle_list_job_runs(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    store = _require_jobs_store(state)
-    if store is None:
-        return web.json_response({"runs": []})
-    limit_raw = request.query.get("limit", "20")
-    try:
-        limit = max(1, min(int(limit_raw), 200))
-    except ValueError:
-        return web.json_response({"error": "'limit' must be an integer"}, status=400)
-    runs = store.list_runs(request.match_info["job_id"], limit=limit)
-    return web.json_response(
-        {
-            "runs": [
-                {
-                    "run_id": r.run_id,
-                    "job_id": r.job_id,
-                    "started_at": r.started_at,
-                    "finished_at": r.finished_at,
-                    "status": r.status,
-                    "iterations": r.iterations,
-                    "output_path": r.output_path,
-                    "error": r.error,
-                }
-                for r in runs
-            ]
-        }
-    )
-
-
-# ---- dream handlers (M76) ----
-
-
-async def _handle_dream_status(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    if state.dream_runner is None:
-        return web.json_response({"enabled": False})
-    status_fn = getattr(state.dream_runner, "status", None)
-    if callable(status_fn):
-        return web.json_response(status_fn())
-    return web.json_response({"enabled": True})
-
-
-async def _handle_dream_run(request: web.Request) -> web.Response:
-    state: DaemonState = request.app["state"]
-    if state.dream_runner is None:
-        return web.json_response({"error": "dream-runner not enabled"}, status=503)
-    body: Any = {}
-    with contextlib.suppress(Exception):
-        body = await request.json()
-    if not isinstance(body, dict):  # a JSON array/number body is not an error-500
-        body = {}
-    include_consolidation = bool(body.get("include_consolidation", True))
-    force_fn = getattr(state.dream_runner, "force_run", None)
-    if not callable(force_fn):
-        return web.json_response({"error": "dream-runner missing force_run"}, status=500)
-    result = await force_fn(include_consolidation=include_consolidation)
-    return web.json_response({"summary": result.summary(), "notes": result.notes})
-
-
 async def _start_background_runners(app: web.Application) -> None:
     """Start JobRunner / DreamRunner / channel gateways if they're wired."""
     state: DaemonState = app["state"]
-    if state.job_runner is not None:
-        start_fn = getattr(state.job_runner, "start", None)
+    for runner in (state.job_runner, state.dream_runner, state.reminder_runner):
+        start_fn = getattr(runner, "start", None)
         if callable(start_fn):
             await start_fn()
-    if state.dream_runner is not None:
-        start_fn = getattr(state.dream_runner, "start", None)
-        if callable(start_fn):
-            await start_fn()
-    if state.reminder_runner is not None:
-        start_fn = getattr(state.reminder_runner, "start", None)
-        if callable(start_fn):
-            await start_fn()
-    _start_channel_runners(state)
+    start_channel_runners(state)
 
 
 async def _stop_background_runners(app: web.Application) -> None:
@@ -788,142 +560,6 @@ async def _stop_background_runners(app: web.Application) -> None:
     state.channel_runners.clear()
     state.channel_tasks.clear()
     state.active_channels.clear()
-
-
-def _channel_session_map(state: DaemonState, platform: str):
-    """Per-(session, platform) chat→session map so two daemon sessions running
-    the same platform keep independent conversation contexts. The unnamed
-    daemon keeps the back-compat `<platform>-sessions.json` key."""
-    from veles.channels.session_map import SessionMap, channel_session_path
-
-    key = f"{state.session_name}-{platform}" if state.session_name else platform
-    return SessionMap.load(channel_session_path(key))
-
-
-def _chat_session_slot(state: DaemonState, target: str):
-    """`(session map, key)` of the chat a delivery target names, keyed the way
-    its gateway keys it (`chat_key_for_target`); None for a non-chat target."""
-    from veles.channels.session_map import chat_key_for_target
-
-    found = chat_key_for_target(target)
-    if found is None:
-        return None
-    platform, key = found
-    return _channel_session_map(state, platform), key
-
-
-def _float_setting(cfg: dict, key: str) -> float | None:
-    """Read an optional numeric channel setting. A typo warns and falls
-    back to the code default rather than crashing daemon startup."""
-    raw = cfg.get(key)
-    if raw is None:
-        return None
-    try:
-        return float(raw)
-    except (TypeError, ValueError):
-        logger.warning("[channels.telegram] %s=%r is not a number — using the default", key, raw)
-        return None
-
-
-def _build_channel_gateway(platform: str, channel_cfg: dict, *, backend, state: DaemonState):
-    """Resolve creds + build one gateway via the platform registry. Returns
-    None (and warns) when the platform is unregistered or its token is
-    missing — a bad channel is skipped, never fatal to daemon startup."""
-    from veles.channels.platform_registry import get_platform
-    from veles.core.secrets import get_provider_key
-
-    try:
-        entry = get_platform(platform)
-    except KeyError:
-        logger.warning("channel %r is not a registered platform — skipping", platform)
-        return None
-    token = get_provider_key(platform, project=state.project.name) or channel_cfg.get("bot_token")
-    if not token:
-        logger.warning(
-            "[channels.%s] enabled but no bot token in keychain (veles:%s:%s) or config — skipping",
-            platform,
-            platform,
-            state.project.name,
-        )
-        return None
-    session_map = _channel_session_map(state, platform)
-    if platform == "telegram":
-        raw_whitelist = channel_cfg.get("whitelist") or []
-        if isinstance(raw_whitelist, str):
-            raw_whitelist = [raw_whitelist]
-        whitelist = tuple(str(x) for x in raw_whitelist if str(x).strip())
-        # Stdin-fallback wizard wrote chat_id as a single allowed peer; honor it.
-        legacy_chat_id = channel_cfg.get("chat_id")
-        if legacy_chat_id and not whitelist:
-            whitelist = (str(legacy_chat_id),)
-        gateway = entry.factory(
-            bot_token=str(token),
-            daemon_client=backend,
-            session_map=session_map,
-            whitelist=whitelist,
-            attachment_dir=state.project.tmp_dir,
-            project_root=state.project.root,
-            debounce_seconds=_float_setting(channel_cfg, "debounce_seconds"),
-            forward_debounce_seconds=_float_setting(channel_cfg, "forward_debounce_seconds"),
-        )
-        logger.info("telegram channel started (whitelist: %d entries)", len(whitelist))
-        return gateway
-    # Generic platforms use the minimal factory contract shared with
-    # `veles channel run` (bot_token / daemon_client / session_map).
-    gateway = entry.factory(bot_token=str(token), daemon_client=backend, session_map=session_map)
-    logger.info("channel %r started", platform)
-    return gateway
-
-
-def _start_channel_runners(state: DaemonState) -> None:
-    """Read declared channels from config and start in-process gateways.
-
-    Generic over platforms (`channels/platform_registry`) and over several
-    channels per daemon. For a named session (`state.session_name`) the source
-    is `[daemon.<name>.channels.<type>]`; otherwise the legacy global
-    `[channels.<type>]`. Each enabled channel is resolved via the registry and
-    given its own `SessionMap`; the run backend is `InProcessRunBackend` so no
-    HTTP loopback / token is needed. Channels with missing creds (or an
-    unregistered platform) are skipped with a warning rather than failing
-    daemon startup.
-    """
-    from veles.channels.in_process_backend import InProcessRunBackend
-    from veles.channels.platform_registry import ensure_builtins_registered
-    from veles.core.project_config import list_channel_configs, load_project_config
-
-    ensure_builtins_registered()
-    cfg = load_project_config(state.project)
-    declared = list_channel_configs(cfg, daemon_session=state.session_name)
-    if not declared:
-        return
-    backend = InProcessRunBackend(state)
-    for platform, channel_cfg in declared:
-        gateway = _build_channel_gateway(platform, channel_cfg, backend=backend, state=state)
-        if gateway is None:
-            continue
-        state.channel_runners.append(gateway)
-        state.active_channels.append(platform)
-        # M165: expose this channel as an outbound delivery target for the
-        # scheduler. Any gateway implementing `deliver(chat_id, text,
-        # thread_id)` becomes reachable via `deliver_to = "<platform>:<chat>"`.
-        if state.delivery_router is not None:
-            deliver_fn = getattr(gateway, "deliver", None)
-            if callable(deliver_fn):
-                state.delivery_router.register_deliverer(platform, deliver_fn)
-        task = asyncio.create_task(_run_channel_gateway(gateway))
-        state.channel_tasks.append(task)
-
-
-async def _run_channel_gateway(gateway) -> None:
-    """Wrap `gateway.start()` so a crash doesn't take down the daemon."""
-    try:
-        await gateway.start()
-    except asyncio.CancelledError:
-        raise
-    except Exception as exc:
-        logger.error("channel gateway crashed: %s: %s", type(exc).__name__, exc)
-        with contextlib.suppress(Exception):
-            await gateway.stop()
 
 
 async def _drain_in_flight_runs(app: web.Application) -> None:

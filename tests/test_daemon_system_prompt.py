@@ -1,7 +1,7 @@
 """Daemon's agent_factory must assemble a system prompt the same way
 `veles run` does — AGENTS.md included.
 
-We mock the helpers that the factory imports lazily from `veles.cli`
+We mock the helpers the factory imports lazily from their owning modules
 so we don't need the network or a real Agent.
 """
 
@@ -10,13 +10,15 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import veles.cli as cli_mod
 import veles.core.agent as agent_mod
+import veles.core.provider_factory as pf_mod
+import veles.runtime.registry as registry_mod
+import veles.runtime.run as run_mod
 from tests.conftest import StubProvider
-from veles.cli.commands.daemon import _make_agent_factory
 from veles.core.context import reset_active_project, set_active_project
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
+from veles.daemon.agent_factory import make_agent_factory
 
 
 def _build_args() -> argparse.Namespace:
@@ -31,8 +33,8 @@ def _build_args() -> argparse.Namespace:
 
 
 def _install_factory_stubs(monkeypatch) -> dict:
-    """Patch the helpers `_make_agent_factory.factory` imports from
-    `veles.cli`. Returns the dict that Agent.__init__ captures."""
+    """Patch the provider, skills and compressor helpers the daemon factory
+    imports at call time. Returns the dict that Agent.__init__ captures."""
     from veles.core.tools.registry import Registry
 
     captured: dict = {}
@@ -42,12 +44,12 @@ def _install_factory_stubs(monkeypatch) -> dict:
             captured.update(kwargs)
 
     monkeypatch.setattr(
-        cli_mod,
-        "_make_provider",
+        pf_mod,
+        "make_provider",
         lambda *_a, **_kw: StubProvider(supports_tools=False, supports_streaming=True),
     )
-    monkeypatch.setattr(cli_mod, "_load_skills", lambda *_a, **_kw: Registry())
-    monkeypatch.setattr(cli_mod, "_build_compressor", lambda *_a, **_kw: None)
+    monkeypatch.setattr(registry_mod, "load_skills", lambda *_a, **_kw: Registry())
+    monkeypatch.setattr(run_mod, "build_compressor", lambda *_a, **_kw: None)
     monkeypatch.setattr(agent_mod, "Agent", _StubAgent)
     return captured
 
@@ -62,7 +64,7 @@ def test_fresh_session_injects_agents_md(tmp_path: Path, monkeypatch) -> None:
         store = SessionStore(project.memory_db_path)
         captured = _install_factory_stubs(monkeypatch)
 
-        factory = _make_agent_factory(_build_args(), project=project, store=store)
+        factory = make_agent_factory(_build_args(), project=project, store=store)
         factory(None, prompt="hello")
 
         sp = captured.get("system_prompt") or ""
@@ -111,7 +113,7 @@ def test_daemon_system_prompt_isolates_subproject(tmp_path: Path, monkeypatch) -
             ],
         )
 
-        factory = _make_agent_factory(_build_args(), project=project, store=store)
+        factory = make_agent_factory(_build_args(), project=project, store=store)
         factory(None, prompt="опиши текущий проект")
 
         sp = captured.get("system_prompt") or ""
@@ -146,7 +148,7 @@ def test_resumed_session_builds_system_prompt(tmp_path: Path, monkeypatch) -> No
         sid = store.create_session()
         captured = _install_factory_stubs(monkeypatch)
 
-        factory = _make_agent_factory(_build_args(), project=project, store=store)
+        factory = make_agent_factory(_build_args(), project=project, store=store)
         factory(sid, prompt="follow-up")
         sp = captured.get("system_prompt")
         assert isinstance(sp, str) and sp

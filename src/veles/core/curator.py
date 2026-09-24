@@ -1,25 +1,9 @@
 """Curator core types and pure helpers (VISION §5.1).
 
-The curator's *orchestration* lives in `cli/_curator.py` for now — its
-public surface is the argparse-driven `_maybe_run_*` triggers, and the
-existing test suite intentionally monkey-patches CLI-level lookup paths
-(`veles.cli._run_curator_pass`) for isolation. Moving that orchestration
-here would force every test in `tests/test_curator_*.py` and friends to
-re-patch, with no behavioural payoff.
-
-What *can* live in core cleanly:
-
-- `_CuratorPassResult` — value type, no dependencies.
-- `_CURATE_TOOLS`, `_CURATE_*_LIMIT` — domain constants the CLI layer
-  reaches for during configuration; equally useful to any future
-  daemon-side curator or test fixture without paying for the CLI
-  import chain.
-- `_render_message`, `_truncate_session_messages` — pure rendering
-  helpers used during prompt construction.
-
-`cli/_curator.py` re-imports these names so existing
-`from veles.cli._curator import _CURATE_TOOLS` paths keep working
-unchanged."""
+The curator's orchestration — the post-turn `_maybe_run_*` triggers and the
+curator pass — lives in `runtime/learning.py`, shared by the CLI and the
+daemon. This module holds what has no dependencies: the pass result type,
+the curate toolset and limits, and the transcript rendering."""
 
 from __future__ import annotations
 

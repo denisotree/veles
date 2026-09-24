@@ -18,10 +18,10 @@ from pathlib import Path
 
 import pytest
 
-from veles.cli._curator import _CURATE_TOOLS
 from veles.core.context import reset_active_project, set_active_project
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
+from veles.runtime.learning import _CURATE_TOOLS
 
 
 @pytest.fixture()
@@ -52,11 +52,11 @@ def test_curate_tools_retain_legacy_wiki_writers() -> None:
 # ---- curator system prompt ----
 
 
-def test_curate_prompt_instructs_memory_save_insight(project) -> None:
+def test_curate_prompt_instructs_memory_save_insight(project, monkeypatch) -> None:
     """The curator system prompt must explicitly tell the agent to
     call memory_save_insight after writing the wiki page. Without
     this instruction the agent skips the SQL mirror."""
-    from veles.cli._curator import _curate_one_session
+    from veles.runtime.learning import _curate_one_session
 
     # We can't run _curate_one_session without an LLM, but we can
     # capture the system prompt by patching the Agent constructor.
@@ -77,8 +77,9 @@ def test_curate_prompt_instructs_memory_save_insight(project) -> None:
                 session_id="x",
             )
 
-    import veles.cli as cli_mod
-    import veles.cli._curator as curator_mod
+    import veles.runtime.learning as curator_mod
+    import veles.runtime.registry as registry_mod
+    import veles.runtime.run as run_mod
     from veles.core.memory import SessionInfo
 
     store = SessionStore(project.memory_db_path)
@@ -87,34 +88,25 @@ def test_curate_prompt_instructs_memory_save_insight(project) -> None:
         id=sid, created_at=0.0, last_activity_at=0.0, title=None, turn_count=0
     )
 
-    real_agent = curator_mod.Agent
-    real_provider = cli_mod._make_tool_aware_provider
-    real_skills = cli_mod._load_skills
-    real_run = cli_mod._run_agent_streaming_aware
-    real_qualify = cli_mod._qualify_for_provider
+    monkeypatch.setattr(curator_mod, "Agent", _FakeAgent)
+    monkeypatch.setattr(registry_mod, "make_tool_aware_provider", lambda *a, **kw: None)
+    monkeypatch.setattr(registry_mod, "load_skills", lambda *a, **kw: None)
+    monkeypatch.setattr(registry_mod, "qualify_for_provider", lambda prompt, *a, **kw: prompt)
+    monkeypatch.setattr(
+        run_mod,
+        "run_agent_streaming_aware",
+        lambda *a, **kw: (type("R", (), {"stopped_reason": "completed"})(), None),
+    )
+
+    class _Args:
+        provider = "openrouter"
+        model = "x"
+        max_iterations = 1
+        verbose = False
+
     try:
-        curator_mod.Agent = _FakeAgent
-        cli_mod._make_tool_aware_provider = lambda *a, **kw: None
-        cli_mod._load_skills = lambda *a, **kw: None
-        cli_mod._qualify_for_provider = lambda prompt, *a, **kw: prompt
-        cli_mod._run_agent_streaming_aware = lambda *a, **kw: (
-            type("R", (), {"stopped_reason": "completed"})(),
-            None,
-        )
-
-        class _Args:
-            provider = "openrouter"
-            model = "x"
-            max_iterations = 1
-            verbose = False
-
         _curate_one_session(store, session_info, _Args(), project)
     finally:
-        curator_mod.Agent = real_agent
-        cli_mod._make_tool_aware_provider = real_provider
-        cli_mod._load_skills = real_skills
-        cli_mod._qualify_for_provider = real_qualify
-        cli_mod._run_agent_streaming_aware = real_run
         store.close()
 
     prompt = captured["system_prompt"]

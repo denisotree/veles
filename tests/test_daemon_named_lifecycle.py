@@ -76,7 +76,7 @@ def test_cleanup_keeps_registry_entry_on_exit(tmp_path, monkeypatch):
 
 
 def test_factory_settings_uses_named_session_provider_and_model(tmp_path):
-    from veles.cli.commands.daemon import _factory_settings_from_args
+    from veles.daemon.agent_factory import factory_settings_from_args
 
     project = init_project(tmp_path / "p", name="p")
     cfg = load_project_config(project)
@@ -90,12 +90,12 @@ def test_factory_settings_uses_named_session_provider_and_model(tmp_path):
     save_project_config(project, cfg)
 
     args = argparse.Namespace(provider=None, model=None)
-    pinned = _factory_settings_from_args(args, project, daemon_session="api")
+    pinned = factory_settings_from_args(args, project, daemon_session="api")
     assert pinned.provider_name == "ollama"
     assert pinned.model == "ollama/qwen3:4b-instruct"
 
     # Without the session arg it falls back to the project [engine] base.
-    base = _factory_settings_from_args(args, project)
+    base = factory_settings_from_args(args, project)
     assert base.provider_name == "openrouter"
     assert base.model == "openrouter/base-model"
 
@@ -154,8 +154,8 @@ def test_resolve_instance_paths_named_vs_default(tmp_path, monkeypatch):
 
 def test_instance_log_slug_matches_instance_log_path(tmp_path, monkeypatch):
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path))
-    from veles.cli.commands.daemon import _instance_log_slug, daemon_log_path
-    from veles.daemon.paths import instance_log_path
+    from veles.cli.commands.daemon_lifecycle import _instance_log_slug
+    from veles.daemon.paths import daemon_log_path, instance_log_path
 
     project = _P("myproj", tmp_path / "memory.db")
     slug = _instance_log_slug(project, "api")
@@ -167,7 +167,10 @@ def test_instance_log_slug_matches_instance_log_path(tmp_path, monkeypatch):
 
 
 def test_mark_session_running_and_stopped(tmp_path):
-    from veles.cli.commands.daemon import _mark_session_running, _mark_session_stopped
+    from veles.cli.commands.daemon_lifecycle import (
+        _mark_session_running,
+        _mark_session_stopped,
+    )
 
     project = _P("myproj", tmp_path / "memory.db")
     store = RuntimeSessionStore(project.memory_db_path)

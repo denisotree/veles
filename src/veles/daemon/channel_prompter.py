@@ -1,28 +1,25 @@
-"""Daemon-side prompters that route trust / approval questions to a
-channel client (e.g. Telegram) via the run's event stream.
+"""Daemon-side prompters that route trust / approval / critical-op questions and
+the agent's `ask_user` to a channel client (e.g. Telegram) via the run's event
+stream.
 
-The agent's permission engine calls `evaluate_trust` / `ask_for_approval`
-on whatever ContextVar prompter is installed. Inside `veles daemon`,
-without a custom prompter, the defaults check `sys.stdin.isatty()` and
-auto-refuse — so a Telegram-originated run can never invoke a
-sensitive tool.
+The agent's permission engine calls whatever ContextVar prompter is installed.
+Inside `veles daemon`, without these, the defaults check `sys.stdin.isatty()`
+and auto-refuse — so a Telegram-originated run could never invoke a sensitive
+tool or ask the user anything.
 
-`make_unified_prompter` builds a prompter bound to a specific
-`RunHandle`. When fired (on the agent's worker thread), it:
+Every prompter here goes through `_ask`, which (on the agent's worker thread):
 
   1. allocates an 8-char hex `prompt_id`,
   2. registers a `PendingPrompt` (carrying a `concurrent.futures.Future`)
      on `handle.pending_prompts`,
-  3. emits a `trust_prompt` / `approval_prompt` event to the WebSocket
-     stream via `loop.call_soon_threadsafe(handle.append_event, …)`,
+  3. emits a `<kind>_prompt` event to the run's stream via
+     `loop.call_soon_threadsafe(handle.append_event, …)`,
   4. blocks on `future.result(timeout)`,
-  5. translates the channel's string key (`"once"` / `"yes"` / …)
-     back into a `PromptAnswer` decision, or falls back to the safest
-     answer on timeout / unknown value.
+  5. returns the channel's raw answer, or None on timeout — each prompter then
+     maps that to its own safest outcome.
 
-The HTTP endpoint `POST /v1/runs/{run_id}/prompts/{prompt_id}` (see
-`daemon/server.py`) is the other half: it looks up the `PendingPrompt`
-and calls `future.set_result(choice_key)`."""
+The other half is `RunHandle.resolve_prompt`, called from
+`POST /v1/runs/{run_id}/prompts/{prompt_id}` or the in-process backend."""
 
 from __future__ import annotations
 
@@ -48,6 +45,8 @@ DEFAULT_PROMPT_TIMEOUT_SECONDS = 300.0
 """Five minutes — matches the user-chosen UX in the plan. Configurable
 per call if a channel needs a different SLA."""
 
+# Telegram shows these as inline-keyboard buttons. Trust omits "always global":
+# a daemon is bound to one project.
 _TRUST_OPTIONS_TELEGRAM: tuple[dict[str, str], ...] = (
     {"key": "once", "label": "⏱ Once"},
     {"key": "always_project", "label": "🔓 Always for this project"},
@@ -64,129 +63,6 @@ _CRITICAL_OPTIONS_TELEGRAM: tuple[dict[str, str], ...] = (
     {"key": "no", "label": "🚫 Cancel"},
 )
 
-
-def _make_prompt_id() -> str:
-    return secrets.token_hex(4)
-
-
-def _dispatch_trust(
-    handle: RunHandle,
-    loop: asyncio.AbstractEventLoop,
-    tool_name: str,
-    *,
-    arguments: dict[str, Any],
-    reason: str,
-    timeout: float,
-) -> str:
-    """Trust-prompt dispatch for the PromptRequest-driven prompter.
-    Returns the channel's raw key string (`"once"` / `"always_project"` /
-    `"refuse"` / ...); the caller translates to a `PromptAnswer` decision.
-
-    Telegram surfaces three buttons (`Once`, `Always for this project`,
-    `Refuse`); `ALWAYS_GLOBAL` is omitted because a daemon is bound to
-    one project. `arguments` and `reason` go into the event payload so
-    the channel can show what the agent actually wants to do.
-    """
-    prompt_id = _make_prompt_id()
-    valid_keys = tuple(opt["key"] for opt in _TRUST_OPTIONS_TELEGRAM)
-    pending = PendingPrompt(
-        kind="trust",
-        tool=tool_name,
-        valid_choices=valid_keys,
-    )
-    handle.pending_prompts[prompt_id] = pending
-    loop.call_soon_threadsafe(
-        handle.append_event,
-        {
-            "type": "trust_prompt",
-            "prompt_id": prompt_id,
-            "tool": tool_name,
-            "arguments": arguments,
-            "reason": reason,
-            "options": list(_TRUST_OPTIONS_TELEGRAM),
-        },
-    )
-    try:
-        answer = pending.future.result(timeout=timeout)
-    except _FuturesTimeout:
-        logger.info(
-            "trust prompt %s for tool %r timed out after %.0fs → REFUSE",
-            prompt_id,
-            tool_name,
-            timeout,
-        )
-        handle.pending_prompts.pop(prompt_id, None)
-        loop.call_soon_threadsafe(
-            handle.append_event,
-            {
-                "type": "prompt_resolved",
-                "prompt_id": prompt_id,
-                "choice": "refuse",
-                "reason": "timeout",
-            },
-        )
-        return "refuse"
-    return answer
-
-
-def _dispatch_approval(
-    handle: RunHandle,
-    loop: asyncio.AbstractEventLoop,
-    tool_name: str,
-    arguments: dict[str, Any],
-    reason: str,
-    *,
-    timeout: float,
-) -> str:
-    """Approval-prompt dispatch for the unified prompter. Two outcomes —
-    Allow / Deny — mirroring the modal `[y/N]`; defaults to Deny on
-    timeout. Returns the raw channel key (`"yes"` / `"no"`)."""
-
-    prompt_id = _make_prompt_id()
-    valid_keys = tuple(opt["key"] for opt in _APPROVAL_OPTIONS_TELEGRAM)
-    pending = PendingPrompt(
-        kind="approval",
-        tool=tool_name,
-        valid_choices=valid_keys,
-    )
-    handle.pending_prompts[prompt_id] = pending
-    loop.call_soon_threadsafe(
-        handle.append_event,
-        {
-            "type": "approval_prompt",
-            "prompt_id": prompt_id,
-            "tool": tool_name,
-            "reason": reason,
-            "arguments": arguments,
-            "options": list(_APPROVAL_OPTIONS_TELEGRAM),
-        },
-    )
-    try:
-        answer = pending.future.result(timeout=timeout)
-    except _FuturesTimeout:
-        logger.info(
-            "approval prompt %s for tool %r timed out after %.0fs → deny",
-            prompt_id,
-            tool_name,
-            timeout,
-        )
-        handle.pending_prompts.pop(prompt_id, None)
-        loop.call_soon_threadsafe(
-            handle.append_event,
-            {
-                "type": "prompt_resolved",
-                "prompt_id": prompt_id,
-                "reason": "timeout",
-            },
-        )
-        return "no"
-    return answer
-
-
-# Single Prompter that routes by `req.kind`. The daemon installs this
-# via `permission.prompt.set_prompter` so both trust and approval flows
-# reach the channel with arguments populated.
-
 _TRUST_DECISION_BY_KEY: dict[str, str] = {
     "once": "allow_once",
     "always_project": "allow_project",
@@ -195,37 +71,77 @@ _TRUST_DECISION_BY_KEY: dict[str, str] = {
 }
 
 
+def _ask(
+    handle: RunHandle,
+    loop: asyncio.AbstractEventLoop,
+    *,
+    kind: str,
+    subject: str,
+    payload: dict[str, Any],
+    options: tuple[dict[str, str], ...] | list[dict[str, str]],
+    timeout: float,
+    free_text: bool = False,
+    timeout_choice: str | None = None,
+) -> str | None:
+    """Put one question to the channel and wait for its answer (see the module
+    docstring). `timeout_choice`, when given, is recorded on the timeout's
+    `prompt_resolved` event as the choice taken."""
+    prompt_id = secrets.token_hex(4)
+    pending = PendingPrompt(
+        kind=kind,
+        tool=subject,
+        valid_choices=tuple(opt["key"] for opt in options),
+        free_text=free_text,
+    )
+    handle.pending_prompts[prompt_id] = pending
+    loop.call_soon_threadsafe(
+        handle.append_event,
+        {"type": f"{kind}_prompt", "prompt_id": prompt_id, **payload, "options": list(options)},
+    )
+    try:
+        return pending.future.result(timeout=timeout)
+    except _FuturesTimeout:
+        logger.info("%s prompt %s for %r timed out after %.0fs", kind, prompt_id, subject, timeout)
+        handle.pending_prompts.pop(prompt_id, None)
+        resolved = {"type": "prompt_resolved", "prompt_id": prompt_id, "reason": "timeout"}
+        if timeout_choice is not None:
+            resolved["choice"] = timeout_choice
+        loop.call_soon_threadsafe(handle.append_event, resolved)
+        return None
+
+
 def make_unified_prompter(
     handle: RunHandle,
     loop: asyncio.AbstractEventLoop,
     *,
     timeout: float = DEFAULT_PROMPT_TIMEOUT_SECONDS,
 ) -> UnifiedPrompter:
-    """One PromptRequest-based prompter for both trust and approval.
-
-    Routes by `req.kind` to `_dispatch_trust` / `_dispatch_approval`.
-    The wire format is `trust_prompt` / `approval_prompt` event types
-    with an inline-keyboard `options` payload.
-    """
+    """One PromptRequest-based prompter for trust and approval, routed by
+    `req.kind`; `arguments` and `reason` go to the channel so it can show what
+    the agent wants to do. Anything but an explicit allow is a deny."""
 
     def prompter(req: PromptRequest) -> PromptAnswer:
+        payload = {"tool": req.tool_name, "arguments": req.arguments, "reason": req.reason}
         if req.kind == "trust":
-            key = _dispatch_trust(
+            key = _ask(
                 handle,
                 loop,
-                req.tool_name,
-                arguments=req.arguments,
-                reason=req.reason,
+                kind="trust",
+                subject=req.tool_name,
+                payload=payload,
+                options=_TRUST_OPTIONS_TELEGRAM,
                 timeout=timeout,
+                timeout_choice="refuse",
             )
-            return PromptAnswer(_TRUST_DECISION_BY_KEY.get(key, "deny"))  # type: ignore[arg-type]
+            return PromptAnswer(_TRUST_DECISION_BY_KEY.get(key or "refuse", "deny"))  # type: ignore[arg-type]
         if req.kind == "approval":
-            key = _dispatch_approval(
+            key = _ask(
                 handle,
                 loop,
-                req.tool_name,
-                req.arguments,
-                req.reason,
+                kind="approval",
+                subject=req.tool_name,
+                payload=payload,
+                options=_APPROVAL_OPTIONS_TELEGRAM,
                 timeout=timeout,
             )
             return PromptAnswer("allow_once" if key == "yes" else "deny")
@@ -240,55 +156,22 @@ def make_critical_confirmer(
     *,
     timeout: float = DEFAULT_PROMPT_TIMEOUT_SECONDS,
 ) -> Confirmer:
-    """M213: route `confirm_critical` (M39 always-confirm + the M198
-    exfiltration gate) to the channel as an inline-keyboard prompt — the
-    channel-side mirror of the REPL's in-app yes/no picker.
-
-    Same mechanics as `_dispatch_approval` (PendingPrompt + Future +
-    `critical_prompt` event); the payload carries `op`/`summary` instead of
-    tool/arguments because that's the `Confirmer` contract. Deny on
-    timeout / cancel / anything but a literal `"yes"` — critical ops stay
-    fail-closed. Installed per run by `run_agent_in_background`, overriding
-    the daemon's M212 auto-deny confirmer for the turn."""
+    """Route `confirm_critical` (always-confirm ops and the exfiltration gate)
+    to the channel as a `critical_prompt`; the payload carries `op`/`summary`,
+    the `Confirmer` contract. Deny on timeout, cancel or anything but a literal
+    `"yes"` — critical ops stay fail-closed. Installed per run by
+    `run_agent_in_background`, overriding the daemon's auto-deny confirmer."""
 
     def confirmer(op: str, summary: str) -> bool:
-        prompt_id = _make_prompt_id()
-        valid_keys = tuple(opt["key"] for opt in _CRITICAL_OPTIONS_TELEGRAM)
-        pending = PendingPrompt(
+        answer = _ask(
+            handle,
+            loop,
             kind="critical",
-            tool=op,
-            valid_choices=valid_keys,
+            subject=op,
+            payload={"op": op, "summary": summary},
+            options=_CRITICAL_OPTIONS_TELEGRAM,
+            timeout=timeout,
         )
-        handle.pending_prompts[prompt_id] = pending
-        loop.call_soon_threadsafe(
-            handle.append_event,
-            {
-                "type": "critical_prompt",
-                "prompt_id": prompt_id,
-                "op": op,
-                "summary": summary,
-                "options": list(_CRITICAL_OPTIONS_TELEGRAM),
-            },
-        )
-        try:
-            answer = pending.future.result(timeout=timeout)
-        except _FuturesTimeout:
-            logger.info(
-                "critical prompt %s for %r timed out after %.0fs → deny",
-                prompt_id,
-                op,
-                timeout,
-            )
-            handle.pending_prompts.pop(prompt_id, None)
-            loop.call_soon_threadsafe(
-                handle.append_event,
-                {
-                    "type": "prompt_resolved",
-                    "prompt_id": prompt_id,
-                    "reason": "timeout",
-                },
-            )
-            return False
         return answer == "yes"
 
     return confirmer
@@ -300,48 +183,28 @@ def make_question_prompter(
     *,
     timeout: float = DEFAULT_PROMPT_TIMEOUT_SECONDS,
 ):
-    """M284: route the agent's `ask_user` to the chat — the daemon returned
-    "no human available" for every question, so an agent working in a chat
-    could never ask for a detail only the user has.
-
-    Emits a `clarification_prompt` (the event the Telegram gateway already
-    renders, which nothing produced until now): the options, if any, become
-    buttons, and any text the user types in reply is taken as the answer
-    (`free_text`). Returns the chosen option's label, the typed answer, or
-    None on timeout — `ask_user` then tells the agent to proceed on its best
-    assumption, exactly as before."""
+    """Route the agent's `ask_user` to the chat as a `clarification_prompt`:
+    the options, if any, become buttons, and any text the user types in reply
+    is taken as the answer (`free_text`). Returns the chosen option's label,
+    the typed answer, or None on timeout — `ask_user` then tells the agent to
+    proceed on its best assumption."""
 
     def prompter(question: str, options: list[str] | None = None) -> str | None:
-        prompt_id = _make_prompt_id()
         choices = list(options or [])
-        keys = tuple(str(i) for i in range(len(choices)))
-        pending = PendingPrompt(
+        buttons = [{"key": str(i), "label": c} for i, c in enumerate(choices)]
+        answer = _ask(
+            handle,
+            loop,
             kind="clarification",
-            tool="ask_user",
-            valid_choices=keys,
+            subject="ask_user",
+            payload={"question": question},
+            options=buttons,
+            timeout=timeout,
             free_text=True,
         )
-        handle.pending_prompts[prompt_id] = pending
-        loop.call_soon_threadsafe(
-            handle.append_event,
-            {
-                "type": "clarification_prompt",
-                "prompt_id": prompt_id,
-                "question": question,
-                "options": [{"key": k, "label": c} for k, c in zip(keys, choices, strict=True)],
-            },
-        )
-        try:
-            answer = pending.future.result(timeout=timeout)
-        except _FuturesTimeout:
-            logger.info("question %s timed out after %.0fs → no answer", prompt_id, timeout)
-            handle.pending_prompts.pop(prompt_id, None)
-            loop.call_soon_threadsafe(
-                handle.append_event,
-                {"type": "prompt_resolved", "prompt_id": prompt_id, "reason": "timeout"},
-            )
+        if answer is None:
             return None
-        if answer in keys:
+        if answer in {b["key"] for b in buttons}:
             return choices[int(answer)]
         return answer.strip() or None
 

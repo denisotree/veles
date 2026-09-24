@@ -23,16 +23,8 @@ def _build_runtime(args: argparse.Namespace, project: Project):
 
     Returns ``(state, factory, store)`` or ``None`` when the key gate fails.
     """
-    from veles.cli import (
-        _PLANNING_TOOLS,
-        _PROVIDER_API_KEY_ENVS,
-        _RUN_TOOLS,
-        _build_compressor,
-        _ensure_api_key,
-        _load_skills,
-        _make_provider,
-        _touch_active_project,
-    )
+    from veles.cli._console import ensure_api_key
+    from veles.cli._project import _touch_active_project
     from veles.core.agent import Agent
     from veles.core.memory import SessionStore
     from veles.core.model_resolver import (
@@ -43,7 +35,10 @@ def _build_runtime(args: argparse.Namespace, project: Project):
     )
     from veles.core.model_windows import default_hard_ceiling_for
     from veles.core.modes import get_mode
+    from veles.core.provider_factory import make_provider
     from veles.core.session_state import AppState
+    from veles.runtime.registry import PLANNING_TOOLS, RUN_TOOLS, load_skills
+    from veles.runtime.run import compressor_from_args
 
     args.provider = resolve_effective_provider(args, project)
     try:
@@ -51,7 +46,7 @@ def _build_runtime(args: argparse.Namespace, project: Project):
     except ConfigurationError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return None
-    if args.provider in _PROVIDER_API_KEY_ENVS and not _ensure_api_key(args.provider):
+    if not ensure_api_key(args.provider):
         return None
     _touch_active_project(project)
 
@@ -62,11 +57,11 @@ def _build_runtime(args: argparse.Namespace, project: Project):
     # 2026-07-08) while `veles run`/curator already used native calls. NOTE:
     # detection is bound to the STARTUP model — an in-session /model switch
     # keeps the provider instance (pre-existing behaviour).
-    provider = _make_provider(args.provider, model=args.model)
-    compressor = _build_compressor(args, project, provider)
+    provider = make_provider(args.provider, model=args.model)
+    compressor = compressor_from_args(args, project, provider)
     registries = {
-        "writing": _load_skills(project, _RUN_TOOLS, provider=provider, model=args.model),
-        "planning": _load_skills(project, _PLANNING_TOOLS, provider=provider, model=args.model),
+        "writing": load_skills(project, RUN_TOOLS, provider=provider, model=args.model),
+        "planning": load_skills(project, PLANNING_TOOLS, provider=provider, model=args.model),
     }
     store = SessionStore(project.memory_db_path)
 

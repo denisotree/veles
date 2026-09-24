@@ -15,12 +15,12 @@ text in `line`.
 from __future__ import annotations
 
 import contextlib
-import datetime as dt
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from veles.cli.repl.slash.registry import SlashContext, SlashRegistry, SlashResult
 from veles.core.text import first_heading
+from veles.core.timeutil import local_stamp
 
 if TYPE_CHECKING:
     from veles.core.project import Project
@@ -38,66 +38,94 @@ def _parse_int(text: str, default: int) -> int:
         return default
 
 
-def _fmt_ts(ts: float) -> str:
-    return dt.datetime.fromtimestamp(ts, tz=dt.UTC).strftime("%Y-%m-%d %H:%M")
+_HOTKEYS = (
+    ("@", "open the project file picker, insert a path"),
+    ("Ctrl+I / Ctrl+O", "toggle the inspector (tool activity + status/duration)"),
+    ("Ctrl+X Ctrl+E", "open the current draft in $EDITOR"),
+    ("Ctrl+V", "paste an image from the clipboard (or plain text)"),
+    ("Shift+Tab", "cycle mode (auto, planning, writing, goal)"),
+    ("Ctrl+J / Shift+Enter", "insert a newline (Enter submits)"),
+    ("Up / Down", "input history"),
+    ("Esc", "cancel a picker/question, or stop generation"),
+    ("Ctrl+C", "cancel a picker/stop generation/clear input; twice on an empty line to exit"),
+    ("Ctrl+D", "exit"),
+    ("⌘C / Ctrl+Shift+C", "native terminal copy (the REPL writes to the normal screen)"),
+)
 
 
 # ---------------- basics ----------------
 
 
-def _help(line: str, ctx: SlashContext) -> SlashResult:
-    del line
-    from veles.core.layout.engines import wiki_enabled
-
-    wiki_on = ctx.project is not None and wiki_enabled(ctx.project)
-    save_help = (
-        "  /save <slug>                 save last answer as wiki/queries/<slug>.md"
-        if wiki_on
-        else "  /save <slug>                 save last answer to project memory"
-    )
-    rows = [
-        "Slash commands:",
-        "  /help                        show this help",
-        "  /quit, /q, /exit             exit the TUI",
-        "  /clear                       start a fresh session (clears chat)",
-        "  /session                     print current session id",
-        save_help,
-        "  /history [N]                 list recent sessions (default 20)",
-    ]
-    if wiki_on:
-        rows += [
-            "  /wiki add <path|url>         agent ingests a source into the wiki",
-            "  /wiki query <question>       agent answers from the wiki",
-        ]
-    rows += [
-        "  /model [<id>]                show or set the active model",
-        "  /theme [<name>]              show or set the active TUI theme",
-        "  /mode [<name>]               show or set the active mode (Shift+Tab cycles)",
-        "                               modes: auto, planning, writing, goal",
-        "  /schema [validate|fix]       inspect or fix AGENTS.md sections",
-        "  /self-doc                    refresh project self-documentation",
-        "  /tokens                      per-session and per-turn token totals",
-        "  /context                     current context size vs model window",
-        "  /status                      snapshot: model/mode/session/provider/busy/queue",
-        "  /insights [category] [N]     recent insights (setup-hint, skill-suggestion, …)",
-        "  /rules [kind] [N]            recent behavioral rules (format, do, dont, preference)",
-        "",
-        "Hotkeys:",
-        "  @                            open the project file picker, insert a path",
-        "  Ctrl+I / Ctrl+O              toggle the inspector (tool activity + status/duration)",
-        "  Ctrl+X Ctrl+E                open the current draft in $EDITOR",
-        "  Ctrl+V                       paste an image from the clipboard (or plain text)",
-        "  Shift+Tab                    cycle mode",
-        "  Ctrl+J / Shift+Enter         insert a newline (Enter submits)",
-        "  Up / Down                    input history",
-        "  Esc                          cancel a picker/question, or stop generation",
-        "  Ctrl+C                       cancel a picker/stop generation/clear input;",
-        "                               twice on an empty line to exit",
-        "  Ctrl+D                       exit",
-        "  ⌘C (macOS) / Ctrl+Shift+C    native terminal copy (no app binding needed —",
-        "                               the REPL streams to the normal screen buffer)",
-    ]
+def _help(registry: SlashRegistry) -> SlashResult:
+    """Every registered command with its usage and aliases, then the hotkeys —
+    built from the registry, so a new command shows up without editing a list."""
+    rows = ["Slash commands:"]
+    for cmd in registry.commands():
+        names = ", ".join([cmd.usage or cmd.name, *cmd.aliases])
+        rows.append(f"  {names:<30} {cmd.summary}")
+    rows += ["", "Hotkeys:", *(f"  {key:<30} {what}" for key, what in _HOTKEYS)]
     return SlashResult.ok("\n".join(rows))
+
+
+# `/errors` also reaches back past this process: a failure in an earlier REPL
+# run, a `veles run` or the daemon is in `events.jsonl` and would otherwise be
+# invisible after a restart. Bounded so a days-old, already-fixed failure doesn't
+# resurface on a fresh start.
+_EARLIER_ERRORS_WINDOW_S = 24 * 60 * 60
+_EARLIER_ERRORS_LIMIT = 10
+
+
+def _earlier_errors(project, current_session_id: str | None) -> list[tuple[str, str]]:
+    """`(ts, text)` for recent `error` events from other runs. Best-effort: a
+    missing or unreadable log yields nothing rather than breaking `/errors`."""
+    if project is None:
+        return []
+    from veles.core.events import events_path_for_project, read_events, recent_error_events
+
+    try:
+        events = read_events(events_path_for_project(project.state_dir))
+    except OSError:
+        return []
+    recent = recent_error_events(
+        events, within_seconds=_EARLIER_ERRORS_WINDOW_S, limit=_EARLIER_ERRORS_LIMIT
+    )
+    return [
+        (str(e.get("ts", "")), f"{e.get('error_type', 'error')}: {e.get('message', '')}")
+        for e in recent
+        # This session's own failures are already in the in-memory list.
+        if not current_session_id or e.get("session_id") != current_session_id
+    ]
+
+
+def _errors(line: str, ctx: SlashContext) -> SlashResult:
+    """This session's failures, plus other runs' from the last 24h."""
+    del line
+    earlier = _earlier_errors(ctx.project, getattr(ctx.state, "session_id", None))
+    if not ctx.errors and not earlier:
+        return SlashResult.ok("  no errors in this session or the last 24h")
+    rows = [f"  · {e}" for e in ctx.errors[-20:]]
+    if earlier:
+        rows.append("  earlier runs, last 24h:")
+        rows += [f"  · {ts} {text}" for ts, text in earlier]
+    return SlashResult.ok("\n".join(rows))
+
+
+def _sessions(line: str, ctx: SlashContext) -> SlashResult:
+    del line, ctx
+    return SlashResult(open_picker="sessions")
+
+
+def _resume(line: str, ctx: SlashContext) -> SlashResult:
+    prefix = line.strip()
+    match = (
+        next((s for s in ctx.store.list_sessions(limit=50) if s.id.startswith(prefix)), None)
+        if prefix
+        else None
+    )
+    if match is None:
+        return SlashResult.err("/resume <id-prefix> — see /sessions for ids")
+    ctx.state.session_id = match.id
+    return SlashResult.ok(f"  resumed {match.id}")
 
 
 def _quit(line: str, ctx: SlashContext) -> SlashResult:
@@ -187,9 +215,8 @@ def _history(line: str, ctx: SlashContext) -> SlashResult:
     for info in sessions:
         marker = " *" if info.id == ctx.state.session_id else "  "
         title = info.title or "(untitled)"
-        rows.append(
-            f"{marker}{info.id}  {_fmt_ts(info.last_activity_at)}  turns={info.turn_count}  {title}"
-        )
+        when = local_stamp(info.last_activity_at)
+        rows.append(f"{marker}{info.id}  {when}  turns={info.turn_count}  {title}")
     return SlashResult.ok("\n".join(rows))
 
 
@@ -504,7 +531,7 @@ def _insights(line: str, ctx: SlashContext) -> SlashResult:
     header_bits.append("):")
     out_lines = ["".join(header_bits)]
     for row in rows:
-        ts = _fmt_ts(row.created_at) if row.created_at else "—"
+        ts = local_stamp(row.created_at) if row.created_at else "—"
         cat = row.category or "—"
         title = row.title or "(no title)"
         # M260: a hidden row is still listed — the inspector's job is to show
@@ -548,7 +575,7 @@ def _rules(line: str, ctx: SlashContext) -> SlashResult:
     header_bits.append("):")
     out_lines = ["".join(header_bits)]
     for row in rows:
-        ts = _fmt_ts(row.created_at) if row.created_at else "—"
+        ts = local_stamp(row.created_at) if row.created_at else "—"
         kind = row.kind or "—"
         body = (row.body or "(no body)").strip()
         if len(body) > 120:
@@ -594,49 +621,66 @@ def build_default_registry(project: Project | None = None) -> SlashRegistry:
 
     reg = SlashRegistry()
 
-    reg.register("/help", _help, summary="show this help")
-    reg.register(
-        "/quit",
-        _quit,
-        summary="exit the TUI",
-        aliases=("/q", "/exit"),
-    )
+    reg.register("/help", lambda _line, _ctx: _help(reg), summary="show this help", aliases=("/h",))
+    reg.register("/quit", _quit, summary="exit (or Ctrl+D)", aliases=("/q", "/exit"))
     reg.register("/clear", _clear, summary="start a fresh session", aliases=("/new",))
     reg.register("/session", _session, summary="print current session id")
+    reg.register("/sessions", _sessions, summary="list recent sessions and resume one")
+    reg.register(
+        "/resume", _resume, summary="resume a session by id prefix", usage="/resume <id-prefix>"
+    )
+    reg.register("/history", _history, summary="list recent sessions", usage="/history [N]")
+    reg.register(
+        "/errors", _errors, summary="errors from this session, plus earlier runs in the last 24h"
+    )
 
     save_summary = (
-        "save last answer as wiki/queries/<slug>.md" if wiki_on else "save last answer to memory"
+        "save last answer as wiki/queries/<slug>.md"
+        if wiki_on
+        else "save last answer to project memory"
     )
-    reg.register("/save", _save, summary=save_summary)
-    reg.register("/history", _history, summary="list recent sessions")
+    reg.register("/save", _save, summary=save_summary, usage="/save <slug>")
 
     if wiki_on:
-        reg.register("/wiki", _wiki, summary="wiki: add <path|url> | query <question>")
+        reg.register(
+            "/wiki",
+            _wiki,
+            summary="add <path|url>: ingest a source · query <q>: answer from the wiki",
+            usage="/wiki add|query <arg>",
+        )
 
-    reg.register("/model", _model, summary="show or set the active model")
-    reg.register("/theme", _theme, summary="show or set the active TUI theme")
-    reg.register("/mode", _mode, summary="show or set the active mode (auto|planning|writing|goal)")
-    reg.register("/schema", _schema, summary="schema: validate | fix")
+    reg.register("/model", _model, summary="show or set the active model", usage="/model [<id>]")
+    reg.register(
+        "/theme", _theme, summary="show or set the active TUI theme", usage="/theme [<name>]"
+    )
+    reg.register(
+        "/mode",
+        _mode,
+        summary="show or set the mode (auto|planning|writing|goal)",
+        usage="/mode [<name>]",
+    )
+    reg.register(
+        "/schema",
+        _schema,
+        summary="inspect or fix AGENTS.md sections",
+        usage="/schema [validate|fix]",
+    )
     reg.register("/self-doc", _self_doc, summary="refresh project self-documentation")
-
-    # M115.1: dedicated inspector commands (VISION §7.2).
     reg.register("/tokens", _tokens, summary="per-session and per-turn token totals")
     reg.register("/context", _context, summary="current context size vs model window")
     reg.register("/status", _status, summary="snapshot: model/mode/session/provider/busy/queue")
-    # M-insights: surface skill suggestions + setup hints + manager
-    # reports from the M119 `insights` table.
     reg.register(
         "/insights",
         _insights,
         summary="recent insights (skill suggestions, setup hints, manager reports)",
+        usage="/insights [category] [N]",
     )
-    # M125: surface behavioral rules curator extracts from sessions.
     reg.register(
         "/rules",
         _rules,
         summary="recent behavioral rules (format, do, dont, preference)",
+        usage="/rules [kind] [N]",
     )
-    # M138: open the daemon control panel (start/stop/restart/delete) from the TUI.
     reg.register("/daemon", _daemon, summary="open the daemon control panel")
 
     return reg

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from veles.core.frontmatter import parse_frontmatter
 from veles.core.project import init_project
 from veles.core.skill_install import (
     SkillInstallError,
@@ -15,7 +16,8 @@ from veles.core.skill_install import (
     promote_skill,
     remove_skill,
 )
-from veles.core.skills import discover_skills, parse_frontmatter, user_skills_dir
+from veles.core.skills import discover_skills
+from veles.core.user_paths import user_skills_dir
 
 # ---------- harness ----------
 

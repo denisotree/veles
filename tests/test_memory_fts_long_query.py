@@ -1,6 +1,6 @@
 """M230 — a long free-text query must not silently retrieve nothing.
 
-Recall is keyed on the raw prompt (`cli/_runtime.py`), and `_fts_escape_query`
+Recall is keyed on the raw prompt (`runtime/prompt.py`), and `_fts_escape_query`
 quoted every token and joined them with FTS5's implicit AND. That demands one
 stored row contain *every* token of the query, so a paragraph — or a pasted
 alert payload, where timestamps, ids and metric values never recur — matched
@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import pytest
 
-from veles.core.memory import SessionStore, _fts_escape_query
+from veles.core.fts import escape_query as _fts_escape_query
+from veles.core.memory import SessionStore
 from veles.core.provider import Message
 
 
@@ -137,7 +138,6 @@ def test_wiki_search_shares_the_same_escaper(store: SessionStore) -> None:
     from veles.modules.wiki.wiki import _fts_escape
 
     assert _fts_escape is escape_query
-    assert _fts_escape_query is escape_query
 
 
 def test_insight_search_gets_the_same_treatment(store: SessionStore) -> None:

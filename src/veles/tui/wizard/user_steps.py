@@ -13,7 +13,6 @@ which API key env var to consult, theme is independent (any moment),
 from __future__ import annotations
 
 import contextlib
-import os
 from dataclasses import dataclass
 
 from veles.core.providers import ALL_PROVIDERS as _ALL_PROVIDERS
@@ -106,7 +105,7 @@ class ApiKeyStep:
     title: str = "Step 3/6 — API key"
 
     async def run(self, ctx: WizardContext) -> WizardOutcome:
-        from veles.core.provider_factory import LOCAL_PROVIDERS, PROVIDER_API_KEY_ENVS
+        from veles.core.provider_factory import env_api_key, needs_api_key
         from veles.core.secrets import (
             KeyringUnavailable,
             get_provider_key,
@@ -114,18 +113,12 @@ class ApiKeyStep:
         )
 
         provider = ctx.answers["default_provider"]
-        if provider in LOCAL_PROVIDERS or provider in ("claude-cli", "gemini-cli"):
+        if not needs_api_key(provider):
             ctx.answers["api_key_status"] = "not-required"
             return WizardOutcome.SKIP
 
-        env_names = PROVIDER_API_KEY_ENVS.get(provider, ())
         keychain_key = get_provider_key(provider, env_fallback=False)
-        env_value, env_name = None, None
-        for name in env_names:
-            value = os.environ.get(name)
-            if value:
-                env_value, env_name = value, name
-                break
+        env_name, env_value = env_api_key(provider) or (None, None)
 
         if keychain_key:
             choice = await ctx.app.push_screen_wait(
@@ -218,10 +211,7 @@ class ModelStep:
     title: str = "Step 4/6 — Default model"
 
     async def run(self, ctx: WizardContext) -> WizardOutcome:
-        from veles.cli.repl.model_fetcher import (
-            known_models,
-            validate_and_fetch_models,
-        )
+        from veles.cli.repl.model_fetcher import validate_and_fetch_models
         from veles.core.provider_factory import LOCAL_PROVIDERS
         from veles.core.secrets import get_provider_key
 
@@ -266,29 +256,39 @@ class ModelStep:
             ctx.answers["api_key_status"] = "deferred"
             return WizardOutcome.SKIP
 
-        if not models:
-            models = list(known_models(provider))
-        # Sort alphabetically (case-insensitive) so the picker is browsable
-        # without scanning. The filter input below makes long provider
-        # lists (OpenRouter ships ~300 entries) usable.
-        models = sorted(models, key=str.casefold)
-        items = [ChoiceItem(label=m, value=m) for m in models]
-        default = ctx.answers.get("default_model") or models[0]
-        result = await ctx.app.push_screen_wait(
-            ChoiceScreen(
-                title=self.title,
-                items=items,
-                subtitle=f"{len(models)} model(s) available from {provider}.",
-                default=default,
-                filterable=True,
-                filter_placeholder="filter models (e.g. claude, gpt, 70b)",
-            )
+        screen = model_choice_screen(
+            self.title, provider, models, default=ctx.answers.get("default_model")
         )
+        if screen is None:
+            ctx.answers["default_model"] = None
+            return WizardOutcome.SKIP
+        result = await ctx.app.push_screen_wait(screen)
         nav = _outcome_from_dismiss(result)
         if nav is not None:
             return nav
         ctx.answers["default_model"] = result
         return WizardOutcome.NEXT
+
+
+def model_choice_screen(
+    title: str, provider: str, models: list[str], *, default: str | None
+) -> ChoiceScreen | None:
+    """Filterable model picker shared by the user and project wizards. An
+    empty `models` falls back to the curated list; None when that is empty
+    too. Sorted case-insensitively so ~300 OpenRouter entries stay browsable."""
+    from veles.cli.repl.model_fetcher import known_models
+
+    models = sorted(models or known_models(provider), key=str.casefold)
+    if not models:
+        return None
+    return ChoiceScreen(
+        title=title,
+        items=[ChoiceItem(label=m, value=m) for m in models],
+        subtitle=f"{len(models)} model(s) available from {provider}.",
+        default=default if default in models else models[0],
+        filterable=True,
+        filter_placeholder="filter models (e.g. claude, gpt, 70b)",
+    )
 
 
 # ---------------- Step 5: Theme ----------------

@@ -49,7 +49,7 @@ def _make_provider_returning(models: list[str] | None, raises: Exception | None 
 def test_cloud_fresh_cache_hits_without_calling_adapter() -> None:
     _write_cache_file("openrouter", ["cached-a", "cached-b"], age_seconds=60)
     fake_make = MagicMock(side_effect=AssertionError("must not be called"))
-    with patch("veles.cli._make_provider", fake_make):
+    with patch("veles.core.provider_factory.make_provider", fake_make):
         result = mf.fetch_models("openrouter")
     assert result.source == "cache"
     assert result.models == ["cached-a", "cached-b"]
@@ -59,7 +59,7 @@ def test_cloud_fresh_cache_hits_without_calling_adapter() -> None:
 def test_cloud_stale_cache_triggers_live_and_overwrites() -> None:
     cache_file = _write_cache_file("openrouter", ["stale"], age_seconds=mf.CACHE_TTL_SECONDS + 10)
     fake_make = _make_provider_returning(["anthropic/claude-opus-4.7", "openai/gpt-4o"])
-    with patch("veles.cli._make_provider", fake_make):
+    with patch("veles.core.provider_factory.make_provider", fake_make):
         result = mf.fetch_models("openrouter")
     assert result.source == "live"
     # live first, curated names deduped onto the tail
@@ -72,7 +72,7 @@ def test_cloud_stale_cache_triggers_live_and_overwrites() -> None:
 def test_cloud_refresh_skips_fresh_cache() -> None:
     _write_cache_file("openrouter", ["cached"], age_seconds=60)
     fake_make = _make_provider_returning(["live"])
-    with patch("veles.cli._make_provider", fake_make):
+    with patch("veles.core.provider_factory.make_provider", fake_make):
         result = mf.fetch_models("openrouter", refresh=True)
     assert result.source == "live"
     assert "live" in result.models
@@ -82,7 +82,7 @@ def test_cloud_live_failure_falls_back_to_curated_without_touching_cache() -> No
     cache_file = mf._cache_path("openrouter")
     assert not cache_file.exists()
     fake_make = _make_provider_returning(None, raises=RuntimeError("boom"))
-    with patch("veles.cli._make_provider", fake_make):
+    with patch("veles.core.provider_factory.make_provider", fake_make):
         result = mf.fetch_models("openrouter")
     assert result.source == "curated"
     assert result.models == mf.known_models("openrouter")
@@ -91,7 +91,7 @@ def test_cloud_live_failure_falls_back_to_curated_without_touching_cache() -> No
 
 def test_cloud_missing_api_key_falls_back_to_curated() -> None:
     fake_make = MagicMock(side_effect=RuntimeError("OPENAI_API_KEY env var is required"))
-    with patch("veles.cli._make_provider", fake_make):
+    with patch("veles.core.provider_factory.make_provider", fake_make):
         result = mf.fetch_models("openai")
     assert result.source == "curated"
     assert result.models == mf.known_models("openai")
@@ -112,7 +112,7 @@ def test_local_ignores_cache_file_and_does_not_write_one(tmp_path: Path) -> None
     the network. After a successful fetch the cache file stays absent."""
     cache_file = _write_cache_file("ollama", ["from-cache"], age_seconds=60)
     fake_make = _make_provider_returning(["qwen2.5:7b"])
-    with patch("veles.cli._make_provider", fake_make):
+    with patch("veles.core.provider_factory.make_provider", fake_make):
         result = mf.fetch_models("ollama")
     assert result.source == "live"
     assert result.models == ["qwen2.5:7b"]
@@ -128,7 +128,7 @@ def test_local_does_not_merge_with_curated() -> None:
     models the local server doesn't actually have."""
     fake_make = _make_provider_returning(["only-local"])
     with (
-        patch("veles.cli._make_provider", fake_make),
+        patch("veles.core.provider_factory.make_provider", fake_make),
         patch.object(mf, "known_models", return_value=["curated-ghost"]),
     ):
         result = mf.fetch_models("ollama")
@@ -137,7 +137,7 @@ def test_local_does_not_merge_with_curated() -> None:
 
 def test_local_live_failure_falls_back_to_curated() -> None:
     fake_make = _make_provider_returning(None, raises=ConnectionRefusedError("nope"))
-    with patch("veles.cli._make_provider", fake_make):
+    with patch("veles.core.provider_factory.make_provider", fake_make):
         result = mf.fetch_models("llamacpp")
     assert result.source == "curated"
     # llamacpp has no curated entries; that's fine — empty list is the
@@ -147,7 +147,7 @@ def test_local_live_failure_falls_back_to_curated() -> None:
 
 def test_local_no_cache_written_after_live_success() -> None:
     fake_make = _make_provider_returning(["a", "b"])
-    with patch("veles.cli._make_provider", fake_make):
+    with patch("veles.core.provider_factory.make_provider", fake_make):
         mf.fetch_models("openai-compat")
     assert not mf._cache_path("openai-compat").exists()
 
@@ -157,7 +157,7 @@ def test_local_no_cache_written_after_live_success() -> None:
 
 def test_curated_only_provider_skips_network() -> None:
     fake_make = MagicMock(side_effect=AssertionError("must not be called"))
-    with patch("veles.cli._make_provider", fake_make):
+    with patch("veles.core.provider_factory.make_provider", fake_make):
         result = mf.fetch_models("anthropic")
     assert result.source == "curated"
     assert result.models == mf.known_models("anthropic")
@@ -178,6 +178,6 @@ def test_adapter_without_list_models_falls_back_to_curated() -> None:
     """If a future adapter is registered as cacheable but doesn't expose
     `list_models()`, we degrade gracefully instead of crashing."""
     fake_make = _make_provider_returning(None)  # adapter without list_models
-    with patch("veles.cli._make_provider", fake_make):
+    with patch("veles.core.provider_factory.make_provider", fake_make):
         result = mf.fetch_models("openrouter")
     assert result.source == "curated"

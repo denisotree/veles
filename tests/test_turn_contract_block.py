@@ -22,8 +22,8 @@ def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 def test_turn_contract_present_and_stable(project) -> None:
-    from veles.cli._runtime import build_run_system_prompt
     from veles.core.cache_hints import CACHE_BREAKPOINT_SENTINEL
+    from veles.runtime.prompt import build_run_system_prompt
 
     prompt = build_run_system_prompt(project, prompt="hi")
     assert prompt is not None

@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from textual.app import App
 
+    from veles.core.project import Project
+
 CollectResult = tuple[str, dict[str, str], dict[str, object]]
 """`(channel, secrets, config_fields)` — ready to hand straight to
 `cli.channel_wizard.apply_channel`."""
@@ -79,3 +81,32 @@ async def collect_channel_via_modals(app: App, *, title: str) -> CollectResult |
         else:
             config_fields[cred.key] = value
     return channel, secrets, config_fields
+
+
+async def add_channel_via_modals(
+    app: App, project: Project, *, session: str | None
+) -> dict[str, object] | None:
+    """Collect a channel through the modals and save it with `apply_channel`
+    (secrets to the keychain, the rest to the config block).
+
+    Returns `{"channel", "config_fields", "status"}` for the wizard's recap —
+    `status` is "saved" or the failure (a missing keychain is reported, never a
+    crash) — or None when the user cancelled."""
+    from veles.cli.channel_wizard import apply_channel
+
+    collected = await collect_channel_via_modals(app, title="Add channel")
+    if collected is None:
+        return None
+    channel, secrets, config_fields = collected
+    try:
+        apply_channel(
+            project,
+            session=session,
+            channel=channel,
+            secrets=secrets,
+            config_fields=config_fields,
+        )
+        status = "saved"
+    except Exception as exc:
+        status = f"failed: {type(exc).__name__}: {exc}"
+    return {"channel": channel, "config_fields": config_fields, "status": status}

@@ -587,7 +587,7 @@ async def test_drain_stream_returns_completed_text_and_session(
     daemon = _FakeDaemonClient()
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
-    outcome = await gateway._drain_stream("run-1", chat_id=42)
+    outcome = await gateway._delivery.drain_stream("run-1", chat_id=42)
     assert outcome.text == "hello world"
     assert outcome.session_id == "ses-final"
     assert outcome.error is None
@@ -601,7 +601,7 @@ async def test_drain_stream_captures_error_event(session_map: SessionMap) -> Non
         ]
     )
     gateway = _make_gateway(daemon, session_map, [])
-    outcome = await gateway._drain_stream("run-1", chat_id=42)
+    outcome = await gateway._delivery.drain_stream("run-1", chat_id=42)
     assert outcome.error == "boom"
     assert outcome.session_id is None
 
@@ -617,9 +617,49 @@ async def test_drain_stream_adopts_session_id_from_started(session_map: SessionM
         ]
     )
     gateway = _make_gateway(daemon, session_map, [])
-    outcome = await gateway._drain_stream("run-1", chat_id=42)
+    outcome = await gateway._delivery.drain_stream("run-1", chat_id=42)
     assert outcome.error == "boom"
     assert outcome.session_id == "ses-early"
+
+
+def _refuse_edits(gateway: TelegramGateway, sends: list[tuple[str, dict[str, Any]]]) -> None:
+    """Make every editMessageText fail the way Telegram does (ok=false)."""
+    inner = gateway._telegram_send
+    assert inner is not None
+
+    async def send(method: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if method == "editMessageText":
+            sends.append((method, payload))
+            raise RuntimeError("telegram editMessageText failed: message to edit not found")
+        return await inner(method, payload)
+
+    gateway._telegram_send = send
+
+
+async def test_refused_ack_edit_is_not_reported_as_acked(session_map: SessionMap) -> None:
+    daemon = _FakeDaemonClient(
+        events=[
+            {"type": "tool_call", "name": "web_search"},
+            {"type": "completed", "text": "done", "session_id": "s"},
+        ]
+    )
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(daemon, session_map, sends)
+    _refuse_edits(gateway, sends)
+    outcome = await gateway._delivery.drain_stream("run-1", chat_id=42, message_id=7)
+    assert outcome.acked is False
+
+
+async def test_refused_final_edit_sends_the_answer_fresh(session_map: SessionMap) -> None:
+    from veles.channels.telegram._delivery import _TurnOutcome
+
+    sends: list[tuple[str, dict[str, Any]]] = []
+    gateway = _make_gateway(_FakeDaemonClient(), session_map, sends)
+    _refuse_edits(gateway, sends)
+    outcome = _TurnOutcome(text="the answer", session_id=None, error=None)
+    await gateway._delivery.deliver(42, "42", 7, outcome)
+    sent = [p["text"] for m, p in sends if m == "sendMessage"]
+    assert sent == ["the answer"]
 
 
 async def test_deliver_persists_session_mapping_on_error(session_map: SessionMap) -> None:
@@ -1033,7 +1073,7 @@ def test_format_prompt_body_html_no_raw_dict() -> None:
     (`{'path': '/Users/...'}`) — neither the dict syntax nor abs paths."""
     import tempfile
 
-    from veles.channels.telegram import _format_prompt_body
+    from veles.channels.telegram._prompts import _format_prompt_body
     from veles.core.context import reset_active_project, set_active_project
     from veles.core.project import init_project
 
@@ -1070,17 +1110,18 @@ def test_format_prompt_body_html_no_raw_dict() -> None:
 # ---- attachment / forward / aggregation (DOC-6) ----
 
 
-from veles.channels.telegram import (  # noqa: E402
-    _build_combined_prompt,
-    _classify,
-    _forward_source,
-    _has_forward,
+from veles.channels.telegram._attachments import (  # noqa: E402
     _is_textual,
-    _Kind,
     _reject_reason,
-    _render_forwarded,
     _safe_filename,
 )
+from veles.channels.telegram._buffer import _classify, _Kind  # noqa: E402
+from veles.channels.telegram._forwarded import (  # noqa: E402
+    _forward_source,
+    _has_forward,
+    _render_forwarded,
+)
+from veles.channels.telegram._helpers import _build_combined_prompt  # noqa: E402
 
 # ---- unit: pure helpers ----
 

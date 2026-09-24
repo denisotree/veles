@@ -135,7 +135,6 @@ def _cmd_history(args: argparse.Namespace, store: JobsStore) -> int:
 
 def _cmd_tick(args: argparse.Namespace, store: JobsStore, project) -> int:
     """Synchronous one-shot tick — for testing / cron-less environments."""
-    from veles.cli import _RUN_TOOLS, _load_skills, _make_provider
     from veles.core.agent import Agent
     from veles.core.job_runner import JobRunner
     from veles.core.memory import SessionStore
@@ -145,6 +144,8 @@ def _cmd_tick(args: argparse.Namespace, store: JobsStore, project) -> int:
         resolve_effective_model,
         resolve_effective_provider,
     )
+    from veles.core.provider_factory import make_provider
+    from veles.runtime.registry import RUN_TOOLS, load_skills
 
     session_store = SessionStore(project.memory_db_path)
     # M165: resolve provider+model from config; error clearly when no model set.
@@ -158,8 +159,8 @@ def _cmd_tick(args: argparse.Namespace, store: JobsStore, project) -> int:
     max_tokens = int(getattr(args, "max_tokens", 4096))
 
     def factory(session_id: str | None):
-        provider = _make_provider(provider_name, model)
-        registry = _load_skills(project, _RUN_TOOLS, provider=provider, model=model)
+        provider = make_provider(provider_name, model)
+        registry = load_skills(project, RUN_TOOLS, provider=provider, model=model)
         sid = session_id or session_store.create_session()
         return Agent(
             provider=provider,

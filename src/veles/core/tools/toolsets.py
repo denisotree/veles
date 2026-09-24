@@ -1,10 +1,9 @@
 """Toolset composition (Tier δ, M57).
 
 Toolsets are named lists of tool names that the CLI hands to the agent via
-`Registry.subset(...)`. Before M57 they lived as inline tuples in
-`cli/_runtime.py`. Now they live in `core/tools/toolsets.toml` with an
+`Registry.subset(...)`. They live in `core/tools/toolsets.toml` with an
 `includes` mechanism so a derived toolset can pull from a base without
-copy-paste. The legacy tuples re-export from here so existing call sites
+copy-paste. `runtime/registry.py` re-exports the ones front ends use so call sites
 keep working.
 
 Loader rules:
@@ -67,7 +66,5 @@ def _resolve(
 
 
 # Cached at import time; toolsets.toml is shipped with the wheel and never
-# mutates at runtime. Re-export the canonical names so `cli/_runtime.py`'s
-# legacy `_RUN_TOOLS` (etc.) can shed its inline tuples without changing
-# any import paths.
+# mutates at runtime.
 TOOLSETS: dict[str, tuple[str, ...]] = load_toolsets()

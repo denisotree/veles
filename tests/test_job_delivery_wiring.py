@@ -7,8 +7,8 @@ deliverer, so a job's `deliver_to` was silently dropped. These tests
 pin the three seams that close the loop:
 
 1. `TelegramGateway.deliver(...)` renders + sends to a chat.
-2. `_attach_background_runners` builds a router and hands it to JobRunner.
-3. `_start_channel_runners` registers each gateway's `deliver` on the
+2. `attach_background_runners` builds a router and hands it to JobRunner.
+3. `start_channel_runners` registers each gateway's `deliver` on the
    router, so `deliver_to = "telegram:<chat>"` reaches the gateway.
 """
 
@@ -24,9 +24,9 @@ from veles.channels.telegram import TelegramGateway
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.core.secrets import delete_provider_key, set_provider_key
-from veles.daemon.agent_factory import _attach_background_runners
 from veles.daemon.auth import TokenStore
-from veles.daemon.server import _start_channel_runners
+from veles.daemon.background import attach_background_runners
+from veles.daemon.channels import start_channel_runners
 from veles.daemon.state import DaemonState
 
 
@@ -93,7 +93,7 @@ async def test_gateway_deliver_accepts_thread_id(tmp_path: Path) -> None:
     assert sends and sends[0][1]["chat_id"] == 7
 
 
-# ---- 2. _attach_background_runners wires a router ----
+# ---- 2. attach_background_runners wires a router ----
 
 
 def test_attach_wires_delivery_router_into_job_runner(tmp_path: Path) -> None:
@@ -102,7 +102,7 @@ def test_attach_wires_delivery_router_into_job_runner(tmp_path: Path) -> None:
     def factory(session_id):  # pragma: no cover
         raise AssertionError
 
-    jobs_store = _attach_background_runners(state, state.project, factory, "anthropic")
+    jobs_store = attach_background_runners(state, state.project, factory, "anthropic")
     try:
         assert state.delivery_router is not None
         # The router the daemon stored is the one the JobRunner will use.
@@ -125,11 +125,11 @@ class _JobAgent:
 
 
 def _wired_state_with_chat(tmp_path: Path, *, deliverer):
-    """The daemon's own wiring (`_attach_background_runners`) plus a fake
+    """The daemon's own wiring (`attach_background_runners`) plus a fake
     Telegram deliverer on the router it built — the production path from a
     due job to a chat, with only the network call replaced."""
     state = _make_state(tmp_path)
-    jobs_store = _attach_background_runners(
+    jobs_store = attach_background_runners(
         state, state.project, lambda _sid: _JobAgent("Summary: 1) db ok 2) disk 91%"), "anthropic"
     )
     state.delivery_router.register_deliverer("telegram", deliverer)
@@ -140,7 +140,7 @@ async def test_a_delivered_job_is_in_the_chat_session(tmp_path: Path) -> None:
     """The reported bug: a scheduled summary reached the chat but not the chat's
     session, so "tell me more about point 2" found an agent with no record of
     sending it. Reminders were already bound (M214); jobs were not."""
-    from veles.daemon.server import _channel_session_map
+    from veles.daemon.channels import channel_session_map
 
     async def fake_telegram(chat_id: str, text: str, thread_id: str | None) -> None:
         pass
@@ -152,7 +152,7 @@ async def test_a_delivered_job_is_in_the_chat_session(tmp_path: Path) -> None:
         )
         await state.job_runner._tick_once(200_000.0)
 
-        sid = _channel_session_map(state, "telegram").get("42")  # the gateway's key
+        sid = channel_session_map(state, "telegram").get("42")  # the gateway's key
         assert sid is not None
         recorded = [m.content for m in state.store.load_messages(sid) if m.role == "assistant"]
         assert any("disk 91%" in (c or "") for c in recorded)
@@ -163,7 +163,7 @@ async def test_a_delivered_job_is_in_the_chat_session(tmp_path: Path) -> None:
 
 async def test_an_undelivered_job_is_not_recorded(tmp_path: Path) -> None:
     """Only what actually reached the chat belongs in its session."""
-    from veles.daemon.server import _channel_session_map
+    from veles.daemon.channels import channel_session_map
 
     async def telegram_down(chat_id: str, text: str, thread_id: str | None) -> None:
         raise RuntimeError("telegram down")
@@ -174,13 +174,13 @@ async def test_an_undelivered_job_is_not_recorded(tmp_path: Path) -> None:
             name="daily", prompt="summarise", schedule_expr="30m", deliver_to="telegram:42", now=100
         )
         await state.job_runner._tick_once(200_000.0)
-        assert _channel_session_map(state, "telegram").get("42") is None
+        assert channel_session_map(state, "telegram").get("42") is None
     finally:
         jobs_store.close()
         state.store.close()
 
 
-# ---- 3. _start_channel_runners registers the gateway deliverer ----
+# ---- 3. start_channel_runners registers the gateway deliverer ----
 
 
 async def test_start_channel_runners_registers_telegram_deliverer(
@@ -202,7 +202,7 @@ async def test_start_channel_runners_registers_telegram_deliverer(
     monkeypatch.setattr(tg_mod.TelegramGateway, "start", fake_start)
 
     try:
-        _start_channel_runners(state)
+        start_channel_runners(state)
         assert len(state.channel_runners) == 1
         gateway = state.channel_runners[0]
 

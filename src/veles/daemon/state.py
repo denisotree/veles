@@ -95,7 +95,7 @@ class DaemonState:
     # Surfaced via /v1/health so channels can show only the relevant
     # model catalogue — daemon's provider is fixed at startup.
     provider: str | None = None
-    # Default model from `_FactorySettings.model` — the fallback used
+    # Default model from `FactorySettings.model` — the fallback used
     # when a session has no override. Surfaced via /v1/health so
     # channels can highlight the effective model in their pickers.
     default_model: str | None = None
@@ -131,7 +131,7 @@ class DaemonState:
     chat_modes_path: Path | None = None
     # M204: `factory(*, system_prompt, tools) -> Agent` installed around every
     # daemon turn so delegate/wiki_add can spawn scoped sub-agents (this used
-    # to be REPL-only). Built by `_attach_background_runners`, capped at [run].
+    # to be REPL-only). Built by `attach_background_runners`, capped at [run].
     subagent_factory: Any | None = None
     # M204: per-session turn serializer — a background-op RESUME turn queues
     # behind a live user turn on the same session instead of racing it.

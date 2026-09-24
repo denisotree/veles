@@ -198,7 +198,8 @@ def _register_project_skills(registry_obj: Registry, project: Project, model: st
         _log("OPENROUTER_API_KEY missing — skill tools disabled")
         return []
     from veles.adapters.openrouter import OpenRouterProvider
-    from veles.core.skills import discover_skills, make_skill_tool
+    from veles.core.skill_tool import make_skill_tool
+    from veles.core.skills import discover_skills
 
     skills = discover_skills(project)
     if not skills:

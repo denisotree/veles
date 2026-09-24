@@ -13,11 +13,11 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from veles.channels.in_process_backend import InProcessRunBackend
 from veles.core.agent import RunResult
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.daemon.auth import TokenStore
+from veles.daemon.in_process_backend import InProcessRunBackend
 from veles.daemon.state import DaemonState
 
 

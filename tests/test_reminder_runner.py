@@ -14,8 +14,8 @@ from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.core.reminder_runner import ReminderRunner
 from veles.core.tasks_store import TasksStore
-from veles.daemon.agent_factory import _attach_background_runners
 from veles.daemon.auth import TokenStore
+from veles.daemon.background import attach_background_runners
 from veles.daemon.state import DaemonState
 
 
@@ -182,7 +182,7 @@ def _make_state(tmp_path: Path) -> DaemonState:
 
 def test_attach_wires_reminder_runner_sharing_router(tmp_path: Path):
     state = _make_state(tmp_path)
-    jobs_store = _attach_background_runners(state, state.project, lambda s: None, "anthropic")
+    jobs_store = attach_background_runners(state, state.project, lambda s: None, "anthropic")
     try:
         assert state.reminder_runner is not None
         # MUST be the same instance channels register deliverers on (M165 lesson).
@@ -202,7 +202,7 @@ def test_attach_wires_reminder_runner_sharing_router(tmp_path: Path):
 
 async def test_due_reminder_reaches_registered_deliverer(tmp_path: Path):
     state = _make_state(tmp_path)
-    jobs_store = _attach_background_runners(state, state.project, lambda s: None, "anthropic")
+    jobs_store = attach_background_runners(state, state.project, lambda s: None, "anthropic")
     try:
         seen: list[tuple[str, str]] = []
 

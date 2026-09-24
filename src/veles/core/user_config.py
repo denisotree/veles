@@ -5,7 +5,7 @@ subsequent CLI invocations skip setup. Today the file holds:
 
     [user]
     language = "en"                  # "en" | "ru"
-    default_provider = "openrouter"  # one of cli._PROVIDER_CHOICES
+    default_provider = "openrouter"  # one of the `--provider` choices
     first_project_name = "myorg"     # optional; recorded but not used yet
 
     [permissions]                    # M124-perm-unify (optional)

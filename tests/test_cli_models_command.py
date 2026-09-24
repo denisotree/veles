@@ -27,7 +27,7 @@ def _make_provider_returning(models: list[str]):
 
 def test_models_text_output(capsys: pytest.CaptureFixture[str]) -> None:
     fake_make = _make_provider_returning(["anthropic/claude-opus-4.7", "openai/gpt-4o"])
-    with patch("veles.cli._make_provider", fake_make):
+    with patch("veles.core.provider_factory.make_provider", fake_make):
         rc = cli_main(["models", "openrouter"])
     assert rc == 0
     out = capsys.readouterr().out
@@ -39,7 +39,7 @@ def test_models_text_output(capsys: pytest.CaptureFixture[str]) -> None:
 
 def test_models_json_output(capsys: pytest.CaptureFixture[str]) -> None:
     fake_make = _make_provider_returning(["only-one"])
-    with patch("veles.cli._make_provider", fake_make):
+    with patch("veles.core.provider_factory.make_provider", fake_make):
         rc = cli_main(["models", "openrouter", "--json"])
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
@@ -53,7 +53,7 @@ def test_models_refresh_writes_cache(capsys: pytest.CaptureFixture[str], tmp_pat
     cache_file = tmp_path / "veles_home" / ".veles" / "cache" / "models" / "openrouter.json"
     assert not cache_file.exists()
     fake_make = _make_provider_returning(["m1", "m2"])
-    with patch("veles.cli._make_provider", fake_make):
+    with patch("veles.core.provider_factory.make_provider", fake_make):
         rc = cli_main(["models", "openrouter", "--refresh", "--json"])
     assert rc == 0
     capsys.readouterr()
@@ -66,7 +66,7 @@ def test_models_local_provider_skips_cache(tmp_path: Path) -> None:
     """ollama / llamacpp / openai-compat must never write a cache file."""
     fake_make = _make_provider_returning(["qwen2.5:7b"])
     cache_file = tmp_path / "veles_home" / ".veles" / "cache" / "models" / "ollama.json"
-    with patch("veles.cli._make_provider", fake_make):
+    with patch("veles.core.provider_factory.make_provider", fake_make):
         rc = cli_main(["models", "ollama", "--json"])
     assert rc == 0
     assert not cache_file.exists()
@@ -76,7 +76,7 @@ def test_models_falls_back_to_curated_on_missing_key(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     fake_make = MagicMock(side_effect=RuntimeError("OPENROUTER_API_KEY env var is required"))
-    with patch("veles.cli._make_provider", fake_make):
+    with patch("veles.core.provider_factory.make_provider", fake_make):
         rc = cli_main(["models", "openrouter"])
     assert rc == 0
     out = capsys.readouterr().out

@@ -130,20 +130,43 @@ def find_safe_boundaries(history: list[Message], cfg: CompressionConfig) -> tupl
 
 def render_transcript(middle: list[Message]) -> str:
     """Serialise turns as plain text for a side-call prompt (summariser, extractor)."""
-    blocks: list[str] = []
-    for m in middle:
-        tag = m.role
-        if m.role == "tool" and m.tool_call_id:
-            tag = f"tool[{m.tool_call_id}]"
-        body = m.content or ""
-        if m.tool_calls:
-            calls = ", ".join(
-                f"{tc.name}({json.dumps(tc.arguments, separators=(',', ':'))})"
-                for tc in m.tool_calls
-            )
-            body = (body + "\n" if body else "") + f"<calls: {calls}>"
-        blocks.append(f"# {tag}\n{body}")
-    return "\n\n".join(blocks)
+    return "\n\n".join(_render_turn(m) for m in middle)
+
+
+def _render_turn(m: Message) -> str:
+    tag = m.role
+    if m.role == "tool" and m.tool_call_id:
+        tag = f"tool[{m.tool_call_id}]"
+    body = m.content or ""
+    if m.tool_calls:
+        calls = ", ".join(
+            f"{tc.name}({json.dumps(tc.arguments, separators=(',', ':'))})" for tc in m.tool_calls
+        )
+        body = (body + "\n" if body else "") + f"<calls: {calls}>"
+    return f"# {tag}\n{body}"
+
+
+def _fit_summariser_input(middle: list[Message], limit: int) -> tuple[list[Message], str, int]:
+    """Drop turns from the front of `middle` until its transcript fits `limit`
+    tokens. Returns (kept turns, their transcript, its token count).
+
+    Per-turn counts jump close to the cut in one pass; the exact count of the
+    joined transcript then decides the last few turns, so the result never
+    exceeds `limit` (re-rendering after every single drop was quadratic)."""
+    per_turn = [count_tokens(_render_turn(m)) for m in middle]
+    running = sum(per_turn)
+    start = 0
+    while start < len(middle) and running > limit:
+        running -= per_turn[start]
+        start += 1
+    kept = middle[start:]
+    rendered = render_transcript(kept)
+    tokens = count_tokens(rendered)
+    while kept and tokens > limit:
+        kept = kept[1:]
+        rendered = render_transcript(kept)
+        tokens = count_tokens(rendered)
+    return kept, rendered, tokens
 
 
 def _build_compression_note(
@@ -190,8 +213,12 @@ def apply_compression(
     summary_path: str,
     n_turns_dropped: int,
     active_plan_refs: list[str] | None = None,
+    bounds: tuple[int, int] | None = None,
 ) -> list[Message]:
     """Build the post-compression history.
+
+    `bounds` is the `(head_end, tail_start)` split when the caller already
+    computed it; otherwise `find_safe_boundaries` does.
 
     Strategy: trim the middle, augment the first `system` message in head
     with a `[CONTEXT-COMPRESSION]` note pointing at `summary_path`. If
@@ -206,7 +233,7 @@ def apply_compression(
     is the storage half of the M70 `test_compaction_preserves_active_plan`
     contract.
     """
-    bounds = find_safe_boundaries(history, cfg)
+    bounds = bounds or find_safe_boundaries(history, cfg)
     if bounds is None:
         return history
     head_end, tail_start = bounds
@@ -255,9 +282,7 @@ def _save_summary_cache(project: Project, cache: dict[str, str]) -> None:
     path.write_text(json.dumps(cache), encoding="utf-8")
 
 
-def _summary_is_cacheable(summary: str) -> bool:
-    """Only store genuine summaries — failures/empties must retry next run."""
-    return not summary.startswith("(summary failed") and summary != "_(empty summary)_"
+_EMPTY_SUMMARY = "_(empty summary)_"
 
 
 def make_default_compressor(
@@ -325,10 +350,9 @@ def make_default_compressor(
         rendered_tokens = count_tokens(rendered)
         if rendered_tokens > cfg.max_summariser_input_tokens:
             original_len = len(middle)
-            while middle and rendered_tokens > cfg.max_summariser_input_tokens:
-                middle = middle[1:]
-                rendered = render_transcript(middle)
-                rendered_tokens = count_tokens(rendered)
+            middle, rendered, rendered_tokens = _fit_summariser_input(
+                middle, cfg.max_summariser_input_tokens
+            )
             logger.info(
                 "compressor summariser-input-truncated session=%s "
                 "dropped_from_front=%d kept_middle=%d input_tokens=%d "
@@ -361,6 +385,8 @@ def make_default_compressor(
             logger.info("compressor summary-cache-hit session=%s", sid)
             summary = cached_summary
         else:
+            # Only a genuine summary is cached; a failed or empty one retries.
+            cacheable = False
             # If the summariser blows up (rate-limit, network, an unforeseen
             # context-limit), don't let it take down the main run — fall
             # back to a placeholder summary and still drop the middle from
@@ -370,7 +396,8 @@ def make_default_compressor(
                 result = run_oneshot(
                     provider, model, sub_prompt, rendered, max_tokens=cfg.max_summary_tokens
                 )
-                summary = (result.text or "").strip() or "_(empty summary)_"
+                summary = (result.text or "").strip() or _EMPTY_SUMMARY
+                cacheable = summary != _EMPTY_SUMMARY
                 if getattr(result, "stopped_reason", None) == "budget_exhausted":
                     logger.info(
                         "compressor summariser-budget-exhausted session=%s — using partial summary",
@@ -384,7 +411,7 @@ def make_default_compressor(
                     exc,
                 )
                 summary = f"(summary failed: {type(exc).__name__}; see daemon log)"
-            if _summary_is_cacheable(summary):
+            if cacheable:
                 cache[fingerprint] = summary
                 _save_summary_cache(project, cache)
         slug_id = sid
@@ -411,6 +438,7 @@ def make_default_compressor(
             summary_path=rel_path,
             n_turns_dropped=len(middle),
             active_plan_refs=plan_refs,
+            bounds=bounds,
         )
         logger.info(
             "compressor applied session=%s tokens_before=%d tokens_after=%d "
@@ -451,11 +479,15 @@ def emergency_truncate(
         lead += 1
     head = list(history[:lead])
     body = list(history[lead:])
-    # Drop oldest body turns until under target.
+    # Drop oldest body turns until under target. `estimate_tokens` is a per-turn
+    # sum, so subtracting each dropped turn keeps the total exact.
+    per_turn = [estimate_tokens([m]) for m in body]
+    total = estimate_tokens(head) + sum(per_turn)
     n_dropped = 0
-    while body and estimate_tokens(head + body) > target_tokens:
-        body.pop(0)
+    while n_dropped < len(body) and total > target_tokens:
+        total -= per_turn[n_dropped]
         n_dropped += 1
+    body = body[n_dropped:]
     note = (
         f"\n\n[CONTEXT-EMERGENCY-TRUNCATED] {n_dropped} earlier turns "
         f"dropped without summary to fit the model's context window. "

@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from veles.cli._curator import _maybe_surface_skill_suggestions
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.core.skill_suggester import SKILL_SUGGESTION_CATEGORY
 from veles.core.tools.persistence import record_use, upsert_tool
 from veles.core.tools.registry import ToolEntry
+from veles.runtime.learning import _maybe_surface_skill_suggestions
 
 
 def _entry(name: str) -> ToolEntry:

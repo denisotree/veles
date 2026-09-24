@@ -1,7 +1,7 @@
 """M191 — the default REPL must inject per-turn project-memory recall.
 
 The inline REPL's Agent factory used to build the system prompt with an empty
-recall query (`_build_run_system_prompt(args, project)` reads `args.prompt`,
+recall query (`system_prompt_from_args(args, project)` reads `args.prompt`,
 which the REPL parser never sets), so `<memory-context>` was never injected —
 "never forgets" was false in the flagship UX. These tests pin the turn-prompt
 assembly seam: given a recall query that matches stored memory, the assembled
@@ -17,7 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from veles.cli.commands.repl import _repl_turn_system_prompt
+from veles.cli.repl.turn import _repl_turn_system_prompt
 from veles.core.memory import SessionStore
 from veles.core.modes import get_mode
 from veles.core.project import init_project
@@ -89,8 +89,8 @@ def test_repl_post_turn_hooks_fire_insight_and_curator(
     """M191: after a REPL turn the same learning-loop hooks `veles run` fires —
     insight extraction + post-turn curation (dream rides inside) — run, so the
     flagship REPL actually builds project memory (it ran none before M191)."""
-    import veles.cli as cli
-    from veles.cli.commands.repl import _run_repl_post_turn_hooks
+    import veles.runtime.learning as cli
+    from veles.cli.repl.turn import _run_repl_post_turn_hooks
     from veles.core.agent import RunResult
 
     calls: list[tuple] = []
@@ -114,8 +114,8 @@ def test_repl_post_turn_hooks_skip_when_turn_produced_no_result(
 ) -> None:
     """A cancelled/errored turn yields no RunResult — memory processing must be
     skipped, not fed a None result."""
-    import veles.cli as cli
-    from veles.cli.commands.repl import _run_repl_post_turn_hooks
+    import veles.runtime.learning as cli
+    from veles.cli.repl.turn import _run_repl_post_turn_hooks
 
     calls: list[tuple] = []
     monkeypatch.setattr(
@@ -136,8 +136,8 @@ def test_repl_post_turn_hooks_skip_cancelled_turn(
 ) -> None:
     """A user-cancelled turn (Ctrl+C) has no meaningful content — memory upkeep
     must skip it, not distil a half-finished interruption into an insight."""
-    import veles.cli as cli
-    from veles.cli.commands.repl import _run_repl_post_turn_hooks
+    import veles.runtime.learning as cli
+    from veles.cli.repl.turn import _run_repl_post_turn_hooks
 
     calls: list[tuple] = []
     monkeypatch.setattr(

@@ -91,7 +91,7 @@ def test_suggest_reports_no_clusters(tmp_path: Path, capsys) -> None:
 
 
 def test_proposer_skipped_when_resume_set(project_with_cluster, monkeypatch) -> None:
-    from veles.cli._curator import _maybe_run_subproject_proposer
+    from veles.runtime.learning import _maybe_run_subproject_proposer
 
     args = _ns(provider="openrouter", resume="ses-X", no_proposer=False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "x")
@@ -102,7 +102,7 @@ def test_proposer_skipped_when_resume_set(project_with_cluster, monkeypatch) -> 
 
 
 def test_proposer_skipped_by_flag(project_with_cluster, monkeypatch) -> None:
-    from veles.cli._curator import _maybe_run_subproject_proposer
+    from veles.runtime.learning import _maybe_run_subproject_proposer
 
     args = _ns(provider="openrouter", resume=None, no_proposer=True)
     monkeypatch.setenv("OPENROUTER_API_KEY", "x")
@@ -113,7 +113,7 @@ def test_proposer_skipped_by_flag(project_with_cluster, monkeypatch) -> None:
 
 
 def test_proposer_skipped_when_no_api_key(project_with_cluster, monkeypatch) -> None:
-    from veles.cli._curator import _maybe_run_subproject_proposer
+    from veles.runtime.learning import _maybe_run_subproject_proposer
 
     args = _ns(provider="openrouter", resume=None, no_proposer=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
@@ -124,7 +124,7 @@ def test_proposer_skipped_when_no_api_key(project_with_cluster, monkeypatch) -> 
 
 
 def test_proposer_runs_first_time_and_writes_state(project_with_cluster, monkeypatch) -> None:
-    from veles.cli._curator import _maybe_run_subproject_proposer
+    from veles.runtime.learning import _maybe_run_subproject_proposer
 
     args = _ns(provider="openrouter", resume=None, no_proposer=False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "x")
@@ -136,7 +136,7 @@ def test_proposer_runs_first_time_and_writes_state(project_with_cluster, monkeyp
 
 
 def test_proposer_idle_threshold_skips_second_call(project_with_cluster, monkeypatch) -> None:
-    from veles.cli._curator import _maybe_run_subproject_proposer
+    from veles.runtime.learning import _maybe_run_subproject_proposer
 
     args = _ns(provider="openrouter", resume=None, no_proposer=False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "x")
@@ -153,7 +153,7 @@ def test_proposer_idle_threshold_skips_second_call(project_with_cluster, monkeyp
 
 
 def test_proposer_logs_skip_on_detector_failure(project_with_cluster, monkeypatch, capsys) -> None:
-    from veles.cli._curator import _maybe_run_subproject_proposer
+    from veles.runtime.learning import _maybe_run_subproject_proposer
 
     args = _ns(provider="openrouter", resume=None, no_proposer=False)
     monkeypatch.setenv("OPENROUTER_API_KEY", "x")
@@ -173,7 +173,7 @@ def test_proposer_logs_skip_on_detector_failure(project_with_cluster, monkeypatc
 
 
 def test_proposals_block_present_in_system_prompt(project_with_cluster) -> None:
-    from veles.cli._runtime import _build_run_system_prompt
+    from veles.runtime.prompt import system_prompt_from_args
 
     cluster = Cluster(
         slug="frontend-stack",
@@ -188,27 +188,27 @@ def test_proposals_block_present_in_system_prompt(project_with_cluster) -> None:
         no_index=False,
         prompt="anything",
     )
-    prompt = _build_run_system_prompt(args, project_with_cluster)
+    prompt = system_prompt_from_args(args, project_with_cluster)
     assert prompt is not None
     assert "<proposals>" in prompt
     assert "frontend-stack" in prompt
 
 
 def test_proposals_block_absent_when_none(project_with_cluster) -> None:
-    from veles.cli._runtime import _build_run_system_prompt
+    from veles.runtime.prompt import system_prompt_from_args
 
     args = _ns(
         no_agents_md=False,
         no_index=False,
         prompt="anything",
     )
-    prompt = _build_run_system_prompt(args, project_with_cluster)
+    prompt = system_prompt_from_args(args, project_with_cluster)
     # No proposals were written
     assert prompt is None or "<proposals>" not in prompt
 
 
 def test_proposals_block_skipped_when_stale(project_with_cluster) -> None:
-    from veles.cli._runtime import _build_run_system_prompt
+    from veles.runtime.prompt import system_prompt_from_args
 
     cluster = Cluster(slug="stale", pages=["wiki/concepts/a.md"], score=0.5, rationale="ok")
     write_proposals(project_with_cluster, [cluster])
@@ -220,7 +220,7 @@ def test_proposals_block_skipped_when_stale(project_with_cluster) -> None:
     os.utime(page, (old, old))
 
     args = _ns(no_agents_md=False, no_index=False, prompt="x")
-    prompt = _build_run_system_prompt(args, project_with_cluster)
+    prompt = system_prompt_from_args(args, project_with_cluster)
     assert prompt is None or "<proposals>" not in prompt
 
 
@@ -228,9 +228,9 @@ def test_a_skill_promotion_is_not_offered_as_a_subproject(project_with_cluster) 
     """M275, through the `veles run` prompt builder: a promotion proposal —
     exactly what `write_promote_proposals` writes — used to be listed as a
     "candidate subproject" to accept with `veles subproject init promote-…`."""
-    from veles.cli._runtime import _build_run_system_prompt
     from veles.core.memory.artefacts import write_proposal
     from veles.core.skill_promotion import proposal_slug
+    from veles.runtime.prompt import system_prompt_from_args
 
     write_proposal(
         project_with_cluster,
@@ -241,7 +241,7 @@ def test_a_skill_promotion_is_not_offered_as_a_subproject(project_with_cluster) 
     cluster = Cluster(slug="frontend-stack", pages=["wiki/concepts/a.md"], score=0.5, rationale="r")
     write_proposals(project_with_cluster, [cluster])
 
-    prompt = _build_run_system_prompt(
+    prompt = system_prompt_from_args(
         _ns(no_agents_md=False, no_index=False, prompt="x"), project_with_cluster
     )
     assert prompt is not None

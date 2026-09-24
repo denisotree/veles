@@ -10,15 +10,12 @@ from veles.core.project import Project
 
 
 def cmd_curate(args: argparse.Namespace, project: Project) -> int:
-    from veles.cli import (
-        _PROVIDER_API_KEY_ENVS,
-        _ensure_api_key,
-        _run_curator_pass,
-    )
+    from veles.cli._console import ensure_api_key
+    from veles.runtime import learning
 
-    if args.provider in _PROVIDER_API_KEY_ENVS and not _ensure_api_key(args.provider):
+    if not ensure_api_key(args.provider):
         return 2
-    result = _run_curator_pass(args, project, max_sessions=args.limit, mode_label="batch")
+    result = learning._run_curator_pass(args, project, max_sessions=args.limit, mode_label="batch")
     if not result.had_candidates:
         iso = _dt.datetime.fromtimestamp(result.starting_cursor, tz=_dt.UTC).isoformat()
         print(f"<no new sessions since {iso}>", file=sys.stderr)

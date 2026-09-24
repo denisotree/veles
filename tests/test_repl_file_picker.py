@@ -69,7 +69,7 @@ def app(tmp_path):
 
 
 def test_filter_files_substring_case_insensitive() -> None:
-    from veles.cli.commands.repl import _filter_files
+    from veles.cli.repl.pickers.helpers import _filter_files
 
     files = ["README.md", "src/main.py", "src/alpha.py", "docs/README.md"]
     assert _filter_files(files, "") == files  # empty → all
@@ -103,7 +103,7 @@ def test_fp_filter_reads_only_token_before_cursor(app) -> None:
 
 
 def test_at_trigger_boundary() -> None:
-    from veles.cli.commands.repl import _at_trigger_boundary
+    from veles.cli.repl.pickers.helpers import _at_trigger_boundary
 
     assert _at_trigger_boundary("") is True  # start of input
     assert _at_trigger_boundary("hello ") is True  # after whitespace

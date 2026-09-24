@@ -10,13 +10,13 @@ from pathlib import Path
 
 import pytest
 
-from veles.channels._telegram_commands import (
+from veles.channels.session_map import SessionMap
+from veles.channels.telegram import TelegramGateway
+from veles.channels.telegram._commands import (
     _HANDLERS,
     dispatch,
     menu_descriptors,
 )
-from veles.channels.session_map import SessionMap
-from veles.channels.telegram import TelegramGateway
 
 
 @pytest.fixture()

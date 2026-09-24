@@ -568,3 +568,25 @@ def test_agent_emergency_truncates_when_compressor_left_too_much(
     assert any(
         "[CONTEXT-EMERGENCY-TRUNCATED]" in (m.content or "") for m in seen if m.role == "system"
     )
+
+
+def test_summariser_input_is_trimmed_from_the_front_to_the_limit() -> None:
+    """The one-pass trim keeps exactly the turns the drop-one-and-re-render loop
+    kept, and never exceeds the limit."""
+    from veles.core.context_compressor import _fit_summariser_input, render_transcript
+    from veles.core.tokenizer import count_tokens
+
+    middle = [
+        Message(role="user" if i % 2 == 0 else "assistant", content=f"turn {i} " + "word " * 40)
+        for i in range(60)
+    ]
+    limit = count_tokens(render_transcript(middle)) // 3
+
+    naive = middle
+    while naive and count_tokens(render_transcript(naive)) > limit:
+        naive = naive[1:]
+
+    kept, rendered, tokens = _fit_summariser_input(middle, limit)
+    assert tokens <= limit
+    assert rendered == render_transcript(kept)
+    assert kept == naive

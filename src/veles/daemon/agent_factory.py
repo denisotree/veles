@@ -1,18 +1,13 @@
-"""Daemon agent-factory wiring (M153 — moved from `veles.cli.commands.daemon`).
+"""Building the agents daemon turns run.
 
-Runtime wiring that builds Agents for daemon turns: the immutable
-`_FactorySettings` snapshot, the per-turn `_build_agent_for_turn`
-assembler, the `AgentFactory` closures (`_make_agent_factory`,
-`_make_worker_agent_factory`), the post-turn learning-loop hook
-(`_make_post_turn_hook`) and the JobRunner/DreamRunner wiring
-(`_attach_background_runners`). This belongs with `daemon/runner.py` — it is
-server runtime, not CLI plumbing — but every helper still resolves its
-`veles.cli` dependencies lazily inside the function body, both to avoid
-a `daemon → cli` import cycle and to preserve the monkeypatch contract
-tests rely on (patching `veles.cli._make_provider` etc. at call time).
-
-All names are re-exported from `veles.cli.commands.daemon` for
-backwards compatibility with historic import sites.
+The immutable `FactorySettings` snapshot, the per-turn `build_agent_for_turn`
+assembler, the `AgentFactory` closures (`make_agent_factory`,
+`make_worker_agent_factory`, `make_scoped_subagent_factory`), the post-turn
+learning-loop hook (`make_post_turn_hook`) and the verify hook
+(`make_verify_hook`). It never imports `veles.cli`: the prompt,
+tools, compressor and learning hooks come from `veles.runtime`, the provider from
+`veles.core.provider_factory`. Those are imported lazily inside each function
+so tests can patch them on their owning module at call time.
 """
 
 from __future__ import annotations
@@ -25,183 +20,13 @@ import sys
 logger = logging.getLogger(__name__)
 
 
-def _attach_background_runners(
-    state, project, agent_factory, provider_name: str, *, args=None, store=None
-):
-    """Wire the JobRunner + DreamRunner onto `state` so the daemon's
-    aiohttp lifecycle picks them up. Returns the `JobsStore` so the
-    caller can close it in `finally`.
-
-    `args`/`store` (M204): when supplied, additionally wire the structured
-    background-op machinery — the ingest kind handler (batch kernel driven by
-    ingest-scoped sub-agents), the notify+resume completion callback, and the
-    daemon-wide sub-agent factory (`state.subagent_factory`, capped at [run])
-    that makes delegate/wiki_add usable in daemon turns at all."""
-    from veles.channels.delivery import DeliveryRouter
-    from veles.cli import _make_provider as _make_provider_for_dream
-    from veles.core.dream_runner import DreamRunner
-    from veles.core.job_runner import JobRunner
-    from veles.core.jobs_store import JobsStore
-    from veles.core.memory import SessionStore
-    from veles.core.routing.ensemble import route
-
-    # The dream's LLM steps (insight extraction + consolidation) resolve
-    # their provider AND model together through routing — the same cascade
-    # the post-turn insight extractor uses (`route("insights")`). Reusing
-    # the daemon's main `provider_name` while letting the model default to
-    # dreaming's hardcoded `anthropic/claude-haiku-4.5` decoupled the two:
-    # a daemon on a local `[engine]` (e.g. ollama) asked that backend for
-    # an OpenRouter slug and got HTTP 404 on every deep-dream cycle. Routing
-    # both keeps them consistent (ollama → an ollama model, etc.).
-    del provider_name
-    from veles.core.model_resolver import ConfigurationError
-
-    try:
-        dream_provider_name, dream_model = route("insights", project)
-    except ConfigurationError:
-        # Unconfigured: the background dream runner gets an empty spec and
-        # skips at dream-time (lazy `_provider_for_dream`); daemon start is
-        # unaffected.
-        dream_provider_name, dream_model = "", ""
-
-    # M165: build the router NOW (runner construction) but leave it empty —
-    # platform deliverers are registered later, once channels actually start
-    # (`server._start_channel_runners`). The router is mutable, so a job that
-    # fires before its channel is up just hits "no deliverer wired" (logged,
-    # best-effort) rather than losing the wiring. `local`-target output is
-    # already persisted under `.veles/jobs/`; the sink only echoes it to the log.
-    delivery_router = DeliveryRouter(
-        local_sink=lambda text: logger.info("job delivery [local]: %.200s", text or ""),
-    )
-    state.delivery_router = delivery_router
-
-    from veles.core.job_schedule import resolve_schedule_tz
-
-    # M204: structured background ops need `args` (factory settings) + the
-    # session store — wire the ingest handler, the notify+resume callback,
-    # and the daemon-wide sub-agent factory when the caller supplies them.
-    kind_handlers = None
-    on_op_finished = None
-    if args is not None and store is not None:
-        from veles.daemon.background_ops import (
-            make_ingest_kind_handler,
-            make_on_op_finished,
-            make_research_kind_handler,
-        )
-
-        # Every factory resolves the model the same way the chat does — a named
-        # daemon's `[daemon.<name>] model` applies to its workers too.
-        session = state.session_name
-        kind_handlers = {
-            "ingest": make_ingest_kind_handler(
-                args, project=project, store=store, daemon_session=session
-            ),
-            "research": make_research_kind_handler(
-                args, project=project, store=store, daemon_session=session
-            ),
-        }
-        on_op_finished = make_on_op_finished(state)
-        state.subagent_factory = _make_scoped_subagent_factory(
-            args, project=project, store=store, toolset="run", daemon_session=session
-        )
-
-    from veles.daemon.background_ops import make_proactive_binder
-
-    jobs_store = JobsStore(project.memory_db_path)
-    state.job_runner = JobRunner(
-        store=jobs_store,
-        agent_factory=agent_factory,
-        output_root=project.jobs_dir,
-        delivery_router=delivery_router,
-        # M167: calendar schedules fire in the project's configured zone
-        # (`[schedule] timezone`), host-local by default.
-        tz=resolve_schedule_tz(project),
-        kind_handlers=kind_handlers,
-        on_op_finished=on_op_finished,
-        # M273: the same binder reminders use (M214) — what a job sends into a
-        # chat is recorded in that chat's session.
-        on_delivered=make_proactive_binder(state),
-    )
-
-    # M166: the reminder sweep shares the SAME delivery_router (the one channels
-    # register their deliverers on — a fresh router would never reach Telegram).
-    # The runner owns its TasksStore and closes it on stop().
-    # M214: dream-source notices resolve their target (the last active channel)
-    # at delivery time, and every attempt is audited to `proactive_deliveries`.
-    from veles.core.proactive.delivery_log import DeliveryLog
-    from veles.core.proactive.target_resolver import resolve_last_active_target
-    from veles.core.reminder_runner import ReminderRunner
-    from veles.core.tasks_store import TasksStore
-
-    state.reminder_runner = ReminderRunner(
-        store=TasksStore(project.memory_db_path),
-        delivery_router=delivery_router,
-        target_resolver=lambda: resolve_last_active_target(state),
-        delivery_log=DeliveryLog(project.memory_db_path),
-        on_delivered=make_proactive_binder(state),
-    )
-
-    def _provider_for_dream():
-        return _make_provider_for_dream(dream_provider_name)
-
-    def _history_loader():
-        from veles.core.curator_state import load as _load_curator
-
-        s = _load_curator(project.state_dir / "curator.state.json")
-        sub = SessionStore(project.memory_db_path)
-        try:
-            for sess in sub.list_sessions_since(s.last_curated_at, limit=20):
-                yield sess.id, sub.load_messages(sess.id)
-        finally:
-            sub.close()
-
-    def _proactive_history_loader():
-        # M214: corpus for proactive event extraction — the most recent sessions
-        # by activity, chronological (oldest→newest so the char-cap keeps the
-        # freshest tail). Deliberately independent of the curation cursor: a
-        # session curated seconds ago must still be visible to proactivity.
-        sub = SessionStore(project.memory_db_path)
-        try:
-            recent = sub.list_sessions(limit=20)  # newest-first
-            for sess in reversed(recent):  # chronological
-                yield sess.id, sub.load_messages(sess.id)
-        finally:
-            sub.close()
-
-    def _runtime_session_loader():
-        # M135-dream: feed all launched runtime sessions (incl. soft-deleted)
-        # into the dream so an active daemon's consolidation is aware of the
-        # full fleet (ISSUES 3a).
-        from veles.core.runtime_sessions import (
-            RuntimeSessionStore,
-            runtime_session_digest,
-        )
-
-        store = RuntimeSessionStore(project.memory_db_path)
-        try:
-            return runtime_session_digest(store.list(include_deleted=True))
-        finally:
-            store.close()
-
-    state.dream_runner = DreamRunner(
-        project=project,
-        state=state,
-        provider_factory=_provider_for_dream,
-        consolidation_model=dream_model,
-        insight_history_loader=_history_loader,
-        runtime_session_loader=_runtime_session_loader,
-        proactive_history_loader=_proactive_history_loader,
-    )
-    return jobs_store
-
-
 @dataclasses.dataclass(frozen=True, slots=True)
-class _FactorySettings:
+class FactorySettings:
     """Immutable snapshot of the daemon's per-process agent settings.
 
-    `_make_agent_factory` reads them once from `args` at startup; the
+    `make_agent_factory` reads them once from `args` at startup; the
     factory closure carries this dataclass instead of a bag of locals
-    so `_build_agent_for_turn` is testable in isolation."""
+    so `build_agent_for_turn` is testable in isolation."""
 
     provider_name: str
     model: str
@@ -222,13 +47,10 @@ class _FactorySettings:
     skills_cache_ttl: float = 600.0
 
 
-def _factory_settings_from_args(
+def factory_settings_from_args(
     args: argparse.Namespace, project, *, daemon_session: str | None = None
-) -> _FactorySettings:
-    from veles.cli import (
-        DEFAULT_COMPRESS_THRESHOLD_TOKENS,
-        DEFAULT_MAX_ITERATIONS,
-    )
+) -> FactorySettings:
+    from veles.core.defaults import DEFAULT_COMPRESS_THRESHOLD_TOKENS, DEFAULT_MAX_ITERATIONS
     from veles.core.model_resolver import (
         ensure_model_configured,
         resolve_effective_model,
@@ -272,7 +94,7 @@ def _factory_settings_from_args(
         getattr(args, "hard_ceiling_tokens", None) or compressor_section.get("hard_ceiling_tokens")
     )
 
-    return _FactorySettings(
+    return FactorySettings(
         provider_name=provider_name,
         model=model,
         max_iterations=int(getattr(args, "max_iterations", DEFAULT_MAX_ITERATIONS)),
@@ -314,7 +136,7 @@ _DEFAULT_SUMMARISER_INPUT_CAP = 150_000
 _UNSET = object()
 
 
-def _effective_ceilings(settings: _FactorySettings) -> tuple[int, int]:
+def _effective_ceilings(settings: FactorySettings) -> tuple[int, int]:
     """(hard_ceiling, summariser_input) from settings, applying the defaults."""
     hard = (
         settings.hard_ceiling_tokens
@@ -329,8 +151,8 @@ def _effective_ceilings(settings: _FactorySettings) -> tuple[int, int]:
     return hard, summariser
 
 
-def _build_agent_for_turn(
-    settings: _FactorySettings,
+def build_agent_for_turn(
+    settings: FactorySettings,
     *,
     project,
     store,
@@ -358,7 +180,7 @@ def _build_agent_for_turn(
     context refreshed for follow-up messages.
 
     `provider` / `compressor` (M158-followup): both are fixed at daemon
-    launch (M127), so `_make_agent_factory` builds them ONCE and passes
+    launch (M127), so `make_agent_factory` builds them ONCE and passes
     them in for reuse across turns — this keeps the provider's HTTP
     connection pool warm instead of reconstructing the client (+ its TLS
     handshakes) every turn. When omitted (worker-spawn factory, tests)
@@ -372,32 +194,28 @@ def _build_agent_for_turn(
 
     `system_prompt_override` (M124): when set, the worker role's
     system prompt is concatenated with the project context. Used by
-    `_make_worker_agent_factory` for manager-spawn sub-agents so
+    `make_worker_agent_factory` for manager-spawn sub-agents so
     workers see the project AGENTS.md plus their role-specific
     instructions."""
-    from veles.cli import (
-        _PLANNING_TOOLS,
-        _RUN_TOOLS,
-        _load_skills,
-        _make_provider,
-        build_compressor,
-        build_run_system_prompt,
-    )
     from veles.core.agent import Agent
+    from veles.core.provider_factory import make_provider
     from veles.core.tools.registry import Registry
+    from veles.runtime.prompt import build_run_system_prompt
+    from veles.runtime.registry import PLANNING_TOOLS, RUN_TOOLS, load_skills
+    from veles.runtime.run import build_compressor
 
     if provider is None:
-        provider = _make_provider(settings.provider_name, settings.model)
+        provider = make_provider(settings.provider_name, settings.model)
     is_planning = mode == "planning"
     if toolless:
         registry = Registry()
     else:
-        registry = _load_skills(
+        registry = load_skills(
             project,
             # M204: `tools` narrows the surface for scoped sub-agents (e.g. the
             # [ingest] set for background ingest workers — no run_shell/fetch_url,
             # B1). Default stays the full run surface; planning gets its own.
-            tools if tools is not None else (_PLANNING_TOOLS if is_planning else _RUN_TOOLS),
+            tools if tools is not None else (PLANNING_TOOLS if is_planning else RUN_TOOLS),
             provider=provider,
             model=settings.model,
             skills_cache_ttl=settings.skills_cache_ttl,
@@ -470,12 +288,12 @@ def _build_agent_for_turn(
     )
 
 
-def _make_agent_factory(
+def make_agent_factory(
     args: argparse.Namespace, *, project, store, state=None, daemon_session: str | None = None
 ):
     """Build an `AgentFactory` for the daemon, mirroring `veles run`.
 
-    Thin wrapper over `_build_agent_for_turn` — captures `settings`,
+    Thin wrapper over `build_agent_for_turn` — captures `settings`,
     `project`, `store` in the closure; per-turn args (`session_id`,
     `prompt`) come through the factory signature. JobRunner calls
     `factory(None)` for batch jobs (no prompt → no recall); the HTTP
@@ -491,7 +309,7 @@ def _make_agent_factory(
     M158-followup: because provider + compressor are launch-fixed (M127),
     build them once on the **first turn** and reuse them afterwards (warm HTTP
     connection pool instead of a fresh client per turn). Only the per-turn
-    `_build_agent_for_turn` work (recall-aware system prompt, skills registry,
+    `build_agent_for_turn` work (recall-aware system prompt, skills registry,
     session probe) reruns. Build is *lazy* (first turn, not factory creation)
     so the daemon still boots without an API key / reachable provider — it
     constructs the provider only when it actually serves a turn. The model is
@@ -501,22 +319,23 @@ def _make_agent_factory(
     nothing here touches it.)
     """
     del state  # M127: no model/provider override lookup — config is fixed.
-    settings = _factory_settings_from_args(args, project, daemon_session=daemon_session)
+    settings = factory_settings_from_args(args, project, daemon_session=daemon_session)
 
     factory_logger = logging.getLogger("veles.daemon.agent_factory")
 
-    # First-turn-lazy, then reused. `_make_provider` / `build_compressor` are
-    # resolved via `veles.cli` at call time to honour the monkeypatch contract
-    # (tests patch `veles.cli._make_provider` etc.). A concurrent first-turn
+    # First-turn-lazy, then reused. `make_provider` / `build_compressor` are
+    # imported at call time so tests can patch them on their owning modules.
+    # A concurrent first-turn
     # race would at worst build a second (equivalent) provider that the dict
     # write supersedes — harmless, so no lock.
     reused: dict[str, object] = {}
 
     def _reused_provider_and_compressor():
         if "provider" not in reused:
-            from veles.cli import _make_provider, build_compressor
+            from veles.core.provider_factory import make_provider
+            from veles.runtime.run import build_compressor
 
-            provider = _make_provider(settings.provider_name)
+            provider = make_provider(settings.provider_name)
             hard_ceiling, summariser_input = _effective_ceilings(settings)
             reused["provider"] = provider
             reused["compressor"] = build_compressor(
@@ -548,7 +367,7 @@ def _make_agent_factory(
             mode or "default",
         )
         provider, compressor = _reused_provider_and_compressor()
-        return _build_agent_for_turn(
+        return build_agent_for_turn(
             settings,
             project=project,
             store=store,
@@ -564,7 +383,7 @@ def _make_agent_factory(
     return factory
 
 
-def _make_worker_agent_factory(
+def make_worker_agent_factory(
     args: argparse.Namespace, *, project, store, daemon_session: str | None = None
 ):
     """M124: build a `(**kwargs) -> Agent` factory for manager-spawn workers.
@@ -574,7 +393,7 @@ def _make_worker_agent_factory(
     when a role-specific prompt resolves. The daemon's regular factory
     has a different shape (`(session_id, *, prompt) -> Agent`), so we
     bridge — pulling `system_prompt` out of kwargs and routing through
-    `_build_agent_for_turn` with the new `system_prompt_override`
+    `build_agent_for_turn` with the new `system_prompt_override`
     parameter.
 
     Each spawn call allocates a fresh sub-session (`session_id=None`)
@@ -582,11 +401,11 @@ def _make_worker_agent_factory(
     contract preserves explorer output verbatim in the writer's
     composed prompt (see `core.orchestration.manager.decompose_and_run`).
     """
-    settings = _factory_settings_from_args(args, project, daemon_session=daemon_session)
+    settings = factory_settings_from_args(args, project, daemon_session=daemon_session)
 
     def factory(**kwargs):
         worker_system_prompt = kwargs.get("system_prompt")
-        return _build_agent_for_turn(
+        return build_agent_for_turn(
             settings,
             project=project,
             store=store,
@@ -598,7 +417,7 @@ def _make_worker_agent_factory(
     return factory
 
 
-def _make_scoped_subagent_factory(
+def make_scoped_subagent_factory(
     args: argparse.Namespace,
     *,
     project,
@@ -616,17 +435,17 @@ def _make_scoped_subagent_factory(
     requested `tools` list says — requests are intersected with the toolset
     ceiling, and an empty intersection falls back to the full (still-capped)
     set. Fresh sub-session per call (`session_id=None`), mirroring
-    `_make_worker_agent_factory`.
+    `make_worker_agent_factory`.
     """
     from veles.core.tools.toolsets import TOOLSETS
 
-    settings = _factory_settings_from_args(args, project, daemon_session=daemon_session)
+    settings = factory_settings_from_args(args, project, daemon_session=daemon_session)
     ceiling: tuple[str, ...] = TOOLSETS[toolset]
 
     def factory(*, system_prompt: str | None = None, tools: list[str] | None = None, **_kw):
         allowed = set(ceiling)
         resolved = tuple(t for t in (tools or ceiling) if t in allowed) or ceiling
-        return _build_agent_for_turn(
+        return build_agent_for_turn(
             settings,
             project=project,
             store=store,
@@ -639,7 +458,7 @@ def _make_scoped_subagent_factory(
     return factory
 
 
-def _make_post_turn_hook(args: argparse.Namespace, project):
+def make_post_turn_hook(args: argparse.Namespace, project):
     """Closure that runs the same post-turn learning loop as `cmd_run`.
 
     Synchronous; fires curator/insights/proposer/etc. after every daemon
@@ -664,7 +483,7 @@ def _make_post_turn_hook(args: argparse.Namespace, project):
     if not getattr(args, "provider", None):
         args.provider = resolve_effective_provider(args, project)
 
-    from veles.cli import (
+    from veles.runtime.learning import (
         _maybe_refresh_nl_routing,
         _maybe_refresh_self_doc,
         _maybe_run_insight_extractor,
@@ -707,7 +526,7 @@ def _verify_enabled(project) -> bool:
     return bool(section.get("enabled", False))
 
 
-def _make_verify_hook(
+def make_verify_hook(
     args: argparse.Namespace, *, project, store, daemon_session: str | None = None
 ):
     """M170b: build the daemon `verify_hook(prompt, result) -> result`, or
@@ -724,7 +543,7 @@ def _make_verify_hook(
     """
     if not _verify_enabled(project):
         return None
-    settings = _factory_settings_from_args(args, project, daemon_session=daemon_session)
+    settings = factory_settings_from_args(args, project, daemon_session=daemon_session)
 
     def hook(prompt: str, result):
         from veles.core.model_resolver import ConfigurationError
@@ -748,7 +567,7 @@ def _make_verify_hook(
                 settings, provider_name=adv_provider, model=adv_model
             )
             try:
-                adv_agent = _build_agent_for_turn(
+                adv_agent = build_agent_for_turn(
                     adv_settings,
                     project=project,
                     store=store,

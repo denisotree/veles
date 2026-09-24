@@ -12,7 +12,7 @@ through whichever surface they happen to look at. After it's surfaced
 once, the dedup check (same title + category) prevents it from
 re-appearing on every curator pass.
 
-Call site: `cli/_curator.py` runs `maybe_surface_embedding_setup_hint`
+Call site: `runtime/learning.py` runs `maybe_surface_embedding_setup_hint`
 when `get_local_embedding_adapter()` returns None. Safe to call
 repeatedly — idempotent on the insights row.
 

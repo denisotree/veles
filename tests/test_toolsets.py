@@ -127,11 +127,11 @@ def test_non_list_tools_raises(tmp_path: Path) -> None:
         load_toolsets(tmp_path / "ts.toml")
 
 
-# ---------- cli/_runtime.py module aliases ----------
+# ---------- runtime/registry.py module aliases ----------
 
 
 def test_runtime_module_aliases_match_toolsets() -> None:
-    from veles.cli._runtime import _INGEST_TOOLS, _RUN_TOOLS
+    from veles.runtime.registry import INGEST_TOOLS, RUN_TOOLS
 
-    assert TOOLSETS["run"] == _RUN_TOOLS
-    assert TOOLSETS["ingest"] == _INGEST_TOOLS
+    assert TOOLSETS["run"] == RUN_TOOLS
+    assert TOOLSETS["ingest"] == INGEST_TOOLS

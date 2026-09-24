@@ -1,21 +1,11 @@
-"""`veles repl` — inline streaming REPL (the "act like `cat`" interface).
+"""Bare `veles` — the inline streaming REPL.
 
-Why this exists (research in M185): the full-screen `veles tui` runs in the
-terminal's *alternate screen buffer* and must capture the mouse to scroll,
-which disables the terminal's native text selection and makes the terminal
-eat ⌘C. There is no way to have app-managed wheel-scroll AND native
-selection/copy at once in a full-screen TUI.
-
-This REPL renders to the **normal** screen buffer and never enables mouse
-reporting, so the terminal owns scrollback, text selection and clipboard
-copy (⌘C on macOS / Ctrl+Shift+C on Linux) natively. Assistant output
-streams straight to stdout; the input line is drawn inline by prompt_toolkit
-(no alternate screen, no mouse capture). Visual polish is `rich`.
-
-It reuses the framework-agnostic core the Textual TUI already exposes —
-`AppState`, the `slash` command registry, and the `core.modes` FSM
-(auto/planning/writing/goal). Only the presentation layer changes: the
-Textual app + bridge + widgets become print-based callbacks.
+It renders to the terminal's **normal** screen buffer and never enables mouse
+reporting, so the terminal keeps its own scrollback, text selection and
+clipboard copy (⌘C on macOS / Ctrl+Shift+C on Linux). Assistant output streams
+straight to stdout; the input box is drawn inline by prompt_toolkit; `rich`
+does the formatting. State (`AppState`), the slash-command registry and the
+mode FSM (auto/planning/writing/goal) are shared with the rest of Veles.
 """
 
 from __future__ import annotations
@@ -33,18 +23,12 @@ from veles.cli.repl.history import HistoryMixin
 from veles.cli.repl.hud import HudMixin
 from veles.cli.repl.keys import KeysMixin
 from veles.cli.repl.pickers.file import FilePickerMixin
-from veles.cli.repl.pickers.helpers import (  # noqa: F401  (_print_model_list is a test shim)
-    _at_trigger_boundary,
-    _filter_files,
-    _filter_models,
-    _print_model_list,
-)
 from veles.cli.repl.pickers.model import ModelPickerMixin
 from veles.cli.repl.pickers.theme import ThemePickerMixin
 from veles.cli.repl.prompts import PromptsMixin
 from veles.cli.repl.runtime import _build_runtime
-from veles.cli.repl.simple import _ask_repl, _run_simple_repl  # noqa: F401  (_ask_repl is a shim)
-from veles.cli.repl.terminal import (  # noqa: F401  (_settled_status is a test shim)
+from veles.cli.repl.simple import _run_simple_repl
+from veles.cli.repl.terminal import (
     _KITTY_ENABLE,
     _banner,
     _console,
@@ -52,47 +36,10 @@ from veles.cli.repl.terminal import (  # noqa: F401  (_settled_status is a test 
     _print_resume_recap,
     _register_kitty_sequences,
     _resolve_theme,
-    _settled_status,
+    _slash_completer,
 )
-from veles.cli.repl.turn import (  # noqa: F401  (some names are re-export shims)
-    _REPL_BEHAVIOUR_BLOCK,
-    TurnMixin,
-    _handle_slash,
-    _make_turn_callbacks,
-    _render_answer,
-    _render_edit_diff,
-    _repl_turn_system_prompt,
-    _run_mode_turn,
-    _run_repl_post_turn_hooks,
-    _split_blocks,
-    _update_state_after_turn,
-)
+from veles.cli.repl.turn import TurnMixin
 from veles.core.project import Project
-
-# The rich.Live pinning the status bar during the active turn (or None). The
-# ask_user picker runs a prompt_toolkit Application mid-turn, which needs the
-# terminal — `_suspend_live` pauses this Live around it. Single-threaded loop,
-# so a module global is safe.
-_ACTIVE_LIVE = None
-
-
-def _suspend_live():
-    """Context manager that pauses the active status-bar Live so a nested
-    interactive prompt (the ask_user picker) can own the terminal, then resumes."""
-    import contextlib
-
-    @contextlib.contextmanager
-    def _cm():
-        live = _ACTIVE_LIVE
-        if live is not None:
-            live.stop()
-        try:
-            yield
-        finally:
-            if live is not None:
-                live.start(refresh=True)
-
-    return _cm()
 
 
 class _ReplApp(
@@ -126,7 +73,6 @@ class _ReplApp(
         subagent_factory=None,
     ):
         from prompt_toolkit.application import Application
-        from prompt_toolkit.completion import Completer, Completion
         from prompt_toolkit.filters import Condition
         from prompt_toolkit.formatted_text import FormattedText
         from prompt_toolkit.history import FileHistory
@@ -215,21 +161,6 @@ class _ReplApp(
         # project the tools resolve wrong paths (run_shell cwd → ~/.veles/skills).
         self._parent_ctx = contextvars.copy_context()
 
-        extra = ("/sessions", "/errors", "/resume")
-        outer = self
-
-        class _SlashCompleter(Completer):
-            def get_completions(self, document, complete_event):
-                # No slash completion while the model/file filter owns the input box.
-                if outer.mp_active or outer.fp_active or outer.tp_active:
-                    return
-                text = document.text_before_cursor
-                if not text.startswith("/") or " " in text:
-                    return
-                for name in [*registry.names(), *extra]:
-                    if name.startswith(text):
-                        yield Completion(name, start_position=-len(text))
-
         # Input history is managed explicitly (see _history_up/_down): the
         # Buffer's own FileHistory reloads its working-lines asynchronously and
         # didn't resync a just-submitted command in this embedded Application, so
@@ -249,7 +180,10 @@ class _ReplApp(
             # Without this the Window extends to fill toward max even when empty
             # (its default dont_extend_height is False).
             dont_extend_height=True,
-            completer=_SlashCompleter(),
+            # No slash completion while a model/file/theme picker owns the input box.
+            completer=_slash_completer(
+                registry, paused=lambda: self.mp_active or self.fp_active or self.tp_active
+            ),
             complete_while_typing=True,
             style="class:input",
         )

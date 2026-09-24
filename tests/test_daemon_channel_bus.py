@@ -1,6 +1,6 @@
 """M136: channels as a data bus — generic registry-driven channel startup.
 
-`_start_channel_runners` is now generic over `channels/platform_registry` and
+`start_channel_runners` is now generic over `channels/platform_registry` and
 over several channels per daemon; a named session reads its own
 `[daemon.<name>.channels.*]` (independent contexts via per-(session,platform)
 SessionMap), and a bad/credless channel is skipped without aborting the others.
@@ -20,7 +20,7 @@ from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.core.project_config import list_channel_configs
 from veles.daemon.auth import TokenStore
-from veles.daemon.server import _channel_session_map, _start_channel_runners
+from veles.daemon.channels import channel_session_map, start_channel_runners
 from veles.daemon.state import DaemonState
 
 # ---- list_channel_configs (pure config parsing) ----
@@ -78,8 +78,8 @@ def test_channel_session_map_keying(monkeypatch, tmp_path):
     class _U:
         session_name = None
 
-    _channel_session_map(_S(), "telegram")
-    _channel_session_map(_U(), "telegram")
+    channel_session_map(_S(), "telegram")
+    channel_session_map(_U(), "telegram")
     # Named session is namespaced; unnamed keeps the back-compat bare key.
     assert captured == ["api-telegram", "telegram"]
 
@@ -132,7 +132,7 @@ def _write_config(project, body: str) -> None:
 
 async def test_generic_loop_starts_registered_channel(state, fake_platforms):
     _write_config(state.project, '[channels.fake]\nenabled = true\nbot_token = "tok"\n')
-    _start_channel_runners(state)
+    start_channel_runners(state)
     assert len(state.channel_runners) == 1
     assert state.channel_runners[0].bot_token == "tok"
     for task in list(state.channel_tasks):
@@ -146,7 +146,7 @@ async def test_two_channels_one_daemon(state, fake_platforms):
         '[channels.fake]\nenabled = true\nbot_token = "a"\n'
         '[channels.fake2]\nenabled = true\nbot_token = "b"\n',
     )
-    _start_channel_runners(state)
+    start_channel_runners(state)
     assert len(state.channel_runners) == 2
     tokens = sorted(g.bot_token for g in state.channel_runners)
     assert tokens == ["a", "b"]
@@ -161,7 +161,7 @@ async def test_credless_channel_skipped_others_survive(state, fake_platforms, ca
         "[channels.fake2]\nenabled = true\n",  # no token
     )
     with caplog.at_level(logging.WARNING, logger="veles.daemon.server"):
-        _start_channel_runners(state)
+        start_channel_runners(state)
     assert len(state.channel_runners) == 1
     assert state.channel_runners[0].bot_token == "a"
     assert any("no bot token" in r.message for r in caplog.records)
@@ -172,7 +172,7 @@ async def test_credless_channel_skipped_others_survive(state, fake_platforms, ca
 def test_unregistered_platform_skipped(state, caplog):
     _write_config(state.project, '[channels.nope]\nenabled = true\nbot_token = "x"\n')
     with caplog.at_level(logging.WARNING, logger="veles.daemon.server"):
-        _start_channel_runners(state)
+        start_channel_runners(state)
     assert state.channel_runners == []
     assert any("not a registered platform" in r.message for r in caplog.records)
 
@@ -184,7 +184,7 @@ async def test_named_session_reads_own_channels(state, fake_platforms):
         '[channels.fake]\nenabled = true\nbot_token = "global"\n'
         '[daemon.api.channels.fake2]\nenabled = true\nbot_token = "scoped"\n',
     )
-    _start_channel_runners(state)
+    start_channel_runners(state)
     # Only the session-scoped channel starts; the global one is ignored.
     assert len(state.channel_runners) == 1
     assert state.channel_runners[0].bot_token == "scoped"

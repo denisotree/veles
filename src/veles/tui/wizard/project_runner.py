@@ -7,7 +7,7 @@ success, or None if the user cancelled at any step.
 If the wizard's DaemonModeStep collected daemon settings (host/port),
 this entry point spawns `veles daemon start` in the new project root
 after the wizard exits, so the user gets a running daemon (and any
-configured channels — see `daemon.server._start_channel_runners`)
+configured channels — see `daemon.channels.start_channel_runners`)
 without an extra manual command.
 """
 

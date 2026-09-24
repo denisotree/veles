@@ -54,7 +54,7 @@ def _make_pack(
 
 
 def test_prompt_file_injected_into_stable_prompt(tmp_path: Path, user_home: Path) -> None:
-    from veles.cli._runtime import build_run_system_prompt
+    from veles.runtime.prompt import build_run_system_prompt
 
     _make_pack(
         user_home,
@@ -72,7 +72,7 @@ def test_prompt_file_injected_into_stable_prompt(tmp_path: Path, user_home: Path
 
 
 def test_prompt_file_absent_no_block(tmp_path: Path, user_home: Path) -> None:
-    from veles.cli._runtime import build_run_system_prompt
+    from veles.runtime.prompt import build_run_system_prompt
 
     _make_pack(
         user_home,
@@ -89,7 +89,7 @@ def test_prompt_file_absent_no_block(tmp_path: Path, user_home: Path) -> None:
 
 
 def test_prompt_file_declared_but_missing_file_no_crash(tmp_path: Path, user_home: Path) -> None:
-    from veles.cli._runtime import build_run_system_prompt
+    from veles.runtime.prompt import build_run_system_prompt
 
     _make_pack(
         user_home,
@@ -109,8 +109,8 @@ def test_prompt_file_present_when_wiki_engine_off(tmp_path: Path, user_home: Pat
     """Engine-independence: the block appears even for a pack that does NOT
     enable the wiki engine — this is a general pack-authoring hook, not a
     wiki feature."""
-    from veles.cli._runtime import build_run_system_prompt
     from veles.core.layout import wiki_enabled
+    from veles.runtime.prompt import build_run_system_prompt
 
     _make_pack(
         user_home,
@@ -135,7 +135,7 @@ def test_load_layout_prompt_reads_from_pack_root_not_project_root(
     """Critical difference from `context_file`: the prompt file lives in the
     PACK root, so a pack edit reaches existing projects even though the
     project itself never has the file."""
-    from veles.cli._runtime import _load_layout_prompt
+    from veles.runtime.prompt import _load_layout_prompt
 
     _make_pack(
         user_home,

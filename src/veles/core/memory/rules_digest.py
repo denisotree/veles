@@ -3,7 +3,7 @@
 Curator and the insight-extractor save behavioural rules via
 `memory_save_rule(kind="preference|do|dont|format")`, but until M139 nothing
 read them back — they reached only the `/rules` inspector. This module renders
-the highest-ranked rules into a small markdown block that `cli/_runtime.py`
+the highest-ranked rules into a small markdown block that `runtime/prompt.py`
 injects into the **stable** (cacheable) part of the run system prompt, next to
 AGENTS.md. Stable, not the per-turn `<memory-context>`, because rules are
 query-independent and change rarely: keeping them turn-stable preserves prompt

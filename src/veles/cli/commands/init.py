@@ -10,7 +10,7 @@ from veles.core.project import ProjectAlreadyExists, init_project
 
 
 def cmd_init(args: argparse.Namespace) -> int:
-    from veles.cli import _register_project
+    from veles.cli._project import _register_project
 
     cwd = Path.cwd()
     try:

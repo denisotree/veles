@@ -38,6 +38,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
 
+from veles.core.frontmatter import parse_frontmatter
 from veles.core.io_utils import atomic_write_text
 from veles.core.timeutil import utc_iso
 
@@ -261,7 +262,6 @@ def _to_markdown(plan: PlanArtifact) -> str:
     return "\n".join(frontmatter + body)
 
 
-_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 _SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 
 
@@ -270,16 +270,11 @@ def _read_markdown(path: Path) -> PlanArtifact | None:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return None
-    m = _FRONTMATTER_RE.match(text)
-    if m is None:
+    parsed, body = parse_frontmatter(text)
+    if not parsed:
         return None
-    fm: dict[str, str] = {}
-    for line in m.group(1).splitlines():
-        if ":" not in line:
-            continue
-        k, _, v = line.partition(":")
-        fm[k.strip()] = v.strip()
-    body = text[m.end() :]
+    # Plan fields are strings; the shared parser would coerce an all-digit id.
+    fm = {k: str(v) for k, v in parsed.items() if v is not None}
     obj_match = re.match(r"\s*#\s+(.+?)\s*$", body, re.MULTILINE)
     objective = obj_match.group(1).strip() if obj_match else "(no objective)"
     sections = _split_sections(body)

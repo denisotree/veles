@@ -20,7 +20,7 @@ from typing import Any, cast
 
 import pytest
 
-import veles.cli as cli
+import veles.cli._agent_builder as cli
 from veles.cli.commands.run import EXIT_BY_REASON, cmd_run
 from veles.core.project import Project, init_project
 from veles.core.provider import ProviderError
@@ -182,7 +182,7 @@ def test_unapproved_tool_file_warns_on_stderr(project: Project, capsys) -> None:
     lastResort stderr handler makes the visibility accidental, and it vanishes
     as soon as an embedder configures logging.
     """
-    from veles.cli._runtime import _load_skills
+    from veles.runtime.registry import load_skills
 
     tools_dir = project.state_dir / "tools"
     tools_dir.mkdir(parents=True, exist_ok=True)
@@ -194,7 +194,7 @@ def test_unapproved_tool_file_warns_on_stderr(project: Project, capsys) -> None:
         "    return q\n"
     )
 
-    registry = _load_skills(
+    registry = load_skills(
         project,
         ("read_file",),
         provider=cast(Any, object()),

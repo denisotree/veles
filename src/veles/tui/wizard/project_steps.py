@@ -26,7 +26,6 @@ redundant, unstructured pile.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -188,12 +187,10 @@ async def _pick_project_model(
     ctx: WizardContext, provider: str, *, default_pref: str | None
 ) -> str | None:
     """Mirror of user-level ModelStep, scoped to the project."""
-    from veles.cli.repl.model_fetcher import (
-        known_models,
-        validate_and_fetch_models,
-    )
+    from veles.cli.repl.model_fetcher import validate_and_fetch_models
     from veles.core.provider_factory import LOCAL_PROVIDERS
     from veles.core.secrets import get_provider_key
+    from veles.tui.wizard.user_steps import model_choice_screen
 
     project: Project = ctx.answers["project"]
     slug = project.name
@@ -205,23 +202,12 @@ async def _pick_project_model(
             return None
 
     ok, models, _err = validate_and_fetch_models(provider, api_key)
-    if not ok or not models:
-        models = list(known_models(provider))
-    if not models:
-        return None
-    models = sorted(models, key=str.casefold)
-    items = [ChoiceItem(label=m, value=m) for m in models]
-    default = default_pref if default_pref in models else models[0]
-    result = await ctx.app.push_screen_wait(
-        ChoiceScreen(
-            title="Project model override",
-            items=items,
-            subtitle=f"{len(models)} model(s) available from {provider}.",
-            default=default,
-            filterable=True,
-            filter_placeholder="filter models (e.g. claude, gpt, 70b)",
-        )
+    screen = model_choice_screen(
+        "Project model override", provider, models if ok else [], default=default_pref
     )
+    if screen is None:
+        return None
+    result = await ctx.app.push_screen_wait(screen)
     if result is None or result == _CANCEL_SENTINEL:
         return None
     return str(result)
@@ -229,26 +215,20 @@ async def _pick_project_model(
 
 async def _project_api_key_flow(ctx: WizardContext, project: Project, provider: str) -> None:
     """Same shape as user-level ApiKeyStep but writes to the project scope."""
-    from veles.core.provider_factory import LOCAL_PROVIDERS, PROVIDER_API_KEY_ENVS
+    from veles.core.provider_factory import env_api_key, needs_api_key
     from veles.core.secrets import (
         KeyringUnavailable,
         get_provider_key,
         set_provider_key,
     )
 
-    if provider in LOCAL_PROVIDERS or provider in ("claude-cli", "gemini-cli"):
+    if not needs_api_key(provider):
         ctx.answers["project_api_key_status"] = "not-required"
         return
 
     slug = project.name
     default_key = get_provider_key(provider, env_fallback=False)
-    env_value: str | None = None
-    env_name: str | None = None
-    for name in PROVIDER_API_KEY_ENVS.get(provider, ()):
-        value = os.environ.get(name)
-        if value:
-            env_value, env_name = value, name
-            break
+    env_name, env_value = env_api_key(provider) or (None, None)
 
     options: list[ChoiceItem] = []
     if default_key:
@@ -326,31 +306,14 @@ class DaemonModeStep:
             ctx.answers["daemon"] = None
             return WizardOutcome.SKIP
 
-        host = await ctx.app.push_screen_wait(
-            InputScreen(
-                title=self.title,
-                prompt=f"Daemon host (Enter for {DEFAULT_DAEMON_HOST})",
-                default=DEFAULT_DAEMON_HOST,
-            )
+        from veles.tui.wizard.daemon_steps import prompt_host_port
+
+        answer = await prompt_host_port(
+            ctx, self.title, host=DEFAULT_DAEMON_HOST, port=DEFAULT_DAEMON_PORT
         )
-        nav = _nav(host)
-        if nav is not None:
-            return nav
-        port = await ctx.app.push_screen_wait(
-            InputScreen(
-                title=self.title,
-                prompt=f"Daemon port (Enter for {DEFAULT_DAEMON_PORT})",
-                default=str(DEFAULT_DAEMON_PORT),
-            )
-        )
-        nav = _nav(port)
-        if nav is not None:
-            return nav
-        host_clean = host.strip() or DEFAULT_DAEMON_HOST
-        try:
-            port_clean = int(port.strip() or DEFAULT_DAEMON_PORT)
-        except ValueError:  # a typo must not crash the wizard
-            port_clean = DEFAULT_DAEMON_PORT
+        if isinstance(answer, WizardOutcome):
+            return answer
+        host_clean, port_clean = answer
         ctx.answers["daemon"] = {
             "host": host_clean,
             "port": port_clean,
@@ -374,8 +337,7 @@ async def _channel_subflow(ctx: WizardContext) -> None:
     (`wizard/channel_flow.py`, the same one the daemon picker's `c` uses) and
     persists via `apply_channel`. No telegram hardcoded — the channel-type
     choice is always shown so new platforms appear with zero wizard code."""
-    from veles.cli.channel_wizard import apply_channel
-    from veles.tui.wizard.channel_flow import collect_channel_via_modals
+    from veles.tui.wizard.channel_flow import add_channel_via_modals
 
     wants = await ctx.app.push_screen_wait(
         ConfirmScreen(
@@ -387,25 +349,9 @@ async def _channel_subflow(ctx: WizardContext) -> None:
     if not wants or wants == _CANCEL_SENTINEL:
         ctx.answers["channel"] = None
         return
-    collected = await collect_channel_via_modals(ctx.app, title="Add channel")
-    if collected is None:
-        ctx.answers["channel"] = None
-        return
-    channel, secrets, config_fields = collected
-    project: Project = ctx.answers["project"]
-    # Secrets → keychain, the rest → config block; all via the shared writer.
-    try:
-        apply_channel(
-            project, session=None, channel=channel, secrets=secrets, config_fields=config_fields
-        )
-        status = "saved"
-    except Exception as exc:  # keychain unavailable etc. — report, don't crash.
-        status = f"failed: {type(exc).__name__}: {exc}"
-    ctx.answers["channel"] = {
-        "channel": channel,
-        "config_fields": config_fields,
-        "status": status,
-    }
+    ctx.answers["channel"] = await add_channel_via_modals(
+        ctx.app, ctx.answers["project"], session=None
+    )
 
 
 # ---------------- Step 6: Recap ----------------

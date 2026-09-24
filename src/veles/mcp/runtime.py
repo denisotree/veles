@@ -1,6 +1,6 @@
 """Process-global MCP manager lifecycle + agent-registry mounting (M157).
 
-The agent loop builds its tool Registry in `cli/_runtime._load_skills`;
+The agent loop builds its tool Registry in `runtime/registry.load_skills`;
 `mount_mcp_tools` is the single hook it calls. Design:
 
   - Lazy: the manager (and the `mcp` SDK) is only created when the

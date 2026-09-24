@@ -15,7 +15,8 @@ from veles.core.context import (
 )
 from veles.core.project import init_project
 from veles.core.provider import ProviderResponse, TokenUsage
-from veles.core.skills import discover_skills, make_skill_tool
+from veles.core.skill_tool import make_skill_tool
+from veles.core.skills import discover_skills
 from veles.core.tools.registry import Registry
 
 

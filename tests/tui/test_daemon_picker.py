@@ -548,27 +548,10 @@ async def test_pushed_screen_mounts_and_cursor_lands(tmp_path) -> None:
 # ---------------- data layer: runtime rows / actions ----------------
 
 
-def test_runtime_session_rows_none_project() -> None:
-    from veles.tui.screens.daemon_picker import runtime_session_rows
+def test_runtime_session_records_none_project() -> None:
+    from veles.tui.screens.daemon_picker import runtime_session_records
 
-    assert runtime_session_rows(None) == []
-
-
-def test_runtime_session_rows_lists_named_and_tui(tmp_path: Path) -> None:
-    from veles.tui.screens.daemon_picker import runtime_session_rows
-
-    project = init_project(tmp_path / "p", name="p")
-    store = RuntimeSessionStore(project.memory_db_path)
-    store.create("api", "daemon", provider="ollama", model="qwen3:4b-instruct", port=8801)
-    store.create("tui", "tui")
-    store.close()
-
-    rows = runtime_session_rows(project)
-    assert len(rows) == 2
-    joined = "\n".join(rows)
-    assert "api" in joined and "daemon" in joined and "8801" in joined
-    assert "tui" in joined
-    assert "ollama:qwen3:4b-instruct" in joined
+    assert runtime_session_records(None) == []
 
 
 def _daemon_rec(**kw):
@@ -638,16 +621,15 @@ def test_runtime_action_tui_is_noop(tmp_path):
     assert "not applicable" in msg
 
 
-def test_runtime_action_delete_soft_deletes(tmp_path):
-    from veles.tui.screens.daemon_picker import runtime_session_action
+def test_soft_delete_runtime_keeps_row_for_history(tmp_path):
+    from veles.tui.screens.daemon_picker import soft_delete_runtime
 
     project = init_project(tmp_path / "p", name="p")
     store = RuntimeSessionStore(project.memory_db_path)
     rec = store.create("api", "daemon", port=8801)
     store.close()
 
-    msg = runtime_session_action(project, rec, "delete")
-    assert "deleted" in msg
+    soft_delete_runtime(project, rec)
     store = RuntimeSessionStore(project.memory_db_path)
     try:
         assert store.get_by_name("api", kind="daemon") is None

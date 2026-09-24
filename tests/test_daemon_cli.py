@@ -30,7 +30,7 @@ def test_daemon_start_runs_wizard_when_no_project(
     suppressed). Here the wizard declines → falls through to the error."""
     import argparse
 
-    import veles.cli as cli_mod
+    import veles.cli._project as cli_mod
     import veles.cli.project_wizard as pw_mod
 
     monkeypatch.chdir(tmp_path)
@@ -68,7 +68,7 @@ def test_daemon_start_clean_decline_exits_zero(
     rather than the generic error."""
     import argparse
 
-    import veles.cli as cli_mod
+    import veles.cli._project as cli_mod
     import veles.cli.project_wizard as pw_mod
 
     monkeypatch.chdir(tmp_path)
@@ -154,7 +154,7 @@ def test_daemon_token_remove_missing(isolated_user_home: Path, capsys) -> None:
 def _project_here(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str = "p"):
     """Init a project and pin `_resolve_active_project` to it — stop/status
     address the cwd project's daemon since M209 (per-slug pid/info paths)."""
-    import veles.cli as cli_mod
+    import veles.cli._project as cli_mod
     from veles.core.project import init_project
 
     project = init_project(tmp_path, name=name)
@@ -177,7 +177,7 @@ def test_daemon_status_outside_project_errors(
 ) -> None:
     """M209: stop/status are project-scoped; outside a project there is no
     daemon to address — point the user at the cross-project verbs instead."""
-    import veles.cli as cli_mod
+    import veles.cli._project as cli_mod
 
     monkeypatch.setattr(cli_mod, "_resolve_active_project", lambda args: None)
     args = _ns(daemon_command="status")
@@ -599,7 +599,7 @@ def test_daemon_start_honours_config_port(
     Cascade: explicit flag (None here) > config block > 127.0.0.1:8765."""
     import argparse
 
-    import veles.cli as cli_mod
+    import veles.cli._project as cli_mod
     from veles.core.project import init_project
     from veles.core.project_config import load_project_config, save_project_config
 
@@ -612,7 +612,7 @@ def test_daemon_start_honours_config_port(
     save_project_config(project, cfg)
 
     monkeypatch.setattr(cli_mod, "_resolve_active_project", lambda args: project)
-    monkeypatch.setattr(cli_mod, "_ensure_api_key", lambda *a, **k: True)
+    monkeypatch.setattr("veles.cli._console.ensure_api_key", lambda *a, **k: True)
     captured: dict[str, object] = {}
 
     def _fake_detach(args, project, *, name=None):
@@ -644,7 +644,7 @@ def test_daemon_start_explicit_port_beats_config(
     """An explicit `--port` outranks the config block."""
     import argparse
 
-    import veles.cli as cli_mod
+    import veles.cli._project as cli_mod
     from veles.core.project import init_project
     from veles.core.project_config import load_project_config, save_project_config
 
@@ -655,7 +655,7 @@ def test_daemon_start_explicit_port_beats_config(
     save_project_config(project, cfg)
 
     monkeypatch.setattr(cli_mod, "_resolve_active_project", lambda args: project)
-    monkeypatch.setattr(cli_mod, "_ensure_api_key", lambda *a, **k: True)
+    monkeypatch.setattr("veles.cli._console.ensure_api_key", lambda *a, **k: True)
     captured: dict[str, object] = {}
     monkeypatch.setattr(
         daemon_cmd,

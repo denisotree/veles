@@ -6,10 +6,10 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from veles.cli._runtime import build_run_system_prompt
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.core.project_tree import ensure_table
+from veles.runtime.prompt import build_run_system_prompt
 
 
 def _seed_rule(project, *, kind: str, body: str) -> None:

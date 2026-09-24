@@ -50,7 +50,7 @@ def test_skips_keys_the_pre_m278_binder_wrote(tmp_path: Path):
 
 
 def test_a_named_daemon_reads_its_own_map(tmp_path: Path):
-    """`_channel_session_map` keeps a named daemon's chats in
+    """`channel_session_map` keeps a named daemon's chats in
     `<name>-<channel>-sessions.json`; the resolver read only `<channel>`."""
     _write_map(tmp_path, "work-telegram", {"7": 100.0})
     assert last_active_target(["telegram"], base_dir=tmp_path, session_name="work") == "telegram:7"

@@ -11,10 +11,10 @@ from __future__ import annotations
 import pytest
 from aiohttp import web
 
-from veles.channels.in_process_backend import InProcessRunBackend
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.daemon.auth import TokenStore
+from veles.daemon.in_process_backend import InProcessRunBackend
 from veles.daemon.server import build_state, make_app
 
 
@@ -82,23 +82,24 @@ async def test_post_v1_runs_starts_turns_through_start_turn(
 
 @pytest.fixture()
 def real_build(state, monkeypatch):
-    """The daemon's real per-turn build (`_build_agent_for_turn`: system prompt
+    """The daemon's real per-turn build (`build_agent_for_turn`: system prompt
     with memory recall, skills, session probe) — only the network provider and
     the compressor are stubbed."""
     import argparse
 
-    import veles.cli as cli_mod
-    from veles.daemon.agent_factory import _make_agent_factory
+    import veles.core.provider_factory as pf_mod
+    import veles.runtime.run as run_mod
+    from veles.daemon.agent_factory import make_agent_factory
 
     class _Provider:
         name = "stub"
         supports_tools = True
         supports_streaming = False
 
-    monkeypatch.setattr(cli_mod, "_make_provider", lambda *a, **k: _Provider())
-    monkeypatch.setattr(cli_mod, "build_compressor", lambda *a, **k: None)
+    monkeypatch.setattr(pf_mod, "make_provider", lambda *a, **k: _Provider())
+    monkeypatch.setattr(run_mod, "build_compressor", lambda *a, **k: None)
     monkeypatch.setenv("OPENROUTER_API_KEY", "unused-in-this-test")
-    state.agent_factory = _make_agent_factory(
+    state.agent_factory = make_agent_factory(
         argparse.Namespace(model="stub/model"), project=state.project, store=state.store
     )
 

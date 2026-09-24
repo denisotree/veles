@@ -1,6 +1,6 @@
 """M116.1: slash-command dispatcher for the Telegram channel.
 
-Unit-tests for `channels/_telegram_commands.py` — parse + dispatch +
+Unit-tests for `channels/telegram/_commands.py` — parse + dispatch +
 menu payload. Handler functions are async; we use pytest-asyncio.
 
 Integration tests (handler reached from `_handle_update`) live in
@@ -14,13 +14,13 @@ from pathlib import Path
 
 import pytest
 
-from veles.channels._telegram_commands import (
+from veles.channels.session_map import SessionMap
+from veles.channels.telegram import TelegramGateway
+from veles.channels.telegram._commands import (
     dispatch,
     menu_descriptors,
     parse_command,
 )
-from veles.channels.session_map import SessionMap
-from veles.channels.telegram import TelegramGateway
 
 # ---- parse_command ----
 
@@ -242,7 +242,7 @@ async def test_dream_reports_a_daemon_without_a_dream_runner(session_map: Sessio
 
 
 async def test_goal_dream_appear_in_menu_descriptors() -> None:
-    from veles.channels._telegram_commands import menu_descriptors
+    from veles.channels.telegram._commands import menu_descriptors
 
     cmds = {d["command"] for d in menu_descriptors()}
     assert "goal" in cmds
@@ -262,18 +262,21 @@ async def test_every_menu_command_is_dispatchable() -> None:
     a command the bot publishes in its menu (`setMyCommands`) must have
     something that answers it — the dispatcher or the gateway itself. A menu
     entry with no handler is a button that does nothing."""
-    from veles.channels._telegram_commands import _HANDLERS, menu_descriptors
+    from veles.channels.telegram._commands import _HANDLERS, menu_descriptors
 
-    gateway_owned = {"start", "reset"}
     published = {d["command"] for d in menu_descriptors()}
-    assert published - (set(_HANDLERS) | gateway_owned) == set()
+    assert published - set(_HANDLERS) == set()
     assert {"goal", "dream"} <= published
 
 
 async def test_dispatch_unknown_command_returns_none(session_map: SessionMap) -> None:
-    """`start`/`reset` are gateway-owned — dispatch returns None so the
-    gateway's existing flow handles them. Same for truly unknown commands."""
     gateway = _make_gateway(session_map)
-    assert await dispatch(gateway, "42", "start", "") is None
-    assert await dispatch(gateway, "42", "reset", "") is None
     assert await dispatch(gateway, "42", "foobar", "") is None
+
+
+async def test_reset_forgets_the_chat_session(session_map: SessionMap) -> None:
+    gateway = _make_gateway(session_map)
+    session_map.set("42", "sess-1")
+    assert await dispatch(gateway, "42", "reset", "") == "History cleared."
+    assert session_map.get("42") is None
+    assert await dispatch(gateway, "42", "reset", "") == "History is already empty."

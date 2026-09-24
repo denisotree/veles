@@ -1,7 +1,7 @@
 """Start one agent turn on the daemon — the single entry both front doors share.
 
 `POST /v1/runs` (`server.py::_handle_create_run`) and the in-process channel
-backend (`channels/in_process_backend.py::submit_run`) each carried their own
+backend (`daemon/in_process_backend.py::submit_run`) each carried their own
 copy of "manager gate → build agent → run in background", and the copies had
 already drifted. M280 routes agent modes through here, so there has to be one
 place to route them.
@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -114,9 +113,7 @@ async def start_turn(
             effective_session_id = _session_for_mode_turn(state, session_id)
             turn = make_mode_turn(state, session_id=effective_session_id, prompt=prompt)
     except Exception as exc:
-        handle.state = "failed"
-        handle.error = f"{type(exc).__name__}: {exc}"
-        handle.finished_at = time.time()
+        handle.mark_failed(f"{type(exc).__name__}: {exc}")
         raise
 
     # The real session id is known BEFORE the run starts. Adopt it on the handle
@@ -163,7 +160,7 @@ def _session_for_mode_turn(state: DaemonState, session_id: str) -> str:
     a mode builds several agents per turn and none may mint its own.
 
     A channel's map can outlive a session row (DB reset), as
-    `_build_agent_for_turn` handles on the default path: a stale id gets a
+    `build_agent_for_turn` handles on the default path: a stale id gets a
     fresh session, and the chat's mode moves with it instead of being lost."""
     if state.store.session_exists(session_id):
         return session_id

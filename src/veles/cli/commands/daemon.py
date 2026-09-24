@@ -23,19 +23,16 @@ same `_resolve_active_project` helper used by every other verb.
 M153 decomposition: this module keeps only the `cmd_daemon` dispatcher
 and the thin `_cmd_daemon_*` verb handlers. The moved clusters:
 
-- agent-factory runtime wiring (`_FactorySettings`,
-  `_factory_settings_from_args`, `_build_agent_for_turn`,
-  `_make_agent_factory`, `_make_worker_agent_factory`,
-  `_make_post_turn_hook`) → `veles.daemon.agent_factory`;
+- building agents for turns (`FactorySettings`, `make_agent_factory`, the
+  post-turn and verify hooks, …) → `veles.daemon.agent_factory`, and the
+  job/reminder/dream runners → `veles.daemon.background`;
 - process/lifecycle helpers (pid/info sidecars, registry, detach,
   graceful stop, instance paths, named-session marking) →
   `veles.cli.commands.daemon_lifecycle`;
 - token-store bootstrap + `token` CRUD →
   `veles.cli.commands.daemon_tokens`.
 
-Every moved name stays importable from here via the re-export block
-below, so historic `from veles.cli.commands.daemon import …` sites keep
-working. New code should import from the canonical modules.
+Import those names from their own modules; this one imports only what it uses.
 """
 
 from __future__ import annotations
@@ -51,51 +48,28 @@ from pathlib import Path
 
 from aiohttp import web
 
-# M153 re-exports — canonical home is `commands/daemon_lifecycle.py`.
-from veles.cli.commands.daemon_lifecycle import (  # noqa: F401 (re-export)
+from veles.cli.commands.daemon_lifecycle import (
     _bootstrap_daemon,
     _cleanup_daemon_exit,
     _detach_and_report,
     _graceful_stop,
-    _instance_log_slug,
     _mark_session_running,
-    _mark_session_stopped,
     _register_in_registry,
     _resolve_instance_paths,
     _restart_named_session,
     _stop_status_paths,
     _write_pid_and_info,
 )
-
-# M153 re-exports — canonical home is `commands/daemon_tokens.py`.
-from veles.cli.commands.daemon_tokens import (  # noqa: F401 (re-export)
-    _cmd_daemon_token,
-    _cmd_daemon_token_add,
-    _cmd_daemon_token_list,
-    _cmd_daemon_token_remove,
-    _initialise_token_store,
-)
+from veles.cli.commands.daemon_tokens import _cmd_daemon_token, _initialise_token_store
 from veles.core.defaults import DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT
-from veles.core.user_paths import user_home as _user_home_dir  # noqa: F401 (legacy alias)
-
-# M153 re-exports — canonical home is `veles.daemon.agent_factory`.
-from veles.daemon.agent_factory import (  # noqa: F401 (re-export)
-    _attach_background_runners,
-    _build_agent_for_turn,
-    _factory_settings_from_args,
-    _FactorySettings,
-    _make_agent_factory,
-    _make_post_turn_hook,
-    _make_verify_hook,
-    _make_worker_agent_factory,
+from veles.daemon.agent_factory import (
+    factory_settings_from_args,
+    make_agent_factory,
+    make_post_turn_hook,
+    make_verify_hook,
+    make_worker_agent_factory,
 )
-
-# M-R1.4: path helpers and logging setup moved to `daemon/paths.py` +
-# `daemon/logging.py` so the TUI picker can import them without
-# reaching into the CLI layer. These thin re-exports keep historic
-# call sites + plugin imports working.
-from veles.daemon.auth import TokenStore, _default_tokens_path  # noqa: F401 (re-export)
-from veles.daemon.logging import setup_daemon_logging as _setup_daemon_logging  # noqa: F401
+from veles.daemon.background import attach_background_runners
 from veles.daemon.paths import daemon_log_path, read_pid
 from veles.daemon.registry import is_alive
 
@@ -151,7 +125,8 @@ def _warn_on_security_config_typos(project) -> None:
 
 
 def _cmd_daemon_start(args: argparse.Namespace) -> int:
-    from veles.cli import _ensure_api_key, _resolve_active_project
+    from veles.cli._console import ensure_api_key as _ensure_api_key
+    from veles.cli._project import _resolve_active_project
     from veles.core.memory import SessionStore
     from veles.daemon.server import build_state, make_app
 
@@ -249,13 +224,13 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     token_store = _initialise_token_store()
 
     store = SessionStore(project.memory_db_path)
-    worker_agent_factory = _make_worker_agent_factory(
+    worker_agent_factory = make_worker_agent_factory(
         args, project=project, store=store, daemon_session=name
     )
     # M126: build state first (with a placeholder) so the agent factory
     # closure can capture it for per-session override lookup. Replace
     # the factory immediately after.
-    settings_for_health = _factory_settings_from_args(args, project, daemon_session=name)
+    settings_for_health = factory_settings_from_args(args, project, daemon_session=name)
     state = build_state(
         project=project,
         store=store,
@@ -265,14 +240,14 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
         default_model=settings_for_health.model,
         session_name=name,
     )
-    agent_factory = _make_agent_factory(
+    agent_factory = make_agent_factory(
         args, project=project, store=store, state=state, daemon_session=name
     )
     state.agent_factory = agent_factory
-    state.post_turn_hook = _make_post_turn_hook(args, project)
-    state.verify_hook = _make_verify_hook(args, project=project, store=store, daemon_session=name)
+    state.post_turn_hook = make_post_turn_hook(args, project)
+    state.verify_hook = make_verify_hook(args, project=project, store=store, daemon_session=name)
     state.worker_agent_factory = worker_agent_factory
-    jobs_store = _attach_background_runners(
+    jobs_store = attach_background_runners(
         state, project, agent_factory, provider_name, args=args, store=store
     )
 
@@ -598,7 +573,7 @@ def _cmd_daemon_picker(args: argparse.Namespace) -> int:
     # Resolve the project from cwd (best-effort) so the picker can also show
     # this project's runtime sessions (named daemons + the kind=tui row);
     # None just hides that section (M138-followup).
-    from veles.cli import _resolve_active_project
+    from veles.cli._project import _resolve_active_project
 
     project = _resolve_active_project(args)
     # Disable Textual mouse-mode so the terminal handles drag-to-select +
@@ -688,7 +663,7 @@ def _cmd_daemon_delete(args: argparse.Namespace) -> int:
     then remove from the registry. Does NOT delete the project's
     `.veles/` data — that's the user's content. Use `--yes`/`-y` to
     skip the prompt for scripted use (CI, ansible)."""
-    from veles.cli import _confirm
+    from veles.cli._console import confirm as _confirm
     from veles.daemon.registry import DaemonRegistry
 
     slug = _resolve_target_slug(args)

@@ -1,18 +1,16 @@
 """Data/formatting layer for the daemon picker (M154).
 
-Non-TUI helpers carved out of `daemon_picker.py`: row formatters,
-runtime-session record access/actions, and per-entry model/channel
-resolution. Nothing here touches Textual — `DaemonPickerScreen`
+Non-TUI helpers carved out of `daemon_picker.py`: the daemon tree model
+and labels, runtime-session record access/actions, and per-entry
+model/channel resolution. Nothing here touches Textual — `DaemonPickerScreen`
 imports from this module and re-exports the names for tests.
 """
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import signal
-import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -39,21 +37,6 @@ def _fmt_uptime(seconds: float) -> str:
     return f"{seconds / 86400:.1f}d"
 
 
-_MODEL_COL_WIDTH = 32
-
-
-def _fmt_model(model: str | None) -> str:
-    """Pad / truncate the model id to a fixed column so rows align.
-
-    `None` (no project config or no `[engine] model` key) renders as
-    a centred dash so the column reads cleanly across mixed daemons."""
-    if not model:
-        return f"{'-':<{_MODEL_COL_WIDTH}}"
-    if len(model) > _MODEL_COL_WIDTH:
-        return model[: _MODEL_COL_WIDTH - 1] + "…"
-    return f"{model:<{_MODEL_COL_WIDTH}}"
-
-
 def runtime_session_records(project) -> list:
     """The project's `runtime_sessions` records (named daemon sessions from
     M135 + the kind=tui row from M138). Best-effort: [] on no project or any
@@ -72,29 +55,11 @@ def runtime_session_records(project) -> list:
         return []
 
 
-def _fmt_runtime_row(r, *, channels: list[str] | None = None) -> str:
-    """One picker line for a runtime-session record."""
-    model = r.model or "-"
-    provider = r.provider or "-"
-    port = r.port if r.port is not None else "-"
-    chans = f"  chans={','.join(channels)}" if channels else ""
-    return f"  {r.name:<16}  {r.kind:<6}  {r.status:<8}  {provider}:{model}  port={port}{chans}"
-
-
-def runtime_session_rows(project) -> list[str]:
-    """Text rows for the project's runtime sessions (M138-followup), distinct
-    from the M97 cross-project `DaemonRegistry` table above."""
-    return [_fmt_runtime_row(r) for r in runtime_session_records(project)]
-
-
 def runtime_session_action(project, record, action: str) -> str:
-    """Perform a lifecycle `action` (start/stop/restart/delete) on a named
-    runtime daemon session and return a status string for `last_action`.
-
-    Daemon sessions map to the M135 named-session lifecycle (spawn `--name`,
-    SIGTERM the instance pid, soft-delete the row). The kind=tui row and
-    unknown actions return an explanatory no-op — you don't drive the TUI's
-    own runtime from this panel."""
+    """Start or stop a named runtime daemon session and return a status
+    string for `last_action`. Start re-reads host/port from the session's
+    config block; restart and delete run async in the picker itself. The
+    kind=tui row and unknown actions return an explanatory no-op."""
     if record.kind != "daemon":
         return f"{record.name}: {action} not applicable to a {record.kind} session"
 
@@ -132,100 +97,7 @@ def runtime_session_action(project, record, action: str) -> str:
             return f"{record.name}: SIGTERM sent"
         except OSError as exc:
             return f"{record.name}: stop failed: {exc}"
-    if action == "restart":
-        if pid and is_alive(pid):
-            with contextlib.suppress(OSError):
-                os.kill(pid, signal.SIGTERM)
-            for _ in range(20):
-                if not is_alive(pid):
-                    break
-                time.sleep(0.05)
-        return f"{record.name}: restart spawned" if _spawn() else f"{record.name}: restart failed"
-    if action == "delete":
-        # Graceful-stop a live process first (mirror registry delete) so we
-        # don't orphan a running named daemon, then soft-delete the row.
-        if pid and is_alive(pid):
-            with contextlib.suppress(OSError):
-                os.kill(pid, signal.SIGTERM)
-            for _ in range(20):
-                if not is_alive(pid):
-                    break
-                time.sleep(0.05)
-        from veles.core.runtime_sessions import RuntimeSessionStore
-
-        store = RuntimeSessionStore(project.memory_db_path)
-        try:
-            store.soft_delete(record.id)
-        finally:
-            store.close()
-        stopped = " stopped +" if pid else ""
-        return f"{record.name}:{stopped} deleted (kept in DB for history)"
     return f"{record.name}: unknown action {action!r}"
-
-
-class DaemonRowFormatter:
-    """Pure rendering for a single daemon registry row.
-
-    Carved out of `DaemonPickerScreen` in M-R2.6 so the diff-update
-    machinery (`signature`) and the row-text formatter (`render`)
-    have their own testable home. Both methods are static — they
-    take `DaemonEntry` (+ `now` for the live uptime, + `model` for
-    the M-R3 model column) and return plain values, no Textual
-    dependencies.
-    """
-
-    @staticmethod
-    def signature(
-        entry: DaemonEntry,
-        *,
-        model: str | None = None,
-        channels: list[str] | None = None,
-    ) -> tuple:
-        """Hashable tuple representing the entry's structural state.
-
-        Drives diff-based refresh: when every row's signature matches
-        the previous tick, only uptime + model labels need re-rendering
-        and the ListView children aren't rebuilt (M111 focus-survival).
-
-        Model is intentionally **not** part of the signature: live
-        `active_model` (from /v1/health) changes on every /model swap,
-        and including it would force a `ListView.clear()` + rebuild on
-        each change — which destroys focus. The in-place update path
-        already re-renders the full label (including the model column)
-        so the value is reflected without churn. `model` is kept as a
-        kwarg purely for the historical signature-call shape.
-
-        Channels **are** part of the signature so an add/remove forces a
-        rebuild and the `chans=…` suffix appears immediately."""
-        del model  # see docstring — accepted for back-compat, ignored.
-        return (entry.slug, entry.pid, status_for(entry), tuple(channels or ()))
-
-    @staticmethod
-    def render(
-        entry: DaemonEntry,
-        now: float,
-        *,
-        model: str | None = None,
-        channels: list[str] | None = None,
-    ) -> str:
-        """One-line row text. Columns are width-padded so daemons line
-        up visually in the picker; the trailing project path is left
-        unpadded so very long paths overflow rather than truncate.
-
-        The `model` column reads `<project>/.veles/config.toml
-        [engine] model` (resolver's canonical source after the TUI
-        `/model` fix); `None` renders as a dash so the alignment stays
-        consistent across daemons with and without a configured model.
-        `channels` (enabled global `[channels.*]`) render as a trailing
-        `chans=…` so the user can see what a daemon serves."""
-        st = status_for(entry)
-        up = _fmt_uptime(uptime_seconds(entry, now=now))
-        chans = f"chans={','.join(channels)}  " if channels else ""
-        return (
-            f"  {entry.slug:<20}  {entry.host}:{entry.port:<6}  "
-            f"pid={entry.pid:<8}  {st:<8}  up {up:<6}  "
-            f"{_fmt_model(model)}  {chans}{entry.project_path}"
-        )
 
 
 def _fetch_health(entry: DaemonEntry) -> dict | None:

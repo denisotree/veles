@@ -15,7 +15,7 @@ from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.daemon.auth import TokenStore
 from veles.daemon.background_ops import make_proactive_binder
-from veles.daemon.server import _channel_session_map
+from veles.daemon.channels import channel_session_map
 from veles.daemon.state import DaemonState
 
 
@@ -41,7 +41,7 @@ async def test_binder_opens_session_when_chat_has_none(state):
 
     # Keyed as the gateway keys a chat — `str(chat_id)` — not by the target
     # string; pre-M278 the binder used "telegram:42", which the gateway never reads.
-    sid = _channel_session_map(state, "telegram").get("42")
+    sid = channel_session_map(state, "telegram").get("42")
     assert sid is not None  # the agent opened a session itself
     msgs = state.store.load_messages(sid)
     assert any(m.role == "assistant" and "BC GAME live" in (m.content or "") for m in msgs)
@@ -49,12 +49,12 @@ async def test_binder_opens_session_when_chat_has_none(state):
 
 async def test_binder_reuses_existing_session(state):
     existing = state.store.create_session()
-    _channel_session_map(state, "telegram").set("42", existing)  # as the gateway writes it
+    channel_session_map(state, "telegram").set("42", existing)  # as the gateway writes it
 
     await make_proactive_binder(state)("telegram:42", "⏰ standup")
 
     # same session — no new one minted, notice recorded there
-    assert _channel_session_map(state, "telegram").get("42") == existing
+    assert channel_session_map(state, "telegram").get("42") == existing
     msgs = state.store.load_messages(existing)
     assert any(m.role == "assistant" and "standup" in (m.content or "") for m in msgs)
 
@@ -62,7 +62,7 @@ async def test_binder_reuses_existing_session(state):
 async def test_the_chats_next_message_continues_the_bound_session(state):
     """The contract that matters, end to end: after a notice is bound to chat
     42, the gateway's next message from chat 42 goes to that same session. The
-    gateway gets the very map the daemon hands it (`_start_channel_runners`).
+    gateway gets the very map the daemon hands it (`start_channel_runners`).
     Pre-M278 the binder keyed "telegram:42" while the gateway reads "42", so
     this message started a fresh session with no record of the notice."""
     from veles.channels.telegram import TelegramGateway
@@ -85,7 +85,7 @@ async def test_the_chats_next_message_continues_the_bound_session(state):
     gateway = TelegramGateway(
         bot_token="X",
         daemon_client=_Client(),
-        session_map=_channel_session_map(state, "telegram"),
+        session_map=channel_session_map(state, "telegram"),
     )
 
     async def _send(method, payload):
@@ -105,4 +105,4 @@ async def test_the_chats_next_message_continues_the_bound_session(state):
 async def test_binder_ignores_malformed_target(state):
     # No ':' → not a chat target; must not raise or create anything.
     await make_proactive_binder(state)("local", "⏰ x")
-    assert _channel_session_map(state, "local").get("local") is None
+    assert channel_session_map(state, "local").get("local") is None

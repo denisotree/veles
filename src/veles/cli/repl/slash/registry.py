@@ -40,6 +40,8 @@ class SlashContext:
     state: AppState
     project: Project
     store: SessionStore
+    # This REPL session's failures, newest last (read by `/errors`).
+    errors: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)

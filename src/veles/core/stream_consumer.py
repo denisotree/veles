@@ -13,7 +13,7 @@ from collections.abc import Callable
 
 from veles.core.cancel import current_cancel_token
 from veles.core.context_scrubber import MemoryContextScrubber
-from veles.core.events import ThinkingDelta
+from veles.core.events import Event, ThinkingDelta
 from veles.core.provider import (
     Provider,
     ProviderResponse,
@@ -32,7 +32,7 @@ def consume_stream(
     model: str,
     max_tokens: int,
     on_text_delta: Callable[[str], None],
-    emit_event: Callable[[object], None],
+    emit_event: Callable[[Event], None],
     session_id: str | None,
 ) -> tuple[ProviderResponse, int]:
     """Consume one streaming provider call; return (response, ttft_ms).

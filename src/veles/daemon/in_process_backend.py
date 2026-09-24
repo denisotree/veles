@@ -1,5 +1,8 @@
 """In-process run backend for channels co-hosted inside the daemon.
 
+The daemon builds it and hands it to a channel gateway through the channels'
+`RunBackend` protocol, so channel code never imports the daemon.
+
 `TelegramGateway` was originally written against `DaemonClient`, which
 talks HTTP/WS to a remote daemon. When the gateway lives *inside* the
 daemon's own asyncio loop, going through localhost would mean spinning
@@ -13,7 +16,6 @@ the gateway's `RunBackend` protocol.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import AsyncIterator
 from typing import Any
@@ -51,24 +53,8 @@ class InProcessRunBackend:
         handle = self._state.get_run(run_id)
         if handle is None:
             raise LookupError(f"unknown run_id: {run_id!r}")
-        cursor = 0
-        while True:
-            while cursor < len(handle.events):
-                event = handle.events[cursor]
-                cursor += 1
-                yield event
-                if event.get("type") in ("completed", "error"):
-                    return
-            if handle.done.is_set() and cursor >= len(handle.events):
-                # The terminal event is appended via call_soon_threadsafe just
-                # before `done` is set, so it may still be queued. Drain pending
-                # callbacks before closing, else a fast run's completion event
-                # is lost to this subscriber.
-                await asyncio.sleep(0)
-                if cursor >= len(handle.events):
-                    return
-                continue
-            await handle.event_added.wait()
+        async for event in handle.iter_events():
+            yield event
 
     async def get_session(self, session_id: str) -> dict[str, Any]:
         """In-process equivalent of `DaemonClient.get_session`: the session's
@@ -124,21 +110,7 @@ class InProcessRunBackend:
         handle = self._state.get_run(run_id)
         if handle is None:
             raise LookupError(f"unknown run_id: {run_id!r}")
-        pending = handle.pending_prompts.pop(prompt_id, None)
-        if pending is None:
-            raise LookupError(f"prompt {prompt_id!r} not pending on run {run_id!r}")
-        if not pending.accepts(choice):
-            # Restore so a follow-up call with a valid key can resolve.
-            handle.pending_prompts[prompt_id] = pending
-            raise ValueError(f"choice {choice!r} not valid for {pending.kind} prompt")
-        pending.future.set_result(choice)
-        handle.append_event(
-            {
-                "type": "prompt_resolved",
-                "prompt_id": prompt_id,
-                "choice": choice,
-            }
-        )
+        handle.resolve_prompt(prompt_id, choice)
         return {"accepted": True, "choice": choice}
 
 

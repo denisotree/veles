@@ -1,7 +1,7 @@
 """M170b — daemon verify→escalate wiring.
 
 Two layers: `run_agent_in_background` runs the injected `verify_hook` before
-the `completed` event and rebinds the result; `_make_verify_hook` builds the
+the `completed` event and rebinds the result; `make_verify_hook` builds the
 real daemon hook (gate + advisor verdict + escalation on the BASE session_id
 for chat continuity).
 """
@@ -28,7 +28,7 @@ class _StubAgent:
 
 
 def _daemon_args():
-    # _factory_settings_from_args resolves provider/model from config when these
+    # factory_settings_from_args resolves provider/model from config when these
     # are None; the rest of the fields fall through getattr defaults.
     return argparse.Namespace(provider=None, model=None)
 
@@ -85,7 +85,7 @@ async def test_verify_hook_failure_keeps_base():
     assert handle.state == "completed"
 
 
-# ---- _make_verify_hook gate ----
+# ---- make_verify_hook gate ----
 
 
 def test_make_verify_hook_off_returns_none(monkeypatch, tmp_path):
@@ -94,7 +94,7 @@ def test_make_verify_hook_off_returns_none(monkeypatch, tmp_path):
     store = SessionStore(project.memory_db_path)
     try:
         assert (
-            af._make_verify_hook(_daemon_args(), project=project, store=store, daemon_session=None)
+            af.make_verify_hook(_daemon_args(), project=project, store=store, daemon_session=None)
             is None
         )
     finally:
@@ -106,7 +106,7 @@ def test_make_verify_hook_enabled_via_config(monkeypatch, tmp_path):
     project = _project_with_provider(tmp_path, extra="[verify]\nenabled = true\n")
     store = SessionStore(project.memory_db_path)
     try:
-        hook = af._make_verify_hook(
+        hook = af.make_verify_hook(
             _daemon_args(), project=project, store=store, daemon_session=None
         )
         assert hook is not None
@@ -114,7 +114,7 @@ def test_make_verify_hook_enabled_via_config(monkeypatch, tmp_path):
         store.close()
 
 
-# ---- _make_verify_hook decision + REAL escalator (continuity fix) ----
+# ---- make_verify_hook decision + REAL escalator (continuity fix) ----
 
 
 def test_make_verify_hook_escalates_on_base_session(monkeypatch, tmp_path):
@@ -139,9 +139,9 @@ def test_make_verify_hook_escalates_on_base_session(monkeypatch, tmp_path):
             captured["model"] = settings.model
             return _StubAgent(strong)
 
-        monkeypatch.setattr(af, "_build_agent_for_turn", fake_build)
+        monkeypatch.setattr(af, "build_agent_for_turn", fake_build)
 
-        hook = af._make_verify_hook(
+        hook = af.make_verify_hook(
             _daemon_args(), project=project, store=store, daemon_session=None
         )
         assert hook is not None
@@ -170,7 +170,7 @@ def test_make_verify_hook_same_model_no_escalation(monkeypatch, tmp_path):
         # advisor route resolves to the SAME provider/model as the daemon base.
         monkeypatch.setattr(rmod, "route", lambda task, proj: ("ollama", "base-m"))
 
-        hook = af._make_verify_hook(
+        hook = af.make_verify_hook(
             _daemon_args(), project=project, store=store, daemon_session=None
         )
         base = RunResult(text="weak", iterations=1, session_id="s1")

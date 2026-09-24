@@ -2,8 +2,8 @@
 
 Wiki tools are NOT registered here: they live in the wiki content-engine
 module (`veles.modules.wiki.tools`) and register lazily at agent-build time
-only when the project's layout enables the wiki engine (`_load_skills` in
-cli/_runtime.py). A non-wiki project never imports the wiki module.
+only when the project's layout enables the wiki engine (`load_skills` in
+runtime/registry.py). A non-wiki project never imports the wiki module.
 
 Agent-ops command tools (job_add/job_list/job_remove — M204) are NOT here
 either: they live in `veles.modules.agentops.tools` (module-resident by

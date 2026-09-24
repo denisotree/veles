@@ -81,7 +81,7 @@ def test_ranks_strongest_first(project: Project) -> None:
 
 def test_skip_when_user_scope_exists(project: Project, tmp_path: Path) -> None:
     """A same-name skill at user scope means promotion would collide."""
-    from veles.core.skills import user_skills_dir
+    from veles.core.user_paths import user_skills_dir
 
     _write_skill(project, "shadow", use_count=20, success_count=18)
     user_skill = user_skills_dir() / "shadow"
@@ -95,7 +95,7 @@ def test_skip_when_user_scope_exists(project: Project, tmp_path: Path) -> None:
 
 def test_skip_user_scope_skills(project: Project, tmp_path: Path) -> None:
     """User-scope skills already are at user scope; nothing to promote."""
-    from veles.core.skills import user_skills_dir
+    from veles.core.user_paths import user_skills_dir
 
     user_skill = user_skills_dir() / "user-only"
     user_skill.mkdir(parents=True, exist_ok=True)

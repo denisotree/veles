@@ -54,7 +54,7 @@ def last_active_target(
     A map is keyed by the gateway's chat key (`"42"`), so the target is built
     as `<channel>:<key>` — returning the bare key made every "last active chat"
     notice undeliverable. A named daemon keeps its maps as
-    `<session_name>-<channel>` (`daemon/server.py::_channel_session_map`)."""
+    `<session_name>-<channel>` (`daemon/channels.py::channel_session_map`)."""
     from veles.channels.session_map import SessionMap, channel_session_path
 
     best: str | None = None

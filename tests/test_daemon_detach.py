@@ -154,7 +154,7 @@ def test_detach_path_default_calls_spawn(
     from veles.cli.commands import daemon_lifecycle as lifecycle_mod
 
     monkeypatch.setattr(lifecycle_mod, "is_alive", lambda pid: pid == fake_child_pid)
-    monkeypatch.setattr("veles.cli._ensure_api_key", lambda provider, project=None: True)
+    monkeypatch.setattr("veles.cli._console.ensure_api_key", lambda provider, project=None: True)
 
     try:
         rc = daemon_cmd._cmd_daemon_start(_start_args(port=port))
@@ -176,7 +176,7 @@ def test_detach_path_spawn_returns_none_reports_failure(
     from veles.daemon import spawn as spawn_mod
 
     monkeypatch.setattr(spawn_mod, "spawn_daemon", lambda **_: None)
-    monkeypatch.setattr("veles.cli._ensure_api_key", lambda provider, project=None: True)
+    monkeypatch.setattr("veles.cli._console.ensure_api_key", lambda provider, project=None: True)
 
     rc = daemon_cmd._cmd_daemon_start(_start_args())
     assert rc == 1
@@ -206,7 +206,7 @@ def test_detach_path_pid_never_appears_reports_log_tail(
             return 1  # already exited
 
     monkeypatch.setattr(spawn_mod, "spawn_daemon", lambda **_: _DeadProc())
-    monkeypatch.setattr("veles.cli._ensure_api_key", lambda provider, project=None: True)
+    monkeypatch.setattr("veles.cli._console.ensure_api_key", lambda provider, project=None: True)
     # Speed up the polling loop so the test doesn't take 5s.
     monkeypatch.setattr("time.sleep", lambda _s: None)
 
@@ -223,7 +223,7 @@ def test_detach_path_already_running_refuses(
     """Existing pid file + live pid → reject the start (same project)."""
     pid_file = isolated_user_home / "daemon-detach-tests.pid"
     pid_file.write_text(f"{os.getpid()}\n", encoding="utf-8")
-    monkeypatch.setattr("veles.cli._ensure_api_key", lambda provider, project=None: True)
+    monkeypatch.setattr("veles.cli._console.ensure_api_key", lambda provider, project=None: True)
 
     rc = daemon_cmd._cmd_daemon_start(_start_args())
     assert rc == 1
@@ -248,7 +248,7 @@ def test_foreground_flag_runs_aiohttp_inline(
 
     web_run_called: list[Any] = []
     monkeypatch.setattr("aiohttp.web.run_app", lambda *a, **k: web_run_called.append((a, k)))
-    monkeypatch.setattr("veles.cli._ensure_api_key", lambda provider, project=None: True)
+    monkeypatch.setattr("veles.cli._console.ensure_api_key", lambda provider, project=None: True)
     # This test drives the real `_bootstrap_daemon` (via `_cmd_daemon_start`)
     # for its foreground-vs-detach behavior only; suppress the stdio funnel
     # so it doesn't permanently swap sys.stdout/stderr and leak into later

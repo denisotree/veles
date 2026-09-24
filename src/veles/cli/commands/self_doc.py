@@ -8,9 +8,11 @@ import sys
 from veles.core.project import Project
 
 
-def cmd_self_doc(args: argparse.Namespace, project: Project | None) -> int:
+def cmd_self_doc(args: argparse.Namespace) -> int:
+    from veles.cli._project import require_project
+
+    project = require_project(args)
     if project is None:
-        print("error: no Veles project found", file=sys.stderr)
         return 2
     sub = getattr(args, "self_doc_cmd", None) or "refresh"
     if sub == "refresh":
@@ -24,12 +26,12 @@ def cmd_self_doc(args: argparse.Namespace, project: Project | None) -> int:
 def _refresh(project: Project) -> int:
     # Import builtin modules so @tool decorators fire and register entries.
     import veles.core.tools.builtin  # noqa: F401
-    from veles.cli._runtime import _RUN_TOOLS
     from veles.core.self_doc import refresh_self_doc
     from veles.core.tools.registry import registry as _tool_registry
+    from veles.runtime.registry import RUN_TOOLS
 
     tools: list[tuple[str, str]] = []
-    for name in _RUN_TOOLS:
+    for name in RUN_TOOLS:
         try:
             entry = _tool_registry.get(name)
             tools.append((name, entry.description or ""))

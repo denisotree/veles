@@ -25,8 +25,6 @@ def cmd_dream(args: argparse.Namespace, project) -> int:
     history_loader = None
     consolidation_model = getattr(args, "consolidation_model", None)
     if include_consolidation:
-        from veles.cli import _make_provider
-
         # Resolve the consolidation provider+model through routing (M125) so
         # they stay consistent. A bare `veles dream --include-consolidation`
         # on a fully-local project (`[engine]=ollama`) must not ask that
@@ -34,6 +32,7 @@ def cmd_dream(args: argparse.Namespace, project) -> int:
         # An explicit `--provider` still wins; the routed model is adopted
         # only when it belongs to that same provider.
         from veles.core.model_resolver import ConfigurationError
+        from veles.core.provider_factory import make_provider as _make_provider
         from veles.core.routing.ensemble import route
 
         try:

@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.43.0] — 2026-09-23
+
+A structure release: the big modules are split along real seams, and the
+layers stop reaching into each other. Two user-visible defects are fixed.
+
+### Fixed
+
+- Telegram: when Telegram refused to edit the "…" placeholder, the answer was
+  dropped. It is now sent as a new message. A refused edit also no longer
+  counts as the "on it" acknowledgement.
+- A background ingest or research job that resumed into a chat whose session
+  was gone ran under the dead session id, and the chat stayed pointed at it.
+  The job now follows the new session and re-points the chat.
+
+### Changed
+
+- REPL: `/help` is generated from the command registry, so it lists every
+  command with its aliases and the hotkeys. `/errors`, `/sessions` and
+  `/resume` are ordinary registry commands, and both REPL loops complete the
+  same command set.
+- Timestamps shown to the user are in local time everywhere; two places used
+  UTC.
+- Telegram `/start` and `/reset` go through the same command table as the
+  other commands.
+- `import veles.cli` is much faster: each command module loads only when its
+  verb runs.
+
+### Internal
+
+- New `veles/runtime/` package for what the CLI and the daemon share: system
+  prompt, tool and skill registry, run loop helpers, post-turn learning. The
+  daemon, the runtime and the modules no longer import `veles.cli`.
+- The daemon's HTTP server, runner and in-process backend share one run-handle
+  API. Channel startup, jobs routes and background runners have their own
+  modules.
+- `core/memory` is split into schema, session store and re-exports; the
+  frontmatter parser and the skill-to-tool factory have their own modules.
+- The agent turn loop is split into phases, with characterization tests
+  pinning every way a turn can end. `agent.py` and `tool_dispatch.py` are
+  checked by strict mypy.
+- The Telegram gateway calls its API, media and delivery helpers directly; the
+  package exports only `TelegramGateway`.
+- Wizards share the host/port prompt, the channel flow, the provider key lookup
+  and the model picker.
+
 ## [0.42.0] — 2026-09-23
 
 A cleanup release: shared code instead of copies, plus the defects the audit
@@ -1718,7 +1763,9 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v0.41.0...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v0.43.0...HEAD
+[0.43.0]: https://github.com/denisotree/veles/compare/v0.42.0...v0.43.0
+[0.42.0]: https://github.com/denisotree/veles/compare/v0.41.0...v0.42.0
 [0.41.0]: https://github.com/denisotree/veles/compare/v0.40.0...v0.41.0
 [0.40.0]: https://github.com/denisotree/veles/compare/v0.39.0...v0.40.0
 [0.39.0]: https://github.com/denisotree/veles/compare/v0.38.0...v0.39.0

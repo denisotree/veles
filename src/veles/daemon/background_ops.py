@@ -54,9 +54,9 @@ def _scoped_factory_for(
     args: argparse.Namespace, project, store, toolset: str, *, daemon_session: str | None
 ):
     """Seam for tests: build the toolset-capped sub-agent factory."""
-    from veles.daemon.agent_factory import _make_scoped_subagent_factory
+    from veles.daemon.agent_factory import make_scoped_subagent_factory
 
-    return _make_scoped_subagent_factory(
+    return make_scoped_subagent_factory(
         args, project=project, store=store, toolset=toolset, daemon_session=daemon_session
     )
 
@@ -168,8 +168,8 @@ def make_on_op_finished(state):
     async def on_op_finished(job, summary: str) -> None:
         from veles.core.context import reset_resume_depth, set_resume_depth
         from veles.core.untrusted import wrap_untrusted
+        from veles.daemon.channels import chat_session_slot
         from veles.daemon.runner import new_run_handle, run_agent_in_background
-        from veles.daemon.server import _chat_session_slot
 
         target = (job.deliver_to or "").strip()
         router = state.delivery_router
@@ -178,8 +178,9 @@ def make_on_op_finished(state):
             return
         notify_text = f"Background {job.kind} finished. {summary}"
         depth = int((job.params or {}).get("resume_depth", 0))
+        slot = None
         try:
-            slot = _chat_session_slot(state, target)
+            slot = chat_session_slot(state, target)
             session_id = slot[0].get(slot[1]) if slot else None
         except Exception:  # pragma: no cover - a broken map must not eat the notice
             session_id = None
@@ -204,6 +205,14 @@ def make_on_op_finished(state):
         # Off the event loop: the build runs memory recall, which the M264
         # bridge refuses to do on a running loop (see `daemon/turns.py`).
         agent = await asyncio.to_thread(state.agent_factory, session_id, prompt=seed)
+        # A stale mapped id makes the factory allocate a fresh session (as for a
+        # chat turn, `daemon/turns.py`): run, lock and record under that one,
+        # and re-point the chat so its next message continues it.
+        fresh = getattr(agent, "session_id", None)
+        if fresh and fresh != session_id:
+            session_id = fresh
+            if slot is not None:
+                slot[0].set(slot[1], fresh)
         handle = new_run_handle(session_id=session_id)
         state.add_run(handle)
         loop = asyncio.get_running_loop()
@@ -252,9 +261,9 @@ def make_proactive_binder(state):
 
     async def on_delivered(target: str, text: str) -> None:
         from veles.core.provider import Message
-        from veles.daemon.server import _chat_session_slot
+        from veles.daemon.channels import chat_session_slot
 
-        slot = _chat_session_slot(state, target)
+        slot = chat_session_slot(state, target)
         if slot is None or state.store is None:
             return
         smap, key = slot

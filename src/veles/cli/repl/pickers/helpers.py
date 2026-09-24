@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import time
 
-from veles.cli.repl.terminal import _fmt_ts
+from veles.core.timeutil import local_stamp
 
 
 def _filter_models(models, text: str) -> list[str]:
@@ -116,7 +116,7 @@ def _pick_session(store, state, console) -> None:
         table.add_row(
             f"{marker}{i}",
             s.id[:8],
-            _fmt_ts(s.last_activity_at),
+            local_stamp(s.last_activity_at),
             str(s.turn_count),
             s.title or "[dim](untitled)[/dim]",
         )

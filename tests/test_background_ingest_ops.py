@@ -249,6 +249,48 @@ def test_mapped_session_resumes_and_delivers_final_text(tmp_path: Path) -> None:
     assert target == "telegram:12345" and "продолжаю" in text
 
 
+def test_resume_into_a_stale_session_follows_the_session_the_factory_allocated(
+    tmp_path: Path,
+) -> None:
+    """The chat's map can outlive its session row (a DB reset). The agent factory
+    then allocates a fresh session; the resume turn must run, lock and be recorded
+    under that session, and the chat must be re-pointed to it — otherwise the
+    resumed answer lands in a session the chat never reads again."""
+    from veles.channels.session_map import SessionMap, channel_session_path
+    from veles.daemon.background_ops import make_on_op_finished
+
+    project = _project(tmp_path)
+    router = _FakeRouter()
+
+    class _FreshAgent:
+        session_id = "sess-fresh"
+
+        def run(self, prompt, on_text_delta=None, event_listener=None):
+            class _RR:
+                text = "resumed"
+                iterations = 1
+                stopped_reason = "completed"
+                session_id = "sess-fresh"
+
+            return _RR()
+
+    def agent_factory(session_id, *, prompt=None):
+        assert session_id == "sess-stale"
+        return _FreshAgent()
+
+    smap = SessionMap.load(channel_session_path("telegram"))
+    smap.set("12345", "sess-stale")
+
+    state = _FakeState(project=project, agent_factory=agent_factory, delivery_router=router)
+    job = _job(project, deliver_to="telegram:12345")
+    asyncio.run(make_on_op_finished(state)(job, "Ingested 1/1 file(s)."))
+
+    (handle,) = state.runs.values()
+    assert handle.session_id == "sess-fresh"
+    assert "sess-fresh" in state.session_locks and "sess-stale" not in state.session_locks
+    assert SessionMap.load(channel_session_path("telegram")).get("12345") == "sess-fresh"
+
+
 def test_resume_depth_cap_degrades_to_notify_only(tmp_path: Path) -> None:
     from veles.channels.session_map import SessionMap, channel_session_path
     from veles.daemon.background_ops import make_on_op_finished
