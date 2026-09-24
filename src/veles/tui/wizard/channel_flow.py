@@ -84,7 +84,7 @@ async def collect_channel_via_modals(app: App, *, title: str) -> CollectResult |
 
 
 async def add_channel_via_modals(
-    app: App, project: Project, *, session: str | None
+    app: App, project: Project, *, session: str | None, title: str = "Add channel"
 ) -> dict[str, object] | None:
     """Collect a channel through the modals and save it with `apply_channel`
     (secrets to the keychain, the rest to the config block).
@@ -94,7 +94,7 @@ async def add_channel_via_modals(
     crash) — or None when the user cancelled."""
     from veles.cli.channel_wizard import apply_channel
 
-    collected = await collect_channel_via_modals(app, title="Add channel")
+    collected = await collect_channel_via_modals(app, title=title)
     if collected is None:
         return None
     channel, secrets, config_fields = collected

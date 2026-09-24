@@ -459,23 +459,17 @@ class DaemonPickerScreen(Screen[None]):
         `[daemon.<name>.channels.<type>]`) + keychain secret. The pick→collect
         modal flow is shared with the project wizard (M172,
         `wizard/channel_flow.py`)."""
-        from veles.cli.channel_wizard import apply_channel
-        from veles.tui.wizard.channel_flow import collect_channel_via_modals
+        from veles.tui.wizard.channel_flow import add_channel_via_modals
 
-        collected = await collect_channel_via_modals(self.app, title=f"Add channel to {label}")
-        if collected is None:
+        added = await add_channel_via_modals(
+            self.app, project, session=session, title=f"Add channel to {label}"
+        )
+        if added is None:
             return
-        channel, secrets, config_fields = collected
-        try:
-            apply_channel(
-                project,
-                session=session,
-                channel=channel,
-                secrets=secrets,
-                config_fields=config_fields,
-            )
-        except Exception as exc:
-            self._set_action(f"{label}: failed to add {channel}: {exc}", severity="error")
+        channel, status = added["channel"], str(added["status"])
+        if status != "saved":
+            reason = status.removeprefix("failed: ")
+            self._set_action(f"{label}: failed to add {channel}: {reason}", severity="error")
             return
         self._set_action(f"{label}: added {channel} channel (restart to apply)")
         self._refresh()
