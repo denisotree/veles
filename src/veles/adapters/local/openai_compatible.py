@@ -16,10 +16,10 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from veles.adapters.local._base import _OpenAICompatibleBase
+from veles.adapters.local._base import LocalOpenAIBase
 
 
-class OpenAICompatibleProvider(_OpenAICompatibleBase):
+class OpenAICompatibleProvider(LocalOpenAIBase):
     """Provider backed by an arbitrary OpenAI-compatible HTTP endpoint."""
 
     name: str = "openai-compat"

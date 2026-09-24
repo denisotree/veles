@@ -512,7 +512,7 @@ def _insights(line: str, ctx: SlashContext) -> SlashResult:
     Default shows 10 most recent across all categories. `/insights
     <category>` filters to one. `/insights all <N>` shows up to N rows.
     """
-    from veles.core.memory.inspect import recent_insights
+    from veles.core.memory.inspectors import recent_insights
 
     category_filter, limit = _filter_and_limit(line)
     rows = _query_memory(
@@ -558,7 +558,7 @@ def _rules(line: str, ctx: SlashContext) -> SlashResult:
     filters to one of `format`, `do`, `dont`, `preference`.
     `/rules all <N>` shows up to N rows.
     """
-    from veles.core.memory.inspect import recent_rules
+    from veles.core.memory.inspectors import recent_rules
 
     kind_filter, limit = _filter_and_limit(line)
     rows = _query_memory(ctx, "/rules", lambda c: recent_rules(c, kind=kind_filter, limit=limit))

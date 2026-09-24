@@ -1,7 +1,7 @@
 """Local-model adapters — Ollama, llama.cpp, generic OpenAI-compatible.
 
 All three speak the OpenAI Chat Completions wire format, so a single thin
-base class (`_OpenAICompatibleBase`) covers `create_message` and
+base class (`LocalOpenAIBase`) covers `create_message` and
 `stream_message`. Each concrete provider is a small subclass that pins
 default `base_url`, env-var name, and (for Ollama) backend-specific extras
 like `list_models()`.

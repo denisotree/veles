@@ -64,6 +64,8 @@ class MemoryStore(Protocol):
 
     async def close(self) -> None: ...
 
+    def raw(self) -> sqlite3.Connection: ...
+
 
 class SqliteStore:
     """The default implementation: one SQLite file, the way Veles has always

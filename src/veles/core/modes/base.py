@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from veles.core.agent import Agent
     from veles.core.events import Event
     from veles.core.project import Project
-    from veles.core.session_state import AppState
+    from veles.core.session_state import AppState, ModeName
 
 
 # The per-turn Agent factory. Callable with the AppState plus optional
@@ -51,7 +51,7 @@ class ModeContext:
 
 
 class Mode(Protocol):
-    name: str
+    name: ModeName
     label: str
     system_block: str
     """Mode-specific system-prompt addendum, appended to the project's

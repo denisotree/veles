@@ -44,6 +44,7 @@ from typing import Any, Literal
 
 from veles.core.agent_events import SystemLine, TurnDone
 from veles.core.modes.base import Mode, ModeContext
+from veles.core.session_state import ModeName
 from veles.core.text import strip_code_fence
 
 # ---- system prompts per phase ----
@@ -221,7 +222,7 @@ def _ended_meanwhile(ctx: ModeContext, goal_id: str, result: Any) -> bool:
         return False
     status = goal.status if goal is not None else "gone"
     ctx.state.active_goal_id = None
-    ctx.state.mode = "auto"  # type: ignore[assignment]
+    ctx.state.mode = "auto"
     ctx.post(SystemLine(text=f"[goal {goal_id} {status} meanwhile — stopping; mode → auto]"))
     ctx.post(TurnDone(result=result))
     return True
@@ -284,7 +285,7 @@ def _classify_confirm_reply(prompt: str) -> Literal["yes", "no", "cancel"]:
 
 
 class GoalMode:
-    name: str = "goal"
+    name: ModeName = "goal"
     label: str = "goal"
     # No system block — the per-phase prompts are injected by run_turn.
     system_block: str = ""
@@ -329,7 +330,7 @@ class GoalMode:
             if exhausted:
                 cancel(state_dir, goal.id, reason=f"budget: {exhausted}")
                 ctx.state.active_goal_id = None
-                ctx.state.mode = "auto"  # type: ignore[assignment]
+                ctx.state.mode = "auto"
                 ctx.post(SystemLine(text=f"[goal {goal.id} cancelled — {exhausted}; mode → auto]"))
                 ctx.post(
                     TurnDone(
@@ -340,7 +341,7 @@ class GoalMode:
                         )
                     )
                 )
-                ctx.state.last_mode_in_session = self.name  # type: ignore[assignment]
+                ctx.state.last_mode_in_session = self.name
                 return
 
         phase = goal.current_phase
@@ -368,7 +369,7 @@ class GoalMode:
             ctx.state.active_goal_id = None
             ctx.post(TurnDone(result=RunResult(text="", iterations=0, stopped_reason="synthetic")))
 
-        ctx.state.last_mode_in_session = self.name  # type: ignore[assignment]
+        ctx.state.last_mode_in_session = self.name
 
         # Silence pyright unused-import warnings for symbols we conditionally use
         # in the per-phase handlers below; importing here at the dispatch site
@@ -472,7 +473,7 @@ class GoalMode:
         if verdict == "cancel":
             cancel(ctx.project.state_dir, goal.id, reason="user cancelled at confirm")
             ctx.state.active_goal_id = None
-            ctx.state.mode = "auto"  # type: ignore[assignment]
+            ctx.state.mode = "auto"
             ctx.post(SystemLine(text="[goal cancelled at confirm; mode → auto]"))
             ctx.post(TurnDone(result=RunResult(text="", iterations=0, stopped_reason="synthetic")))
             return
@@ -534,7 +535,7 @@ class GoalMode:
         if infeasible:
             cancel(ctx.project.state_dir, goal.id, reason=f"infeasible: {infeasible}")
             ctx.state.active_goal_id = None
-            ctx.state.mode = "auto"  # type: ignore[assignment]
+            ctx.state.mode = "auto"
             ctx.post(SystemLine(text=f"[goal infeasible: {infeasible}; mode → auto]"))
         else:
             # The model called `create_plan`; the latest plan_id is in
@@ -751,7 +752,7 @@ class GoalMode:
                     mark_plan_done(ctx.project.state_dir, goal.plan_id)
             complete(ctx.project.state_dir, goal.id, evidence=reason)
             ctx.state.active_goal_id = None
-            ctx.state.mode = "auto"  # type: ignore[assignment]
+            ctx.state.mode = "auto"
             ctx.post(SystemLine(text=f"[goal achieved — {reason}; mode → auto]"))
         elif verdict == "step_off_track":
             update_fsm(ctx.project.state_dir, goal.id, phase="plan")

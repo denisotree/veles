@@ -9,14 +9,12 @@ from pathlib import Path
 import pytest
 
 from veles.core.export import (
+    BundleImportError,
     ExportManifest,
     export_full,
     export_template,
     import_bundle,
     sanitize_pii,
-)
-from veles.core.export import (
-    ImportError as VelesImportError,
 )
 from veles.core.project import init_project
 
@@ -252,7 +250,7 @@ def test_import_into_existing_project_refuses_without_force(tmp_path: Path) -> N
     export_full(load_project(project_root), bundle)
     other_root = tmp_path / "other"
     init_project(other_root, name="other")
-    with pytest.raises(VelesImportError, match="already has a Veles project"):
+    with pytest.raises(BundleImportError, match="already has a Veles project"):
         import_bundle(bundle, other_root)
 
 
@@ -290,7 +288,7 @@ def test_import_refuses_path_escape(tmp_path: Path) -> None:
         info2 = tarfile.TarInfo(name="../escaped.txt")
         info2.size = len(bad_payload)
         tf.addfile(info2, fileobj=__import__("io").BytesIO(bad_payload))
-    with pytest.raises(VelesImportError, match="unsafe path"):
+    with pytest.raises(BundleImportError, match="unsafe path"):
         import_bundle(bundle, tmp_path / "into")
 
 
@@ -300,7 +298,7 @@ def test_import_refuses_missing_manifest(tmp_path: Path) -> None:
         info = tarfile.TarInfo(name="AGENTS.md")
         info.size = 0
         tf.addfile(info, fileobj=__import__("io").BytesIO(b""))
-    with pytest.raises(VelesImportError, match="missing MANIFEST"):
+    with pytest.raises(BundleImportError, match="missing MANIFEST"):
         import_bundle(bundle, tmp_path / "into")
 
 
@@ -319,12 +317,12 @@ def test_import_refuses_unsupported_schema_version(tmp_path: Path) -> None:
         info = tarfile.TarInfo(name="MANIFEST.json")
         info.size = len(manifest)
         tf.addfile(info, fileobj=__import__("io").BytesIO(manifest))
-    with pytest.raises(VelesImportError, match="unsupported bundle schema"):
+    with pytest.raises(BundleImportError, match="unsupported bundle schema"):
         import_bundle(bundle, tmp_path / "into")
 
 
 def test_import_refuses_missing_bundle(tmp_path: Path) -> None:
-    with pytest.raises(VelesImportError, match="not found"):
+    with pytest.raises(BundleImportError, match="not found"):
         import_bundle(tmp_path / "nope.tar.gz", tmp_path / "into")
 
 

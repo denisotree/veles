@@ -138,7 +138,7 @@ def drive_goal(
         # GoalMode clears these on completion/cancel; re-assert them each turn so
         # it never mistakes the driven goal for "no goal" and starts a new one.
         ctx.state.active_goal_id = goal_id
-        ctx.state.mode = "goal"  # type: ignore[assignment]
+        ctx.state.mode = "goal"
         # An empty prompt lets each phase use its own cue ("Continue with the
         # plan.", "Execute the next step."); CHECK ignores it.
         mode.run_turn("", ctx)

@@ -7,13 +7,11 @@ import sys
 from pathlib import Path
 
 from veles.core.export import (
+    BundleImportError,
     ExportError,
     export_full,
     export_template,
     import_bundle,
-)
-from veles.core.export import (
-    ImportError as VelesImportError,
 )
 from veles.core.project import Project
 
@@ -46,7 +44,7 @@ def cmd_import(args: argparse.Namespace) -> int:
     target = Path(args.into).expanduser() if args.into else Path.cwd()
     try:
         project = import_bundle(bundle_path, target, force=args.force)
-    except VelesImportError as exc:
+    except BundleImportError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(

@@ -21,10 +21,10 @@ from typing import ClassVar
 
 import httpx
 
-from veles.adapters.local._base import _OpenAICompatibleBase
+from veles.adapters.local._base import LocalOpenAIBase
 
 
-class OllamaProvider(_OpenAICompatibleBase):
+class OllamaProvider(LocalOpenAIBase):
     """Provider backed by a local Ollama server."""
 
     name: str = "ollama"

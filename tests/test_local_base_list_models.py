@@ -1,4 +1,4 @@
-"""Generic `_OpenAICompatibleBase.list_models()` — covers llamacpp +
+"""Generic `LocalOpenAIBase.list_models()` — covers llamacpp +
 openai-compat (both inherit straight from the base; ollama overrides with
 its native `/api/tags` endpoint and is covered in
 `test_local_ollama_adapter.py`)."""

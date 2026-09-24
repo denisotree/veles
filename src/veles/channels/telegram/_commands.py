@@ -291,7 +291,7 @@ async def _cmd_insights(gateway: TelegramGateway, chat_key: str, args: str) -> s
     """List recent rows from the `insights` table — mirrors the REPL
     `/insights`. Optional category filter as the first arg."""
     del chat_key
-    from veles.core.memory.inspect import recent_insights
+    from veles.core.memory.inspectors import recent_insights
 
     found = await _memory_rows(
         gateway, "insights", args, lambda c, f, n: recent_insights(c, category=f, limit=n)
@@ -316,7 +316,7 @@ async def _cmd_rules(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     """List recent rows from the `rules` table — mirrors the REPL `/rules`.
     Optional kind filter as the first arg."""
     del chat_key
-    from veles.core.memory.inspect import recent_rules
+    from veles.core.memory.inspectors import recent_rules
 
     found = await _memory_rows(
         gateway, "rules", args, lambda c, f, n: recent_rules(c, kind=f, limit=n)

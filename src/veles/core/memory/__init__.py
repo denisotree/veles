@@ -10,8 +10,8 @@ the on-disk artefacts (`artefacts.py`).
 from __future__ import annotations
 
 from veles.core.memory.session_store import (
+    DigestRule,
     InsightHit,
-    RuleRow,
     SessionInfo,
     SessionStore,
     TurnHit,
@@ -19,8 +19,8 @@ from veles.core.memory.session_store import (
 )
 
 __all__ = [
+    "DigestRule",
     "InsightHit",
-    "RuleRow",
     "SessionInfo",
     "SessionStore",
     "TurnHit",

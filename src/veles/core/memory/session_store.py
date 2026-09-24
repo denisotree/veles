@@ -39,8 +39,9 @@ class SessionInfo:
 
 
 @dataclass(slots=True, frozen=True)
-class RuleRow:
-    """One behavioural rule. `kind` ∈ format/do/dont/preference."""
+class DigestRule:
+    """One behavioural rule for the system-prompt digest.
+    `kind` ∈ format/do/dont/preference."""
 
     kind: str
     body: str
@@ -178,7 +179,7 @@ class SessionStore:
         ).fetchone()
         return row is not None
 
-    def top_rules(self, limit: int = 12) -> list[RuleRow]:
+    def top_rules(self, limit: int = 12) -> list[DigestRule]:
         """The highest-ranked behavioural rules for the house-rules digest.
 
         Ranked by `decay_score DESC`, then most-recently-applied, then newest
@@ -193,7 +194,7 @@ class SessionStore:
             ).fetchall()
         except sqlite3.Error:
             return []
-        return [RuleRow(kind=r["kind"], body=r["body"]) for r in rows]
+        return [DigestRule(kind=r["kind"], body=r["body"]) for r in rows]
 
     def append_turn(self, session_id: str, message: Message) -> int:
         # Sanitize on the write boundary so future loads of this row are

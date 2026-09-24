@@ -105,7 +105,7 @@ async def test_picked_layout_flows_into_init(isolated_home: Path, tmp_path: Path
 
 
 async def test_picker_esc_returns_back_signal(isolated_home: Path, tmp_path: Path) -> None:
-    """Esc on the picker (push_screen_wait returns None) → `_nav`
+    """Esc on the picker (push_screen_wait returns None) → `outcome_from_dismiss`
     helper translates that to BACK so the wizard runner can step
     backwards."""
     _write_user_pack(isolated_home, "obsidian-import")
