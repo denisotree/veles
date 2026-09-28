@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,6 +27,10 @@ _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 class RegistryConfigError(ValueError):
     pass
+
+
+def _has_control_char(value: str) -> bool:
+    return any(ord(c) < 32 or ord(c) == 127 for c in value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +74,13 @@ def add_source(url: str, *, name: str | None = None, ref: str | None = None) -> 
         raise RegistryConfigError(f"registry name {name!r} must match [a-z0-9][a-z0-9-]*")
     if not url or url.startswith("-"):
         raise RegistryConfigError(f"registry url {url!r} must not be empty or start with '-'")
+    if _has_control_char(url):
+        raise RegistryConfigError(f"registry url {url!r} must not contain control characters")
+    if ref:
+        if ref.startswith("-"):
+            raise RegistryConfigError(f"registry ref {ref!r} must not start with '-'")
+        if _has_control_char(ref):
+            raise RegistryConfigError(f"registry ref {ref!r} must not contain control characters")
     if name in taken:
         raise RegistryConfigError(f"a registry named {name!r} already exists")
     source = RegistrySource(name, url, ref)
@@ -89,10 +101,17 @@ def cache_dir(name: str) -> Path:
 
 
 def _write(sources: list[RegistrySource]) -> None:
+    path = user_config_path()
+    if path.exists() and path.stat().st_size > 0:
+        try:
+            tomllib.loads(path.read_text(encoding="utf-8"))
+        except (tomllib.TOMLDecodeError, OSError) as exc:
+            raise RegistryConfigError(
+                f"{path} is not valid TOML ({exc}); fix it before changing registries"
+            ) from exc
     data = read_user_config_raw()
     data["registries"] = {
         s.name: {"url": s.url, **({"ref": s.ref} if s.ref else {})} for s in sources
     }
-    path = user_config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_text(path, dump_toml(data))

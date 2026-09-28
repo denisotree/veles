@@ -65,3 +65,28 @@ def test_bad_name_rejected() -> None:
 def test_option_like_url_rejected() -> None:
     with pytest.raises(RegistryConfigError, match="start with '-'"):
         add_source("--upload-pack=touch /x")
+
+
+def test_add_source_rejects_malformed_existing_config() -> None:
+    path = user_config_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("[user\nbroken", encoding="utf-8")
+    before = path.read_bytes()
+    with pytest.raises(RegistryConfigError):
+        add_source("git@x:a.git")
+    assert path.read_bytes() == before
+
+
+def test_url_with_control_char_rejected() -> None:
+    with pytest.raises(RegistryConfigError):
+        add_source("git@x:a.git\nrm -rf /")
+
+
+def test_ref_starting_with_dash_rejected() -> None:
+    with pytest.raises(RegistryConfigError):
+        add_source("git@x:a.git", ref="-x")
+
+
+def test_ref_with_control_char_rejected() -> None:
+    with pytest.raises(RegistryConfigError):
+        add_source("git@x:a.git", ref="stable\nevil")
