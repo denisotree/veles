@@ -699,6 +699,32 @@ def _check_events_health(project: Project | None) -> CheckResult:
     return CheckResult(name="events_health", status="ok", message=f"events.jsonl: {size} bytes")
 
 
+def _check_extensions(project: Project | None) -> CheckResult:
+    from veles.core.registry.maintenance import verify
+
+    issues = verify(project)
+    broken = [i for i in issues if i.problem in ("missing", "modified")]
+    yanked = [i for i in issues if i.problem == "yanked"]
+    if broken:
+        names = ", ".join(f"{i.record.name} ({i.problem})" for i in broken)
+        return CheckResult(
+            name="extensions",
+            status="error",
+            message=f"installed extensions changed or missing: {names}",
+            fix_hint="review the changes; reinstall with `veles registry install`, or "
+            "`veles module approve <name>` for a module you changed on purpose",
+        )
+    if yanked:
+        names = ", ".join(i.record.name for i in yanked)
+        return CheckResult(
+            name="extensions",
+            status="warn",
+            message=f"yanked by their registry: {names}",
+            fix_hint="`veles registry verify` shows why; uninstall or upgrade them",
+        )
+    return CheckResult(name="extensions", status="ok", message="installed extensions verified")
+
+
 def _check_approval_audit(project: Project | None) -> CheckResult:
     if project is None:
         return CheckResult(name="approval_audit", status="info", message="no active project")
@@ -756,6 +782,7 @@ def run_all(project: Project | None) -> DoctorReport:
         _check_trace_health,
         _check_events_health,
         _check_approval_audit,
+        _check_extensions,
     ]
     results: list[CheckResult] = [c() for c in no_arg]
     results.extend(c(project) for c in project_aware)

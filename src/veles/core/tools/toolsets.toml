@@ -44,6 +44,7 @@ tools = [
     "wiki_read_page",
     "wiki_search",
     "veles_help",
+    "registry_search",
 ]
 
 [run]
@@ -84,6 +85,7 @@ tools = [
     "job_list",
     "job_remove",
     "research",
+    "registry_install",
 ]
 
 [research]
