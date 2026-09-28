@@ -142,3 +142,74 @@ def test_uninstall_skill(remote: Path, tmp_path: Path) -> None:
     uninstall("alpha", project=project)
     assert not (project.skills_dir / "alpha").exists()
     assert load_records() == []
+
+
+def test_put_record_failure_rolls_back_install(
+    remote: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom(rec: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr("veles.core.registry.install.put_record", boom)
+    project = init_project(tmp_path / "p", name="p")
+    with pytest.raises(InstallError):
+        install(resolve("alpha"), project=project)
+    assert not (project.skills_dir / "alpha").exists()
+    assert load_records() == []
+
+
+def test_put_record_failure_rolls_back_mcp_config(
+    remote: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom(rec: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr("veles.core.registry.install.put_record", boom)
+    project = init_project(tmp_path / "p", name="p")
+    with pytest.raises(InstallError):
+        install(resolve("graph"), project=project)
+    cfg = tomllib.loads((project.root / ".veles" / "config.toml").read_text(encoding="utf-8"))
+    assert "graph" not in cfg.get("mcp", {}).get("servers", {})
+    assert load_records() == []
+
+
+def test_uninstall_rmtree_failure_keeps_record(
+    remote: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    install(resolve("alpha"), project=project)
+
+    def boom(path: object, *a: object, **kw: object) -> None:
+        raise OSError("permission denied")
+
+    monkeypatch.setattr("veles.core.registry.install.shutil.rmtree", boom)
+    with pytest.raises(InstallError):
+        uninstall("alpha", project=project)
+    assert (project.skills_dir / "alpha").exists()
+    assert any(r.name == "alpha" for r in load_records())
+
+
+def test_name_clash_refused_without_confirmation(remote: Path, tmp_path: Path) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    install(resolve("alpha"), project=project)
+    calls: list[tuple[str, str]] = []
+    token = set_critical_confirmer(lambda op, summary: calls.append((op, summary)) or True)
+    try:
+        with pytest.raises(InstallError, match="already exists"):
+            install(resolve("alpha"), project=project)
+    finally:
+        reset_critical_confirmer(token)
+    assert calls == []
+
+
+def test_mcp_name_clash_refused_without_confirmation(remote: Path, tmp_path: Path) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    install(resolve("graph"), project=project)
+    calls: list[tuple[str, str]] = []
+    token = set_critical_confirmer(lambda op, summary: calls.append((op, summary)) or True)
+    try:
+        with pytest.raises(InstallError, match="already exists"):
+            install(resolve("graph"), project=project)
+    finally:
+        reset_critical_confirmer(token)
+    assert calls == []

@@ -17,7 +17,12 @@ from veles import __version__
 from veles.core.critical_ops import confirm_critical
 from veles.core.io_utils import atomic_write_text, dump_toml, load_optional_toml
 from veles.core.project import Project
-from veles.core.project_config import load_project_config, project_config_path, save_project_config
+from veles.core.project_config import (
+    get_section,
+    load_project_config,
+    project_config_path,
+    save_project_config,
+)
 from veles.core.registry.catalog import Found
 from veles.core.registry.gate import now_iso
 from veles.core.registry.hashing import tree_sha256
@@ -79,6 +84,9 @@ def install(
     needs_project = ext.kind in ("module", "mcp") or (ext.kind == "skill" and not user_scope)
     if needs_project and project is None:
         raise InstallError(f"installing a {ext.kind} needs a project (run inside one)")
+    # Cheap collision checks run before the confirmation prompt — no point asking the
+    # user to confirm an install that is going to fail on a name clash anyway.
+    _check_collision(found, project, user_scope=user_scope)
     if not confirmed and not confirm_critical(
         f"install {found.ref} {ext.version}", describe(found)
     ):
@@ -87,8 +95,6 @@ def install(
         assert project is not None
         return _install_mcp(found, project)
     target = _target_dir(found, project, user_scope=user_scope)
-    if target.exists():
-        raise InstallError(f"{target} already exists — uninstall it or use `registry upgrade`")
     target.parent.mkdir(parents=True, exist_ok=True)
     try:
         materialise(found, target)
@@ -102,8 +108,30 @@ def install(
             f"{found.ref}: hash mismatch — expected {ext.source.sha256}, got {digest}"
         )
     rec = _record(found, path=str(target.resolve()), digest=digest, project=project)
-    put_record(rec)
+    try:
+        put_record(rec)
+    except OSError as exc:
+        # An install that materialised but never got recorded is untracked: a retry
+        # sees `target.exists()` and refuses, and `uninstall` can't find it either.
+        # Roll the copy back so a failed install leaves nothing behind.
+        shutil.rmtree(target, ignore_errors=True)
+        raise InstallError(f"{found.ref}: could not record install: {exc}") from exc
     return rec
+
+
+def _check_collision(found: Found, project: Project | None, *, user_scope: bool) -> None:
+    ext = found.ext
+    if ext.kind == "mcp":
+        assert project is not None
+        servers = get_section(load_project_config(project), "mcp", "servers")
+        if ext.name in servers:
+            raise InstallError(
+                f"[mcp.servers.{ext.name}] already exists in {project_config_path(project)}"
+            )
+        return
+    target = _target_dir(found, project, user_scope=user_scope)
+    if target.exists():
+        raise InstallError(f"{target} already exists — uninstall it or use `registry upgrade`")
 
 
 def installed_records(project: Project | None) -> list[InstallRecord]:
@@ -125,11 +153,24 @@ def uninstall(name: str, *, project: Project | None) -> InstallRecord:
 
 
 def remove_installed(rec: InstallRecord) -> None:
+    """Delete the installed payload, then drop the record.
+
+    A deletion failure leaves the record in place — the install is still there on
+    disk, so the approval that lets it run must stay too. Only "already gone" is
+    treated as success (nothing to clean up, safe to drop the record)."""
     if rec.kind == "mcp":
         config_path, _, _ = rec.path.partition("#")
-        _drop_mcp_server(Path(config_path), rec.name)
+        try:
+            _drop_mcp_server(Path(config_path), rec.name)
+        except OSError as exc:
+            raise InstallError(f"could not remove {rec.path}: {exc}") from exc
     else:
-        shutil.rmtree(rec.path, ignore_errors=True)
+        path = Path(rec.path)
+        if path.exists():
+            try:
+                shutil.rmtree(path)
+            except OSError as exc:
+                raise InstallError(f"could not remove {rec.path}: {exc}") from exc
     drop_record(rec.path)
 
 
@@ -173,7 +214,11 @@ def _install_mcp(found: Found, project: Project) -> InstallRecord:
         digest=recipe_sha256(found.ext.mcp),
         project=project,
     )
-    put_record(rec)
+    try:
+        put_record(rec)
+    except OSError as exc:
+        _drop_mcp_server(project_config_path(project), name)
+        raise InstallError(f"{found.ref}: could not record install: {exc}") from exc
     return rec
 
 
