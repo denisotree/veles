@@ -59,6 +59,21 @@ def test_private_registry_allows_proprietary(tmp_path: Path) -> None:
     assert validate_registry(root).ok
 
 
+def test_entrypoint_outside_payload_fails(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "r")
+    (tmp_path / "outside.py").write_text("def register(api): pass\n", encoding="utf-8")
+    manifest = _MODULE_FILES["module.toml"].replace("demo.py", "../../../../outside.py")
+    write_extension(
+        root,
+        "official",
+        "demo",
+        kind="module",
+        extra_ext='provides = ["hook:pre_turn"]',
+        files={**_MODULE_FILES, "module.toml": manifest},
+    )
+    assert any("outside" in e for e in validate_registry(root).errors)
+
+
 def test_symlink_payload_fails(tmp_path: Path) -> None:
     root = write_registry(tmp_path / "r")
     ext = write_extension(root, "official", "sneaky")

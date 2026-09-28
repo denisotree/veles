@@ -96,6 +96,20 @@ def test_install_cleans_up_when_manifest_invalid(tmp_path: Path) -> None:
     assert not (project.modules_dir / "broken").exists()
 
 
+def test_install_rejects_entrypoint_outside_module(tmp_path: Path) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    src = _make_module_fixture(tmp_path / "src", name="esc")
+    (tmp_path / "outside.py").write_text("def register(api): pass\n", encoding="utf-8")
+    manifest = src / "module.toml"
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace("main.py", "../../../../outside.py"),
+        encoding="utf-8",
+    )
+    with pytest.raises(ModuleInstallError, match="outside"):
+        install_module_from_source(str(src), project=project, name_override="esc")
+    assert not (project.modules_dir / "esc").exists()
+
+
 def test_install_rejects_unknown_source_format(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     with pytest.raises(ModuleInstallError, match="neither a git URL nor a directory"):

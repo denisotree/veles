@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import tomllib
 from dataclasses import dataclass
+from pathlib import Path
 
 
 class ManifestError(RuntimeError):
@@ -58,3 +59,14 @@ def parse_entrypoint(spec: str) -> tuple[str, str]:
     if not file_part or not func_part:
         raise ManifestError(f"entrypoint has empty file or func: {spec!r}")
     return file_part, func_part
+
+
+def entrypoint_file(module_dir: Path, spec: str) -> tuple[Path, str]:
+    """`parse_entrypoint`, then the file's path — which must stay inside
+    `module_dir`. The approval hash covers only that directory, so an entrypoint
+    like `../../x.py` or an absolute path would run code nobody reviewed."""
+    file_part, func_part = parse_entrypoint(spec)
+    path = module_dir / file_part
+    if not path.resolve().is_relative_to(module_dir.resolve()):
+        raise ManifestError(f"entrypoint {file_part!r} points outside the module directory")
+    return path, func_part

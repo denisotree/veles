@@ -11,7 +11,7 @@ import shutil
 
 from veles.core.module_manifest import (
     ManifestError,
-    parse_entrypoint,
+    entrypoint_file,
     parse_manifest,
 )
 from veles.core.modules import ModuleHandle, discover_modules
@@ -49,11 +49,11 @@ def install_module_from_source(
             raise ModuleInstallError(f"installed source has no {_MANIFEST_FILENAME} at {target}")
         try:
             manifest = parse_manifest(manifest_path.read_text(encoding="utf-8"))
+            entry, _ = entrypoint_file(target, manifest.entrypoint)
         except ManifestError as exc:
             raise ModuleInstallError(f"manifest validation failed: {exc}") from exc
-        file_part, _ = parse_entrypoint(manifest.entrypoint)
-        if not (target / file_part).is_file():
-            raise ModuleInstallError(f"entrypoint file {file_part!r} not found in {target}")
+        if not entry.is_file():
+            raise ModuleInstallError(f"entrypoint file {entry.name!r} not found in {target}")
         match = next((h for h in discover_modules(project) if h.name == manifest.name), None)
         if match is None:
             raise ModuleInstallError(

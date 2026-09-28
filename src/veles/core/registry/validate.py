@@ -15,7 +15,7 @@ from pathlib import Path
 
 from veles.core.frontmatter import parse_frontmatter
 from veles.core.layout.manifest import LayoutManifestError, read_manifest
-from veles.core.module_manifest import ManifestError, parse_entrypoint, parse_manifest
+from veles.core.module_manifest import ManifestError, entrypoint_file, parse_manifest
 from veles.core.modules import (
     HOOK_NAMES,
     ModuleHandle,
@@ -191,11 +191,11 @@ def _check_module(ext: Extension, payload: Path, run_code: bool, work: Path) -> 
         errors.append(f"provides entries must start with {', '.join(_PROVIDES_PREFIXES)}: {bad}")
     try:
         manifest = parse_manifest((payload / "module.toml").read_text(encoding="utf-8"))
-        file_part, _ = parse_entrypoint(manifest.entrypoint)
+        entry, _ = entrypoint_file(payload, manifest.entrypoint)
     except (OSError, ManifestError) as exc:
         return [*errors, f"module.toml: {exc}"]
-    if not (payload / file_part).is_file():
-        return [*errors, f"entrypoint file {file_part!r} not found"]
+    if not entry.is_file():
+        return [*errors, f"entrypoint file {entry.relative_to(payload).as_posix()!r} not found"]
     if not run_code:
         return errors
     registry = ModuleRegistry()

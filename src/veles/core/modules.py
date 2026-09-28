@@ -29,7 +29,7 @@ from typing import Any
 from veles.core.module_manifest import (
     ManifestError,
     ModuleManifest,
-    parse_entrypoint,
+    entrypoint_file,
     parse_manifest,
 )
 from veles.core.project import Project
@@ -143,10 +143,12 @@ def discover_modules(project: Project) -> list[ModuleHandle]:
 
 def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
     """Import the entrypoint file and call `register(api)` to populate hooks."""
-    file_part, func_part = parse_entrypoint(handle.manifest.entrypoint)
-    file_path = handle.dir / file_part
+    try:
+        file_path, func_part = entrypoint_file(handle.dir, handle.manifest.entrypoint)
+    except ManifestError as exc:
+        raise ModuleLoadError(str(exc)) from exc
     if not file_path.is_file():
-        raise ModuleLoadError(f"entrypoint file {file_part!r} not found in {handle.dir}")
+        raise ModuleLoadError(f"entrypoint file {str(file_path)!r} not found")
     spec = importlib.util.spec_from_file_location(f"_veles_module_{handle.name}", file_path)
     if spec is None or spec.loader is None:
         raise ModuleLoadError(f"could not build import spec for {file_path}")

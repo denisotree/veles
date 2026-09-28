@@ -115,6 +115,25 @@ def test_load_module_raises_on_missing_entrypoint_file(tmp_path: Path) -> None:
         load_module(handles[0], ModuleRegistry())
 
 
+@pytest.mark.parametrize("escape", ["relative", "absolute"])
+def test_load_module_refuses_entrypoint_outside_module(tmp_path: Path, escape: str) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    outside = tmp_path / "outside.py"
+    ran = tmp_path / "ran"
+    outside.write_text(
+        f"open({str(ran)!r}, 'w').close()\ndef register(api): pass\n", encoding="utf-8"
+    )
+    entry = "../../../../outside.py" if escape == "relative" else str(outside)
+    mod_dir = _write_module(
+        project.modules_dir, "esc", body="def register(api): pass\n", entrypoint=f"{entry}:register"
+    )
+    assert (mod_dir / entry).resolve() == outside.resolve()
+    [handle] = discover_modules(project)
+    with pytest.raises(ModuleLoadError, match="outside"):
+        load_module(handle, ModuleRegistry())
+    assert not ran.exists()
+
+
 def test_load_module_raises_on_register_exception(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     project.modules_dir.mkdir(parents=True, exist_ok=True)
