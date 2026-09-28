@@ -57,6 +57,20 @@ def test_empty_registry_does_not_break_the_cli(tmp_path: Path, capsys, monkeypat
     assert main(["registry", "verify"]) == 0
 
 
+def test_os_errors_are_reported_not_raised(tmp_path: Path, capsys) -> None:
+    from tests.registry_helpers import write_registry
+
+    root = write_registry(tmp_path / "r")
+    write_extension(root, "official", "alpha")
+    report = tmp_path / "no-such-dir" / "report.md"
+    assert main(["registry", "validate", str(root), "--report", str(report)]) == 1
+    assert "error:" in capsys.readouterr().err
+    blocker = tmp_path / "file"
+    blocker.write_text("x", encoding="utf-8")
+    assert main(["registry", "init", str(blocker / "reg"), "--name", "acme"]) == 1
+    assert "error:" in capsys.readouterr().err
+
+
 def test_install_by_full_ref(tmp_path: Path, capsys, monkeypatch) -> None:
     remote = tmp_path / "remote"
     make_git_registry(remote, skills=("alpha",))

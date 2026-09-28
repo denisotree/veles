@@ -115,3 +115,58 @@ def test_module_approve_command(tmp_path: Path, monkeypatch) -> None:
         reset_critical_confirmer(token)
     assert rc == 0
     assert module_approved(d)
+
+
+def _approve(project, confirmer) -> int:
+    from veles.cli.commands.modules import cmd_module
+    from veles.core.critical_ops import reset_critical_confirmer, set_critical_confirmer
+
+    token = set_critical_confirmer(confirmer)
+    try:
+        return cmd_module(argparse.Namespace(module_command="approve", name="demo"), project)
+    finally:
+        reset_critical_confirmer(token)
+
+
+def test_module_approve_refuses_files_changed_during_review(tmp_path: Path, capsys) -> None:
+    from veles.core.registry.hashing import tree_sha256
+
+    project = init_project(tmp_path / "p", name="p")
+    d = _make_module(project.root)
+    shown = tree_sha256(d)[:12]
+
+    def edit_while_asking(op: str, summary: str) -> bool:
+        assert shown in summary
+        (d / "demo.py").write_text(_DEMO_PY + "# swapped after review\n", encoding="utf-8")
+        return True
+
+    assert _approve(project, edit_while_asking) == 1
+    assert "changed while it was being reviewed" in capsys.readouterr().err
+    assert not module_approved(d)
+
+
+def test_module_approve_symlink_is_an_error_not_a_traceback(tmp_path: Path, capsys) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    d = _make_module(project.root)
+    (d / "leak").symlink_to(tmp_path)
+    assert _approve(project, lambda op, summary: True) == 1
+    assert "symlinks are not allowed" in capsys.readouterr().err
+
+
+def test_module_add_copy_failure_is_an_error_not_a_traceback(tmp_path: Path, capsys) -> None:
+    from veles.cli.commands.modules import cmd_module
+    from veles.core.critical_ops import reset_critical_confirmer, set_critical_confirmer
+
+    project = init_project(tmp_path / "p", name="p")
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "module.toml").write_text(_MODULE_TOML, encoding="utf-8")
+    (src / "demo.py").write_text(_DEMO_PY, encoding="utf-8")
+    (src / "dangling").symlink_to(tmp_path / "nowhere")
+    token = set_critical_confirmer(lambda op, summary: True)
+    try:
+        args = argparse.Namespace(module_command="add", source=str(src), name="demo")
+        assert cmd_module(args, project) == 1
+    finally:
+        reset_critical_confirmer(token)
+    assert "error:" in capsys.readouterr().err

@@ -37,13 +37,20 @@ def admit_module(module_dir: Path) -> bool:
     return True
 
 
-def approve_module(module_dir: Path, *, name: str, project_root: Path) -> InstallRecord:
+def approve_module(
+    module_dir: Path, *, name: str, project_root: Path, expected_sha256: str | None = None
+) -> InstallRecord:
+    """Record `module_dir`'s current hash as approved. `expected_sha256` is the hash
+    the user was shown: if the files changed since, nothing is approved."""
+    digest = tree_sha256(module_dir)
+    if expected_sha256 is not None and digest != expected_sha256:
+        raise ValueError(f"{module_dir} changed while it was being reviewed — review it again")
     existing = record_for_path(str(module_dir.resolve()))
     rec = InstallRecord(
         name=name,
         kind="module",
         path=str(module_dir.resolve()),
-        tree_sha256=tree_sha256(module_dir),
+        tree_sha256=digest,
         project=str(project_root.resolve()),
         registry=existing.registry if existing else None,
         group=existing.group if existing else "",

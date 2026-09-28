@@ -49,6 +49,7 @@ _ERRORS = (
     InstallError,
     TemplateError,
     ValueError,
+    OSError,
 )
 
 
