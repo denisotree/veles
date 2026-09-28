@@ -95,6 +95,23 @@ def test_resolve_unique_ambiguous_and_missing(private_registry: Path, tmp_path: 
         resolve("zeta")
 
 
+def test_resolve_by_group_slash_name(private_registry: Path) -> None:
+    assert resolve("private:official/alpha").registry == "private"
+    assert resolve("official/alpha").registry == "private"
+
+
+def test_resolve_disambiguates_same_name_different_group(private_registry: Path) -> None:
+    # `validate` forbids two extensions sharing a name within one registry, but a
+    # locally-authored registry that was never validated can still reach this state —
+    # `resolve` must disambiguate it rather than pick one arbitrarily.
+    write_extension(private_registry, "community", "alpha")
+    commit_all(private_registry, "add community/alpha")
+    with pytest.raises(ResolveError, match="ambiguous"):
+        resolve("alpha")
+    assert resolve("official/alpha").ext.group == "official"
+    assert resolve("community/alpha").ext.group == "community"
+
+
 def test_resolve_unknown_registry(private_registry: Path) -> None:
     with pytest.raises(ResolveError, match="no registry named 'nope'"):
         resolve("nope:alpha")

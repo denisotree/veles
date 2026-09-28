@@ -2,7 +2,9 @@
 
 `registry_search` reads the local registry clones only — no network. `registry_install`
 runs the same install path as the CLI, including the critical-ops confirmation, so
-nothing is installed without the human typing `yes`; channels without a TTY refuse.
+nothing is installed without the human confirming: the gate asks through whichever
+surface is active (a TTY prompt, or a channel's own confirmation UI), and refuses when
+no surface can answer.
 """
 
 from __future__ import annotations

@@ -81,17 +81,33 @@ def search(
 
 
 def resolve(spec: str) -> Found:
-    """`name` or `registry:name` → the one matching extension."""
-    registry, _, name = spec.rpartition(":")
+    """`name`, `group/name`, `registry:name` or `registry:group/name` → the one matching
+    extension.
+
+    A bare `name` is ambiguous whenever more than one registry — or, within one registry,
+    more than one group — has an extension by that name (the latter is a state `validate`
+    forbids for a published registry, but `resolve` must still disambiguate it: e.g. a
+    locally-authored registry not yet validated). `group/name` or `registry:group/name`
+    (the `ref` a search result prints) disambiguates either case.
+    """
+    registry, _, rest = spec.rpartition(":")
+    group, sep, name = rest.rpartition("/")
     found, warnings = available(registry=registry or None)
-    matches = [f for f in found if f.ext.name == name]
+
+    def _matches(f: Found) -> bool:
+        return f.ext.name == name and (not sep or f.ext.group == group)
+
+    matches = [f for f in found if _matches(f)]
     if not matches:
         where = f" in registry {registry!r}" if registry else ""
-        message = f"no extension named {name!r}{where} (try `veles registry update`, then `search`)"
+        label = f"{group}/{name}" if sep else name
+        message = (
+            f"no extension named {label!r}{where} (try `veles registry update`, then `search`)"
+        )
         if warnings:
             message += "; unreachable: " + "; ".join(warnings)
         raise ResolveError(message)
     if len(matches) > 1:
         refs = ", ".join(f.ref for f in matches)
-        raise ResolveError(f"{name!r} is ambiguous: {refs} — use <registry>:{name}")
+        raise ResolveError(f"{name!r} is ambiguous: {refs} — use one of these refs")
     return matches[0]

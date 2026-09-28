@@ -36,6 +36,17 @@ def test_full_cycle(tmp_path: Path, capsys, monkeypatch) -> None:
     assert main(["registry", "uninstall", "alpha"]) == 0
 
 
+def test_install_by_full_ref(tmp_path: Path, capsys, monkeypatch) -> None:
+    remote = tmp_path / "remote"
+    make_git_registry(remote, skills=("alpha",))
+    project = init_project(tmp_path / "p", name="p")
+    monkeypatch.chdir(project.root)
+    main(["registry", "remove", "public"])
+    main(["registry", "add", str(remote)])
+    assert main(["registry", "install", "private:official/alpha"]) == 0
+    assert (project.skills_dir / "alpha" / "SKILL.md").is_file()
+
+
 def test_install_unknown_is_error_not_traceback(tmp_path: Path, capsys, monkeypatch) -> None:
     remote = tmp_path / "remote"
     make_git_registry(remote)

@@ -701,8 +701,16 @@ def _check_events_health(project: Project | None) -> CheckResult:
 
 def _check_extensions(project: Project | None) -> CheckResult:
     from veles.core.registry.maintenance import verify
+    from veles.core.registry.repo import RegistryRepoError
 
-    issues = verify(project)
+    try:
+        issues = verify(project)
+    except (RegistryRepoError, OSError, ValueError) as exc:
+        return CheckResult(
+            name="extensions",
+            status="warn",
+            message=f"could not verify extensions: {exc}",
+        )
     broken = [i for i in issues if i.problem in ("missing", "modified")]
     yanked = [i for i in issues if i.problem == "yanked"]
     if broken:

@@ -29,8 +29,13 @@ def test_install_goes_through_critical_gate(tmp_path: Path) -> None:
     try:
         assert "not installed" in registry_install("alpha")
         reset_critical_confirmer(refuse)
+        # The ref `registry_search` prints (`registry:group/name`) must itself be a
+        # valid `registry_install` argument — that's the round trip an agent actually
+        # does (search, then install what it found).
+        ref = registry_search("alpha").splitlines()[0].split()[0]
+        assert ref == "private:official/alpha"
         allow = set_critical_confirmer(lambda op, summary: True)
-        assert "installed" in registry_install("alpha")
+        assert "installed" in registry_install(ref)
         reset_critical_confirmer(allow)
         assert "private:official/alpha" in registry_search("alpha")
     finally:
@@ -50,3 +55,16 @@ def test_doctor_flags_modified(tmp_path: Path) -> None:
         reset_critical_confirmer(confirm)
     (project.skills_dir / "alpha" / "SKILL.md").write_text("tampered", encoding="utf-8")
     assert _check_extensions(project).status == "error"
+
+
+def test_doctor_extensions_check_warns_instead_of_crashing(tmp_path: Path, monkeypatch) -> None:
+    project = _setup(tmp_path)
+    import veles.core.registry.maintenance as maintenance
+
+    def _boom(project: object) -> None:
+        raise OSError("disk gone")
+
+    monkeypatch.setattr(maintenance, "verify", _boom)
+    result = _check_extensions(project)
+    assert result.status == "warn"
+    assert "could not verify extensions" in result.message
