@@ -48,6 +48,7 @@ def test_parse_git_source() -> None:
         ),
         ("", 'type = "git"\nurl = "https://x/y"\ncommit = "' + _SHA + '"', "sha256"),
         ("", 'type = "path"\nurl = "https://x/y"', "path"),
+        ("", 'type = "path"\nsha256 = "' + _TREE + '"', "path"),
         ("", 'type = "zip"', "source.type"),
         (
             "",

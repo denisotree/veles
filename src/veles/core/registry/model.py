@@ -161,7 +161,7 @@ def _parse_source(src: dict[str, Any], kind: str) -> Source:
     if kind == "mcp" and kind_of_source != "path":
         raise ExtensionError("an mcp recipe carries no code: source.type must be 'path'")
     if kind_of_source == "path":
-        stray = sorted(k for k in ("url", "commit", "subdir") if k in src)
+        stray = sorted(k for k in ("url", "commit", "subdir", "sha256") if k in src)
         if stray:
             raise ExtensionError(f"source.type 'path' does not take {', '.join(stray)}")
         return Source(type="path")
