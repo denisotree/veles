@@ -24,6 +24,15 @@ _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
+def is_slug(value: str) -> bool:
+    """`True` iff `value` is a safe extension/group name: lowercase, digits, `-`,
+    starting with an alnum. Used both to validate `extension.toml`'s
+    `[extension].name` and, in `template.py`, to reject a `name`/`group` before
+    it is ever used to build a filesystem path or TOML string — a slug can
+    never contain `..`, `/`, or a quote."""
+    return bool(_SLUG_RE.match(value))
+
+
 class ExtensionError(ValueError):
     """A registry or extension manifest is malformed."""
 
@@ -77,7 +86,7 @@ def parse_extension(text: str, *, group: str = "", dir: Path | None = None) -> E
     if not isinstance(src, dict):
         raise ExtensionError("missing [source] table")
     name = _required(ext, "name")
-    if not _SLUG_RE.match(name):
+    if not is_slug(name):
         raise ExtensionError(f"[extension].name {name!r} must match [a-z0-9][a-z0-9-]*")
     kind = _required(ext, "kind")
     if kind not in KINDS:

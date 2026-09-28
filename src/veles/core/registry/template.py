@@ -13,7 +13,7 @@ from typing import Any
 from veles import __version__
 from veles.core.io_utils import dump_toml
 from veles.core.registry.catalog import Found
-from veles.core.registry.model import EXTENSION_FILE, KINDS
+from veles.core.registry.model import EXTENSION_FILE, KINDS, is_slug
 
 _TEMPLATE = Path(__file__).resolve().parent.parent.parent / "registry_template"
 CI_CHOICES = ("github", "gitlab", "none")
@@ -26,6 +26,10 @@ class TemplateError(RuntimeError):
 def init_registry(dest: Path, *, name: str, ci: str = "github", public: bool = False) -> Path:
     if ci not in CI_CHOICES:
         raise TemplateError(f"--ci must be one of {', '.join(CI_CHOICES)}")
+    if not is_slug(name):
+        raise TemplateError(f"name {name!r} must match [a-z0-9][a-z0-9-]*")
+    if dest.is_file():
+        raise TemplateError(f"{dest} is a file, not a directory")
     if dest.exists() and any(dest.iterdir()):
         raise TemplateError(f"{dest} is not empty")
     shutil.copytree(_TEMPLATE / "base", dest, dirs_exist_ok=True)
@@ -45,6 +49,10 @@ def init_registry(dest: Path, *, name: str, ci: str = "github", public: bool = F
 def scaffold_extension(root: Path, kind: str, name: str, *, group: str = "internal") -> Path:
     if kind not in KINDS:
         raise TemplateError(f"kind must be one of {', '.join(KINDS)}")
+    if not is_slug(name):
+        raise TemplateError(f"name {name!r} must match [a-z0-9][a-z0-9-]*")
+    if not is_slug(group):
+        raise TemplateError(f"group {group!r} must match [a-z0-9][a-z0-9-]*")
     dest = root / "extensions" / group / name
     if dest.exists():
         raise TemplateError(f"{dest} already exists")
@@ -60,6 +68,8 @@ def scaffold_extension(root: Path, kind: str, name: str, *, group: str = "intern
 def vendor_extension(found: Found, into: Path, *, group: str = "vendor") -> Path:
     """Copy an extension into another registry as a `path` source that remembers its upstream."""
     ext = found.ext
+    if not is_slug(group):
+        raise TemplateError(f"group {group!r} must match [a-z0-9][a-z0-9-]*")
     dest = into / "extensions" / group / ext.name
     if dest.exists():
         raise TemplateError(f"{dest} already exists")

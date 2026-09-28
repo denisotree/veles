@@ -5,6 +5,7 @@ import pytest
 from tests.registry_helpers import write_extension, write_registry
 from veles.core.registry.model import (
     ExtensionError,
+    is_slug,
     load_registry_meta,
     parse_extension,
     scan_registry,
@@ -124,6 +125,24 @@ def test_scan_registry_reports_bad_encoding_without_raising(tmp_path: Path) -> N
     assert entries == []
     assert errors and errors[0][0] == ext / "extension.toml"
     assert "extension.toml" in str(errors[0][0])
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("alpha", True),
+        ("alpha-2", True),
+        ("a", True),
+        ("../evil", False),
+        ("has/slash", False),
+        ('has"quote', False),
+        ("", False),
+        ("-leading-dash", False),
+        ("Has-Upper", False),
+    ],
+)
+def test_is_slug(value: str, expected: bool) -> None:
+    assert is_slug(value) is expected
 
 
 def test_load_registry_meta_reports_bad_encoding_as_extension_error(tmp_path: Path) -> None:

@@ -53,6 +53,41 @@ def test_scaffold_each_kind_validates(tmp_path: Path, kind: str) -> None:
     assert report.ok, report.errors
 
 
+def test_scaffold_rejects_path_escaping_name_or_group(tmp_path: Path) -> None:
+    root = init_registry(tmp_path / "r", name="r", ci="none")
+    with pytest.raises(TemplateError):
+        scaffold_extension(root, "skill", "../evil")
+    assert not (tmp_path / "evil").exists()
+    assert not (root / "extensions" / "evil").exists()
+    with pytest.raises(TemplateError):
+        scaffold_extension(root, "skill", "ok-name", group="../x")
+    assert not (tmp_path / "x").exists()
+    assert not (root / "x").exists()
+
+
+def test_init_into_a_file_raises_template_error(tmp_path: Path) -> None:
+    path = tmp_path / "notadir"
+    path.write_text("x", encoding="utf-8")
+    with pytest.raises(TemplateError):
+        init_registry(path, name="x")
+
+
+def test_scaffold_into_an_existing_dir_refuses(tmp_path: Path) -> None:
+    root = init_registry(tmp_path / "r2", name="r2", ci="none")
+    scaffold_extension(root, "skill", "dup")
+    with pytest.raises(TemplateError):
+        scaffold_extension(root, "skill", "dup")
+
+
+def test_scaffold_module_passes_run_code(tmp_path: Path) -> None:
+    """The path CI actually runs: `--run-code` executes `register()`, checks
+    `provides` against the registered hooks, and runs the module's own tests."""
+    root = init_registry(tmp_path / "ci", name="ci", ci="none")
+    scaffold_extension(root, "module", "my-module")
+    report = validate_registry(root, run_code=True)
+    assert report.ok, report.errors
+
+
 def test_vendor_copies_with_upstream(tmp_path: Path) -> None:
     remote = tmp_path / "public-remote"
     head = make_git_registry(remote, skills=("alpha",))
