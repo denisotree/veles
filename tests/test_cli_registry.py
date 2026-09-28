@@ -1,12 +1,15 @@
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from tests.registry_helpers import make_git_registry
+from tests.registry_helpers import commit_all, make_git_registry, write_extension
 from veles.cli import main
 from veles.core.critical_ops import reset_critical_confirmer, set_critical_confirmer
 from veles.core.project import init_project
+from veles.core.registry.install import InstallError, installed_records
+from veles.core.registry.records import put_record
 
 
 @pytest.fixture(autouse=True)
@@ -57,3 +60,50 @@ def test_init_scaffold_validate(tmp_path: Path) -> None:
 def test_browse_is_gone() -> None:
     with pytest.raises(SystemExit):
         main(["browse", "skills"])
+
+
+def test_upgrade_all_isolates_failures(tmp_path: Path, capsys, monkeypatch) -> None:
+    remote = tmp_path / "remote"
+    make_git_registry(remote, skills=("alpha", "beta"))
+    project = init_project(tmp_path / "p", name="p")
+    monkeypatch.chdir(project.root)
+    main(["registry", "remove", "public"])
+    main(["registry", "add", str(remote)])
+    main(["registry", "install", "alpha"])
+    main(["registry", "install", "beta"])
+    write_extension(remote, "official", "alpha", version="0.2.0")
+    write_extension(remote, "official", "beta", version="0.2.0")
+    commit_all(remote, "bump")
+    main(["registry", "update"])
+    capsys.readouterr()
+
+    import veles.cli.commands.registry as registry_cmd
+
+    real_upgrade = registry_cmd.upgrade
+
+    def flaky(name, *, project):
+        if name == "alpha":
+            raise InstallError("boom")
+        return real_upgrade(name, project=project)
+
+    monkeypatch.setattr(registry_cmd, "upgrade", flaky)
+
+    assert main(["registry", "upgrade"]) == 1
+    out = capsys.readouterr()
+    assert "alpha: error: boom" in out.err
+    assert "beta: upgraded to 0.2.0" in out.out
+
+
+def test_verify_corrupt_version_is_error_not_traceback(tmp_path: Path, capsys, monkeypatch) -> None:
+    remote = tmp_path / "remote"
+    make_git_registry(remote, skills=("alpha",))
+    project = init_project(tmp_path / "p", name="p")
+    monkeypatch.chdir(project.root)
+    main(["registry", "remove", "public"])
+    main(["registry", "add", str(remote)])
+    main(["registry", "install", "alpha"])
+    [rec] = [r for r in installed_records(project) if r.name == "alpha"]
+    put_record(replace(rec, version=""))
+
+    assert main(["registry", "verify"]) == 1
+    assert "error:" in capsys.readouterr().err

@@ -42,7 +42,14 @@ from veles.core.registry.template import (
 )
 from veles.core.registry.validate import validate_registry
 
-_ERRORS = (RegistryConfigError, RegistryRepoError, ResolveError, InstallError, TemplateError)
+_ERRORS = (
+    RegistryConfigError,
+    RegistryRepoError,
+    ResolveError,
+    InstallError,
+    TemplateError,
+    ValueError,
+)
 
 
 def cmd_registry(args: argparse.Namespace, project: Project | None) -> int:
@@ -130,10 +137,16 @@ def _upgrade(args: argparse.Namespace, project: Project | None) -> int:
         if args.name
         else sorted({r.name for r in installed_records(project) if r.registry is not None})
     )
+    rc = 0
     for name in names:
-        rec = upgrade(name, project=project)
+        try:
+            rec = upgrade(name, project=project)
+        except _ERRORS as exc:
+            print(f"{name}: error: {exc}", file=sys.stderr)
+            rc = 1
+            continue
         print(f"{name}: " + (f"upgraded to {rec.version}" if rec else "up to date"))
-    return 0
+    return rc
 
 
 def _uninstall(args: argparse.Namespace, project: Project | None) -> int:

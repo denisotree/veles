@@ -11,6 +11,7 @@ from veles.core.registry.catalog import resolve
 from veles.core.registry.config import add_source, get_source, remove_source
 from veles.core.registry.install import InstallError, install, installed_records
 from veles.core.registry.maintenance import upgrade, verify
+from veles.core.registry.records import InstallRecord, put_record
 from veles.core.registry.repo import update
 
 
@@ -159,6 +160,28 @@ def test_upgrade_restores_mcp_recipe_on_install_failure(tmp_path: Path, monkeypa
     cfg = tomllib.loads((project.root / ".veles" / "config.toml").read_text(encoding="utf-8"))
     assert cfg["mcp"]["servers"]["graph"] == {"command": "graphify-mcp"}
     assert all(i.problem != "missing" for i in verify(project))
+
+
+def test_upgrade_refuses_ambiguous_name(tmp_path: Path) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    root = str(project.root.resolve())
+    put_record(
+        InstallRecord(
+            "dup", "skill", str(project.skills_dir / "dup"), "1" * 64, project=root, version="0.1.0"
+        )
+    )
+    put_record(
+        InstallRecord(
+            "dup",
+            "module",
+            str(project.modules_dir / "dup"),
+            "2" * 64,
+            project=root,
+            version="0.1.0",
+        )
+    )
+    with pytest.raises(InstallError, match="several kinds"):
+        upgrade("dup", project=project)
 
 
 def test_upgrade_declined_keeps_old(setup) -> None:

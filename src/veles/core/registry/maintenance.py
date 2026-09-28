@@ -54,9 +54,13 @@ def verify(project: Project | None) -> list[Issue]:
 
 
 def upgrade(name: str, *, project: Project | None) -> InstallRecord | None:
-    rec = next((r for r in installed_records(project) if r.name == name), None)
-    if rec is None:
+    matches = [r for r in installed_records(project) if r.name == name]
+    if not matches:
         raise InstallError(f"{name!r} is not installed here")
+    if len(matches) > 1:
+        kinds = ", ".join(sorted(r.kind for r in matches))
+        raise InstallError(f"{name!r} is installed as several kinds ({kinds}); remove by hand")
+    rec = matches[0]
     if rec.registry is None:
         raise InstallError(
             f"{name!r} was installed from a raw source; reinstall it from a registry"
