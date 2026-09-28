@@ -98,7 +98,7 @@ def _coerce_float(raw: Any, default: float, *, server: str, key: str) -> float:
     return value
 
 
-def _parse_server(name: str, raw: dict[str, Any]) -> McpServerConfig | None:
+def parse_server(name: str, raw: dict[str, Any]) -> McpServerConfig | None:
     """Validate one `[mcp.servers.<name>]` table. None means skip (warned)."""
     transport = raw.get("transport", "stdio")
     if transport not in VALID_TRANSPORTS:
@@ -180,7 +180,7 @@ def load_mcp_config(project: Project) -> dict[str, McpServerConfig]:
                 _SERVER_NAME_RE.pattern,
             )
             continue
-        cfg = _parse_server(name, raw)
+        cfg = parse_server(name, raw)
         if cfg is not None:
             out[name] = cfg
     return out
@@ -209,4 +209,5 @@ __all__ = [
     "interpolate_env",
     "load_disabled_tools",
     "load_mcp_config",
+    "parse_server",
 ]
