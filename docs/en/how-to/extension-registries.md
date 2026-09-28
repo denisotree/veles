@@ -23,9 +23,11 @@ error asking you to pass `--name`. Clones live outside the sandbox, in
 `~/.veles/registries/<name>/` — Veles calls the system `git` and never stores
 credentials itself. Private access works through your own SSH keys or git
 credential helper (`gh auth setup-git` is the usual one-time setup for
-GitHub). If a fetch fails or there is no network, Veles falls back to the
-existing clone with a warning about its age; if there is no clone yet, it
-fails with a clear error instead of guessing.
+GitHub). A registry is cloned once, on first use (`add`, or the first
+`search`/`install` that needs it) — after that, `search` and `install` only
+read the local clone and never touch the network again. Run `veles registry
+update` to fetch the latest; if that fails, it prints an error for that
+registry and leaves the existing clone exactly as it was.
 
 ## Find and install
 
@@ -36,8 +38,9 @@ veles registry install slack                 # bare name — unambiguous if only
 veles registry install private:vendor/slack  # registry:group/name — the ref search prints
 ```
 
-`search` prints `registry:group/name  version  kind  — description`, flagging
-anything yanked. A bare `name` resolves as long as it's unambiguous; if more
+`search` prints one entry per hit — `registry:group/name  version  kind`
+(plus `[YANKED: reason]` when it's yanked) with the description indented on
+the line below. A bare `name` resolves as long as it's unambiguous; if more
 than one registry (or, within one registry, more than one group) has an
 extension by that name, `install` refuses and lists every matching
 `registry:group/name` ref to disambiguate with.
@@ -65,17 +68,25 @@ it, and autopilot does not skip it.
 Every install is recorded with its registry, version, git commit and a
 content hash of its files (`tree_sha256`). A module only *loads* while its
 files still match that hash — edit one on purpose and it stops loading until
-you review the change and run `veles module approve <name>`. A module placed
-by hand (`veles module add` from a raw URL, or dropped into
-`.veles/modules/`) works the same way: it needs an explicit
-`veles module approve <name>` before Veles will import it at all.
+you review the change and run `veles module approve <name>`. Both `veles
+registry install` and `veles module add` approve the module automatically
+right after installing it, so a normal install just works on the next run;
+only a module you drop into `.veles/modules/` by hand, or one you edit after
+it was approved, needs an explicit `veles module approve <name>`.
 
 ```bash
 veles registry verify     # drift, yanked extensions, and available upgrades
-veles registry upgrade    # upgrade every installed extension
+veles registry upgrade    # every registry-installed extension, one by one
 veles registry upgrade slack   # or just one — shows the file diff before confirming
-veles doctor              # includes an "extensions" check: drift or yanks fail it
+veles doctor               # includes an "extensions" check
 ```
+
+A bare `upgrade` walks every registry-installed extension and upgrades each
+in turn; a failure on one is reported and does not stop the rest, but the
+command exits 1 if any of them failed. `doctor`'s `extensions` check treats a
+missing or modified installed extension as an **error** — that fails
+`doctor`'s exit code — while a yanked one is only a **warning**: `doctor`
+still exits 0 for it unless you pass `--strict`.
 
 Skills aren't gated this way — they're text, not executable code — but
 `verify` still reports if one has drifted from what you installed.

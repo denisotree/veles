@@ -1,4 +1,4 @@
-"""Parser for `veles module {list,show,add,remove}`."""
+"""Parser for `veles module {list,show,add,remove,approve}`."""
 
 from __future__ import annotations
 
