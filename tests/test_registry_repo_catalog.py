@@ -136,6 +136,30 @@ def test_no_sync_when_asked(private_registry: Path) -> None:
     assert warnings and "veles registry update" in warnings[0]
 
 
+def test_access_failures_carry_a_hint(private_registry: Path, tmp_path: Path) -> None:
+    import shutil
+
+    from veles.core.registry.config import get_source
+
+    add_source(str(tmp_path / "does-not-exist"), name="broken")
+    with pytest.raises(RegistryRepoError) as clone_err:
+        ensure_cache(get_source("broken"))
+    assert str(clone_err.value).count("gh auth setup-git") == 1
+    ensure_cache(get_source("private"))
+    shutil.rmtree(private_registry)
+    with pytest.raises(RegistryRepoError) as fetch_err:
+        update(get_source("private"))
+    assert str(fetch_err.value).count("gh auth setup-git") == 1
+
+
+def test_changed_paths_rejects_option_like_base(private_registry: Path) -> None:
+    from veles.core.registry.repo import changed_paths
+
+    with pytest.raises(RegistryRepoError, match="must not start with '-'"):
+        changed_paths(private_registry, "--output=pwned")
+    assert not (private_registry / "pwned").exists()
+
+
 def test_fetch_git_source_drops_bytecode(tmp_path: Path) -> None:
     upstream = tmp_path / "upstream"
     (upstream / "pkg" / "__pycache__").mkdir(parents=True)

@@ -18,6 +18,7 @@ from veles.core.registry.hashing import BYTECODE_PATTERNS
 from veles.core.registry.model import Source
 
 _GIT_TIMEOUT_S = 300
+_ACCESS_HINT = "check your git access (SSH key or `gh auth setup-git`)"
 
 
 class RegistryRepoError(RuntimeError):
@@ -43,6 +44,9 @@ def ensure_cache(source: RegistrySource) -> Path:
     try:
         _git(*args, "--", source.url, str(staging))
         staging.rename(path)
+    except RegistryRepoError as exc:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise RegistryRepoError(f"{exc}\n{_ACCESS_HINT}") from exc
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
         raise
@@ -52,7 +56,10 @@ def ensure_cache(source: RegistrySource) -> Path:
 def update(source: RegistrySource) -> str:
     """Fetch and move the clone to the remote tip; returns the new HEAD."""
     path = ensure_cache(source)
-    _git("fetch", "--quiet", "--prune", "origin", cwd=path)
+    try:
+        _git("fetch", "--quiet", "--prune", "origin", cwd=path)
+    except RegistryRepoError as exc:
+        raise RegistryRepoError(f"{exc}\n{_ACCESS_HINT}") from exc
     target = f"origin/{source.ref}" if source.ref else "origin/HEAD"
     _git("reset", "--quiet", "--hard", target, cwd=path)
     return head_commit(path)
@@ -102,6 +109,8 @@ def changed_paths(repo: Path, base: str) -> list[str]:
     `-z` NUL-terminates each entry with no quoting; plain `--name-only` would
     otherwise emit a non-ASCII path octal-escaped and wrapped in quotes, which
     a caller matching on the raw path (e.g. a group/name prefix) would miss."""
+    if base.startswith("-"):
+        raise RegistryRepoError(f"base ref {base!r} must not start with '-'")
     out = _git("diff", "--name-only", "-z", f"{base}...HEAD", cwd=repo)
     return [p for p in out.split("\0") if p]
 
