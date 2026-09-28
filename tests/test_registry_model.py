@@ -55,6 +55,18 @@ def test_parse_git_source() -> None:
             f'type = "git"\nurl = "--upload-pack=touch /x"\ncommit = "{_SHA}"\nsha256 = "{_TREE}"',
             "must not start",
         ),
+        (
+            "",
+            f'type = "git"\nurl = "https://x/y"\ncommit = "{_SHA}"\nsha256 = "{_TREE}"\n'
+            'subdir = "/etc"',
+            "subdir",
+        ),
+        (
+            "",
+            f'type = "git"\nurl = "https://x/y"\ncommit = "{_SHA}"\nsha256 = "{_TREE}"\n'
+            'subdir = "../x"',
+            "subdir",
+        ),
     ],
 )
 def test_parse_rejects_bad_source(body: str, source: str, needle: str) -> None:

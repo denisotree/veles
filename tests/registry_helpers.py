@@ -68,3 +68,13 @@ def commit_all(repo: Path, message: str = "update") -> str:
     git(repo, "add", "-A")
     git(repo, "commit", "-q", "-m", message)
     return git(repo, "rev-parse", "HEAD")
+
+
+def make_git_registry(
+    root: Path, *, name: str = "test", skills: tuple[str, ...] = ("alpha",)
+) -> str:
+    """A committed registry at `root` with one skill per name; returns the HEAD sha."""
+    write_registry(root, name=name)
+    for skill in skills:
+        write_extension(root, "official", skill)
+    return commit_all(root, "init")

@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 import tomllib
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 EXTENSION_FILE = "extension.toml"
@@ -174,13 +174,28 @@ def _parse_source(src: dict[str, Any], kind: str) -> Source:
     sha256 = _required(src, "sha256", where="source")
     if not _SHA256_RE.match(sha256):
         raise ExtensionError("source.sha256 must be a 64-character hex digest")
+    subdir = str(src.get("subdir", ""))
+    if not _is_safe_subdir(subdir):
+        raise ExtensionError("source.subdir must be a relative path inside the repository")
     return Source(
         type="git",
         url=url,
         commit=commit,
-        subdir=str(src.get("subdir", "")),
+        subdir=subdir,
         sha256=sha256,
     )
+
+
+def _is_safe_subdir(subdir: str) -> bool:
+    if not subdir:
+        return True
+    if PurePosixPath(subdir).is_absolute() or "\\" in subdir or _has_control_char(subdir):
+        return False
+    return ".." not in PurePosixPath(subdir).parts
+
+
+def _has_control_char(value: str) -> bool:
+    return any(ord(c) < 32 or ord(c) == 127 for c in value)
 
 
 def _required(table: dict[str, Any], key: str, *, where: str = "extension") -> str:
