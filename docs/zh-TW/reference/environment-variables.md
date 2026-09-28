@@ -65,13 +65,6 @@ fenced-tools 路徑需要在區塊周圍保留敘述文字，而 JSON 物件約�
 | `VELES_FETCH_ALLOW_PRIVATE` | 關閉 | 允許工具抓取 RFC-1918／私有位址 |
 | `VELES_WEB_SEARCH_BACKEND` | 自動 | `research` 與 `web_search` 的網路搜尋後端 |
 
-## 登錄庫
-
-| 變數 | 用途 |
-|---|---|
-| `VELES_SKILLS_REGISTRY_URL` | `veles browse skills` 的來源 |
-| `VELES_MODULES_REGISTRY_URL` | `veles browse modules` 的來源 |
-
 ## 內部／測試
 
 | 變數 | 用途 |

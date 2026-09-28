@@ -65,9 +65,8 @@ veles module remove <name>
 
 ## さらに見つける
 
-キュレーションされたレジストリを閲覧します。
+接続されたレジストリを検索します。
 
 ```bash
-veles browse skills [query]
-veles browse modules [query]
+veles registry search [query] [--kind module|skill|layout|mcp]
 ```

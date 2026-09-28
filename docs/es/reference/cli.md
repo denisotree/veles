@@ -185,13 +185,14 @@ herramienta escrita por el agente necesita un paso de revisión antes de poder i
 | `add <source> [--name N] [-y]` | Instala un módulo desde una URL de git o una ruta local |
 | `remove <name> [-y]` | Elimina un módulo instalado |
 
-### `veles browse {modules,skills} [query]`
-Explora los registros curados.
+### `veles registry search [query] [--kind K]`
+Busca en los registros conectados (módulos, skills, paquetes de layout,
+recetas MCP).
 
 | Opción | Predeterminado | Propósito |
 |---|---|---|
 | `query` (posicional) | `""` | Filtro por subcadena |
-| `--source <url>` | canónico | Anula la fuente del registro |
+| `--kind <module\|skill\|layout\|mcp>` | — | Filtra por kind |
 | `--json` | desactivado | Emite JSON |
 
 ---

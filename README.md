@@ -365,7 +365,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | Skill management |
 | `veles tool {list,show,promote,approve}` | Tool management (`approve` gates self-authored tools) |
 | `veles module {list,add,remove}` | Plugin management |
-| `veles browse {modules,skills}` | Search the curated module / skill registries |
+| `veles registry {add,search,install,upgrade,verify,...}` | Extension registries: search, install, publish |
 | `veles route {show,set,reset,refresh}` | Model routing |
 | `veles schema {validate,edit}` | Validate / edit AGENTS.md |
 | `veles self-doc` | Generate project self-documentation |

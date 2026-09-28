@@ -163,13 +163,13 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `add <source> [--name N] [-y]` | git URL 또는 로컬 경로에서 모듈 설치 |
 | `remove <name> [-y]` | 설치된 모듈 삭제 |
 
-### `veles browse {modules,skills} [query]`
-큐레이트된 레지스트리를 탐색합니다.
+### `veles registry search [query] [--kind K]`
+연결된 레지스트리를 검색합니다 (모듈, 스킬, 레이아웃 팩, MCP 레시피).
 
 | 플래그 | 기본값 | 용도 |
 |---|---|---|
 | `query` (위치 인자) | `""` | 부분 문자열 필터 |
-| `--source <url>` | 표준 | 레지스트리 소스 재정의 |
+| `--kind <module\|skill\|layout\|mcp>` | — | kind로 필터링 |
 | `--json` | off | JSON 출력 |
 
 ---

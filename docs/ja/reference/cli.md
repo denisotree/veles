@@ -163,13 +163,13 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `add <source> [--name N] [-y]` | git URL またはローカルパスからモジュールをインストールする |
 | `remove <name> [-y]` | インストール済みのモジュールを削除する |
 
-### `veles browse {modules,skills} [query]`
-キュレーション済みのレジストリを閲覧します。
+### `veles registry search [query] [--kind K]`
+接続されたレジストリを検索します(モジュール、スキル、レイアウトパック、MCP レシピ)。
 
 | フラグ | デフォルト | 目的 |
 |---|---|---|
 | `query`（位置引数） | `""` | 部分文字列フィルタ |
-| `--source <url>` | 正規 | レジストリのソースを上書きする |
+| `--kind <module\|skill\|layout\|mcp>` | — | kind で絞り込む |
 | `--json` | オフ | JSON を出力する |
 
 ---

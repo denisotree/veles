@@ -140,14 +140,23 @@ def installed_records(project: Project | None) -> list[InstallRecord]:
     return [r for r in load_records() if r.project in (None, root)]
 
 
-def uninstall(name: str, *, project: Project | None) -> InstallRecord:
+def resolve_one_record(name: str, *, project: Project | None) -> InstallRecord:
+    """The single installed record for `name`, or raise if it's missing/ambiguous.
+
+    Shared by `uninstall` and `registry.maintenance.upgrade` — both need exactly
+    one installed record for a bare name before they can act on it.
+    """
     matches = [r for r in installed_records(project) if r.name == name]
     if not matches:
         raise InstallError(f"{name!r} is not installed here")
     if len(matches) > 1:
         kinds = ", ".join(sorted(r.kind for r in matches))
         raise InstallError(f"{name!r} is installed as several kinds ({kinds}); remove by hand")
-    rec = matches[0]
+    return matches[0]
+
+
+def uninstall(name: str, *, project: Project | None) -> InstallRecord:
+    rec = resolve_one_record(name, project=project)
     remove_installed(rec)
     return rec
 

@@ -65,13 +65,6 @@ fenced-tools 路径需要在代码块周围保留散文，而 JSON 对象约束�
 | `VELES_FETCH_ALLOW_PRIVATE` | 关闭 | 允许 tools 获取 RFC-1918 / 私有地址 |
 | `VELES_WEB_SEARCH_BACKEND` | auto | `research` 和 `web_search` 使用的网络搜索后端 |
 
-## 注册表
-
-| 变量 | 用途 |
-|---|---|
-| `VELES_SKILLS_REGISTRY_URL` | `veles browse skills` 的来源 |
-| `VELES_MODULES_REGISTRY_URL` | `veles browse modules` 的来源 |
-
 ## 内部 / 测试
 
 | 变量 | 用途 |

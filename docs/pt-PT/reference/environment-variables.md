@@ -71,13 +71,6 @@ ele, pelo que normalmente não é preciso mexer neste interruptor.
 | `VELES_FETCH_ALLOW_PRIVATE` | desligado | Permite às ferramentas obter endereços RFC-1918 / privados |
 | `VELES_WEB_SEARCH_BACKEND` | auto | Backend de pesquisa web para `research` e `web_search` |
 
-## Registos
-
-| Variável | Finalidade |
-|---|---|
-| `VELES_SKILLS_REGISTRY_URL` | Fonte para `veles browse skills` |
-| `VELES_MODULES_REGISTRY_URL` | Fonte para `veles browse modules` |
-
 ## Interno / testes
 
 | Variável | Finalidade |

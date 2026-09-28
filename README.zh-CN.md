@@ -333,7 +333,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | 技能管理 |
 | `veles tool {list,show,promote,approve}` | 工具管理（`approve` 用于批准自建工具）|
 | `veles module {list,add,remove}` | 插件管理 |
-| `veles browse {modules,skills}` | 搜索精选的模块 / 技能注册表 |
+| `veles registry {add,search,install,upgrade,verify,...}` | 扩展注册表：搜索、安装、发布 |
 | `veles route {show,set,reset,refresh}` | 模型路由 |
 | `veles schema {validate,edit}` | 校验 / 编辑 AGENTS.md |
 | `veles self-doc` | 生成项目自文档 |

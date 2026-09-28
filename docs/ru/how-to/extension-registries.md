@@ -1,0 +1,157 @@
+# Как устанавливать расширения из реестров
+
+> 🌐 **Языки:** [English](../../en/how-to/extension-registries.md) · [简体中文](../../zh-CN/how-to/extension-registries.md) · [繁體中文](../../zh-TW/how-to/extension-registries.md) · [日本語](../../ja/how-to/extension-registries.md) · [한국어](../../ko/how-to/extension-registries.md) · [Español](../../es/how-to/extension-registries.md) · [Français](../../fr/how-to/extension-registries.md) · [Italiano](../../it/how-to/extension-registries.md) · [Português (BR)](../../pt-BR/how-to/extension-registries.md) · [Português (PT)](../../pt-PT/how-to/extension-registries.md) · **Русский** · [العربية](../../ar/how-to/extension-registries.md) · [हिन्दी](../../hi/how-to/extension-registries.md) · [বাংলা](../../bn/how-to/extension-registries.md) · [Tiếng Việt](../../vi/how-to/extension-registries.md)
+
+Реестр — это обычный git-репозиторий с проверенными расширениями: модулями,
+навыками, layout-пакетами и рецептами MCP-серверов. `veles registry`
+подключается к реестру, находит расширение и ставит его после вашего
+подтверждения.
+
+## Подключить реестр
+
+Встроенный реестр `public` (`https://github.com/denisotree/veles-registry`)
+уже подключён. Добавьте свой — приватный или корпоративный:
+
+```bash
+veles registry add https://github.com/acme/veles-registry.git   # → получит имя "private"
+veles registry add git@github.com:acme/veles-registry.git --name acme --ref main
+veles registry list                                              # url, ref, коммит кэша, дата fetch
+veles registry remove public                                     # отключить ненужный
+```
+
+`add` без имени всегда становится `private`; вторая безымянная попытка —
+ошибка с просьбой указать `--name`. Клоны лежат вне песочницы, в
+`~/.veles/registries/<name>/` — Veles вызывает системный `git` и сам не
+хранит учётные данные. Доступ к приватному репозиторию работает через ваши
+SSH-ключи или git credential helper (для GitHub обычно достаточно один раз
+выполнить `gh auth setup-git`). Если fetch упал или нет сети, Veles
+работает по уже существующему клону с предупреждением о его возрасте; если
+клона ещё нет — понятная ошибка вместо угадывания.
+
+## Найти и установить
+
+```bash
+veles registry search                       # всё из всех подключённых реестров
+veles registry search slack --kind module    # подстрока + kind (module|skill|layout|mcp)
+veles registry install slack                 # голое имя — если оно однозначно
+veles registry install private:vendor/slack  # registry:group/name — ref из вывода search
+```
+
+`search` печатает `registry:group/name  version  kind  — description`,
+помечая отозванные (yanked) записи. Голое имя разрешается, если оно
+однозначно; если расширение с таким именем есть в нескольких реестрах (или,
+внутри одного реестра, в нескольких группах), `install` отказывает и
+показывает список всех подходящих `registry:group/name`, чтобы выбрать
+нужный.
+
+Перед установкой Veles сверяет `requires_veles` с вашей версией Veles и
+отказывается ставить отозванное расширение без `--force`. Затем показывает
+сводку — kind, версию, реестр/группу, что расширение предоставляет и что
+требует, лицензию — и запрашивает подтверждение через `confirm_critical`:
+установка кода всегда проходит через этот гейт, и `--yes` его не обходит.
+Если расширение объявляет `requires` (pip-зависимости), Veles печатает
+команду `uv tool install` для ручного запуска — сам он Python-зависимости
+не ставит. Каждый kind ложится в своё обычное место: модули — в
+`<project>/.veles/modules/<name>/`, навыки — в
+`<project>/.veles/skills/<name>/` (`--user` ставит в
+`~/.veles/skills/<name>/`), layout-пакеты — в `~/.veles/layouts/<name>/`, а
+рецепт `mcp` — как блок `[mcp.servers.<name>]` в `config.toml` проекта.
+
+У агента есть только read-only половина этого набора: он может вызвать
+`registry_search`, чтобы посмотреть, что доступно, и предложить
+`registry_install`, но тот же гейт подтверждения действует и здесь — ничего
+не устанавливается без вашего одобрения, и autopilot его не обходит.
+
+## Держать установленное в порядке
+
+Каждая установка записывается вместе с реестром, версией, git-коммитом и
+хэшем содержимого файлов (`tree_sha256`). Модуль *загружается* только пока
+его файлы совпадают с этим хэшем — отредактируйте файл намеренно, и модуль
+перестанет загружаться, пока вы не проверите изменение и не выполните
+`veles module approve <name>`. Модуль, положенный вручную (`veles module
+add` из сырого URL или файлы, добавленные напрямую в `.veles/modules/`),
+работает так же: ему нужен явный `veles module approve <name>`, прежде чем
+Veles вообще его импортирует.
+
+```bash
+veles registry verify     # расхождения, отозванные расширения, доступные обновления
+veles registry upgrade    # обновить все установленные расширения
+veles registry upgrade slack   # или одно — перед подтверждением показывает diff файлов
+veles doctor               # включает проверку "extensions": расхождение или yanked — ошибка
+```
+
+Навыки так не гейтятся — это текст, а не исполняемый код, — но `verify`
+всё равно сообщает, если навык разошёлся с тем, что было установлено.
+
+## Опубликовать расширение
+
+```bash
+veles registry scaffold module slack --group community --root ./veles-registry
+# … пишем модуль, добавляем тесты в payload/tests/ …
+veles registry validate . --base main   # только то, что изменилось относительно base-ref
+```
+
+`scaffold` кладёт заготовку (`extension.toml` + payload нужного kind,
+например `module.toml` + Python-код для модуля) в
+`extensions/<group>/<name>/` того реестра, на который указывает `--root`.
+`validate` — **единственная** реализация CI-проверок реестра: тот же код
+запускаете локально вы, ревьюер и CI, так что отдельного «только для CI»
+набора правил угадывать не нужно. По умолчанию проверка статическая: схема,
+slug, semver, уникальность `name`, у `git`-источника — полный SHA коммита и
+совпадение хэша дерева, соответствие payload заявленному `kind` (у модуля
+разбираются манифест и точка входа, у навыка валиден frontmatter
+`SKILL.md`, у layout-пакета грузится `layout.toml`, у `mcp` — рецепт
+соответствует схеме `[mcp.servers]`), рост `version` при изменении payload
+или source, и то, что реестры с `public = true` принимают только
+пермиссивные лицензии. `--run-code` дополнительно импортирует модуль и
+запускает его `tests/` — этот флаг предназначен только для CI, потому что
+исполняет код из PR; локальный запуск `validate` у ревьюера остаётся
+статическим. `--report FILE` пишет неблокирующий Markdown-отчёт для
+ревьюера: статический скан на `subprocess`/`os.system`, `eval`/`exec`,
+сетевой доступ, запись вне проекта, чтение `os.environ`, динамический
+импорт, а также заявленные `requires`.
+
+Дальше — форк реестра, PR (для `git`-источника в PR меняется только
+`extension.toml`), и CI реестра публикует отчёт validate и блокирует мерж
+до зелёного результата. Отдельного флага «одобрено» нет — ревью означает,
+что PR влит в основную ветку реестра, поэтому доверие определяется на
+уровне реестра, а не отдельного расширения.
+
+## Завести корпоративный реестр
+
+```bash
+veles registry init veles-registry --name acme --ci github   # или --ci gitlab / --ci none
+cd veles-registry && git init && git add -A && git commit -m "init registry"
+# запушить, затем включить branch protection на хостинге (Veles API хостинга не трогает)
+```
+
+`init` генерирует тот же шаблон, из которого собран `public`:
+`registry.toml`, рабочий пример модуля и пример навыка в
+`extensions/internal/`, CI-workflow для выбранного хостинга, запускающий
+`validate` с версией Veles, зафиксированной на момент генерации, заглушку
+`CODEOWNERS` (`@<org>/security`) и шаблон PR с чеклистом ревьюера
+(назначение; права и побочные эффекты; куда уходят данные; pip-зависимости;
+наличие тестов). `--public` передавайте только для реестра, который должен
+принимать расширения с пермиссивной лицензией от внешних авторов —
+корпоративные реестры обычно оставляют его выключенным.
+
+Внести проверенное внешнее расширение, не подставляя сотрудников под
+апстрим, который вы не контролируете:
+
+```bash
+veles registry vendor public:community/slack --into ../veles-registry --group vendor
+```
+
+`vendor` копирует payload расширения в ваш реестр как источник `path`,
+помечая его `upstream = "public:community/slack@<sha>"`, чтобы ваш
+`verify` мог позже сообщить, что апстрим ушёл вперёд. Альтернатива — запись
+с `git`-источником, закреплённая на коммите апстрима, — тоже работает, но
+именно `vendor` обычно нужен службе безопасности: код лежит и
+рецензируется внутри репозитория компании.
+
+**Закрытые консалтинговые модули.** Закрытый реестр (например,
+`denisotree/veles-registry-pro`, `license = "Proprietary"`) работает так
+же, как любой другой приватный реестр — клиенту либо выдаётся доступ на
+чтение и он выполняет `veles registry add <url> --name pro`, либо,
+предпочтительнее для его службы безопасности, вы делаете `vendor` модуля в
+*его* реестр, чтобы код рецензировался и хранился на его стороне.

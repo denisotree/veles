@@ -332,7 +332,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | 技能管理 |
 | `veles tool {list,show,promote,approve}` | 工具管理（`approve` 用於核准自建工具）|
 | `veles module {list,add,remove}` | 外掛管理 |
-| `veles browse {modules,skills}` | 搜尋精選的模組 / 技能登錄 |
+| `veles registry {add,search,install,upgrade,verify,...}` | 擴充功能登錄庫：搜尋、安裝、發佈 |
 | `veles route {show,set,reset,refresh}` | 模型路由 |
 | `veles schema {validate,edit}` | 驗證 / 編輯 AGENTS.md |
 | `veles self-doc` | 產生專案自我文件 |

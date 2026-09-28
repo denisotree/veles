@@ -184,13 +184,13 @@ loader उन्हें import करता है, इसलिए एक न
 | `add <source> [--name N] [-y]` | git URL या local path से एक module install करें |
 | `remove <name> [-y]` | एक installed module हटाएँ |
 
-### `veles browse {modules,skills} [query]`
-curated registries ब्राउज़ करें।
+### `veles registry search [query] [--kind K]`
+connected registries में search करें (module, skill, layout pack, MCP recipe)।
 
 | Flag | Default | उद्देश्य |
 |---|---|---|
 | `query` (positional) | `""` | Substring filter |
-| `--source <url>` | canonical | registry source override करें |
+| `--kind <module\|skill\|layout\|mcp>` | — | kind के अनुसार filter करें |
 | `--json` | off | JSON निकालें |
 
 ---

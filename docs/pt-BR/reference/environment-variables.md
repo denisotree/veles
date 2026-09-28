@@ -70,13 +70,6 @@ repetida sem ele, então normalmente não é preciso mexer nessa chave.
 | `VELES_FETCH_ALLOW_PRIVATE` | desligado | Permite que tools acessem endereços RFC-1918 / privados |
 | `VELES_WEB_SEARCH_BACKEND` | auto | Backend de busca na web para `research` e `web_search` |
 
-## Registries
-
-| Variável | Finalidade |
-|---|---|
-| `VELES_SKILLS_REGISTRY_URL` | Fonte para `veles browse skills` |
-| `VELES_MODULES_REGISTRY_URL` | Fonte para `veles browse modules` |
-
 ## Internas / testes
 
 | Variável | Finalidade |

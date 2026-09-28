@@ -184,13 +184,14 @@ tool do agent viết cần một bước xem lại trước khi có thể gọi 
 | `add <source> [--name N] [-y]` | Cài đặt một module từ URL git hoặc đường dẫn cục bộ |
 | `remove <name> [-y]` | Xóa một module đã cài đặt |
 
-### `veles browse {modules,skills} [query]`
-Duyệt các registry đã được tuyển chọn.
+### `veles registry search [query] [--kind K]`
+Tìm kiếm trong các registry đã kết nối (module, skill, layout pack, công
+thức MCP).
 
 | Cờ | Mặc định | Mục đích |
 |---|---|---|
 | `query` (vị trí) | `""` | Bộ lọc chuỗi con |
-| `--source <url>` | chính tắc | Ghi đè nguồn registry |
+| `--kind <module\|skill\|layout\|mcp>` | — | Lọc theo kind |
 | `--json` | tắt | Xuất JSON |
 
 ---

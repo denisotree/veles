@@ -192,13 +192,13 @@ di diventare richiamabile.
 | `add <source> [--name N] [-y]` | Installa un modulo da un URL git o da un percorso locale |
 | `remove <name> [-y]` | Elimina un modulo installato |
 
-### `veles browse {modules,skills} [query]`
-Sfoglia i registri curati.
+### `veles registry search [query] [--kind K]`
+Cerca nei registri connessi (moduli, skill, pacchetti di layout, ricette MCP).
 
 | Flag | Default | Scopo |
 |---|---|---|
 | `query` (posizionale) | `""` | Filtro per sottostringa |
-| `--source <url>` | canonico | Sovrascrive la sorgente del registro |
+| `--kind <module\|skill\|layout\|mcp>` | — | Filtra per kind |
 | `--json` | off | Emette JSON |
 
 ---

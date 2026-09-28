@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Extension registries: `veles registry {add,remove,list,update,search,install,upgrade,uninstall,verify}`
+  install reviewed modules, skills, layout packs and MCP recipes from git repositories —
+  the built-in `public` one or your own (`private`, company, consulting).
+- `veles registry {init,scaffold,validate,vendor}` create and maintain a registry; the
+  generated GitHub/GitLab CI runs the same `validate` checks and posts a reviewer report.
+- The agent can `registry_search` and propose `registry_install` (you confirm every install).
+- `veles module approve <name>`.
+
+### Changed
+
+- A module loads only while its files match what you approved (registry install,
+  `veles module add` or `veles module approve`); `veles doctor` flags changed extensions.
+  **Upgrading from 1.0:** modules already in `.veles/modules/` are skipped until you
+  review them and run `veles module approve <name>` once per module.
+
+### Removed
+
+- `veles browse` and `VELES_{MODULES,SKILLS}_REGISTRY_URL` — use `veles registry search`.
+
 ## [1.0.0] — 2026-09-25
 
 The first stable release. Veles is a personal, local-first agent: one

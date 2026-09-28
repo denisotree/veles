@@ -333,7 +333,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | Quản lý kỹ năng |
 | `veles tool {list,show,promote,approve}` | Quản lý công cụ (`approve` phê duyệt các công cụ tự tạo) |
 | `veles module {list,add,remove}` | Quản lý plugin |
-| `veles browse {modules,skills}` | Tìm kiếm registry module / kỹ năng đã tuyển chọn |
+| `veles registry {add,search,install,upgrade,verify,...}` | Registry tiện ích mở rộng: tìm kiếm, cài đặt, xuất bản |
 | `veles route {show,set,reset,refresh}` | Định tuyến mô hình |
 | `veles schema {validate,edit}` | Kiểm tra / chỉnh sửa AGENTS.md |
 | `veles self-doc` | Tạo tài liệu tự mô tả cho dự án |

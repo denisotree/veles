@@ -64,9 +64,8 @@ veles module remove <name>
 
 ## Khám phá thêm
 
-Duyệt qua các registry được tuyển chọn:
+Tìm kiếm trong các registry đã kết nối:
 
 ```bash
-veles browse skills [query]
-veles browse modules [query]
+veles registry search [query] [--kind module|skill|layout|mcp]
 ```

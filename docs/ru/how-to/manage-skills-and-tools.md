@@ -66,9 +66,10 @@ veles module remove <name>
 
 ## Поиск новых
 
-Просматривайте курируемые реестры:
+Ищите в подключённых реестрах расширений и ставьте проверенные навыки,
+инструменты и модули — см. [Установка расширений из реестров](extension-registries.md):
 
 ```bash
-veles browse skills [query]
-veles browse modules [query]
+veles registry search [query] [--kind module|skill|layout|mcp]
+veles registry install <name>
 ```

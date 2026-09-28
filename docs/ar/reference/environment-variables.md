@@ -68,13 +68,6 @@
 | `VELES_FETCH_ALLOW_PRIVATE` | معطّل | السماح للأدوات بجلب عناوين RFC-1918 / الخاصة |
 | `VELES_WEB_SEARCH_BACKEND` | تلقائي | خلفية بحث الويب لـ `research` و`web_search` |
 
-## السجلّات
-
-| المتغيّر | الغرض |
-|---|---|
-| `VELES_SKILLS_REGISTRY_URL` | مصدر `veles browse skills` |
-| `VELES_MODULES_REGISTRY_URL` | مصدر `veles browse modules` |
-
 ## داخلية / للاختبار
 
 | المتغيّر | الغرض |

@@ -333,7 +333,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | স্কিল ব্যবস্থাপনা |
 | `veles tool {list,show,promote,approve}` | টুল ব্যবস্থাপনা (`approve` স্ব-রচিত টুলগুলোকে নিয়ন্ত্রণ করে) |
 | `veles module {list,add,remove}` | প্লাগইন ব্যবস্থাপনা |
-| `veles browse {modules,skills}` | কিউরেটেড মডিউল / স্কিল রেজিস্ট্রিতে অনুসন্ধান করুন |
+| `veles registry {add,search,install,upgrade,verify,...}` | এক্সটেনশন রেজিস্ট্রি: search, install, publish |
 | `veles route {show,set,reset,refresh}` | মডেল রাউটিং |
 | `veles schema {validate,edit}` | AGENTS.md যাচাই / সম্পাদনা করুন |
 | `veles self-doc` | প্রকল্পের স্ব-ডকুমেন্টেশন তৈরি করুন |

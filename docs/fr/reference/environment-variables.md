@@ -71,13 +71,6 @@ rarement nécessaire.
 | `VELES_FETCH_ALLOW_PRIVATE` | désactivé | Autorise les outils à atteindre des adresses RFC-1918 / privées |
 | `VELES_WEB_SEARCH_BACKEND` | auto | Backend de recherche web pour `research` et `web_search` |
 
-## Registres
-
-| Variable | Rôle |
-|---|---|
-| `VELES_SKILLS_REGISTRY_URL` | Source pour `veles browse skills` |
-| `VELES_MODULES_REGISTRY_URL` | Source pour `veles browse modules` |
-
 ## Interne / tests
 
 | Variable | Rôle |

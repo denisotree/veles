@@ -63,9 +63,8 @@ veles module remove <name>
 
 ## اكتشف المزيد
 
-تصفّح السجلّات المنسَّقة:
+ابحث في السجلّات المتصلة:
 
 ```bash
-veles browse skills [query]
-veles browse modules [query]
+veles registry search [query] [--kind module|skill|layout|mcp]
 ```

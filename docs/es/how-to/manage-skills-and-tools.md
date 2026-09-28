@@ -66,9 +66,8 @@ veles module remove <name>
 
 ## Descubrir más
 
-Explora los registros curados:
+Busca en los registros conectados:
 
 ```bash
-veles browse skills [query]
-veles browse modules [query]
+veles registry search [query] [--kind module|skill|layout|mcp]
 ```

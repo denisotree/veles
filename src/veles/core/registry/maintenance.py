@@ -18,6 +18,7 @@ from veles.core.registry.install import (
     installed_records,
     recipe_sha256,
     remove_installed,
+    resolve_one_record,
 )
 from veles.core.registry.records import InstallRecord
 from veles.core.registry.repo import diff_stat
@@ -54,13 +55,7 @@ def verify(project: Project | None) -> list[Issue]:
 
 
 def upgrade(name: str, *, project: Project | None) -> InstallRecord | None:
-    matches = [r for r in installed_records(project) if r.name == name]
-    if not matches:
-        raise InstallError(f"{name!r} is not installed here")
-    if len(matches) > 1:
-        kinds = ", ".join(sorted(r.kind for r in matches))
-        raise InstallError(f"{name!r} is installed as several kinds ({kinds}); remove by hand")
-    rec = matches[0]
+    rec = resolve_one_record(name, project=project)
     if rec.registry is None:
         raise InstallError(
             f"{name!r} was installed from a raw source; reinstall it from a registry"

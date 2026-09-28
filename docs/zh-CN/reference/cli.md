@@ -163,13 +163,13 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `add <source> [--name N] [-y]` | 从 git URL 或本地路径安装 module |
 | `remove <name> [-y]` | 删除已安装的 module |
 
-### `veles browse {modules,skills} [query]`
-浏览精选的注册表。
+### `veles registry search [query] [--kind K]`
+在已连接的注册表中搜索（模块、技能、layout 包、MCP 配方）。
 
 | 参数 | 默认值 | 用途 |
 |---|---|---|
 | `query`（位置参数） | `""` | 子串过滤 |
-| `--source <url>` | 规范来源 | 覆盖注册表来源 |
+| `--kind <module\|skill\|layout\|mcp>` | — | 按 kind 过滤 |
 | `--json` | 关闭 | 输出 JSON |
 
 ---

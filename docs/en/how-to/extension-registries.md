@@ -1,0 +1,152 @@
+# How to install extensions from registries
+
+> 🌐 **Languages:** **English** · [简体中文](../../zh-CN/how-to/extension-registries.md) · [繁體中文](../../zh-TW/how-to/extension-registries.md) · [日本語](../../ja/how-to/extension-registries.md) · [한국어](../../ko/how-to/extension-registries.md) · [Español](../../es/how-to/extension-registries.md) · [Français](../../fr/how-to/extension-registries.md) · [Italiano](../../it/how-to/extension-registries.md) · [Português (BR)](../../pt-BR/how-to/extension-registries.md) · [Português (PT)](../../pt-PT/how-to/extension-registries.md) · [Русский](../../ru/how-to/extension-registries.md) · [العربية](../../ar/how-to/extension-registries.md) · [हिन्दी](../../hi/how-to/extension-registries.md) · [বাংলা](../../bn/how-to/extension-registries.md) · [Tiếng Việt](../../vi/how-to/extension-registries.md)
+
+A registry is a plain git repository that holds reviewed extensions — modules,
+skills, layout packs, and MCP server recipes. `veles registry` connects to one,
+finds an extension, and installs it after you confirm.
+
+## Connect a registry
+
+The built-in `public` registry (`https://github.com/denisotree/veles-registry`)
+is already connected. Add a private or company one:
+
+```bash
+veles registry add https://github.com/acme/veles-registry.git   # → named "private"
+veles registry add git@github.com:acme/veles-registry.git --name acme --ref main
+veles registry list                                              # url, ref, cache commit, fetch date
+veles registry remove public                                     # disconnect one you don't want
+```
+
+An unnamed `add` becomes `private`; adding a second unnamed registry is an
+error asking you to pass `--name`. Clones live outside the sandbox, in
+`~/.veles/registries/<name>/` — Veles calls the system `git` and never stores
+credentials itself. Private access works through your own SSH keys or git
+credential helper (`gh auth setup-git` is the usual one-time setup for
+GitHub). If a fetch fails or there is no network, Veles falls back to the
+existing clone with a warning about its age; if there is no clone yet, it
+fails with a clear error instead of guessing.
+
+## Find and install
+
+```bash
+veles registry search                       # everything in every connected registry
+veles registry search slack --kind module    # substring filter + kind (module|skill|layout|mcp)
+veles registry install slack                 # bare name — unambiguous if only one registry has it
+veles registry install private:vendor/slack  # registry:group/name — the ref search prints
+```
+
+`search` prints `registry:group/name  version  kind  — description`, flagging
+anything yanked. A bare `name` resolves as long as it's unambiguous; if more
+than one registry (or, within one registry, more than one group) has an
+extension by that name, `install` refuses and lists every matching
+`registry:group/name` ref to disambiguate with.
+
+Before installing, Veles checks `requires_veles` against your Veles version
+and refuses a yanked extension unless you pass `--force`. It then shows a
+summary — kind, version, registry/group, what it provides and requires, and
+its license — and asks you to confirm through `confirm_critical`; installing
+code always goes through this gate, and `--yes` does not bypass it. Where an
+extension declares `requires` (pip packages), Veles prints the `uv tool
+install` command to run — it never installs Python dependencies for you.
+Each kind lands in its usual place: modules in
+`<project>/.veles/modules/<name>/`, skills in `<project>/.veles/skills/<name>/`
+(`--user` installs to `~/.veles/skills/<name>/` instead), layout packs in
+`~/.veles/layouts/<name>/`, and an `mcp` recipe as a
+`[mcp.servers.<name>]` block in the project's `config.toml`.
+
+The agent has the read-only half of this on its own: it can call
+`registry_search` to see what's available and propose `registry_install`, but
+the same confirmation gate applies — nothing installs without you approving
+it, and autopilot does not skip it.
+
+## Keep installs honest
+
+Every install is recorded with its registry, version, git commit and a
+content hash of its files (`tree_sha256`). A module only *loads* while its
+files still match that hash — edit one on purpose and it stops loading until
+you review the change and run `veles module approve <name>`. A module placed
+by hand (`veles module add` from a raw URL, or dropped into
+`.veles/modules/`) works the same way: it needs an explicit
+`veles module approve <name>` before Veles will import it at all.
+
+```bash
+veles registry verify     # drift, yanked extensions, and available upgrades
+veles registry upgrade    # upgrade every installed extension
+veles registry upgrade slack   # or just one — shows the file diff before confirming
+veles doctor              # includes an "extensions" check: drift or yanks fail it
+```
+
+Skills aren't gated this way — they're text, not executable code — but
+`verify` still reports if one has drifted from what you installed.
+
+## Publish an extension
+
+```bash
+veles registry scaffold module slack --group community --root ./veles-registry
+# … write the module, add tests under its payload's tests/ …
+veles registry validate . --base main   # only what changed since the base ref
+```
+
+`scaffold` drops a skeleton (`extension.toml` + the kind's payload, e.g.
+`module.toml` + Python for a module) under `extensions/<group>/<name>/` in the
+registry you point `--root` at. `validate` is the **one** implementation of a
+registry's CI checks — the same code you run locally, a reviewer runs
+locally, and CI runs — so there's no separate "CI-only" rule set to guess at.
+By default it's static: it checks the schema, slugs, semver, uniqueness of
+`name`, that a `git`-sourced extension pins a full commit SHA and its tree
+hash matches, that the payload matches its `kind` (a module's manifest and
+entry point parse, a skill's `SKILL.md` frontmatter is valid, a layout's
+`layout.toml` loads, an `mcp` recipe matches the `[mcp.servers]` schema), that
+`version` grew if the payload or source changed, and that `public = true`
+registries only accept permissive licenses. `--run-code` additionally imports
+the module and runs its `tests/` — that flag is meant for CI only, since it
+executes the code under review; a local `validate` run by a reviewer stays
+static. `--report FILE` writes a non-blocking Markdown report for the
+reviewer: a static scan for `subprocess`/`os.system`, `eval`/`exec`, network
+access, writes outside the project, `os.environ` reads, dynamic imports, and
+the extension's declared `requires`.
+
+From there: fork the registry, open a PR (for a `git`-sourced extension, only
+`extension.toml` changes), and let the registry's CI post the validate report
+and gate the merge. There is no separate "approved" flag — review means the
+PR merged to the registry's main branch, so trust is scoped to the registry,
+not to an individual extension.
+
+## Run a company registry
+
+```bash
+veles registry init veles-registry --name acme --ci github   # or --ci gitlab / --ci none
+cd veles-registry && git init && git add -A && git commit -m "init registry"
+# push it, then enable branch protection on the host (Veles doesn't touch the host's API)
+```
+
+`init` generates the same template `public` was built from: `registry.toml`,
+a working example module and example skill under `extensions/internal/`, a CI
+workflow for the chosen host that runs `validate` with the Veles version
+pinned at generation time, a `CODEOWNERS` stub (`@<org>/security`), and a PR
+template with a reviewer checklist (purpose, permissions and side effects,
+where data goes, pip dependencies, tests). Pass `--public` only for a
+registry meant to accept permissive-license extensions from outside
+contributors — company registries usually leave it off.
+
+Bring in a reviewed external extension without exposing employees to an
+upstream you don't control:
+
+```bash
+veles registry vendor public:community/slack --into ../veles-registry --group vendor
+```
+
+`vendor` copies the extension's payload into your registry as a `path`
+source, tagging it with `upstream = "public:community/slack@<sha>"` so your
+own `verify` can tell you later when the upstream has moved on. The
+alternative — a `git`-sourced record pinned to the upstream commit — works
+too, but `vendor` is what security review usually wants: the code lives in,
+and is reviewed inside, the company's own repository.
+
+**Private consulting modules.** A closed registry (e.g.
+`denisotree/veles-registry-pro`, `license = "Proprietary"`) works exactly
+like any other private registry — a client either gets read access and runs
+`veles registry add <url> --name pro`, or, preferably for their security
+team, you `vendor` the module into *their* registry so the code is reviewed
+and hosted on their side.
