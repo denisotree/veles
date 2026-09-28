@@ -1,0 +1,46 @@
+"""Module load gate: a module runs only if its files still hash to what the user approved.
+
+Approval = an install record (registry install, `veles module add`, or
+`veles module approve`). The agent can write into `.veles/modules/`, but it cannot
+write `~/.veles/extensions.json`, so it cannot make its own edits load.
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from pathlib import Path
+
+from veles.core.registry.hashing import tree_sha256
+from veles.core.registry.records import InstallRecord, put_record, record_for_path
+
+
+def now_iso() -> str:
+    return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def module_approved(module_dir: Path) -> bool:
+    rec = record_for_path(str(module_dir.resolve()))
+    if rec is None:
+        return False
+    try:
+        return tree_sha256(module_dir) == rec.tree_sha256
+    except (OSError, ValueError):
+        return False
+
+
+def approve_module(module_dir: Path, *, name: str, project_root: Path) -> InstallRecord:
+    existing = record_for_path(str(module_dir.resolve()))
+    rec = InstallRecord(
+        name=name,
+        kind="module",
+        path=str(module_dir.resolve()),
+        tree_sha256=tree_sha256(module_dir),
+        project=str(project_root.resolve()),
+        registry=existing.registry if existing else None,
+        group=existing.group if existing else "",
+        version=existing.version if existing else "",
+        commit=existing.commit if existing else "",
+        installed_at=now_iso(),
+    )
+    put_record(rec)
+    return rec

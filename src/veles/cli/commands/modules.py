@@ -26,6 +26,8 @@ def cmd_module(args: argparse.Namespace, project: Project) -> int:
         return _add(args, project)
     if args.module_command == "remove":
         return _remove(args, project)
+    if args.module_command == "approve":
+        return _approve(args, project)
     return 2
 
 
@@ -70,6 +72,9 @@ def _add(args: argparse.Namespace, project: Project) -> int:
     except ModuleInstallError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    from veles.core.registry.gate import approve_module
+
+    approve_module(handle.dir, name=handle.name, project_root=project.root)
     print(f"<installed module {handle.name!r} at {handle.dir}>", file=sys.stderr)
     return 0
 
@@ -86,5 +91,24 @@ def _remove(args: argparse.Namespace, project: Project) -> int:
     except ModuleNotFoundError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    from veles.core.registry.records import drop_record
+
+    drop_record(str(target.resolve()))
     print(f"<removed module {args.name!r}>", file=sys.stderr)
+    return 0
+
+
+def _approve(args: argparse.Namespace, project: Project) -> int:
+    from veles.core.registry.gate import approve_module
+
+    handle = next((h for h in discover_modules(project) if h.name == args.name), None)
+    if handle is None:
+        print(f"error: module {args.name!r} not found in {project.modules_dir}", file=sys.stderr)
+        return 1
+    summary = f"Module: {handle.dir}\nIts code will run on every agent turn. Review it first."
+    if not confirm_critical(f"approve module {args.name}", summary):
+        print("<aborted>", file=sys.stderr)
+        return 1
+    approve_module(handle.dir, name=handle.name, project_root=project.root)
+    print(f"<approved module {args.name!r}>", file=sys.stderr)
     return 0

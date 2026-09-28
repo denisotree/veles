@@ -35,3 +35,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     module_remove.add_argument(
         "--yes", "-y", action="store_true", help="Skip the confirmation prompt."
     )
+
+    module_approve = module_sub.add_parser(
+        "approve", help="Approve an installed module's current code so it loads."
+    )
+    module_approve.add_argument("name", help="Module name.")
