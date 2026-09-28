@@ -30,7 +30,7 @@ _COMMANDS: dict[str | None, tuple[str, str, _ProjectNeed]] = {
     "daemon": ("veles.cli.commands.daemon", "cmd_daemon", "none"),
     "channel": ("veles.cli.commands.channel", "cmd_channel", "none"),
     "autopilot": ("veles.cli.commands.autopilot", "cmd_autopilot", "none"),
-    "browse": ("veles.cli.commands.browse", "cmd_browse", "none"),
+    "registry": ("veles.cli.commands.registry", "cmd_registry", "optional"),
     "secret": ("veles.cli.commands.secrets", "cmd_secret", "none"),
     "models": ("veles.cli.commands.models", "cmd_models", "none"),
     "self-doc": ("veles.cli.commands.self_doc", "cmd_self_doc", "none"),
