@@ -35,8 +35,10 @@ def registry_search(query: str = "", kind: str = "") -> str:
 
 @tool(risk_class=RiskClass.PROCESS_EXECUTION, side_effects=["filesystem"])
 def registry_install(name: str) -> str:
-    """Install an extension from a connected registry by `name` or `registry:name`.
-    The user must confirm; explain why the extension is needed before calling."""
+    """Install an extension from a connected registry. `name` accepts a bare
+    name, `registry:name`, `group/name`, or the full `registry:group/name` ref
+    `registry_search` prints. The user must confirm; explain why the extension
+    is needed before calling."""
     from veles.core.context import current_project
     from veles.core.registry.catalog import ResolveError, resolve
     from veles.core.registry.install import InstallError, install, pip_hint
