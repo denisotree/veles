@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from veles.core.registry.hashing import tree_sha256
+from veles.core.registry.hashing import strip_bytecode, tree_sha256
 from veles.core.registry.records import InstallRecord, put_record, record_for_path
 
 
@@ -26,6 +26,15 @@ def module_approved(module_dir: Path) -> bool:
         return tree_sha256(module_dir) == rec.tree_sha256
     except (OSError, ValueError):
         return False
+
+
+def admit_module(module_dir: Path) -> bool:
+    """`module_approved`, then drop the module's bytecode so the import that follows
+    compiles the reviewed source instead of running a planted `.pyc`."""
+    if not module_approved(module_dir):
+        return False
+    strip_bytecode(module_dir)
+    return True
 
 
 def approve_module(module_dir: Path, *, name: str, project_root: Path) -> InstallRecord:

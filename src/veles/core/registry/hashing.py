@@ -10,11 +10,30 @@ payload would otherwise be copied or hashed as if it were extension code.
 from __future__ import annotations
 
 import hashlib
+import shutil
 from pathlib import Path
 
 _SKIP_DIRS = frozenset({".git", "__pycache__"})
 _SKIP_NAMES = frozenset({".DS_Store"})
 _ROOT_SKIP = frozenset({"extension.toml"})
+BYTECODE_PATTERNS = ("__pycache__", "*.pyc")
+
+
+def bytecode_paths(root: Path) -> list[Path]:
+    """Every `__pycache__/` dir and stray `*.pyc` under `root` — the files the hash
+    ignores, so the ones that must never be trusted as reviewed code."""
+    return sorted(p for p in root.rglob("*") if p.name == "__pycache__" or p.suffix == ".pyc")
+
+
+def strip_bytecode(root: Path) -> None:
+    """Delete all bytecode under `root`. Bytecode sits outside `tree_sha256`, so a
+    planted `.pyc` would run instead of the reviewed `.py`; after this, only the
+    bytecode Python itself compiles from the hashed source can run."""
+    for path in bytecode_paths(root):
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            path.unlink(missing_ok=True)
 
 
 def tree_sha256(root: Path) -> str:

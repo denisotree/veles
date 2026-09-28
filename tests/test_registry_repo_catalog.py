@@ -136,6 +136,24 @@ def test_no_sync_when_asked(private_registry: Path) -> None:
     assert warnings and "veles registry update" in warnings[0]
 
 
+def test_fetch_git_source_drops_bytecode(tmp_path: Path) -> None:
+    upstream = tmp_path / "upstream"
+    (upstream / "pkg" / "__pycache__").mkdir(parents=True)
+    (upstream / "pkg" / "mod.py").write_text("x = 1\n", encoding="utf-8")
+    (upstream / "pkg" / "__pycache__" / "mod.cpython-313.pyc").write_bytes(b"\0")
+    (upstream / "pkg" / "helper.pyc").write_bytes(b"\0")
+    git(upstream, "init", "-q", "-b", "main")
+    git(upstream, "add", "-f", "-A")
+    head = commit_all(upstream, "with bytecode")
+    assert "pkg/helper.pyc" in git(upstream, "ls-files")
+    dest = tmp_path / "install-target"
+    src = Source(type="git", url=str(upstream), commit=head, subdir="pkg", sha256="0" * 64)
+    fetch_git_source(src, dest)
+    assert (dest / "mod.py").is_file()
+    assert not (dest / "__pycache__").exists()
+    assert not (dest / "helper.pyc").exists()
+
+
 def test_fetch_git_source_rejects_escaping_subdir(private_registry: Path, tmp_path: Path) -> None:
     head = git(private_registry, "rev-parse", "HEAD")
     dest = tmp_path / "install-target"

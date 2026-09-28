@@ -27,11 +27,11 @@ from veles.core.slug import normalize_slug as _normalize_slug
 
 
 def _load_project_modules(project: Project) -> ModuleRegistry:
-    from veles.core.registry.gate import module_approved
+    from veles.core.registry.gate import admit_module
 
     registry = ModuleRegistry()
     for handle in discover_modules(project):
-        if not module_approved(handle.dir):
+        if not admit_module(handle.dir):
             print(
                 f"warning: skipping module {handle.name!r}: not approved or changed since "
                 f"approval — review it, then `veles module approve {handle.name}`",
