@@ -70,3 +70,33 @@ def test_tree_sha256_rejects_symlink(tmp_path: Path) -> None:
     (root / "leak").symlink_to(tmp_path)
     with pytest.raises(ValueError, match="symlink"):
         tree_sha256(root)
+
+
+def test_tree_sha256_rejects_symlink_named_like_a_skip_dir(tmp_path: Path) -> None:
+    root = tmp_path / "t"
+    _tree(root)
+    (root / "pkg" / "__pycache__").symlink_to(tmp_path)
+    with pytest.raises(ValueError, match="symlink"):
+        tree_sha256(root)
+
+
+def test_tree_sha256_ignores_real_git_dir(tmp_path: Path) -> None:
+    root = tmp_path / "t"
+    _tree(root)
+    before = tree_sha256(root)
+    (root / ".git").mkdir()
+    (root / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    assert tree_sha256(root) == before
+
+
+def test_tree_sha256_hashes_nested_extension_toml(tmp_path: Path) -> None:
+    root = tmp_path / "t"
+    _tree(root)
+    before = tree_sha256(root)
+    (root / "pkg" / "extension.toml").write_text("[nested]\n", encoding="utf-8")
+    assert tree_sha256(root) != before
+
+
+def test_tree_sha256_rejects_missing_root(tmp_path: Path) -> None:
+    with pytest.raises(ValueError):
+        tree_sha256(tmp_path / "does-not-exist")
