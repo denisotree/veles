@@ -10,7 +10,8 @@ Extensions (modules, skills, layout packs, MCP recipes) come from git registries
 
 `veles registry search <query>` finds extensions; `veles registry install <name>`
 (or `private:<name>`) installs one after you confirm. `veles registry verify`
-reports changed, yanked or outdated installs; `veles registry upgrade` moves to a
+reports changed, yanked, removed or outdated installs (and vendored copies whose
+upstream moved ahead); `veles registry upgrade` moves to a
 newer version and shows the diff.
 
 A module only loads while its files match what you approved. After editing one on

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.registry_helpers import commit_all, make_git_registry, write_extension
+from tests.registry_helpers import commit_all, git, make_git_registry, write_extension
 from veles.cli import main
 from veles.core.critical_ops import reset_critical_confirmer, set_critical_confirmer
 from veles.core.project import init_project
@@ -34,6 +34,27 @@ def test_full_cycle(tmp_path: Path, capsys, monkeypatch) -> None:
     assert (project.skills_dir / "alpha" / "SKILL.md").is_file()
     assert main(["registry", "verify"]) == 0
     assert main(["registry", "uninstall", "alpha"]) == 0
+
+
+def test_empty_registry_does_not_break_the_cli(tmp_path: Path, capsys, monkeypatch) -> None:
+    remote = tmp_path / "remote"
+    make_git_registry(remote, skills=("alpha",))
+    empty = tmp_path / "empty.git"
+    empty.mkdir()
+    git(empty, "init", "-q", "--bare")
+    project = init_project(tmp_path / "p", name="p")
+    monkeypatch.chdir(project.root)
+    main(["registry", "remove", "public"])
+    assert main(["registry", "add", str(remote)]) == 0
+    assert main(["registry", "add", str(empty), "--name", "empty"]) == 0
+    capsys.readouterr()
+    assert main(["registry", "list"]) == 0
+    assert "unreadable" in capsys.readouterr().out
+    assert main(["registry", "search", "alp"]) == 0
+    out = capsys.readouterr()
+    assert "private:official/alpha" in out.out and "empty:" in out.err
+    assert main(["registry", "install", "alpha"]) == 0
+    assert main(["registry", "verify"]) == 0
 
 
 def test_install_by_full_ref(tmp_path: Path, capsys, monkeypatch) -> None:

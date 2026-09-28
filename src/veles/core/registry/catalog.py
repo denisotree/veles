@@ -5,7 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from veles.core.registry.config import RegistryConfigError, cache_dir, get_source, list_sources
+from veles.core.registry.config import (
+    RegistryConfigError,
+    RegistrySource,
+    cache_dir,
+    get_source,
+    list_sources,
+)
 from veles.core.registry.model import Extension, scan_registry
 from veles.core.registry.repo import RegistryRepoError, ensure_cache, head_commit
 
@@ -43,22 +49,31 @@ def available(
     found: list[Found] = []
     warnings: list[str] = []
     for source in sources:
-        if sync_missing:
-            try:
-                root = ensure_cache(source)
-            except RegistryRepoError as exc:
-                warnings.append(f"{source.name}: {exc}")
-                continue
-        else:
-            root = cache_dir(source.name)
-            if not (root / ".git").is_dir():
-                warnings.append(f"{source.name}: not fetched yet — run `veles registry update`")
-                continue
-        commit = head_commit(root)
-        entries, errors = scan_registry(root)
+        try:
+            entries, errors = scan_source(source, sync_missing=sync_missing)
+        except (RegistryRepoError, OSError) as exc:
+            warnings.append(f"{source.name}: {exc}")
+            continue
         warnings.extend(f"{source.name}: {path}: {msg}" for path, msg in errors)
-        found.extend(Found(source.name, ext, commit, root) for ext in entries)
+        found.extend(entries)
     return found, warnings
+
+
+def scan_source(
+    source: RegistrySource, *, sync_missing: bool = True
+) -> tuple[list[Found], list[tuple[Path, str]]]:
+    """One registry's extensions plus its unparsable manifests. Raises
+    `RegistryRepoError` when the clone is missing or unreadable (e.g. an empty
+    repository has no HEAD) — one such registry must never break the others."""
+    if sync_missing:
+        root = ensure_cache(source)
+    else:
+        root = cache_dir(source.name)
+        if not (root / ".git").is_dir():
+            raise RegistryRepoError("not fetched yet — run `veles registry update`")
+    commit = head_commit(root)
+    entries, errors = scan_registry(root)
+    return [Found(source.name, ext, commit, root) for ext in entries], errors
 
 
 def search(

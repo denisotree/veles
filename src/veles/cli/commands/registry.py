@@ -82,7 +82,10 @@ def _list(args: argparse.Namespace, project: Project | None) -> int:
         cache = cache_dir(s.name)
         if (cache / ".git").is_dir():
             age = time.strftime("%Y-%m-%d %H:%M", time.localtime(fetched_at(cache)))
-            state = f"{head_commit(cache)[:10]} fetched {age}"
+            try:
+                state = f"{head_commit(cache)[:10]} fetched {age}"
+            except RegistryRepoError as exc:
+                state = f"unreadable: {exc.args[0].splitlines()[0]}"
         else:
             state = "not fetched"
         print(f"{s.name:<12} {s.url}  ref={s.ref or 'HEAD'}  [{state}]")
@@ -161,7 +164,7 @@ def _verify(args: argparse.Namespace, project: Project | None) -> int:
         print("all installed extensions match their records")
         return 0
     for i in issues:
-        print(f"{i.problem:<10} {i.record.name}  {i.detail}")
+        print(f"{i.problem:<14} {i.record.name}  {i.detail}")
     return 1 if any(i.problem in ("missing", "modified") for i in issues) else 0
 
 

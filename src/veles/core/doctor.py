@@ -712,7 +712,8 @@ def _check_extensions(project: Project | None) -> CheckResult:
             message=f"could not verify extensions: {exc}",
         )
     broken = [i for i in issues if i.problem in ("missing", "modified")]
-    yanked = [i for i in issues if i.problem == "yanked"]
+    revoked = [i for i in issues if i.problem in ("yanked", "removed")]
+    ahead = [i for i in issues if i.problem == "upstream-ahead"]
     if broken:
         names = ", ".join(f"{i.record.name} ({i.problem})" for i in broken)
         return CheckResult(
@@ -722,13 +723,21 @@ def _check_extensions(project: Project | None) -> CheckResult:
             fix_hint="review the changes; reinstall with `veles registry install`, or "
             "`veles module approve <name>` for a module you changed on purpose",
         )
-    if yanked:
-        names = ", ".join(i.record.name for i in yanked)
+    if revoked:
+        names = ", ".join(f"{i.record.name} ({i.problem})" for i in revoked)
         return CheckResult(
             name="extensions",
             status="warn",
-            message=f"yanked by their registry: {names}",
+            message=f"revoked by their registry: {names}",
             fix_hint="`veles registry verify` shows why; uninstall or upgrade them",
+        )
+    if ahead:
+        names = ", ".join(i.record.name for i in ahead)
+        return CheckResult(
+            name="extensions",
+            status="info",
+            message=f"installed extensions verified; upstream moved ahead of vendored: {names}",
+            fix_hint="`veles registry verify` shows the versions; re-vendor when reviewed",
         )
     return CheckResult(name="extensions", status="ok", message="installed extensions verified")
 

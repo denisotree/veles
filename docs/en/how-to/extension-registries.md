@@ -85,8 +85,12 @@ A bare `upgrade` walks every registry-installed extension and upgrades each
 in turn; a failure on one is reported and does not stop the rest, but the
 command exits 1 if any of them failed. `doctor`'s `extensions` check treats a
 missing or modified installed extension as an **error** — that fails
-`doctor`'s exit code — while a yanked one is only a **warning**: `doctor`
-still exits 0 for it unless you pass `--strict`.
+`doctor`'s exit code — while a revoked one (marked `yanked`, or whose
+directory was deleted from its registry — reported as `removed` once you've
+run `veles registry update`) is only a **warning**: `doctor` still exits 0
+for it unless you pass `--strict`. A vendored extension whose upstream has
+published a newer version is reported as `upstream-ahead` — information,
+not a problem.
 
 Skills aren't gated this way — they're text, not executable code — but
 `verify` still reports if one has drifted from what you installed.
@@ -149,8 +153,9 @@ veles registry vendor public:community/slack --into ../veles-registry --group ve
 ```
 
 `vendor` copies the extension's payload into your registry as a `path`
-source, tagging it with `upstream = "public:community/slack@<sha>"` so your
-own `verify` can tell you later when the upstream has moved on. The
+source, tagging it with `upstream = "public:slack@<sha>"` so your own
+`verify` can tell you later when the upstream has moved on (it compares
+versions whenever the upstream registry is connected and fetched). The
 alternative — a `git`-sourced record pinned to the upstream commit — works
 too, but `vendor` is what security review usually wants: the code lives in,
 and is reviewed inside, the company's own repository.

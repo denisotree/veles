@@ -57,6 +57,19 @@ def test_doctor_flags_modified(tmp_path: Path) -> None:
     assert _check_extensions(project).status == "error"
 
 
+def test_doctor_statuses_for_removed_and_upstream_ahead(tmp_path: Path, monkeypatch) -> None:
+    import veles.core.registry.maintenance as maintenance
+    from veles.core.registry.maintenance import Issue
+    from veles.core.registry.records import InstallRecord
+
+    project = _setup(tmp_path)
+    rec = InstallRecord("alpha", "skill", "/x", "1" * 64, registry="private")
+    for problem, status in (("removed", "warn"), ("upstream-ahead", "info")):
+        monkeypatch.setattr(maintenance, "verify", lambda p, pr=problem: [Issue(rec, pr, "d")])
+        result = _check_extensions(project)
+        assert result.status == status and "alpha" in result.message
+
+
 def test_doctor_extensions_check_warns_instead_of_crashing(tmp_path: Path, monkeypatch) -> None:
     project = _setup(tmp_path)
     import veles.core.registry.maintenance as maintenance
