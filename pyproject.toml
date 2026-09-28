@@ -159,6 +159,7 @@ files = [
     "src/veles/core/model_metadata.py",
     "src/veles/core/session_state.py",
     "src/veles/core/memory/schema.py",
+    "src/veles/core/registry",
     "src/veles/runtime/prompt.py",
     "src/veles/daemon/runner.py",
     "src/veles/daemon/http_util.py",
