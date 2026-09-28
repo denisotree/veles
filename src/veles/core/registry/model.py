@@ -118,7 +118,7 @@ def load_registry_meta(root: Path) -> RegistryMeta:
     path = root / REGISTRY_FILE
     try:
         data = tomllib.loads(path.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError) as exc:
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise ExtensionError(f"cannot read {path}: {exc}") from exc
     reg = data.get("registry")
     if not isinstance(reg, dict):
@@ -149,7 +149,7 @@ def scan_registry(root: Path) -> tuple[list[Extension], list[tuple[Path, str]]]:
             try:
                 text = manifest.read_text(encoding="utf-8")
                 entries.append(parse_extension(text, group=group_dir.name, dir=ext_dir))
-            except (OSError, ExtensionError) as exc:
+            except (OSError, UnicodeDecodeError, ExtensionError) as exc:
                 errors.append((manifest, str(exc)))
     return entries, errors
 

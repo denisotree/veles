@@ -91,8 +91,13 @@ def fetch_git_source(src: Source, dest: Path) -> None:
 
 
 def changed_paths(repo: Path, base: str) -> list[str]:
-    """Paths that differ between `base` and `HEAD`, relative to `repo`."""
-    return _git("diff", "--name-only", f"{base}...HEAD", cwd=repo).splitlines()
+    """Paths that differ between `base` and `HEAD`, relative to `repo`.
+
+    `-z` NUL-terminates each entry with no quoting; plain `--name-only` would
+    otherwise emit a non-ASCII path octal-escaped and wrapped in quotes, which
+    a caller matching on the raw path (e.g. a group/name prefix) would miss."""
+    out = _git("diff", "--name-only", "-z", f"{base}...HEAD", cwd=repo)
+    return [p for p in out.split("\0") if p]
 
 
 def file_at(repo: Path, rev: str, relpath: str) -> str | None:

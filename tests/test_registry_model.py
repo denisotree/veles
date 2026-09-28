@@ -114,3 +114,20 @@ def test_load_registry_meta(tmp_path: Path) -> None:
     assert (meta.name, meta.schema, meta.public) == ("acme", 1, True)
     with pytest.raises(ExtensionError):
         load_registry_meta(tmp_path)
+
+
+def test_scan_registry_reports_bad_encoding_without_raising(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "reg")
+    ext = write_extension(root, "official", "bad")
+    (ext / "extension.toml").write_bytes(b"\xff\xfe")
+    entries, errors = scan_registry(root)
+    assert entries == []
+    assert errors and errors[0][0] == ext / "extension.toml"
+    assert "extension.toml" in str(errors[0][0])
+
+
+def test_load_registry_meta_reports_bad_encoding_as_extension_error(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "reg")
+    (root / "registry.toml").write_bytes(b"\xff\xfe")
+    with pytest.raises(ExtensionError, match=r"registry\.toml"):
+        load_registry_meta(root)

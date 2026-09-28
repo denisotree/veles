@@ -26,6 +26,7 @@ from veles.core.modules import (
 from veles.core.registry.hashing import tree_sha256
 from veles.core.registry.model import (
     EXTENSION_FILE,
+    REGISTRY_FILE,
     Extension,
     ExtensionError,
     RegistryMeta,
@@ -93,12 +94,23 @@ def validate_registry(
                 f"duplicate name {ext.name!r}: {ext.group}/ and {seen[ext.name].group}/"
             )
         seen.setdefault(ext.name, ext)
-    targets = entries if base is None else _changed(root, base, entries)
+    touched: frozenset[str] = frozenset()
+    if base is None:
+        targets = entries
+    else:
+        selected = _select_targets(root, base, entries, report)
+        if selected is None:
+            return report
+        targets, touched = selected
     for ext in targets:
         report.errors += [
             f"{ext.group}/{ext.name}: {e}" for e in _check(ext, meta, root, report, run_code)
         ]
-        if base is not None:
+        # A version bump is only owed by an extension whose own directory
+        # changed — not by every extension a registry.toml-triggered full
+        # revalidation happens to touch (registry.toml itself carries no
+        # per-extension version to compare against).
+        if base is not None and ext.dir is not None and _rel(ext.dir, root) in touched:
             report.errors += [f"{ext.group}/{ext.name}: {e}" for e in _check_bump(ext, root, base)]
     return report
 
@@ -120,10 +132,14 @@ def _check(
     shutil.rmtree(work, ignore_errors=True)
     try:
         payload = _payload(ext, work)
+        # Unconditional (path sources never created `work` before this): a module's
+        # own pytest run needs a scratch dir under it for --basetemp, and for a git
+        # source `work` already exists (it *is* the payload) so this is a no-op.
+        work.mkdir(parents=True, exist_ok=True)
         digest = tree_sha256(payload)
         if ext.source.type == "git" and digest != ext.source.sha256:
             errors.append(f"sha256 mismatch: declared {ext.source.sha256}, actual {digest}")
-        errors += _check_kind(ext, payload, run_code)
+        errors += _check_kind(ext, payload, run_code, work)
         report.review += [f"{ext.group}/{ext.name}: {f}" for f in scan_python(payload)]
         if ext.requires:
             report.review.append(
@@ -145,7 +161,7 @@ def _payload(ext: Extension, work: Path) -> Path:
     return ext.dir
 
 
-def _check_kind(ext: Extension, payload: Path, run_code: bool) -> list[str]:
+def _check_kind(ext: Extension, payload: Path, run_code: bool, work: Path) -> list[str]:
     if ext.kind == "skill":
         skill = payload / "SKILL.md"
         if not skill.is_file():
@@ -165,10 +181,10 @@ def _check_kind(ext: Extension, payload: Path, run_code: bool) -> list[str]:
 
         assert ext.mcp is not None
         return [] if parse_server(ext.name, ext.mcp) is not None else ["[mcp] recipe is invalid"]
-    return _check_module(ext, payload, run_code)
+    return _check_module(ext, payload, run_code, work)
 
 
-def _check_module(ext: Extension, payload: Path, run_code: bool) -> list[str]:
+def _check_module(ext: Extension, payload: Path, run_code: bool, work: Path) -> list[str]:
     errors: list[str] = []
     bad = [p for p in ext.provides if not p.startswith(_PROVIDES_PREFIXES)]
     if bad:
@@ -204,7 +220,12 @@ def _check_module(ext: Extension, payload: Path, run_code: bool) -> list[str]:
         # collect any conftest.py above the payload (confcutdir defaults past
         # it), so --confcutdir pins that too — proven with a conftest.py at the
         # registry root that raises on import. -p no:cacheprovider keeps it from
-        # writing a .pytest_cache into the payload (controller ruling 2).
+        # writing a .pytest_cache into the payload (controller ruling 2). Without
+        # --basetemp, a `tmp_path`-using test falls through to pytest's own
+        # default (the OS temp dir) once -c /dev/null drops this repo's own
+        # `--basetemp=./tmp/pytest` addopts — pin it under `work` so every temp
+        # path this validation run touches stays inside the repo, per the
+        # project's temp-dir rule.
         try:
             run = subprocess.run(
                 [
@@ -220,6 +241,8 @@ def _check_module(ext: Extension, payload: Path, run_code: bool) -> list[str]:
                     str(payload),
                     "--rootdir",
                     str(payload),
+                    "--basetemp",
+                    str(work / "pytest-tmp"),
                     str(tests),
                 ],
                 cwd=payload,
@@ -237,13 +260,32 @@ def _check_module(ext: Extension, payload: Path, run_code: bool) -> list[str]:
     return errors
 
 
-def _changed(root: Path, base: str, entries: list[Extension]) -> list[Extension]:
-    touched = {
-        "/".join(p.split("/")[:3]) for p in changed_paths(root, base) if p.startswith("extensions/")
-    }
-    return [
-        e for e in entries if e.dir is not None and e.dir.relative_to(root).as_posix() in touched
-    ]
+def _rel(path: Path, root: Path) -> str:
+    return path.relative_to(root).as_posix()
+
+
+def _select_targets(
+    root: Path, base: str, entries: list[Extension], report: ValidationReport
+) -> tuple[list[Extension], frozenset[str]] | None:
+    """Returns `(targets, touched)`: `touched` is the set of `extensions/<group>/
+    <name>` paths whose own directory actually changed — the version-bump check
+    (`_check_bump`) only applies to those, even when `registry.toml` changing
+    widens `targets` to every extension (a bump makes no sense for one that
+    wasn't itself touched). `None` means `base` couldn't be resolved — an error
+    is already on `report` and the caller must stop rather than validate
+    against a made-up change set."""
+    try:
+        changed = changed_paths(root, base)
+    except RegistryRepoError as exc:
+        report.errors.append(f"cannot compute changes against {base}: {exc}")
+        return None
+    touched = frozenset("/".join(p.split("/")[:3]) for p in changed if p.startswith("extensions/"))
+    if REGISTRY_FILE in changed:
+        # registry.toml carries [registry].public — a flip there can change
+        # what every extension's license must satisfy, so re-check them all.
+        return entries, touched
+    targets = [e for e in entries if e.dir is not None and _rel(e.dir, root) in touched]
+    return targets, touched
 
 
 def _check_bump(ext: Extension, root: Path, base: str) -> list[str]:

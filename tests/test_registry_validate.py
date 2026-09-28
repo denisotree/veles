@@ -138,6 +138,100 @@ def test_module_tests_ignore_registry_root_conftest(tmp_path: Path) -> None:
     assert report.ok, report.errors
 
 
+def test_bad_encoding_extension_is_reported_not_raised(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "r")
+    ext = write_extension(root, "official", "bad")
+    (ext / "extension.toml").write_bytes(b"\xff\xfe")
+    report = validate_registry(root)
+    assert not report.ok
+    assert any("extension.toml" in e for e in report.errors)
+
+
+def test_changed_paths_handles_non_ascii_group_name(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "r")
+    write_extension(root, "café", "alpha")
+    commit_all(root, "base")
+    git(root, "branch", "base")
+    (root / "extensions/café/alpha/SKILL.md").write_text(
+        "---\nname: alpha\ndescription: Changed.\n---\nnew\n", encoding="utf-8"
+    )
+    commit_all(root, "change alpha under café, no bump")
+    report = validate_registry(root, base="base")
+    assert any("alpha" in e and "version" in e for e in report.errors)
+
+
+def test_module_tests_use_basetemp_under_work(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "r")
+    files = {
+        **_MODULE_FILES,
+        "tests/test_tmp.py": (
+            "def test_tmp_under_work(tmp_path):\n    assert '.tmp/validate' in str(tmp_path)\n"
+        ),
+    }
+    write_extension(
+        root,
+        "official",
+        "demo",
+        kind="module",
+        extra_ext='provides = ["hook:pre_turn"]',
+        files=files,
+    )
+    report = validate_registry(root, run_code=True)
+    assert report.ok, report.errors
+
+
+def test_register_only_runs_with_run_code(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "r")
+    files = {
+        "module.toml": (
+            '[module]\nname = "demo"\ndescription = "d"\nentrypoint = "demo.py:register"\n'
+        ),
+        "demo.py": (
+            "from pathlib import Path\n\n\n"
+            "def register(api):\n"
+            "    (Path(__file__).parent / 'sentinel.txt').write_text('x')\n"
+        ),
+    }
+    ext_dir = write_extension(root, "official", "demo", kind="module", files=files)
+    sentinel = ext_dir / "sentinel.txt"
+    validate_registry(root, run_code=False)
+    assert not sentinel.exists()
+    validate_registry(root, run_code=True)
+    assert sentinel.exists()
+
+
+def test_registry_toml_change_forces_full_revalidation(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "r", public=False)
+    write_extension(root, "official", "alpha")
+    closed = write_extension(root, "official", "closed")
+    text = (closed / "extension.toml").read_text(encoding="utf-8")
+    (closed / "extension.toml").write_text(
+        text.replace("Apache-2.0", "Proprietary"), encoding="utf-8"
+    )
+    commit_all(root, "base")
+    git(root, "branch", "base")
+    # Flip the registry public without touching any extension directory — the
+    # licence gate now applies to `closed`, even though it wasn't itself changed.
+    (root / "registry.toml").write_text(
+        '[registry]\nname = "test"\ndescription = "Test registry"\nschema = 1\npublic = true\n',
+        encoding="utf-8",
+    )
+    commit_all(root, "flip public")
+    report = validate_registry(root, base="base")
+    assert any("closed" in e and "Proprietary" in e for e in report.errors)
+    # `alpha` wasn't itself touched, so it owes no version bump — only the
+    # registry.toml-driven license re-check applies to it, and it passes that.
+    assert not any("official/alpha" in e for e in report.errors)
+
+
+def test_bogus_base_ref_is_reported_not_raised(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "r")
+    write_extension(root, "official", "alpha")
+    commit_all(root, "base")
+    report = validate_registry(root, base="does-not-exist")
+    assert any("does-not-exist" in e and "cannot compute changes" in e for e in report.errors)
+
+
 def test_scan_python_flags(tmp_path: Path) -> None:
     (tmp_path / "m.py").write_text(
         "import subprocess, os\nimport httpx\neval('1')\nos.environ['X']\nopen('f', 'w')\n",
