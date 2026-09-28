@@ -1,0 +1,82 @@
+"""Static hints for a registry reviewer — never a verdict, never blocking.
+
+Walks every `.py` file and names the lines worth a human look: process execution,
+network access, eval/exec and dynamic imports, environment (secrets) reads, and
+file writes.
+"""
+
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+
+_NETWORK = frozenset(
+    {"socket", "urllib", "http", "httpx", "requests", "aiohttp", "ftplib", "smtplib", "websockets"}
+)
+_PROCESS = frozenset({"subprocess", "pty", "multiprocessing"})
+_DYNAMIC = frozenset({"eval", "exec", "compile", "__import__"})
+
+
+def scan_python(root: Path) -> list[str]:
+    findings: list[str] = []
+    for path in sorted(root.rglob("*.py")):
+        rel = path.relative_to(root).as_posix()
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=rel)
+        except (SyntaxError, UnicodeDecodeError) as exc:
+            findings.append(f"{rel}: could not parse ({exc})")
+            continue
+        for node in ast.walk(tree):
+            finding = _classify(node)
+            if finding:
+                findings.append(f"{rel}:{getattr(node, 'lineno', 0)}: {finding}")
+    return findings
+
+
+def _classify(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Import | ast.ImportFrom):
+        names = (
+            [a.name for a in node.names] if isinstance(node, ast.Import) else [node.module or ""]
+        )
+        for name in names:
+            top = name.split(".")[0]
+            if top in _PROCESS:
+                return f"process execution ({name})"
+            if top in _NETWORK:
+                return f"network access ({name})"
+            if name == "importlib":
+                return "dynamic import (importlib)"
+        return None
+    if isinstance(node, ast.Call):
+        func = node.func
+        if isinstance(func, ast.Name) and func.id in _DYNAMIC:
+            return f"dynamic code ({func.id})"
+        if isinstance(func, ast.Name) and func.id == "open" and _writes(node):
+            return "file write (check the target path)"
+        if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
+            dotted = f"{func.value.id}.{func.attr}"
+            if dotted in {"os.system", "os.popen", "os.execv", "os.spawnv"}:
+                return f"process execution ({dotted})"
+            if dotted == "os.getenv":
+                return "environment read (secrets?)"
+        return None
+    if (
+        isinstance(node, ast.Attribute)
+        and node.attr == "environ"
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "os"
+    ):
+        return "environment read (secrets?)"
+    return None
+
+
+def _writes(call: ast.Call) -> bool:
+    mode: ast.expr | None = call.args[1] if len(call.args) > 1 else None
+    for kw in call.keywords:
+        if kw.arg == "mode":
+            mode = kw.value
+    return (
+        isinstance(mode, ast.Constant)
+        and isinstance(mode.value, str)
+        and any(c in mode.value for c in "wax+")
+    )

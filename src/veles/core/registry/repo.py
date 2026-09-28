@@ -90,6 +90,19 @@ def fetch_git_source(src: Source, dest: Path) -> None:
         shutil.rmtree(work, ignore_errors=True)
 
 
+def changed_paths(repo: Path, base: str) -> list[str]:
+    """Paths that differ between `base` and `HEAD`, relative to `repo`."""
+    return _git("diff", "--name-only", f"{base}...HEAD", cwd=repo).splitlines()
+
+
+def file_at(repo: Path, rev: str, relpath: str) -> str | None:
+    """`relpath`'s content at `rev`, or `None` if it didn't exist there."""
+    try:
+        return _git("show", f"{rev}:{relpath}", cwd=repo)
+    except RegistryRepoError:
+        return None
+
+
 def _git(*args: str, cwd: Path | None = None) -> str:
     if shutil.which("git") is None:
         raise RegistryRepoError("git executable not found in PATH")

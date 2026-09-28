@@ -34,7 +34,7 @@ from veles.core.module_manifest import (
 )
 from veles.core.project import Project
 
-_HOOK_NAMES: tuple[str, ...] = (
+HOOK_NAMES: tuple[str, ...] = (
     "pre_turn",
     "post_turn",
     "pre_tool_call",
@@ -74,12 +74,12 @@ HookFn = Callable[[dict[str, Any]], VetoResult | None]
 
 class ModuleRegistry:
     def __init__(self) -> None:
-        self._hooks: dict[str, list[tuple[str, HookFn]]] = {n: [] for n in _HOOK_NAMES}
+        self._hooks: dict[str, list[tuple[str, HookFn]]] = {n: [] for n in HOOK_NAMES}
         self.modules: list[str] = []
 
     def add_hook(self, hook_name: str, module_name: str, fn: HookFn) -> None:
-        if hook_name not in _HOOK_NAMES:
-            raise ValueError(f"unknown hook {hook_name!r}; expected one of {_HOOK_NAMES}")
+        if hook_name not in HOOK_NAMES:
+            raise ValueError(f"unknown hook {hook_name!r}; expected one of {HOOK_NAMES}")
         self._hooks[hook_name].append((module_name, fn))
 
     def iter_hooks(self, hook_name: str) -> Iterator[tuple[str, HookFn]]:
