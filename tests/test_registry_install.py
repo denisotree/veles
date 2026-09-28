@@ -189,6 +189,23 @@ def test_uninstall_rmtree_failure_keeps_record(
     assert any(r.name == "alpha" for r in load_records())
 
 
+def test_uninstall_mcp_write_failure_keeps_record(
+    remote: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    install(resolve("graph"), project=project)
+
+    def boom(path: object, text: object, **kw: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr("veles.core.registry.install.atomic_write_text", boom)
+    with pytest.raises(InstallError):
+        uninstall("graph", project=project)
+    assert load_records() != []
+    cfg = tomllib.loads((project.root / ".veles" / "config.toml").read_text(encoding="utf-8"))
+    assert "graph" in cfg.get("mcp", {}).get("servers", {})
+
+
 def test_name_clash_refused_without_confirmation(remote: Path, tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     install(resolve("alpha"), project=project)
