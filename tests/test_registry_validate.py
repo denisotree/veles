@@ -1,3 +1,5 @@
+import subprocess
+import sys
 from pathlib import Path
 
 from tests.registry_helpers import commit_all, git, write_extension, write_registry
@@ -245,6 +247,75 @@ def test_bogus_base_ref_is_reported_not_raised(tmp_path: Path) -> None:
     commit_all(root, "base")
     report = validate_registry(root, base="does-not-exist")
     assert any("does-not-exist" in e and "cannot compute changes" in e for e in report.errors)
+
+
+def test_register_cannot_fake_a_green_run(tmp_path: Path) -> None:
+    """A PR's register() that kills the validator (os._exit(0)) must not turn CI
+    green: it runs in a subprocess, and the report still lands."""
+    root = write_registry(tmp_path / "r")
+    files = {**_MODULE_FILES, "demo.py": "import os\n\ndef register(api):\n    os._exit(0)\n"}
+    write_extension(
+        root,
+        "official",
+        "demo",
+        kind="module",
+        extra_ext='provides = ["hook:pre_turn"]',
+        files=files,
+    )
+    write_extension(root, "official", "nodesc", files={"SKILL.md": "no frontmatter"})
+    report_file = tmp_path / "report.md"
+    run = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; from veles.cli import main; sys.exit(main(sys.argv[1:]))",
+            "registry",
+            "validate",
+            str(root),
+            "--run-code",
+            "--report",
+            str(report_file),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=300,
+    )
+    assert run.returncode == 1, run.stdout + run.stderr
+    text = report_file.read_text(encoding="utf-8")
+    assert "official/nodesc" in text and "SKILL.md" in text
+    assert "official/demo" in text and "register()" in text
+
+
+def test_bytecode_in_payload_fails(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "r")
+    ext = write_extension(
+        root,
+        "official",
+        "demo",
+        kind="module",
+        extra_ext='provides = ["hook:pre_turn"]',
+        files=_MODULE_FILES,
+    )
+    (ext / "helper.pyc").write_bytes(b"\0")
+    errors = validate_registry(root).errors
+    assert any("bytecode" in e and "helper.pyc" in e for e in errors), errors
+
+
+def test_run_code_leaves_no_bytecode_behind(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "r")
+    files = {**_MODULE_FILES, "tests/test_ok.py": "def test_x():\n    assert True\n"}
+    write_extension(
+        root,
+        "official",
+        "demo",
+        kind="module",
+        extra_ext='provides = ["hook:pre_turn"]',
+        files=files,
+    )
+    assert validate_registry(root, run_code=True).ok
+    report = validate_registry(root, run_code=True)  # a second local run stays green
+    assert report.ok, report.errors
 
 
 def test_scan_python_flags(tmp_path: Path) -> None:

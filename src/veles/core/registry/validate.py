@@ -7,6 +7,8 @@ so authors, reviewers and CI all run the same code. `errors` block the merge;
 
 from __future__ import annotations
 
+import json
+import os
 import shutil
 import subprocess
 import sys
@@ -16,14 +18,7 @@ from pathlib import Path
 from veles.core.frontmatter import parse_frontmatter
 from veles.core.layout.manifest import LayoutManifestError, read_manifest
 from veles.core.module_manifest import ManifestError, entrypoint_file, parse_manifest
-from veles.core.modules import (
-    HOOK_NAMES,
-    ModuleHandle,
-    ModuleLoadError,
-    ModuleRegistry,
-    load_module,
-)
-from veles.core.registry.hashing import tree_sha256
+from veles.core.registry.hashing import bytecode_paths, tree_sha256
 from veles.core.registry.model import (
     EXTENSION_FILE,
     REGISTRY_FILE,
@@ -78,7 +73,11 @@ def validate_registry(
     """`run_code=False` (the default for a local run) never executes the extension:
     static checks plus the reviewer scan only. CI passes `--run-code` to also import
     modules (`register()` vs `provides`) and run their tests — PR code must not run on
-    a reviewer's machine just because they validated it."""
+    a reviewer's machine just because they validated it.
+
+    The code phase runs only after every static check, and only in subprocesses: a
+    PR's `register()` must not be able to exit or patch the validator into a green,
+    report-less run."""
     report = ValidationReport()
     try:
         meta = load_registry_meta(root)
@@ -102,22 +101,36 @@ def validate_registry(
         if selected is None:
             return report
         targets, touched = selected
-    for ext in targets:
-        report.errors += [
-            f"{ext.group}/{ext.name}: {e}" for e in _check(ext, meta, root, report, run_code)
-        ]
-        # A version bump is only owed by an extension whose own directory
-        # changed — not by every extension a registry.toml-triggered full
-        # revalidation happens to touch (registry.toml itself carries no
-        # per-extension version to compare against).
-        if base is not None and ext.dir is not None and _rel(ext.dir, root) in touched:
-            report.errors += [f"{ext.group}/{ext.name}: {e}" for e in _check_bump(ext, root, base)]
+    runnable: list[tuple[Extension, Path, Path]] = []
+    try:
+        for ext in targets:
+            work = root / ".tmp" / "validate" / ext.name
+            errors, payload = _check(ext, meta, report, work)
+            report.errors += [f"{ext.group}/{ext.name}: {e}" for e in errors]
+            if run_code and ext.kind == "module" and not errors and payload is not None:
+                runnable.append((ext, payload, work))
+            # A version bump is only owed by an extension whose own directory
+            # changed — not by every extension a registry.toml-triggered full
+            # revalidation happens to touch (registry.toml itself carries no
+            # per-extension version to compare against).
+            if base is not None and ext.dir is not None and _rel(ext.dir, root) in touched:
+                report.errors += [
+                    f"{ext.group}/{ext.name}: {e}" for e in _check_bump(ext, root, base)
+                ]
+        for ext, payload, work in runnable:
+            report.errors += [
+                f"{ext.group}/{ext.name}: {e}" for e in _run_module(ext, payload, work)
+            ]
+    finally:
+        shutil.rmtree(root / ".tmp" / "validate", ignore_errors=True)
     return report
 
 
 def _check(
-    ext: Extension, meta: RegistryMeta, root: Path, report: ValidationReport, run_code: bool
-) -> list[str]:
+    ext: Extension, meta: RegistryMeta, report: ValidationReport, work: Path
+) -> tuple[list[str], Path | None]:
+    """Static checks only. Returns the errors and the payload dir (a git source's
+    payload is fetched into `work`, which the caller removes after the code phase)."""
     errors: list[str] = []
     assert ext.dir is not None
     if ext.dir.name != ext.name:
@@ -128,18 +141,18 @@ def _check(
         errors.append(f"requires_veles: {exc}")
     if meta.public and ext.license not in PERMISSIVE_LICENSES:
         errors.append(f"license {ext.license!r} is not allowed in a public registry")
-    work = root / ".tmp" / "validate" / ext.name
     shutil.rmtree(work, ignore_errors=True)
+    payload: Path | None = None
     try:
         payload = _payload(ext, work)
-        # Unconditional (path sources never created `work` before this): a module's
-        # own pytest run needs a scratch dir under it for --basetemp, and for a git
-        # source `work` already exists (it *is* the payload) so this is a no-op.
-        work.mkdir(parents=True, exist_ok=True)
         digest = tree_sha256(payload)
         if ext.source.type == "git" and digest != ext.source.sha256:
             errors.append(f"sha256 mismatch: declared {ext.source.sha256}, actual {digest}")
-        errors += _check_kind(ext, payload, run_code, work)
+        bytecode = [p.relative_to(payload).as_posix() for p in bytecode_paths(payload)]
+        if bytecode:
+            # The hash ignores bytecode, so a committed .pyc would be unreviewed code.
+            errors.append(f"bytecode is not allowed in an extension (delete it): {bytecode}")
+        errors += _check_kind(ext, payload)
         report.review += [f"{ext.group}/{ext.name}: {f}" for f in scan_python(payload)]
         if ext.requires:
             report.review.append(
@@ -147,9 +160,7 @@ def _check(
             )
     except (RegistryRepoError, ValueError, OSError) as exc:
         errors.append(str(exc))
-    finally:
-        shutil.rmtree(work, ignore_errors=True)
-    return errors
+    return errors, payload
 
 
 def _payload(ext: Extension, work: Path) -> Path:
@@ -161,7 +172,7 @@ def _payload(ext: Extension, work: Path) -> Path:
     return ext.dir
 
 
-def _check_kind(ext: Extension, payload: Path, run_code: bool, work: Path) -> list[str]:
+def _check_kind(ext: Extension, payload: Path) -> list[str]:
     if ext.kind == "skill":
         skill = payload / "SKILL.md"
         if not skill.is_file():
@@ -181,10 +192,10 @@ def _check_kind(ext: Extension, payload: Path, run_code: bool, work: Path) -> li
 
         assert ext.mcp is not None
         return [] if parse_server(ext.name, ext.mcp) is not None else ["[mcp] recipe is invalid"]
-    return _check_module(ext, payload, run_code, work)
+    return _check_module(ext, payload)
 
 
-def _check_module(ext: Extension, payload: Path, run_code: bool, work: Path) -> list[str]:
+def _check_module(ext: Extension, payload: Path) -> list[str]:
     errors: list[str] = []
     bad = [p for p in ext.provides if not p.startswith(_PROVIDES_PREFIXES)]
     if bad:
@@ -196,14 +207,69 @@ def _check_module(ext: Extension, payload: Path, run_code: bool, work: Path) -> 
         return [*errors, f"module.toml: {exc}"]
     if not entry.is_file():
         return [*errors, f"entrypoint file {entry.relative_to(payload).as_posix()!r} not found"]
-    if not run_code:
-        return errors
-    registry = ModuleRegistry()
+    return errors
+
+
+# Run in a child interpreter: the hooks it registers come back as the last stdout
+# line. The child can still lie about them — this checks `provides` against
+# reality for honest authors; it is not a security boundary (the human review is).
+_DRY_RUN = """\
+import json, sys
+from pathlib import Path
+from veles.core.module_manifest import parse_manifest
+from veles.core.modules import HOOK_NAMES, ModuleHandle, ModuleRegistry, load_module
+payload = Path(sys.argv[1])
+manifest = parse_manifest((payload / "module.toml").read_text(encoding="utf-8"))
+registry = ModuleRegistry()
+load_module(ModuleHandle(manifest.name, manifest, payload), registry)
+print(json.dumps([h for h in HOOK_NAMES if any(True for _ in registry.iter_hooks(h))]))
+"""
+_CODE_TIMEOUT_S = 600
+
+
+def _run_code(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str] | str:
+    """The completed child, or an error string when it timed out. No bytecode is
+    written, so a local `--run-code` can't make the next run fail the bytecode check."""
     try:
-        load_module(ModuleHandle(name=manifest.name, manifest=manifest, dir=payload), registry)
-    except ModuleLoadError as exc:
-        return [*errors, f"register() failed: {exc}"]
-    registered = {f"hook:{h}" for h in HOOK_NAMES if any(True for _ in registry.iter_hooks(h))}
+        return subprocess.run(
+            [sys.executable, *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=_CODE_TIMEOUT_S,
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+        )
+    except subprocess.TimeoutExpired:
+        return f"timed out after {_CODE_TIMEOUT_S}s"
+
+
+def _tail(run: subprocess.CompletedProcess[str]) -> str:
+    return "\n".join((run.stdout + run.stderr).strip().splitlines()[-5:])
+
+
+def _registered_hooks(run: subprocess.CompletedProcess[str]) -> set[str] | None:
+    lines = run.stdout.strip().splitlines()
+    if run.returncode != 0 or not lines:
+        return None
+    try:
+        hooks = json.loads(lines[-1])
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(hooks, list) or not all(isinstance(h, str) for h in hooks):
+        return None
+    return {f"hook:{h}" for h in hooks}
+
+
+def _run_module(ext: Extension, payload: Path, work: Path) -> list[str]:
+    errors: list[str] = []
+    work.mkdir(parents=True, exist_ok=True)
+    run = _run_code(["-c", _DRY_RUN, str(payload)], work)
+    if isinstance(run, str):
+        return [f"register() {run}"]
+    registered = _registered_hooks(run)
+    if registered is None:
+        return [f"register() failed (no hook list from the dry run):\n{_tail(run)}"]
     declared = {p for p in ext.provides if p.startswith("hook:")}
     if registered != declared:
         errors.append(
@@ -226,37 +292,29 @@ def _check_module(ext: Extension, payload: Path, run_code: bool, work: Path) -> 
         # `--basetemp=./tmp/pytest` addopts — pin it under `work` so every temp
         # path this validation run touches stays inside the repo, per the
         # project's temp-dir rule.
-        try:
-            run = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "pytest",
-                    "-q",
-                    "-p",
-                    "no:cacheprovider",
-                    "-c",
-                    "/dev/null",
-                    "--confcutdir",
-                    str(payload),
-                    "--rootdir",
-                    str(payload),
-                    "--basetemp",
-                    str(work / "pytest-tmp"),
-                    str(tests),
-                ],
-                cwd=payload,
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=600,
-            )
-        except subprocess.TimeoutExpired:
-            errors.append("tests timed out after 600s")
-            return errors
-        if run.returncode != 0:
-            tail = "\n".join((run.stdout + run.stderr).strip().splitlines()[-5:])
-            errors.append(f"tests failed:\n{tail}")
+        tests_run = _run_code(
+            [
+                "-m",
+                "pytest",
+                "-q",
+                "-p",
+                "no:cacheprovider",
+                "-c",
+                "/dev/null",
+                "--confcutdir",
+                str(payload),
+                "--rootdir",
+                str(payload),
+                "--basetemp",
+                str(work / "pytest-tmp"),
+                str(tests),
+            ],
+            payload,
+        )
+        if isinstance(tests_run, str):
+            errors.append(f"tests {tests_run}")
+        elif tests_run.returncode != 0:
+            errors.append(f"tests failed:\n{_tail(tests_run)}")
     return errors
 
 
