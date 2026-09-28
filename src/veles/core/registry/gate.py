@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from veles.core.registry.hashing import strip_bytecode, tree_sha256
+from veles.core.registry.hashing import bytecode_paths, strip_bytecode, tree_sha256
 from veles.core.registry.records import InstallRecord, put_record, record_for_path
 
 
@@ -30,11 +30,15 @@ def module_approved(module_dir: Path) -> bool:
 
 def admit_module(module_dir: Path) -> bool:
     """`module_approved`, then drop the module's bytecode so the import that follows
-    compiles the reviewed source instead of running a planted `.pyc`."""
+    compiles the reviewed source instead of running a planted `.pyc`. Fails closed:
+    bytecode that can't be removed (e.g. a read-only `__pycache__`) refuses the module."""
     if not module_approved(module_dir):
         return False
-    strip_bytecode(module_dir)
-    return True
+    try:
+        strip_bytecode(module_dir)
+    except OSError:
+        return False
+    return not bytecode_paths(module_dir)
 
 
 def approve_module(

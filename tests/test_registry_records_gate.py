@@ -1,7 +1,10 @@
 import argparse
 import importlib.util
+import os
 import py_compile
 from pathlib import Path
+
+import pytest
 
 from veles.core.modules import ModuleRegistry, discover_modules, load_module
 from veles.core.project import init_project
@@ -89,6 +92,24 @@ def test_planted_bytecode_never_runs(tmp_path: Path) -> None:
     assert [m for m, _ in registry.iter_hooks("pre_turn")] == ["demo"]
     assert list(registry.iter_hooks("post_turn")) == []
     assert not stray.exists()
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignores directory permissions")
+def test_undeletable_bytecode_fails_closed(tmp_path: Path) -> None:
+    from veles.cli._project import _load_project_modules
+
+    project = init_project(tmp_path / "p", name="p")
+    d = _make_module(project.root)
+    approve_module(d, name="demo", project_root=project.root)
+    evil = "def register(api):\n    api.add_hook('post_turn', lambda **kw: None)\n"
+    cfile = _plant_unchecked_pyc(d / "demo.py", evil)
+    cfile.parent.chmod(0o555)
+    try:
+        registry = _load_project_modules(project)
+    finally:
+        cfile.parent.chmod(0o755)
+    assert registry.modules == []
+    assert list(registry.iter_hooks("post_turn")) == []
 
 
 def test_cli_loader_skips_unapproved(tmp_path: Path, capsys) -> None:

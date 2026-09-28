@@ -242,6 +242,8 @@ def _run_code(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str] | 
         )
     except subprocess.TimeoutExpired:
         return f"timed out after {_CODE_TIMEOUT_S}s"
+    except OSError as exc:
+        return f"could not run: {exc}"
 
 
 def _tail(run: subprocess.CompletedProcess[str]) -> str:
@@ -263,7 +265,10 @@ def _registered_hooks(run: subprocess.CompletedProcess[str]) -> set[str] | None:
 
 def _run_module(ext: Extension, payload: Path, work: Path) -> list[str]:
     errors: list[str] = []
-    work.mkdir(parents=True, exist_ok=True)
+    try:
+        work.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return [f"could not create {work}: {exc}"]
     run = _run_code(["-c", _DRY_RUN, str(payload)], work)
     if isinstance(run, str):
         return [f"register() {run}"]
