@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from veles.core.critical_ops import confirm_critical
-from veles.core.io_utils import load_optional_toml
+from veles.core.io_utils import atomic_write_text, dump_toml, load_optional_toml
 from veles.core.project import Project
 from veles.core.registry.catalog import available, resolve
 from veles.core.registry.hashing import tree_sha256
@@ -79,9 +79,15 @@ def upgrade(name: str, *, project: Project | None) -> InstallRecord | None:
         # Nothing was actually removed (remove_installed raises and keeps the
         # record when deletion fails) — there is nothing to restore, only the
         # backup copy to clean up before the error propagates.
-        if backup is not None:
-            shutil.rmtree(backup, ignore_errors=True)
+        _cleanup_backup(backup)
         raise
+    except OSError as exc:
+        # `remove_installed`'s trailing `drop_record` call is not itself wrapped
+        # in a try/except, so a disk failure there surfaces as a bare OSError
+        # rather than InstallError. Same handling either way: clean the backup,
+        # re-raise as the InstallError callers of `upgrade` expect.
+        _cleanup_backup(backup)
+        raise InstallError(f"could not remove {rec.path}: {exc}") from exc
     try:
         new = install(
             found,
@@ -96,18 +102,15 @@ def upgrade(name: str, *, project: Project | None) -> InstallRecord | None:
         # leaves the extension gone with no trace, not just "upgrade failed".
         _restore(rec, backup)
         raise
-    if backup is not None:
-        shutil.rmtree(backup, ignore_errors=True)
+    _cleanup_backup(backup)
     return new
 
 
 def _drift(rec: InstallRecord) -> Issue | None:
     if rec.kind == "mcp":
         config_path, _, _ = rec.path.partition("#")
-        recipe = (
-            load_optional_toml(Path(config_path)).get("mcp", {}).get("servers", {}).get(rec.name)
-        )
-        if not isinstance(recipe, dict):
+        recipe = _read_mcp_recipe(Path(config_path), rec.name)
+        if recipe is None:
             return Issue(rec, "missing", f"[mcp.servers.{rec.name}] is gone from {config_path}")
         if recipe_sha256(recipe) != rec.tree_sha256:
             return Issue(rec, "modified", f"[mcp.servers.{rec.name}] was edited")
@@ -124,20 +127,58 @@ def _drift(rec: InstallRecord) -> Issue | None:
     return None
 
 
-def _backup(rec: InstallRecord) -> Path | None:
+@dataclass(frozen=True, slots=True)
+class _Backup:
+    """What `_restore` needs to put an upgrade's old install back.
+
+    Exactly one of `dir` (skill/module/layout: a copy of the install directory) or
+    `mcp` (the config path + the recipe dict that was under `[mcp.servers.<name>]`)
+    is set, matching `rec.kind`. One shape covers both so `upgrade` doesn't need a
+    second restore path for mcp installs."""
+
+    dir: Path | None = None
+    mcp: tuple[Path, dict[str, object]] | None = None
+
+
+def _read_mcp_recipe(config_path: Path, name: str) -> dict[str, object] | None:
+    recipe = load_optional_toml(config_path).get("mcp", {}).get("servers", {}).get(name)
+    return recipe if isinstance(recipe, dict) else None
+
+
+def _backup(rec: InstallRecord) -> _Backup:
     if rec.kind == "mcp":
-        return None
+        config_path, _, _ = rec.path.partition("#")
+        path = Path(config_path)
+        recipe = _read_mcp_recipe(path, rec.name)
+        return _Backup(mcp=(path, recipe) if recipe is not None else None)
     src = Path(rec.path)
     dest = src.with_name(f".{src.name}.upgrade-backup")
     shutil.rmtree(dest, ignore_errors=True)
-    shutil.copytree(src, dest, symlinks=True)
-    return dest
+    try:
+        shutil.copytree(src, dest, symlinks=True)
+    except OSError as exc:
+        # A copy that dies partway through must not leave a half-written backup
+        # behind — that would both violate "never left behind" and, worse, look
+        # like a real backup to a later `_restore`.
+        shutil.rmtree(dest, ignore_errors=True)
+        raise InstallError(f"could not back up {src} before upgrading: {exc}") from exc
+    return _Backup(dir=dest)
 
 
-def _restore(rec: InstallRecord, backup: Path | None) -> None:
+def _cleanup_backup(backup: _Backup) -> None:
+    if backup.dir is not None:
+        shutil.rmtree(backup.dir, ignore_errors=True)
+
+
+def _restore(rec: InstallRecord, backup: _Backup) -> None:
     from veles.core.registry.records import put_record
 
-    if backup is not None:
+    if backup.dir is not None:
         shutil.rmtree(rec.path, ignore_errors=True)
-        backup.rename(rec.path)
+        backup.dir.rename(rec.path)
+    elif backup.mcp is not None:
+        config_path, recipe = backup.mcp
+        data = load_optional_toml(config_path)
+        data.setdefault("mcp", {}).setdefault("servers", {})[rec.name] = recipe
+        atomic_write_text(config_path, dump_toml(data))
     put_record(rec)

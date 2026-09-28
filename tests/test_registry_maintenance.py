@@ -1,3 +1,4 @@
+import tomllib
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -8,7 +9,7 @@ from veles.core.critical_ops import reset_critical_confirmer, set_critical_confi
 from veles.core.project import init_project
 from veles.core.registry.catalog import resolve
 from veles.core.registry.config import add_source, get_source, remove_source
-from veles.core.registry.install import InstallError, install
+from veles.core.registry.install import InstallError, install, installed_records
 from veles.core.registry.maintenance import upgrade, verify
 from veles.core.registry.repo import update
 
@@ -119,6 +120,45 @@ def test_upgrade_reraises_when_remove_fails(setup, monkeypatch) -> None:
         upgrade("alpha", project=project)
     assert [i.problem for i in verify(project)] == ["outdated"]
     assert not (project.skills_dir / ".alpha.upgrade-backup").exists()
+
+
+def test_upgrade_restores_mcp_recipe_on_install_failure(tmp_path: Path, monkeypatch) -> None:
+    remote = tmp_path / "remote"
+    make_git_registry(remote, skills=())
+    write_extension(
+        remote, "official", "graph", kind="mcp", files={}, mcp='command = "graphify-mcp"'
+    )
+    commit_all(remote, "init")
+    remove_source("public")
+    add_source(str(remote))
+    project = init_project(tmp_path / "p", name="p")
+    install(resolve("graph"), project=project)
+
+    write_extension(
+        remote,
+        "official",
+        "graph",
+        kind="mcp",
+        version="0.2.0",
+        files={},
+        mcp='command = "graphify-mcp"\nargs = ["--v2"]',
+    )
+    commit_all(remote, "graph 0.2.0")
+    update(get_source("private"))
+
+    import veles.core.registry.maintenance as maintenance
+
+    monkeypatch.setattr(
+        maintenance, "install", lambda *a, **k: (_ for _ in ()).throw(InstallError("boom"))
+    )
+    with pytest.raises(InstallError, match="boom"):
+        upgrade("graph", project=project)
+
+    rec = next(r for r in installed_records(project) if r.name == "graph")
+    assert rec.version == "0.1.0"
+    cfg = tomllib.loads((project.root / ".veles" / "config.toml").read_text(encoding="utf-8"))
+    assert cfg["mcp"]["servers"]["graph"] == {"command": "graphify-mcp"}
+    assert all(i.problem != "missing" for i in verify(project))
 
 
 def test_upgrade_declined_keeps_old(setup) -> None:
