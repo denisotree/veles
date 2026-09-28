@@ -1,0 +1,10 @@
+[extension]
+name = "example-skill"
+kind = "skill"
+version = "0.1.0"
+description = "Example skill — delete once you have your own"
+license = "Apache-2.0"
+requires_veles = ">=1.0,<2"
+
+[source]
+type = "path"

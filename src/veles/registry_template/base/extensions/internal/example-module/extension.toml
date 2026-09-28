@@ -1,0 +1,11 @@
+[extension]
+name = "example-module"
+kind = "module"
+version = "0.1.0"
+description = "Example module — logs every turn; delete once you have your own"
+license = "Apache-2.0"
+requires_veles = ">=1.0,<2"
+provides = ["hook:post_turn"]
+
+[source]
+type = "path"

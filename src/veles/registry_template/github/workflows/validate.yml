@@ -1,0 +1,21 @@
+name: validate
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+      - name: Validate changed extensions
+        run: >
+          uvx --python 3.13 --from 'veles-ai==@@VELES_VERSION@@' --with pytest
+          veles registry validate . --run-code
+          --base origin/${{ github.base_ref }} --report review.md
+      - name: Reviewer report
+        if: always()
+        run: test -f review.md && cat review.md >> "$GITHUB_STEP_SUMMARY" || true

@@ -1,0 +1,7 @@
+# Every change needs an approval from the owners of its group.
+# Replace the placeholders with real GitHub teams or users, then enable
+# branch protection on the default branch with "Require review from Code Owners".
+/extensions/internal/  @@@NAME@@/security
+/extensions/vendor/    @@@NAME@@/security
+/registry.toml         @@@NAME@@/security
+/.github/              @@@NAME@@/security
