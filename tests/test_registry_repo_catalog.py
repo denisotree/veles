@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from tests.registry_helpers import commit_all, git, make_git_registry, write_extension
+from veles.core.registry import repo as repo_module
 from veles.core.registry.catalog import ResolveError, available, resolve, search
 from veles.core.registry.config import add_source, cache_dir, remove_source
 from veles.core.registry.model import Source
@@ -45,6 +46,34 @@ def test_failed_clone_leaves_no_cache(tmp_path: Path) -> None:
     with pytest.raises(RegistryRepoError):
         ensure_cache(get_source("broken"))
     assert not cache_dir("broken").exists()
+    assert not cache_dir("broken").with_name(".broken.cloning").exists()
+
+
+def test_ensure_cache_removes_stale_staging_dir(private_registry: Path) -> None:
+    from veles.core.registry.config import get_source
+
+    staging = cache_dir("private").with_name(".private.cloning")
+    staging.mkdir(parents=True)
+    (staging / "junk.txt").write_text("stale", encoding="utf-8")
+    path = ensure_cache(get_source("private"))
+    assert (path / "registry.toml").is_file()
+    assert not staging.exists()
+
+
+def test_ensure_cache_cleans_up_on_keyboard_interrupt(
+    private_registry: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from veles.core.registry.config import get_source
+
+    def _boom(*args: object, **kwargs: object) -> str:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(repo_module, "_git", _boom)
+    with pytest.raises(KeyboardInterrupt):
+        ensure_cache(get_source("private"))
+    path = cache_dir("private")
+    assert not path.exists()
+    assert not path.with_name(".private.cloning").exists()
 
 
 def test_search_filters(private_registry: Path) -> None:
@@ -69,6 +98,12 @@ def test_resolve_unique_ambiguous_and_missing(private_registry: Path, tmp_path: 
 def test_resolve_unknown_registry(private_registry: Path) -> None:
     with pytest.raises(ResolveError, match="no registry named 'nope'"):
         resolve("nope:alpha")
+
+
+def test_resolve_reports_warnings_when_missing(private_registry: Path, tmp_path: Path) -> None:
+    add_source(str(tmp_path / "missing"), name="gone")
+    with pytest.raises(ResolveError, match="unreachable: gone:"):
+        resolve("zeta")
 
 
 def test_available_warns_on_unreachable_registry(private_registry: Path, tmp_path: Path) -> None:

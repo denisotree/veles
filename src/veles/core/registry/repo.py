@@ -24,18 +24,26 @@ class RegistryRepoError(RuntimeError):
 
 
 def ensure_cache(source: RegistrySource) -> Path:
+    """Clone once, atomically: `path` only ever exists complete or not at all.
+
+    Cloning into a sibling staging dir and renaming it into place on success
+    means a kill/Ctrl+C mid-clone (or a crash) can never leave a half-cloned
+    directory at `path` for the next run to mistake for a real cache."""
     path = cache_dir(source.name)
     if (path / ".git").is_dir():
         return path
+    staging = path.with_name(f".{path.name}.cloning")
+    shutil.rmtree(staging, ignore_errors=True)
     shutil.rmtree(path, ignore_errors=True)
     path.parent.mkdir(parents=True, exist_ok=True)
     args = ["clone", "--quiet", "--filter=blob:none"]
     if source.ref:
         args += ["--branch", source.ref]
     try:
-        _git(*args, "--", source.url, str(path))
-    except RegistryRepoError:
-        shutil.rmtree(path, ignore_errors=True)
+        _git(*args, "--", source.url, str(staging))
+        staging.rename(path)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
         raise
     return path
 

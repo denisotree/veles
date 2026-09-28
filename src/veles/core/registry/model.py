@@ -189,12 +189,13 @@ def _parse_source(src: dict[str, Any], kind: str) -> Source:
 def _is_safe_subdir(subdir: str) -> bool:
     if not subdir:
         return True
-    if PurePosixPath(subdir).is_absolute() or "\\" in subdir or _has_control_char(subdir):
+    if PurePosixPath(subdir).is_absolute() or "\\" in subdir or has_control_char(subdir):
         return False
     return ".." not in PurePosixPath(subdir).parts
 
 
-def _has_control_char(value: str) -> bool:
+def has_control_char(value: str) -> bool:
+    """Shared with `config.py`: a URL/ref/subdir must not smuggle a control character."""
     return any(ord(c) < 32 or ord(c) == 127 for c in value)
 
 

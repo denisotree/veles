@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from veles.core.io_utils import atomic_write_text, dump_toml
+from veles.core.registry.model import has_control_char
 from veles.core.user_config import read_user_config_raw, user_config_path
 from veles.core.user_paths import user_home
 
@@ -27,10 +28,6 @@ _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 class RegistryConfigError(ValueError):
     pass
-
-
-def _has_control_char(value: str) -> bool:
-    return any(ord(c) < 32 or ord(c) == 127 for c in value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,12 +71,12 @@ def add_source(url: str, *, name: str | None = None, ref: str | None = None) -> 
         raise RegistryConfigError(f"registry name {name!r} must match [a-z0-9][a-z0-9-]*")
     if not url or url.startswith("-"):
         raise RegistryConfigError(f"registry url {url!r} must not be empty or start with '-'")
-    if _has_control_char(url):
+    if has_control_char(url):
         raise RegistryConfigError(f"registry url {url!r} must not contain control characters")
     if ref:
         if ref.startswith("-"):
             raise RegistryConfigError(f"registry ref {ref!r} must not start with '-'")
-        if _has_control_char(ref):
+        if has_control_char(ref):
             raise RegistryConfigError(f"registry ref {ref!r} must not contain control characters")
     if name in taken:
         raise RegistryConfigError(f"a registry named {name!r} already exists")

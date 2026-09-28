@@ -83,13 +83,14 @@ def search(
 def resolve(spec: str) -> Found:
     """`name` or `registry:name` → the one matching extension."""
     registry, _, name = spec.rpartition(":")
-    found, _warnings = available(registry=registry or None)
+    found, warnings = available(registry=registry or None)
     matches = [f for f in found if f.ext.name == name]
     if not matches:
         where = f" in registry {registry!r}" if registry else ""
-        raise ResolveError(
-            f"no extension named {name!r}{where} (try `veles registry update`, then `search`)"
-        )
+        message = f"no extension named {name!r}{where} (try `veles registry update`, then `search`)"
+        if warnings:
+            message += "; unreachable: " + "; ".join(warnings)
+        raise ResolveError(message)
     if len(matches) > 1:
         refs = ", ".join(f.ref for f in matches)
         raise ResolveError(f"{name!r} is ambiguous: {refs} — use <registry>:{name}")
