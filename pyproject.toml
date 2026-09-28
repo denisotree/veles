@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "veles-ai"
-version = "0.44.0"
+version = "1.0.0"
 description = "Veles — a minimalist agent framework: clean, decomposed code, compounding per-project memory, and a modular core with optional pluggable modules."
 requires-python = ">=3.13"
 readme = "README.md"
@@ -23,7 +23,7 @@ keywords = [
     "self-improving",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",

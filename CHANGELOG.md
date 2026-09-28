@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-09-25
+
+The first stable release. Veles is a personal, local-first agent: one
+operator, one machine, many projects. The memory and learning loop work in the
+default REPL, recall is semantic and runs on an on-device embedder, and the
+security gates for a solo user are in place. The CLI verbs, the project layout
+(`.veles/`, `AGENTS.md`, layout packs), `config.toml` and `module.toml` are
+now the stable surface; breaking changes to them follow semantic versioning.
+
+### Fixed
+
+- `atomic_write_text` again removes its temp file after any `OSError`, so a
+  failed cleanup can no longer hide the real write error.
+- `veles tool list` no longer raises `TypeError` when there are no tools.
+
+### Internal
+
+- `tests/test_cli_package.py` pins the full verb set and checks that the
+  parser and the dispatch table match in both directions.
+
 ## [0.44.0] — 2026-09-24
 
 A hygiene release: dead code out, names and types that say what they mean,
@@ -1792,7 +1812,8 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v0.44.0...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/denisotree/veles/compare/v0.44.0...v1.0.0
 [0.44.0]: https://github.com/denisotree/veles/compare/v0.43.0...v0.44.0
 [0.43.0]: https://github.com/denisotree/veles/compare/v0.42.0...v0.43.0
 [0.42.0]: https://github.com/denisotree/veles/compare/v0.41.0...v0.42.0
