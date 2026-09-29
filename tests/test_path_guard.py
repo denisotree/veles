@@ -469,6 +469,30 @@ def test_symlinked_user_home_is_closed_by_both_paths(
         reset_active_project(token)
 
 
+def test_dangling_symlinked_user_home_is_closed_by_both_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`~/.veles -> ~/dotfiles/veles` before the target exists: writing through the
+    link or to the real path would create Veles' state — both refused."""
+    from veles.core.user_paths import user_home
+
+    project_root = tmp_path / "p"
+    token = _with_project(monkeypatch, project_root, project_root / "h")
+    try:
+        real = project_root / "dotfiles" / "veles"
+        (project_root / "h").mkdir()
+        user_home().symlink_to(real, target_is_directory=True)
+        assert not real.exists()
+        for p in (user_home() / "extensions.json", real / "extensions.json"):
+            with pytest.raises(SandboxViolation):
+                resolve_safe(p)
+        with pytest.raises(SandboxViolation):
+            write_file(str(real / "extensions.json"), "[]")
+        assert resolve_safe(user_home() / "skills" / "x") == real / "skills" / "x"
+    finally:
+        reset_active_project(token)
+
+
 def test_sandbox_cwd_returns_first_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     a = tmp_path / "a"
     b = tmp_path / "b"

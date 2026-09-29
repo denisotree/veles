@@ -109,35 +109,39 @@ def _closed_user_path(resolved: Path) -> bool:
     `_dedupe` and open approvals, trust and modules to the agent. Decided by file
     identity (`_same_place`), not by spelling."""
     home = user_home()
-    if not _same_place(resolved, home):
+    if not _same_place(resolved, home, fold=True):  # refusing side: fold, over-refuse
         return False
-    return not any(_same_place(resolved, home / n) for n in _USER_ROOT_WHITELIST)
+    # Allowing side: exact names for a missing tail, so folding never widens the
+    # whitelist (on a case-sensitive FS `SKILLS` is a different, closed dir).
+    return not any(_same_place(resolved, home / n, fold=False) for n in _USER_ROOT_WHITELIST)
 
 
-def _fold(name: str) -> str:
-    return unicodedata.normalize("NFC", name).casefold()
-
-
-def _same_place(target: Path, directory: Path) -> bool:
+def _same_place(target: Path, directory: Path, *, fold: bool) -> bool:
     """Is `target` inside `directory`, as the filesystem sees it? `resolve()` keeps the
     caller's spelling, and on a case- or normalization-insensitive FS (macOS APFS)
     `.VELES` or an NFD `café` *is* the same dir — so the comparison is by identity
-    (`samefile`) of the nearest existing ancestor of `directory`. The part of
-    `directory` that does not exist yet is compared by case- and NFC-folded name,
-    which can only over-refuse (on a case-sensitive FS) and never under-refuse."""
-    directory = directory.absolute()
+    (`samefile`) of the nearest existing ancestor of `directory`. `directory` is
+    resolved first (a dangling `~/.veles -> dotfiles/veles` link then points at the
+    real, not yet created, location). The part of it that does not exist yet is
+    compared by name: case- and NFC-folded when `fold` (answers "yes" more often —
+    right for the refusing check), exactly otherwise (right for the allowing check)."""
+
+    def names(p: Path) -> list[str]:
+        parts = p.parts
+        return [unicodedata.normalize("NFC", s).casefold() for s in parts] if fold else list(parts)
+
+    directory = directory.resolve()
     anchor = directory
     while not anchor.exists() and anchor != anchor.parent:
         anchor = anchor.parent
-    missing = [_fold(p) for p in directory.relative_to(anchor).parts]
+    missing = names(directory.relative_to(anchor))
     for ancestor in (target, *target.parents):
         try:
             if not ancestor.samefile(anchor):
                 continue
         except OSError:  # this ancestor does not exist
             continue
-        below = [_fold(p) for p in target.relative_to(ancestor).parts]
-        return below[: len(missing)] == missing
+        return names(target.relative_to(ancestor))[: len(missing)] == missing
     return False
 
 
