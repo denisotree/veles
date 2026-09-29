@@ -215,14 +215,18 @@ it** — `veles tool approve` shows the code and records its hash. Bare
 `veles tool approve` lists what's pending. This is why an agent-written tool
 needs a review step before it becomes callable.
 
-### `veles module {list,show,add,remove}`
+### `veles module {list,show,add,remove,approve}`
 
 | Subcommand | Purpose |
 |---|---|
-| `list` | List installed modules |
-| `show <name>` | Print a module's manifest |
-| `add <source> [--name N] [-y]` | Install a module from a git URL or local path |
-| `remove <name> [-y]` | Delete an installed module |
+| `list [--user]` | List installed modules (both scopes, with a `scope` column, unless `--user`) |
+| `show <name> [--user]` | Print a module's manifest |
+| `add <source> [--name N] [--user] [-y]` | Install a module from a git URL or local path |
+| `remove <name> [--user] [-y]` | Delete an installed module |
+| `approve <name> [--user]` | Re-approve a module after reviewing an edit |
+
+`--user` targets `~/.veles/modules/` instead of the project's, so the module
+loads in every project. A same-named project module overrides a user-level one.
 
 ### `veles registry search [query] [--kind K]`
 Search connected registries (modules, skills, layout packs, MCP recipes). See

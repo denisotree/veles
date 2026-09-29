@@ -57,9 +57,12 @@ version  kind` (плюс `[YANKED: причина]`, если запись от�
 команду `uv tool install` для ручного запуска — сам он Python-зависимости
 не ставит. Каждый kind ложится в своё обычное место: модули — в
 `<project>/.veles/modules/<name>/`, навыки — в
-`<project>/.veles/skills/<name>/` (`--user` ставит в
-`~/.veles/skills/<name>/`), layout-пакеты — в `~/.veles/layouts/<name>/`, а
-рецепт `mcp` — как блок `[mcp.servers.<name>]` в `config.toml` проекта.
+`<project>/.veles/skills/<name>/` (`--user` ставит и то, и другое в
+`~/.veles/{modules,skills}/<name>/` — расширение будет доступно в каждом
+проекте), layout-пакеты — в `~/.veles/layouts/<name>/`, а рецепт `mcp` — как
+блок `[mcp.servers.<name>]` в `config.toml` проекта. Пользовательский модуль —
+это способ поставить модуль-провайдер памяти (Honcho, Mem0, Supermemory, …) —
+см. [управление навыками, инструментами и модулями](manage-skills-and-tools.md#модули).
 
 У агента есть только read-only половина этого набора: он может вызвать
 `registry_search`, чтобы посмотреть, что доступно, и предложить

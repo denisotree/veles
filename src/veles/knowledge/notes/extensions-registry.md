@@ -9,7 +9,9 @@ Extensions (modules, skills, layout packs, MCP recipes) come from git registries
 `veles registry add <git-url>` (it becomes `private`).
 
 `veles registry search <query>` finds extensions; `veles registry install <name>`
-(or `private:<name>`) installs one after you confirm. `veles registry verify`
+(or `private:<name>`) installs one after you confirm. Add `--user` to install a
+module or skill to `~/.veles/`, loaded in every project — that's how you set up
+a memory-provider module (Honcho, Mem0, Supermemory). `veles registry verify`
 reports changed, yanked, removed or outdated installs (and vendored copies whose
 upstream moved ahead); `veles registry upgrade` moves to a
 newer version and shows the diff.

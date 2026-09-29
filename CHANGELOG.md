@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- User-level modules in `~/.veles/modules/`: loaded in every project, through the same approval
+  gate as project modules. `veles registry install --user <module>` and
+  `veles module {list,show,add,remove,approve} --user`; `veles module list` (no flag) shows both
+  scopes with a `scope` column. A project module with the same name overrides a user-level one
+  (with a warning); two modules at the same scope sharing a name — the first loads, the rest warn.
+- Modules can register external memory providers: `api.add_memory_provider(name, factory)`. The
+  name must match a `[memory.external.<name>]` section in `~/.veles/config.toml`; the factory
+  receives that section as a `dict` and returns a provider (or `None` to skip it). `MemoryProvider`,
+  `IngestingMemoryProvider` and `RecallHit` (`veles.core.memory.provider`) are the public protocol
+  a module's provider implements.
+
+### Removed
+
+- Built-in Honcho, Mem0 and Supermemory memory providers — they are registry modules now
+  (`veles registry install --user {honcho,mem0,supermemory}`).
+
+### Upgrading from 1.1
+
+- If `~/.veles/config.toml` has `[memory.external.<name>]`, install the provider once:
+  `veles registry install --user <name>` (honcho, mem0 or supermemory). Until then Veles prints one
+  warning per provider and recalls without it. The install prints a
+  `uv tool install veles-ai --with '<package>'` command for the provider's SDK — run it too, even
+  if you already had the SDK installed for the built-in provider: minimum versions moved to
+  `mem0ai>=2.0`, `honcho-ai>=2.5`, `supermemory>=3.62`, and an older SDK will fail recalls.
+- Honcho's config keys changed: `app_id`/`user_id` are gone, replaced by `workspace_id` (and an
+  optional `peer_id` to search only that peer's messages). Update
+  `[memory.external.honcho]` before installing the module.
+
 ## [1.1.0] — 2026-09-29
 
 Extension registries: find, install, update and verify reviewed extensions from git
