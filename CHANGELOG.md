@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Upgrading from 1.1
 
+- Project MCP servers (`[mcp.servers.*]`) start only after `veles mcp approve <name>` — an
+  unapproved or edited recipe is skipped with a warning. Approve each server you already use once.
 - If `~/.veles/config.toml` has `[memory.external.<name>]`, install the provider once:
   `veles registry install --user <name>` (honcho, mem0 or supermemory). Until then Veles prints one
   warning per provider and recalls without it. The install prints a

@@ -52,15 +52,19 @@ def shutdown_mcp() -> None:
 
 
 def mount_mcp_tools(registry: Registry, project: Project) -> list[str]:
-    """Connect configured MCP servers and register their tools.
+    """Connect configured, approved MCP servers and register their tools.
 
     Returns the registered tool names (``mcp_<server>_<tool>``), or `[]`
-    when the project declares no `[mcp.servers.*]`. Never raises — MCP
-    problems are logged warnings, not startup failures."""
-    from veles.mcp.config import load_disabled_tools, load_mcp_config
+    when the project declares no approved `[mcp.servers.*]`. A server whose
+    raw recipe the user has not approved is never spawned (one warning per
+    process). Never raises — MCP problems are logged warnings, not startup
+    failures."""
+    from veles.mcp.approvals import only_approved
+    from veles.mcp.config import load_disabled_tools, load_raw_mcp_servers, parse_servers
 
-    configs = load_mcp_config(project)
-    if not any(cfg.enabled for cfg in configs.values()):
+    raw = load_raw_mcp_servers(project)
+    configs = only_approved(project.root, parse_servers(raw), raw)
+    if not configs:
         return []
     try:
         manager = get_manager()

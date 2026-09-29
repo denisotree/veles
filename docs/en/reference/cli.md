@@ -401,14 +401,16 @@ External chat gateways (Telegram, …) that talk to a daemon. See
 
 ## MCP (external tool servers)
 
-### `veles mcp {list,test}`
-Inspect external MCP servers configured under `[mcp.servers.*]`. See
+### `veles mcp {list,test,approve}`
+Inspect and approve external MCP servers configured under `[mcp.servers.*]`. A server
+starts only after its exact recipe is approved. See
 [external MCP servers](../how-to/external-mcp-servers.md).
 
 | Subcommand | Purpose |
 |---|---|
-| `list [--connect-timeout f]` | Show configured servers, connection status, tool counts |
-| `test <server>` | Connect to one server and list its tools |
+| `list [--connect-timeout f]` | Show configured servers, approval state (yes/no/changed), connection status, tool counts |
+| `test <server>` | Connect to one approved server and list its tools |
+| `approve <server>` | Review the server's recipe and approve it to start |
 
 ---
 

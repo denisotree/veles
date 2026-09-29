@@ -199,6 +199,9 @@ def test_upgrade_restores_mcp_recipe_on_install_failure(tmp_path: Path, monkeypa
     cfg = tomllib.loads((project.root / ".veles" / "config.toml").read_text(encoding="utf-8"))
     assert cfg["mcp"]["servers"]["graph"] == {"command": "graphify-mcp"}
     assert all(i.problem != "missing" for i in verify(project))
+    from veles.mcp.approvals import approval_state
+
+    assert approval_state(project.root, "graph", {"command": "graphify-mcp"}) == "yes"
 
 
 def test_upgrade_refuses_ambiguous_name(tmp_path: Path) -> None:

@@ -161,13 +161,24 @@ def parse_server(name: str, raw: dict[str, Any]) -> McpServerConfig | None:
     )
 
 
-def load_mcp_config(project: Project) -> dict[str, McpServerConfig]:
-    """Parse `[mcp.servers.*]` from the project config.
+def load_raw_mcp_servers(project: Project) -> dict[str, Any]:
+    """`[mcp.servers]` exactly as written — no validation, no `${VAR}` expansion.
+    The approval hash is taken over these tables."""
+    return get_section(load_project_config(project), "mcp", "servers")
 
-    Returns `{}` when the section is absent. Disabled servers are kept in
+
+def load_mcp_config(project: Project) -> dict[str, McpServerConfig]:
+    """Parse `[mcp.servers.*]` from the project config (`parse_servers` over
+    `load_raw_mcp_servers`)."""
+    return parse_servers(load_raw_mcp_servers(project))
+
+
+def parse_servers(servers: dict[str, Any]) -> dict[str, McpServerConfig]:
+    """Validate raw `[mcp.servers]` tables.
+
+    Returns `{}` when there are none. Disabled servers are kept in
     the result (with `enabled=False`) so `veles mcp list` can show them;
     the connect path skips them."""
-    servers = get_section(load_project_config(project), "mcp", "servers")
     out: dict[str, McpServerConfig] = {}
     for name, raw in servers.items():
         if not isinstance(raw, dict):
@@ -209,5 +220,7 @@ __all__ = [
     "interpolate_env",
     "load_disabled_tools",
     "load_mcp_config",
+    "load_raw_mcp_servers",
     "parse_server",
+    "parse_servers",
 ]

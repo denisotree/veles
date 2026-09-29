@@ -8,8 +8,6 @@ does not.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import shutil
 from pathlib import Path
 
@@ -31,6 +29,7 @@ from veles.core.registry.records import InstallRecord, drop_record, load_records
 from veles.core.registry.repo import RegistryRepoError, fetch_git_source
 from veles.core.registry.versions import satisfies
 from veles.core.user_paths import user_home, user_modules_dir, user_skills_dir
+from veles.mcp.approvals import approve, recipe_hash, revoke
 
 
 class InstallError(RuntimeError):
@@ -173,6 +172,8 @@ def remove_installed(rec: InstallRecord) -> None:
             _drop_mcp_server(Path(config_path), rec.name)
         except OSError as exc:
             raise InstallError(f"could not remove {rec.path}: {exc}") from exc
+        if rec.project is not None:
+            revoke(Path(rec.project), rec.name)
     else:
         path = Path(rec.path)
         if path.exists():
@@ -222,7 +223,7 @@ def _install_mcp(found: Found, project: Project) -> InstallRecord:
     rec = _record(
         found,
         path=f"{project_config_path(project).resolve()}#mcp.servers.{name}",
-        digest=recipe_sha256(found.ext.mcp),
+        digest=recipe_hash(found.ext.mcp),
         project=project,
     )
     try:
@@ -230,11 +231,9 @@ def _install_mcp(found: Found, project: Project) -> InstallRecord:
     except OSError as exc:
         _drop_mcp_server(project_config_path(project), name)
         raise InstallError(f"{found.ref}: could not record install: {exc}") from exc
+    # The install passed `confirm_critical` on this exact recipe — that is the approval.
+    approve(project.root, name, servers[name])
     return rec
-
-
-def recipe_sha256(recipe: dict[str, object]) -> str:
-    return hashlib.sha256(json.dumps(recipe, sort_keys=True).encode()).hexdigest()
 
 
 def _drop_mcp_server(config_path: Path, name: str) -> None:

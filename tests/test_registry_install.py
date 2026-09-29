@@ -14,6 +14,8 @@ from veles.core.registry.gate import module_approved
 from veles.core.registry.hashing import tree_sha256
 from veles.core.registry.install import InstallError, install, uninstall
 from veles.core.registry.records import load_records
+from veles.mcp.approvals import approval_state
+from veles.mcp.config import load_raw_mcp_servers
 
 _MODULE_FILES = {
     "module.toml": '[module]\nname = "demo"\ndescription = "d"\nentrypoint = "demo.py:register"\n',
@@ -86,9 +88,12 @@ def test_install_mcp_writes_config(remote: Path, tmp_path: Path) -> None:
     install(resolve("graph"), project=project)
     cfg = tomllib.loads((project.root / ".veles" / "config.toml").read_text(encoding="utf-8"))
     assert cfg["mcp"]["servers"]["graph"]["command"] == "graphify-mcp"
+    recipe = load_raw_mcp_servers(project)["graph"]  # read back: TOML round-trip keeps the hash
+    assert approval_state(project.root, "graph", recipe) == "yes"
     uninstall("graph", project=project)
     cfg = tomllib.loads((project.root / ".veles" / "config.toml").read_text(encoding="utf-8"))
     assert "graph" not in cfg.get("mcp", {}).get("servers", {})
+    assert approval_state(project.root, "graph", recipe) == "no"
 
 
 def test_declined_confirmation_installs_nothing(remote: Path, tmp_path: Path) -> None:
@@ -232,6 +237,8 @@ def test_uninstall_mcp_write_failure_keeps_record(
     assert load_records() != []
     cfg = tomllib.loads((project.root / ".veles" / "config.toml").read_text(encoding="utf-8"))
     assert "graph" in cfg.get("mcp", {}).get("servers", {})
+    recipe = load_raw_mcp_servers(project)["graph"]
+    assert approval_state(project.root, "graph", recipe) == "yes"
 
 
 def test_name_clash_refused_without_confirmation(remote: Path, tmp_path: Path) -> None:
