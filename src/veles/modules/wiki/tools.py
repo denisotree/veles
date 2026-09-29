@@ -16,9 +16,11 @@ from __future__ import annotations
 import contextlib
 
 from veles.core.context import current_project
+from veles.core.path_guard import is_inside, resolve_safe
 from veles.core.risk import RiskClass
 from veles.core.slug import normalize_slug
-from veles.core.text import first_heading
+from veles.core.text import first_heading, shown
+from veles.core.tools.builtin.fs_write_guard import guard_write
 from veles.core.tools.registry import tool
 from veles.modules.wiki.wiki import Wiki
 
@@ -134,6 +136,20 @@ def wiki_rename_page(rel_path: str, new_category: str, new_slug: str) -> str:
     Returns the new relative path, or a `<error: ...>` marker.
     """
     wiki = _default_wiki()
+    # Only a page under wiki/ may be taken, and both ends obey the file tools'
+    # write guard — otherwise this moves `.veles/config.toml` into a page.
+    old_path = resolve_safe(wiki.root / rel_path)
+    if not is_inside(old_path, wiki.root / "wiki", fold=False):
+        return f"<error: {shown(rel_path)} is not a wiki page (must be under wiki/)>"
+    try:
+        new_category = wiki.validate_category(new_category)
+    except ValueError as exc:
+        return f"<error: {exc}>"
+    new_path = wiki.root / "wiki" / new_category / f"{normalize_slug(new_slug)}.md"
+    for endpoint in (old_path, new_path):
+        refusal = guard_write(endpoint, current_project())
+        if refusal is not None:
+            return refusal
     old_slug = rel_path.rsplit("/", 1)[-1].removesuffix(".md")
     try:
         title = next(
@@ -152,7 +168,6 @@ def wiki_rename_page(rel_path: str, new_category: str, new_slug: str) -> str:
     if new_rel == rel_path:
         return f"<error: target {new_rel} is the same page (no-op)>"
     # Remove the old file now that the new one is written.
-    old_path = wiki.root / rel_path
     with contextlib.suppress(OSError):
         old_path.unlink()
     # Repair inbound [[old-slug]] links across every page, then reindex.

@@ -224,7 +224,7 @@ def test_relocation_allowed_under_llm_wiki(isolated_home: Path, tmp_path: Path) 
     """`guard_write` (the chokepoint `move_file` calls on both endpoints)
     no longer refuses relocating an arbitrary project file into `wiki/`
     or `sources/` under the now-permissive llm-wiki pack."""
-    from veles.core.tools.builtin._fs_write_guard import guard_write
+    from veles.core.tools.builtin.fs_write_guard import guard_write
 
     project = init_project(tmp_path / "proj", name="proj")
     src = project.root / "misc" / "raw.txt"

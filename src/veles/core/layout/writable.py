@@ -19,7 +19,7 @@ write-permission mechanism.
 
 `is_writable(project, path)` is the runtime check the builtin
 `write_file` tool (and any agent-generated write tool) consults
-before persisting bytes, via `_fs_write_guard.guard_write` — the single
+before persisting bytes, via `fs_write_guard.guard_write` — the single
 chokepoint every builtin write/move/delete tool calls. The read sandbox
 (`path_guard.py`) stays unchanged — read remains full-project.
 
@@ -152,11 +152,17 @@ def _state_verdict(project: Project, abs_path: Path) -> bool | None:
     Decided by file identity (`is_inside`), not spelling, so `.VELES/trust.json`
     on a case-insensitive FS is still trust.json. The refusing side folds a
     missing tail; the allowing side compares it exactly, so folding never
-    widens the allow-list."""
+    widens the allow-list. An allow-listed name that is a symlink does not count:
+    `.veles/tmp -> .veles` (or -> the root) would otherwise open all of
+    `.veles/`, and any link can be retargeted after the check."""
     state = project.state_dir
     if not is_inside(abs_path, state, fold=True):
         return None
-    return any(is_inside(abs_path, state / name, fold=False) for name in AGENT_WRITABLE_STATE)
+    return any(
+        is_inside(abs_path, state / name, fold=False)
+        for name in AGENT_WRITABLE_STATE
+        if not (state / name).is_symlink()
+    )
 
 
 def _effective_writable_zones(project: Project) -> list[str]:

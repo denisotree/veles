@@ -78,7 +78,7 @@ def guard_write(p: Path, project) -> str | None:
         zones = writable_zones(project)
         zones_hint = ", ".join(zones) if zones else "(none)"
         return (
-            f"<refused: {display_path(p, project)} is outside the "
+            f"<refused: {shown(display_path(p, project))} is outside the "
             f"active layout-pack's writable zones. Allowed: {zones_hint}>"
         )
     return None

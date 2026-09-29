@@ -5,7 +5,7 @@ import logging
 from veles.core.context import current_project
 from veles.core.path_guard import resolve_safe
 from veles.core.risk import RiskClass
-from veles.core.tools.builtin._fs_write_guard import display_path, guard_write
+from veles.core.tools.builtin.fs_write_guard import display_path, guard_write
 from veles.core.tools.registry import tool
 
 logger = logging.getLogger(__name__)

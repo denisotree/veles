@@ -191,7 +191,7 @@ class Wiki:
             self._categories_resolved = _resolve_wiki_categories(self._root)
         return self._categories_resolved
 
-    def _validate_category(self, category: str) -> str:
+    def validate_category(self, category: str) -> str:
         """Normalize + validate a (possibly nested) category like `projects/work`.
         Its first segment must be a declared category root; every segment is
         slug-normalized. Raises ValueError otherwise."""
@@ -231,7 +231,7 @@ class Wiki:
         / `fetched:` so curator and lint can apply the right priority during
         contradiction resolution (M66, §8.6).
         """
-        category = self._validate_category(category)
+        category = self.validate_category(category)
         clean_slug = _normalize_slug(slug)
         self.ensure_layout()
         body = content if content.lstrip().startswith("#") else f"# {title}\n\n{content}"

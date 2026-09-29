@@ -152,6 +152,75 @@ def test_case_variant_refused(project) -> None:
     assert not _run_shell_granted()
 
 
+@pytest.mark.parametrize("target", [".veles", "."])
+def test_symlinked_allowed_subdir_does_not_open_state(project, target: str) -> None:
+    """`.veles/tmp -> .veles` (or -> the project root) must not make
+    trust.json / config.toml writable through or next to it."""
+    tmp = project.state_dir / "tmp"
+    if tmp.exists():
+        tmp.rmdir()
+    tmp.symlink_to((project.root / target).resolve(), target_is_directory=True)
+    project.trust_path.unlink(missing_ok=True)
+    if target == ".veles":
+        assert _refused(write_file(".veles/tmp/trust.json", _GRANT))
+    # (with tmp -> root, `.veles/tmp/trust.json` is just `<root>/trust.json`,
+    # ordinary content Veles never reads)
+    assert _refused(write_file(".veles/trust.json", _GRANT))
+    assert _refused(write_file(".veles/config.toml", "x"))
+    assert not project.trust_path.exists()
+    assert not _run_shell_granted()
+
+
+def test_allowed_subdir_symlink_elsewhere_is_not_allow_listed(project) -> None:
+    """An allow-listed name that is a symlink at all loses its allow-list pass:
+    the pass exists for Veles' own dirs, and a link can be retargeted later."""
+    for name in ("artifacts", "plans"):
+        if (project.state_dir / name).exists():
+            (project.state_dir / name).rmdir()
+    modules = project.state_dir / "modules"
+    modules.mkdir(exist_ok=True)
+    (project.state_dir / "artifacts").symlink_to(modules, target_is_directory=True)
+    assert _refused(write_file(".veles/artifacts/evil.py", "x"))
+    assert not (modules / "evil.py").exists()
+    # A link to ordinary content resolves outside .veles — the usual zone
+    # rules decide there, exactly as for any other in-project symlink.
+    notes = project.root / "notes"
+    notes.mkdir()
+    (project.state_dir / "plans").symlink_to(notes, target_is_directory=True)
+    assert write_file(".veles/plans/a.md", "x").startswith("wrote")
+
+
+def test_in_project_symlink_to_state_file_refused(project) -> None:
+    config = project.state_dir / "config.toml"
+    config.write_text("[engine]\n", encoding="utf-8")
+    link = project.root / "cfg.toml"
+    link.symlink_to(config)
+    assert _refused(write_file("cfg.toml", "x"))
+    assert _refused(edit_file("cfg.toml", "engine", "evil"))
+    assert _refused(delete_file("cfg.toml"))
+    assert config.read_text(encoding="utf-8") == "[engine]\n"
+
+
+def test_wiki_rename_page_cannot_take_state_files(project) -> None:
+    import veles.modules.wiki.tools as wt
+
+    config = project.state_dir / "config.toml"
+    config.write_text("[engine]\n", encoding="utf-8")
+    msg = wt.wiki_rename_page(".veles/config.toml", "concepts", "stolen")
+    assert msg.startswith("<"), msg
+    assert config.read_text(encoding="utf-8") == "[engine]\n"
+    assert not (project.root / "wiki" / "concepts" / "stolen.md").exists()
+
+
+def test_wiki_rename_page_only_moves_wiki_pages(project) -> None:
+    import veles.modules.wiki.tools as wt
+
+    readme = project.root / "README.md"
+    readme.write_text("# R\n", encoding="utf-8")
+    assert wt.wiki_rename_page("README.md", "concepts", "r").startswith("<")
+    assert readme.exists()
+
+
 def test_lookalike_dir_is_not_state(project) -> None:
     """`.veles-notes/` is ordinary project content, not Veles state."""
     assert "wrote" in write_file(".veles-notes/a.md", "x")
