@@ -101,6 +101,31 @@ class ModuleRegistry:
         for name, (module_name, factory) in self._memory_providers.items():
             yield name, module_name, factory
 
+    def merge_from(self, other: ModuleRegistry, module_name: str) -> None:
+        """Fold `other` (a scratch registry a single module's `register()` populated)
+        into self, then record `module_name` as loaded.
+
+        Called only once `register()` has returned without raising, so this is the one
+        moment a module's registrations become visible outside its own load attempt —
+        `load_module` builds each module a fresh scratch `ModuleRegistry`, and only a
+        clean `register()` return reaches this call, making registration atomic: a
+        module that raises never leaves hooks or providers behind (`api.add_hook` /
+        `api.add_memory_provider` only ever mutate the scratch copy).
+
+        A memory-provider name that collides with one already in self is treated as a
+        load failure too: raises `ValueError` (the caller turns it into a
+        `ModuleLoadError`) before anything is merged, so a colliding module leaves
+        nothing behind either — checked first so the merge itself is all-or-nothing.
+        """
+        for name in other._memory_providers:
+            if name in self._memory_providers:
+                owner = self._memory_providers[name][0]
+                raise ValueError(f"memory provider {name!r} is already registered by {owner!r}")
+        for hook_name, entries in other._hooks.items():
+            self._hooks[hook_name].extend(entries)
+        self._memory_providers.update(other._memory_providers)
+        self.modules.append(module_name)
+
 
 class ModuleAPI:
     """Thin facade passed to a module's `register(api)` function."""
@@ -185,12 +210,16 @@ def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
         raise ModuleLoadError(
             f"entrypoint {handle.manifest.entrypoint!r} resolved but is not callable"
         )
-    api = ModuleAPI(registry, handle.name)
+    scratch = ModuleRegistry()
+    api = ModuleAPI(scratch, handle.name)
     try:
         register(api)
     except Exception as exc:
         raise ModuleLoadError(f"register() raised {type(exc).__name__}: {exc}") from exc
-    registry.modules.append(handle.name)
+    try:
+        registry.merge_from(scratch, handle.name)
+    except ValueError as exc:
+        raise ModuleLoadError(str(exc)) from exc
 
 
 # ---- Hook firing ----

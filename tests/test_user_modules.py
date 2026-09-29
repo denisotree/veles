@@ -129,3 +129,70 @@ def test_user_module_memory_provider_is_built_under_its_registry(tmp_path: Path)
     finally:
         reset_module_registry(token)
     assert provider == {"cfg": {"api_key": "k"}}
+
+
+def test_module_that_fails_to_register_leaves_nothing_behind(tmp_path: Path, capsys) -> None:
+    """A module whose `register()` raises must not leave partial state behind: not the
+    hook, not the memory provider it registered before raising."""
+    project = init_project(tmp_path / "p", name="p")
+    d = user_modules_dir() / "boom"
+    d.mkdir(parents=True)
+    (d / "module.toml").write_text(
+        '[module]\nname = "boom"\ndescription = "d"\nentrypoint = "m.py:register"\n',
+        encoding="utf-8",
+    )
+    (d / "m.py").write_text(
+        "def register(api):\n"
+        "    api.add_hook('pre_turn', lambda **kw: None)\n"
+        "    api.add_memory_provider('fake', lambda cfg: object())\n"
+        "    raise RuntimeError('boom')\n",
+        encoding="utf-8",
+    )
+    approve_module(d, name="boom", project_root=None)
+
+    registry = _load_project_modules(project)
+
+    assert registry.modules == []
+    assert [m for m, _ in registry.iter_hooks("pre_turn")] == []
+    assert list(registry.iter_memory_providers()) == []
+    assert "boom" in capsys.readouterr().err
+
+
+def test_module_with_colliding_provider_name_is_skipped_entirely(tmp_path: Path, capsys) -> None:
+    """A module whose `register()` returns cleanly but whose memory-provider name
+    collides with one an earlier module already registered is skipped as a whole — its
+    hook must not land either, only the earlier module's provider stays registered."""
+    project = init_project(tmp_path / "p", name="p")
+
+    first = user_modules_dir() / "first"
+    first.mkdir(parents=True)
+    (first / "module.toml").write_text(
+        '[module]\nname = "first"\ndescription = "d"\nentrypoint = "m.py:register"\n',
+        encoding="utf-8",
+    )
+    (first / "m.py").write_text(
+        "def register(api):\n    api.add_memory_provider('fake', lambda cfg: object())\n",
+        encoding="utf-8",
+    )
+    approve_module(first, name="first", project_root=None)
+
+    second = user_modules_dir() / "second"
+    second.mkdir(parents=True)
+    (second / "module.toml").write_text(
+        '[module]\nname = "second"\ndescription = "d"\nentrypoint = "m.py:register"\n',
+        encoding="utf-8",
+    )
+    (second / "m.py").write_text(
+        "def register(api):\n"
+        "    api.add_hook('post_turn', lambda **kw: None)\n"
+        "    api.add_memory_provider('fake', lambda cfg: object())\n",
+        encoding="utf-8",
+    )
+    approve_module(second, name="second", project_root=None)
+
+    registry = _load_project_modules(project)
+
+    assert registry.modules == ["first"]
+    assert [m for m, _ in registry.iter_hooks("post_turn")] == []
+    assert [name for name, _module, _factory in registry.iter_memory_providers()] == ["fake"]
+    assert "second" in capsys.readouterr().err

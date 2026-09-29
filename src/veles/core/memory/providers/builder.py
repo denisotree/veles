@@ -33,7 +33,9 @@ def build_extra_providers(config_path: Path | None = None) -> list[object]:
     if registry is None:
         # No module registry at all (e.g. a command that runs without a project) —
         # nothing can ever build these providers here, so warning about missing
-        # installs would just be noise every time such a command runs.
+        # installs would just be noise every time such a command runs. Today every
+        # caller runs inside `_run_in_project`/`_bootstrap_daemon`, so this only
+        # guards future callers that might invoke this outside either.
         return []
     factories = {name: factory for name, _module, factory in registry.iter_memory_providers()}
     providers: list[object] = []
