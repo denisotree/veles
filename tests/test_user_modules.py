@@ -54,6 +54,23 @@ def test_project_module_overrides_user_module(tmp_path: Path, capsys) -> None:
     assert "overrides the user-level one" in capsys.readouterr().err
 
 
+def test_unapproved_project_module_does_not_shadow_approved_user_module(
+    tmp_path: Path, capsys
+) -> None:
+    """A planted, unapproved project module named like an approved user module must
+    not disable it: the gate runs before override, and the warning names the planted dir."""
+    project = init_project(tmp_path / "p", name="p")
+    approve_module(_module(user_modules_dir(), "same"), name="same", project_root=None)
+    planted = _module(project.modules_dir, "same", hook="post_turn")
+    registry = _load_project_modules(project)
+    assert registry.modules == ["same"]
+    assert [m for m, _ in registry.iter_hooks("pre_turn")] == ["same"]
+    assert [m for m, _ in registry.iter_hooks("post_turn")] == []
+    err = capsys.readouterr().err
+    assert str(planted) in err
+    assert "overrides" not in err
+
+
 def test_changed_user_module_is_refused(tmp_path: Path, capsys) -> None:
     project = init_project(tmp_path / "p", name="p")
     d = _module(user_modules_dir(), "u1")

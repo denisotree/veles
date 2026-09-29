@@ -46,16 +46,35 @@ def _dedup_by_name(handles: list[ModuleHandle], *, scope: str) -> list[ModuleHan
     return out
 
 
-def _load_project_modules(project: Project) -> ModuleRegistry:
-    """User-level modules (`~/.veles/modules/`) first, then the project's; a project module
-    with the same name replaces the user-level one. Every module passes the same gate."""
+def _admitted(handles: list[ModuleHandle], *, flag: str) -> list[ModuleHandle]:
+    """The handles the load gate admits; each refused one is named by its dir."""
     from veles.core.registry.gate import admit_module
+
+    out: list[ModuleHandle] = []
+    for handle in handles:
+        refusal = admit_module(handle.dir)
+        if refusal is None:
+            out.append(handle)
+            continue
+        print(
+            f"warning: skipping module {handle.name!r} at {handle.dir}: {refusal} — review "
+            f"it, then `veles module approve {flag}{handle.name}`",
+            file=sys.stderr,
+        )
+    return out
+
+
+def _load_project_modules(project: Project) -> ModuleRegistry:
+    """User-level modules (`~/.veles/modules/`) first, then the project's. Every module
+    passes the gate first; only then does an approved project module replace a same-named
+    user-level one, so an unapproved dir can never disable an approved module."""
     from veles.core.user_paths import user_modules_dir
 
-    user_dir = user_modules_dir().resolve()
-    project_handles = _dedup_by_name(discover_modules(project), scope="project")
+    project_handles = _dedup_by_name(_admitted(discover_modules(project), flag=""), scope="project")
     overridden = {h.name for h in project_handles}
-    user_handles = _dedup_by_name(discover_modules_in(user_modules_dir()), scope="user")
+    user_handles = _dedup_by_name(
+        _admitted(discover_modules_in(user_modules_dir()), flag="--user "), scope="user"
+    )
     handles: list[ModuleHandle] = []
     for h in user_handles:
         if h.name in overridden:
@@ -68,15 +87,6 @@ def _load_project_modules(project: Project) -> ModuleRegistry:
     handles.extend(project_handles)
     registry = ModuleRegistry()
     for handle in handles:
-        refusal = admit_module(handle.dir)
-        if refusal is not None:
-            scope = "--user " if handle.dir.resolve().parent == user_dir else ""
-            print(
-                f"warning: skipping module {handle.name!r}: {refusal} — review it, then "
-                f"`veles module approve {scope}{handle.name}`",
-                file=sys.stderr,
-            )
-            continue
         try:
             load_module(handle, registry)
         except ModuleLoadError as exc:
