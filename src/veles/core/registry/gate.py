@@ -58,7 +58,11 @@ def admit_module(module_dir: Path) -> str | None:
 
 
 def approve_module(
-    module_dir: Path, *, name: str, project_root: Path, expected_sha256: str | None = None
+    module_dir: Path,
+    *,
+    name: str,
+    project_root: Path | None,
+    expected_sha256: str | None = None,
 ) -> InstallRecord:
     """Record `module_dir`'s current hash as approved. `expected_sha256` is the hash
     the user was shown: if the files changed since, nothing is approved. A module
@@ -79,7 +83,7 @@ def approve_module(
         kind="module",
         path=str(module_dir.resolve()),
         tree_sha256=digest,
-        project=str(project_root.resolve()),
+        project=str(project_root.resolve()) if project_root is not None else None,
         registry=existing.registry if existing else None,
         group=existing.group if existing else "",
         version=existing.version if existing else "",

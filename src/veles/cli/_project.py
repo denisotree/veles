@@ -11,9 +11,11 @@ import sys
 from pathlib import Path
 
 from veles.core.modules import (
+    ModuleHandle,
     ModuleLoadError,
     ModuleRegistry,
     discover_modules,
+    discover_modules_in,
     load_module,
 )
 from veles.core.project import (
@@ -27,15 +29,31 @@ from veles.core.slug import normalize_slug as _normalize_slug
 
 
 def _load_project_modules(project: Project) -> ModuleRegistry:
+    """User-level modules (`~/.veles/modules/`) first, then the project's; a project module
+    with the same name replaces the user-level one. Every module passes the same gate."""
     from veles.core.registry.gate import admit_module
+    from veles.core.user_paths import user_modules_dir
 
+    project_handles = discover_modules(project)
+    overridden = {h.name for h in project_handles}
+    handles: list[ModuleHandle] = []
+    for h in discover_modules_in(user_modules_dir()):
+        if h.name in overridden:
+            print(
+                f"warning: module {h.name!r} in the project overrides the user-level one",
+                file=sys.stderr,
+            )
+            continue
+        handles.append(h)
+    handles.extend(project_handles)
     registry = ModuleRegistry()
-    for handle in discover_modules(project):
+    for handle in handles:
         refusal = admit_module(handle.dir)
         if refusal is not None:
+            scope = "--user " if handle.dir.parent == user_modules_dir() else ""
             print(
                 f"warning: skipping module {handle.name!r}: {refusal} — review it, then "
-                f"`veles module approve {handle.name}`",
+                f"`veles module approve {scope}{handle.name}`",
                 file=sys.stderr,
             )
             continue

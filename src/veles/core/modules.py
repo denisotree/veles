@@ -120,9 +120,8 @@ def reset_module_registry(token: Token) -> None:
 # ---- Discovery / loading ----
 
 
-def discover_modules(project: Project) -> list[ModuleHandle]:
-    """Scan `<project>/.veles/modules/`. Skip directories with bad manifest."""
-    root = project.modules_dir
+def discover_modules_in(root: Path) -> list[ModuleHandle]:
+    """Modules in one directory (`<root>/<name>/module.toml`). Bad manifests are skipped."""
     if not root.is_dir():
         return []
     out: list[ModuleHandle] = []
@@ -139,6 +138,11 @@ def discover_modules(project: Project) -> list[ModuleHandle]:
             continue
         out.append(ModuleHandle(name=manifest.name, manifest=manifest, dir=entry))
     return out
+
+
+def discover_modules(project: Project) -> list[ModuleHandle]:
+    """Scan `<project>/.veles/modules/`."""
+    return discover_modules_in(project.modules_dir)
 
 
 def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
