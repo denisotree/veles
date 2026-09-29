@@ -11,18 +11,36 @@ from __future__ import annotations
 
 import hashlib
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 
-_SKIP_DIRS = frozenset({".git", "__pycache__"})
 _SKIP_NAMES = frozenset({".DS_Store"})
 _ROOT_SKIP = frozenset({"extension.toml"})
-BYTECODE_PATTERNS = ("__pycache__", "*.pyc")
+
+
+def is_bytecode(name: str) -> bool:
+    """A `__pycache__` dir or `*.pyc` name, in any letter case: on a case-insensitive
+    filesystem (macOS APFS) the import system opens `__PYCACHE__/X.PYC` as the
+    cache file for `x.py`."""
+    folded = name.casefold()
+    return folded == "__pycache__" or folded.endswith(".pyc")
+
+
+def hash_skips(name: str) -> bool:
+    """True for a path component `tree_sha256` never looks inside (`.git`, bytecode).
+    Code under such a component is unreviewed, so it must never be loaded."""
+    return name.casefold() == ".git" or is_bytecode(name)
+
+
+def copy_ignore(*extra: str) -> Callable[[str, list[str]], set[str]]:
+    """`shutil.copytree` ignore: drop every hash-skipped name, plus `extra` names."""
+    return lambda _dir, names: {n for n in names if hash_skips(n) or n in extra}
 
 
 def bytecode_paths(root: Path) -> list[Path]:
     """Every `__pycache__/` dir and stray `*.pyc` under `root` — the files the hash
     ignores, so the ones that must never be trusted as reviewed code."""
-    return sorted(p for p in root.rglob("*") if p.name == "__pycache__" or p.suffix == ".pyc")
+    return sorted(p for p in root.rglob("*") if is_bytecode(p.name))
 
 
 def strip_bytecode(root: Path) -> None:
@@ -44,9 +62,9 @@ def tree_sha256(root: Path) -> str:
         rel = path.relative_to(root)
         if path.is_symlink():
             raise ValueError(f"symlinks are not allowed in an extension: {rel.as_posix()}")
-        if any(part in _SKIP_DIRS for part in rel.parts):
+        if any(hash_skips(part) for part in rel.parts):
             continue
-        if path.is_dir() or path.suffix == ".pyc" or path.name in _SKIP_NAMES:
+        if path.is_dir() or path.name in _SKIP_NAMES:
             continue
         if len(rel.parts) == 1 and rel.name in _ROOT_SKIP:
             continue

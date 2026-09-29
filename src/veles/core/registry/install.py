@@ -25,7 +25,7 @@ from veles.core.project_config import (
 )
 from veles.core.registry.catalog import Found
 from veles.core.registry.gate import now_iso
-from veles.core.registry.hashing import BYTECODE_PATTERNS, tree_sha256
+from veles.core.registry.hashing import copy_ignore, tree_sha256
 from veles.core.registry.model import EXTENSION_FILE
 from veles.core.registry.records import InstallRecord, drop_record, load_records, put_record
 from veles.core.registry.repo import RegistryRepoError, fetch_git_source
@@ -204,7 +204,7 @@ def materialise(found: Found, target: Path) -> None:
         ext.dir,
         target,
         symlinks=True,
-        ignore=shutil.ignore_patterns(EXTENSION_FILE, ".git", *BYTECODE_PATTERNS),
+        ignore=copy_ignore(EXTENSION_FILE),
     )
 
 

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -176,6 +177,22 @@ def test_fetch_git_source_drops_bytecode(tmp_path: Path) -> None:
     assert (dest / "mod.py").is_file()
     assert not (dest / "__pycache__").exists()
     assert not (dest / "helper.pyc").exists()
+
+
+def test_fetch_git_source_drops_case_variant_bytecode(tmp_path: Path) -> None:
+    upstream = tmp_path / "upstream"
+    (upstream / "pkg" / "__PYCACHE__").mkdir(parents=True)
+    (upstream / "pkg" / "mod.py").write_text("x = 1\n", encoding="utf-8")
+    (upstream / "pkg" / "__PYCACHE__" / "MOD.CPYTHON-313.PYC").write_bytes(b"\0")
+    (upstream / "pkg" / "HELPER.PYC").write_bytes(b"\0")
+    git(upstream, "init", "-q", "-b", "main")
+    git(upstream, "add", "-f", "-A")
+    head = commit_all(upstream, "with bytecode")
+    assert "pkg/HELPER.PYC" in git(upstream, "ls-files")
+    dest = tmp_path / "install-target"
+    src = Source(type="git", url=str(upstream), commit=head, subdir="pkg", sha256="0" * 64)
+    fetch_git_source(src, dest)
+    assert sorted(os.listdir(dest)) == ["mod.py"]
 
 
 def test_fetch_git_source_rejects_escaping_subdir(private_registry: Path, tmp_path: Path) -> None:

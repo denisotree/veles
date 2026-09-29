@@ -14,7 +14,7 @@ import subprocess
 from pathlib import Path
 
 from veles.core.registry.config import RegistrySource, cache_dir
-from veles.core.registry.hashing import BYTECODE_PATTERNS
+from veles.core.registry.hashing import copy_ignore
 from veles.core.registry.model import Source
 
 _GIT_TIMEOUT_S = 300
@@ -97,7 +97,7 @@ def fetch_git_source(src: Source, dest: Path) -> None:
             payload,
             dest,
             symlinks=True,
-            ignore=shutil.ignore_patterns(".git", *BYTECODE_PATTERNS),
+            ignore=copy_ignore(),
         )
     finally:
         shutil.rmtree(work, ignore_errors=True)

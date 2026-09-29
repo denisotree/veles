@@ -302,6 +302,23 @@ def test_bytecode_in_payload_fails(tmp_path: Path) -> None:
     assert any("bytecode" in e and "helper.pyc" in e for e in errors), errors
 
 
+def test_case_variant_bytecode_in_payload_fails(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "r")
+    ext = write_extension(
+        root,
+        "official",
+        "demo",
+        kind="module",
+        extra_ext='provides = ["hook:pre_turn"]',
+        files=_MODULE_FILES,
+    )
+    (ext / "__PYCACHE__").mkdir()
+    (ext / "__PYCACHE__" / "DEMO.CPYTHON-313.PYC").write_bytes(b"\0")
+    (ext / "X.PYC").write_bytes(b"\0")
+    [error] = [e for e in validate_registry(root).errors if "bytecode" in e]
+    assert "__PYCACHE__" in error and "X.PYC" in error
+
+
 def test_run_code_leaves_no_bytecode_behind(tmp_path: Path) -> None:
     root = write_registry(tmp_path / "r")
     files = {**_MODULE_FILES, "tests/test_ok.py": "def test_x():\n    assert True\n"}

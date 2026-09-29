@@ -1,3 +1,4 @@
+import os
 import tomllib
 from collections.abc import Iterator
 from pathlib import Path
@@ -50,6 +51,24 @@ def test_install_skill_into_project(remote: Path, tmp_path: Path) -> None:
 def test_install_module_is_approved(remote: Path, tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     install(resolve("demo"), project=project)
+    assert module_approved(project.modules_dir / "demo")
+
+
+def test_install_drops_case_variant_bytecode(remote: Path, tmp_path: Path) -> None:
+    from tests.registry_helpers import git
+    from veles.core.registry.config import get_source
+    from veles.core.registry.repo import update
+
+    ext = remote / "extensions" / "official" / "demo"
+    (ext / "__PYCACHE__").mkdir()
+    (ext / "__PYCACHE__" / "DEMO.CPYTHON-313.PYC").write_bytes(b"\0")
+    (ext / "X.PYC").write_bytes(b"\0")
+    git(remote, "add", "-f", "-A")
+    commit_all(remote, "bytecode")
+    update(get_source("private"))
+    project = init_project(tmp_path / "p", name="p")
+    install(resolve("demo"), project=project)
+    assert sorted(os.listdir(project.modules_dir / "demo")) == ["demo.py", "module.toml"]
     assert module_approved(project.modules_dir / "demo")
 
 

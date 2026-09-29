@@ -2,6 +2,7 @@ import argparse
 import importlib.util
 import os
 import py_compile
+import sys
 from pathlib import Path
 
 import pytest
@@ -92,6 +93,37 @@ def test_planted_bytecode_never_runs(tmp_path: Path) -> None:
     assert [m for m, _ in registry.iter_hooks("pre_turn")] == ["demo"]
     assert list(registry.iter_hooks("post_turn")) == []
     assert not stray.exists()
+
+
+def test_case_variant_bytecode_never_runs(tmp_path: Path) -> None:
+    # On a case-insensitive FS (macOS APFS) the import system opens
+    # `__PYCACHE__/DEMO.<TAG>.PYC` as `__pycache__/demo.<tag>.pyc` — so the
+    # uppercase spelling must be stripped exactly like the lowercase one.
+    from veles.cli._project import _load_project_modules
+
+    project = init_project(tmp_path / "p", name="p")
+    d = _make_module(project.root)
+    evil_src = d.parent / "evil_src.py"
+    evil_src.write_text(
+        "def register(api):\n    api.add_hook('post_turn', lambda **kw: None)\n", encoding="utf-8"
+    )
+    cfile = d / "__PYCACHE__" / f"DEMO.{sys.implementation.cache_tag.upper()}.PYC"
+    cfile.parent.mkdir()
+    py_compile.compile(
+        str(evil_src),
+        cfile=str(cfile),
+        dfile=str(d / "demo.py"),
+        doraise=True,
+        invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH,
+    )
+    evil_src.unlink()
+    (d / "HELPER.PYC").write_bytes(b"\0")
+    approve_module(d, name="demo", project_root=project.root)
+    registry = _load_project_modules(project)
+    assert registry.modules == ["demo"]  # hash and strip agree
+    assert [m for m, _ in registry.iter_hooks("pre_turn")] == ["demo"]
+    assert list(registry.iter_hooks("post_turn")) == []
+    assert not {"__PYCACHE__", "HELPER.PYC"} & set(os.listdir(d))
 
 
 @pytest.mark.skipif(os.geteuid() == 0, reason="root ignores directory permissions")
