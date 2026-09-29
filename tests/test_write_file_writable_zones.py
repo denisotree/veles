@@ -36,7 +36,7 @@ def test_wiki_write_succeeds(project) -> None:
 
 
 def test_veles_state_write_succeeds(project) -> None:
-    """.veles/ is always writable, regardless of pack."""
+    """.veles/tmp/ (the agent's scratch) is always writable, regardless of pack."""
     target = project.root / ".veles" / "tmp" / "scratch.txt"
     msg = write_file(str(target), "scratch")
     assert "wrote" in msg

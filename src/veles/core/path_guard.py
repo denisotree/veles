@@ -107,16 +107,16 @@ def _closed_user_path(resolved: Path) -> bool:
     not via the roots: a project root that contains `user_home()` (a project at `~`, or
     `VELES_USER_HOME` inside the project) would otherwise swallow the whitelist in
     `_dedupe` and open approvals, trust and modules to the agent. Decided by file
-    identity (`_same_place`), not by spelling."""
+    identity (`is_inside`), not by spelling."""
     home = user_home()
-    if not _same_place(resolved, home, fold=True):  # refusing side: fold, over-refuse
+    if not is_inside(resolved, home, fold=True):  # refusing side: fold, over-refuse
         return False
     # Allowing side: exact names for a missing tail, so folding never widens the
     # whitelist (on a case-sensitive FS `SKILLS` is a different, closed dir).
-    return not any(_same_place(resolved, home / n, fold=False) for n in _USER_ROOT_WHITELIST)
+    return not any(is_inside(resolved, home / n, fold=False) for n in _USER_ROOT_WHITELIST)
 
 
-def _same_place(target: Path, directory: Path, *, fold: bool) -> bool:
+def is_inside(target: Path, directory: Path, *, fold: bool) -> bool:
     """Is `target` inside `directory`, as the filesystem sees it? `resolve()` keeps the
     caller's spelling, and on a case- or normalization-insensitive FS (macOS APFS)
     `.VELES` or an NFD `café` *is* the same dir — so the comparison is by identity

@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from veles.core.critical_ops import confirm_critical
+from veles.core.text import shown
 
 
 def is_within(child: Path, parent: Path) -> bool:
@@ -47,6 +48,9 @@ def guard_write(p: Path, project) -> str | None:
     - Outside the active project root → M39 hard-confirm (the agent could
       install executable code under `~/.veles/skills|modules/`); refusal
       returns a `<refused …>` string.
+    - Inside the project's `.veles/` but outside the agent's own subdirs →
+      refused: trust.json, config.toml, modules/ … are Veles' state, and
+      writing them would let the agent grant itself tools or load code.
     - Inside the project root → M117d writable-zone check from the active
       layout pack; a write outside the declared zones is refused with the
       allowed-zones hint.
@@ -63,8 +67,13 @@ def guard_write(p: Path, project) -> str | None:
         if not ok:
             return f"<refused: write to {p} outside active project not confirmed>"
         return None
-    from veles.core.layout.writable import is_writable, writable_zones
+    from veles.core.layout.writable import is_veles_managed, is_writable, writable_zones
 
+    if is_veles_managed(project, p):
+        return (
+            f"<refused: {shown(display_path(p, project))} is managed by Veles; "
+            "change it with veles commands, not file tools>"
+        )
     if not is_writable(project, p):
         zones = writable_zones(project)
         zones_hint = ", ".join(zones) if zones else "(none)"
