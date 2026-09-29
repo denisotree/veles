@@ -165,3 +165,101 @@ def test_diff_preview_escapes_control_chars_in_path(capsys: pytest.CaptureFixtur
     out = capsys.readouterr().out
     assert "\x1b" not in out
     assert "\\x1b" in out
+
+
+# ---------------- permission prompt body: agent-controlled fields escaped ----------------
+
+
+def test_shown_multiline_escapes_carriage_return() -> None:
+    """`\\r` is not `\\n`/`\\t`, so `shown_multiline` still escapes it — a raw
+    CR is a terminal-line-overwrite vector (VISION-style spoofing), same
+    class as ESC."""
+    from veles.core.text import shown_multiline
+
+    assert shown_multiline("a\rb") == "a\\rb"
+
+
+def test_permission_prompt_body_escapes_control_chars_in_arguments() -> None:
+    from veles.core.permission.prompt import PromptRequest, format_prompt_body
+
+    req = PromptRequest(
+        tool_name="run_shell",
+        arguments={"command": "ls\x1b[2K\r; rm -rf /"},
+        reason="process_execution requires trust ladder",
+        kind="trust",
+    )
+    body = format_prompt_body(req)
+    assert "\x1b" not in body  # no raw ESC
+    assert "\r" not in body  # no raw CR (line-overwrite spoofing)
+    assert "\\x1b" in body  # escaped forms present instead
+    assert "\\r" in body
+    assert "run_shell" in body
+
+
+def test_repl_confirm_critical_escapes_control_chars_in_op_and_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The REPL's in-app M39 picker (`_confirm_critical`) prints `op`/`summary`
+    escaped, same as the default confirmer — separate code path, same
+    property."""
+    import argparse
+    import threading
+    import time as _t
+
+    from rich.console import Console
+
+    from veles.cli.commands import repl as repl_mod
+    from veles.cli.commands.repl import _ReplApp, _resolve_theme
+    from veles.cli.repl.slash import build_default_registry
+    from veles.core.memory import SessionStore
+    from veles.core.project import init_project
+    from veles.core.session_state import AppState
+
+    project = init_project(tmp_path, name="repltest")
+    store = SessionStore(project.memory_db_path)
+    state = AppState(session_id=None, provider_name="openrouter", model="m")
+    # Plain Console (not the REPL's force_terminal=True one): under pytest
+    # capture, rich then emits no ANSI style codes of its own, so the only
+    # ESC bytes in `out` — if any — come from our escaping bug, not from
+    # styling. The `_render_edit_diff` tests above use the same approach.
+    app = _ReplApp(
+        argparse.Namespace(),
+        project,
+        state,
+        lambda *_a, **_k: None,
+        store,
+        build_default_registry(project=project),
+        Console(),
+        _resolve_theme(state),
+        [],
+    )
+    try:
+        monkeypatch.setattr(repl_mod.sys.stdin, "isatty", lambda: True)
+        result: dict = {}
+        op = "dispatch delete_file\x1b[2K evil"
+        summary = "line one\rCR-injected"
+
+        def _run():
+            result["ok"] = app._confirm_critical(op, summary)
+
+        th = threading.Thread(target=_run)
+        th.start()
+        for _ in range(400):
+            if app.q_active:
+                break
+            _t.sleep(0.005)
+        assert app.q_active
+        app.q_sel = 1  # highlight defaults to Cancel (safe)
+        app._picker_enter()
+        th.join(timeout=2)
+        assert result["ok"] is False
+    finally:
+        store.close()
+
+    out = capsys.readouterr().out
+    assert "\x1b" not in out
+    assert "\r" not in out
+    assert "\\x1b" in out
+    assert "\\r" in out
+    assert "dispatch delete_file" in out
+    assert "line one" in out
