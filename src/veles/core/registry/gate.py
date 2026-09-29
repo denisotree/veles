@@ -35,14 +35,29 @@ def module_approved(module_dir: Path) -> bool:
         return False
 
 
-def admit_module(module_dir: Path) -> str | None:
-    """Why the module may not load, or None when it may. `module_approved`, then no
-    `.git` anywhere (outside the hash), then drop the module's bytecode so the import
-    that follows compiles the reviewed source instead of running a planted `.pyc`.
-    Fails closed: bytecode that can't be removed refuses the module."""
+def admit_module(module_dir: Path, *, project_root: Path | None) -> str | None:
+    """Why the module may not load, or None when it may. `project_root` is the scope it
+    is being loaded in (None = user scope). The dir must be a real dir in its modules
+    dir (no symlink borrowing another dir's approval), approved for this very scope,
+    and unchanged (`module_approved`); then no `.git` anywhere (outside the hash), then
+    drop the module's bytecode so the import that follows compiles the reviewed source
+    instead of running a planted `.pyc`. Fails closed: bytecode that can't be removed
+    refuses the module."""
     if sys.pycache_prefix:
         # Bytecode would then be read from outside the module dir, where no strip reaches.
         return "PYTHONPYCACHEPREFIX (sys.pycache_prefix) is set; unset it to load modules"
+    # Records are keyed by resolved path, so a symlinked module dir would inherit the
+    # approval of whatever it points at. Symlinked ancestors (a project under a linked
+    # dir) are fine: they are resolved on both the approval and the load side.
+    if module_dir.is_symlink() or module_dir.resolve() != module_dir.parent.resolve() / (
+        module_dir.name
+    ):
+        return "its directory is a symlink; a module dir must be a real directory"
+    rec = record_for_path(str(module_dir.resolve()))
+    scope = str(project_root.resolve()) if project_root is not None else None
+    if rec is not None and rec.project != scope:
+        where = "user scope" if rec.project is None else "another project"
+        return f"it was approved for {where}, not for where it is loading"
     if not module_approved(module_dir):
         return "not approved, or changed since approval"
     try:

@@ -46,13 +46,15 @@ def _dedup_by_name(handles: list[ModuleHandle], *, scope: str) -> list[ModuleHan
     return out
 
 
-def _admitted(handles: list[ModuleHandle], *, flag: str) -> list[ModuleHandle]:
-    """The handles the load gate admits; each refused one is named by its dir."""
+def _admitted(handles: list[ModuleHandle], *, project_root: Path | None) -> list[ModuleHandle]:
+    """The handles the load gate admits in this scope (`project_root` None = user);
+    each refused one is named by its dir."""
     from veles.core.registry.gate import admit_module
 
+    flag = "--user " if project_root is None else ""
     out: list[ModuleHandle] = []
     for handle in handles:
-        refusal = admit_module(handle.dir)
+        refusal = admit_module(handle.dir, project_root=project_root)
         if refusal is None:
             out.append(handle)
             continue
@@ -70,10 +72,12 @@ def _load_project_modules(project: Project) -> ModuleRegistry:
     user-level one, so an unapproved dir can never disable an approved module."""
     from veles.core.user_paths import user_modules_dir
 
-    project_handles = _dedup_by_name(_admitted(discover_modules(project), flag=""), scope="project")
+    project_handles = _dedup_by_name(
+        _admitted(discover_modules(project), project_root=project.root), scope="project"
+    )
     overridden = {h.name for h in project_handles}
     user_handles = _dedup_by_name(
-        _admitted(discover_modules_in(user_modules_dir()), flag="--user "), scope="user"
+        _admitted(discover_modules_in(user_modules_dir()), project_root=None), scope="user"
     )
     handles: list[ModuleHandle] = []
     for h in user_handles:
