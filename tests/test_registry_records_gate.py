@@ -151,10 +151,38 @@ def test_code_inside_git_dir_is_refused(tmp_path: Path, monkeypatch, capsys) -> 
     registry = _load_project_modules(project)
     assert registry.modules == []
     assert list(registry.iter_hooks("post_turn")) == []
-    assert ".GIT/gitdir_helper.py" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "remove the .git directory (.GIT)" in err and "veles module approve demo" in err
 
 
-def test_plain_git_dir_still_loads(tmp_path: Path) -> None:
+def test_zip_inside_git_dir_never_runs(tmp_path: Path, monkeypatch) -> None:
+    # zipimport accepts an archive of any name on sys.path — no suffix list catches it.
+    import zipfile
+
+    from veles.cli._project import _load_project_modules
+
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    monkeypatch.delitem(sys.modules, "gitzip_helper", raising=False)
+    project = init_project(tmp_path / "p", name="p")
+    d = _make_module(project.root)
+    (d / "demo.py").write_text(
+        "import pathlib, sys\n"
+        "sys.path.insert(0, str(pathlib.Path(__file__).parent / '.git/objects/pack/x.pack'))\n"
+        "from gitzip_helper import register\n",
+        encoding="utf-8",
+    )
+    pack = d / ".git" / "objects" / "pack" / "x.pack"
+    pack.parent.mkdir(parents=True)
+    with zipfile.ZipFile(pack, "w") as zf:
+        zf.writestr("gitzip_helper.py", _DEMO_PY.replace("pre_turn", "post_turn"))
+    approve_module(d, name="demo", project_root=project.root)
+    registry = _load_project_modules(project)
+    assert registry.modules == []
+    assert list(registry.iter_hooks("post_turn")) == []
+    assert "gitzip_helper" not in sys.modules
+
+
+def test_plain_git_dir_is_refused(tmp_path: Path) -> None:
     from veles.cli._project import _load_project_modules
 
     project = init_project(tmp_path / "p", name="p")
@@ -163,7 +191,7 @@ def test_plain_git_dir_still_loads(tmp_path: Path) -> None:
     (d / ".git" / "objects" / "ab" / "cdef0123").write_bytes(b"x\x9c")
     (d / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
     approve_module(d, name="demo", project_root=project.root)
-    assert _load_project_modules(project).modules == ["demo"]
+    assert _load_project_modules(project).modules == []
 
 
 def _point_entrypoint_at(d: Path, rel: str) -> None:

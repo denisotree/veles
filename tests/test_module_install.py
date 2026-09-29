@@ -46,6 +46,31 @@ def test_derive_name_strips_dot_git_suffix() -> None:
     assert _derive_name("https://github.com/u/foo-mod.git") == "foo-mod"
 
 
+@pytest.mark.parametrize("dirname", ["demo.git", "demo"])  # git clone / directory copy
+def test_module_add_from_git_repo_drops_dot_git(tmp_path: Path, dirname: str) -> None:
+    import argparse
+    import os
+
+    from tests.registry_helpers import commit_all
+    from veles.cli._project import _load_project_modules
+    from veles.cli.commands.modules import cmd_module
+    from veles.core.critical_ops import reset_critical_confirmer, set_critical_confirmer
+
+    project = init_project(tmp_path / "p", name="p")
+    src = _make_module_fixture(tmp_path, name="demo")
+    src = src.rename(tmp_path / dirname)
+    commit_all(src, "module")
+    token = set_critical_confirmer(lambda op, summary: True)
+    try:
+        args = argparse.Namespace(module_command="add", source=str(src), name=None)
+        assert cmd_module(args, project) == 0
+    finally:
+        reset_critical_confirmer(token)
+    installed = project.modules_dir / "demo"
+    assert sorted(os.listdir(installed)) == ["main.py", "module.toml"]
+    assert _load_project_modules(project).modules == ["demo"]
+
+
 def test_install_from_local_directory_succeeds(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     src = _make_module_fixture(tmp_path / "src", name="logger")

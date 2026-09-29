@@ -16,6 +16,7 @@ from veles.core.module_manifest import (
 )
 from veles.core.modules import ModuleHandle, discover_modules
 from veles.core.project import Project
+from veles.core.registry.hashing import git_dirs
 from veles.core.source_install import derive_name, install_tree
 
 
@@ -60,6 +61,13 @@ def install_module_from_source(
                 f"installed module at {target} did not pass discover_modules; "
                 f"check that [module].name == {manifest.name!r}"
             )
+        # Nothing reads a module's `.git`, and the load gate refuses one (it is
+        # outside the approval hash), so an installed module never carries it.
+        for git in git_dirs(target):
+            if git.is_dir():
+                shutil.rmtree(git)
+            else:
+                git.unlink()
         return match
 
     return install_tree(source, target, validate=validate, error=ModuleInstallError)
