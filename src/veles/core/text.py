@@ -8,6 +8,12 @@ _SUMMARY_CHAR_CAP = 200
 _OPENING_FENCE = re.compile(r"^```[\w-]*[ \t]*\n?")
 
 
+def shown(value: object) -> str:
+    """`value` as text safe to print to a terminal: control characters escaped
+    (`\\n`, `\\x1b`, …), everything printable — non-ASCII included — kept as is."""
+    return "".join(c if c.isprintable() else repr(c)[1:-1] for c in str(value))
+
+
 def ellipsize(text: str, cap: int) -> str:
     """`text` on one line, cut to `cap` characters with a trailing `…` when longer."""
     line = text.strip().replace("\n", " ")

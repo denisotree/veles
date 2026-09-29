@@ -16,6 +16,7 @@ from veles.core.module_install import (
 )
 from veles.core.modules import ModuleHandle, discover_modules, discover_modules_in
 from veles.core.project import Project
+from veles.core.text import shown
 from veles.core.user_paths import user_modules_dir
 
 
@@ -49,10 +50,10 @@ def _list(args: argparse.Namespace, project: Project) -> int:
     print(f"{'name':<20}  {'scope':<8}  {'version':<10}  description")
     for scope, h in rows:
         version = h.manifest.version or "—"
-        desc = h.manifest.description
+        desc = shown(h.manifest.description)
         if len(desc) > 60:
             desc = desc[:57] + "..."
-        print(f"{h.name:<20}  {scope:<8}  {version:<10}  {desc}")
+        print(f"{h.name:<20}  {scope:<8}  {shown(version):<10}  {desc}")
     return 0
 
 
@@ -63,10 +64,10 @@ def _find(modules_dir: Path, name: str, *, by_dir: bool = False) -> Path | None:
     directory name when no manifest matches (to remove a module whose manifest is broken)."""
     matches = [h.dir for h in discover_modules_in(modules_dir) if h.name == name]
     if len(matches) > 1:
-        dirs = "\n".join(f"  {d}" for d in matches)
+        dirs = "\n".join(f"  {shown(d)}" for d in matches)
         print(
-            f"error: {len(matches)} modules in {modules_dir} declare name {name!r}:\n{dirs}\n"
-            "review them and remove the one you did not install",
+            f"error: {len(matches)} modules in {shown(modules_dir)} declare name {name!r}:\n"
+            f"{dirs}\nreview them and remove the one you did not install",
             file=sys.stderr,
         )
         return None
@@ -74,7 +75,7 @@ def _find(modules_dir: Path, name: str, *, by_dir: bool = False) -> Path | None:
         return matches[0]
     if by_dir and (modules_dir / name).is_dir():
         return modules_dir / name
-    print(f"error: module {name!r} not found in {modules_dir}", file=sys.stderr)
+    print(f"error: module {name!r} not found in {shown(modules_dir)}", file=sys.stderr)
     return None
 
 
@@ -82,7 +83,8 @@ def _show(args: argparse.Namespace, project: Project) -> int:
     module_dir = _find(_modules_dir(args, project), args.name)
     if module_dir is None:
         return 1
-    print((module_dir / "module.toml").read_text(encoding="utf-8"))
+    text = (module_dir / "module.toml").read_text(encoding="utf-8")
+    print("\n".join(shown(line) for line in text.splitlines()))
     return 0
 
 
@@ -108,9 +110,9 @@ def _add(args: argparse.Namespace, project: Project) -> int:
         project_root = None if getattr(args, "user", False) else project.root
         approve_module(handle.dir, name=handle.name, project_root=project_root)
     except (ModuleInstallError, OSError, ValueError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        print(f"error: {shown(exc)}", file=sys.stderr)
         return 1
-    print(f"<installed module {handle.name!r} at {handle.dir}>", file=sys.stderr)
+    print(f"<installed module {handle.name!r} at {shown(handle.dir)}>", file=sys.stderr)
     return 0
 
 
@@ -121,13 +123,13 @@ def _remove(args: argparse.Namespace, project: Project) -> int:
     target = _find(modules_dir, args.name, by_dir=True)
     if target is None:
         return 1
-    if not args.yes and not confirm(f"Remove module {args.name!r} ({target})? [y/N]"):
+    if not args.yes and not confirm(f"Remove module {args.name!r} ({shown(target)})? [y/N]"):
         print("<aborted>", file=sys.stderr)
         return 1
     try:
         remove_module(target.name, modules_dir=modules_dir)
     except ModuleNotFoundError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        print(f"error: {shown(exc)}", file=sys.stderr)
         return 1
     from veles.core.registry.records import drop_record
 
@@ -146,7 +148,7 @@ def _approve(args: argparse.Namespace, project: Project) -> int:
     try:
         digest = tree_sha256(module_dir)
         summary = (
-            f"Module: {module_dir}\nFiles hash: {digest[:12]}\n"
+            f"Module: {shown(module_dir)}\nFiles hash: {digest[:12]}\n"
             "Its code will run on every agent turn. Review it first."
         )
         if not confirm_critical(f"approve module {args.name}", summary):
@@ -157,7 +159,7 @@ def _approve(args: argparse.Namespace, project: Project) -> int:
             module_dir, name=args.name, project_root=project_root, expected_sha256=digest
         )
     except (OSError, ValueError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        print(f"error: {shown(exc)}", file=sys.stderr)
         return 1
     print(f"<approved module {args.name!r}>", file=sys.stderr)
     return 0

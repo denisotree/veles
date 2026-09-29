@@ -18,6 +18,7 @@ from veles.core.module_manifest import (
 from veles.core.modules import ModuleHandle, discover_modules_in
 from veles.core.registry.hashing import git_dirs
 from veles.core.source_install import derive_name, install_tree
+from veles.core.text import shown
 
 
 class ModuleInstallError(RuntimeError):
@@ -47,24 +48,27 @@ def install_module_from_source(
     def validate() -> ModuleHandle:
         manifest_path = target / _MANIFEST_FILENAME
         if not manifest_path.is_file():
-            raise ModuleInstallError(f"installed source has no {_MANIFEST_FILENAME} at {target}")
+            raise ModuleInstallError(
+                f"installed source has no {_MANIFEST_FILENAME} at {shown(target)}"
+            )
         try:
             manifest = parse_manifest(manifest_path.read_text(encoding="utf-8"))
             entry, _ = entrypoint_file(target, manifest.entrypoint)
         except ManifestError as exc:
-            raise ModuleInstallError(f"manifest validation failed: {exc}") from exc
+            raise ModuleInstallError(f"manifest validation failed: {shown(exc)}") from exc
         if not entry.is_file():
-            raise ModuleInstallError(f"entrypoint file {entry.name!r} not found in {target}")
+            raise ModuleInstallError(f"entrypoint file {entry.name!r} not found in {shown(target)}")
         # The handle is always `target`: approving "the first dir with this name" would
         # approve whatever else in the scope declares it — e.g. a dir the agent planted.
         others = [
-            str(h.dir)
+            shown(h.dir)
             for h in discover_modules_in(modules_dir)
             if h.name == manifest.name and h.dir != target
         ]
         if others:
             raise ModuleInstallError(
-                f"another module in {modules_dir} already declares name {manifest.name!r}: "
+                f"another module in {shown(modules_dir)} already declares name "
+                f"{manifest.name!r}: "
                 f"{', '.join(others)} — review and remove it first"
             )
         # Nothing reads a module's `.git`, and the load gate refuses one (it is
@@ -83,5 +87,5 @@ def remove_module(name: str, *, modules_dir: Path) -> None:
     """Delete <modules_dir>/<name>/ recursively."""
     target = modules_dir / name
     if not target.is_dir():
-        raise ModuleNotFoundError(f"no module named {name!r} at {target}")
+        raise ModuleNotFoundError(f"no module named {name!r} at {shown(target)}")
     shutil.rmtree(target)

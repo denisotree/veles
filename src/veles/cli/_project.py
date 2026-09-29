@@ -26,6 +26,7 @@ from veles.core.project import (
 )
 from veles.core.project_registry import Registry as ProjectRegistry
 from veles.core.slug import normalize_slug as _normalize_slug
+from veles.core.text import shown
 
 
 def _dedup_by_name(handles: list[ModuleHandle], *, scope: str) -> list[ModuleHandle]:
@@ -36,8 +37,8 @@ def _dedup_by_name(handles: list[ModuleHandle], *, scope: str) -> list[ModuleHan
     for h in handles:
         if h.name in seen:
             print(
-                f"warning: duplicate {scope} module name {h.name!r} at {h.dir} "
-                f"(already loading from {seen[h.name].dir}) — ignored",
+                f"warning: duplicate {scope} module name {h.name!r} at {shown(h.dir)} "
+                f"(already loading from {shown(seen[h.name].dir)}) — ignored",
                 file=sys.stderr,
             )
             continue
@@ -59,7 +60,8 @@ def _admitted(handles: list[ModuleHandle], *, project_root: Path | None) -> list
             out.append(handle)
             continue
         print(
-            f"warning: skipping module {handle.name!r} at {handle.dir}: {refusal} — review "
+            f"warning: skipping module {handle.name!r} at {shown(handle.dir)}: "
+            f"{shown(refusal)} — review "
             f"it, then `veles module approve {flag}{handle.name}`",
             file=sys.stderr,
         )
@@ -94,7 +96,7 @@ def _load_project_modules(project: Project) -> ModuleRegistry:
         try:
             load_module(handle, registry)
         except ModuleLoadError as exc:
-            print(f"warning: skipping module {handle.name!r}: {exc}", file=sys.stderr)
+            print(f"warning: skipping module {handle.name!r}: {shown(exc)}", file=sys.stderr)
     return registry
 
 

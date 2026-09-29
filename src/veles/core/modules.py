@@ -33,6 +33,7 @@ from veles.core.module_manifest import (
     parse_manifest,
 )
 from veles.core.project import Project
+from veles.core.text import shown
 
 HOOK_NAMES: tuple[str, ...] = (
     "pre_turn",
@@ -178,7 +179,7 @@ def discover_modules_in(root: Path) -> list[ModuleHandle]:
         try:
             manifest = parse_manifest(manifest_path.read_text(encoding="utf-8"))
         except ManifestError as exc:
-            print(f"warning: skipping module at {entry}: {exc}", file=sys.stderr)
+            print(f"warning: skipping module at {shown(entry)}: {shown(exc)}", file=sys.stderr)
             continue
         out.append(ModuleHandle(name=manifest.name, manifest=manifest, dir=entry))
     return out

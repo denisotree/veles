@@ -19,6 +19,7 @@ from veles.core.registry.hashing import (
     tree_sha256,
 )
 from veles.core.registry.records import InstallRecord, put_record, record_for_path
+from veles.core.text import shown
 
 
 def now_iso() -> str:
@@ -64,11 +65,11 @@ def admit_module(module_dir: Path, *, project_root: Path | None) -> str | None:
         found = git_dirs(module_dir)
         if found:
             rel = found[0].relative_to(module_dir).as_posix()
-            return f"remove the .git directory ({rel}): it is outside the approval hash"
+            return f"remove the .git directory ({shown(rel)}): it is outside the approval hash"
         strip_bytecode(module_dir)
         left = bytecode_paths(module_dir)
     except (OSError, ValueError) as exc:
-        return f"its files cannot be checked: {exc}"
+        return f"its files cannot be checked: {shown(exc)}"
     return "its bytecode cannot be removed" if left else None
 
 
@@ -86,12 +87,14 @@ def approve_module(
         manifest = parse_manifest((module_dir / "module.toml").read_text(encoding="utf-8"))
         entry, _ = entrypoint_file(module_dir, manifest.entrypoint)
     except ManifestError as exc:
-        raise ValueError(f"{module_dir}: {exc}") from exc
+        raise ValueError(f"{shown(module_dir)}: {shown(exc)}") from exc
     if not entry.is_file():
-        raise ValueError(f"{module_dir}: entrypoint file {entry.name!r} not found")
+        raise ValueError(f"{shown(module_dir)}: entrypoint file {entry.name!r} not found")
     digest = tree_sha256(module_dir)
     if expected_sha256 is not None and digest != expected_sha256:
-        raise ValueError(f"{module_dir} changed while it was being reviewed — review it again")
+        raise ValueError(
+            f"{shown(module_dir)} changed while it was being reviewed — review it again"
+        )
     existing = record_for_path(str(module_dir.resolve()))
     rec = InstallRecord(
         name=name,

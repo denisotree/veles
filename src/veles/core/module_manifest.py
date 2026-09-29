@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from veles.core.registry.hashing import hash_skips
+from veles.core.registry.model import is_slug
 
 
 class ManifestError(RuntimeError):
@@ -42,6 +43,12 @@ def parse_manifest(text: str) -> ModuleManifest:
         value = section.get(key)
         if not isinstance(value, str) or not value:
             raise ManifestError(f"[module].{key} is required and must be a non-empty string")
+    if not is_slug(section["name"]):
+        # Same rule as registry extension names; also keeps control characters (an
+        # agent-written manifest) out of every message that prints the name.
+        raise ManifestError(
+            f"[module].name {section['name']!r} must be lowercase letters, digits and '-'"
+        )
     version = section.get("version")
     if version is not None and not isinstance(version, str):
         raise ManifestError("[module].version must be a string if present")
