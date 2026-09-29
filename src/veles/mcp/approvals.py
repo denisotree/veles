@@ -46,6 +46,19 @@ def recipe_hash(raw: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(raw, sort_keys=True, default=str).encode()).hexdigest()
 
 
+def describe_recipe(name: str, raw: dict[str, Any]) -> str:
+    """The whole raw recipe as the user must review it before approving: every key
+    (env values included — `PATH` decides which binary runs; `${VAR}` references
+    appear verbatim), escaped because the config is untrusted, plus the short hash."""
+    lines = [f"  MCP server {shown(name)}:"]
+    for key in sorted(raw):
+        value = json.dumps(raw[key], ensure_ascii=False, sort_keys=True, default=str)
+        lines.append(f"    {shown(key)} = {shown(value)}")
+    lines.append(f"    recipe sha256 {recipe_hash(raw)[:12]}")
+    lines.append("  Approving lets Veles start this command whenever the project is opened.")
+    return "\n".join(lines)
+
+
 def _key(project_root: Path) -> str:
     return str(Path(project_root).resolve())
 
@@ -115,6 +128,7 @@ __all__ = [
     "ApprovalState",
     "approval_state",
     "approve",
+    "describe_recipe",
     "only_approved",
     "recipe_hash",
     "revoke",

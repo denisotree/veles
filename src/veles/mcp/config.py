@@ -167,12 +167,6 @@ def load_raw_mcp_servers(project: Project) -> dict[str, Any]:
     return get_section(load_project_config(project), "mcp", "servers")
 
 
-def load_mcp_config(project: Project) -> dict[str, McpServerConfig]:
-    """Parse `[mcp.servers.*]` from the project config (`parse_servers` over
-    `load_raw_mcp_servers`)."""
-    return parse_servers(load_raw_mcp_servers(project))
-
-
 def parse_servers(servers: dict[str, Any]) -> dict[str, McpServerConfig]:
     """Validate raw `[mcp.servers]` tables.
 
@@ -219,7 +213,6 @@ __all__ = [
     "McpServerConfig",
     "interpolate_env",
     "load_disabled_tools",
-    "load_mcp_config",
     "load_raw_mcp_servers",
     "parse_server",
     "parse_servers",

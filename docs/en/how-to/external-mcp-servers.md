@@ -97,13 +97,14 @@ veles mcp list              # every configured server: transport, approved, stat
 veles mcp test github       # connect to one server and list its tools
 ```
 
-A server starts only after you approved its exact recipe. `veles mcp approve` shows
-`command`, `args`, `url`, `transport` and the `env` keys (never their values), and
+A server starts only after you approved its exact recipe. `veles mcp approve` shows the
+whole table — `command`, `args`, `env` values (a `PATH` there decides which binary runs;
+`${VAR}` references appear as written), `url`, `transport` and any other key — and
 records a hash of the table as written in `config.toml` — before `${VAR}` expansion, so
 rotating a token keeps the approval, while any edit to the table (a cloned project, a
 changed argument) makes the server `changed` and stops it from starting until you approve
 it again. Approvals live in `~/.veles/mcp-approvals.json`. `veles registry install` of
-an MCP extension approves it; `veles registry uninstall` revokes it.
+an MCP extension shows the same recipe in its confirmation and approves it; `veles registry uninstall` revokes it.
 
 `veles mcp list` always exits 0 — it's an inspector, not a health gate; it never starts
 an unapproved server. `veles mcp test` exits 1 when the server is unapproved or the

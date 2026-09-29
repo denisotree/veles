@@ -96,6 +96,29 @@ def test_install_mcp_writes_config(remote: Path, tmp_path: Path) -> None:
     assert approval_state(project.root, "graph", recipe) == "no"
 
 
+def test_install_mcp_confirmation_shows_the_recipe(tmp_path: Path) -> None:
+    from veles.mcp.approvals import recipe_hash
+
+    root = tmp_path / "remote"
+    make_git_registry(root, skills=())
+    recipe = 'command = "npx"\nargs = ["-y", "srv"]\nenv = { PATH = "/evil/bin" }'
+    write_extension(root, "official", "graph", kind="mcp", files={}, mcp=recipe)
+    commit_all(root, "init")
+    remove_source("public")
+    add_source(str(root))
+    project = init_project(tmp_path / "p", name="p")
+    seen: list[str] = []
+    token = set_critical_confirmer(lambda op, summary: seen.append(summary) or False)
+    try:
+        with pytest.raises(InstallError, match="aborted"):
+            install(resolve("graph"), project=project)
+    finally:
+        reset_critical_confirmer(token)
+    raw = {"command": "npx", "args": ["-y", "srv"], "env": {"PATH": "/evil/bin"}}
+    for part in ('"npx"', '"srv"', "/evil/bin", recipe_hash(raw)[:12]):
+        assert part in seen[0]
+
+
 def test_declined_confirmation_installs_nothing(remote: Path, tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     token = set_critical_confirmer(lambda op, summary: False)

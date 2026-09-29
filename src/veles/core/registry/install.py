@@ -29,7 +29,7 @@ from veles.core.registry.records import InstallRecord, drop_record, load_records
 from veles.core.registry.repo import RegistryRepoError, fetch_git_source
 from veles.core.registry.versions import satisfies
 from veles.core.user_paths import user_home, user_modules_dir, user_skills_dir
-from veles.mcp.approvals import approve, recipe_hash, revoke
+from veles.mcp.approvals import approve, describe_recipe, recipe_hash, revoke
 
 
 class InstallError(RuntimeError):
@@ -51,6 +51,9 @@ def describe(found: Found) -> str:
         lines.append(f"  pip requirements: {', '.join(ext.requires)}")
     if ext.kind == "module":
         lines.append("  A module's code runs inside Veles on every turn. Review it first.")
+    if ext.kind == "mcp" and ext.mcp is not None:
+        # Installing approves this exact recipe — the user must see all of it.
+        lines.append(describe_recipe(ext.name, dict(ext.mcp)))
     return "\n".join(lines)
 
 

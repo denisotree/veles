@@ -158,7 +158,7 @@ def test_cli_approve_then_list_and_test(project: Project, capsys) -> None:
     assert "/nonexistent/veles-no-such-binary" in seen[0]
     assert "--flag" in seen[0]
     assert "TOKEN" in seen[0]
-    assert "VELES_TEST_SECRET" not in seen[0]  # env keys only, never values
+    assert "${VELES_TEST_SECRET}" in seen[0]  # a reference is shown verbatim, not expanded
 
     rc = mcp_cmd.cmd_mcp(_ns(mcp_command="list", connect_timeout=5.0), project)
     assert rc == 0
@@ -166,17 +166,38 @@ def test_cli_approve_then_list_and_test(project: Project, capsys) -> None:
     assert "gh" in out and "yes" in out
 
 
+def test_cli_approve_shows_env_values_that_steer_execution(project: Project) -> None:
+    """`PATH` in `env` decides which `npx` runs — the user must see it."""
+    _write_config(
+        project,
+        '[mcp.servers.gh]\ncommand = "npx"\ncwd = "/some/dir"\n'
+        'env = { PATH = "/repo/evilbin:/usr/bin", TOKEN = "${GH_TOKEN}" }\n'
+        'weird = "a\\u001b[31mb"\n',
+    )
+    seen: list[str] = []
+    token = set_critical_confirmer(lambda op, summary: seen.append(summary) or False)
+    try:
+        mcp_cmd.cmd_mcp(_ns(mcp_command="approve", server="gh"), project)
+    finally:
+        reset_critical_confirmer(token)
+    assert "/repo/evilbin:/usr/bin" in seen[0]
+    assert "${GH_TOKEN}" in seen[0]
+    assert "/some/dir" in seen[0]
+    assert "\x1b" not in seen[0]  # untrusted values are escaped
+
+
 def test_cli_list_does_not_probe_unapproved(project: Project, tmp_path: Path, capsys) -> None:
     marker = tmp_path / "pwned"
     _touch_server(project, marker)
     assert mcp_cmd.cmd_mcp(_ns(mcp_command="list", connect_timeout=5.0), project) == 0
     assert not marker.exists()
-    out = capsys.readouterr().out
-    assert "evil" in out and "no" in out
+    row = next(line for line in capsys.readouterr().out.splitlines() if "evil" in line)
+    assert row.split()[2] == "no"  # name, transport, approved
     _approve_current(project, "evil")
     _touch_server(project, marker, extra=', "x"')
     mcp_cmd.cmd_mcp(_ns(mcp_command="list", connect_timeout=5.0), project)
-    assert "changed" in capsys.readouterr().out
+    row = next(line for line in capsys.readouterr().out.splitlines() if "evil" in line)
+    assert row.split()[2] == "changed"
     assert not marker.exists()
 
 

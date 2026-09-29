@@ -11,7 +11,7 @@ Subcommands:
                                  tools with sanitized descriptions. rc 1 when
                                  the server is unapproved or the connect fails,
                                  rc 2 for an unknown name.
-    veles mcp approve <server> — show the recipe (env keys, never values) and
+    veles mcp approve <server> — show the whole raw recipe (env values too) and
                                  record it as approved after `confirm_critical`.
 
 A server spawns only once its exact raw recipe is approved
@@ -26,9 +26,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
-import json
 import sys
-from typing import Any
 
 from veles.core.project import Project
 from veles.core.text import shown
@@ -145,25 +143,9 @@ def _test(args: argparse.Namespace, project: Project) -> int:
     return 0
 
 
-def _describe(recipe: dict[str, Any], digest: str) -> str:
-    """The recipe as the user must review it. Env shows keys only — a value may
-    be a literal secret. Everything is escaped: the config is untrusted."""
-    env = recipe.get("env")
-    lines = [
-        f"  transport: {shown(recipe.get('transport', 'stdio'))}",
-        f"  command:   {shown(recipe.get('command', ''))}",
-        f"  args:      {shown(json.dumps(recipe.get('args', []), ensure_ascii=False))}",
-        f"  url:       {shown(recipe.get('url', ''))}",
-        f"  env keys:  {', '.join(shown(k) for k in env) if isinstance(env, dict) else ''}",
-        f"  recipe:    sha256 {digest[:12]}",
-        "  Approving lets Veles start this command whenever the project is opened.",
-    ]
-    return "\n".join(lines)
-
-
 def _approve(args: argparse.Namespace, project: Project) -> int:
     from veles.core.critical_ops import confirm_critical
-    from veles.mcp.approvals import approve, recipe_hash
+    from veles.mcp.approvals import approve, describe_recipe, recipe_hash
     from veles.mcp.config import load_raw_mcp_servers
 
     name = args.server
@@ -172,7 +154,7 @@ def _approve(args: argparse.Namespace, project: Project) -> int:
         print(f"error: no MCP server named {shown(name)} in config", file=sys.stderr)
         return 2
     digest = recipe_hash(recipe)
-    if not confirm_critical(f"approve MCP server {shown(name)}", _describe(recipe, digest)):
+    if not confirm_critical(f"approve MCP server {shown(name)}", describe_recipe(name, recipe)):
         print("aborted — nothing approved.", file=sys.stderr)
         return 1
     # The config may have changed while the user was reading: approve only what

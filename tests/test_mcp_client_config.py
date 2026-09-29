@@ -15,10 +15,16 @@ from veles.core.project import Project, init_project
 from veles.mcp.config import (
     DEFAULT_CONNECT_TIMEOUT_S,
     DEFAULT_TIMEOUT_S,
+    McpServerConfig,
     interpolate_env,
     load_disabled_tools,
-    load_mcp_config,
+    load_raw_mcp_servers,
+    parse_servers,
 )
+
+
+def load_mcp_config(project: Project) -> dict[str, McpServerConfig]:
+    return parse_servers(load_raw_mcp_servers(project))
 
 
 @pytest.fixture()
