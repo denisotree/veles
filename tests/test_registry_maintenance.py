@@ -70,6 +70,36 @@ def test_outdated_then_upgrade(setup) -> None:
     assert upgrade("alpha", project=project) is None
 
 
+def test_upgrade_keeps_a_user_module_in_the_user_dir(tmp_path: Path) -> None:
+    from veles.core.user_paths import user_modules_dir
+
+    remote = tmp_path / "remote"
+    make_git_registry(remote, skills=())
+    files = {
+        "module.toml": '[module]\nname = "demo"\ndescription = "d"\n'
+        'entrypoint = "demo.py:register"\n',
+        "demo.py": "def register(api):\n    api.add_hook('pre_turn', lambda **kw: None)\n",
+    }
+    write_extension(remote, "official", "demo", kind="module", files=files)
+    commit_all(remote, "demo")
+    remove_source("public")
+    add_source(str(remote))
+    project = init_project(tmp_path / "p", name="p")
+    rec = install(resolve("demo"), project=project, user_scope=True)
+    assert rec.project is None
+    assert Path(rec.path).parent == user_modules_dir()
+
+    write_extension(remote, "official", "demo", kind="module", version="0.2.0", files=files)
+    commit_all(remote, "demo 0.2.0")
+    update(get_source("private"))
+    new = upgrade("demo", project=project)
+    assert new is not None and new.version == "0.2.0"
+    assert new.project is None
+    assert Path(new.path).parent == user_modules_dir()
+    assert (user_modules_dir() / "demo" / "demo.py").is_file()
+    assert not (project.modules_dir / "demo").exists()
+
+
 def test_yanked_reported(setup) -> None:
     remote, project = setup
     write_extension(remote, "official", "alpha", extra_ext='yanked = "bad release"')

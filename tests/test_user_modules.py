@@ -63,6 +63,28 @@ def test_changed_user_module_is_refused(tmp_path: Path, capsys) -> None:
     assert "u1" in capsys.readouterr().err
 
 
+def test_duplicate_module_name_in_same_scope_is_ignored(tmp_path: Path, capsys) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    d1 = _module(user_modules_dir(), "aaa-dup")
+    d2 = user_modules_dir() / "zzz-dup"
+    d2.mkdir(parents=True)
+    (d2 / "module.toml").write_text(
+        '[module]\nname = "aaa-dup"\ndescription = "d2"\nentrypoint = "m.py:register"\n',
+        encoding="utf-8",
+    )
+    (d2 / "m.py").write_text(
+        "def register(api):\n    api.add_hook('post_turn', lambda **kw: None)\n",
+        encoding="utf-8",
+    )
+    approve_module(d1, name="aaa-dup", project_root=None)
+    approve_module(d2, name="aaa-dup", project_root=None)
+    registry = _load_project_modules(project)
+    assert registry.modules == ["aaa-dup"]
+    assert [m for m, _ in registry.iter_hooks("pre_turn")] == ["aaa-dup"]
+    assert [m for m, _ in registry.iter_hooks("post_turn")] == []
+    assert "duplicate" in capsys.readouterr().err
+
+
 def test_user_modules_dir_is_outside_the_agent_sandbox(tmp_path: Path) -> None:
     from veles.core.context import reset_active_project, set_active_project
 

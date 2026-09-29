@@ -30,7 +30,9 @@ def register(sub: argparse._SubParsersAction) -> None:
 
     p = rs.add_parser("install", help="Install <name> or <registry>:<name>.")
     p.add_argument("spec")
-    p.add_argument("--user", action="store_true", help="Skills: install for all projects.")
+    p.add_argument(
+        "--user", action="store_true", help="Skills and modules: install for all projects."
+    )
     p.add_argument("--force", action="store_true", help="Install even if yanked.")
     p = rs.add_parser("upgrade", help="Upgrade one or all installed extensions.")
     p.add_argument("name", nargs="?")

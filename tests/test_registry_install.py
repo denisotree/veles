@@ -54,6 +54,15 @@ def test_install_module_is_approved(remote: Path, tmp_path: Path) -> None:
     assert module_approved(project.modules_dir / "demo")
 
 
+def test_install_user_module_needs_no_project(remote: Path, tmp_path: Path) -> None:
+    from veles.core.user_paths import user_modules_dir
+
+    rec = install(resolve("demo"), project=None, user_scope=True)
+    assert rec.project is None
+    assert Path(rec.path) == user_modules_dir() / "demo"
+    assert module_approved(user_modules_dir() / "demo")
+
+
 def test_install_drops_case_variant_bytecode(remote: Path, tmp_path: Path) -> None:
     from tests.registry_helpers import git
     from veles.core.registry.config import get_source

@@ -30,7 +30,7 @@ from veles.core.registry.model import EXTENSION_FILE
 from veles.core.registry.records import InstallRecord, drop_record, load_records, put_record
 from veles.core.registry.repo import RegistryRepoError, fetch_git_source
 from veles.core.registry.versions import satisfies
-from veles.core.user_paths import user_home, user_skills_dir
+from veles.core.user_paths import user_home, user_modules_dir, user_skills_dir
 
 
 class InstallError(RuntimeError):
@@ -81,7 +81,7 @@ def install(
         raise InstallError(
             f"{found.ref} requires Veles {ext.requires_veles}; this is {__version__}"
         )
-    needs_project = ext.kind in ("module", "mcp") or (ext.kind == "skill" and not user_scope)
+    needs_project = ext.kind == "mcp" or (ext.kind in ("module", "skill") and not user_scope)
     if needs_project and project is None:
         raise InstallError(f"installing a {ext.kind} needs a project (run inside one)")
     # Cheap collision checks run before the confirmation prompt — no point asking the
@@ -189,6 +189,8 @@ def _target_dir(found: Found, project: Project | None, *, user_scope: bool) -> P
         return user_home() / "layouts" / name
     if kind == "skill" and user_scope:
         return user_skills_dir() / name
+    if kind == "module" and user_scope:
+        return user_modules_dir() / name
     assert project is not None
     return (project.modules_dir if kind == "module" else project.skills_dir) / name
 

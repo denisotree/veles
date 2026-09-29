@@ -149,7 +149,7 @@ def upgrade(name: str, *, project: Project | None) -> InstallRecord | None:
         new = install(
             found,
             project=project,
-            user_scope=rec.project is None and rec.kind == "skill",
+            user_scope=rec.project is None and rec.kind in ("module", "skill"),
             confirmed=True,
         )
     except BaseException:

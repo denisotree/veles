@@ -28,16 +28,36 @@ from veles.core.project_registry import Registry as ProjectRegistry
 from veles.core.slug import normalize_slug as _normalize_slug
 
 
+def _dedup_by_name(handles: list[ModuleHandle], *, scope: str) -> list[ModuleHandle]:
+    """Two module dirs in the same scope sharing a manifest `name`: keep only the
+    first (sorted by dir — `discover_modules_in` already sorts) and warn about the rest."""
+    seen: dict[str, ModuleHandle] = {}
+    out: list[ModuleHandle] = []
+    for h in handles:
+        if h.name in seen:
+            print(
+                f"warning: duplicate {scope} module name {h.name!r} at {h.dir} "
+                f"(already loading from {seen[h.name].dir}) — ignored",
+                file=sys.stderr,
+            )
+            continue
+        seen[h.name] = h
+        out.append(h)
+    return out
+
+
 def _load_project_modules(project: Project) -> ModuleRegistry:
     """User-level modules (`~/.veles/modules/`) first, then the project's; a project module
     with the same name replaces the user-level one. Every module passes the same gate."""
     from veles.core.registry.gate import admit_module
     from veles.core.user_paths import user_modules_dir
 
-    project_handles = discover_modules(project)
+    user_dir = user_modules_dir().resolve()
+    project_handles = _dedup_by_name(discover_modules(project), scope="project")
     overridden = {h.name for h in project_handles}
+    user_handles = _dedup_by_name(discover_modules_in(user_modules_dir()), scope="user")
     handles: list[ModuleHandle] = []
-    for h in discover_modules_in(user_modules_dir()):
+    for h in user_handles:
         if h.name in overridden:
             print(
                 f"warning: module {h.name!r} in the project overrides the user-level one",
@@ -50,7 +70,7 @@ def _load_project_modules(project: Project) -> ModuleRegistry:
     for handle in handles:
         refusal = admit_module(handle.dir)
         if refusal is not None:
-            scope = "--user " if handle.dir.parent == user_modules_dir() else ""
+            scope = "--user " if handle.dir.resolve().parent == user_dir else ""
             print(
                 f"warning: skipping module {handle.name!r}: {refusal} — review it, then "
                 f"`veles module approve {scope}{handle.name}`",

@@ -8,14 +8,14 @@ parse and its entrypoint file must exist.
 from __future__ import annotations
 
 import shutil
+from pathlib import Path
 
 from veles.core.module_manifest import (
     ManifestError,
     entrypoint_file,
     parse_manifest,
 )
-from veles.core.modules import ModuleHandle, discover_modules
-from veles.core.project import Project
+from veles.core.modules import ModuleHandle, discover_modules_in
 from veles.core.registry.hashing import git_dirs
 from veles.core.source_install import derive_name, install_tree
 
@@ -36,13 +36,13 @@ def derive_module_name(source: str) -> str:
 
 
 def install_module_from_source(
-    source: str, *, project: Project, name_override: str | None = None
+    source: str, *, modules_dir: Path, name_override: str | None = None
 ) -> ModuleHandle:
     """Clone (git URL) or copy (local dir) → validate manifest → return handle.
 
     Cleans up the partially-installed directory on any failure.
     """
-    target = project.modules_dir / (name_override or derive_module_name(source))
+    target = modules_dir / (name_override or derive_module_name(source))
 
     def validate() -> ModuleHandle:
         manifest_path = target / _MANIFEST_FILENAME
@@ -55,10 +55,10 @@ def install_module_from_source(
             raise ModuleInstallError(f"manifest validation failed: {exc}") from exc
         if not entry.is_file():
             raise ModuleInstallError(f"entrypoint file {entry.name!r} not found in {target}")
-        match = next((h for h in discover_modules(project) if h.name == manifest.name), None)
+        match = next((h for h in discover_modules_in(modules_dir) if h.name == manifest.name), None)
         if match is None:
             raise ModuleInstallError(
-                f"installed module at {target} did not pass discover_modules; "
+                f"installed module at {target} did not pass discover_modules_in; "
                 f"check that [module].name == {manifest.name!r}"
             )
         # Nothing reads a module's `.git`, and the load gate refuses one (it is
@@ -73,9 +73,9 @@ def install_module_from_source(
     return install_tree(source, target, validate=validate, error=ModuleInstallError)
 
 
-def remove_module(name: str, *, project: Project) -> None:
-    """Delete <project>/.veles/modules/<name>/ recursively."""
-    target = project.modules_dir / name
+def remove_module(name: str, *, modules_dir: Path) -> None:
+    """Delete <modules_dir>/<name>/ recursively."""
+    target = modules_dir / name
     if not target.is_dir():
         raise ModuleNotFoundError(f"no module named {name!r} at {target}")
     shutil.rmtree(target)
