@@ -40,6 +40,7 @@ on URL hostnames; file-system sandbox doesn't apply.
 from __future__ import annotations
 
 import os
+import unicodedata
 from pathlib import Path
 
 from veles.core.context import current_project
@@ -105,11 +106,39 @@ def _closed_user_path(resolved: Path) -> bool:
     """Inside `user_home()` but outside the whitelisted subdirs. Checked on its own,
     not via the roots: a project root that contains `user_home()` (a project at `~`, or
     `VELES_USER_HOME` inside the project) would otherwise swallow the whitelist in
-    `_dedupe` and open approvals, trust and modules to the agent."""
+    `_dedupe` and open approvals, trust and modules to the agent. Decided by file
+    identity (`_same_place`), not by spelling."""
     home = user_home()
-    if not _is_within(resolved, home.resolve()):
+    if not _same_place(resolved, home):
         return False
-    return not any(_is_within(resolved, (home / n).resolve()) for n in _USER_ROOT_WHITELIST)
+    return not any(_same_place(resolved, home / n) for n in _USER_ROOT_WHITELIST)
+
+
+def _fold(name: str) -> str:
+    return unicodedata.normalize("NFC", name).casefold()
+
+
+def _same_place(target: Path, directory: Path) -> bool:
+    """Is `target` inside `directory`, as the filesystem sees it? `resolve()` keeps the
+    caller's spelling, and on a case- or normalization-insensitive FS (macOS APFS)
+    `.VELES` or an NFD `café` *is* the same dir — so the comparison is by identity
+    (`samefile`) of the nearest existing ancestor of `directory`. The part of
+    `directory` that does not exist yet is compared by case- and NFC-folded name,
+    which can only over-refuse (on a case-sensitive FS) and never under-refuse."""
+    directory = directory.absolute()
+    anchor = directory
+    while not anchor.exists() and anchor != anchor.parent:
+        anchor = anchor.parent
+    missing = [_fold(p) for p in directory.relative_to(anchor).parts]
+    for ancestor in (target, *target.parents):
+        try:
+            if not ancestor.samefile(anchor):
+                continue
+        except OSError:  # this ancestor does not exist
+            continue
+        below = [_fold(p) for p in target.relative_to(ancestor).parts]
+        return below[: len(missing)] == missing
+    return False
 
 
 def resolve_safe(path: str | Path) -> Path:

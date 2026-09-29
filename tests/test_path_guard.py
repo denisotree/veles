@@ -374,6 +374,101 @@ def test_user_home_stays_closed_when_the_project_contains_it(
         reset_active_project(token)
 
 
+def _require_case_insensitive_fs(tmp_path: Path) -> None:
+    (tmp_path / "probe-a").touch()
+    if not (tmp_path / "PROBE-A").exists():
+        pytest.skip("case-sensitive filesystem: spelling variants are different files here")
+
+
+def _with_project(monkeypatch: pytest.MonkeyPatch, project_root: Path, home_base: Path):
+    monkeypatch.delenv("VELES_SANDBOX_ROOTS", raising=False)
+    monkeypatch.setenv("VELES_USER_HOME", str(home_base))
+    return set_active_project(init_project(project_root, name="p"))
+
+
+@pytest.mark.parametrize("variant", [".VELES/extensions.json", ".Veles/modules/x/m.py"])
+def test_user_home_is_closed_under_any_case_spelling(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, variant: str
+) -> None:
+    """On a case-insensitive FS `.VELES` *is* `~/.veles`: the check goes by file
+    identity, not by spelling."""
+    from veles.core.user_paths import user_home
+
+    _require_case_insensitive_fs(tmp_path)
+    project_root = tmp_path / "p"
+    token = _with_project(monkeypatch, project_root, project_root / "h")
+    try:
+        (user_home() / "skills").mkdir(parents=True)
+        with pytest.raises(SandboxViolation):
+            resolve_safe(project_root / "h" / variant)
+        with pytest.raises(SandboxViolation):
+            write_file(f"h/{variant}", "[]")
+        assert not (user_home() / variant.split("/", 1)[1]).exists()
+        assert resolve_safe(user_home() / "skills" / "x").name == "x"
+        assert resolve_safe(project_root / "h" / ".VELES" / "SKILLS" / "x").name == "x"
+    finally:
+        reset_active_project(token)
+
+
+def test_user_home_is_closed_before_it_exists(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """No `~/.veles` yet: creating it through another spelling is refused too."""
+    _require_case_insensitive_fs(tmp_path)
+    project_root = tmp_path / "p"
+    token = _with_project(monkeypatch, project_root, project_root / "h")
+    try:
+        (project_root / "h").mkdir()
+        with pytest.raises(SandboxViolation):
+            resolve_safe(project_root / "h" / ".VELES" / "extensions.json")
+        assert resolve_safe(project_root / "h" / ".veles" / "skills" / "x").name == "x"
+    finally:
+        reset_active_project(token)
+
+
+def test_user_home_is_closed_under_another_unicode_normalization(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import unicodedata
+
+    from veles.core.user_paths import user_home
+
+    project_root = tmp_path / "p"
+    nfc = unicodedata.normalize("NFC", "café")
+    nfd = unicodedata.normalize("NFD", "café")
+    token = _with_project(monkeypatch, project_root, project_root / nfc)
+    try:
+        user_home().mkdir(parents=True)
+        if not (project_root / nfd).exists():
+            pytest.skip("filesystem does not treat NFC and NFD spellings as one name")
+        with pytest.raises(SandboxViolation):
+            resolve_safe(project_root / nfd / ".veles" / "extensions.json")
+    finally:
+        reset_active_project(token)
+
+
+def test_symlinked_user_home_is_closed_by_both_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Dotfiles setup: `~/.veles` links to a dir elsewhere in the project tree."""
+    from veles.core.user_paths import user_home
+
+    project_root = tmp_path / "p"
+    token = _with_project(monkeypatch, project_root, project_root / "h")
+    try:
+        real = project_root / "dotfiles" / "veles"
+        (real / "skills").mkdir(parents=True)
+        (project_root / "h").mkdir()
+        user_home().symlink_to(real, target_is_directory=True)
+        for p in (user_home() / "extensions.json", real / "extensions.json"):
+            with pytest.raises(SandboxViolation):
+                resolve_safe(p)
+        assert resolve_safe(user_home() / "skills" / "x") == (real / "skills" / "x").resolve()
+        assert resolve_safe(project_root / "dotfiles" / "other.md").name == "other.md"
+    finally:
+        reset_active_project(token)
+
+
 def test_sandbox_cwd_returns_first_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     a = tmp_path / "a"
     b = tmp_path / "b"
