@@ -49,8 +49,15 @@ class PromptsMixin:
         Cancel so a stray Enter never deletes."""
         import threading
 
+        from veles.core.text import shown
+
         if not sys.stdin.isatty():
             return False
+        # `op`/`summary` come from tool-controlled strings (paths, names) —
+        # escape before they reach the terminal or the picker question, so a
+        # control character can't forge this confirmation.
+        op = shown(op)
+        summary = shown(summary)
         self.console.print()
         self.console.print(f"⚠ {op}", style=self.theme.error, markup=False)
         if summary:

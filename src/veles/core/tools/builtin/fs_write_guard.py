@@ -60,7 +60,7 @@ def guard_write(p: Path, project) -> str | None:
     root = project.root.resolve()
     if not is_within(p, root):
         ok = confirm_critical(
-            f"write file outside active project to {p}",
+            f"write file outside active project to {shown(str(p))}",
             "This writes to user-global storage; the agent could install "
             "executable code under ~/.veles/skills/ or ~/.veles/modules/ this way.",
         )

@@ -14,6 +14,14 @@ def shown(value: object) -> str:
     return "".join(c if c.isprintable() else repr(c)[1:-1] for c in str(value))
 
 
+def shown_multiline(value: object) -> str:
+    """Like `shown`, but keeps `\\n` and `\\t` literal — for previewing file/diff
+    content where line and column structure matters. Every other control
+    character (ANSI escapes, bidi overrides, …) is still escaped, so injected
+    control sequences never reach the terminal raw."""
+    return "".join(c if c in "\n\t" or c.isprintable() else repr(c)[1:-1] for c in str(value))
+
+
 def ellipsize(text: str, cap: int) -> str:
     """`text` on one line, cut to `cap` characters with a trailing `…` when longer."""
     line = text.strip().replace("\n", " ")
@@ -70,4 +78,12 @@ def title_and_summary(content: str, fallback: str) -> tuple[str, str]:
     return title, ellipsize(" ".join(summary_lines), _SUMMARY_CHAR_CAP)
 
 
-__all__ = ["cut_with_note", "ellipsize", "first_heading", "strip_code_fence", "title_and_summary"]
+__all__ = [
+    "cut_with_note",
+    "ellipsize",
+    "first_heading",
+    "shown",
+    "shown_multiline",
+    "strip_code_fence",
+    "title_and_summary",
+]

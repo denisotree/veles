@@ -54,6 +54,24 @@ _SANDBOX_ENV = "VELES_SANDBOX_ROOTS"
 # files stay accessible to the daemon process.
 _USER_ROOT_WHITELIST = ("skills", "locales")
 
+# The one definition of "control character" for path input: C0 (incl. \n,
+# \t, ESC) + DEL, C1, and the Unicode bidi-override/isolate characters. A
+# path smuggling one of these can forge a confirmation prompt or diff
+# preview (an ESC sequence rewrites the terminal line; a bidi override makes
+# the displayed path read differently from the bytes on disk). Checked
+# against the raw, unresolved input, before any filesystem work.
+_CONTROL_CHAR_RANGES: tuple[tuple[int, int], ...] = (
+    (0x00, 0x1F),  # C0 controls, incl. \n \t \x1b
+    (0x7F, 0x7F),  # DEL
+    (0x80, 0x9F),  # C1 controls
+    (0x202A, 0x202E),  # bidi override: LRE RLE PDF LRO RLO
+    (0x2066, 0x2069),  # bidi isolate: LRI RLI FSI PDI
+)
+
+
+def _has_control_char(s: str) -> bool:
+    return any(any(lo <= ord(c) <= hi for lo, hi in _CONTROL_CHAR_RANGES) for c in s)
+
 
 class SandboxViolation(RuntimeError):
     """Raised when a tool tries to access a path outside the sandbox."""
@@ -148,6 +166,10 @@ def is_inside(target: Path, directory: Path, *, fold: bool) -> bool:
 def resolve_safe(path: str | Path) -> Path:
     """Resolve `path` and raise `SandboxViolation` if it escapes the sandbox.
 
+    Control characters (see `_CONTROL_CHAR_RANGES`) in the raw input are
+    refused first, before `..` traversal and before any filesystem work —
+    an ESC or bidi-override byte in a path can otherwise forge a
+    confirmation prompt or diff preview downstream.
     `..` traversal in the literal input is refused before resolution.
     Symlinks pointing outside the sandbox are caught after resolution.
     Non-existent targets are allowed (write_file needs that).
@@ -159,6 +181,9 @@ def resolve_safe(path: str | Path) -> Path:
     from veles.core.sanitize import sanitize
 
     raw = str(path)
+    if _has_control_char(raw):
+        # Never echo `raw` back — it's exactly the payload we're refusing.
+        raise SandboxViolation("path contains control characters")
     p = Path(raw).expanduser()
     if ".." in p.parts:
         raise SandboxViolation(

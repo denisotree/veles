@@ -84,6 +84,13 @@ def confirm_critical(op: str, summary: str) -> bool:
 
 
 def _default_confirmer(op: str, summary: str) -> bool:
+    # `op`/`summary` are built by call sites from tool-controlled strings
+    # (paths, names, recipes) — escape once here so no caller has to
+    # remember to, and a control character can't forge this prompt.
+    from veles.core.text import shown
+
+    op = shown(op)
+    summary = shown(summary)
     if not sys.stdin.isatty():
         print(
             f"\nCRITICAL: {op} requires interactive confirmation; non-TTY context refuses.",
