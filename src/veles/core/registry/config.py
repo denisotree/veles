@@ -67,7 +67,7 @@ def add_source(url: str, *, name: str | None = None, ref: str | None = None) -> 
                 f"a registry named {PRIVATE!r} already exists; pass --name for this one"
             )
         name = PRIVATE
-    if not _NAME_RE.match(name):
+    if not _NAME_RE.fullmatch(name):
         raise RegistryConfigError(f"registry name {name!r} must match [a-z0-9][a-z0-9-]*")
     if not url or url.startswith("-"):
         raise RegistryConfigError(f"registry url {url!r} must not be empty or start with '-'")

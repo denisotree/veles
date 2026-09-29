@@ -30,7 +30,7 @@ def is_slug(value: str) -> bool:
     `[extension].name` and, in `template.py`, to reject a `name`/`group` before
     it is ever used to build a filesystem path or TOML string — a slug can
     never contain `..`, `/`, or a quote."""
-    return bool(_SLUG_RE.match(value))
+    return bool(_SLUG_RE.fullmatch(value))  # `match` + `$` would accept a trailing "\n"
 
 
 class ExtensionError(ValueError):
@@ -92,7 +92,7 @@ def parse_extension(text: str, *, group: str = "", dir: Path | None = None) -> E
     if kind not in KINDS:
         raise ExtensionError(f"[extension].kind {kind!r} must be one of {', '.join(KINDS)}")
     version = _required(ext, "version")
-    if not _SEMVER_RE.match(version):
+    if not _SEMVER_RE.fullmatch(version):
         raise ExtensionError(f"[extension].version {version!r} must be MAJOR.MINOR.PATCH")
     provides = _str_list(ext, "provides")
     requires = _str_list(ext, "requires")
@@ -178,10 +178,10 @@ def _parse_source(src: dict[str, Any], kind: str) -> Source:
     if url.startswith("-"):
         raise ExtensionError("source.url must not start with '-'")
     commit = _required(src, "commit", where="source")
-    if not _COMMIT_RE.match(commit):
+    if not _COMMIT_RE.fullmatch(commit):
         raise ExtensionError("source.commit must be a full 40-character commit SHA")
     sha256 = _required(src, "sha256", where="source")
-    if not _SHA256_RE.match(sha256):
+    if not _SHA256_RE.fullmatch(sha256):
         raise ExtensionError("source.sha256 must be a 64-character hex digest")
     subdir = str(src.get("subdir", ""))
     if not _is_safe_subdir(subdir):

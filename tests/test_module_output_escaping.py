@@ -41,6 +41,16 @@ def test_manifest_name_must_be_a_slug() -> None:
     assert parse_manifest(_TOML.format(name="ok-name2")).name == "ok-name2"
 
 
+def test_slug_rejects_a_trailing_newline() -> None:
+    """`$` in `re.match` also matches before a final newline — slugs must match exactly."""
+    from veles.core.registry.model import is_slug
+
+    assert is_slug("guard")
+    assert not is_slug("guard\n")
+    with pytest.raises(ManifestError):
+        parse_manifest(_TOML.format(name="guard\\n"))
+
+
 def test_control_characters_in_module_name_never_reach_stderr_raw(tmp_path: Path, capsys) -> None:
     project = init_project(tmp_path / "p", name="p")
     # TOML escapes: the parsed name is "x\n\x1b[1A".
