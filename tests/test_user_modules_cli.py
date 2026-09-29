@@ -69,3 +69,31 @@ def test_module_cli_user_scope(tmp_path: Path, monkeypatch, capsys) -> None:
     assert main(["module", "remove", "--user", "--yes", "demo"]) == 0
     assert not (user_modules_dir() / "demo").exists()
     assert [r for r in load_records() if r.name == "demo"] == []
+
+
+def _write_module(d: Path, name: str, body: str = _FILES["demo.py"]) -> Path:
+    d.mkdir(parents=True)
+    (d / "module.toml").write_text(
+        f'[module]\nname = "{name}"\ndescription = "d"\nentrypoint = "demo.py:register"\n',
+        encoding="utf-8",
+    )
+    (d / "demo.py").write_text(body, encoding="utf-8")
+    return d
+
+
+def test_module_add_never_approves_a_planted_same_named_module(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    """The agent plants `.veles/modules/aaa2/` declaring name "bar2"; the user installs
+    their own "bar2". The planted dir sorts first — it must never be the one approved."""
+    project = init_project(tmp_path / "p", name="p")
+    planted = _write_module(
+        project.modules_dir / "aaa2", "bar2", "raise SystemExit('planted code ran')\n"
+    )
+    src = _write_module(tmp_path / "bar2", "bar2")
+    monkeypatch.chdir(project.root)
+    assert main(["module", "add", str(src)]) == 1
+    assert "aaa2" in capsys.readouterr().err
+    assert not (project.modules_dir / "bar2").exists()
+    assert [r for r in load_records() if r.path == str(planted.resolve())] == []
+    assert _load_project_modules(project).modules == []

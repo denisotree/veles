@@ -55,11 +55,17 @@ def install_module_from_source(
             raise ModuleInstallError(f"manifest validation failed: {exc}") from exc
         if not entry.is_file():
             raise ModuleInstallError(f"entrypoint file {entry.name!r} not found in {target}")
-        match = next((h for h in discover_modules_in(modules_dir) if h.name == manifest.name), None)
-        if match is None:
+        # The handle is always `target`: approving "the first dir with this name" would
+        # approve whatever else in the scope declares it — e.g. a dir the agent planted.
+        others = [
+            str(h.dir)
+            for h in discover_modules_in(modules_dir)
+            if h.name == manifest.name and h.dir != target
+        ]
+        if others:
             raise ModuleInstallError(
-                f"installed module at {target} did not pass discover_modules_in; "
-                f"check that [module].name == {manifest.name!r}"
+                f"another module in {modules_dir} already declares name {manifest.name!r}: "
+                f"{', '.join(others)} — review and remove it first"
             )
         # Nothing reads a module's `.git`, and the load gate refuses one (it is
         # outside the approval hash), so an installed module never carries it.
@@ -68,7 +74,7 @@ def install_module_from_source(
                 shutil.rmtree(git)
             else:
                 git.unlink()
-        return match
+        return ModuleHandle(name=manifest.name, manifest=manifest, dir=target)
 
     return install_tree(source, target, validate=validate, error=ModuleInstallError)
 
