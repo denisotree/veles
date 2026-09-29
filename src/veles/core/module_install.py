@@ -86,6 +86,12 @@ def install_module_from_source(
 def remove_module(name: str, *, modules_dir: Path) -> None:
     """Delete <modules_dir>/<name>/ recursively."""
     target = modules_dir / name
+    if target.is_symlink():
+        # Refuse rather than unlink: the link's target is someone else's module (and its
+        # approval record, keyed by resolved path); deleting the link is left to the user.
+        raise ModuleInstallError(
+            f"{shown(target)} is a symlink, not an installed module — delete the link itself"
+        )
     if not target.is_dir():
         raise ModuleNotFoundError(f"no module named {name!r} at {shown(target)}")
     shutil.rmtree(target)

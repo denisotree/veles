@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
 from pathlib import Path
 
@@ -10,7 +11,6 @@ from veles.core.critical_ops import confirm_critical
 from veles.core.module_install import (
     ModuleInstallError,
     ModuleNotFoundError,
-    derive_module_name,
     install_module_from_source,
     remove_module,
 )
@@ -89,27 +89,37 @@ def _show(args: argparse.Namespace, project: Project) -> int:
 
 
 def _add(args: argparse.Namespace, project: Project) -> int:
-    modules_dir = _modules_dir(args, project)
-    target_name = args.name or derive_module_name(args.source)
-    target = modules_dir / target_name
-    summary = (
-        f"Source: {args.source}\n"
-        f"Target: {target}\n"
-        "Installing a module wires hook callbacks that run on every agent "
-        "turn / tool dispatch. Review the source before confirming."
-    )
-    if not confirm_critical(f"install module from {args.source}", summary):
-        print("<aborted>", file=sys.stderr)
-        return 1
+    """Copy/clone the source in first (unapproved files never load), show the user the
+    hash of exactly those files, and approve that hash only — files swapped while the
+    user was confirming are refused. A decline or failure removes the copy."""
     from veles.core.registry.gate import approve_module
+    from veles.core.registry.hashing import tree_sha256
 
     try:
         handle = install_module_from_source(
-            args.source, modules_dir=modules_dir, name_override=args.name
+            args.source, modules_dir=_modules_dir(args, project), name_override=args.name
         )
-        project_root = None if getattr(args, "user", False) else project.root
-        approve_module(handle.dir, name=handle.name, project_root=project_root)
     except (ModuleInstallError, OSError, ValueError) as exc:
+        print(f"error: {shown(exc)}", file=sys.stderr)
+        return 1
+    try:
+        digest = tree_sha256(handle.dir)
+        summary = (
+            f"Source: {shown(args.source)}\nInstalled at: {shown(handle.dir)}\n"
+            f"Files hash: {digest[:12]}\n"
+            "Installing a module wires hook callbacks that run on every agent "
+            "turn / tool dispatch. Review the files before confirming."
+        )
+        if not confirm_critical(f"install module from {shown(args.source)}", summary):
+            shutil.rmtree(handle.dir, ignore_errors=True)
+            print("<aborted>", file=sys.stderr)
+            return 1
+        project_root = None if getattr(args, "user", False) else project.root
+        approve_module(
+            handle.dir, name=handle.name, project_root=project_root, expected_sha256=digest
+        )
+    except (OSError, ValueError) as exc:
+        shutil.rmtree(handle.dir, ignore_errors=True)
         print(f"error: {shown(exc)}", file=sys.stderr)
         return 1
     print(f"<installed module {handle.name!r} at {shown(handle.dir)}>", file=sys.stderr)
@@ -128,7 +138,7 @@ def _remove(args: argparse.Namespace, project: Project) -> int:
         return 1
     try:
         remove_module(target.name, modules_dir=modules_dir)
-    except ModuleNotFoundError as exc:
+    except (ModuleNotFoundError, ModuleInstallError) as exc:
         print(f"error: {shown(exc)}", file=sys.stderr)
         return 1
     from veles.core.registry.records import drop_record

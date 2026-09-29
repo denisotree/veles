@@ -36,6 +36,19 @@ def module_approved(module_dir: Path) -> bool:
         return False
 
 
+_LINKED = "its directory is a symlink; a module dir must be a real directory"
+
+
+def is_linked(module_dir: Path) -> bool:
+    """Records are keyed by resolved path, so a symlinked module dir would borrow the
+    approval of whatever it points at (and approving or removing it would act on that
+    target). Symlinked ancestors (a project under a linked dir) are fine: they are
+    resolved the same way on the approval and the load side."""
+    return module_dir.is_symlink() or module_dir.resolve() != (
+        module_dir.parent.resolve() / module_dir.name
+    )
+
+
 def admit_module(module_dir: Path, *, project_root: Path | None) -> str | None:
     """Why the module may not load, or None when it may. `project_root` is the scope it
     is being loaded in (None = user scope). The dir must be a real dir in its modules
@@ -47,13 +60,8 @@ def admit_module(module_dir: Path, *, project_root: Path | None) -> str | None:
     if sys.pycache_prefix:
         # Bytecode would then be read from outside the module dir, where no strip reaches.
         return "PYTHONPYCACHEPREFIX (sys.pycache_prefix) is set; unset it to load modules"
-    # Records are keyed by resolved path, so a symlinked module dir would inherit the
-    # approval of whatever it points at. Symlinked ancestors (a project under a linked
-    # dir) are fine: they are resolved on both the approval and the load side.
-    if module_dir.is_symlink() or module_dir.resolve() != module_dir.parent.resolve() / (
-        module_dir.name
-    ):
-        return "its directory is a symlink; a module dir must be a real directory"
+    if is_linked(module_dir):
+        return _LINKED
     rec = record_for_path(str(module_dir.resolve()))
     scope = str(project_root.resolve()) if project_root is not None else None
     if rec is not None and rec.project != scope:
@@ -82,7 +90,9 @@ def approve_module(
 ) -> InstallRecord:
     """Record `module_dir`'s current hash as approved. `expected_sha256` is the hash
     the user was shown: if the files changed since, nothing is approved. A module
-    whose entrypoint is invalid or missing is refused."""
+    whose entrypoint is invalid or missing, or whose dir is a symlink, is refused."""
+    if is_linked(module_dir):
+        raise ValueError(f"{shown(module_dir)}: {_LINKED}")
     try:
         manifest = parse_manifest((module_dir / "module.toml").read_text(encoding="utf-8"))
         entry, _ = entrypoint_file(module_dir, manifest.entrypoint)

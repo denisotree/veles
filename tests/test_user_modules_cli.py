@@ -8,6 +8,7 @@ from veles.cli import main
 from veles.cli._project import _load_project_modules
 from veles.core.critical_ops import reset_critical_confirmer, set_critical_confirmer
 from veles.core.project import init_project
+from veles.core.registry.gate import approve_module
 from veles.core.registry.records import load_records
 from veles.core.user_paths import user_modules_dir
 
@@ -97,6 +98,61 @@ def test_module_add_never_approves_a_planted_same_named_module(
     assert not (project.modules_dir / "bar2").exists()
     assert [r for r in load_records() if r.path == str(planted.resolve())] == []
     assert _load_project_modules(project).modules == []
+
+
+def test_module_add_shows_and_pins_the_approved_hash(tmp_path: Path, monkeypatch, capsys) -> None:
+    """The confirmation shows the installed files' hash; files swapped while the user is
+    confirming are refused (and removed), never approved."""
+    project = init_project(tmp_path / "p", name="p")
+    src = _write_module(tmp_path / "src-demo", "demo")
+    monkeypatch.chdir(project.root)
+    seen: list[str] = []
+
+    def swap_during_review(op: str, summary: str) -> bool:
+        seen.append(summary)
+        (project.modules_dir / "demo" / "demo.py").write_text(
+            "raise SystemExit('swapped')\n", encoding="utf-8"
+        )
+        return True
+
+    token = set_critical_confirmer(swap_during_review)
+    try:
+        assert main(["module", "add", str(src), "--name", "demo"]) == 1
+    finally:
+        reset_critical_confirmer(token)
+    assert "Files hash:" in seen[0]
+    assert "changed while it was being reviewed" in capsys.readouterr().err
+    assert not (project.modules_dir / "demo").exists()
+    assert load_records() == []
+
+
+def test_module_add_declined_leaves_nothing(tmp_path: Path, monkeypatch) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    src = _write_module(tmp_path / "src-demo", "demo")
+    monkeypatch.chdir(project.root)
+    token = set_critical_confirmer(lambda op, summary: False)
+    try:
+        assert main(["module", "add", str(src), "--name", "demo"]) == 1
+    finally:
+        reset_critical_confirmer(token)
+    assert not (project.modules_dir / "demo").exists()
+    assert load_records() == []
+
+
+def test_module_remove_refuses_a_symlinked_module_dir(tmp_path: Path, monkeypatch, capsys) -> None:
+    """Removing through a link would delete (or un-approve) whatever it points at."""
+    project = init_project(tmp_path / "p", name="p")
+    other = init_project(tmp_path / "other", name="other")
+    real = _write_module(other.modules_dir / "linked", "linked")
+    approve_module(real, name="linked", project_root=other.root)
+    project.modules_dir.mkdir(parents=True, exist_ok=True)
+    (project.modules_dir / "linked").symlink_to(real, target_is_directory=True)
+    monkeypatch.chdir(project.root)
+    assert main(["module", "remove", "--yes", "linked"]) == 1
+    assert "symlink" in capsys.readouterr().err
+    assert (real / "demo.py").is_file()
+    assert (project.modules_dir / "linked").is_symlink()
+    assert [r.path for r in load_records()] == [str(real.resolve())]
 
 
 def test_module_verbs_refuse_an_ambiguous_name(tmp_path: Path, monkeypatch, capsys) -> None:
