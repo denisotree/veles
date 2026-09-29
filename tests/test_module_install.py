@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -69,6 +70,22 @@ def test_module_add_from_git_repo_drops_dot_git(tmp_path: Path, dirname: str) ->
     installed = project.modules_dir / "demo"
     assert sorted(os.listdir(installed)) == ["main.py", "module.toml"]
     assert _load_project_modules(project).modules == ["demo"]
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignores directory permissions")
+def test_failed_dot_git_removal_rolls_back_completely(tmp_path: Path) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    src = _make_module_fixture(tmp_path, name="demo")
+    locked = src / ".git" / "locked"
+    locked.mkdir(parents=True)
+    (locked / "obj").write_bytes(b"x")
+    locked.chmod(0o555)  # copytree keeps the mode, so the copy's .git can't be emptied
+    try:
+        with pytest.raises(OSError):
+            install_module_from_source(str(src), project=project)
+    finally:
+        locked.chmod(0o755)
+    assert not (project.modules_dir / "fixture-demo").exists()
 
 
 def test_install_from_local_directory_succeeds(tmp_path: Path) -> None:

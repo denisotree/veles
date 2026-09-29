@@ -7,9 +7,11 @@ went wrong. What counts as valid differs, so it is the caller's `validate`.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import shutil
+import stat
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -54,8 +56,20 @@ def install_tree[T](
             shutil.copytree(src_path, target, symlinks=False)
         return validate()
     except Exception:
-        shutil.rmtree(target, ignore_errors=True)
+        _remove_completely(target)
         raise
+
+
+def _remove_completely(target: Path) -> None:
+    """Roll back `target` fully, even through read-only dirs (a copied `.git` can
+    carry them), so a retry is not blocked by "already exists"."""
+
+    def unlock_and_retry(func: Callable[[str], object], path: str, _exc: BaseException) -> None:
+        Path(path).parent.chmod(stat.S_IRWXU)
+        func(path)
+
+    with contextlib.suppress(OSError):  # best effort: never mask the original failure
+        shutil.rmtree(target, onexc=unlock_and_retry)
 
 
 def _git_clone(url: str, target: Path, error: type[Exception]) -> None:

@@ -53,15 +53,19 @@ def test_tree_sha256_is_stable_and_content_sensitive(tmp_path: Path) -> None:
     assert tree_sha256(tmp_path / "one") != tree_sha256(tmp_path / "two")
 
 
-def test_tree_sha256_ignores_caches_and_manifest(tmp_path: Path) -> None:
+def test_tree_sha256_skips_only_bytecode(tmp_path: Path) -> None:
     root = tmp_path / "t"
     _tree(root)
     before = tree_sha256(root)
     (root / "pkg" / "__pycache__").mkdir()
     (root / "pkg" / "__pycache__" / "a.cpython-313.pyc").write_bytes(b"\0")
-    (root / ".DS_Store").write_bytes(b"\0")
-    (root / "extension.toml").write_text("[extension]\n", encoding="utf-8")
     assert tree_sha256(root) == before
+    # Anything the gate neither strips nor refuses is hashed — even OS litter.
+    (root / ".DS_Store").write_bytes(b"\0")
+    with_ds = tree_sha256(root)
+    assert with_ds != before
+    (root / "extension.toml").write_text("[extension]\n", encoding="utf-8")
+    assert tree_sha256(root) != with_ds
 
 
 def test_tree_sha256_rejects_symlink(tmp_path: Path) -> None:

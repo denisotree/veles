@@ -182,6 +182,66 @@ def test_zip_inside_git_dir_never_runs(tmp_path: Path, monkeypatch) -> None:
     assert "gitzip_helper" not in sys.modules
 
 
+def _zip_module(path: Path, hook: str) -> None:
+    import zipfile
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("zipped_helper.py", _DEMO_PY.replace("pre_turn", hook))
+
+
+@pytest.mark.parametrize("rel", [".DS_Store", "extension.toml", "sub/.DS_Store"])
+def test_zip_swapped_after_approval_never_runs(tmp_path: Path, monkeypatch, rel: str) -> None:
+    from veles.cli._project import _load_project_modules
+
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    monkeypatch.delitem(sys.modules, "zipped_helper", raising=False)
+    project = init_project(tmp_path / "p", name="p")
+    d = _make_module(project.root)
+    (d / "demo.py").write_text(
+        f"import pathlib, sys\nsys.path.insert(0, str(pathlib.Path(__file__).parent / {rel!r}))\n"
+        "from zipped_helper import register\n",
+        encoding="utf-8",
+    )
+    _zip_module(d / rel, "pre_turn")
+    approve_module(d, name="demo", project_root=project.root)
+    _zip_module(d / rel, "post_turn")
+    registry = _load_project_modules(project)
+    assert registry.modules == []
+    assert list(registry.iter_hooks("post_turn")) == []
+    assert "zipped_helper" not in sys.modules
+
+
+@pytest.mark.parametrize(
+    "rel",
+    [
+        ".git/x",
+        ".GIT/x",
+        "sub/.git/x",
+        "__pycache__/x",
+        "__PYCACHE__/x",
+        "x.pyc",
+        "X.PYC",
+        "sub/y.pyc",
+        ".DS_Store",
+        "sub/.DS_Store",
+        "extension.toml",
+        "sub/extension.toml",
+        "note.txt",
+    ],
+)
+def test_hash_skips_only_what_the_gate_strips_or_refuses(tmp_path: Path, rel: str) -> None:
+    # Invariant: a file added after approval either changes the hash, or the gate
+    # removes it before import, or the gate refuses the module.
+    project = init_project(tmp_path / "p", name="p")
+    d = _make_module(project.root)
+    approve_module(d, name="demo", project_root=project.root)
+    (d / rel).parent.mkdir(parents=True, exist_ok=True)
+    (d / rel).write_bytes(b"PK\x03\x04")
+    refusal = admit_module(d)
+    assert refusal is not None or not (d / rel).exists()
+
+
 def test_plain_git_dir_is_refused(tmp_path: Path) -> None:
     from veles.cli._project import _load_project_modules
 

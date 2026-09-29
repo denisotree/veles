@@ -1,9 +1,11 @@
 """`tree_sha256` — one content hash for an extension's files.
 
 Used by install (git sources), the module load gate, `verify` and `validate`, so all
-four agree on what "the same code" means. Interpreter byte-code and OS litter are
-excluded — Python writes `__pycache__/` next to a module on first import, and that
-must not look like tampering. Symlinks are rejected: a link to `~/.ssh` inside a
+four agree on what "the same code" means. Only bytecode and `.git` are excluded
+(see `hash_skips`) — Python writes `__pycache__/` next to a module on first import,
+and that must not look like tampering. Everything else, OS litter included, is
+hashed: any unhashed file could be put on `sys.path` and swapped after approval.
+Symlinks are rejected: a link to `~/.ssh` inside a
 payload would otherwise be copied or hashed as if it were extension code.
 """
 
@@ -13,9 +15,6 @@ import hashlib
 import shutil
 from collections.abc import Callable
 from pathlib import Path
-
-_SKIP_NAMES = frozenset({".DS_Store"})
-_ROOT_SKIP = frozenset({"extension.toml"})
 
 
 def is_bytecode(name: str) -> bool:
@@ -28,9 +27,11 @@ def is_bytecode(name: str) -> bool:
 
 def hash_skips(name: str) -> bool:
     """True for a path component `tree_sha256` never looks inside (`.git`, bytecode).
-    Content there is unreviewed. What is enforced: an entrypoint may not sit under
-    one (`entrypoint_file`), bytecode is stripped before a module loads, and a module
-    containing any `.git` is refused (`git_dirs`)."""
+
+    Invariant: a path is skipped by the hash only if the gate strips it (bytecode,
+    `strip_bytecode`) or refuses the module (`.git`, `git_dirs`). Add a skip here
+    only together with gate handling for it. An entrypoint may not sit under a
+    skipped component either (`entrypoint_file`)."""
     return _is_git(name) or is_bytecode(name)
 
 
@@ -81,9 +82,7 @@ def tree_sha256(root: Path) -> str:
             raise ValueError(f"symlinks are not allowed in an extension: {rel.as_posix()}")
         if any(hash_skips(part) for part in rel.parts):
             continue
-        if path.is_dir() or path.name in _SKIP_NAMES:
-            continue
-        if len(rel.parts) == 1 and rel.name in _ROOT_SKIP:
+        if path.is_dir():
             continue
         entries.append((rel.as_posix(), hashlib.sha256(path.read_bytes()).hexdigest()))
     digest = hashlib.sha256()
