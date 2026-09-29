@@ -11,7 +11,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from veles.core.module_manifest import ManifestError, entrypoint_file, parse_manifest
-from veles.core.registry.hashing import bytecode_paths, strip_bytecode, tree_sha256
+from veles.core.registry.hashing import (
+    bytecode_paths,
+    git_code_paths,
+    strip_bytecode,
+    tree_sha256,
+)
 from veles.core.registry.records import InstallRecord, put_record, record_for_path
 
 
@@ -29,17 +34,22 @@ def module_approved(module_dir: Path) -> bool:
         return False
 
 
-def admit_module(module_dir: Path) -> bool:
-    """`module_approved`, then drop the module's bytecode so the import that follows
-    compiles the reviewed source instead of running a planted `.pyc`. Fails closed:
-    bytecode that can't be removed (e.g. a read-only `__pycache__`) refuses the module."""
+def admit_module(module_dir: Path) -> str | None:
+    """Why the module may not load, or None when it may. `module_approved`, then no
+    Python code under `.git` (outside the hash), then drop the module's bytecode so
+    the import that follows compiles the reviewed source instead of running a planted
+    `.pyc`. Fails closed: bytecode that can't be removed refuses the module."""
     if not module_approved(module_dir):
-        return False
+        return "not approved, or changed since approval"
     try:
+        git_code = git_code_paths(module_dir)
+        if git_code:
+            rel = git_code[0].relative_to(module_dir).as_posix()
+            return f"it has Python code inside .git ({rel}), outside the approval hash"
         strip_bytecode(module_dir)
     except OSError:
-        return False
-    return not bytecode_paths(module_dir)
+        return "its bytecode cannot be removed"
+    return "its bytecode cannot be removed" if bytecode_paths(module_dir) else None
 
 
 def approve_module(

@@ -93,6 +93,14 @@ def test_entrypoint_in_hash_skipped_dir_fails(tmp_path: Path) -> None:
     assert any("not covered by the approval hash" in e for e in validate_registry(root).errors)
 
 
+def test_git_dir_in_payload_fails(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "r")
+    ext = write_extension(root, "official", "alpha")
+    (ext / ".GIT").mkdir()
+    (ext / ".GIT" / "x").write_text("x", encoding="utf-8")
+    assert any(".GIT" in e for e in validate_registry(root).errors)
+
+
 def test_symlink_payload_fails(tmp_path: Path) -> None:
     root = write_registry(tmp_path / "r")
     ext = write_extension(root, "official", "sneaky")

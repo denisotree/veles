@@ -28,8 +28,29 @@ def is_bytecode(name: str) -> bool:
 
 def hash_skips(name: str) -> bool:
     """True for a path component `tree_sha256` never looks inside (`.git`, bytecode).
-    Code under such a component is unreviewed, so it must never be loaded."""
-    return name.casefold() == ".git" or is_bytecode(name)
+    Content there is unreviewed. What is enforced: an entrypoint may not sit under
+    one (`entrypoint_file`), bytecode is stripped before a module loads, and a module
+    with Python code under `.git` is refused (`git_code_paths`)."""
+    return is_git_dir(name) or is_bytecode(name)
+
+
+def is_git_dir(name: str) -> bool:
+    return name.casefold() == ".git"
+
+
+_PYTHON_LOADABLE = (".py", ".so", ".pyd", ".pth")
+
+
+def git_code_paths(root: Path) -> list[Path]:
+    """Files Python could import that sit under a `.git` component of `root`. `.git`
+    is outside the hash (a git-cloned module keeps a real one), so code there could
+    be swapped after approval and still reached via `sys.path`."""
+    return sorted(
+        p
+        for p in root.rglob("*")
+        if p.name.casefold().endswith(_PYTHON_LOADABLE)
+        and any(is_git_dir(part) for part in p.relative_to(root).parts[:-1])
+    )
 
 
 def copy_ignore(*extra: str) -> Callable[[str, list[str]], set[str]]:

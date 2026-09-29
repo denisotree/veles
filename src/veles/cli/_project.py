@@ -31,10 +31,10 @@ def _load_project_modules(project: Project) -> ModuleRegistry:
 
     registry = ModuleRegistry()
     for handle in discover_modules(project):
-        if not admit_module(handle.dir):
+        refusal = admit_module(handle.dir)
+        if refusal is not None:
             print(
-                f"warning: skipping module {handle.name!r}: not approved, changed since "
-                "approval, or its bytecode cannot be removed — review it, then "
+                f"warning: skipping module {handle.name!r}: {refusal} — review it, then "
                 f"`veles module approve {handle.name}`",
                 file=sys.stderr,
             )

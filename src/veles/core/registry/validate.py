@@ -18,7 +18,7 @@ from pathlib import Path
 from veles.core.frontmatter import parse_frontmatter
 from veles.core.layout.manifest import LayoutManifestError, read_manifest
 from veles.core.module_manifest import ManifestError, entrypoint_file, parse_manifest
-from veles.core.registry.hashing import bytecode_paths, tree_sha256
+from veles.core.registry.hashing import bytecode_paths, is_git_dir, tree_sha256
 from veles.core.registry.model import (
     EXTENSION_FILE,
     REGISTRY_FILE,
@@ -152,6 +152,12 @@ def _check(
         if bytecode:
             # The hash ignores bytecode, so a committed .pyc would be unreviewed code.
             errors.append(f"bytecode is not allowed in an extension (delete it): {bytecode}")
+        git_dirs = sorted(
+            p.relative_to(payload).as_posix() for p in payload.rglob("*") if is_git_dir(p.name)
+        )
+        if git_dirs:
+            # `.git` is outside the hash, so anything in it would be unreviewed.
+            errors.append(f".git is not allowed in an extension payload: {git_dirs}")
         errors += _check_kind(ext, payload)
         report.review += [f"{ext.group}/{ext.name}: {f}" for f in scan_python(payload)]
         if ext.requires:

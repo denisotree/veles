@@ -55,7 +55,7 @@ def test_gate_survives_bytecode_cache(tmp_path: Path) -> None:
     (d / "__pycache__").mkdir(exist_ok=True)
     (d / "__pycache__" / "demo.cpython-313.pyc").write_bytes(b"\0")
     assert module_approved(d)
-    assert admit_module(d)  # still admitted — and the untrusted bytecode is gone
+    assert admit_module(d) is None  # still admitted — and the untrusted bytecode is gone
     assert not (d / "__pycache__").exists()
 
 
@@ -124,6 +124,46 @@ def test_case_variant_bytecode_never_runs(tmp_path: Path) -> None:
     assert [m for m, _ in registry.iter_hooks("pre_turn")] == ["demo"]
     assert list(registry.iter_hooks("post_turn")) == []
     assert not {"__PYCACHE__", "HELPER.PYC"} & set(os.listdir(d))
+
+
+def test_code_inside_git_dir_is_refused(tmp_path: Path, monkeypatch, capsys) -> None:
+    # `.git/` sits outside the hash; a reviewed entrypoint that imports from it
+    # would run code that can change after approval.
+    from veles.cli._project import _load_project_modules
+
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    monkeypatch.delitem(sys.modules, "gitdir_helper", raising=False)
+    project = init_project(tmp_path / "p", name="p")
+    d = _make_module(project.root)
+    (d / "demo.py").write_text(
+        "import pathlib, sys\n"
+        "sys.path.insert(0, str(pathlib.Path(__file__).parent / '.GIT'))\n"
+        "from gitdir_helper import register\n",
+        encoding="utf-8",
+    )
+    (d / ".GIT").mkdir()
+    (d / ".GIT" / "gitdir_helper.py").write_text(_DEMO_PY, encoding="utf-8")
+    approve_module(d, name="demo", project_root=project.root)
+    (d / ".GIT" / "gitdir_helper.py").write_text(
+        _DEMO_PY.replace("pre_turn", "post_turn"), encoding="utf-8"
+    )
+    assert module_approved(d)  # the hash cannot see it — the gate must
+    registry = _load_project_modules(project)
+    assert registry.modules == []
+    assert list(registry.iter_hooks("post_turn")) == []
+    assert ".GIT/gitdir_helper.py" in capsys.readouterr().err
+
+
+def test_plain_git_dir_still_loads(tmp_path: Path) -> None:
+    from veles.cli._project import _load_project_modules
+
+    project = init_project(tmp_path / "p", name="p")
+    d = _make_module(project.root)
+    (d / ".git" / "objects" / "ab").mkdir(parents=True)
+    (d / ".git" / "objects" / "ab" / "cdef0123").write_bytes(b"x\x9c")
+    (d / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    approve_module(d, name="demo", project_root=project.root)
+    assert _load_project_modules(project).modules == ["demo"]
 
 
 def _point_entrypoint_at(d: Path, rel: str) -> None:
