@@ -258,7 +258,7 @@ def fire_hook(hook_name: str, /, **ctx: Any) -> VetoResult | None:
         except Exception as exc:
             print(
                 f"warning: module {module_name!r} hook {hook_name!r} raised "
-                f"{type(exc).__name__}: {exc}",
+                f"{type(exc).__name__}: {shown(exc)}",
                 file=sys.stderr,
             )
             continue

@@ -139,6 +139,23 @@ def test_module_add_declined_leaves_nothing(tmp_path: Path, monkeypatch) -> None
     assert load_records() == []
 
 
+def test_module_add_interrupted_leaves_nothing(tmp_path: Path, monkeypatch) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    src = _write_module(tmp_path / "src-demo", "demo")
+    monkeypatch.chdir(project.root)
+
+    def ctrl_c(op: str, summary: str) -> bool:
+        raise KeyboardInterrupt
+
+    token = set_critical_confirmer(ctrl_c)
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            main(["module", "add", str(src), "--name", "demo"])
+    finally:
+        reset_critical_confirmer(token)
+    assert not (project.modules_dir / "demo").exists()
+
+
 def test_module_remove_refuses_a_symlinked_module_dir(tmp_path: Path, monkeypatch, capsys) -> None:
     """Removing through a link would delete (or un-approve) whatever it points at."""
     project = init_project(tmp_path / "p", name="p")

@@ -85,3 +85,26 @@ def test_control_characters_in_module_dir_name_never_reach_stderr_raw(
     assert _load_project_modules(project).modules == ["solo"]
     assert main(["module", "remove", "--yes", "solo"]) == 0
     assert _clean(capsys.readouterr().err)
+
+
+def test_hook_error_is_printed_escaped(capsys) -> None:
+    from veles.core.modules import (
+        ModuleAPI,
+        ModuleRegistry,
+        fire_hook,
+        reset_module_registry,
+        set_module_registry,
+    )
+
+    def boom(ctx: object) -> None:
+        raise RuntimeError(f"x{_EVIL}")
+
+    registry = ModuleRegistry()
+    ModuleAPI(registry, "m").add_hook("pre_turn", boom)
+    token = set_module_registry(registry)
+    try:
+        fire_hook("pre_turn")
+    finally:
+        reset_module_registry(token)
+    err = capsys.readouterr().err
+    assert "RuntimeError" in err and _clean(err)

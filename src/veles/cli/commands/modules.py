@@ -138,6 +138,9 @@ def _add(args: argparse.Namespace, project: Project) -> int:
         shutil.rmtree(handle.dir, ignore_errors=True)
         print(f"error: {shown(exc)}", file=sys.stderr)
         return 1
+    except BaseException:  # Ctrl-C at the confirmation: leave no unapproved copy behind
+        shutil.rmtree(handle.dir, ignore_errors=True)
+        raise
     print(f"<installed module {handle.name!r} at {shown(handle.dir)}>", file=sys.stderr)
     return 0
 

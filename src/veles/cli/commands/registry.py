@@ -41,6 +41,7 @@ from veles.core.registry.template import (
     vendor_extension,
 )
 from veles.core.registry.validate import validate_registry
+from veles.core.text import shown
 
 _ERRORS = (
     RegistryConfigError,
@@ -58,7 +59,7 @@ def cmd_registry(args: argparse.Namespace, project: Project | None) -> int:
     try:
         return handler(args, project)
     except _ERRORS as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        print(f"error: {shown(exc)}", file=sys.stderr)
         return 1
 
 
@@ -100,7 +101,7 @@ def _update(args: argparse.Namespace, project: Project | None) -> int:
         try:
             print(f"{s.name}: {update(s)[:10]}")
         except RegistryRepoError as exc:
-            print(f"{s.name}: error: {exc}", file=sys.stderr)
+            print(f"{s.name}: error: {shown(exc)}", file=sys.stderr)
             rc = 1
     return rc
 
@@ -128,7 +129,7 @@ def _search(args: argparse.Namespace, project: Project | None) -> int:
 def _install(args: argparse.Namespace, project: Project | None) -> int:
     found = resolve(args.spec)
     rec = install(found, project=project, user_scope=args.user, force=args.force)
-    print(f"<installed {found.ref} {rec.version} at {rec.path}>", file=sys.stderr)
+    print(f"<installed {found.ref} {rec.version} at {shown(rec.path)}>", file=sys.stderr)
     hint = pip_hint(found)
     if hint:
         print(hint, file=sys.stderr)
@@ -146,7 +147,7 @@ def _upgrade(args: argparse.Namespace, project: Project | None) -> int:
         try:
             rec = upgrade(name, project=project)
         except _ERRORS as exc:
-            print(f"{name}: error: {exc}", file=sys.stderr)
+            print(f"{name}: error: {shown(exc)}", file=sys.stderr)
             rc = 1
             continue
         print(f"{name}: " + (f"upgraded to {rec.version}" if rec else "up to date"))
@@ -165,7 +166,8 @@ def _verify(args: argparse.Namespace, project: Project | None) -> int:
         print("all installed extensions match their records")
         return 0
     for i in issues:
-        print(f"{i.problem:<14} {i.record.name}  {i.detail}")
+        # Paths and hashing errors come from dirs the agent can create or rename.
+        print(f"{i.problem:<14} {shown(i.record.name)}  {shown(i.detail)}")
     return 1 if any(i.problem in ("missing", "modified") for i in issues) else 0
 
 
