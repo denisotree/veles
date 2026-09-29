@@ -49,15 +49,18 @@ class PromptsMixin:
         Cancel so a stray Enter never deletes."""
         import threading
 
-        from veles.core.text import shown
+        from veles.core.text import shown, shown_multiline
 
         if not sys.stdin.isatty():
             return False
         # `op`/`summary` come from tool-controlled strings (paths, names) —
         # escape before they reach the terminal or the picker question, so a
-        # control character can't forge this confirmation.
+        # control character can't forge this confirmation. `op` is always
+        # one line; `summary` can legitimately be multi-line (e.g. an MCP
+        # recipe review body), so it keeps `\n`/`\t` literal (`shown_multiline`)
+        # while still escaping any other control character.
         op = shown(op)
-        summary = shown(summary)
+        summary = shown_multiline(summary)
         self.console.print()
         self.console.print(f"⚠ {op}", style=self.theme.error, markup=False)
         if summary:

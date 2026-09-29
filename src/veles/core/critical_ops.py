@@ -86,11 +86,16 @@ def confirm_critical(op: str, summary: str) -> bool:
 def _default_confirmer(op: str, summary: str) -> bool:
     # `op`/`summary` are built by call sites from tool-controlled strings
     # (paths, names, recipes) — escape once here so no caller has to
-    # remember to, and a control character can't forge this prompt.
-    from veles.core.text import shown
+    # remember to, and a control character can't forge this prompt. `op` is
+    # always one line (an action description), so full `shown()` is right.
+    # `summary` is sometimes a legitimate multi-line review body (e.g.
+    # `mcp/approvals.py::describe_recipe`, install summaries with `Source:
+    # .../Target: ...` lines) — `shown_multiline()` keeps those newlines
+    # literal while still escaping any other injected control character.
+    from veles.core.text import shown, shown_multiline
 
     op = shown(op)
-    summary = shown(summary)
+    summary = shown_multiline(summary)
     if not sys.stdin.isatty():
         print(
             f"\nCRITICAL: {op} requires interactive confirmation; non-TTY context refuses.",

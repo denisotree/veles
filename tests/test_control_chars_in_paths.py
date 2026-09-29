@@ -91,6 +91,29 @@ def test_default_confirmer_escapes_control_chars(
     assert "evil" in err
 
 
+def test_default_confirmer_keeps_newlines_in_multiline_summary(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A legitimate multi-line summary (e.g. an MCP recipe review body built
+    by `mcp/approvals.py::describe_recipe`, or an install summary's
+    `Source:`/`Target:` lines) must still print on separate lines — escaping
+    is about control characters, not about collapsing real structure."""
+    from veles.core.critical_ops import _default_confirmer
+
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
+
+    summary = "Source: pkg\x1b[2K\nTarget: /dest\nReview before confirming."
+    assert _default_confirmer("op", summary) is True
+
+    err = capsys.readouterr().err
+    assert "\x1b" not in err  # the injected ESC is still escaped
+    assert "\\x1b" in err
+    lines = err.splitlines()
+    assert any(line.strip().startswith("Source:") for line in lines)
+    assert any(line.strip().startswith("Target: /dest") for line in lines)
+
+
 # ---------------- diff preview: control chars in content escaped ----------------
 
 
@@ -119,8 +142,13 @@ def test_diff_preview_escapes_esc_but_keeps_newlines(capsys: pytest.CaptureFixtu
     out = capsys.readouterr().out
     assert "\x1b" not in out  # no raw ANSI escape leaks into the diff
     assert "\\x1b" in out  # escaped form shown instead
-    assert "line one" in out
-    assert "line two" in out  # the \n between the two content lines survived
+    assert "\\n" not in out  # the real newline was NOT itself escaped away
+    lines = out.splitlines()
+    # "line one"/"line two" landed as two separate `+` diff lines, not one
+    # line joined by a literal "\n" — proves shown_multiline() kept the
+    # structural newline while still escaping the ANSI escape inside it.
+    assert any(line.lstrip().startswith("+line one") for line in lines)
+    assert any(line.lstrip() == "+line two" for line in lines)
 
 
 def test_diff_preview_escapes_control_chars_in_path(capsys: pytest.CaptureFixture[str]) -> None:
