@@ -95,3 +95,37 @@ def test_user_modules_dir_is_outside_the_agent_sandbox(tmp_path: Path) -> None:
             resolve_safe(user_modules_dir() / "evil" / "m.py")
     finally:
         reset_active_project(token)
+
+
+def test_user_module_memory_provider_is_built_under_its_registry(tmp_path: Path) -> None:
+    """A user-level module that registers a memory provider is loaded by
+    `_load_project_modules`, and `build_extra_providers` builds it under that
+    project's registry — the module wiring reaches all the way to the recall path."""
+    from veles.core.memory.providers import build_extra_providers
+    from veles.core.modules import reset_module_registry, set_module_registry
+
+    d = user_modules_dir() / "mem-provider"
+    d.mkdir(parents=True)
+    (d / "module.toml").write_text(
+        '[module]\nname = "mem-provider"\ndescription = "d"\nentrypoint = "m.py:register"\n',
+        encoding="utf-8",
+    )
+    (d / "m.py").write_text(
+        "def register(api):\n    api.add_memory_provider('fake', lambda cfg: {'cfg': cfg})\n",
+        encoding="utf-8",
+    )
+    approve_module(d, name="mem-provider", project_root=None)
+
+    project = init_project(tmp_path / "p", name="p")
+    registry = _load_project_modules(project)
+    assert registry.modules == ["mem-provider"]
+
+    config = tmp_path / "config.toml"
+    config.write_text('[memory.external.fake]\napi_key = "k"\n', encoding="utf-8")
+
+    token = set_module_registry(registry)
+    try:
+        [provider] = build_extra_providers(config)
+    finally:
+        reset_module_registry(token)
+    assert provider == {"cfg": {"api_key": "k"}}

@@ -70,11 +70,13 @@ class VetoResult:
 
 
 HookFn = Callable[[dict[str, Any]], VetoResult | None]
+ProviderFactory = Callable[[dict[str, Any]], object | None]
 
 
 class ModuleRegistry:
     def __init__(self) -> None:
         self._hooks: dict[str, list[tuple[str, HookFn]]] = {n: [] for n in HOOK_NAMES}
+        self._memory_providers: dict[str, tuple[str, ProviderFactory]] = {}
         self.modules: list[str] = []
 
     def add_hook(self, hook_name: str, module_name: str, fn: HookFn) -> None:
@@ -84,6 +86,20 @@ class ModuleRegistry:
 
     def iter_hooks(self, hook_name: str) -> Iterator[tuple[str, HookFn]]:
         return iter(self._hooks.get(hook_name, []))
+
+    def add_memory_provider(self, name: str, module_name: str, factory: ProviderFactory) -> None:
+        from veles.core.registry.model import is_slug
+
+        if not is_slug(name):
+            raise ValueError(f"memory provider name {name!r} must match [a-z0-9][a-z0-9-]*")
+        if name in self._memory_providers:
+            owner = self._memory_providers[name][0]
+            raise ValueError(f"memory provider {name!r} is already registered by {owner!r}")
+        self._memory_providers[name] = (module_name, factory)
+
+    def iter_memory_providers(self) -> Iterator[tuple[str, str, ProviderFactory]]:
+        for name, (module_name, factory) in self._memory_providers.items():
+            yield name, module_name, factory
 
 
 class ModuleAPI:
@@ -95,6 +111,9 @@ class ModuleAPI:
 
     def add_hook(self, hook_name: str, fn: HookFn) -> None:
         self._registry.add_hook(hook_name, self._module_name, fn)
+
+    def add_memory_provider(self, name: str, factory: ProviderFactory) -> None:
+        self._registry.add_memory_provider(name, self._module_name, factory)
 
 
 # ---- ContextVar for the active registry ----

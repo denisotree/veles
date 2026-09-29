@@ -1,28 +1,12 @@
-"""Concrete external memory providers (Tier δ, M55 follow-up).
+"""External memory providers (Tier δ, M55 follow-up).
 
-M55 shipped the `MemoryProvider` Protocol and the `MemoryRouter.extra_providers`
-wire-up. This sub-package carries the actual adapters: Honcho and Mem0
-today, with room for more (Supermemory, a corporate KB, ...) on the same
-pattern.
-
-Every adapter follows the same rules:
-  - Lazy SDK import — `pip install honcho-ai` / `mem0ai` is the user's
-    decision. We only attempt the import when `recall()` is first called.
-  - Soft failure — ImportError, auth error, or network error → empty
-    `list[RecallHit]`. A broken external provider must not block the
-    project's primary recall (wiki + turns).
-  - No magic ENV reads at module import time — the factory in
-    `builder.py` reads config and constructs providers explicitly.
+Providers come from modules: a module calls `api.add_memory_provider(name, factory)`
+in `register()`, and `build_extra_providers()` builds whatever `[memory.external.<name>]`
+sections the user configured against the factories the currently-loaded modules
+registered. Veles core ships no concrete external adapters — see the registry
+extensions for those (Honcho, Mem0, Supermemory, ...).
 """
 
 from veles.core.memory.providers.builder import build_extra_providers
-from veles.core.memory.providers.honcho import HonchoMemoryProvider
-from veles.core.memory.providers.mem0 import Mem0MemoryProvider
-from veles.core.memory.providers.supermemory import SupermemoryProvider
 
-__all__ = [
-    "HonchoMemoryProvider",
-    "Mem0MemoryProvider",
-    "SupermemoryProvider",
-    "build_extra_providers",
-]
+__all__ = ["build_extra_providers"]
