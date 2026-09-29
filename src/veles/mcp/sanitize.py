@@ -58,7 +58,7 @@ def normalize_tool_name(name: Any) -> str | None:
     name, because a silently renamed tool would no longer match the
     server's own tool id at call time."""
     text = _CONTROL_CHARS_RE.sub("", str(name)).strip()
-    if not TOOL_NAME_RE.match(text):
+    if not TOOL_NAME_RE.fullmatch(text):
         logger.warning("MCP tool name %r is not a safe identifier; rejecting tool", name)
         return None
     return text

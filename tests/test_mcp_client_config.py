@@ -161,6 +161,12 @@ def test_bad_server_name_skipped(project: Project, caplog: pytest.LogCaptureFixt
         assert load_mcp_config(project) == {}
 
 
+def test_server_name_with_trailing_newline_skipped(project: Project) -> None:
+    """`$` in `re.match` also matches before a final newline — names must match exactly."""
+    _write_config(project, '[mcp.servers."srv\\n"]\ncommand = "x"\n')
+    assert load_mcp_config(project) == {}
+
+
 def test_non_numeric_timeout_falls_back(project: Project) -> None:
     _write_config(
         project,

@@ -173,7 +173,7 @@ def load_mcp_config(project: Project) -> dict[str, McpServerConfig]:
         if not isinstance(raw, dict):
             logger.warning("MCP server %r: entry is not a table; skipping", name)
             continue
-        if not _SERVER_NAME_RE.match(name):
+        if not _SERVER_NAME_RE.fullmatch(name):  # `match` + `$` would accept "name\n"
             logger.warning(
                 "MCP server %r: name must match %s; skipping",
                 name,
