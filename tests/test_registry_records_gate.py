@@ -126,6 +126,41 @@ def test_case_variant_bytecode_never_runs(tmp_path: Path) -> None:
     assert not {"__PYCACHE__", "HELPER.PYC"} & set(os.listdir(d))
 
 
+def _point_entrypoint_at(d: Path, rel: str) -> None:
+    (d / rel).parent.mkdir(parents=True, exist_ok=True)
+    (d / rel).write_text(_DEMO_PY, encoding="utf-8")
+    (d / "module.toml").write_text(_MODULE_TOML.replace("demo.py", rel), encoding="utf-8")
+
+
+@pytest.mark.parametrize("rel", [".git/main.py", "__PYCACHE__/x.py", ".GIT/main.py"])
+def test_entrypoint_in_hash_skipped_dir_is_refused(tmp_path: Path, rel: str) -> None:
+    # `.git/` sits outside the approval hash: its code could be rewritten after approval.
+    from veles.core.modules import ModuleLoadError
+
+    project = init_project(tmp_path / "p", name="p")
+    d = _make_module(project.root)
+    _point_entrypoint_at(d, rel)
+    with pytest.raises(ValueError, match="not covered by the approval hash"):
+        approve_module(d, name="demo", project_root=project.root)
+    assert not module_approved(d)
+    [handle] = discover_modules(project)
+    with pytest.raises(ModuleLoadError, match="not covered by the approval hash"):
+        load_module(handle, ModuleRegistry())
+
+
+def test_module_approve_refuses_bad_entrypoint(tmp_path: Path, capsys) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    d = _make_module(project.root)
+    _point_entrypoint_at(d, ".git/main.py")
+    assert _approve(project, lambda op, summary: True) == 1
+    assert "not covered by the approval hash" in capsys.readouterr().err
+    (d / "module.toml").write_text(_MODULE_TOML, encoding="utf-8")
+    (d / "demo.py").unlink()
+    assert _approve(project, lambda op, summary: True) == 1
+    assert "not found" in capsys.readouterr().err
+    assert not module_approved(d)
+
+
 @pytest.mark.skipif(os.geteuid() == 0, reason="root ignores directory permissions")
 def test_undeletable_bytecode_fails_closed(tmp_path: Path) -> None:
     from veles.cli._project import _load_project_modules

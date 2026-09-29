@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
+from veles.core.module_manifest import ManifestError, entrypoint_file, parse_manifest
 from veles.core.registry.hashing import bytecode_paths, strip_bytecode, tree_sha256
 from veles.core.registry.records import InstallRecord, put_record, record_for_path
 
@@ -45,7 +46,15 @@ def approve_module(
     module_dir: Path, *, name: str, project_root: Path, expected_sha256: str | None = None
 ) -> InstallRecord:
     """Record `module_dir`'s current hash as approved. `expected_sha256` is the hash
-    the user was shown: if the files changed since, nothing is approved."""
+    the user was shown: if the files changed since, nothing is approved. A module
+    whose entrypoint is invalid or missing is refused."""
+    try:
+        manifest = parse_manifest((module_dir / "module.toml").read_text(encoding="utf-8"))
+        entry, _ = entrypoint_file(module_dir, manifest.entrypoint)
+    except ManifestError as exc:
+        raise ValueError(f"{module_dir}: {exc}") from exc
+    if not entry.is_file():
+        raise ValueError(f"{module_dir}: entrypoint file {entry.name!r} not found")
     digest = tree_sha256(module_dir)
     if expected_sha256 is not None and digest != expected_sha256:
         raise ValueError(f"{module_dir} changed while it was being reviewed — review it again")

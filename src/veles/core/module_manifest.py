@@ -14,6 +14,8 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+from veles.core.registry.hashing import hash_skips
+
 
 class ManifestError(RuntimeError):
     pass
@@ -63,10 +65,14 @@ def parse_entrypoint(spec: str) -> tuple[str, str]:
 
 def entrypoint_file(module_dir: Path, spec: str) -> tuple[Path, str]:
     """`parse_entrypoint`, then the file's path — which must stay inside
-    `module_dir`. The approval hash covers only that directory, so an entrypoint
-    like `../../x.py` or an absolute path would run code nobody reviewed."""
+    `module_dir` and outside the dirs the hash skips (`.git/`, `__pycache__/`). The
+    approval hash covers only those files, so an entrypoint like `../../x.py` or
+    `.git/main.py` would run code that can change after approval."""
     file_part, func_part = parse_entrypoint(spec)
     path = module_dir / file_part
-    if not path.resolve().is_relative_to(module_dir.resolve()):
+    resolved = path.resolve()
+    if not resolved.is_relative_to(module_dir.resolve()):
         raise ManifestError(f"entrypoint {file_part!r} points outside the module directory")
+    if any(hash_skips(part) for part in resolved.relative_to(module_dir.resolve()).parts):
+        raise ManifestError(f"entrypoint {file_part!r} is not covered by the approval hash")
     return path, func_part

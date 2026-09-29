@@ -76,6 +76,23 @@ def test_entrypoint_outside_payload_fails(tmp_path: Path) -> None:
     assert any("outside" in e for e in validate_registry(root).errors)
 
 
+def test_entrypoint_in_hash_skipped_dir_fails(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "r")
+    files = {
+        "module.toml": _MODULE_FILES["module.toml"].replace("demo.py", ".git/main.py"),
+        ".git/main.py": _MODULE_FILES["demo.py"],
+    }
+    write_extension(
+        root,
+        "official",
+        "demo",
+        kind="module",
+        extra_ext='provides = ["hook:pre_turn"]',
+        files=files,
+    )
+    assert any("not covered by the approval hash" in e for e in validate_registry(root).errors)
+
+
 def test_symlink_payload_fails(tmp_path: Path) -> None:
     root = write_registry(tmp_path / "r")
     ext = write_extension(root, "official", "sneaky")
