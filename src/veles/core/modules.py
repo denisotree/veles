@@ -201,25 +201,34 @@ def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
     if spec is None or spec.loader is None:
         raise ModuleLoadError(f"could not build import spec for {file_path}")
     module = importlib.util.module_from_spec(spec)
+    # Standard importlib recipe: register in sys.modules before exec so
+    # annotation resolution (e.g. `from __future__ import annotations` +
+    # `dataclass(slots=True)`) can find the module via sys.modules[cls.__module__].
+    # Removed again on any failure below so a failed module leaves nothing behind.
+    sys.modules[spec.name] = module
     try:
-        spec.loader.exec_module(module)
-    except Exception as exc:
-        raise ModuleLoadError(f"failed to import {file_path}: {exc}") from exc
-    register = getattr(module, func_part, None)
-    if not callable(register):
-        raise ModuleLoadError(
-            f"entrypoint {handle.manifest.entrypoint!r} resolved but is not callable"
-        )
-    scratch = ModuleRegistry()
-    api = ModuleAPI(scratch, handle.name)
-    try:
-        register(api)
-    except Exception as exc:
-        raise ModuleLoadError(f"register() raised {type(exc).__name__}: {exc}") from exc
-    try:
-        registry.merge_from(scratch, handle.name)
-    except ValueError as exc:
-        raise ModuleLoadError(str(exc)) from exc
+        try:
+            spec.loader.exec_module(module)
+        except Exception as exc:
+            raise ModuleLoadError(f"failed to import {file_path}: {exc}") from exc
+        register = getattr(module, func_part, None)
+        if not callable(register):
+            raise ModuleLoadError(
+                f"entrypoint {handle.manifest.entrypoint!r} resolved but is not callable"
+            )
+        scratch = ModuleRegistry()
+        api = ModuleAPI(scratch, handle.name)
+        try:
+            register(api)
+        except Exception as exc:
+            raise ModuleLoadError(f"register() raised {type(exc).__name__}: {exc}") from exc
+        try:
+            registry.merge_from(scratch, handle.name)
+        except ValueError as exc:
+            raise ModuleLoadError(str(exc)) from exc
+    except BaseException:
+        sys.modules.pop(spec.name, None)
+        raise
 
 
 # ---- Hook firing ----
