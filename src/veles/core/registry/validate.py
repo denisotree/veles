@@ -46,7 +46,7 @@ PERMISSIVE_LICENSES = frozenset(
         "MPL-2.0",
     }
 )
-_PROVIDES_PREFIXES = ("hook:", "tool:", "platform:", "provider:")
+_PROVIDES_PREFIXES = ("hook:", "tool:", "platform:", "provider:", "memory:")
 
 
 @dataclass
@@ -214,9 +214,10 @@ def _check_module(ext: Extension, payload: Path) -> list[str]:
     return errors
 
 
-# Run in a child interpreter: the hooks it registers come back as the last stdout
-# line. The child can still lie about them — this checks `provides` against
-# reality for honest authors; it is not a security boundary (the human review is).
+# Run in a child interpreter: the hooks and memory providers it registers come
+# back as a JSON object on the last stdout line. The child can still lie about
+# them — this checks `provides` against reality for honest authors; it is not
+# a security boundary (the human review is).
 _DRY_RUN = """\
 import json, sys
 from pathlib import Path
@@ -226,7 +227,10 @@ payload = Path(sys.argv[1])
 manifest = parse_manifest((payload / "module.toml").read_text(encoding="utf-8"))
 registry = ModuleRegistry()
 load_module(ModuleHandle(manifest.name, manifest, payload), registry)
-print(json.dumps([h for h in HOOK_NAMES if any(True for _ in registry.iter_hooks(h))]))
+print(json.dumps({
+    "hooks": [h for h in HOOK_NAMES if any(True for _ in registry.iter_hooks(h))],
+    "memory": [name for name, _m, _f in registry.iter_memory_providers()],
+}))
 """
 _CODE_TIMEOUT_S = 600
 
@@ -254,17 +258,26 @@ def _tail(run: subprocess.CompletedProcess[str]) -> str:
     return "\n".join((run.stdout + run.stderr).strip().splitlines()[-5:])
 
 
-def _registered_hooks(run: subprocess.CompletedProcess[str]) -> set[str] | None:
+def _registered(run: subprocess.CompletedProcess[str]) -> set[str] | None:
+    """Parses the dry run's last stdout line into `{"hook:<name>", "memory:<name>"}`.
+    Untrusted output (the module can lie) — any shape mismatch is a `None`, never
+    an exception."""
     lines = run.stdout.strip().splitlines()
     if run.returncode != 0 or not lines:
         return None
     try:
-        hooks = json.loads(lines[-1])
+        payload = json.loads(lines[-1])
     except json.JSONDecodeError:
         return None
+    if not isinstance(payload, dict):
+        return None
+    hooks = payload.get("hooks")
+    memory = payload.get("memory")
     if not isinstance(hooks, list) or not all(isinstance(h, str) for h in hooks):
         return None
-    return {f"hook:{h}" for h in hooks}
+    if not isinstance(memory, list) or not all(isinstance(m, str) for m in memory):
+        return None
+    return {f"hook:{h}" for h in hooks} | {f"memory:{m}" for m in memory}
 
 
 def _run_module(ext: Extension, payload: Path, work: Path) -> list[str]:
@@ -276,13 +289,13 @@ def _run_module(ext: Extension, payload: Path, work: Path) -> list[str]:
     run = _run_code(["-c", _DRY_RUN, str(payload)], work)
     if isinstance(run, str):
         return [f"register() {run}"]
-    registered = _registered_hooks(run)
+    registered = _registered(run)
     if registered is None:
         return [f"register() failed (no hook list from the dry run):\n{_tail(run)}"]
-    declared = {p for p in ext.provides if p.startswith("hook:")}
+    declared = {p for p in ext.provides if p.startswith(("hook:", "memory:"))}
     if registered != declared:
         errors.append(
-            f"provides declares hooks {sorted(declared)} but register() adds {sorted(registered)}"
+            f"provides declares {sorted(declared)} but register() adds {sorted(registered)}"
         )
     tests = payload / "tests"
     if tests.is_dir():
