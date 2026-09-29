@@ -70,13 +70,6 @@ need the switch.
 | `VELES_FETCH_ALLOW_PRIVATE` | off | Allow tools to fetch RFC-1918 / private addresses |
 | `VELES_WEB_SEARCH_BACKEND` | auto | Web search backend for `research` and `web_search` |
 
-## Registries
-
-| Variable | Purpose |
-|---|---|
-| `VELES_SKILLS_REGISTRY_URL` | Source for `veles browse skills` |
-| `VELES_MODULES_REGISTRY_URL` | Source for `veles browse modules` |
-
 ## Internal / testing
 
 | Variable | Purpose |

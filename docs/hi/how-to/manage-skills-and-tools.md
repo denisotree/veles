@@ -63,9 +63,8 @@ veles module remove <name>
 
 ## और खोजें
 
-curated registries browse करें:
+connected registries में search करें:
 
 ```bash
-veles browse skills [query]
-veles browse modules [query]
+veles registry search [query] [--kind module|skill|layout|mcp]
 ```

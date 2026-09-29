@@ -184,13 +184,13 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `add <source> [--name N] [-y]` | একটি git URL বা লোকাল পাথ থেকে একটি module ইনস্টল করে |
 | `remove <name> [-y]` | একটি ইনস্টল করা module মুছে ফেলে |
 
-### `veles browse {modules,skills} [query]`
-কিউরেটেড রেজিস্ট্রিগুলো ব্রাউজ করে।
+### `veles registry search [query] [--kind K]`
+সংযুক্ত রেজিস্ট্রিতে অনুসন্ধান করে (module, skill, layout pack, MCP recipe)।
 
 | ফ্ল্যাগ | ডিফল্ট | উদ্দেশ্য |
 |---|---|---|
 | `query` (positional) | `""` | সাবস্ট্রিং ফিল্টার |
-| `--source <url>` | canonical | রেজিস্ট্রি সোর্স ওভাররাইড করে |
+| `--kind <module\|skill\|layout\|mcp>` | — | kind অনুযায়ী ফিল্টার করে |
 | `--json` | off | JSON প্রদান করে |
 
 ---

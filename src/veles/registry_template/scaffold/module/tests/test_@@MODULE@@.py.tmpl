@@ -1,0 +1,21 @@
+import importlib.util
+from pathlib import Path
+
+
+def _load():
+    path = Path(__file__).resolve().parent.parent / "@@MODULE@@.py"
+    spec = importlib.util.spec_from_file_location("@@MODULE@@", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_registers_post_turn_hook() -> None:
+    added = []
+
+    class Api:
+        def add_hook(self, name, fn):
+            added.append(name)
+
+    _load().register(Api())
+    assert added == ["post_turn"]

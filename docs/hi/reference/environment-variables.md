@@ -69,13 +69,6 @@ strict JSON की अपेक्षा रखते हैं — फ़िल
 | `VELES_FETCH_ALLOW_PRIVATE` | off | tools को RFC-1918 / private addresses fetch करने दें |
 | `VELES_WEB_SEARCH_BACKEND` | auto | `research` और `web_search` के लिए web search backend |
 
-## Registries
-
-| Variable | उद्देश्य |
-|---|---|
-| `VELES_SKILLS_REGISTRY_URL` | `veles browse skills` के लिए source |
-| `VELES_MODULES_REGISTRY_URL` | `veles browse modules` के लिए source |
-
 ## Internal / testing
 
 | Variable | उद्देश्य |

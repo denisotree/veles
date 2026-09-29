@@ -163,13 +163,13 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `add <source> [--name N] [-y]` | 從 git URL 或本機路徑安裝模組 |
 | `remove <name> [-y]` | 刪除已安裝的模組 |
 
-### `veles browse {modules,skills} [query]`
-瀏覽經策展的登錄庫。
+### `veles registry search [query] [--kind K]`
+在已連接的登錄庫中搜尋（模組、技能、layout 包、MCP 配方）。
 
 | 旗標 | 預設 | 用途 |
 |---|---|---|
 | `query`（位置引數） | `""` | 子字串篩選 |
-| `--source <url>` | canonical | 覆寫登錄庫來源 |
+| `--kind <module\|skill\|layout\|mcp>` | — | 按 kind 篩選 |
 | `--json` | 關閉 | 輸出 JSON |
 
 ---

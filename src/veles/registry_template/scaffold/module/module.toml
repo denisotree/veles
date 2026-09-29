@@ -1,0 +1,5 @@
+[module]
+name = "@@EXT@@"
+description = "@@EXT@@ — describe what it does"
+entrypoint = "@@MODULE@@.py:register"
+version = "0.1.0"

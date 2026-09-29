@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-09-29
+
+Extension registries: find, install, update and verify reviewed extensions from git
+repositories, and run your own reviewed registry inside a company.
+
+### Added
+
+- Extension registries: `veles registry {add,remove,list,update,search,install,upgrade,uninstall,verify}`
+  install reviewed modules, skills, layout packs and MCP recipes from git repositories —
+  the built-in `public` one (github.com/denisotree/veles-registry) or your own (`private`,
+  company, consulting).
+- `veles registry {init,scaffold,validate,vendor}` create and maintain a registry; the
+  generated GitHub/GitLab CI runs the same `validate` checks (`--run-code` in CI) and writes a
+  reviewer report to the job summary.
+- The agent can `registry_search` and propose `registry_install` (you confirm every install).
+- `veles module approve <name>`.
+
+### Changed
+
+- A module loads only while its files match what you approved (registry install,
+  `veles module add` or `veles module approve`); `veles doctor` flags changed extensions.
+  **Upgrading from 1.0:** modules already in `.veles/modules/` are skipped until you
+  review them and run `veles module approve <name>` once per module.
+- Before a module loads, its bytecode caches are removed so only the reviewed source runs.
+  A module that contains a `.git` directory, a symlink, an unreadable directory or a
+  special file is refused, and so is every module while `PYTHONPYCACHEPREFIX` is set.
+  `veles module add` no longer keeps the cloned `.git`; remove it from modules added
+  earlier, then approve them. Every other file counts toward the approved hash, so a
+  `.DS_Store` that Finder creates later needs deleting or a new approval.
+
+### Removed
+
+- `veles browse` and `VELES_{MODULES,SKILLS}_REGISTRY_URL` — use `veles registry search`.
+
 ## [1.0.0] — 2026-09-25
 
 The first stable release. Veles is a personal, local-first agent: one
@@ -1812,7 +1846,8 @@ Initial public release.
 - Export/import of full projects and templates.
 - i18n: English (default) and Russian locales, user-extensible.
 
-[Unreleased]: https://github.com/denisotree/veles/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/denisotree/veles/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/denisotree/veles/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/denisotree/veles/compare/v0.44.0...v1.0.0
 [0.44.0]: https://github.com/denisotree/veles/compare/v0.43.0...v0.44.0
 [0.43.0]: https://github.com/denisotree/veles/compare/v0.42.0...v0.43.0

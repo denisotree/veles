@@ -189,13 +189,14 @@ chamável.
 | `add <source> [--name N] [-y]` | Instala um módulo a partir de uma URL git ou caminho local |
 | `remove <name> [-y]` | Remove um módulo instalado |
 
-### `veles browse {modules,skills} [query]`
-Navega pelos registries curados.
+### `veles registry search [query] [--kind K]`
+Pesquisa nos registries conectados (módulos, skills, pacotes de layout,
+receitas MCP).
 
 | Flag | Padrão | Finalidade |
 |---|---|---|
 | `query` (posicional) | `""` | Filtro por substring |
-| `--source <url>` | canônico | Sobrescreve a fonte do registry |
+| `--kind <module\|skill\|layout\|mcp>` | — | Filtra por kind |
 | `--json` | desligado | Emite JSON |
 
 ---

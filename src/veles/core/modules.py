@@ -29,12 +29,12 @@ from typing import Any
 from veles.core.module_manifest import (
     ManifestError,
     ModuleManifest,
-    parse_entrypoint,
+    entrypoint_file,
     parse_manifest,
 )
 from veles.core.project import Project
 
-_HOOK_NAMES: tuple[str, ...] = (
+HOOK_NAMES: tuple[str, ...] = (
     "pre_turn",
     "post_turn",
     "pre_tool_call",
@@ -74,12 +74,12 @@ HookFn = Callable[[dict[str, Any]], VetoResult | None]
 
 class ModuleRegistry:
     def __init__(self) -> None:
-        self._hooks: dict[str, list[tuple[str, HookFn]]] = {n: [] for n in _HOOK_NAMES}
+        self._hooks: dict[str, list[tuple[str, HookFn]]] = {n: [] for n in HOOK_NAMES}
         self.modules: list[str] = []
 
     def add_hook(self, hook_name: str, module_name: str, fn: HookFn) -> None:
-        if hook_name not in _HOOK_NAMES:
-            raise ValueError(f"unknown hook {hook_name!r}; expected one of {_HOOK_NAMES}")
+        if hook_name not in HOOK_NAMES:
+            raise ValueError(f"unknown hook {hook_name!r}; expected one of {HOOK_NAMES}")
         self._hooks[hook_name].append((module_name, fn))
 
     def iter_hooks(self, hook_name: str) -> Iterator[tuple[str, HookFn]]:
@@ -143,10 +143,12 @@ def discover_modules(project: Project) -> list[ModuleHandle]:
 
 def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
     """Import the entrypoint file and call `register(api)` to populate hooks."""
-    file_part, func_part = parse_entrypoint(handle.manifest.entrypoint)
-    file_path = handle.dir / file_part
+    try:
+        file_path, func_part = entrypoint_file(handle.dir, handle.manifest.entrypoint)
+    except ManifestError as exc:
+        raise ModuleLoadError(str(exc)) from exc
     if not file_path.is_file():
-        raise ModuleLoadError(f"entrypoint file {file_part!r} not found in {handle.dir}")
+        raise ModuleLoadError(f"entrypoint file {str(file_path)!r} not found")
     spec = importlib.util.spec_from_file_location(f"_veles_module_{handle.name}", file_path)
     if spec is None or spec.loader is None:
         raise ModuleLoadError(f"could not build import spec for {file_path}")

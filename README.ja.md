@@ -332,7 +332,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | スキル管理 |
 | `veles tool {list,show,promote,approve}` | ツール管理（`approve` は自作ツールを承認）|
 | `veles module {list,add,remove}` | プラグイン管理 |
-| `veles browse {modules,skills}` | 厳選されたモジュール／スキルのレジストリを検索 |
+| `veles registry {add,search,install,upgrade,verify,...}` | 拡張機能レジストリ: 検索、インストール、公開 |
 | `veles route {show,set,reset,refresh}` | モデルルーティング |
 | `veles schema {validate,edit}` | AGENTS.md の検証／編集 |
 | `veles self-doc` | プロジェクトの自己ドキュメントを生成 |

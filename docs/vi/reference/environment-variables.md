@@ -70,13 +70,6 @@ không có nó, nên thường bạn không cần đụng tới công tắc này
 | `VELES_FETCH_ALLOW_PRIVATE` | tắt | Cho phép tool truy cập các địa chỉ RFC-1918 / riêng tư |
 | `VELES_WEB_SEARCH_BACKEND` | auto | Backend tìm kiếm web cho `research` và `web_search` |
 
-## Registry
-
-| Biến | Mục đích |
-|---|---|
-| `VELES_SKILLS_REGISTRY_URL` | Nguồn cho `veles browse skills` |
-| `VELES_MODULES_REGISTRY_URL` | Nguồn cho `veles browse modules` |
-
 ## Nội bộ / kiểm thử
 
 | Biến | Mục đích |

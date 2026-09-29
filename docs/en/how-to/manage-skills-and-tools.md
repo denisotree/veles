@@ -64,9 +64,10 @@ veles module remove <name>
 
 ## Discover more
 
-Browse the curated registries:
+Search connected extension registries and install reviewed skills, tools,
+and modules — see [Install extensions from registries](extension-registries.md):
 
 ```bash
-veles browse skills [query]
-veles browse modules [query]
+veles registry search [query] [--kind module|skill|layout|mcp]
+veles registry install <name>
 ```

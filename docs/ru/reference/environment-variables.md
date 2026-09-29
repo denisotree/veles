@@ -71,13 +71,6 @@ default) → переменная окружения.
 | `VELES_FETCH_ALLOW_PRIVATE` | выкл | Разрешить инструментам обращаться к адресам RFC-1918 / приватным |
 | `VELES_WEB_SEARCH_BACKEND` | auto | Бэкенд веб-поиска для `research` и `web_search` |
 
-## Реестры
-
-| Переменная | Назначение |
-|---|---|
-| `VELES_SKILLS_REGISTRY_URL` | Источник для `veles browse skills` |
-| `VELES_MODULES_REGISTRY_URL` | Источник для `veles browse modules` |
-
 ## Внутренние / тестовые
 
 | Переменная | Назначение |

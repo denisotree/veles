@@ -27,15 +27,22 @@ from veles.core.slug import normalize_slug as _normalize_slug
 
 
 def _load_project_modules(project: Project) -> ModuleRegistry:
+    from veles.core.registry.gate import admit_module
+
     registry = ModuleRegistry()
     for handle in discover_modules(project):
+        refusal = admit_module(handle.dir)
+        if refusal is not None:
+            print(
+                f"warning: skipping module {handle.name!r}: {refusal} — review it, then "
+                f"`veles module approve {handle.name}`",
+                file=sys.stderr,
+            )
+            continue
         try:
             load_module(handle, registry)
         except ModuleLoadError as exc:
-            print(
-                f"warning: skipping module {handle.name!r}: {exc}",
-                file=sys.stderr,
-            )
+            print(f"warning: skipping module {handle.name!r}: {exc}", file=sys.stderr)
     return registry
 
 

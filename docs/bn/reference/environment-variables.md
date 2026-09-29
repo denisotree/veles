@@ -69,13 +69,6 @@ object constraint সেটিকে নিষিদ্ধ করবে। এ�
 | `VELES_FETCH_ALLOW_PRIVATE` | off | tools-কে RFC-1918 / প্রাইভেট ঠিকানা ফেচ করতে দেয় |
 | `VELES_WEB_SEARCH_BACKEND` | auto | `research` এবং `web_search`-এর জন্য ওয়েব সার্চ ব্যাকএন্ড |
 
-## রেজিস্ট্রি
-
-| ভ্যারিয়েবল | উদ্দেশ্য |
-|---|---|
-| `VELES_SKILLS_REGISTRY_URL` | `veles browse skills`-এর সোর্স |
-| `VELES_MODULES_REGISTRY_URL` | `veles browse modules`-এর সোর্স |
-
 ## ইন্টারনাল / টেস্টিং
 
 | ভ্যারিয়েবল | উদ্দেশ্য |

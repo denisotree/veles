@@ -70,13 +70,6 @@ petición se reintenta sin él, así que normalmente no hace falta tocar este in
 | `VELES_FETCH_ALLOW_PRIVATE` | desactivado | Permite a las herramientas acceder a direcciones RFC-1918 / privadas |
 | `VELES_WEB_SEARCH_BACKEND` | auto | Backend de búsqueda web para `research` y `web_search` |
 
-## Registros
-
-| Variable | Propósito |
-|---|---|
-| `VELES_SKILLS_REGISTRY_URL` | Fuente para `veles browse skills` |
-| `VELES_MODULES_REGISTRY_URL` | Fuente para `veles browse modules` |
-
 ## Interno / pruebas
 
 | Variable | Propósito |

@@ -71,13 +71,6 @@ richiesta viene ritentata senza, quindi di norma questo interruttore non serve.
 | `VELES_FETCH_ALLOW_PRIVATE` | off | Consente ai tool di raggiungere indirizzi RFC-1918 / privati |
 | `VELES_WEB_SEARCH_BACKEND` | auto | Backend di ricerca web per `research` e `web_search` |
 
-## Registri
-
-| Variabile | Scopo |
-|---|---|
-| `VELES_SKILLS_REGISTRY_URL` | Sorgente per `veles browse skills` |
-| `VELES_MODULES_REGISTRY_URL` | Sorgente per `veles browse modules` |
-
 ## Interne / test
 
 | Variabile | Scopo |

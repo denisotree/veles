@@ -186,13 +186,14 @@ appelable.
 | `add <source> [--name N] [-y]` | Installe un module depuis une URL git ou un chemin local |
 | `remove <name> [-y]` | Supprime un module installé |
 
-### `veles browse {modules,skills} [query]`
-Parcourt les registres curatés.
+### `veles registry search [query] [--kind K]`
+Recherche dans les registres connectés (modules, skills, packs de layout,
+recettes MCP).
 
 | Option | Défaut | Rôle |
 |---|---|---|
 | `query` (positionnel) | `""` | Filtre par sous-chaîne |
-| `--source <url>` | canonique | Surcharge la source du registre |
+| `--kind <module\|skill\|layout\|mcp>` | — | Filtre par kind |
 | `--json` | désactivé | Émet du JSON |
 
 ---

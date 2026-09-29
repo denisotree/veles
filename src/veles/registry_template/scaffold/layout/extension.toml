@@ -1,0 +1,10 @@
+[extension]
+name = "@@EXT@@"
+kind = "layout"
+version = "0.1.0"
+description = "@@EXT@@ — describe what it does"
+license = "Apache-2.0"
+requires_veles = ">=1.0,<2"
+
+[source]
+type = "path"

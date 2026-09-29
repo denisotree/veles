@@ -332,7 +332,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | Skill management |
 | `veles tool {list,show,promote,approve}` | Tool management (`approve` self-authored tools को gate करता है) |
 | `veles module {list,add,remove}` | Plugin management |
-| `veles browse {modules,skills}` | curated module / skill registries खोजें |
+| `veles registry {add,search,install,upgrade,verify,...}` | Extension registries: search, install, publish |
 | `veles route {show,set,reset,refresh}` | Model routing |
 | `veles schema {validate,edit}` | AGENTS.md validate / edit करें |
 | `veles self-doc` | project self-documentation generate करें |

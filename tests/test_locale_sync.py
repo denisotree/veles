@@ -41,6 +41,7 @@ _BASELINE = {
     "how-to/embed-veles-run.md": 14,  # M233; never translated at all
     "how-to/run-as-daemon.md": 14,  # M234 added the HTTP section
     "reference/cli.md": 14,
+    "how-to/extension-registries.md": 13,  # extension-registry spec; en+ru only by design
 }
 
 

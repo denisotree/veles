@@ -224,13 +224,15 @@ needs a review step before it becomes callable.
 | `add <source> [--name N] [-y]` | Install a module from a git URL or local path |
 | `remove <name> [-y]` | Delete an installed module |
 
-### `veles browse {modules,skills} [query]`
-Browse the curated registries.
+### `veles registry search [query] [--kind K]`
+Search connected registries (modules, skills, layout packs, MCP recipes). See
+[Install extensions from registries](../how-to/extension-registries.md) for
+the full `veles registry` command set.
 
 | Flag | Default | Purpose |
 |---|---|---|
 | `query` (positional) | `""` | Substring filter |
-| `--source <url>` | canonical | Override the registry source |
+| `--kind <module\|skill\|layout\|mcp>` | — | Filter by kind |
 | `--json` | off | Emit JSON |
 
 ---

@@ -67,13 +67,6 @@ API キーの参照カスケード: OS キーチェーン（プロジェクト�
 | `VELES_FETCH_ALLOW_PRIVATE` | off | ツールが RFC-1918 / プライベートアドレスを取得するのを許可する |
 | `VELES_WEB_SEARCH_BACKEND` | auto | `research` と `web_search` 用の Web 検索バックエンド |
 
-## レジストリ
-
-| 変数 | 目的 |
-|---|---|
-| `VELES_SKILLS_REGISTRY_URL` | `veles browse skills` のソース |
-| `VELES_MODULES_REGISTRY_URL` | `veles browse modules` のソース |
-
 ## 内部 / テスト用
 
 | 変数 | 目的 |

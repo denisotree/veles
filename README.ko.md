@@ -332,7 +332,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | 스킬 관리 |
 | `veles tool {list,show,promote,approve}` | 도구 관리 (`approve`는 자체 작성 도구를 승인) |
 | `veles module {list,add,remove}` | 플러그인 관리 |
-| `veles browse {modules,skills}` | 엄선된 모듈 / 스킬 레지스트리 검색 |
+| `veles registry {add,search,install,upgrade,verify,...}` | 확장 레지스트리: 검색, 설치, 게시 |
 | `veles route {show,set,reset,refresh}` | 모델 라우팅 |
 | `veles schema {validate,edit}` | AGENTS.md 검증 / 편집 |
 | `veles self-doc` | 프로젝트 자체 문서 생성 |

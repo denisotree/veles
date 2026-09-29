@@ -1,0 +1,5 @@
+[module]
+name = "example-module"
+description = "Logs the length of every answer."
+entrypoint = "example_module.py:register"
+version = "0.1.0"

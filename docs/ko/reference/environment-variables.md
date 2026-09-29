@@ -66,13 +66,6 @@ advisor(`advisor_review`, verify 단계, goal 모드의 CHECK 단계에서 사�
 | `VELES_FETCH_ALLOW_PRIVATE` | off | 도구가 RFC-1918 / 사설 주소를 가져오도록 허용 |
 | `VELES_WEB_SEARCH_BACKEND` | auto | `research`와 `web_search`의 웹 검색 백엔드 |
 
-## 레지스트리
-
-| 변수 | 용도 |
-|---|---|
-| `VELES_SKILLS_REGISTRY_URL` | `veles browse skills`의 소스 |
-| `VELES_MODULES_REGISTRY_URL` | `veles browse modules`의 소스 |
-
 ## 내부 / 테스트
 
 | 변수 | 용도 |

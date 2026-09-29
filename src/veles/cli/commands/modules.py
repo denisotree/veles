@@ -26,6 +26,8 @@ def cmd_module(args: argparse.Namespace, project: Project) -> int:
         return _add(args, project)
     if args.module_command == "remove":
         return _remove(args, project)
+    if args.module_command == "approve":
+        return _approve(args, project)
     return 2
 
 
@@ -65,9 +67,12 @@ def _add(args: argparse.Namespace, project: Project) -> int:
     if not confirm_critical(f"install module from {args.source}", summary):
         print("<aborted>", file=sys.stderr)
         return 1
+    from veles.core.registry.gate import approve_module
+
     try:
         handle = install_module_from_source(args.source, project=project, name_override=args.name)
-    except ModuleInstallError as exc:
+        approve_module(handle.dir, name=handle.name, project_root=project.root)
+    except (ModuleInstallError, OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(f"<installed module {handle.name!r} at {handle.dir}>", file=sys.stderr)
@@ -86,5 +91,35 @@ def _remove(args: argparse.Namespace, project: Project) -> int:
     except ModuleNotFoundError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    from veles.core.registry.records import drop_record
+
+    drop_record(str(target.resolve()))
     print(f"<removed module {args.name!r}>", file=sys.stderr)
+    return 0
+
+
+def _approve(args: argparse.Namespace, project: Project) -> int:
+    from veles.core.registry.gate import approve_module
+    from veles.core.registry.hashing import tree_sha256
+
+    handle = next((h for h in discover_modules(project) if h.name == args.name), None)
+    if handle is None:
+        print(f"error: module {args.name!r} not found in {project.modules_dir}", file=sys.stderr)
+        return 1
+    try:
+        digest = tree_sha256(handle.dir)
+        summary = (
+            f"Module: {handle.dir}\nFiles hash: {digest[:12]}\n"
+            "Its code will run on every agent turn. Review it first."
+        )
+        if not confirm_critical(f"approve module {args.name}", summary):
+            print("<aborted>", file=sys.stderr)
+            return 1
+        approve_module(
+            handle.dir, name=handle.name, project_root=project.root, expected_sha256=digest
+        )
+    except (OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    print(f"<approved module {args.name!r}>", file=sys.stderr)
     return 0

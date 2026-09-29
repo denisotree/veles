@@ -24,6 +24,7 @@ from veles.core.tools.builtin import (  # noqa: F401
     pdf,
     plan_tool,
     read_file,
+    registry_tools,
     run_shell,
     search_files,
     stat_file,

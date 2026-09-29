@@ -1,0 +1,14 @@
+validate:
+  image: ghcr.io/astral-sh/uv:python3.13-bookworm
+  variables:
+    GIT_DEPTH: "0"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - >
+      uvx --from 'veles-ai==@@VELES_VERSION@@' --with pytest veles registry validate .
+      --run-code --base "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" --report review.md
+  artifacts:
+    when: always
+    paths: [review.md]

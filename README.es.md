@@ -332,7 +332,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | Gestión de skills |
 | `veles tool {list,show,promote,approve}` | Gestión de herramientas (`approve` autoriza las herramientas autogeneradas) |
 | `veles module {list,add,remove}` | Gestión de plugins |
-| `veles browse {modules,skills}` | Buscar en los registros curados de módulos / skills |
+| `veles registry {add,search,install,upgrade,verify,...}` | Registros de extensiones: buscar, instalar, publicar |
 | `veles route {show,set,reset,refresh}` | Enrutamiento de modelos |
 | `veles schema {validate,edit}` | Validar / editar AGENTS.md |
 | `veles self-doc` | Generar la autodocumentación del proyecto |

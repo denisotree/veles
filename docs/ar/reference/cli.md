@@ -184,13 +184,13 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `add <source> [--name N] [-y]` | تثبيت وحدة من رابط git أو مسار محلي |
 | `remove <name> [-y]` | حذف وحدة مُثبَّتة |
 
-### `veles browse {modules,skills} [query]`
-تصفّح السجلّات المُنسَّقة.
+### `veles registry search [query] [--kind K]`
+ابحث في السجلّات المتصلة (وحدات، مهارات، حزم تخطيط، وصفات MCP).
 
 | العَلَم | الافتراضي | الغرض |
 |---|---|---|
 | `query` (موضعي) | `""` | مرشّح بسلسلة جزئية |
-| `--source <url>` | المعياري | تجاوز مصدر السجلّ |
+| `--kind <module\|skill\|layout\|mcp>` | — | تصفية حسب kind |
 | `--json` | معطّل | إصدار JSON |
 
 ---

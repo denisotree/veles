@@ -56,9 +56,8 @@ veles module remove <name>
 
 ## 더 찾아보기
 
-큐레이션된 레지스트리를 탐색합니다:
+연결된 레지스트리를 검색합니다:
 
 ```bash
-veles browse skills [query]
-veles browse modules [query]
+veles registry search [query] [--kind module|skill|layout|mcp]
 ```

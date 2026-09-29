@@ -1,0 +1,13 @@
+"""@@EXT@@ — describe what it does."""
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def on_post_turn(**ctx: object) -> None:
+    logger.info("turn finished (%d chars)", len(str(ctx.get("text", ""))))
+
+
+def register(api) -> None:  # noqa: ANN001 — ModuleAPI
+    api.add_hook("post_turn", on_post_turn)

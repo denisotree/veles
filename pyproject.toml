@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "veles-ai"
-version = "1.0.0"
+version = "1.1.0"
 description = "Veles — a minimalist agent framework: clean, decomposed code, compounding per-project memory, and a modular core with optional pluggable modules."
 requires-python = ">=3.13"
 readme = "README.md"
@@ -159,6 +159,7 @@ files = [
     "src/veles/core/model_metadata.py",
     "src/veles/core/session_state.py",
     "src/veles/core/memory/schema.py",
+    "src/veles/core/registry",
     "src/veles/runtime/prompt.py",
     "src/veles/daemon/runner.py",
     "src/veles/daemon/http_util.py",

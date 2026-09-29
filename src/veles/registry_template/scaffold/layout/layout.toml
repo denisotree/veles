@@ -1,0 +1,6 @@
+# @@EXT@@ layout pack — replace this comment with what it scaffolds and why.
+
+[layout]
+name = "@@EXT@@"
+description = "@@EXT@@ — describe what it does"
+version = "1.0"

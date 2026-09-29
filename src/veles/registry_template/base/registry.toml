@@ -1,0 +1,5 @@
+[registry]
+name = "@@NAME@@"
+description = "Veles extension registry @@NAME@@"
+schema = 1
+public = @@PUBLIC@@

@@ -32,6 +32,7 @@ If you have never run Veles, do the two tutorials in order:
 - [Embed `veles run` in another program](how-to/embed-veles-run.md)
 - [Connect a Telegram channel](how-to/connect-telegram.md)
 - [Manage skills, tools, and modules](how-to/manage-skills-and-tools.md)
+- [Install extensions from registries](how-to/extension-registries.md)
 - [Work with multiple projects and subprojects](how-to/multi-project-and-subprojects.md)
 - [Security: trust, autopilot, secrets](how-to/security-and-permissions.md)
 - [Long-running tasks: goals, jobs, dreaming, research](how-to/long-running-tasks.md)

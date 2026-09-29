@@ -1,0 +1,14 @@
+[extension]
+name = "@@EXT@@"
+kind = "mcp"
+version = "0.1.0"
+description = "@@EXT@@ — MCP server recipe"
+license = "Apache-2.0"
+requires_veles = ">=1.0,<2"
+
+[source]
+type = "path"
+
+[mcp]
+command = "@@EXT@@"
+args = []

@@ -332,7 +332,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | إدارة المهارات |
 | `veles tool {list,show,promote,approve}` | إدارة الأدوات (`approve` يضبط الأدوات المؤلَّفة ذاتيًا) |
 | `veles module {list,add,remove}` | إدارة الإضافات |
-| `veles browse {modules,skills}` | البحث في سجلّات الوحدات / المهارات المنسَّقة |
+| `veles registry {add,search,install,upgrade,verify,...}` | سجلّات الإضافات: بحث، تثبيت، نشر |
 | `veles route {show,set,reset,refresh}` | توجيه النماذج |
 | `veles schema {validate,edit}` | التحقّق من AGENTS.md / تحريره |
 | `veles self-doc` | توليد توثيق ذاتي للمشروع |

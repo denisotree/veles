@@ -56,9 +56,8 @@ veles module remove <name>
 
 ## আরও আবিষ্কার করুন
 
-curated registry-গুলো ব্রাউজ করুন:
+সংযুক্ত registry-গুলোতে অনুসন্ধান করুন:
 
 ```bash
-veles browse skills [query]
-veles browse modules [query]
+veles registry search [query] [--kind module|skill|layout|mcp]
 ```

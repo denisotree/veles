@@ -56,9 +56,8 @@ veles module remove <name>
 
 ## 发现更多
 
-浏览精选的注册表：
+在已连接的注册表中搜索：
 
 ```bash
-veles browse skills [query]
-veles browse modules [query]
+veles registry search [query] [--kind module|skill|layout|mcp]
 ```

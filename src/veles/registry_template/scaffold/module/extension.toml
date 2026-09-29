@@ -1,0 +1,11 @@
+[extension]
+name = "@@EXT@@"
+kind = "module"
+version = "0.1.0"
+description = "@@EXT@@ — describe what it does"
+license = "Apache-2.0"
+requires_veles = ">=1.0,<2"
+provides = ["hook:post_turn"]
+
+[source]
+type = "path"
