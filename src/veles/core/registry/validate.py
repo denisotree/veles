@@ -291,7 +291,7 @@ def _run_module(ext: Extension, payload: Path, work: Path) -> list[str]:
         return [f"register() {run}"]
     registered = _registered(run)
     if registered is None:
-        return [f"register() failed (no hook list from the dry run):\n{_tail(run)}"]
+        return [f"register() failed (no hook/provider list from the dry run):\n{_tail(run)}"]
     declared = {p for p in ext.provides if p.startswith(("hook:", "memory:"))}
     if registered != declared:
         errors.append(

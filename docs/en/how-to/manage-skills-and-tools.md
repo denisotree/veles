@@ -71,10 +71,16 @@ veles module approve <name> [--user]
 Modules live at two scopes, same as skills and tools: project-local
 (`<project>/.veles/modules/`) and user-global (`~/.veles/modules/`, loaded in
 every project). A user-level module goes through the same approval gate as a
-project one. If a project and a user module share a name, the project one
-loads and Veles warns about the user-level one being shadowed; two modules at
-the same scope sharing a name — the first (sorted by directory) loads, the
-rest warn and are skipped.
+project one, and the gate runs before names are compared. If a project and a
+user module share a name, an approved project module loads and Veles warns
+about the user-level one being shadowed; an unapproved project module is
+skipped (the warning names its directory) and the user module loads. Two
+approved modules at the same scope sharing a name — the first (sorted by
+directory) loads, the rest warn and are skipped. `veles module
+{show,approve,remove}` take the manifest name (what `list` shows) and refuse
+a name that more than one directory in the scope declares, listing them;
+`veles module add` refuses to install a module whose name another directory
+in the scope already declares.
 
 ### Write a module that adds a memory provider
 
@@ -123,9 +129,9 @@ api_key = "..."
 
 A provider that also implements `ingest(title, body, *, insight_id) ->
 bool` (the `IngestingMemoryProvider` protocol) gets Veles's writes too, not
-just reads. If two modules register the same provider name, the second
-`register()` fails — that module is skipped with a warning, nothing partial is
-left registered. A section configured in `config.toml` whose module isn't
+just reads. If two modules register the same provider name, loading the
+second module fails — it is skipped with a warning, nothing partial is left
+registered. A section configured in `config.toml` whose module isn't
 installed prints one warning with the install command; recall keeps working
 without it.
 

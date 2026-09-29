@@ -12,8 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - User-level modules in `~/.veles/modules/`: loaded in every project, through the same approval
   gate as project modules. `veles registry install --user <module>` and
   `veles module {list,show,add,remove,approve} --user`; `veles module list` (no flag) shows both
-  scopes with a `scope` column. A project module with the same name overrides a user-level one
-  (with a warning); two modules at the same scope sharing a name — the first loads, the rest warn.
+  scopes with a `scope` column. Every module passes the approval gate before names are
+  compared: an approved project module with the same name overrides a user-level one (with a
+  warning), an unapproved one is skipped and the user-level module loads; two approved modules at
+  the same scope sharing a name — the first loads, the rest warn.
 - Modules can register external memory providers: `api.add_memory_provider(name, factory)`. The
   name must match a `[memory.external.<name>]` section in `~/.veles/config.toml`; the factory
   receives that section as a `dict` and returns a provider (or `None` to skip it). `MemoryProvider`,
