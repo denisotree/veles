@@ -116,6 +116,9 @@ def test_user_scope_record_does_not_admit_a_project_load(tmp_path: Path) -> None
     approve_module(d, name="m1", project_root=None)  # recorded as user scope
     assert admit_module(d, project_root=project.root) is not None
     assert admit_module(d, project_root=None) is None
+    from veles.core.registry.records import drop_record
+
+    drop_record(str(d.resolve()))  # approve_module never re-scopes an existing record
     approve_module(d, name="m1", project_root=project.root)
     assert admit_module(d, project_root=None) is not None
     assert admit_module(d, project_root=project.root) is None

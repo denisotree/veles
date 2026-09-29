@@ -106,12 +106,18 @@ def approve_module(
             f"{shown(module_dir)} changed while it was being reviewed — review it again"
         )
     existing = record_for_path(str(module_dir.resolve()))
+    scope = str(project_root.resolve()) if project_root is not None else None
+    if existing is not None and existing.project != scope:
+        # Re-scoping would un-approve it where it was approved (e.g. reached through a
+        # linked modules dir of another project).
+        where = "user scope" if existing.project is None else shown(existing.project)
+        raise ValueError(f"{shown(module_dir)} is already approved for another scope ({where})")
     rec = InstallRecord(
         name=name,
         kind="module",
         path=str(module_dir.resolve()),
         tree_sha256=digest,
-        project=str(project_root.resolve()) if project_root is not None else None,
+        project=scope,
         registry=existing.registry if existing else None,
         group=existing.group if existing else "",
         version=existing.version if existing else "",

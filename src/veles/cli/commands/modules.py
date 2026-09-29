@@ -17,7 +17,7 @@ from veles.core.module_install import (
 from veles.core.modules import ModuleHandle, discover_modules, discover_modules_in
 from veles.core.project import Project
 from veles.core.text import shown
-from veles.core.user_paths import user_modules_dir
+from veles.core.user_paths import user_home, user_modules_dir
 
 
 def cmd_module(args: argparse.Namespace, project: Project) -> int:
@@ -36,6 +36,22 @@ def cmd_module(args: argparse.Namespace, project: Project) -> int:
 
 def _modules_dir(args: argparse.Namespace, project: Project) -> Path:
     return user_modules_dir() if getattr(args, "user", False) else project.modules_dir
+
+
+def _in_own_scope(args: argparse.Namespace, project: Project, module_dir: Path) -> bool:
+    """`module_dir` really sits in this scope's modules dir: only the scope root
+    (`~/.veles`, the project root) is resolved, so a linked `.veles` or `modules` dir
+    reaching into another project is caught. Prints the error when it is not."""
+    base = user_home() if getattr(args, "user", False) else project.root
+    own = base.resolve() / _modules_dir(args, project).relative_to(base)
+    if module_dir.resolve().parent == own:
+        return True
+    print(
+        f"error: {shown(module_dir)} resolves outside {shown(own)} through a symlink — "
+        "refusing to act on another scope's module",
+        file=sys.stderr,
+    )
+    return False
 
 
 def _list(args: argparse.Namespace, project: Project) -> int:
@@ -131,7 +147,7 @@ def _remove(args: argparse.Namespace, project: Project) -> int:
 
     modules_dir = _modules_dir(args, project)
     target = _find(modules_dir, args.name, by_dir=True)
-    if target is None:
+    if target is None or not _in_own_scope(args, project, target):
         return 1
     if not args.yes and not confirm(f"Remove module {args.name!r} ({shown(target)})? [y/N]"):
         print("<aborted>", file=sys.stderr)
@@ -153,7 +169,7 @@ def _approve(args: argparse.Namespace, project: Project) -> int:
     from veles.core.registry.hashing import tree_sha256
 
     module_dir = _find(_modules_dir(args, project), args.name)
-    if module_dir is None:
+    if module_dir is None or not _in_own_scope(args, project, module_dir):
         return 1
     try:
         digest = tree_sha256(module_dir)

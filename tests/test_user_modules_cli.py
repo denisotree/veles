@@ -155,6 +155,41 @@ def test_module_remove_refuses_a_symlinked_module_dir(tmp_path: Path, monkeypatc
     assert [r.path for r in load_records()] == [str(real.resolve())]
 
 
+def test_approve_and_remove_stay_in_their_own_scope(tmp_path: Path, monkeypatch, capsys) -> None:
+    """A's `.veles/modules` is a link to B's: `approve`/`remove` run in A must not
+    re-scope or delete B's module."""
+    a = init_project(tmp_path / "a", name="a")
+    b = init_project(tmp_path / "b", name="b")
+    guard = _write_module(b.modules_dir / "guard", "guard")
+    approve_module(guard, name="guard", project_root=b.root)
+    if a.modules_dir.exists():
+        a.modules_dir.rmdir()
+    a.modules_dir.symlink_to(b.modules_dir, target_is_directory=True)
+    monkeypatch.chdir(a.root)
+    assert main(["module", "approve", "guard"]) == 1
+    assert main(["module", "remove", "--yes", "guard"]) == 1
+    err = capsys.readouterr().err
+    assert "Traceback" not in err and err.count("error:") == 2
+    assert (guard / "demo.py").is_file()
+    [rec] = load_records()
+    assert rec.project == str(b.root.resolve())
+    assert _load_project_modules(b).modules == ["guard"]
+
+
+def test_approve_module_refuses_to_rescope_a_record(tmp_path: Path) -> None:
+    a = init_project(tmp_path / "a", name="a")
+    b = init_project(tmp_path / "b", name="b")
+    guard = _write_module(b.modules_dir / "guard", "guard")
+    approve_module(guard, name="guard", project_root=b.root)
+    with pytest.raises(ValueError, match="scope"):
+        approve_module(guard, name="guard", project_root=a.root)
+    with pytest.raises(ValueError, match="scope"):
+        approve_module(guard, name="guard", project_root=None)
+    approve_module(guard, name="guard", project_root=b.root)  # same scope: re-approve is fine
+    [rec] = load_records()
+    assert rec.project == str(b.root.resolve())
+
+
 def test_module_verbs_refuse_an_ambiguous_name(tmp_path: Path, monkeypatch, capsys) -> None:
     project = init_project(tmp_path / "p", name="p")
     a = _write_module(project.modules_dir / "a-dir", "dup")
