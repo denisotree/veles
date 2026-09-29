@@ -88,6 +88,26 @@ def test_failed_dot_git_removal_rolls_back_completely(tmp_path: Path) -> None:
     assert not (project.modules_dir / "fixture-demo").exists()
 
 
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignores directory permissions")
+def test_rollback_never_chmods_outside_the_target(tmp_path: Path) -> None:
+    from veles.core.source_install import install_tree
+
+    src = _make_module_fixture(tmp_path, name="demo")
+    parent = tmp_path / "modules"
+    target = parent / "demo"
+
+    def fail() -> None:
+        parent.chmod(0o555)
+        raise LookupError("validation failed")
+
+    try:
+        with pytest.raises(LookupError, match="validation failed"):
+            install_tree(str(src), target, validate=fail, error=RuntimeError)
+        assert parent.stat().st_mode & 0o777 == 0o555
+    finally:
+        parent.chmod(0o755)
+
+
 def test_install_from_local_directory_succeeds(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     src = _make_module_fixture(tmp_path / "src", name="logger")

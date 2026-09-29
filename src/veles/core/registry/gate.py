@@ -7,6 +7,7 @@ write `~/.veles/extensions.json`, so it cannot make its own edits load.
 
 from __future__ import annotations
 
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -39,6 +40,9 @@ def admit_module(module_dir: Path) -> str | None:
     `.git` anywhere (outside the hash), then drop the module's bytecode so the import
     that follows compiles the reviewed source instead of running a planted `.pyc`.
     Fails closed: bytecode that can't be removed refuses the module."""
+    if sys.pycache_prefix:
+        # Bytecode would then be read from outside the module dir, where no strip reaches.
+        return "PYTHONPYCACHEPREFIX (sys.pycache_prefix) is set; unset it to load modules"
     if not module_approved(module_dir):
         return "not approved, or changed since approval"
     try:
@@ -47,9 +51,10 @@ def admit_module(module_dir: Path) -> str | None:
             rel = found[0].relative_to(module_dir).as_posix()
             return f"remove the .git directory ({rel}): it is outside the approval hash"
         strip_bytecode(module_dir)
-    except OSError:
-        return "its bytecode cannot be removed"
-    return "its bytecode cannot be removed" if bytecode_paths(module_dir) else None
+        left = bytecode_paths(module_dir)
+    except (OSError, ValueError) as exc:
+        return f"its files cannot be checked: {exc}"
+    return "its bytecode cannot be removed" if left else None
 
 
 def approve_module(

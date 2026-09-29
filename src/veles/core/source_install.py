@@ -62,13 +62,17 @@ def install_tree[T](
 
 def _remove_completely(target: Path) -> None:
     """Roll back `target` fully, even through read-only dirs (a copied `.git` can
-    carry them), so a retry is not blocked by "already exists"."""
+    carry them), so a retry is not blocked by "already exists". Only dirs inside
+    `target` are ever unlocked."""
 
-    def unlock_and_retry(func: Callable[[str], object], path: str, _exc: BaseException) -> None:
-        Path(path).parent.chmod(stat.S_IRWXU)
+    def unlock_and_retry(func: Callable[[str], object], path: str, exc: BaseException) -> None:
+        parent = Path(path).parent
+        if not parent.is_relative_to(target):
+            raise exc
+        parent.chmod(stat.S_IRWXU)
         func(path)
 
-    with contextlib.suppress(OSError):  # best effort: never mask the original failure
+    with contextlib.suppress(Exception):  # best effort: never mask the original failure
         shutil.rmtree(target, onexc=unlock_and_retry)
 
 

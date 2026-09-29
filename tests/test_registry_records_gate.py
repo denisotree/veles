@@ -242,6 +242,67 @@ def test_hash_skips_only_what_the_gate_strips_or_refuses(tmp_path: Path, rel: st
     assert refusal is not None or not (d / rel).exists()
 
 
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignores directory permissions")
+def test_unlistable_dir_is_refused(tmp_path: Path, monkeypatch) -> None:
+    # 0o311: Python can still import from it (it stats `__init__.py`), but a walk
+    # that silently skips unreadable dirs would hash around it.
+    from veles.cli._project import _load_project_modules
+
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    monkeypatch.delitem(sys.modules, "strictlib", raising=False)
+    project = init_project(tmp_path / "p", name="p")
+    d = _make_module(project.root)
+    (d / "demo.py").write_text(
+        "import pathlib, sys\nsys.path.insert(0, str(pathlib.Path(__file__).parent))\n"
+        "from strictlib import register\n",
+        encoding="utf-8",
+    )
+    approve_module(d, name="demo", project_root=project.root)
+    lib = d / "strictlib"
+    lib.mkdir()
+    (lib / "__init__.py").write_text(_DEMO_PY.replace("pre_turn", "post_turn"), encoding="utf-8")
+    lib.chmod(0o311)
+    try:
+        registry = _load_project_modules(project)
+        with pytest.raises(ValueError, match="strictlib"):
+            approve_module(d, name="demo", project_root=project.root)
+    finally:
+        lib.chmod(0o755)
+    assert registry.modules == []
+    assert list(registry.iter_hooks("post_turn")) == []
+    assert "strictlib" not in sys.modules
+
+
+def test_fifo_in_module_is_refused_without_hanging(tmp_path: Path) -> None:
+    import signal
+
+    def timeout(*_: object) -> None:
+        raise TimeoutError("hashing hung on a FIFO")
+
+    project = init_project(tmp_path / "p", name="p")
+    d = _make_module(project.root)
+    approve_module(d, name="demo", project_root=project.root)
+    os.mkfifo(d / "pipe")
+    previous = signal.signal(signal.SIGALRM, timeout)
+    signal.alarm(5)
+    try:
+        assert admit_module(d) is not None
+        with pytest.raises(ValueError, match="pipe"):
+            approve_module(d, name="demo", project_root=project.root)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
+
+
+def test_pycache_prefix_refuses_modules(tmp_path: Path, monkeypatch) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    d = _make_module(project.root)
+    approve_module(d, name="demo", project_root=project.root)
+    monkeypatch.setattr(sys, "pycache_prefix", str(tmp_path / "pyc"))
+    refusal = admit_module(d)
+    assert refusal is not None and "PYTHONPYCACHEPREFIX" in refusal
+
+
 def test_plain_git_dir_is_refused(tmp_path: Path) -> None:
     from veles.cli._project import _load_project_modules
 
