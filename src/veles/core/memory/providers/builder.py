@@ -51,7 +51,8 @@ def build_extra_providers(config_path: Path | None = None) -> list[object]:
         try:
             provider = factory(section if isinstance(section, dict) else {})
         except Exception as exc:  # a broken provider must not break recall
-            print(f"warning: memory provider {name!r} failed to start: {exc}", file=sys.stderr)
+            # Built on every turn — say it once per process, not once per turn.
+            _warn_once(f"{name}:failed", f"memory provider {name!r} failed to start: {exc}")
             continue
         if provider is not None:
             providers.append(provider)

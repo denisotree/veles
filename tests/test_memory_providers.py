@@ -62,8 +62,10 @@ def test_factory_exception_is_contained(tmp_path: Path, registry: ModuleRegistry
         raise RuntimeError("bad key")
 
     ModuleAPI(registry, "m").add_memory_provider("fake", boom)
-    assert build_extra_providers(_config(tmp_path, "[memory.external.fake]\n")) == []
-    assert "bad key" in capsys.readouterr().err
+    cfg = _config(tmp_path, "[memory.external.fake]\n")
+    assert build_extra_providers(cfg) == []
+    assert build_extra_providers(cfg) == []  # called once per turn: warn only once
+    assert capsys.readouterr().err.count("bad key") == 1
 
 
 def test_configured_but_not_installed_warns_once(

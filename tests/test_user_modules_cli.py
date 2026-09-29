@@ -97,3 +97,25 @@ def test_module_add_never_approves_a_planted_same_named_module(
     assert not (project.modules_dir / "bar2").exists()
     assert [r for r in load_records() if r.path == str(planted.resolve())] == []
     assert _load_project_modules(project).modules == []
+
+
+def test_module_verbs_refuse_an_ambiguous_name(tmp_path: Path, monkeypatch, capsys) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    a = _write_module(project.modules_dir / "a-dir", "dup")
+    b = _write_module(project.modules_dir / "b-dir", "dup")
+    monkeypatch.chdir(project.root)
+    for verb in (["approve"], ["show"], ["remove", "--yes"]):
+        capsys.readouterr()
+        assert main(["module", *verb, "dup"]) == 1, verb
+        err = capsys.readouterr().err
+        assert str(a) in err and str(b) in err, verb
+    assert a.is_dir() and b.is_dir()
+    assert load_records() == []
+
+
+def test_module_remove_takes_the_manifest_name(tmp_path: Path, monkeypatch) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    d = _write_module(project.modules_dir / "some-dir", "demo")
+    monkeypatch.chdir(project.root)
+    assert main(["module", "remove", "--yes", "demo"]) == 0
+    assert not d.exists()

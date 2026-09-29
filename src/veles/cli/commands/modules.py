@@ -56,14 +56,34 @@ def _list(args: argparse.Namespace, project: Project) -> int:
     return 0
 
 
+def _find(modules_dir: Path, name: str, *, by_dir: bool = False) -> Path | None:
+    """The dir of the one module in `modules_dir` whose manifest declares `name` (what
+    `list` shows). Two dirs declaring it is ambiguous — refused, with the dirs listed, so
+    a verb never acts on whichever dir happens to sort first. `by_dir` falls back to the
+    directory name when no manifest matches (to remove a module whose manifest is broken)."""
+    matches = [h.dir for h in discover_modules_in(modules_dir) if h.name == name]
+    if len(matches) > 1:
+        dirs = "\n".join(f"  {d}" for d in matches)
+        print(
+            f"error: {len(matches)} modules in {modules_dir} declare name {name!r}:\n{dirs}\n"
+            "review them and remove the one you did not install",
+            file=sys.stderr,
+        )
+        return None
+    if matches:
+        return matches[0]
+    if by_dir and (modules_dir / name).is_dir():
+        return modules_dir / name
+    print(f"error: module {name!r} not found in {modules_dir}", file=sys.stderr)
+    return None
+
+
 def _show(args: argparse.Namespace, project: Project) -> int:
-    modules_dir = _modules_dir(args, project)
-    for h in discover_modules_in(modules_dir):
-        if h.name == args.name:
-            print((h.dir / "module.toml").read_text(encoding="utf-8"))
-            return 0
-    print(f"error: module {args.name!r} not found in {modules_dir}", file=sys.stderr)
-    return 1
+    module_dir = _find(_modules_dir(args, project), args.name)
+    if module_dir is None:
+        return 1
+    print((module_dir / "module.toml").read_text(encoding="utf-8"))
+    return 0
 
 
 def _add(args: argparse.Namespace, project: Project) -> int:
@@ -98,12 +118,14 @@ def _remove(args: argparse.Namespace, project: Project) -> int:
     from veles.cli._console import confirm
 
     modules_dir = _modules_dir(args, project)
-    target = modules_dir / args.name
+    target = _find(modules_dir, args.name, by_dir=True)
+    if target is None:
+        return 1
     if not args.yes and not confirm(f"Remove module {args.name!r} ({target})? [y/N]"):
         print("<aborted>", file=sys.stderr)
         return 1
     try:
-        remove_module(args.name, modules_dir=modules_dir)
+        remove_module(target.name, modules_dir=modules_dir)
     except ModuleNotFoundError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -118,15 +140,13 @@ def _approve(args: argparse.Namespace, project: Project) -> int:
     from veles.core.registry.gate import approve_module
     from veles.core.registry.hashing import tree_sha256
 
-    modules_dir = _modules_dir(args, project)
-    handle = next((h for h in discover_modules_in(modules_dir) if h.name == args.name), None)
-    if handle is None:
-        print(f"error: module {args.name!r} not found in {modules_dir}", file=sys.stderr)
+    module_dir = _find(_modules_dir(args, project), args.name)
+    if module_dir is None:
         return 1
     try:
-        digest = tree_sha256(handle.dir)
+        digest = tree_sha256(module_dir)
         summary = (
-            f"Module: {handle.dir}\nFiles hash: {digest[:12]}\n"
+            f"Module: {module_dir}\nFiles hash: {digest[:12]}\n"
             "Its code will run on every agent turn. Review it first."
         )
         if not confirm_critical(f"approve module {args.name}", summary):
@@ -134,7 +154,7 @@ def _approve(args: argparse.Namespace, project: Project) -> int:
             return 1
         project_root = None if getattr(args, "user", False) else project.root
         approve_module(
-            handle.dir, name=handle.name, project_root=project_root, expected_sha256=digest
+            module_dir, name=args.name, project_root=project_root, expected_sha256=digest
         )
     except (OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
