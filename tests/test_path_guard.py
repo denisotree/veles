@@ -341,6 +341,39 @@ def test_run_shell_uses_sandbox_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     assert str(tmp_path.resolve()) in out
 
 
+@pytest.mark.parametrize("home_inside_project", [True, False])
+def test_user_home_stays_closed_when_the_project_contains_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, home_inside_project: bool
+) -> None:
+    """A project at `~` (or `VELES_USER_HOME` inside the project) must not open
+    `~/.veles/` — approvals, trust, modules, registries — to the agent: inside
+    `user_home()` only the whitelisted subdirs are reachable."""
+    from veles.core.user_paths import user_home
+
+    monkeypatch.delenv("VELES_SANDBOX_ROOTS", raising=False)
+    project = init_project(tmp_path / "p", name="p")
+    monkeypatch.setenv(
+        "VELES_USER_HOME", str(project.root if home_inside_project else tmp_path / "home")
+    )
+    token = set_active_project(project)
+    try:
+        if home_inside_project:
+            for rel in ("extensions.json", "tool-approvals.json", "modules/m/m.py", "x"):
+                with pytest.raises(SandboxViolation):
+                    resolve_safe(user_home() / rel)
+            with pytest.raises(SandboxViolation):
+                write_file(str(user_home() / "extensions.json"), "[]")
+            assert not (user_home() / "extensions.json").exists()
+        assert (
+            resolve_safe(user_home() / "skills" / "x") == (user_home() / "skills" / "x").resolve()
+        )
+        assert resolve_safe(user_home() / "locales" / "ru.toml").parent.name == "locales"
+        assert resolve_safe(project.root / "notes.md") == (project.root / "notes.md").resolve()
+        assert resolve_safe("notes.md") == (project.root / "notes.md").resolve()
+    finally:
+        reset_active_project(token)
+
+
 def test_sandbox_cwd_returns_first_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     a = tmp_path / "a"
     b = tmp_path / "b"

@@ -101,6 +101,17 @@ def _is_within(child: Path, parent: Path) -> bool:
     return True
 
 
+def _closed_user_path(resolved: Path) -> bool:
+    """Inside `user_home()` but outside the whitelisted subdirs. Checked on its own,
+    not via the roots: a project root that contains `user_home()` (a project at `~`, or
+    `VELES_USER_HOME` inside the project) would otherwise swallow the whitelist in
+    `_dedupe` and open approvals, trust and modules to the agent."""
+    home = user_home()
+    if not _is_within(resolved, home.resolve()):
+        return False
+    return not any(_is_within(resolved, (home / n).resolve()) for n in _USER_ROOT_WHITELIST)
+
+
 def resolve_safe(path: str | Path) -> Path:
     """Resolve `path` and raise `SandboxViolation` if it escapes the sandbox.
 
@@ -139,6 +150,11 @@ def resolve_safe(path: str | Path) -> Path:
         resolved = p.resolve(strict=False)
     except OSError as exc:
         raise SandboxViolation(f"cannot resolve {sanitize(raw)!r}: {exc}") from exc
+    if _closed_user_path(resolved):
+        raise SandboxViolation(
+            f"path {sanitize(str(resolved))} is Veles' own user state; only "
+            f"{', '.join(_USER_ROOT_WHITELIST)} under it are open to tools"
+        )
     roots = _get_sandbox_roots()
     for root in roots:
         if _is_within(resolved, root):
