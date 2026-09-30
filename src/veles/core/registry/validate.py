@@ -241,16 +241,30 @@ _INSTALL_TIMEOUT_S = 600
 
 def _install_requires(requires: tuple[str, ...], target: Path) -> str | None:
     """Install an extension's `requires` into `target` (a throwaway dir put on
-    PYTHONPATH for its dry run and tests). None on success, else an error."""
+    PYTHONPATH for its dry run and tests). None on success, else an error.
+
+    `target` goes first on PYTHONPATH, so a package it shares with Veles must
+    keep Veles's version: the running env is frozen into a constraints file, and a
+    real conflict fails here with the resolver's message. `--` keeps a `requires`
+    entry from ever being read as an option (`--index-url=…`)."""
     uv = shutil.which("uv")
-    cmd = (
-        [uv, "pip", "install", "--python", sys.executable, "--target", str(target), *requires]
-        if uv
-        else [sys.executable, "-m", "pip", "install", "--target", str(target), *requires]
-    )
+    pip = [uv, "pip"] if uv else [sys.executable, "-m", "pip"]
+    python = ["--python", sys.executable] if uv else []
     try:
+        frozen = subprocess.run(
+            [*pip, "freeze", *python], capture_output=True, text=True, check=False, timeout=120
+        )
+        constraints = target.parent / "constraints.txt"
+        constraints.parent.mkdir(parents=True, exist_ok=True)
+        pins = [ln for ln in frozen.stdout.splitlines() if "==" in ln and not ln.startswith("-")]
+        constraints.write_text("".join(f"{ln}\n" for ln in pins), encoding="utf-8")
+        cmd = [*pip, "install", *python, "--target", str(target), "-c", str(constraints)]
         run = subprocess.run(
-            cmd, capture_output=True, text=True, check=False, timeout=_INSTALL_TIMEOUT_S
+            [*cmd, "--", *requires],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=_INSTALL_TIMEOUT_S,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return f"could not install requires: {exc}"

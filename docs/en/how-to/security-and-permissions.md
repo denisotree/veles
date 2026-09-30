@@ -77,7 +77,8 @@ too.
 Files that run without an explicit command or steer an agent CLI — anything under
 `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`, `.vscode/`, `.devcontainer/`,
 `.husky/`, and `.envrc`, `.mcp.json`, `.pre-commit-config.yaml`, `lefthook.yml`, at any
-depth, plus the repo's `core.hooksPath` directory and wherever a symlinked `.git` points —
+depth, plus — when the git repo sits at the project root — the `core.hooksPath` set in its
+`.git/config` and wherever a symlinked `.git` points —
 the agent's file tools write only after you confirm that write. Trust grants and
 autopilot don't cover it; the daemon asks in the channel, and a batch run with nobody to
 ask refuses.

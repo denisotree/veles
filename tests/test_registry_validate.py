@@ -431,6 +431,29 @@ def test_install_requires_puts_deps_on_the_path(tmp_path: Path, monkeypatch) -> 
     assert report.errors == []
 
 
+def test_install_requires_is_pinned_to_the_running_env(tmp_path: Path, monkeypatch) -> None:
+    """Shared packages keep Veles's own versions (a constraints file from the
+    running env), and a `requires` entry can never be read as an option."""
+    import subprocess as sp
+
+    from veles.core.registry import validate as v
+
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, **_kw):
+        calls.append(list(cmd))
+        return sp.CompletedProcess(cmd, 0, stdout="rich==15.0.0\n", stderr="")
+
+    monkeypatch.setattr(v.shutil, "which", lambda _name: "/usr/bin/uv")
+    monkeypatch.setattr(v.subprocess, "run", fake_run)
+    target = tmp_path / "deps"
+    assert v._install_requires(("--index-url=https://evil/simple", "somepkg"), target) is None
+    install = calls[-1]
+    constraints = Path(install[install.index("-c") + 1])
+    assert constraints.read_text() == "rich==15.0.0\n"
+    assert install[install.index("--") + 1 :] == ["--index-url=https://evil/simple", "somepkg"]
+
+
 def test_install_requires_failure_is_reported(tmp_path: Path, monkeypatch) -> None:
     from veles.core.registry import validate as v
 

@@ -213,14 +213,19 @@ def _protected_targets(project: Project) -> list[Path]:
         for name in _CONFIRM_NAMES
         if (project.root / name).is_symlink()
     ]
-    parser = configparser.ConfigParser(strict=False, interpolation=None)
+    # Git's config is INI-like: keys may lack a value, values may be quoted and
+    # carry a trailing `;`/`#` comment. A value that can't be resolved (unknown
+    # `~user`, a NUL) adds nothing — it must never make the write guard throw.
+    parser = configparser.ConfigParser(
+        strict=False, interpolation=None, allow_no_value=True, inline_comment_prefixes=("#", ";")
+    )
     try:
         parser.read_string((project.root / ".git" / "config").read_text(encoding="utf-8"))
-        hooks = parser.get("core", "hooksPath", fallback="").strip()
-    except (OSError, UnicodeDecodeError, configparser.Error):
-        hooks = ""
-    if hooks:
-        out.append((project.root / Path(hooks).expanduser()).resolve())
+        hooks = (parser.get("core", "hooksPath", fallback="") or "").strip().strip('"')
+        if hooks:
+            out.append((project.root / Path(hooks).expanduser()).resolve())
+    except (OSError, UnicodeDecodeError, configparser.Error, RuntimeError, ValueError):
+        pass
     return out
 
 

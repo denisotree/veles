@@ -52,7 +52,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     p.add_argument(
         "--install-requires",
         action="store_true",
-        help="With --run-code: install each module's `requires` first, so SDK tests run.",
+        help="Implies --run-code (executes the PR's code): install each module's `requires` "
+        "first, so its SDK tests run.",
     )
     p = rs.add_parser("scaffold", help="Create a new extension skeleton in a registry.")
     p.add_argument("kind", choices=("module", "skill", "layout", "mcp"))

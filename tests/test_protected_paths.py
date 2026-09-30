@@ -130,6 +130,23 @@ def test_custom_hooks_path_is_protected(project, answers) -> None:
     assert write_file("tools/other.py", "x").startswith("wrote")
 
 
+@pytest.mark.parametrize("value", ["~nosuchuser_zz/hooks", "bad\x00path"])
+def test_bad_hooks_path_value_does_not_break_writes(project, answers, value: str) -> None:
+    (project.root / ".git").mkdir()
+    (project.root / ".git" / "config").write_text(
+        f"[core]\n\thooksPath = {value}\n", encoding="utf-8"
+    )
+    assert write_file("notes.md", "x").startswith("wrote")
+
+
+def test_hooks_path_with_quotes_and_comment_is_protected(project, answers) -> None:
+    (project.root / ".git").mkdir()
+    (project.root / ".git" / "config").write_text(
+        '[core]\n\tbare\n\thooksPath = "tools/hooks" ; set by setup.sh\n', encoding="utf-8"
+    )
+    assert "not confirmed" in write_file("tools/hooks/pre-commit", "x")
+
+
 def test_unreadable_git_config_is_ignored(project, answers) -> None:
     (project.root / ".git").mkdir()
     (project.root / ".git" / "config").write_bytes(b"\xff\xfe[[[ not ini")
