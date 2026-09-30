@@ -257,12 +257,14 @@ def main(argv: list[str] | None = None) -> int:
         snap = load_budget_snapshot(budget_path)
         if snap is not None:
             set_budget(TokenBudget(limit=snap.limit, consumed=snap.consumed))
-    composite = registry.subset(registry.list_names())
-    skill_names = _register_project_skills(composite, project, args.skill_model)
-    # M163: drop wiki-engine tools when the project's layout doesn't
-    # enable the engine — same gating as `_load_skills`.
+    # M163: wiki-engine tools exist only when the project's layout enables the
+    # engine — registered here the way `runtime/registry.py` does, else dropped.
     from veles.core.layout.engines import wiki_enabled
 
+    if wiki_enabled(project):
+        import veles.modules.wiki.tools  # noqa: F401  (registers wiki_*)
+    composite = registry.subset(registry.list_names())
+    skill_names = _register_project_skills(composite, project, args.skill_model)
     tool_names = list(_MCP_TOOLS)
     if not wiki_enabled(project):
         tool_names = [t for t in tool_names if not t.startswith("wiki_")]

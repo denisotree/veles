@@ -136,8 +136,11 @@ def make_provider(name: str, model: str | None = None) -> Provider:
         return GeminiProvider()
     if name == "claude-cli":
         from veles.adapters.cli.claude_cli import ClaudeCLIProvider
+        from veles.core.context import current_project
 
-        return ClaudeCLIProvider()
+        # The project root, not wherever the process happens to run.
+        project = current_project()
+        return ClaudeCLIProvider(workdir=project.root if project else None)
     if name == "gemini-cli":
         from veles.adapters.cli.gemini_cli import GeminiCLIProvider
 

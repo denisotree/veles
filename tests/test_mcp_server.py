@@ -380,3 +380,34 @@ def test_tools_call_goes_through_the_trust_ladder(monkeypatch, tmp_path) -> None
         assert _call(server, "write_file", {"path": "a.md", "content": "x"}).startswith("wrote")
     finally:
         reset_active_project(token)
+
+
+def test_project_trust_grant_lets_the_call_through(monkeypatch, tmp_path) -> None:
+    """What `veles trust set write_file --scope project` stores is honoured here."""
+    import veles.core.permission  # noqa: F401  (import order the app uses)
+    from veles.core.context import reset_active_project, set_active_project
+    from veles.core.tools import registry as builtin
+    from veles.core.trust_store import TrustStore
+
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("VELES_TRUST_AUTO_ALLOW", raising=False)
+    project = init_project(tmp_path / "proj", name="proj")
+    TrustStore.load(project.trust_path).grant("write_file")
+    token = set_active_project(project)
+    try:
+        server = MCPServer(builtin, ["write_file"])
+        assert _call(server, "write_file", {"path": "a.md", "content": "x"}).startswith("wrote")
+    finally:
+        reset_active_project(token)
+
+
+def test_main_exposes_wiki_tools_for_a_wiki_project(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
+    request = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}) + "\n"
+    monkeypatch.setattr("sys.stdin", io.StringIO(request))
+    out = io.StringIO()
+    monkeypatch.setattr("sys.stdout", out)
+    main(["--project-root", str(project.root)])
+    names = {t["name"] for t in json.loads(out.getvalue().splitlines()[0])["result"]["tools"]}
+    assert {"wiki_read_page", "wiki_write_page"} <= names

@@ -119,7 +119,11 @@ entry point parse, a skill's `SKILL.md` frontmatter is valid, a layout's
 registries only accept permissive licenses. `--run-code` additionally imports
 the module and runs its `tests/` — that flag is meant for CI only, since it
 executes the code under review; a local `validate` run by a reviewer stays
-static. `--report FILE` writes a non-blocking Markdown report for the
+static. `--install-requires` (implies `--run-code`) first installs each module's
+`requires` into a throwaway directory (pinned to the versions Veles runs with),
+so tests that drive a real SDK run instead of skipping; the generated CI passes
+it. Test-only dependencies (a mocking library such as `respx`) go into the CI
+command with `uvx --with`. `--report FILE` writes a non-blocking Markdown report for the
 reviewer: a static scan for `subprocess`/`os.system`, `eval`/`exec`, network
 access, writes outside the project, `os.environ` reads, dynamic imports, and
 the extension's declared `requires`.

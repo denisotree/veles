@@ -19,9 +19,11 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any, Literal
 
+from veles.core.file_lock import file_lock
 from veles.core.io_utils import atomic_write_json, load_optional_json
 from veles.core.text import shown
 from veles.core.user_paths import user_home
@@ -78,25 +80,34 @@ def approval_state(project_root: Path, name: str, raw: dict[str, Any]) -> Approv
     return "yes" if recorded == recipe_hash(raw) else "changed"
 
 
+def _locked() -> AbstractContextManager[None]:
+    """One writer at a time: `veles mcp approve` and a registry install can race."""
+    path = store_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return file_lock(path.parent / (path.name + ".lock"))
+
+
 def approve(project_root: Path, name: str, raw: dict[str, Any]) -> str:
     """Record `raw` as the approved recipe for `name`. Returns the hash."""
     digest = recipe_hash(raw)
-    data = _load()
-    entry = data.get(_key(project_root))
-    if not isinstance(entry, dict):
-        entry = data[_key(project_root)] = {}
-    entry[name] = digest
-    atomic_write_json(store_path(), data)
+    with _locked():
+        data = _load()
+        entry = data.get(_key(project_root))
+        if not isinstance(entry, dict):
+            entry = data[_key(project_root)] = {}
+        entry[name] = digest
+        atomic_write_json(store_path(), data)
     return digest
 
 
 def revoke(project_root: Path, name: str) -> None:
-    data = _load()
-    entry = data.get(_key(project_root))
-    if isinstance(entry, dict) and entry.pop(name, None) is not None:
-        if not entry:
-            del data[_key(project_root)]
-        atomic_write_json(store_path(), data)
+    with _locked():
+        data = _load()
+        entry = data.get(_key(project_root))
+        if isinstance(entry, dict) and entry.pop(name, None) is not None:
+            if not entry:
+                del data[_key(project_root)]
+            atomic_write_json(store_path(), data)
 
 
 def only_approved(

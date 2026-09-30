@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from veles.core.io_utils import atomic_write_text, dump_toml
-from veles.core.registry.model import has_control_char
+from veles.core.path_guard import has_control_char
 from veles.core.user_config import read_user_config_raw, user_config_path
 from veles.core.user_paths import user_home
 

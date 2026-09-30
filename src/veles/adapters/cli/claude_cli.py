@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import functools
 import subprocess
+import sys
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -107,6 +108,11 @@ def _isolation_flags(binary: str) -> tuple[str, ...]:
         help_text = ""
     if "--restricted" in help_text:
         return ("--restricted", "--strict-mcp-config", "--tools", "")
+    print(
+        f"warning: {binary} has no --restricted; running it with --setting-sources user "
+        '--tools "" instead — update Claude Code for full isolation',
+        file=sys.stderr,
+    )
     return ("--setting-sources", "user", "--strict-mcp-config", "--tools", "")
 
 

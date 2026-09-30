@@ -91,22 +91,39 @@ outils à ignorer :
 disabled_tools = { github = ["delete_repository"], search = ["raw_query"] }
 ```
 
-## Inspecter et tester
+## Approuver, inspecter et tester
 
 ```bash
-veles mcp list              # chaque serveur configuré : transport, statut, nombre d'outils
+veles mcp approve github    # examinez la recette, tapez `yes` — le serveur peut alors démarrer
+veles mcp list              # chaque serveur configuré : transport, approuvé, statut, nombre d'outils
 veles mcp test github       # se connecte à un serveur et liste ses outils
 ```
 
+Un serveur ne démarre qu'après que vous avez approuvé sa recette exacte. `veles mcp
+approve` affiche la table entière — `command`, `args`, les valeurs de `env` (un `PATH`
+ici décide quel binaire s'exécute ; les références `${VAR}` apparaissent telles
+qu'écrites), `url`, `transport` et toute autre clé — et enregistre un hash de la table
+telle qu'elle figure dans `config.toml`, avant l'expansion de `${VAR}` : ainsi, faire
+tourner un jeton conserve l'approbation, tandis que toute modification de la table (un
+projet cloné, un argument changé) place le serveur en état `changed` et l'empêche de
+démarrer jusqu'à ce que vous l'approuviez à nouveau. L'approbation couvre la ligne de
+commande ; les fichiers qu'elle exécute depuis le projet (un script dans `args`) ne
+sont pas figés — relisez-les aussi. Les approbations sont stockées dans
+`~/.veles/mcp-approvals.json`. `veles registry install` d'une extension MCP affiche la
+même recette dans sa confirmation et l'approuve ; `veles registry uninstall` la
+révoque.
+
 `veles mcp list` se termine toujours avec le code 0 — c'est un inspecteur, pas un
-contrôle de santé. `veles mcp test` se termine avec le code 1 quand la connexion échoue
+contrôle de santé ; il ne démarre jamais un serveur non approuvé. `veles mcp test` se
+termine avec le code 1 quand le serveur n'est pas approuvé ou que la connexion échoue,
 et 2 pour un nom de serveur inconnu.
 
 ## Comment les outils apparaissent
 
-Une fois configurés, les serveurs sont montés **automatiquement** au prochain
-`veles run` / démarrage du TUI / du daemon — il n'y a pas d'indicateur « activer MCP »
-distinct, la présence de la configuration fait office d'interrupteur. Chaque outil
+Une fois configurés et approuvés, les serveurs sont montés **automatiquement** au
+prochain `veles run` / démarrage du TUI / du daemon — il n'y a pas d'indicateur
+« activer MCP » distinct. Un serveur non approuvé est ignoré, avec un avertissement
+par processus. Chaque outil
 entre dans le registre normal sous la forme `mcp_<server>_<tool>` et est appelable par
 l'agent comme n'importe quel outil intégré. Les schémas sont assainis (limites de
 nom/longueur, suppression des caractères de contrôle) afin qu'un serveur non fiable ne

@@ -237,3 +237,37 @@ def test_parser_accepts_approve() -> None:
 
     args = build_parser().parse_args(["mcp", "approve", "gh"])
     assert args.mcp_command == "approve" and args.server == "gh"
+
+
+def test_concurrent_approvals_are_not_lost(tmp_path: Path, monkeypatch) -> None:
+    """Two writers that both read the old store must not drop each other's approval."""
+    import contextlib
+    import threading
+
+    from veles.mcp import approvals as mod
+
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    root = tmp_path / "proj"
+    root.mkdir()
+    real_load = mod._load
+    barrier = threading.Barrier(2)
+
+    def slow_load():
+        data = real_load()
+        # Unlocked, both writers get here with the same old state; locked, the
+        # second waits on the lock and the barrier just times out.
+        with contextlib.suppress(threading.BrokenBarrierError):
+            barrier.wait(timeout=0.5)
+        return data
+
+    monkeypatch.setattr(mod, "_load", slow_load)
+    threads = [
+        threading.Thread(target=mod.approve, args=(root, n, {"command": n})) for n in ("a", "b")
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    monkeypatch.setattr(mod, "_load", real_load)
+    assert mod.approval_state(root, "a", {"command": "a"}) == "yes"
+    assert mod.approval_state(root, "b", {"command": "b"}) == "yes"

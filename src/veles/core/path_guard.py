@@ -69,7 +69,9 @@ _CONTROL_CHAR_RANGES: tuple[tuple[int, int], ...] = (
 )
 
 
-def _has_control_char(s: str) -> bool:
+def has_control_char(s: str) -> bool:
+    """The one definition of a control character, for agent paths and anything
+    else shown to the user or passed on (registry URLs, refs, subdirs)."""
     return any(any(lo <= ord(c) <= hi for lo, hi in _CONTROL_CHAR_RANGES) for c in s)
 
 
@@ -181,7 +183,7 @@ def resolve_safe(path: str | Path) -> Path:
     from veles.core.sanitize import sanitize
 
     raw = str(path)
-    if _has_control_char(raw):
+    if has_control_char(raw):
         # Never echo `raw` back — it's exactly the payload we're refusing.
         raise SandboxViolation("path contains control characters")
     p = Path(raw).expanduser()

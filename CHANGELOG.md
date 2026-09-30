@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] — 2026-09-30
+
+Follow-ups to 1.2.0: tighter write protection, safer registry validation, synced translations.
+
+### Added
+
+- `veles registry validate --install-requires` (implies `--run-code`) installs each module's
+  `requires` into a throwaway directory, pinned to the versions Veles runs with, so tests that
+  drive a real SDK run in CI instead of skipping. The generated GitHub/GitLab CI passes it.
+
+### Security
+
+- Writes into the directory a symlinked `.git` points at, and into the `core.hooksPath` set in
+  the project's `.git/config`, need your confirmation like `.git/` itself.
+- One definition of a control character everywhere: registry URLs, refs and subdirs now also
+  refuse C1 and bidi override/isolate characters.
+- `mcp-approvals.json` writes are serialised — two approvals at once no longer lose one.
+
+### Fixed
+
+- The Veles MCP server exposes the wiki tools to delegated CLIs in wiki projects.
+- `claude-cli` built by the plain provider factory runs in the project root; a Claude Code
+  without `--restricted` prints one warning that it runs on the fallback flags.
+- `wiki_rename_page` reports pages whose links it could not repair.
+
+### Docs
+
+- Security, MCP servers and modules pages are synced across all 15 languages.
+
 ## [1.2.0] — 2026-09-30
 
 User-level modules, memory providers moved to the registry, and the agent can no longer

@@ -14,7 +14,7 @@ jobs:
       - name: Validate changed extensions
         run: >
           uvx --python 3.13 --from 'veles-ai==@@VELES_VERSION@@' --with pytest
-          veles registry validate . --run-code
+          veles registry validate . --run-code --install-requires
           --base origin/${{ github.base_ref }} --report review.md
       - name: Reviewer report
         if: always()

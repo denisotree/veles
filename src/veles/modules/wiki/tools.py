@@ -187,23 +187,26 @@ def wiki_rename_page(rel_path: str, new_category: str, new_slug: str) -> str:
         old_path.unlink()
     # Repair inbound [[old-slug]] links across every page, then reindex.
     clean_new_slug = new_rel.rsplit("/", 1)[-1].removesuffix(".md")
-    repaired = 0
+    repaired = skipped = 0
     if clean_new_slug != old_slug:
         for page in wiki.list_pages():
             ppath = resolve_safe(wiki.root / page.rel_path)
-            if guard_write(ppath, current_project()) is not None:
-                continue
             try:
                 text = ppath.read_text(encoding="utf-8")
             except OSError:
                 continue
             updated = text.replace(f"[[{old_slug}]]", f"[[{clean_new_slug}]]")
-            if updated != text:
-                ppath.write_text(updated, encoding="utf-8")
-                repaired += 1
+            if updated == text:
+                continue
+            if guard_write(ppath, current_project()) is not None:
+                skipped += 1  # a page the agent may not write keeps the old link
+                continue
+            ppath.write_text(updated, encoding="utf-8")
+            repaired += 1
+    counts = f"{repaired} link(s) repaired" + (f", {skipped} page(s) skipped" if skipped else "")
     wiki.update_index()
-    wiki.append_log(op="rename", summary=f"{rel_path} -> {new_rel} ({repaired} links repaired)")
-    return f"renamed {rel_path} -> {new_rel} ({repaired} link(s) repaired)"
+    wiki.append_log(op="rename", summary=f"{rel_path} -> {new_rel} ({counts})")
+    return f"renamed {rel_path} -> {new_rel} ({counts})"
 
 
 @tool(risk_class=RiskClass.WRITE_LOCAL_PROJECT, side_effects=["filesystem"])

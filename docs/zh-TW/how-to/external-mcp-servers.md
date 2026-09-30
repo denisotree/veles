@@ -88,20 +88,30 @@ url = "https://mcp.example.com/mcp"
 disabled_tools = { github = ["delete_repository"], search = ["raw_query"] }
 ```
 
-## 檢視與測試
+## 核可、檢視與測試
 
 ```bash
-veles mcp list              # every configured server: transport, status, tool count
+veles mcp approve github    # review the recipe, type `yes` — the server may now start
+veles mcp list              # every configured server: transport, approved, status, tool count
 veles mcp test github       # connect to one server and list its tools
 ```
 
-`veles mcp list` 永遠以 0 退出 — 它是檢視工具，不是健康檢查閘門。
-`veles mcp test` 在連線失敗時以 1 退出，伺服器名稱未知時以 2 退出。
+伺服器只有在你核可了它的確切設定內容後才會啟動。`veles mcp approve` 會顯示整張表 —
+`command`、`args`、`env` 的值（其中的 `PATH` 決定執行哪個二進位檔；`${VAR}` 參照會照原樣顯示）、
+`url`、`transport` 以及其他任何鍵 — 並記錄 `config.toml` 中該表原樣內容的雜湊值，也就是在 `${VAR}`
+展開之前計算，因此輪替 token 不會使核可失效，而對該表的任何修改（複製來的專案、改動過的引數）
+都會讓伺服器變成 `changed`，在你重新核可之前不會啟動。核可只涵蓋命令列；它從專案中執行的檔案
+（`args` 裡的腳本）不會被固定 — 也請審查它們。核可記錄存放在 `~/.veles/mcp-approvals.json`。
+安裝 MCP 擴充功能的 `veles registry install` 會在確認時顯示同樣的內容並完成核可；
+`veles registry uninstall` 會撤銷核可。
+
+`veles mcp list` 永遠以 0 退出 — 它是檢視工具，不是健康檢查閘門；它絕不會啟動未核可的伺服器。
+`veles mcp test` 在伺服器未核可或連線失敗時以 1 退出，伺服器名稱未知時以 2 退出。
 
 ## tools 如何呈現
 
-設定完成後，伺服器會在下一次 `veles run` / TUI / daemon 啟動時**自動**掛載 —
-沒有獨立的「啟用 MCP」旗標，設定的存在本身就是開關。每個 tool 會以
+設定並核可後，伺服器會在下一次 `veles run` / TUI / daemon 啟動時**自動**掛載 —
+沒有獨立的「啟用 MCP」旗標。未核可的伺服器會被跳過，每個行程只發出一次警告。每個 tool 會以
 `mcp_<server>_<tool>` 的形式進入一般的 registry，並能像任何內建 tool 一樣被 agent
 呼叫。Schema 會經過淨化（名稱/長度限制、去除控制字元），讓不受信任的伺服器無法
 注入到 prompt 中。Tool hints 會對應到 trust ladder：破壞性的 tools 一律需要確認，

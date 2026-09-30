@@ -76,18 +76,30 @@ url = "https://mcp.example.com/mcp"
 disabled_tools = { github = ["delete_repository"], search = ["raw_query"] }
 ```
 
-## পরিদর্শন ও পরীক্ষা
+## অনুমোদন, পরিদর্শন ও পরীক্ষা
 
 ```bash
-veles mcp list              # every configured server: transport, status, tool count
+veles mcp approve github    # review the recipe, type `yes` — the server may now start
+veles mcp list              # every configured server: transport, approved, status, tool count
 veles mcp test github       # connect to one server and list its tools
 ```
 
-`veles mcp list` সবসময় 0 দিয়ে exit করে — এটি একটি inspector, কোনো health gate নয়। সংযোগ ব্যর্থ হলে `veles mcp test` 1 দিয়ে এবং অজানা সার্ভার নামের জন্য 2 দিয়ে exit করে।
+একটি সার্ভার কেবল তখনই চালু হয় যখন আপনি তার হুবহু recipe অনুমোদন করেছেন। `veles mcp approve` পুরো table দেখায় —
+`command`, `args`, `env`-এর মান (সেখানে `PATH` ঠিক করে কোন binary চলবে; `${VAR}` রেফারেন্স যেমন লেখা তেমনই দেখায়),
+`url`, `transport` এবং অন্য যেকোনো key — আর `config.toml`-এ যেমন লেখা আছে সেই table-এর একটি hash
+রেকর্ড করে — `${VAR}` expand হওয়ার আগে, তাই token বদলালে অনুমোদন থেকে যায়, কিন্তু table-এ যেকোনো
+সম্পাদনা (ক্লোন করা প্রজেক্ট, বদলানো argument) সার্ভারকে `changed` করে দেয় এবং আপনি আবার অনুমোদন না দেওয়া
+পর্যন্ত সেটি চালু হয় না। অনুমোদন কমান্ড লাইন কভার করে; প্রজেক্ট থেকে সে যে ফাইল চালায় (`args`-এ থাকা
+script) সেগুলো pin করা হয় না — সেগুলোও পর্যালোচনা করুন। অনুমোদন থাকে `~/.veles/mcp-approvals.json`-এ।
+MCP এক্সটেনশনের `veles registry install` নিশ্চিতকরণে একই recipe দেখায় এবং সেটি অনুমোদন করে;
+`veles registry uninstall` অনুমোদন প্রত্যাহার করে।
+
+`veles mcp list` সবসময় 0 দিয়ে exit করে — এটি একটি inspector, কোনো health gate নয়; এটি কখনো অননুমোদিত সার্ভার চালু করে না।
+সার্ভার অননুমোদিত হলে বা সংযোগ ব্যর্থ হলে `veles mcp test` 1 দিয়ে এবং অজানা সার্ভার নামের জন্য 2 দিয়ে exit করে।
 
 ## টুলগুলো কীভাবে প্রকাশ পায়
 
-কনফিগার করা হয়ে গেলে, পরবর্তী `veles run` / TUI / daemon চালু হওয়ার সময় সার্ভারগুলো **স্বয়ংক্রিয়ভাবে** mount হয় — আলাদা কোনো "enable MCP" ফ্ল্যাগ নেই, কনফিগের উপস্থিতিই হলো সুইচ। প্রতিটি টুল স্বাভাবিক registry-তে `mcp_<server>_<tool>` হিসেবে প্রবেশ করে এবং যেকোনো বিল্ট-ইনের মতোই এজেন্ট দ্বারা কলযোগ্য। Schema-গুলো sanitise করা হয় (নাম/দৈর্ঘ্যের সীমা, control-char অপসারণ) যাতে একটি অবিশ্বস্ত সার্ভার প্রম্পটে inject করতে না পারে। টুলের hint-গুলো trust ladder-এর সাথে map করে: ধ্বংসাত্মক টুল সবসময় নিশ্চিতকরণ চায়, read-only টুল প্রম্পট ছাড়াই চলে, বাকি সবকিছু স্বাভাবিক [trust](security-and-permissions.md) প্রবাহের মধ্য দিয়ে যায় — প্রতিবার জিজ্ঞাসিত হতে না চাইলে `veles trust set` দিয়ে স্থায়ী অনুমোদন দিন।
+কনফিগার ও অনুমোদন করা হয়ে গেলে, পরবর্তী `veles run` / TUI / daemon চালু হওয়ার সময় সার্ভারগুলো **স্বয়ংক্রিয়ভাবে** mount হয় — আলাদা কোনো "enable MCP" ফ্ল্যাগ নেই। অননুমোদিত সার্ভার প্রতি process-এ একটি warning দিয়ে এড়িয়ে যাওয়া হয়। প্রতিটি টুল স্বাভাবিক registry-তে `mcp_<server>_<tool>` হিসেবে প্রবেশ করে এবং যেকোনো বিল্ট-ইনের মতোই এজেন্ট দ্বারা কলযোগ্য। Schema-গুলো sanitise করা হয় (নাম/দৈর্ঘ্যের সীমা, control-char অপসারণ) যাতে একটি অবিশ্বস্ত সার্ভার প্রম্পটে inject করতে না পারে। টুলের hint-গুলো trust ladder-এর সাথে map করে: ধ্বংসাত্মক টুল সবসময় নিশ্চিতকরণ চায়, read-only টুল প্রম্পট ছাড়াই চলে, বাকি সবকিছু স্বাভাবিক [trust](security-and-permissions.md) প্রবাহের মধ্য দিয়ে যায় — প্রতিবার জিজ্ঞাসিত হতে না চাইলে `veles trust set` দিয়ে স্থায়ী অনুমোদন দিন।
 
 ## ব্যর্থতা সামলানো
 
