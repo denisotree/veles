@@ -319,3 +319,42 @@ def test_wiki_rename_under_symlinked_project_root_needs_no_confirm(
 def test_lookalike_dir_is_not_state(project) -> None:
     """`.veles-notes/` is ordinary project content, not Veles state."""
     assert "wrote" in write_file(".veles-notes/a.md", "x")
+
+
+# A nested `.veles/` becomes a project of its own (`find_project_root` picks the
+# nearest one), and `.claude/` / `.gemini/` / `.mcp.json` configure the delegated
+# CLIs outside the trust ladder — all managed, at any depth, in any case.
+_NESTED_MANAGED = (
+    "sub/.veles/trust.json",
+    "sub/.VELES/modules/x/module.toml",
+    "wiki/.veles/project.toml",
+    ".veles/skills/x/.veles/project.toml",
+    ".claude/settings.json",
+    "sub/.Claude/settings.local.json",
+    ".gemini/settings.json",
+    ".mcp.json",
+    "sub/.mcp.json",
+)
+
+
+@pytest.mark.parametrize("rel", _NESTED_MANAGED)
+def test_nested_state_and_cli_config_refused(project, rel: str) -> None:
+    target = project.root / rel
+    assert _refused(write_file(rel, _GRANT))
+    assert _refused(make_dir(rel))
+    write_file("notes.md", _GRANT)
+    assert _refused(move_file("notes.md", rel))
+    assert not target.exists()
+    assert not is_writable(project, rel)
+
+
+@pytest.mark.parametrize("rel", ["sub/veles/x.md", "sub/.velesx/a", "sub/claude/a", "mcp.json"])
+def test_nested_lookalikes_writable(project, rel: str) -> None:
+    assert write_file(rel, "x").startswith("wrote")
+
+
+def test_subproject_init_still_creates_nested_state(project) -> None:
+    """Core APIs create a subproject's `.veles/` without the file-tool guard."""
+    sub = init_project(project.root / "frontend", name="frontend")
+    assert (sub.state_dir / "project.toml").exists()
+    assert _refused(write_file("frontend/.veles/trust.json", _GRANT))
