@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-09-30
+
+User-level modules, memory providers moved to the registry, and the agent can no longer
+raise its own permissions through project files or a delegated CLI.
+
 ### Added
 
 - User-level modules in `~/.veles/modules/`: loaded in every project, through the same approval
