@@ -8,9 +8,56 @@ from dataclasses import dataclass
 
 import pytest
 
+from veles.adapters.cli import claude_cli
 from veles.adapters.cli._common import format_messages_as_prompt as _format_messages_as_prompt
 from veles.adapters.cli.claude_cli import ClaudeCLIProvider, _parse_stream
 from veles.core.provider import Message
+
+
+@pytest.fixture(autouse=True)
+def _fresh_flag_probe():
+    """`_isolation_flags` caches its `claude --help` probe per process."""
+    claude_cli._isolation_flags.cache_clear()
+    yield
+    claude_cli._isolation_flags.cache_clear()
+
+
+def _help_then_result(monkeypatch, captured: dict, help_text: str) -> None:
+    """subprocess.run answers `--help` with `help_text`, anything else with a result."""
+
+    def fake_run(cmd, **kwargs):
+        if cmd[-1] == "--help":
+            return _FakeProc(stdout=help_text)
+        captured["cmd"] = list(cmd)
+        return _FakeProc(stdout='{"type":"result","result":"ok"}\n')
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(shutil, "which", lambda _name: "/usr/local/bin/claude")
+
+
+def test_isolated_with_restricted_when_the_cli_has_it(monkeypatch, tmp_path) -> None:
+    captured: dict = {}
+    _help_then_result(monkeypatch, captured, "  --restricted   Restricted mode ...")
+    cfg = tmp_path / "mcp.json"
+    cfg.write_text("{}")
+    ClaudeCLIProvider(mcp_config_path=cfg).create_message(
+        [Message(role="user", content="x")], model="m"
+    )
+    cmd = captured["cmd"]
+    assert "--restricted" in cmd and "--strict-mcp-config" in cmd
+    assert cmd[cmd.index("--allowedTools") + 1] == "mcp__veles"
+
+
+def test_isolated_by_hand_on_an_older_cli(monkeypatch) -> None:
+    captured: dict = {}
+    _help_then_result(monkeypatch, captured, "  --print  ...")
+    ClaudeCLIProvider().create_message([Message(role="user", content="x")], model="m")
+    cmd = captured["cmd"]
+    assert "--restricted" not in cmd
+    assert cmd[cmd.index("--setting-sources") + 1] == "user"
+    assert cmd[cmd.index("--tools") + 1] == ""
+    assert "--strict-mcp-config" in cmd
+    assert "--allowedTools" not in cmd  # no Veles MCP server → nothing to allow
 
 
 @dataclass
@@ -222,6 +269,9 @@ def test_stream_message_yields_stream_end_even_when_no_result_event(monkeypatch)
 
 def _patch_streaming_popen(monkeypatch, lines: list[str], returncode: int = 0) -> None:
     import io
+
+    # The `claude --help` flag probe goes through subprocess.run, not this Popen.
+    monkeypatch.setattr(subprocess, "run", lambda *_a, **_k: _FakeProc())
 
     class _FakePopen:
         def __init__(self) -> None:
