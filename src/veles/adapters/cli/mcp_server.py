@@ -120,10 +120,11 @@ class MCPServer:
         return _success(req.get("id"), {"tools": out})
 
     def _permission_refusal(self, name: str, arguments: dict[str, Any]) -> str | None:
-        """The same Permission Engine the agent loop runs (trust ladder, untrusted
-        egress, planning mode). Nobody can answer a prompt over this pipe, so
-        anything short of `allow` — an ask included — is refused; a standing
-        `veles trust set` grant or an autopilot window still lets it through."""
+        """The same Permission Engine the agent loop runs (trust ladder, policy
+        overrides, untrusted egress seen in this process). Nobody can answer a
+        prompt over this pipe, so anything short of `allow` — an ask included —
+        is refused; a standing grant or an autopilot window still lets it
+        through. The parent run's planning mode doesn't reach this process."""
         from veles.core.permission import evaluate
 
         try:
@@ -133,9 +134,14 @@ class MCPServer:
         decision = evaluate(entry, arguments)
         if decision.allowed:
             return None
+        how = (
+            f"grant it with `veles trust set {name}`"
+            if entry.sensitive
+            else "allow it under [permissions] in config.toml"
+        )
         return (
             f"<refused: {name} needs Veles permission ({decision.reason or decision.rule}); "
-            f"the user can grant it with `veles trust set {name}`>"
+            f"the user can {how}>"
         )
 
     def _handle_tools_call(self, req: dict[str, Any]) -> dict[str, Any]:

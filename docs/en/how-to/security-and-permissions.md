@@ -94,6 +94,12 @@ Known limits:
   directory under another name isn't recognised.
 - An MCP approval pins the server's command line, not the files it runs from the project
   (a script named in `args`) — review those too.
+- With a CLI provider, runs that pre-authorise tools only for themselves (daemon
+  background jobs, `veles research`) don't pass that on to the delegated CLI: its Veles
+  tools need a standing `veles trust set` grant or an autopilot window. The parent run's
+  planning mode doesn't reach them either.
+- `gemini-cli` trusts the project folder for its run, so gemini also reads the project's
+  `.env` — keep gemini settings you don't want the agent to steer out of it.
 - On a machine with managed (system) gemini policies, gemini ignores the policy Veles
   passes, so `gemini-cli` isn't limited to Veles' tools there.
 
