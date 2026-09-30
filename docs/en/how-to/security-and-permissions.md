@@ -77,7 +77,8 @@ too.
 Files that run without an explicit command or steer an agent CLI — anything under
 `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`, `.vscode/`, `.devcontainer/`,
 `.husky/`, and `.envrc`, `.mcp.json`, `.pre-commit-config.yaml`, `lefthook.yml`, at any
-depth — the agent's file tools write only after you confirm that write. Trust grants and
+depth, plus the repo's `core.hooksPath` directory and wherever a symlinked `.git` points —
+the agent's file tools write only after you confirm that write. Trust grants and
 autopilot don't cover it; the daemon asks in the channel, and a batch run with nobody to
 ask refuses.
 
@@ -90,8 +91,7 @@ refused).
 Known limits:
 
 - `run_shell` is a shell: once you grant it (or under autopilot) it can write any of
-  the files above without the per-file confirmation, and a custom `core.hooksPath`
-  directory under another name isn't recognised.
+  the files above without the per-file confirmation.
 - An MCP approval pins the server's command line, not the files it runs from the project
   (a script named in `args`) — review those too.
 - With a CLI provider, runs that pre-authorise tools only for themselves (daemon

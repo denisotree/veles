@@ -111,6 +111,32 @@ def test_innocent_symlink_into_git_hooks_is_gated(project, answers) -> None:
     assert not (project.root / ".git" / "hooks" / "pre-commit").exists()
 
 
+def test_symlinked_git_dir_is_still_protected(project, answers) -> None:
+    """`.git` linked to a plainly named dir: both spellings of a hook are gated."""
+    real = project.root / "gitdata" / "hooks"
+    real.mkdir(parents=True)
+    (project.root / ".git").symlink_to(project.root / "gitdata")
+    assert "not confirmed" in write_file(".git/hooks/pre-commit", "x")
+    assert "not confirmed" in write_file("gitdata/hooks/pre-commit", "x")
+    assert not (real / "pre-commit").exists()
+
+
+def test_custom_hooks_path_is_protected(project, answers) -> None:
+    (project.root / ".git").mkdir()
+    (project.root / ".git" / "config").write_text(
+        '[core]\n\thooksPath = tools/hooks\n[remote "origin"]\n\turl = x\n', encoding="utf-8"
+    )
+    assert "not confirmed" in write_file("tools/hooks/pre-commit", "x")
+    assert write_file("tools/other.py", "x").startswith("wrote")
+
+
+def test_unreadable_git_config_is_ignored(project, answers) -> None:
+    (project.root / ".git").mkdir()
+    (project.root / ".git" / "config").write_bytes(b"\xff\xfe[[[ not ini")
+    assert write_file("notes.md", "x").startswith("wrote")
+    assert answers.ops == []
+
+
 @pytest.mark.parametrize("rel", ["docs/git.md", "src/claude.py", "envrc", "sub/vscode/a"])
 def test_lookalikes_do_not_ask(project, answers, rel: str) -> None:
     assert write_file(rel, "x").startswith("wrote")

@@ -53,6 +53,7 @@ different route (no pack resolves, vs. a pack resolves but is empty).
 
 from __future__ import annotations
 
+import configparser
 import logging
 import unicodedata
 from pathlib import Path
@@ -89,8 +90,8 @@ _MANAGED_NAMES = frozenset({".veles"})
 # explicit command (git hooks incl. the `.githooks`/pre-commit/lefthook
 # conventions, `.envrc`, editor tasks, dev containers) and the config of agent
 # CLIs (hooks, permissions, MCP servers they run outside Veles' trust ladder).
-# Matched as any path component, at any depth. Not covered: a custom
-# `core.hooksPath` directory with another name.
+# Matched as any path component, at any depth; `needs_confirmation` also covers
+# where a symlinked root entry points and the repo's `core.hooksPath`.
 _CONFIRM_NAMES = frozenset(
     {
         ".git",
@@ -191,12 +192,36 @@ def is_veles_managed(project: Project, path: str | Path) -> bool:
 
 def needs_confirmation(project: Project, path: str | Path) -> bool:
     """True iff a write to `path` needs a hard confirmation: a component of its
-    in-project path is one of `_CONFIRM_NAMES` (`.git/`, `.claude/`, `.envrc`, …)."""
+    in-project path is one of `_CONFIRM_NAMES` (`.git/`, `.claude/`, `.envrc`, …),
+    or it lies under what a symlinked root entry or `core.hooksPath` points at."""
+    abs_path = (project.root / path).resolve()
     try:
-        parts = (project.root / path).resolve().relative_to(project.root.resolve()).parts
+        parts = abs_path.relative_to(project.root.resolve()).parts
     except ValueError:
         return False
-    return any(_folded(part) in _CONFIRM_NAMES for part in parts)
+    if any(_folded(part) in _CONFIRM_NAMES for part in parts):
+        return True
+    return any(is_inside(abs_path, target, fold=True) for target in _protected_targets(project))
+
+
+def _protected_targets(project: Project) -> list[Path]:
+    """Where a root-level protected entry that is a symlink really points (the
+    guard sees resolved paths, so `.git -> gitdata` would hide `gitdata/hooks`),
+    plus the repo's `core.hooksPath`. An unreadable git config adds nothing."""
+    out = [
+        (project.root / name).resolve()
+        for name in _CONFIRM_NAMES
+        if (project.root / name).is_symlink()
+    ]
+    parser = configparser.ConfigParser(strict=False, interpolation=None)
+    try:
+        parser.read_string((project.root / ".git" / "config").read_text(encoding="utf-8"))
+        hooks = parser.get("core", "hooksPath", fallback="").strip()
+    except (OSError, UnicodeDecodeError, configparser.Error):
+        hooks = ""
+    if hooks:
+        out.append((project.root / Path(hooks).expanduser()).resolve())
+    return out
 
 
 def _state_verdict(project: Project, abs_path: Path) -> bool | None:
