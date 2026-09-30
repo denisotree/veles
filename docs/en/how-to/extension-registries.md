@@ -52,11 +52,13 @@ its license — and asks you to confirm through `confirm_critical`; installing
 code always goes through this gate, and `--yes` does not bypass it. Where an
 extension declares `requires` (pip packages), Veles prints the `uv tool
 install` command to run — it never installs Python dependencies for you.
-Each kind lands in its usual place: modules in
-`<project>/.veles/modules/<name>/`, skills in `<project>/.veles/skills/<name>/`
-(`--user` installs to `~/.veles/skills/<name>/` instead), layout packs in
-`~/.veles/layouts/<name>/`, and an `mcp` recipe as a
-`[mcp.servers.<name>]` block in the project's `config.toml`.
+Each kind lands in its usual place: modules in `<project>/.veles/modules/<name>/`
+and skills in `<project>/.veles/skills/<name>/` (`--user` installs either one to
+`~/.veles/{modules,skills}/<name>/` instead, loaded in every project), layout
+packs in `~/.veles/layouts/<name>/`, and an `mcp` recipe as a
+`[mcp.servers.<name>]` block in the project's `config.toml`. A user-level
+module is how you install a memory-provider module (Honcho, Mem0, Supermemory,
+…) — see [manage skills, tools & modules](manage-skills-and-tools.md#modules).
 
 The agent has the read-only half of this on its own: it can call
 `registry_search` to see what's available and propose `registry_install`, but

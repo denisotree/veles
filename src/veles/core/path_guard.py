@@ -40,6 +40,7 @@ on URL hostnames; file-system sandbox doesn't apply.
 from __future__ import annotations
 
 import os
+import unicodedata
 from pathlib import Path
 
 from veles.core.context import current_project
@@ -52,6 +53,24 @@ _SANDBOX_ENV = "VELES_SANDBOX_ROOTS"
 # directly (it doesn't go through `resolve_safe`), so daemon-internal
 # files stay accessible to the daemon process.
 _USER_ROOT_WHITELIST = ("skills", "locales")
+
+# The one definition of "control character" for path input: C0 (incl. \n,
+# \t, ESC) + DEL, C1, and the Unicode bidi-override/isolate characters. A
+# path smuggling one of these can forge a confirmation prompt or diff
+# preview (an ESC sequence rewrites the terminal line; a bidi override makes
+# the displayed path read differently from the bytes on disk). Checked
+# against the raw, unresolved input, before any filesystem work.
+_CONTROL_CHAR_RANGES: tuple[tuple[int, int], ...] = (
+    (0x00, 0x1F),  # C0 controls, incl. \n \t \x1b
+    (0x7F, 0x7F),  # DEL
+    (0x80, 0x9F),  # C1 controls
+    (0x202A, 0x202E),  # bidi override: LRE RLE PDF LRO RLO
+    (0x2066, 0x2069),  # bidi isolate: LRI RLI FSI PDI
+)
+
+
+def _has_control_char(s: str) -> bool:
+    return any(any(lo <= ord(c) <= hi for lo, hi in _CONTROL_CHAR_RANGES) for c in s)
 
 
 class SandboxViolation(RuntimeError):
@@ -101,9 +120,56 @@ def _is_within(child: Path, parent: Path) -> bool:
     return True
 
 
+def _closed_user_path(resolved: Path) -> bool:
+    """Inside `user_home()` but outside the whitelisted subdirs. Checked on its own,
+    not via the roots: a project root that contains `user_home()` (a project at `~`, or
+    `VELES_USER_HOME` inside the project) would otherwise swallow the whitelist in
+    `_dedupe` and open approvals, trust and modules to the agent. Decided by file
+    identity (`is_inside`), not by spelling."""
+    home = user_home()
+    if not is_inside(resolved, home, fold=True):  # refusing side: fold, over-refuse
+        return False
+    # Allowing side: exact names for a missing tail, so folding never widens the
+    # whitelist (on a case-sensitive FS `SKILLS` is a different, closed dir).
+    return not any(is_inside(resolved, home / n, fold=False) for n in _USER_ROOT_WHITELIST)
+
+
+def is_inside(target: Path, directory: Path, *, fold: bool) -> bool:
+    """Is `target` inside `directory`, as the filesystem sees it? `resolve()` keeps the
+    caller's spelling, and on a case- or normalization-insensitive FS (macOS APFS)
+    `.VELES` or an NFD `café` *is* the same dir — so the comparison is by identity
+    (`samefile`) of the nearest existing ancestor of `directory`. `directory` is
+    resolved first (a dangling `~/.veles -> dotfiles/veles` link then points at the
+    real, not yet created, location). The part of it that does not exist yet is
+    compared by name: case- and NFC-folded when `fold` (answers "yes" more often —
+    right for the refusing check), exactly otherwise (right for the allowing check)."""
+
+    def names(p: Path) -> list[str]:
+        parts = p.parts
+        return [unicodedata.normalize("NFC", s).casefold() for s in parts] if fold else list(parts)
+
+    directory = directory.resolve()
+    anchor = directory
+    while not anchor.exists() and anchor != anchor.parent:
+        anchor = anchor.parent
+    missing = names(directory.relative_to(anchor))
+    for ancestor in (target, *target.parents):
+        try:
+            if not ancestor.samefile(anchor):
+                continue
+        except OSError:  # this ancestor does not exist
+            continue
+        return names(target.relative_to(ancestor))[: len(missing)] == missing
+    return False
+
+
 def resolve_safe(path: str | Path) -> Path:
     """Resolve `path` and raise `SandboxViolation` if it escapes the sandbox.
 
+    Control characters (see `_CONTROL_CHAR_RANGES`) in the raw input are
+    refused first, before `..` traversal and before any filesystem work —
+    an ESC or bidi-override byte in a path can otherwise forge a
+    confirmation prompt or diff preview downstream.
     `..` traversal in the literal input is refused before resolution.
     Symlinks pointing outside the sandbox are caught after resolution.
     Non-existent targets are allowed (write_file needs that).
@@ -115,6 +181,9 @@ def resolve_safe(path: str | Path) -> Path:
     from veles.core.sanitize import sanitize
 
     raw = str(path)
+    if _has_control_char(raw):
+        # Never echo `raw` back — it's exactly the payload we're refusing.
+        raise SandboxViolation("path contains control characters")
     p = Path(raw).expanduser()
     if ".." in p.parts:
         raise SandboxViolation(
@@ -139,6 +208,11 @@ def resolve_safe(path: str | Path) -> Path:
         resolved = p.resolve(strict=False)
     except OSError as exc:
         raise SandboxViolation(f"cannot resolve {sanitize(raw)!r}: {exc}") from exc
+    if _closed_user_path(resolved):
+        raise SandboxViolation(
+            f"path {sanitize(str(resolved))} is Veles' own user state; only "
+            f"{', '.join(_USER_ROOT_WHITELIST)} under it are open to tools"
+        )
     roots = _get_sandbox_roots()
     for root in roots:
         if _is_within(resolved, root):

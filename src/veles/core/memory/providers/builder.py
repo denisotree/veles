@@ -1,24 +1,9 @@
-"""Factory for external memory providers (Tier δ, M55 follow-up).
+"""Build the external memory providers the user configured (`[memory.external.<name>]`).
 
-`build_extra_providers()` reads the user's `~/.veles/config.toml` for a
-`[memory.external]` section and constructs the configured adapters. The
-return value plugs directly into `MemoryRouter(extra_providers=...)`.
-
-Config shape (everything under `[memory.external]` is optional):
-
-    [memory.external.honcho]
-    api_key  = "..."
-    app_id   = "..."
-    user_id  = "your-user-id"
-    base_url = "https://demo.honcho.dev"   # optional
-
-    [memory.external.mem0]
-    api_key  = "..."
-    user_id  = "your-user-id"
-    agent_id = "veles"                     # optional
-
-Missing keys for an adapter → that adapter is skipped (no exception).
-Missing config file → empty list (current behaviour preserved).
+Providers come from modules: a module registers a factory with
+`api.add_memory_provider(name, factory)`; this builder calls it with the matching config
+section. A section with no registered factory means the provider's module is not installed —
+one warning per process says how to install it. A broken provider never breaks recall.
 """
 
 from __future__ import annotations
@@ -28,9 +13,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from veles.core.memory.providers.honcho import HonchoMemoryProvider
-from veles.core.memory.providers.mem0 import Mem0MemoryProvider
-from veles.core.memory.providers.supermemory import SupermemoryProvider
+_warned: set[str] = set()
 
 
 def _default_config_path() -> Path:
@@ -40,79 +23,60 @@ def _default_config_path() -> Path:
 
 
 def build_extra_providers(config_path: Path | None = None) -> list[object]:
-    """Construct configured external memory providers.
+    from veles.core.modules import current_module_registry
 
-    Returns a list of provider objects (duck-typed against `MemoryProvider`).
-    Empty list when no config is present or no provider section is filled.
-    """
     path = config_path or _default_config_path()
-    if not path.exists():
+    external = _external_sections(path)
+    if not external:
         return []
+    registry = current_module_registry()
+    if registry is None:
+        # No module registry at all (e.g. a command that runs without a project) —
+        # nothing can ever build these providers here, so warning about missing
+        # installs would just be noise every time such a command runs. Today every
+        # caller runs inside `_run_in_project`/`_bootstrap_daemon`, so this only
+        # guards future callers that might invoke this outside either.
+        return []
+    factories = {name: factory for name, _module, factory in registry.iter_memory_providers()}
+    providers: list[object] = []
+    for name, section in external.items():
+        factory = factories.get(name)
+        if factory is None:
+            _warn_once(
+                name,
+                f"external memory provider {name!r} is configured but its module is not "
+                f"installed: `veles registry install --user {name}`",
+            )
+            continue
+        try:
+            provider = factory(section if isinstance(section, dict) else {})
+        except Exception as exc:  # a broken provider must not break recall
+            # Built on every turn — say it once per process, not once per turn.
+            _warn_once(f"{name}:failed", f"memory provider {name!r} failed to start: {exc}")
+            continue
+        if provider is not None:
+            providers.append(provider)
+    return providers
+
+
+def _external_sections(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
     try:
         with path.open("rb") as f:
             data = tomllib.load(f)
     except (OSError, tomllib.TOMLDecodeError) as exc:
-        print(
-            f"warning: failed to parse {path} for external memory: {exc}",
-            file=sys.stderr,
-        )
-        return []
+        print(f"warning: failed to parse {path} for external memory: {exc}", file=sys.stderr)
+        return {}
     external = data.get("memory", {}).get("external", {}) if isinstance(data, dict) else {}
-    if not isinstance(external, dict):
-        return []
-    providers: list[object] = []
-    honcho = _build_honcho(external.get("honcho"))
-    if honcho is not None:
-        providers.append(honcho)
-    mem0 = _build_mem0(external.get("mem0"))
-    if mem0 is not None:
-        providers.append(mem0)
-    supermem = _build_supermemory(external.get("supermemory"))
-    if supermem is not None:
-        providers.append(supermem)
-    return providers
+    return external if isinstance(external, dict) else {}
 
 
-def _build_honcho(cfg: Any) -> HonchoMemoryProvider | None:
-    if not isinstance(cfg, dict):
-        return None
-    api_key = cfg.get("api_key")
-    app_id = cfg.get("app_id")
-    user_id = cfg.get("user_id")
-    if not (api_key and app_id and user_id):
-        return None
-    return HonchoMemoryProvider(
-        api_key=str(api_key),
-        app_id=str(app_id),
-        user_id=str(user_id),
-        base_url=str(cfg["base_url"]) if cfg.get("base_url") else None,
-    )
-
-
-def _build_mem0(cfg: Any) -> Mem0MemoryProvider | None:
-    if not isinstance(cfg, dict):
-        return None
-    api_key = cfg.get("api_key")
-    user_id = cfg.get("user_id")
-    if not (api_key and user_id):
-        return None
-    return Mem0MemoryProvider(
-        api_key=str(api_key),
-        user_id=str(user_id),
-        agent_id=str(cfg["agent_id"]) if cfg.get("agent_id") else None,
-    )
-
-
-def _build_supermemory(cfg: Any) -> SupermemoryProvider | None:
-    if not isinstance(cfg, dict):
-        return None
-    api_key = cfg.get("api_key")
-    if not api_key:
-        return None
-    return SupermemoryProvider(
-        api_key=str(api_key),
-        user_id=str(cfg["user_id"]) if cfg.get("user_id") else None,
-    )
+def _warn_once(key: str, message: str) -> None:
+    if key in _warned:
+        return
+    _warned.add(key)
+    print(f"warning: {message}", file=sys.stderr)
 
 
 __all__ = ["build_extra_providers"]

@@ -213,7 +213,22 @@ def test_create_message_passes_mcp_flags_when_mcp_wired(monkeypatch, tmp_path) -
     assert "--allowed-mcp-server-names" in cmd
     idx = cmd.index("--allowed-mcp-server-names")
     assert cmd[idx + 1] == "veles"
-    assert "--yolo" in cmd
+    _assert_veles_tools_only(cmd)
+
+
+def _assert_veles_tools_only(cmd: list[str]) -> None:
+    """Never `--yolo`; the admin policy allows the veles MCP server, denies the rest."""
+    import tomllib
+    from pathlib import Path
+
+    assert "--yolo" not in cmd
+    assert cmd[cmd.index("--approval-mode") + 1] == "default"
+    rules = tomllib.loads(Path(cmd[cmd.index("--admin-policy") + 1]).read_text())["rule"]
+    top = max(rules, key=lambda r: r["priority"])
+    assert (top["mcpName"], top["toolName"], top["decision"]) == ("veles", "*", "allow")
+    assert any(
+        r.get("toolName") == "*" and "mcpName" not in r and r["decision"] == "deny" for r in rules
+    )
 
 
 def test_create_message_omits_mcp_flags_when_no_mcp(monkeypatch) -> None:
@@ -223,7 +238,7 @@ def test_create_message_omits_mcp_flags_when_no_mcp(monkeypatch) -> None:
     p.create_message([Message(role="user", content="x")], model="m")
     cmd = captured["cmd"]
     assert "--allowed-mcp-server-names" not in cmd
-    assert "--yolo" not in cmd
+    _assert_veles_tools_only(cmd)
 
 
 def test_stream_message_passes_mcp_flags_when_mcp_wired(monkeypatch, tmp_path) -> None:
@@ -234,7 +249,7 @@ def test_stream_message_passes_mcp_flags_when_mcp_wired(monkeypatch, tmp_path) -
     list(p.stream_message([Message(role="user", content="x")], model="m"))
     cmd = captured["cmd"]
     assert "--allowed-mcp-server-names" in cmd
-    assert "--yolo" in cmd
+    _assert_veles_tools_only(cmd)
 
 
 def test_tools_warning_suppressed_when_mcp_settings_dir_present(

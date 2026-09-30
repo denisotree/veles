@@ -19,14 +19,20 @@ write-permission mechanism.
 
 `is_writable(project, path)` is the runtime check the builtin
 `write_file` tool (and any agent-generated write tool) consults
-before persisting bytes, via `_fs_write_guard.guard_write` — the single
+before persisting bytes, via `fs_write_guard.guard_write` — the single
 chokepoint every builtin write/move/delete tool calls. The read sandbox
 (`path_guard.py`) stays unchanged — read remains full-project.
 
 Always-writable zones, regardless of pack (even a pack that declares
 zones and would otherwise refuse these):
-- `<cwd>/.veles/`  — project memory, agent's own scratch space.
-- `AGENTS.md`      — the project's context file. Veles generates it for
+- `<cwd>/.veles/{skills,tools,tmp,plans,memory,artifacts}/` — the agent's
+  own skills, tools and scratch space (`AGENT_WRITABLE_STATE`). The rest of
+  `.veles/` (trust.json, config.toml, modules/, memory.db, …) is Veles'
+  state and always refused (`is_veles_managed`), whatever the pack says —
+  as is any nested `.veles/`. Auto-executed files and agent CLI config
+  (`.git/`, `.claude/`, `.envrc`, … — `needs_confirmation`) are writable only
+  after a hard confirmation.
+- `AGENTS.md`     — the project's context file. Veles generates it for
   every layout (`scaffold.apply_scaffold`), so the agent may edit it
   like any other file it generated, no matter how restrictive the pack's
   declared zones are. Matched exactly (not as a prefix) so lookalikes
@@ -48,17 +54,22 @@ different route (no pack resolves, vs. a pack resolves but is empty).
 from __future__ import annotations
 
 import logging
+import unicodedata
 from pathlib import Path
 
+from veles.core.path_guard import is_inside
 from veles.core.project import Project
 
 logger = logging.getLogger(__name__)
 
 
-# These always count as writable, no matter what the layout-pack
-# declares. `.veles/` is the agent's own state directory and
-# shouldn't depend on layout-pack declarations.
-_ALWAYS_WRITABLE_REL: tuple[str, ...] = (".veles/",)
+# The only subdirs of the project's `.veles/` the agent's file tools may write:
+# its own skills, tools, scratch, plans, memory notes and artifacts. They are
+# writable no matter what the layout pack declares. Everything else there —
+# trust.json, config.toml, project.toml, modules/, memory.db, any new file — is
+# Veles' own state: writing it would let the agent grant itself tools or load
+# code, so Veles changes it only through its own commands and core APIs.
+AGENT_WRITABLE_STATE: tuple[str, ...] = ("skills", "tools", "tmp", "plans", "memory", "artifacts")
 
 # Exact-match files that are always writable regardless of pack. Unlike
 # the directory prefixes above these are matched by full equality, so
@@ -67,11 +78,49 @@ _ALWAYS_WRITABLE_REL: tuple[str, ...] = (".veles/",)
 # the agent edits it like any other file it generated.
 _ALWAYS_WRITABLE_FILES: tuple[str, ...] = ("AGENTS.md",)
 
+# Tier 1 — never writable by the agent's file tools, at any depth in the project
+# (the active `.veles/` alone keeps its `AGENT_WRITABLE_STATE`): another Veles
+# state dir — run veles there and it loads the planted trust and modules.
+# Compared NFC + casefolded, like every name below.
+_MANAGED_NAMES = frozenset({".veles"})
+
+# Tier 2 — writable only after a hard confirmation (`confirm_critical`: no trust
+# grant or autopilot covers it, no human means no): files that run without an
+# explicit command (git hooks incl. the `.githooks`/pre-commit/lefthook
+# conventions, `.envrc`, editor tasks, dev containers) and the config of agent
+# CLIs (hooks, permissions, MCP servers they run outside Veles' trust ladder).
+# Matched as any path component, at any depth. Not covered: a custom
+# `core.hooksPath` directory with another name.
+_CONFIRM_NAMES = frozenset(
+    {
+        ".git",
+        ".githooks",
+        ".pre-commit-config.yaml",
+        "lefthook.yml",
+        "lefthook.yaml",
+        ".lefthook.yml",
+        ".lefthook.yaml",
+        ".claude",
+        ".gemini",
+        ".codex",
+        ".vscode",
+        ".devcontainer",
+        ".husky",
+        ".envrc",
+        ".mcp.json",
+    }
+)
+
+
+def _folded(name: str) -> str:
+    return unicodedata.normalize("NFC", name).casefold()
+
 
 def is_writable(project: Project, path: str | Path) -> bool:
     """True iff the agent may write to `path` under `project`'s active
-    layout-pack. Always-writable zones (`.veles/`, `AGENTS.md`) override
-    the pack's declaration regardless of what the pack declares.
+    layout-pack. Always-writable zones (`AGENT_WRITABLE_STATE` under `.veles/`,
+    `AGENTS.md`) override the pack's declaration; the rest of `.veles/` is
+    always refused.
 
     Otherwise this is a **universal, opt-in** contract: if the active
     pack declares `writable_zones` in its `layout.toml`, `path` must fall
@@ -91,14 +140,13 @@ def is_writable(project: Project, path: str | Path) -> bool:
         # Outside the project root — `path_guard` is the gate for
         # that. We say no here too for defence in depth.
         return False
+    in_state = _state_verdict(project, abs_path)
+    if in_state is not None:
+        return in_state
     rel_str = str(rel)
     # Normalise to forward slashes for the prefix check; Path's
     # `as_posix` does that without affecting filesystem behaviour.
     rel_posix = rel.as_posix() + ("/" if abs_path.is_dir() else "")
-
-    for prefix in _ALWAYS_WRITABLE_REL:
-        if rel_posix.startswith(prefix) or rel_str.startswith(prefix.rstrip("/")):
-            return True
 
     # Exact-match always-writable files (e.g. AGENTS.md). Compare the
     # slash-free posix form so a same-named directory wouldn't sneak in.
@@ -126,10 +174,59 @@ def writable_zones(project: Project) -> tuple[str, ...]:
     diagnostic surfaces (`veles doctor`, `/status` slash) so the
     user can see what the agent can touch."""
     pack_zones = _effective_writable_zones(project)
+    state = project.state_dir.name
     return (
-        _ALWAYS_WRITABLE_REL
+        tuple(f"{state}/{name}/" for name in AGENT_WRITABLE_STATE)
         + _ALWAYS_WRITABLE_FILES
         + tuple(z if z.endswith("/") else z + "/" for z in pack_zones)
+    )
+
+
+def is_veles_managed(project: Project, path: str | Path) -> bool:
+    """True iff `path` is Veles-managed, closed to the agent's file tools: the
+    project's `.veles/` outside `AGENT_WRITABLE_STATE`, or any path through a
+    nested `.veles/`."""
+    return _state_verdict(project, (project.root / path).resolve()) is False
+
+
+def needs_confirmation(project: Project, path: str | Path) -> bool:
+    """True iff a write to `path` needs a hard confirmation: a component of its
+    in-project path is one of `_CONFIRM_NAMES` (`.git/`, `.claude/`, `.envrc`, …)."""
+    try:
+        parts = (project.root / path).resolve().relative_to(project.root.resolve()).parts
+    except ValueError:
+        return False
+    return any(_folded(part) in _CONFIRM_NAMES for part in parts)
+
+
+def _state_verdict(project: Project, abs_path: Path) -> bool | None:
+    """None outside Veles-managed paths; inside the project's `.veles/`, whether
+    the agent may write there. Decided by file identity (`is_inside`), not
+    spelling, so `.VELES/trust.json` on a case-insensitive FS is still
+    trust.json. The refusing side folds a missing tail; the allowing side
+    compares it exactly, so folding never widens the allow-list. An allow-listed
+    name that is a symlink does not count: `.veles/tmp -> .veles` (or -> the
+    root) would otherwise open all of `.veles/`, and any link can be retargeted
+    after the check.
+
+    Any other path component named in `_MANAGED_NAMES` (a nested `sub/.veles/`)
+    is refused outright: Veles loads the nearest `.veles/project.toml` with its
+    trust and modules."""
+    state = project.state_dir
+    in_state = is_inside(abs_path, state, fold=True)
+    try:
+        parts = abs_path.relative_to(project.root.resolve()).parts
+    except ValueError:
+        parts = ()
+    # The active state dir's own first component keeps its allow-list below.
+    if any(_folded(part) in _MANAGED_NAMES for part in parts[1 if in_state else 0 :]):
+        return False
+    if not in_state:
+        return None
+    return any(
+        is_inside(abs_path, state / name, fold=False)
+        for name in AGENT_WRITABLE_STATE
+        if not (state / name).is_symlink()
     )
 
 
@@ -148,4 +245,4 @@ def _effective_writable_zones(project: Project) -> list[str]:
     return list(pack.manifest.writable_path_strings())
 
 
-__all__ = ["is_writable", "writable_zones"]
+__all__ = ["AGENT_WRITABLE_STATE", "is_veles_managed", "is_writable", "writable_zones"]

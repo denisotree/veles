@@ -1107,6 +1107,28 @@ def test_format_prompt_body_html_no_raw_dict() -> None:
     assert "&lt;mind-palace&gt;" in body
 
 
+@pytest.mark.parametrize("kind", ["trust", "approval", "critical"])
+def test_format_prompt_body_escapes_control_chars(kind: str) -> None:
+    """A bidi override or ESC in agent-controlled prompt text must reach
+    Telegram escaped, never raw — it could reorder what the user approves."""
+    from veles.channels.telegram._prompts import _format_prompt_body
+
+    evil = "rm -rf ~/‮gnp.txt\x1b[2K"
+    body = _format_prompt_body(
+        kind,
+        {
+            "tool": "run_shell‮",
+            "op": "op‮",
+            "summary": evil,
+            "reason": evil,
+            "arguments": {"command": evil, "k‮": {"nested": evil}},
+        },
+    )
+    assert "‮" not in body
+    assert "\x1b" not in body
+    assert "\\u202e" in body
+
+
 # ---- attachment / forward / aggregation (DOC-6) ----
 
 

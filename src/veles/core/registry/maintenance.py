@@ -17,13 +17,13 @@ from veles.core.registry.install import (
     describe,
     install,
     installed_records,
-    recipe_sha256,
     remove_installed,
     resolve_one_record,
 )
 from veles.core.registry.records import InstallRecord
 from veles.core.registry.repo import RegistryRepoError, diff_stat
 from veles.core.registry.versions import is_newer
+from veles.mcp.approvals import approve, recipe_hash
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,7 +149,7 @@ def upgrade(name: str, *, project: Project | None) -> InstallRecord | None:
         new = install(
             found,
             project=project,
-            user_scope=rec.project is None and rec.kind == "skill",
+            user_scope=rec.project is None and rec.kind in ("module", "skill"),
             confirmed=True,
         )
     except BaseException:
@@ -169,7 +169,7 @@ def _drift(rec: InstallRecord) -> Issue | None:
         recipe = _read_mcp_recipe(Path(config_path), rec.name)
         if recipe is None:
             return Issue(rec, "missing", f"[mcp.servers.{rec.name}] is gone from {config_path}")
-        if recipe_sha256(recipe) != rec.tree_sha256:
+        if recipe_hash(recipe) != rec.tree_sha256:
             return Issue(rec, "modified", f"[mcp.servers.{rec.name}] was edited")
         return None
     path = Path(rec.path)
@@ -238,4 +238,8 @@ def _restore(rec: InstallRecord, backup: _Backup) -> None:
         data = load_optional_toml(config_path)
         data.setdefault("mcp", {}).setdefault("servers", {})[rec.name] = recipe
         atomic_write_text(config_path, dump_toml(data))
+        # Uninstall revoked the approval; give it back only for the recipe the
+        # install confirmed — a hand-edited one stays unapproved (fail closed).
+        if rec.project is not None and recipe_hash(recipe) == rec.tree_sha256:
+            approve(Path(rec.project), rec.name, recipe)
     put_record(rec)

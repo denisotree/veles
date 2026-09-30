@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -158,6 +159,47 @@ def test_load_module_raises_when_register_not_callable(tmp_path: Path) -> None:
     handles = discover_modules(project)
     with pytest.raises(ModuleLoadError, match="not callable"):
         load_module(handles[0], ModuleRegistry())
+
+
+def test_load_module_future_annotations_dataclass_slots(tmp_path: Path) -> None:
+    """`from __future__ import annotations` + `dataclass(slots=True)` needs the
+    module registered in `sys.modules` before exec, or dataclass's annotation
+    resolution crashes looking up `sys.modules[cls.__module__]`."""
+    project = init_project(tmp_path / "p", name="p")
+    project.modules_dir.mkdir(parents=True, exist_ok=True)
+    _write_module(
+        project.modules_dir,
+        "sloty",
+        body=(
+            "from __future__ import annotations\n"
+            "from dataclasses import dataclass\n"
+            "\n"
+            "@dataclass(slots=True)\n"
+            "class P:\n"
+            "    x: int\n"
+            "\n"
+            "def register(api):\n"
+            "    P(x=1)\n"
+        ),
+    )
+    handles = discover_modules(project)
+    registry = ModuleRegistry()
+    load_module(handles[0], registry)
+    assert registry.modules == ["sloty"]
+
+
+def test_load_module_removes_sys_modules_entry_on_register_failure(tmp_path: Path) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    project.modules_dir.mkdir(parents=True, exist_ok=True)
+    _write_module(
+        project.modules_dir,
+        "boom2",
+        body="def register(api):\n    raise RuntimeError('nope')\n",
+    )
+    handles = discover_modules(project)
+    with pytest.raises(ModuleLoadError):
+        load_module(handles[0], ModuleRegistry())
+    assert "_veles_module_boom2" not in sys.modules
 
 
 # ---- ModuleRegistry / ModuleAPI ----

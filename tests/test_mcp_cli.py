@@ -8,6 +8,8 @@ import pytest
 
 from veles.cli.commands import mcp as mcp_cmd
 from veles.core.project import Project, init_project
+from veles.mcp.approvals import approve
+from veles.mcp.config import load_raw_mcp_servers
 
 
 @pytest.fixture()
@@ -22,6 +24,9 @@ def _ns(**fields):
 def _write_config(project: Project, text: str) -> None:
     project.state_dir.mkdir(parents=True, exist_ok=True)
     (project.state_dir / "config.toml").write_text(text, encoding="utf-8")
+    # These tests exercise probing; approval gating lives in test_mcp_approvals.py.
+    for name, raw in load_raw_mcp_servers(project).items():
+        approve(project.root, name, raw)
 
 
 # ---- list ----

@@ -82,7 +82,7 @@ def test_failed_dot_git_removal_rolls_back_completely(tmp_path: Path) -> None:
     locked.chmod(0o555)  # copytree keeps the mode, so the copy's .git can't be emptied
     try:
         with pytest.raises(OSError):
-            install_module_from_source(str(src), project=project)
+            install_module_from_source(str(src), modules_dir=project.modules_dir)
     finally:
         locked.chmod(0o755)
     assert not (project.modules_dir / "fixture-demo").exists()
@@ -111,7 +111,9 @@ def test_rollback_never_chmods_outside_the_target(tmp_path: Path) -> None:
 def test_install_from_local_directory_succeeds(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     src = _make_module_fixture(tmp_path / "src", name="logger")
-    handle = install_module_from_source(str(src), project=project, name_override="logger")
+    handle = install_module_from_source(
+        str(src), modules_dir=project.modules_dir, name_override="logger"
+    )
     assert handle.name == "logger"
     assert (project.modules_dir / "logger" / "module.toml").is_file()
     assert (project.modules_dir / "logger" / "main.py").is_file()
@@ -120,9 +122,11 @@ def test_install_from_local_directory_succeeds(tmp_path: Path) -> None:
 def test_install_rejects_existing_non_empty_target(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     src = _make_module_fixture(tmp_path / "src", name="logger")
-    install_module_from_source(str(src), project=project, name_override="logger")
+    install_module_from_source(str(src), modules_dir=project.modules_dir, name_override="logger")
     with pytest.raises(ModuleInstallError, match="already exists"):
-        install_module_from_source(str(src), project=project, name_override="logger")
+        install_module_from_source(
+            str(src), modules_dir=project.modules_dir, name_override="logger"
+        )
 
 
 def test_install_cleans_up_when_manifest_missing(tmp_path: Path) -> None:
@@ -131,7 +135,7 @@ def test_install_cleans_up_when_manifest_missing(tmp_path: Path) -> None:
     src.mkdir()
     (src / "main.py").write_text("def register(api): pass", encoding="utf-8")
     with pytest.raises(ModuleInstallError, match=r"no module\.toml"):
-        install_module_from_source(str(src), project=project, name_override="bad")
+        install_module_from_source(str(src), modules_dir=project.modules_dir, name_override="bad")
     assert not (project.modules_dir / "bad").exists()
 
 
@@ -144,7 +148,7 @@ def test_install_cleans_up_when_entrypoint_file_missing(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with pytest.raises(ModuleInstallError, match="entrypoint file"):
-        install_module_from_source(str(src), project=project, name_override="mod")
+        install_module_from_source(str(src), modules_dir=project.modules_dir, name_override="mod")
     assert not (project.modules_dir / "mod").exists()
 
 
@@ -154,7 +158,9 @@ def test_install_cleans_up_when_manifest_invalid(tmp_path: Path) -> None:
     src.mkdir()
     (src / "module.toml").write_text("[module\nname = 'broken'", encoding="utf-8")
     with pytest.raises(ModuleInstallError, match="manifest validation"):
-        install_module_from_source(str(src), project=project, name_override="broken")
+        install_module_from_source(
+            str(src), modules_dir=project.modules_dir, name_override="broken"
+        )
     assert not (project.modules_dir / "broken").exists()
 
 
@@ -168,26 +174,26 @@ def test_install_rejects_entrypoint_outside_module(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with pytest.raises(ModuleInstallError, match="outside"):
-        install_module_from_source(str(src), project=project, name_override="esc")
+        install_module_from_source(str(src), modules_dir=project.modules_dir, name_override="esc")
     assert not (project.modules_dir / "esc").exists()
 
 
 def test_install_rejects_unknown_source_format(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     with pytest.raises(ModuleInstallError, match="neither a git URL nor a directory"):
-        install_module_from_source("nonexistent-thing-xyz", project=project)
+        install_module_from_source("nonexistent-thing-xyz", modules_dir=project.modules_dir)
 
 
 def test_remove_existing_module_deletes_directory(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     src = _make_module_fixture(tmp_path / "src", name="logger")
-    install_module_from_source(str(src), project=project, name_override="logger")
+    install_module_from_source(str(src), modules_dir=project.modules_dir, name_override="logger")
     assert (project.modules_dir / "logger").is_dir()
-    remove_module("logger", project=project)
+    remove_module("logger", modules_dir=project.modules_dir)
     assert not (project.modules_dir / "logger").exists()
 
 
 def test_remove_nonexistent_module_raises(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     with pytest.raises(ModuleNotFoundError):
-        remove_module("ghost", project=project)
+        remove_module("ghost", modules_dir=project.modules_dir)

@@ -8,6 +8,8 @@ from veles.core.project import init_project
 from veles.core.project_config import save_project_config
 from veles.core.tools.loader import load_into_registry
 from veles.core.tools.registry import Registry
+from veles.mcp.approvals import approve, revoke
+from veles.mcp.config import load_raw_mcp_servers
 from veles.mcp.provision import ensure_mcp_project_tools
 
 
@@ -17,7 +19,15 @@ def _graphify_project(tmp_path: Path):
         project,
         {"mcp": {"servers": {"graphify": {"command": "graphify-mcp", "args": ["graph.json"]}}}},
     )
+    approve(project.root, "graphify", load_raw_mcp_servers(project)["graphify"])
     return project
+
+
+def test_no_provision_for_unapproved_graphify(tmp_path: Path) -> None:
+    project = _graphify_project(tmp_path)
+    revoke(project.root, "graphify")
+    assert ensure_mcp_project_tools(project) == []
+    assert not (project.state_dir / "tools" / "graphify_rebuild.py").exists()
 
 
 def test_provisions_graphify_tool_when_configured(tmp_path: Path) -> None:

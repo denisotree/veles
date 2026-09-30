@@ -8,8 +8,6 @@ does not.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import shutil
 from pathlib import Path
 
@@ -30,7 +28,8 @@ from veles.core.registry.model import EXTENSION_FILE
 from veles.core.registry.records import InstallRecord, drop_record, load_records, put_record
 from veles.core.registry.repo import RegistryRepoError, fetch_git_source
 from veles.core.registry.versions import satisfies
-from veles.core.user_paths import user_home, user_skills_dir
+from veles.core.user_paths import user_home, user_modules_dir, user_skills_dir
+from veles.mcp.approvals import approve, describe_recipe, recipe_hash, revoke
 
 
 class InstallError(RuntimeError):
@@ -52,6 +51,9 @@ def describe(found: Found) -> str:
         lines.append(f"  pip requirements: {', '.join(ext.requires)}")
     if ext.kind == "module":
         lines.append("  A module's code runs inside Veles on every turn. Review it first.")
+    if ext.kind == "mcp" and ext.mcp is not None:
+        # Installing approves this exact recipe — the user must see all of it.
+        lines.append(describe_recipe(ext.name, dict(ext.mcp)))
     return "\n".join(lines)
 
 
@@ -81,7 +83,7 @@ def install(
         raise InstallError(
             f"{found.ref} requires Veles {ext.requires_veles}; this is {__version__}"
         )
-    needs_project = ext.kind in ("module", "mcp") or (ext.kind == "skill" and not user_scope)
+    needs_project = ext.kind == "mcp" or (ext.kind in ("module", "skill") and not user_scope)
     if needs_project and project is None:
         raise InstallError(f"installing a {ext.kind} needs a project (run inside one)")
     # Cheap collision checks run before the confirmation prompt — no point asking the
@@ -173,6 +175,8 @@ def remove_installed(rec: InstallRecord) -> None:
             _drop_mcp_server(Path(config_path), rec.name)
         except OSError as exc:
             raise InstallError(f"could not remove {rec.path}: {exc}") from exc
+        if rec.project is not None:
+            revoke(Path(rec.project), rec.name)
     else:
         path = Path(rec.path)
         if path.exists():
@@ -189,6 +193,8 @@ def _target_dir(found: Found, project: Project | None, *, user_scope: bool) -> P
         return user_home() / "layouts" / name
     if kind == "skill" and user_scope:
         return user_skills_dir() / name
+    if kind == "module" and user_scope:
+        return user_modules_dir() / name
     assert project is not None
     return (project.modules_dir if kind == "module" else project.skills_dir) / name
 
@@ -220,7 +226,7 @@ def _install_mcp(found: Found, project: Project) -> InstallRecord:
     rec = _record(
         found,
         path=f"{project_config_path(project).resolve()}#mcp.servers.{name}",
-        digest=recipe_sha256(found.ext.mcp),
+        digest=recipe_hash(found.ext.mcp),
         project=project,
     )
     try:
@@ -228,11 +234,9 @@ def _install_mcp(found: Found, project: Project) -> InstallRecord:
     except OSError as exc:
         _drop_mcp_server(project_config_path(project), name)
         raise InstallError(f"{found.ref}: could not record install: {exc}") from exc
+    # The install passed `confirm_critical` on this exact recipe — that is the approval.
+    approve(project.root, name, servers[name])
     return rec
-
-
-def recipe_sha256(recipe: dict[str, object]) -> str:
-    return hashlib.sha256(json.dumps(recipe, sort_keys=True).encode()).hexdigest()
 
 
 def _drop_mcp_server(config_path: Path, name: str) -> None:

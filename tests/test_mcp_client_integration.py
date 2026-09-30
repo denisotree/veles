@@ -104,6 +104,10 @@ def test_mount_mcp_tools_end_to_end(tmp_path: Path) -> None:
         "connect_timeout_s = 30\n",
         encoding="utf-8",
     )
+    from veles.mcp.approvals import approve
+    from veles.mcp.config import load_raw_mcp_servers
+
+    approve(project.root, "fake", load_raw_mcp_servers(project)["fake"])
     reg = Registry()
     try:
         names = runtime.mount_mcp_tools(reg, project)

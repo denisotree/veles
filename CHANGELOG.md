@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-09-30
+
+User-level modules, memory providers moved to the registry, and the agent can no longer
+raise its own permissions through project files or a delegated CLI.
+
+### Added
+
+- User-level modules in `~/.veles/modules/`: loaded in every project, through the same approval
+  gate as project modules. `veles registry install --user <module>` and
+  `veles module {list,show,add,remove,approve} --user`; `veles module list` (no flag) shows both
+  scopes with a `scope` column. Every module passes the approval gate before names are
+  compared: an approved project module with the same name overrides a user-level one (with a
+  warning), an unapproved one is skipped and the user-level module loads; two approved modules at
+  the same scope sharing a name — the first loads, the rest warn.
+- Modules can register external memory providers: `api.add_memory_provider(name, factory)`. The
+  name must match a `[memory.external.<name>]` section in `~/.veles/config.toml`; the factory
+  receives that section as a `dict` and returns a provider (or `None` to skip it). `MemoryProvider`,
+  `IngestingMemoryProvider` and `RecallHit` (`veles.core.memory.provider`) are the public protocol
+  a module's provider implements.
+
+### Removed
+
+- Built-in Honcho, Mem0 and Supermemory memory providers — they are registry modules now
+  (`veles registry install --user {honcho,mem0,supermemory}`).
+
+### Security
+
+- The agent's file tools can no longer write Veles' own files in the project's `.veles/`
+  (`trust.json`, `config.toml`, `project.toml`, `modules/`, `wiki.toml`, …): only `skills/`,
+  `tools/`, `tmp/`, `plans/`, `memory/` and `artifacts/` stay writable there. Case, `..` and
+  symlink spellings of a closed file are refused; `wiki_rename_page` works only on wiki pages.
+  Any other `.veles/` in the project (a subproject's, or one planted in `wiki/`) is refused at
+  any depth.
+- Files that run on their own or steer an agent CLI — anything under `.git/`, `.githooks/`,
+  `.claude/`, `.gemini/`, `.codex/`, `.vscode/`, `.devcontainer/`, `.husky/`, and `.envrc`,
+  `.mcp.json`, `.pre-commit-config.yaml`, `lefthook.yml` — at any depth are written by the
+  agent's file tools only after you confirm; trust grants and autopilot don't cover it.
+- The `claude-cli` and `gemini-cli` providers run as a model with Veles' tools only: claude
+  starts `--restricted --strict-mcp-config --tools ""` in the project root (no built-in tools,
+  no project `.claude/` settings or hooks, no `.mcp.json` servers); gemini starts without
+  `--yolo` under an admin policy that allows the Veles MCP server and denies its own tools.
+- The Veles MCP server (what the delegated CLIs call) runs every tool call through the trust
+  ladder; before, `run_shell`, `write_file` and `fetch_url` ran there without it.
+- Multi-line values in the trust/approval prompt and critical confirmations are indented, so
+  they can't fake the prompt's own lines; Telegram prompts escape control characters too.
+- MCP servers from `[mcp.servers.*]` start only after `veles mcp approve <name>`, which shows
+  the full recipe; editing the recipe needs a new approval. `veles mcp list` has an `approved`
+  column; `veles registry install`/`uninstall` of an MCP extension approves/revokes it.
+- Paths with control characters (terminal escapes, C1, bidi overrides) are refused by the
+  sandbox; critical confirmations, the trust/approval prompt and the diff preview escape
+  control characters, so a tool call can't forge the text you approve.
+
+### Upgrading from 1.1
+
+- Agent file tools no longer edit `.veles/` config files — change them with `veles` commands
+  (`veles trust`, `veles route`, `veles mcp approve`, `veles module`, …) or by hand.
+- With `--provider claude-cli`/`gemini-cli` the delegated CLI no longer uses its own shell,
+  file-edit or web tools — the agent works through Veles' tools, and nobody can answer a trust
+  prompt there: grant what it needs up front (`veles trust set write_file --scope project`). `claude-cli` needs a Claude
+  Code that has `--restricted` for the full isolation; older versions fall back to
+  `--setting-sources user --tools ""`.
+- Project MCP servers (`[mcp.servers.*]`) start only after `veles mcp approve <name>` — an
+  unapproved or edited recipe is skipped with a warning. Approve each server you already use once.
+- If `~/.veles/config.toml` has `[memory.external.<name>]`, install the provider once:
+  `veles registry install --user <name>` (honcho, mem0 or supermemory). Until then Veles prints one
+  warning per provider and recalls without it. The install prints a
+  `uv tool install veles-ai --with '<package>'` command for the provider's SDK — run it too, even
+  if you already had the SDK installed for the built-in provider: minimum versions moved to
+  `mem0ai>=2.0`, `honcho-ai>=2.5`, `supermemory>=3.62`, and an older SDK will fail recalls.
+- Honcho's config keys changed: `app_id`/`user_id` are gone, replaced by `workspace_id` (and an
+  optional `peer_id` to search only that peer's messages). Update
+  `[memory.external.honcho]` before installing the module.
+
 ## [1.1.0] — 2026-09-29
 
 Extension registries: find, install, update and verify reviewed extensions from git

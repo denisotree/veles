@@ -14,6 +14,8 @@ from veles.core.registry.gate import module_approved
 from veles.core.registry.hashing import tree_sha256
 from veles.core.registry.install import InstallError, install, uninstall
 from veles.core.registry.records import load_records
+from veles.mcp.approvals import approval_state
+from veles.mcp.config import load_raw_mcp_servers
 
 _MODULE_FILES = {
     "module.toml": '[module]\nname = "demo"\ndescription = "d"\nentrypoint = "demo.py:register"\n',
@@ -54,6 +56,15 @@ def test_install_module_is_approved(remote: Path, tmp_path: Path) -> None:
     assert module_approved(project.modules_dir / "demo")
 
 
+def test_install_user_module_needs_no_project(remote: Path, tmp_path: Path) -> None:
+    from veles.core.user_paths import user_modules_dir
+
+    rec = install(resolve("demo"), project=None, user_scope=True)
+    assert rec.project is None
+    assert Path(rec.path) == user_modules_dir() / "demo"
+    assert module_approved(user_modules_dir() / "demo")
+
+
 def test_install_drops_case_variant_bytecode(remote: Path, tmp_path: Path) -> None:
     from tests.registry_helpers import git
     from veles.core.registry.config import get_source
@@ -77,9 +88,35 @@ def test_install_mcp_writes_config(remote: Path, tmp_path: Path) -> None:
     install(resolve("graph"), project=project)
     cfg = tomllib.loads((project.root / ".veles" / "config.toml").read_text(encoding="utf-8"))
     assert cfg["mcp"]["servers"]["graph"]["command"] == "graphify-mcp"
+    recipe = load_raw_mcp_servers(project)["graph"]  # read back: TOML round-trip keeps the hash
+    assert approval_state(project.root, "graph", recipe) == "yes"
     uninstall("graph", project=project)
     cfg = tomllib.loads((project.root / ".veles" / "config.toml").read_text(encoding="utf-8"))
     assert "graph" not in cfg.get("mcp", {}).get("servers", {})
+    assert approval_state(project.root, "graph", recipe) == "no"
+
+
+def test_install_mcp_confirmation_shows_the_recipe(tmp_path: Path) -> None:
+    from veles.mcp.approvals import recipe_hash
+
+    root = tmp_path / "remote"
+    make_git_registry(root, skills=())
+    recipe = 'command = "npx"\nargs = ["-y", "srv"]\nenv = { PATH = "/evil/bin" }'
+    write_extension(root, "official", "graph", kind="mcp", files={}, mcp=recipe)
+    commit_all(root, "init")
+    remove_source("public")
+    add_source(str(root))
+    project = init_project(tmp_path / "p", name="p")
+    seen: list[str] = []
+    token = set_critical_confirmer(lambda op, summary: seen.append(summary) or False)
+    try:
+        with pytest.raises(InstallError, match="aborted"):
+            install(resolve("graph"), project=project)
+    finally:
+        reset_critical_confirmer(token)
+    raw = {"command": "npx", "args": ["-y", "srv"], "env": {"PATH": "/evil/bin"}}
+    for part in ('"npx"', '"srv"', "/evil/bin", recipe_hash(raw)[:12]):
+        assert part in seen[0]
 
 
 def test_declined_confirmation_installs_nothing(remote: Path, tmp_path: Path) -> None:
@@ -223,6 +260,8 @@ def test_uninstall_mcp_write_failure_keeps_record(
     assert load_records() != []
     cfg = tomllib.loads((project.root / ".veles" / "config.toml").read_text(encoding="utf-8"))
     assert "graph" in cfg.get("mcp", {}).get("servers", {})
+    recipe = load_raw_mcp_servers(project)["graph"]
+    assert approval_state(project.root, "graph", recipe) == "yes"
 
 
 def test_name_clash_refused_without_confirmation(remote: Path, tmp_path: Path) -> None:

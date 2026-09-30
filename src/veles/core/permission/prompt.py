@@ -22,6 +22,8 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from veles.core.text import shown, shown_multiline
+
 PromptKind = Literal["trust", "approval"]
 
 PromptDecision = Literal[
@@ -87,21 +89,32 @@ def format_prompt_body(
     are JSON-dumped (indent=2) and truncated the same way. Empty args
     render as `Arguments: (none)`.
 
+    `tool_name`/argument keys are agent-controlled but expected one-line, so
+    they go through `shown()`; `reason` and argument values can legitimately
+    span multiple lines (a JSON-dumped dict, a multi-line reason), so those
+    go through `shown_multiline()` — either way a control character (ESC,
+    bidi override, …) an agent puts in a tool call can't forge this prompt
+    or the confirmation that follows it. Continuation lines of a multi-line
+    reason or value are indented under a `│` gutter, so a value can't print a
+    line that passes for a top-level `Reason:` / `Arguments:` line.
+
     The Telegram channel formats arguments separately via
     `_render_prompt_args` (HTML, harder limit) — this helper is for
-    plain-text surfaces (TUI body, CLI stderr).
+    plain-text surfaces (TUI body, CLI stderr). The daemon's unified/critical
+    prompters (`daemon/channel_prompter.py`) don't call this helper either —
+    they send `tool_name`/`arguments`/`reason` as JSON event payload fields,
+    and each client that renders them escapes them itself (Telegram:
+    `channels/telegram/_prompts.py`).
     """
 
-    lines = [
-        f"Tool: {req.tool_name}",
-        f"Reason: {req.reason or '(unspecified)'}",
-    ]
+    reason = _continued(shown_multiline(req.reason)) if req.reason else "(unspecified)"
+    lines = [f"Tool: {shown(req.tool_name)}", f"Reason: {reason}"]
     if not req.arguments:
         lines.append("Arguments: (none)")
     else:
         lines.append("Arguments:")
         for key, value in req.arguments.items():
-            lines.append(f"  {key}: {_render_value(value, max_value_chars)}")
+            lines.append(f"  {shown(str(key))}: {_render_value(value, max_value_chars)}")
     return "\n".join(lines)
 
 
@@ -113,9 +126,17 @@ def _render_value(value: Any, max_chars: int) -> str:
             text = _json.dumps(value, indent=2, ensure_ascii=False, default=str)
         except (TypeError, ValueError):
             text = repr(value)
+    # Truncate the raw value first so `max_chars`/`total N chars` still count
+    # real characters, then escape — a control character split by the cut
+    # just doesn't get escaped on the discarded side.
     if len(text) > max_chars:
-        return f"{text[:max_chars]}… (total {len(text)} chars)"
-    return text
+        text = f"{text[:max_chars]}… (total {len(text)} chars)"
+    return _continued(shown_multiline(text))
+
+
+def _continued(text: str) -> str:
+    """`text` with every line after the first under an indented `│` gutter."""
+    return text.replace("\n", "\n    │ ")
 
 
 # ---------------- prompter ContextVar ----------------

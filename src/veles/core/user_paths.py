@@ -53,11 +53,17 @@ def user_skills_dir() -> Path:
     return user_home() / "skills"
 
 
+def user_modules_dir() -> Path:
+    """`~/.veles/modules/` — user-level modules, loaded in every project."""
+    return user_home() / "modules"
+
+
 __all__ = [
     "USER_HOME_ENV",
     "user_home",
     "user_locales_dir",
     "user_logs_dir",
+    "user_modules_dir",
     "user_skills_dir",
     "user_themes_dir",
 ]

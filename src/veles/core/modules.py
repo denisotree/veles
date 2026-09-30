@@ -33,6 +33,7 @@ from veles.core.module_manifest import (
     parse_manifest,
 )
 from veles.core.project import Project
+from veles.core.text import shown
 
 HOOK_NAMES: tuple[str, ...] = (
     "pre_turn",
@@ -70,11 +71,13 @@ class VetoResult:
 
 
 HookFn = Callable[[dict[str, Any]], VetoResult | None]
+ProviderFactory = Callable[[dict[str, Any]], object | None]
 
 
 class ModuleRegistry:
     def __init__(self) -> None:
         self._hooks: dict[str, list[tuple[str, HookFn]]] = {n: [] for n in HOOK_NAMES}
+        self._memory_providers: dict[str, tuple[str, ProviderFactory]] = {}
         self.modules: list[str] = []
 
     def add_hook(self, hook_name: str, module_name: str, fn: HookFn) -> None:
@@ -84,6 +87,45 @@ class ModuleRegistry:
 
     def iter_hooks(self, hook_name: str) -> Iterator[tuple[str, HookFn]]:
         return iter(self._hooks.get(hook_name, []))
+
+    def add_memory_provider(self, name: str, module_name: str, factory: ProviderFactory) -> None:
+        from veles.core.registry.model import is_slug
+
+        if not is_slug(name):
+            raise ValueError(f"memory provider name {name!r} must match [a-z0-9][a-z0-9-]*")
+        if name in self._memory_providers:
+            owner = self._memory_providers[name][0]
+            raise ValueError(f"memory provider {name!r} is already registered by {owner!r}")
+        self._memory_providers[name] = (module_name, factory)
+
+    def iter_memory_providers(self) -> Iterator[tuple[str, str, ProviderFactory]]:
+        for name, (module_name, factory) in self._memory_providers.items():
+            yield name, module_name, factory
+
+    def merge_from(self, other: ModuleRegistry, module_name: str) -> None:
+        """Fold `other` (a scratch registry a single module's `register()` populated)
+        into self, then record `module_name` as loaded.
+
+        Called only once `register()` has returned without raising, so this is the one
+        moment a module's registrations become visible outside its own load attempt —
+        `load_module` builds each module a fresh scratch `ModuleRegistry`, and only a
+        clean `register()` return reaches this call, making registration atomic: a
+        module that raises never leaves hooks or providers behind (`api.add_hook` /
+        `api.add_memory_provider` only ever mutate the scratch copy).
+
+        A memory-provider name that collides with one already in self is treated as a
+        load failure too: raises `ValueError` (the caller turns it into a
+        `ModuleLoadError`) before anything is merged, so a colliding module leaves
+        nothing behind either — checked first so the merge itself is all-or-nothing.
+        """
+        for name in other._memory_providers:
+            if name in self._memory_providers:
+                owner = self._memory_providers[name][0]
+                raise ValueError(f"memory provider {name!r} is already registered by {owner!r}")
+        for hook_name, entries in other._hooks.items():
+            self._hooks[hook_name].extend(entries)
+        self._memory_providers.update(other._memory_providers)
+        self.modules.append(module_name)
 
 
 class ModuleAPI:
@@ -95,6 +137,9 @@ class ModuleAPI:
 
     def add_hook(self, hook_name: str, fn: HookFn) -> None:
         self._registry.add_hook(hook_name, self._module_name, fn)
+
+    def add_memory_provider(self, name: str, factory: ProviderFactory) -> None:
+        self._registry.add_memory_provider(name, self._module_name, factory)
 
 
 # ---- ContextVar for the active registry ----
@@ -120,9 +165,8 @@ def reset_module_registry(token: Token) -> None:
 # ---- Discovery / loading ----
 
 
-def discover_modules(project: Project) -> list[ModuleHandle]:
-    """Scan `<project>/.veles/modules/`. Skip directories with bad manifest."""
-    root = project.modules_dir
+def discover_modules_in(root: Path) -> list[ModuleHandle]:
+    """Modules in one directory (`<root>/<name>/module.toml`). Bad manifests are skipped."""
     if not root.is_dir():
         return []
     out: list[ModuleHandle] = []
@@ -135,10 +179,15 @@ def discover_modules(project: Project) -> list[ModuleHandle]:
         try:
             manifest = parse_manifest(manifest_path.read_text(encoding="utf-8"))
         except ManifestError as exc:
-            print(f"warning: skipping module at {entry}: {exc}", file=sys.stderr)
+            print(f"warning: skipping module at {shown(entry)}: {shown(exc)}", file=sys.stderr)
             continue
         out.append(ModuleHandle(name=manifest.name, manifest=manifest, dir=entry))
     return out
+
+
+def discover_modules(project: Project) -> list[ModuleHandle]:
+    """Scan `<project>/.veles/modules/`."""
+    return discover_modules_in(project.modules_dir)
 
 
 def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
@@ -153,21 +202,34 @@ def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
     if spec is None or spec.loader is None:
         raise ModuleLoadError(f"could not build import spec for {file_path}")
     module = importlib.util.module_from_spec(spec)
+    # Standard importlib recipe: register in sys.modules before exec so
+    # annotation resolution (e.g. `from __future__ import annotations` +
+    # `dataclass(slots=True)`) can find the module via sys.modules[cls.__module__].
+    # Removed again on any failure below so a failed module leaves nothing behind.
+    sys.modules[spec.name] = module
     try:
-        spec.loader.exec_module(module)
-    except Exception as exc:
-        raise ModuleLoadError(f"failed to import {file_path}: {exc}") from exc
-    register = getattr(module, func_part, None)
-    if not callable(register):
-        raise ModuleLoadError(
-            f"entrypoint {handle.manifest.entrypoint!r} resolved but is not callable"
-        )
-    api = ModuleAPI(registry, handle.name)
-    try:
-        register(api)
-    except Exception as exc:
-        raise ModuleLoadError(f"register() raised {type(exc).__name__}: {exc}") from exc
-    registry.modules.append(handle.name)
+        try:
+            spec.loader.exec_module(module)
+        except Exception as exc:
+            raise ModuleLoadError(f"failed to import {file_path}: {exc}") from exc
+        register = getattr(module, func_part, None)
+        if not callable(register):
+            raise ModuleLoadError(
+                f"entrypoint {handle.manifest.entrypoint!r} resolved but is not callable"
+            )
+        scratch = ModuleRegistry()
+        api = ModuleAPI(scratch, handle.name)
+        try:
+            register(api)
+        except Exception as exc:
+            raise ModuleLoadError(f"register() raised {type(exc).__name__}: {exc}") from exc
+        try:
+            registry.merge_from(scratch, handle.name)
+        except ValueError as exc:
+            raise ModuleLoadError(str(exc)) from exc
+    except BaseException:
+        sys.modules.pop(spec.name, None)
+        raise
 
 
 # ---- Hook firing ----
@@ -196,7 +258,7 @@ def fire_hook(hook_name: str, /, **ctx: Any) -> VetoResult | None:
         except Exception as exc:
             print(
                 f"warning: module {module_name!r} hook {hook_name!r} raised "
-                f"{type(exc).__name__}: {exc}",
+                f"{type(exc).__name__}: {shown(exc)}",
                 file=sys.stderr,
             )
             continue

@@ -4,7 +4,7 @@
 region, so the agent can correct a dbt model / script / monitoring query
 without regenerating it. The match must be unique unless `replace_all` is
 set, so the agent can't silently edit the wrong line. Writes obey the same
-sandbox + writable-zone gating as write_file (shared `_fs_write_guard`).
+sandbox + writable-zone gating as write_file (shared `fs_write_guard`).
 """
 
 from __future__ import annotations

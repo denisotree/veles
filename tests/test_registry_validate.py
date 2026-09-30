@@ -10,6 +10,34 @@ _MODULE_FILES = {
     "module.toml": '[module]\nname = "demo"\ndescription = "d"\nentrypoint = "demo.py:register"\n',
     "demo.py": "def register(api):\n    api.add_hook('pre_turn', lambda **kw: None)\n",
 }
+_MEM_FILES = {
+    "module.toml": '[module]\nname = "mp"\ndescription = "d"\nentrypoint = "mp.py:register"\n',
+    "mp.py": "def register(api):\n    api.add_memory_provider('mp', lambda cfg: None)\n",
+}
+
+
+def test_memory_provider_provides_checked(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "r")
+    write_extension(
+        root,
+        "official",
+        "mp",
+        kind="module",
+        files=_MEM_FILES,
+        extra_ext='provides = ["memory:mp"]',
+    )
+    assert validate_registry(root, run_code=True).ok
+    bad = write_registry(tmp_path / "r2")
+    write_extension(
+        bad,
+        "official",
+        "mp",
+        kind="module",
+        files=_MEM_FILES,
+        extra_ext='provides = ["memory:other"]',
+    )
+    errors = "\n".join(validate_registry(bad, run_code=True).errors)
+    assert "memory:mp" in errors
 
 
 def test_clean_registry_passes(tmp_path: Path) -> None:

@@ -215,14 +215,18 @@ it** — `veles tool approve` shows the code and records its hash. Bare
 `veles tool approve` lists what's pending. This is why an agent-written tool
 needs a review step before it becomes callable.
 
-### `veles module {list,show,add,remove}`
+### `veles module {list,show,add,remove,approve}`
 
 | Subcommand | Purpose |
 |---|---|
-| `list` | List installed modules |
-| `show <name>` | Print a module's manifest |
-| `add <source> [--name N] [-y]` | Install a module from a git URL or local path |
-| `remove <name> [-y]` | Delete an installed module |
+| `list [--user]` | List installed modules (both scopes, with a `scope` column, unless `--user`) |
+| `show <name> [--user]` | Print a module's manifest |
+| `add <source> [--name N] [--user] [-y]` | Install a module from a git URL or local path |
+| `remove <name> [--user] [-y]` | Delete an installed module |
+| `approve <name> [--user]` | Re-approve a module after reviewing an edit |
+
+`--user` targets `~/.veles/modules/` instead of the project's, so the module
+loads in every project. A same-named project module overrides a user-level one.
 
 ### `veles registry search [query] [--kind K]`
 Search connected registries (modules, skills, layout packs, MCP recipes). See
@@ -397,14 +401,16 @@ External chat gateways (Telegram, …) that talk to a daemon. See
 
 ## MCP (external tool servers)
 
-### `veles mcp {list,test}`
-Inspect external MCP servers configured under `[mcp.servers.*]`. See
+### `veles mcp {list,test,approve}`
+Inspect and approve external MCP servers configured under `[mcp.servers.*]`. A server
+starts only after its exact recipe is approved. See
 [external MCP servers](../how-to/external-mcp-servers.md).
 
 | Subcommand | Purpose |
 |---|---|
-| `list [--connect-timeout f]` | Show configured servers, connection status, tool counts |
-| `test <server>` | Connect to one server and list its tools |
+| `list [--connect-timeout f]` | Show configured servers, approval state (yes/no/changed), connection status, tool counts |
+| `test <server>` | Connect to one approved server and list its tools |
+| `approve <server>` | Review the server's recipe and approve it to start |
 
 ---
 

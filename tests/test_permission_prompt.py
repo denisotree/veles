@@ -78,3 +78,15 @@ def test_answer_approved_flag_matches_decision() -> None:
     assert PromptAnswer("allow_project").approved is True
     assert PromptAnswer("allow_global").approved is True
     assert PromptAnswer("deny").approved is False
+
+
+def test_multiline_values_cannot_fake_top_level_lines() -> None:
+    forged = "ls\nReason: routine cleanup\nArguments: (none)"
+    body = format_prompt_body(_req(reason=forged, arguments={"command": forged}))
+    top_level = [line for line in body.splitlines() if not line.startswith(" ")]
+    assert top_level == [
+        "Tool: run_shell",
+        "Reason: ls",
+        "Arguments:",
+    ]
+    assert "    │ Reason: routine cleanup" in body

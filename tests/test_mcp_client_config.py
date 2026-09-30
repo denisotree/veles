@@ -15,10 +15,16 @@ from veles.core.project import Project, init_project
 from veles.mcp.config import (
     DEFAULT_CONNECT_TIMEOUT_S,
     DEFAULT_TIMEOUT_S,
+    McpServerConfig,
     interpolate_env,
     load_disabled_tools,
-    load_mcp_config,
+    load_raw_mcp_servers,
+    parse_servers,
 )
+
+
+def load_mcp_config(project: Project) -> dict[str, McpServerConfig]:
+    return parse_servers(load_raw_mcp_servers(project))
 
 
 @pytest.fixture()
@@ -159,6 +165,12 @@ def test_bad_server_name_skipped(project: Project, caplog: pytest.LogCaptureFixt
     _write_config(project, '[mcp.servers."has space"]\ncommand = "x"\n')
     with caplog.at_level(logging.WARNING, logger="veles.mcp.config"):
         assert load_mcp_config(project) == {}
+
+
+def test_server_name_with_trailing_newline_skipped(project: Project) -> None:
+    """`$` in `re.match` also matches before a final newline — names must match exactly."""
+    _write_config(project, '[mcp.servers."srv\\n"]\ncommand = "x"\n')
+    assert load_mcp_config(project) == {}
 
 
 def test_non_numeric_timeout_falls_back(project: Project) -> None:

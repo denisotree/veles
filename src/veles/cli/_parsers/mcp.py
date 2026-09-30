@@ -1,4 +1,4 @@
-"""Parser for `veles mcp {list,test}` (M157)."""
+"""Parser for `veles mcp {list,test,approve}` (M157)."""
 
 from __future__ import annotations
 
@@ -31,3 +31,9 @@ def register(sub: argparse._SubParsersAction) -> None:
         help="Connect to one MCP server and list its tools.",
     )
     mcp_test.add_argument("server", help="Server name (key under [mcp.servers.*]).")
+
+    mcp_approve = mcp_sub.add_parser(
+        "approve",
+        help="Review one MCP server's recipe and approve it to start.",
+    )
+    mcp_approve.add_argument("server", help="Server name (key under [mcp.servers.*]).")

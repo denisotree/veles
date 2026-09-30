@@ -37,9 +37,11 @@ def test_sources_writable_under_llm_wiki(isolated_home: Path, tmp_path: Path) ->
 
 
 def test_veles_state_always_writable(isolated_home: Path, tmp_path: Path) -> None:
-    """`.veles/` is always writable, even if the pack doesn't list it."""
+    """The agent's own `.veles/` subdirs are always writable, even if the pack
+    doesn't list them; Veles' state files (memory.db — written by core through
+    sqlite, not the file tools) never are."""
     project = init_project(tmp_path / "proj", name="proj")
-    assert is_writable(project, ".veles/memory.db")
+    assert not is_writable(project, ".veles/memory.db")
     assert is_writable(project, ".veles/tmp/clipboard.txt")
     assert is_writable(project, ".veles/skills/my_skill/SKILL.md")
 
@@ -104,8 +106,9 @@ def test_unknown_layout_permissive(isolated_home: Path, tmp_path: Path) -> None:
     reloaded = load_project(project.root)
     assert is_writable(reloaded, "README.md")
     assert is_writable(reloaded, "src/main.py")
-    # .veles/ still writable in permissive mode
-    assert is_writable(reloaded, ".veles/memory.db")
+    # the agent's .veles/ subdirs still writable in permissive mode, state files not
+    assert is_writable(reloaded, ".veles/tmp/x")
+    assert not is_writable(reloaded, ".veles/memory.db")
 
 
 # ---- outside the project tree ----
@@ -221,7 +224,7 @@ def test_relocation_allowed_under_llm_wiki(isolated_home: Path, tmp_path: Path) 
     """`guard_write` (the chokepoint `move_file` calls on both endpoints)
     no longer refuses relocating an arbitrary project file into `wiki/`
     or `sources/` under the now-permissive llm-wiki pack."""
-    from veles.core.tools.builtin._fs_write_guard import guard_write
+    from veles.core.tools.builtin.fs_write_guard import guard_write
 
     project = init_project(tmp_path / "proj", name="proj")
     src = project.root / "misc" / "raw.txt"

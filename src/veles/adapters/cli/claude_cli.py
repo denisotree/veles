@@ -8,10 +8,16 @@ missing and are also where streaming TextDeltas are sourced from.
 Tool bridging works only when an MCP-config bridges Veles tools into the
 spawned `claude` subprocess (M13). Otherwise tool schemas are ignored with
 a stderr warning.
+
+The spawned claude runs isolated (`_isolation_flags`): its code-running tools,
+the project's `.claude/settings.json` hooks and `.mcp.json` servers never apply,
+so everything it does goes through Veles' own trust ladder.
 """
 
 from __future__ import annotations
 
+import functools
+import subprocess
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -32,14 +38,20 @@ class ClaudeCLIProvider(CLIProvider):
         timeout: float = 300.0,
         extra_args: Iterable[str] = (),
         mcp_config_path: Path | None = None,
+        workdir: Path | None = None,
     ) -> None:
         super().__init__(
             binary=binary, timeout=timeout, extra_args=extra_args, tools_config=mcp_config_path
         )
         self._mcp_config_path = mcp_config_path
+        self._workdir = workdir
 
     def _new_state(self) -> _ClaudeStreamState:
         return _ClaudeStreamState()
+
+    def _cwd(self) -> str | None:
+        # The project root, not wherever Veles was launched (a daemon, `$HOME`).
+        return str(self._workdir) if self._workdir else None
 
     def _build_cmd(self, messages: list[Message], model: str, *, stream: bool = True) -> list[str]:
         del stream  # the claude CLI always speaks stream-json here
@@ -54,8 +66,12 @@ class ClaudeCLIProvider(CLIProvider):
         ]
         if model:
             cmd += ["--model", model]
+        cmd += _isolation_flags(self._binary)
         if self._mcp_config_path is not None:
-            cmd += ["--mcp-config", str(self._mcp_config_path)]
+            # The Veles MCP server runs every call through Veles' Permission
+            # Engine (trust ladder, sandbox); allowing the server here only stops
+            # headless claude denying them as unprompted.
+            cmd += ["--mcp-config", str(self._mcp_config_path), "--allowedTools", "mcp__veles"]
         cmd += list(self._extra_args)
         return cmd
 
@@ -74,6 +90,24 @@ class ClaudeCLIProvider(CLIProvider):
         for event in iter_jsonl(stdout):
             state.absorb(event)
         return state.to_response(raw=stdout)
+
+
+@functools.cache
+def _isolation_flags(binary: str) -> tuple[str, ...]:
+    """Flags that keep the delegated claude a model, not a second agent: no
+    built-in tools (`--tools ""` — MCP tools stay), no project settings/hooks, no
+    MCP servers but Veles'. `--restricted` adds its own hardening where the CLI
+    has it; older CLIs skip project settings by hand. Probed from `--help` once
+    per process, not pinned to a version."""
+    try:
+        help_text = subprocess.run(
+            [binary, "--help"], capture_output=True, text=True, timeout=30, check=False
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        help_text = ""
+    if "--restricted" in help_text:
+        return ("--restricted", "--strict-mcp-config", "--tools", "")
+    return ("--setting-sources", "user", "--strict-mcp-config", "--tools", "")
 
 
 @dataclass(slots=True)

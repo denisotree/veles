@@ -14,11 +14,14 @@ exposed during `veles ingest` via Registry.subset filtering — the agent in
 from __future__ import annotations
 
 import contextlib
+from pathlib import Path
 
 from veles.core.context import current_project
+from veles.core.path_guard import is_inside, resolve_safe
 from veles.core.risk import RiskClass
 from veles.core.slug import normalize_slug
-from veles.core.text import first_heading
+from veles.core.text import first_heading, shown
+from veles.core.tools.builtin.fs_write_guard import guard_write
 from veles.core.tools.registry import tool
 from veles.modules.wiki.wiki import Wiki
 
@@ -28,6 +31,18 @@ def _default_wiki() -> Wiki:
     if proj is None:
         raise RuntimeError("no active Veles project; run `veles init` and ensure cwd is inside it")
     return Wiki(proj.wiki_root)
+
+
+def _page_target(wiki: Wiki, category: str, slug: str) -> Path | str:
+    """The resolved file `wiki.write_page(category, slug)` would write, or an
+    error / write-guard refusal. Resolved, so a `wiki/` symlinked into `.veles/`
+    is seen for what it is and a symlinked project root still reads as inside."""
+    try:
+        category = wiki.validate_category(category)
+    except ValueError as exc:
+        return f"<error: {exc}>"
+    path = resolve_safe(wiki.root / "wiki" / category / f"{normalize_slug(slug)}.md")
+    return guard_write(path, current_project()) or path
 
 
 @tool(risk_class=RiskClass.READ_ONLY)
@@ -81,6 +96,9 @@ def wiki_write_page(category: str, slug: str, title: str, content: str) -> str:
     missing). INDEX.md is rewritten after the write.
     """
     wiki = _default_wiki()
+    target = _page_target(wiki, category, slug)
+    if isinstance(target, str):
+        return target
     try:
         rel = wiki.write_page(category=category, slug=slug, title=title, content=content)
     except ValueError as exc:
@@ -134,6 +152,21 @@ def wiki_rename_page(rel_path: str, new_category: str, new_slug: str) -> str:
     Returns the new relative path, or a `<error: ...>` marker.
     """
     wiki = _default_wiki()
+    # Only a page under wiki/ may be taken, and both ends obey the file tools'
+    # write guard — otherwise this moves `.veles/config.toml` into a page.
+    old_path = resolve_safe(wiki.root / rel_path)
+    if not is_inside(old_path, wiki.root / "wiki", fold=False):
+        return f"<error: {shown(rel_path)} is not a wiki page (must be under wiki/)>"
+    refusal = guard_write(old_path, current_project())
+    if refusal is not None:
+        return refusal
+    new_path = _page_target(wiki, new_category, new_slug)
+    if isinstance(new_path, str):
+        return new_path
+    # By identity: `WIKI/…`, `wiki//…`, `./wiki/…` name the same file, and
+    # writing then unlinking it would lose the page.
+    if new_path.exists() and new_path.samefile(old_path):
+        return f"<error: target {shown(rel_path)} is the same page (no-op)>"
     old_slug = rel_path.rsplit("/", 1)[-1].removesuffix(".md")
     try:
         title = next(
@@ -149,10 +182,7 @@ def wiki_rename_page(rel_path: str, new_category: str, new_slug: str) -> str:
         )
     except ValueError as exc:
         return f"<error: {exc}>"
-    if new_rel == rel_path:
-        return f"<error: target {new_rel} is the same page (no-op)>"
     # Remove the old file now that the new one is written.
-    old_path = wiki.root / rel_path
     with contextlib.suppress(OSError):
         old_path.unlink()
     # Repair inbound [[old-slug]] links across every page, then reindex.
@@ -160,7 +190,9 @@ def wiki_rename_page(rel_path: str, new_category: str, new_slug: str) -> str:
     repaired = 0
     if clean_new_slug != old_slug:
         for page in wiki.list_pages():
-            ppath = wiki.root / page.rel_path
+            ppath = resolve_safe(wiki.root / page.rel_path)
+            if guard_write(ppath, current_project()) is not None:
+                continue
             try:
                 text = ppath.read_text(encoding="utf-8")
             except OSError:
@@ -220,6 +252,9 @@ def wiki_ingest(
         return "<error: could not derive slug from source>"
     body = text if title is None else f"# {inferred_title}\n\n{text}"
     wiki = _default_wiki()
+    target = _page_target(wiki, category, inferred_slug)
+    if isinstance(target, str):
+        return target
     try:
         rel = wiki.write_page(
             category=category,

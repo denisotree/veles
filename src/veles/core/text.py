@@ -8,6 +8,26 @@ _SUMMARY_CHAR_CAP = 200
 _OPENING_FENCE = re.compile(r"^```[\w-]*[ \t]*\n?")
 
 
+def shown(value: object) -> str:
+    """`value` as text safe to print to a terminal: control characters escaped
+    (`\\n`, `\\x1b`, …), everything printable — non-ASCII included — kept as is."""
+    return "".join(c if c.isprintable() else repr(c)[1:-1] for c in str(value))
+
+
+def shown_multiline(value: object) -> str:
+    """Like `shown`, but keeps `\\n` and `\\t` literal — for previewing file/diff
+    content where line and column structure matters. Every other control
+    character (ANSI escapes, bidi overrides, …) is still escaped, so injected
+    control sequences never reach the terminal raw."""
+    return "".join(c if c in "\n\t" or c.isprintable() else repr(c)[1:-1] for c in str(value))
+
+
+def gutter(text: str, prefix: str = "  │ ") -> str:
+    """Every line of `text` under `prefix` — so a confirmation's quoted body can't
+    print a line that passes for the prompt's own text."""
+    return "\n".join(prefix + line for line in text.split("\n"))
+
+
 def ellipsize(text: str, cap: int) -> str:
     """`text` on one line, cut to `cap` characters with a trailing `…` when longer."""
     line = text.strip().replace("\n", " ")
@@ -64,4 +84,12 @@ def title_and_summary(content: str, fallback: str) -> tuple[str, str]:
     return title, ellipsize(" ".join(summary_lines), _SUMMARY_CHAR_CAP)
 
 
-__all__ = ["cut_with_note", "ellipsize", "first_heading", "strip_code_fence", "title_and_summary"]
+__all__ = [
+    "cut_with_note",
+    "ellipsize",
+    "first_heading",
+    "shown",
+    "shown_multiline",
+    "strip_code_fence",
+    "title_and_summary",
+]

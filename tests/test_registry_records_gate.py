@@ -55,7 +55,8 @@ def test_gate_survives_bytecode_cache(tmp_path: Path) -> None:
     (d / "__pycache__").mkdir(exist_ok=True)
     (d / "__pycache__" / "demo.cpython-313.pyc").write_bytes(b"\0")
     assert module_approved(d)
-    assert admit_module(d) is None  # still admitted — and the untrusted bytecode is gone
+    # Still admitted — and the untrusted bytecode is gone.
+    assert admit_module(d, project_root=project.root) is None
     assert not (d / "__pycache__").exists()
 
 
@@ -238,7 +239,7 @@ def test_hash_skips_only_what_the_gate_strips_or_refuses(tmp_path: Path, rel: st
     approve_module(d, name="demo", project_root=project.root)
     (d / rel).parent.mkdir(parents=True, exist_ok=True)
     (d / rel).write_bytes(b"PK\x03\x04")
-    refusal = admit_module(d)
+    refusal = admit_module(d, project_root=project.root)
     assert refusal is not None or not (d / rel).exists()
 
 
@@ -286,7 +287,7 @@ def test_fifo_in_module_is_refused_without_hanging(tmp_path: Path) -> None:
     previous = signal.signal(signal.SIGALRM, timeout)
     signal.alarm(5)
     try:
-        assert admit_module(d) is not None
+        assert admit_module(d, project_root=project.root) is not None
         with pytest.raises(ValueError, match="pipe"):
             approve_module(d, name="demo", project_root=project.root)
     finally:
@@ -299,7 +300,7 @@ def test_pycache_prefix_refuses_modules(tmp_path: Path, monkeypatch) -> None:
     d = _make_module(project.root)
     approve_module(d, name="demo", project_root=project.root)
     monkeypatch.setattr(sys, "pycache_prefix", str(tmp_path / "pyc"))
-    refusal = admit_module(d)
+    refusal = admit_module(d, project_root=project.root)
     assert refusal is not None and "PYTHONPYCACHEPREFIX" in refusal
 
 

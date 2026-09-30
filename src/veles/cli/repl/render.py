@@ -133,19 +133,22 @@ def _render_edit_diff(console, theme, name: str, arguments: dict) -> None:
 
     from rich.syntax import Syntax
 
-    path = str(arguments.get("path", "?"))
+    from veles.core.text import shown, shown_multiline
+
+    raw_path = str(arguments.get("path", "?"))
+    path = shown(raw_path)  # printed below and in the diff header — never raw
     if name == "edit_file":
-        old = str(arguments.get("old_string", ""))
-        new = str(arguments.get("new_string", ""))
+        old = shown_multiline(str(arguments.get("old_string", "")))
+        new = shown_multiline(str(arguments.get("new_string", "")))
     else:  # write_file
-        new = str(arguments.get("content", ""))
+        new = shown_multiline(str(arguments.get("content", "")))
         old = ""
         try:
             from veles.core.path_guard import resolve_safe
 
-            p = resolve_safe(path)
+            p = resolve_safe(raw_path)
             if p.is_file():
-                old = p.read_text(encoding="utf-8")
+                old = shown_multiline(p.read_text(encoding="utf-8"))
         except Exception:
             old = ""
 

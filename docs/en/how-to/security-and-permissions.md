@@ -58,7 +58,54 @@ unless you pass `--no-env-fallback`.
 
 ## The sandbox
 
-Tools can read inside the active project and `~/.veles/`, and write only to the
-layout's writable zones (`wiki/`, `.veles/` by default). Override the roots for
+Tools can read inside the active project, `~/.veles/skills/` and `~/.veles/locales/`,
+and write only inside the
+project — or only to the layout's writable zones, when the layout declares them. Override the roots for
 advanced setups with `VELES_SANDBOX_ROOTS` (`:`-separated). URL fetches keep an
 SSRF deny-list; `VELES_FETCH_ALLOW_PRIVATE=1` lifts the private-network block.
+
+Inside the project's `.veles/` the agent's file tools may write only to `skills/`,
+`tools/`, `tmp/`, `plans/`, `memory/` and `artifacts/`. Everything else there —
+`trust.json`, `config.toml`, `project.toml`, `modules/`, `wiki.toml`, `memory.db` —
+changes only through `veles` commands and Veles' own tools. The file tools also refuse
+any other `.veles/` directory in the project (a subproject's, or one the agent would plant
+in `wiki/`) at any depth. So through its file tools the agent can't grant itself trust
+or add code that Veles would run (a tool it writes to `.veles/tools/` loads only after you
+approve its file). Other spellings of the same file (case, `..`, a symlink) are refused
+too.
+
+Files that run without an explicit command or steer an agent CLI — anything under
+`.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`, `.vscode/`, `.devcontainer/`,
+`.husky/`, and `.envrc`, `.mcp.json`, `.pre-commit-config.yaml`, `lefthook.yml`, at any
+depth — the agent's file tools write only after you confirm that write. Trust grants and
+autopilot don't cover it; the daemon asks in the channel, and a batch run with nobody to
+ask refuses.
+
+The `claude-cli` and `gemini-cli` providers run as a model with Veles' tools only: their
+own shell, file-edit and web tools, the project's `.claude/` settings and hooks, and
+other MCP servers don't apply, and every Veles tool they call goes through the trust
+ladder above (nobody can answer a prompt there, so anything not already granted is
+refused).
+
+Known limits:
+
+- `run_shell` is a shell: once you grant it (or under autopilot) it can write any of
+  the files above without the per-file confirmation, and a custom `core.hooksPath`
+  directory under another name isn't recognised.
+- An MCP approval pins the server's command line, not the files it runs from the project
+  (a script named in `args`) — review those too.
+- With a CLI provider, runs that pre-authorise tools only for themselves (daemon
+  background jobs, `veles research`) don't pass that on to the delegated CLI: its Veles
+  tools need a standing `veles trust set` grant or an autopilot window. The parent run's
+  planning mode doesn't reach them either.
+- `gemini-cli` trusts the project folder for its run, so gemini also reads the project's
+  `.env` — keep gemini settings you don't want the agent to steer out of it.
+- On a machine with managed (system) gemini policies, gemini ignores the policy Veles
+  passes, so `gemini-cli` isn't limited to Veles' tools there.
+
+Paths with control characters (terminal escapes, bidi overrides) are refused, and
+confirmations, the trust prompt and the diff preview show such characters escaped —
+a tool call can't forge the text you approve.
+
+MCP servers from a config start only after you approve them — see
+[external MCP servers](external-mcp-servers.md#approve-inspect-and-test).

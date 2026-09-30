@@ -89,21 +89,34 @@ Set `[mcp] disabled_tools` — a table mapping each server to the tool names to 
 disabled_tools = { github = ["delete_repository"], search = ["raw_query"] }
 ```
 
-## Inspect and test
+## Approve, inspect and test
 
 ```bash
-veles mcp list              # every configured server: transport, status, tool count
+veles mcp approve github    # review the recipe, type `yes` — the server may now start
+veles mcp list              # every configured server: transport, approved, status, tool count
 veles mcp test github       # connect to one server and list its tools
 ```
 
-`veles mcp list` always exits 0 — it's an inspector, not a health gate.
-`veles mcp test` exits 1 when the connection fails and 2 for an unknown server name.
+A server starts only after you approved its exact recipe. `veles mcp approve` shows the
+whole table — `command`, `args`, `env` values (a `PATH` there decides which binary runs;
+`${VAR}` references appear as written), `url`, `transport` and any other key — and
+records a hash of the table as written in `config.toml` — before `${VAR}` expansion, so
+rotating a token keeps the approval, while any edit to the table (a cloned project, a
+changed argument) makes the server `changed` and stops it from starting until you approve
+it again. The approval covers the command line; files it runs from the project (a script
+in `args`) are not pinned — review them too. Approvals live in
+`~/.veles/mcp-approvals.json`. `veles registry install` of
+an MCP extension shows the same recipe in its confirmation and approves it; `veles registry uninstall` revokes it.
+
+`veles mcp list` always exits 0 — it's an inspector, not a health gate; it never starts
+an unapproved server. `veles mcp test` exits 1 when the server is unapproved or the
+connection fails, and 2 for an unknown server name.
 
 ## How the tools appear
 
-Once configured, servers are mounted **automatically** on the next `veles run` /
-TUI / daemon start — there is no separate "enable MCP" flag, the presence of the
-config is the switch. Each tool enters the normal registry as `mcp_<server>_<tool>`
+Once configured and approved, servers are mounted **automatically** on the next
+`veles run` / TUI / daemon start — there is no separate "enable MCP" flag. An
+unapproved server is skipped with one warning per process. Each tool enters the normal registry as `mcp_<server>_<tool>`
 and is callable by the agent like any builtin. Schemas are sanitised (name/length
 limits, control-char stripping) so an untrusted server can't inject into the prompt.
 Tool hints map to the trust ladder: destructive tools always confirm, read-only

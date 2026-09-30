@@ -12,9 +12,11 @@ Current call sites:
 - `cli.py` install commands (`veles skill add`, `veles module add`):
   third-party code that will execute on the user's machine. `--yes` is
   parsed but ignored for these paths.
-- `tools/builtin/write_file.py`: writes resolved outside the active
-  project root (i.e. into user-global `~/.veles/`) — the agent could
-  install code there otherwise.
+- `tools/builtin/fs_write_guard.py::guard_write` (every file-tool write):
+  writes resolved outside the active project root (i.e. into user-global
+  `~/.veles/`) — the agent could install code there otherwise — and writes
+  to auto-executed / agent CLI config paths (`writable.needs_confirmation`:
+  `.git/`, `.claude/`, `.envrc`, …).
 
 In M39 scope now:
 - `tools/builtin/file_ops.py::delete_file` (DESTRUCTIVE) — routes here per
@@ -84,6 +86,18 @@ def confirm_critical(op: str, summary: str) -> bool:
 
 
 def _default_confirmer(op: str, summary: str) -> bool:
+    # `op`/`summary` are built by call sites from tool-controlled strings
+    # (paths, names, recipes) — escape once here so no caller has to
+    # remember to, and a control character can't forge this prompt. `op` is
+    # always one line (an action description), so full `shown()` is right.
+    # `summary` is sometimes a legitimate multi-line review body (e.g.
+    # `mcp/approvals.py::describe_recipe`, install summaries with `Source:
+    # .../Target: ...` lines) — `shown_multiline()` keeps those newlines
+    # literal while still escaping any other injected control character.
+    from veles.core.text import gutter, shown, shown_multiline
+
+    op = shown(op)
+    summary = gutter(shown_multiline(summary)) if summary else ""
     if not sys.stdin.isatty():
         print(
             f"\nCRITICAL: {op} requires interactive confirmation; non-TTY context refuses.",

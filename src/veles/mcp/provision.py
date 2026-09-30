@@ -33,9 +33,11 @@ def ensure_mcp_project_tools(project: Project) -> list[str]:
     `<project>/.veles/tools/`. Returns the filenames newly provisioned this
     call (empty when nothing was configured or everything already existed)."""
     try:
-        from veles.mcp.config import load_mcp_config
+        from veles.mcp.approvals import approval_state
+        from veles.mcp.config import load_raw_mcp_servers, parse_servers
 
-        configs = load_mcp_config(project)
+        raw = load_raw_mcp_servers(project)
+        configs = parse_servers(raw)
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("MCP tool provisioning skipped: %s", exc)
         return []
@@ -45,7 +47,9 @@ def ensure_mcp_project_tools(project: Project) -> list[str]:
     tools_dir = project.state_dir / "tools"
     provisioned: list[str] = []
     for server, template_name in _MCP_TOOL_TEMPLATES.items():
-        if server not in configs:
+        # Only for a server the user approved — a cloned project's config alone
+        # must not get an auto-approved tool into `.veles/tools/`.
+        if server not in configs or approval_state(project.root, server, raw[server]) != "yes":
             continue
         src = _TEMPLATES_DIR / template_name
         dst = tools_dir / template_name

@@ -364,7 +364,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles sessions {list,show,delete,search}` | Session management |
 | `veles skill {list,show,add,remove,promote,demote,dedup,suggest-promote}` | Skill management |
 | `veles tool {list,show,promote,approve}` | Tool management (`approve` gates self-authored tools) |
-| `veles module {list,add,remove}` | Plugin management |
+| `veles module {list,show,add,remove,approve}` | Plugin management (`--user` for `~/.veles/modules/`) |
 | `veles registry {add,search,install,upgrade,verify,...}` | Extension registries: search, install, publish |
 | `veles route {show,set,reset,refresh}` | Model routing |
 | `veles schema {validate,edit}` | Validate / edit AGENTS.md |
