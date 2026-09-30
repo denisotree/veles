@@ -68,12 +68,14 @@ class ValidationReport:
 
 
 def validate_registry(
-    root: Path, *, base: str | None = None, run_code: bool = False
+    root: Path, *, base: str | None = None, run_code: bool = False, install_requires: bool = False
 ) -> ValidationReport:
     """`run_code=False` (the default for a local run) never executes the extension:
     static checks plus the reviewer scan only. CI passes `--run-code` to also import
     modules (`register()` vs `provides`) and run their tests — PR code must not run on
-    a reviewer's machine just because they validated it.
+    a reviewer's machine just because they validated it. `install_requires` (with
+    `run_code`) first installs each module's `requires` into a throwaway dir on its
+    PYTHONPATH, so tests that drive a real SDK run instead of skipping.
 
     The code phase runs only after every static check, and only in subprocesses: a
     PR's `register()` must not be able to exit or patch the validator into a green,
@@ -119,7 +121,8 @@ def validate_registry(
                 ]
         for ext, payload, work in runnable:
             report.errors += [
-                f"{ext.group}/{ext.name}: {e}" for e in _run_module(ext, payload, work)
+                f"{ext.group}/{ext.name}: {e}"
+                for e in _run_module(ext, payload, work, install_requires=install_requires)
             ]
     finally:
         shutil.rmtree(root / ".tmp" / "validate", ignore_errors=True)
@@ -233,11 +236,36 @@ print(json.dumps({
 }))
 """
 _CODE_TIMEOUT_S = 600
+_INSTALL_TIMEOUT_S = 600
 
 
-def _run_code(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str] | str:
+def _install_requires(requires: tuple[str, ...], target: Path) -> str | None:
+    """Install an extension's `requires` into `target` (a throwaway dir put on
+    PYTHONPATH for its dry run and tests). None on success, else an error."""
+    uv = shutil.which("uv")
+    cmd = (
+        [uv, "pip", "install", "--python", sys.executable, "--target", str(target), *requires]
+        if uv
+        else [sys.executable, "-m", "pip", "install", "--target", str(target), *requires]
+    )
+    try:
+        run = subprocess.run(
+            cmd, capture_output=True, text=True, check=False, timeout=_INSTALL_TIMEOUT_S
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return f"could not install requires: {exc}"
+    return None if run.returncode == 0 else f"could not install requires:\n{_tail(run)}"
+
+
+def _run_code(
+    args: list[str], cwd: Path, *, extra_path: Path | None = None
+) -> subprocess.CompletedProcess[str] | str:
     """The completed child, or an error string when it timed out. No bytecode is
-    written, so a local `--run-code` can't make the next run fail the bytecode check."""
+    written, so a local `--run-code` can't make the next run fail the bytecode check.
+    `extra_path` (installed `requires`) goes first on PYTHONPATH."""
+    env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+    if extra_path is not None:
+        env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(extra_path), env.get("PYTHONPATH")]))
     try:
         return subprocess.run(
             [sys.executable, *args],
@@ -246,7 +274,7 @@ def _run_code(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str] | 
             text=True,
             check=False,
             timeout=_CODE_TIMEOUT_S,
-            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+            env=env,
         )
     except subprocess.TimeoutExpired:
         return f"timed out after {_CODE_TIMEOUT_S}s"
@@ -280,13 +308,21 @@ def _registered(run: subprocess.CompletedProcess[str]) -> set[str] | None:
     return {f"hook:{h}" for h in hooks} | {f"memory:{m}" for m in memory}
 
 
-def _run_module(ext: Extension, payload: Path, work: Path) -> list[str]:
+def _run_module(
+    ext: Extension, payload: Path, work: Path, *, install_requires: bool = False
+) -> list[str]:
     errors: list[str] = []
     try:
         work.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         return [f"could not create {work}: {exc}"]
-    run = _run_code(["-c", _DRY_RUN, str(payload)], work)
+    deps: Path | None = None
+    if install_requires and ext.requires:
+        deps = work / "deps"
+        failed = _install_requires(ext.requires, deps)
+        if failed is not None:
+            return [failed]
+    run = _run_code(["-c", _DRY_RUN, str(payload)], work, extra_path=deps)
     if isinstance(run, str):
         return [f"register() {run}"]
     registered = _registered(run)
@@ -332,6 +368,7 @@ def _run_module(ext: Extension, payload: Path, work: Path) -> list[str]:
                 str(tests),
             ],
             payload,
+            extra_path=deps,
         )
         if isinstance(tests_run, str):
             errors.append(f"tests {tests_run}")

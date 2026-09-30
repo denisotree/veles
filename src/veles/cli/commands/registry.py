@@ -172,7 +172,12 @@ def _verify(args: argparse.Namespace, project: Project | None) -> int:
 
 
 def _validate(args: argparse.Namespace, project: Project | None) -> int:
-    report = validate_registry(Path(args.path).resolve(), base=args.base, run_code=args.run_code)
+    report = validate_registry(
+        Path(args.path).resolve(),
+        base=args.base,
+        run_code=args.run_code or args.install_requires,
+        install_requires=args.install_requires,
+    )
     text = report.to_markdown()
     if args.report:
         Path(args.report).write_text(text, encoding="utf-8")

@@ -396,3 +396,46 @@ def test_scan_python_flags(tmp_path: Path) -> None:
     text = "\n".join(scan_python(tmp_path))
     for needle in ("process", "network", "eval", "environment", "file write"):
         assert needle in text
+
+
+def _sdk_module(root: Path) -> None:
+    files = {
+        **_MODULE_FILES,
+        "tests/test_sdk.py": "import somepkg\n\n\ndef test_x():\n    assert somepkg.X == 1\n",
+    }
+    write_extension(
+        root,
+        "official",
+        "demo",
+        kind="module",
+        extra_ext='provides = ["hook:pre_turn"]\nrequires = ["somepkg"]',
+        files=files,
+    )
+
+
+def test_install_requires_puts_deps_on_the_path(tmp_path: Path, monkeypatch) -> None:
+    """With --install-requires the extension's tests run against its SDK."""
+    from veles.core.registry import validate as v
+
+    def fake_install(requires: tuple[str, ...], target: Path) -> str | None:
+        assert requires == ("somepkg",)
+        (target / "somepkg").mkdir(parents=True)
+        (target / "somepkg" / "__init__.py").write_text("X = 1\n")
+        return None
+
+    monkeypatch.setattr(v, "_install_requires", fake_install)
+    root = write_registry(tmp_path / "r")
+    _sdk_module(root)
+    assert any("tests failed" in e for e in validate_registry(root, run_code=True).errors)
+    report = validate_registry(root, run_code=True, install_requires=True)
+    assert report.errors == []
+
+
+def test_install_requires_failure_is_reported(tmp_path: Path, monkeypatch) -> None:
+    from veles.core.registry import validate as v
+
+    monkeypatch.setattr(v, "_install_requires", lambda _r, _t: "could not install requires: boom")
+    root = write_registry(tmp_path / "r")
+    _sdk_module(root)
+    errors = "\n".join(validate_registry(root, run_code=True, install_requires=True).errors)
+    assert "could not install requires: boom" in errors
