@@ -58,7 +58,8 @@ unless you pass `--no-env-fallback`.
 
 ## The sandbox
 
-Tools can read inside the active project and `~/.veles/`, and write only inside the
+Tools can read inside the active project, `~/.veles/skills/` and `~/.veles/locales/`,
+and write only inside the
 project — or only to the layout's writable zones, when the layout declares them. Override the roots for
 advanced setups with `VELES_SANDBOX_ROOTS` (`:`-separated). URL fetches keep an
 SSRF deny-list; `VELES_FETCH_ALLOW_PRIVATE=1` lifts the private-network block.
@@ -66,9 +67,21 @@ SSRF deny-list; `VELES_FETCH_ALLOW_PRIVATE=1` lifts the private-network block.
 Inside the project's `.veles/` the agent's file tools may write only to `skills/`,
 `tools/`, `tmp/`, `plans/`, `memory/` and `artifacts/`. Everything else there —
 `trust.json`, `config.toml`, `project.toml`, `modules/`, `wiki.toml`, `memory.db` —
-changes only through `veles` commands and Veles' own tools, so an agent can't grant
-itself trust or add code that runs. Other spellings of the same file (case, `..`, a
+changes only through `veles` commands and Veles' own tools. The file tools also refuse
+any other `.veles/` directory in the project (a subproject's, or one the agent would plant
+in `wiki/`), and the configs of the delegated CLIs — `.claude/`, `.gemini/` and
+`.mcp.json` — at any depth. So through its file tools the agent can't grant itself trust
+or add code that Veles or a delegated CLI would run (a tool it writes to `.veles/tools/`
+loads only after you approve its file). Other spellings of the same file (case, `..`, a
 symlink) are refused too.
+
+Known limits:
+
+- With the `claude-cli` or `gemini-cli` provider the delegated CLI runs its own tools
+  under its own permission model, not Veles' trust ladder (`gemini-cli` is started with
+  `--yolo`). Use those providers only in projects you'd let that CLI edit unattended.
+- An MCP approval pins the server's command line, not the files it runs from the project
+  (a script named in `args`) — review those too.
 
 Paths with control characters (terminal escapes, bidi overrides) are refused, and
 confirmations, the trust prompt and the diff preview show such characters escaped —

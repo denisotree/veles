@@ -103,7 +103,9 @@ whole table — `command`, `args`, `env` values (a `PATH` there decides which bi
 records a hash of the table as written in `config.toml` — before `${VAR}` expansion, so
 rotating a token keeps the approval, while any edit to the table (a cloned project, a
 changed argument) makes the server `changed` and stops it from starting until you approve
-it again. Approvals live in `~/.veles/mcp-approvals.json`. `veles registry install` of
+it again. The approval covers the command line; files it runs from the project (a script
+in `args`) are not pinned — review them too. Approvals live in
+`~/.veles/mcp-approvals.json`. `veles registry install` of
 an MCP extension shows the same recipe in its confirmation and approves it; `veles registry uninstall` revokes it.
 
 `veles mcp list` always exits 0 — it's an inspector, not a health gate; it never starts

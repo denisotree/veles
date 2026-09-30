@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`trust.json`, `config.toml`, `project.toml`, `modules/`, `wiki.toml`, …): only `skills/`,
   `tools/`, `tmp/`, `plans/`, `memory/` and `artifacts/` stay writable there. Case, `..` and
   symlink spellings of a closed file are refused; `wiki_rename_page` works only on wiki pages.
+  Any other `.veles/` in the project (a subproject's, or one planted in `wiki/`) and the
+  delegated CLIs' configs — `.claude/`, `.gemini/`, `.mcp.json` — are refused at any depth.
+- Multi-line values in the trust/approval prompt are indented, so they can't fake a
+  `Reason:`/`Arguments:` line; Telegram prompts escape control characters too.
 - MCP servers from `[mcp.servers.*]` start only after `veles mcp approve <name>`, which shows
   the full recipe; editing the recipe needs a new approval. `veles mcp list` has an `approved`
   column; `veles registry install`/`uninstall` of an MCP extension approves/revokes it.
