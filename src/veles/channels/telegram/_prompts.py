@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from veles.channels.telegram_format import escape_html
+from veles.core.text import shown, shown_multiline
 
 
 @dataclass(slots=True)
@@ -103,6 +104,13 @@ def _build_buttons(
     return shorts, buttons, short_to_key
 
 
+def _html(text: str) -> str:
+    """Agent-controlled text for a prompt, HTML-escaped with its control
+    characters (bidi overrides, ESC, …) shown escaped, so a tool argument
+    can't reorder or hide what the user is asked to approve."""
+    return escape_html(shown_multiline(text))
+
+
 def _format_prompt_body(kind: str, event: dict[str, Any]) -> str:
     """Render a trust/approval/clarification prompt as Telegram-HTML
     with emoji and no raw Python `repr()` or dict dumps. Argument
@@ -118,7 +126,7 @@ def _format_prompt_body(kind: str, event: dict[str, Any]) -> str:
             if event.get("options")
             else "Reply with your answer."
         )
-        return f"❓ <b>The agent needs your input</b>\n{escape_html(sanitize(question))}\n\n{hint}"
+        return f"❓ <b>The agent needs your input</b>\n{_html(sanitize(question))}\n\n{hint}"
     if kind == "critical":
         # M213: critical ops carry `op` + `summary` (the Confirmer contract),
         # not tool/arguments. Deliberately alarming — this is the channel
@@ -127,10 +135,10 @@ def _format_prompt_body(kind: str, event: dict[str, Any]) -> str:
         summary = str(event.get("summary") or "")
         body = (
             f"⚠️ <b>Critical operation — explicit confirmation required</b>\n"
-            f"🔧 <code>{escape_html(op)}</code>"
+            f"🔧 <code>{escape_html(shown(op))}</code>"
         )
         if summary:
-            body += f"\n📝 {escape_html(sanitize(summary))}"
+            body += f"\n📝 {_html(sanitize(summary))}"
         body += "\n\nThis bypasses trust grants — allow only if you initiated it."
         return body
     # trust + approval share the same body shape (M124-perm-unify): both
@@ -141,12 +149,14 @@ def _format_prompt_body(kind: str, event: dict[str, Any]) -> str:
     reason = str(event.get("reason") or "(no reason supplied)")
     args = event.get("arguments") or {}
     if kind == "trust":
-        header = f"🔧 <b>Tool:</b> <code>{escape_html(tool)}</code> wants to run."
+        header = f"🔧 <b>Tool:</b> <code>{escape_html(shown(tool))}</code> wants to run."
     else:
-        header = f"🔐 <b>Approval required</b>\n🔧 <b>Tool:</b> <code>{escape_html(tool)}</code>"
+        header = (
+            f"🔐 <b>Approval required</b>\n🔧 <b>Tool:</b> <code>{escape_html(shown(tool))}</code>"
+        )
     return (
         f"{header}\n"
-        f"📝 <b>Reason:</b> {escape_html(sanitize(reason))}\n"
+        f"📝 <b>Reason:</b> {_html(sanitize(reason))}\n"
         f"📋 <b>Arguments:</b>\n{_render_prompt_args(args)}"
     )
 
@@ -162,13 +172,13 @@ def _render_prompt_args(args: Any) -> str:
         return "(none)"
     lines: list[str] = []
     for key, value in args.items():
-        key_html = escape_html(str(key))
+        key_html = escape_html(shown(key))
         if isinstance(value, (str, int, float, bool)) or value is None:
             text = str(value)
             text = sanitize(text)
             if len(text) > 200:
                 text = text[:200] + "…"
-            lines.append(f"• <code>{key_html}</code>: {escape_html(text)}")
+            lines.append(f"• <code>{key_html}</code>: {_html(text)}")
         else:
             try:
                 dumped = _json.dumps(value, indent=2, ensure_ascii=False)
@@ -177,5 +187,5 @@ def _render_prompt_args(args: Any) -> str:
             dumped = sanitize(dumped)
             if len(dumped) > 400:
                 dumped = dumped[:400] + "\n…"
-            lines.append(f"• <code>{key_html}</code>:\n<pre>{escape_html(dumped)}</pre>")
+            lines.append(f"• <code>{key_html}</code>:\n<pre>{_html(dumped)}</pre>")
     return "\n".join(lines)

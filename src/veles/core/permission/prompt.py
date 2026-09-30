@@ -94,21 +94,21 @@ def format_prompt_body(
     span multiple lines (a JSON-dumped dict, a multi-line reason), so those
     go through `shown_multiline()` — either way a control character (ESC,
     bidi override, …) an agent puts in a tool call can't forge this prompt
-    or the confirmation that follows it.
+    or the confirmation that follows it. Continuation lines of a multi-line
+    reason or value are indented under a `│` gutter, so a value can't print a
+    line that passes for a top-level `Reason:` / `Arguments:` line.
 
     The Telegram channel formats arguments separately via
     `_render_prompt_args` (HTML, harder limit) — this helper is for
     plain-text surfaces (TUI body, CLI stderr). The daemon's unified/critical
     prompters (`daemon/channel_prompter.py`) don't call this helper either —
     they send `tool_name`/`arguments`/`reason` as JSON event payload fields,
-    so raw control characters there are just JSON string content, not
-    terminal bytes.
+    and each client that renders them escapes them itself (Telegram:
+    `channels/telegram/_prompts.py`).
     """
 
-    lines = [
-        f"Tool: {shown(req.tool_name)}",
-        f"Reason: {shown_multiline(req.reason) if req.reason else '(unspecified)'}",
-    ]
+    reason = _continued(shown_multiline(req.reason)) if req.reason else "(unspecified)"
+    lines = [f"Tool: {shown(req.tool_name)}", f"Reason: {reason}"]
     if not req.arguments:
         lines.append("Arguments: (none)")
     else:
@@ -131,7 +131,12 @@ def _render_value(value: Any, max_chars: int) -> str:
     # just doesn't get escaped on the discarded side.
     if len(text) > max_chars:
         text = f"{text[:max_chars]}… (total {len(text)} chars)"
-    return shown_multiline(text)
+    return _continued(shown_multiline(text))
+
+
+def _continued(text: str) -> str:
+    """`text` with every line after the first under an indented `│` gutter."""
+    return text.replace("\n", "\n    │ ")
 
 
 # ---------------- prompter ContextVar ----------------
