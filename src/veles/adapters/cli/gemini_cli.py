@@ -24,6 +24,8 @@ from typing import Any
 from veles.adapters.cli._common import CLIProvider, format_messages_as_prompt
 from veles.core.provider import Message, ProviderResponse, TokenUsage
 
+_POLICY = Path(__file__).with_name("gemini_policy.toml")
+
 
 class GeminiCLIProvider(CLIProvider):
     name: str = "gemini-cli"
@@ -52,10 +54,13 @@ class GeminiCLIProvider(CLIProvider):
             cmd += ["--model", model]
         if stream:
             cmd += ["--output-format", "stream-json"]
+        # Only Veles' tools run (`_POLICY`): gemini's own shell/file tools would
+        # bypass Veles' trust ladder and sandbox. Headless default mode turns
+        # anything left to ask into a denial.
+        cmd += ["--approval-mode", "default", "--admin-policy", str(_POLICY)]
         if self._mcp_settings_dir is not None:
-            # gemini -p ignores workspace mcpServers unless explicitly allow-listed,
-            # and tool calls would block on interactive permission prompts.
-            cmd += ["--allowed-mcp-server-names", "veles", "--yolo"]
+            # gemini -p ignores workspace mcpServers unless explicitly allow-listed.
+            cmd += ["--allowed-mcp-server-names", "veles"]
         cmd += list(self._extra_args)
         return cmd
 
