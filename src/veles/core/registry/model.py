@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from veles.core.path_guard import has_control_char
+
 EXTENSION_FILE = "extension.toml"
 REGISTRY_FILE = "registry.toml"
 KINDS = ("module", "skill", "layout", "mcp")
@@ -201,11 +203,6 @@ def _is_safe_subdir(subdir: str) -> bool:
     if PurePosixPath(subdir).is_absolute() or "\\" in subdir or has_control_char(subdir):
         return False
     return ".." not in PurePosixPath(subdir).parts
-
-
-def has_control_char(value: str) -> bool:
-    """Shared with `config.py`: a URL/ref/subdir must not smuggle a control character."""
-    return any(ord(c) < 32 or ord(c) == 127 for c in value)
 
 
 def _required(table: dict[str, Any], key: str, *, where: str = "extension") -> str:

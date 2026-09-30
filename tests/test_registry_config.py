@@ -87,6 +87,14 @@ def test_ref_starting_with_dash_rejected() -> None:
         add_source("git@x:a.git", ref="-x")
 
 
+@pytest.mark.parametrize("bad", ["‮", "⁦", "\x85"])
+def test_url_with_bidi_or_c1_char_rejected(bad: str) -> None:
+    """The same control-character set as agent paths: a bidi override makes the
+    shown URL read differently from the one git fetches."""
+    with pytest.raises(RegistryConfigError):
+        add_source(f"https://example.com/{bad}evil.git")
+
+
 def test_ref_with_control_char_rejected() -> None:
     with pytest.raises(RegistryConfigError):
         add_source("git@x:a.git", ref="stable\nevil")
