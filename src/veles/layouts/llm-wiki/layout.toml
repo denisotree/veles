@@ -19,8 +19,8 @@ agents_md_template = "templates/AGENTS.md"
 # NOTE: no project-specific categories are declared here. The builtin pack ships
 # only the generic wiki categories (concepts/entities/sources/queries/sessions/
 # self-doc — see wiki._DEFAULT_CATEGORIES). Project-specific structure (diary,
-# tasks, projects, …) is declared PER PROJECT in `.veles/wiki.toml` (writable, so
-# the agent can extend it at runtime via `wiki_add_category`). Packs MAY still
+# tasks, projects, …) is declared PER PROJECT in `.veles/wiki.toml` (the agent
+# extends it at runtime via `wiki_add_category`, not with file tools). Packs MAY still
 # add categories via `[layout.wiki].categories = [...]`, but the framework itself
 # hardcodes no project schema.
 

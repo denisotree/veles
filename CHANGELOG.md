@@ -27,8 +27,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Built-in Honcho, Mem0 and Supermemory memory providers — they are registry modules now
   (`veles registry install --user {honcho,mem0,supermemory}`).
 
+### Security
+
+- The agent's file tools can no longer write Veles' own files in the project's `.veles/`
+  (`trust.json`, `config.toml`, `project.toml`, `modules/`, `wiki.toml`, …): only `skills/`,
+  `tools/`, `tmp/`, `plans/`, `memory/` and `artifacts/` stay writable there. Case, `..` and
+  symlink spellings of a closed file are refused; `wiki_rename_page` works only on wiki pages.
+- MCP servers from `[mcp.servers.*]` start only after `veles mcp approve <name>`, which shows
+  the full recipe; editing the recipe needs a new approval. `veles mcp list` has an `approved`
+  column; `veles registry install`/`uninstall` of an MCP extension approves/revokes it.
+- Paths with control characters (terminal escapes, C1, bidi overrides) are refused by the
+  sandbox; critical confirmations, the trust/approval prompt and the diff preview escape
+  control characters, so a tool call can't forge the text you approve.
+
 ### Upgrading from 1.1
 
+- Agent file tools no longer edit `.veles/` config files — change them with `veles` commands
+  (`veles trust`, `veles route`, `veles mcp approve`, `veles module`, …) or by hand.
 - Project MCP servers (`[mcp.servers.*]`) start only after `veles mcp approve <name>` — an
   unapproved or edited recipe is skipped with a warning. Approve each server you already use once.
 - If `~/.veles/config.toml` has `[memory.external.<name>]`, install the provider once:

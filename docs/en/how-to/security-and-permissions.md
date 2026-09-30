@@ -58,7 +58,21 @@ unless you pass `--no-env-fallback`.
 
 ## The sandbox
 
-Tools can read inside the active project and `~/.veles/`, and write only to the
-layout's writable zones (`wiki/`, `.veles/` by default). Override the roots for
+Tools can read inside the active project and `~/.veles/`, and write only inside the
+project — or only to the layout's writable zones, when the layout declares them. Override the roots for
 advanced setups with `VELES_SANDBOX_ROOTS` (`:`-separated). URL fetches keep an
 SSRF deny-list; `VELES_FETCH_ALLOW_PRIVATE=1` lifts the private-network block.
+
+Inside the project's `.veles/` the agent's file tools may write only to `skills/`,
+`tools/`, `tmp/`, `plans/`, `memory/` and `artifacts/`. Everything else there —
+`trust.json`, `config.toml`, `project.toml`, `modules/`, `wiki.toml`, `memory.db` —
+changes only through `veles` commands and Veles' own tools, so an agent can't grant
+itself trust or add code that runs. Other spellings of the same file (case, `..`, a
+symlink) are refused too.
+
+Paths with control characters (terminal escapes, bidi overrides) are refused, and
+confirmations, the trust prompt and the diff preview show such characters escaped —
+a tool call can't forge the text you approve.
+
+MCP servers from a config start only after you approve them — see
+[external MCP servers](external-mcp-servers.md#approve-inspect-and-test).
