@@ -89,21 +89,36 @@ Imposta `[mcp] disabled_tools` — una tabella che mappa ciascun server ai nomi 
 disabled_tools = { github = ["delete_repository"], search = ["raw_query"] }
 ```
 
-## Ispezionare e testare
+## Approvare, ispezionare e testare
 
 ```bash
-veles mcp list              # every configured server: transport, status, tool count
+veles mcp approve github    # review the recipe, type `yes` — the server may now start
+veles mcp list              # every configured server: transport, approved, status, tool count
 veles mcp test github       # connect to one server and list its tools
 ```
 
-`veles mcp list` termina sempre con 0 — è un ispettore, non un controllo di stato.
-`veles mcp test` termina con 1 quando la connessione fallisce e con 2 per un nome di server sconosciuto.
+Un server parte solo dopo che hai approvato la sua ricetta esatta. `veles mcp approve`
+mostra l'intera tabella — `command`, `args`, i valori di `env` (un `PATH` lì decide
+quale binario viene eseguito; i riferimenti `${VAR}` compaiono come scritti), `url`,
+`transport` e qualsiasi altra chiave — e registra un hash della tabella così com'è in
+`config.toml`, prima dell'espansione di `${VAR}`: ruotare un token mantiene quindi
+l'approvazione, mentre qualsiasi modifica alla tabella (un progetto clonato, un
+argomento cambiato) porta il server allo stato `changed` e ne impedisce l'avvio finché
+non lo approvi di nuovo. L'approvazione copre la riga di comando; i file che esegue dal
+progetto (uno script in `args`) non sono bloccati — rivedi anche quelli. Le
+approvazioni si trovano in `~/.veles/mcp-approvals.json`. `veles registry install` di
+un'estensione MCP mostra la stessa ricetta nella sua conferma e la approva; `veles
+registry uninstall` la revoca.
+
+`veles mcp list` termina sempre con 0 — è un ispettore, non un controllo di stato; non
+avvia mai un server non approvato. `veles mcp test` termina con 1 quando il server non
+è approvato o la connessione fallisce, e con 2 per un nome di server sconosciuto.
 
 ## Come appaiono i tool
 
-Una volta configurati, i server vengono montati **automaticamente** al successivo avvio di `veles run` /
-TUI / daemon — non c'è un flag separato "abilita MCP", la presenza della
-configurazione è l'interruttore. Ogni tool entra nel registry normale come `mcp_<server>_<tool>`
+Una volta configurati e approvati, i server vengono montati **automaticamente** al
+successivo avvio di `veles run` / TUI / daemon — non c'è un flag separato "abilita
+MCP". Un server non approvato viene saltato con un avviso per processo. Ogni tool entra nel registry normale come `mcp_<server>_<tool>`
 ed è richiamabile dall'agente come qualsiasi tool integrato. Gli schemi vengono sanificati (limiti di
 nome/lunghezza, rimozione dei caratteri di controllo) così che un server non affidabile non possa iniettare nel prompt.
 Gli hint dei tool si mappano sulla scala di trust: i tool distruttivi chiedono sempre conferma, i tool

@@ -89,21 +89,35 @@ url = "https://mcp.example.com/mcp"
 disabled_tools = { github = ["delete_repository"], search = ["raw_query"] }
 ```
 
-## निरीक्षण और test
+## Approve, निरीक्षण और test
 
 ```bash
-veles mcp list              # every configured server: transport, status, tool count
+veles mcp approve github    # review the recipe, type `yes` — the server may now start
+veles mcp list              # every configured server: transport, approved, status, tool count
 veles mcp test github       # connect to one server and list its tools
 ```
 
-`veles mcp list` हमेशा 0 के साथ exit करता है — यह एक inspector है, health gate नहीं।
-`veles mcp test` connection fail होने पर 1 और अज्ञात server name के लिए 2 के साथ exit करता है।
+server तभी start होता है जब आपने उसकी exact recipe approve की हो। `veles mcp approve` पूरी table
+दिखाता है — `command`, `args`, `env` values (वहाँ `PATH` तय करता है कि कौन सा binary चलेगा;
+`${VAR}` references जैसे लिखे हैं वैसे दिखते हैं), `url`, `transport` और कोई भी अन्य key — और
+table का hash record करता है जैसी वह `config.toml` में लिखी है, `${VAR}` expansion से पहले: इसलिए
+token rotate करने पर approval बना रहता है, जबकि table में कोई भी edit (clone किया हुआ project,
+बदला हुआ argument) server को `changed` बना देता है और आप दोबारा approve करें तब तक उसे start होने
+से रोक देता है। approval command line को cover करता है; जो files वह project से चलाता है
+(`args` में script) pinned नहीं होतीं — उन्हें भी review करें। approvals
+`~/.veles/mcp-approvals.json` में रहते हैं। किसी MCP extension का `veles registry install` अपनी
+confirmation में वही recipe दिखाता है और उसे approve करता है; `veles registry uninstall` उसे
+revoke करता है।
+
+`veles mcp list` हमेशा 0 के साथ exit करता है — यह एक inspector है, health gate नहीं; यह कभी
+unapproved server को start नहीं करता। `veles mcp test` server unapproved होने या connection fail
+होने पर 1, और अज्ञात server name के लिए 2 के साथ exit करता है।
 
 ## tools कैसे दिखते हैं
 
-एक बार configure होने पर, servers अगले `veles run` / TUI / daemon start पर
-**अपने आप** mount हो जाते हैं — कोई अलग "enable MCP" flag नहीं है, config की मौजूदगी ही
-switch है। हर tool normal registry में `mcp_<server>_<tool>` के रूप में आता है
+एक बार configure और approve होने पर, servers अगले `veles run` / TUI / daemon start पर
+**अपने आप** mount हो जाते हैं — कोई अलग "enable MCP" flag नहीं है। unapproved server को हर
+process में एक warning के साथ skip कर दिया जाता है। हर tool normal registry में `mcp_<server>_<tool>` के रूप में आता है
 और agent द्वारा किसी भी builtin की तरह callable होता है। Schemas sanitise की जाती हैं
 (name/length limits, control-char stripping) ताकि कोई untrusted server prompt में inject न कर सके।
 Tool hints trust ladder से map होते हैं: destructive tools हमेशा confirm करते हैं, read-only

@@ -55,14 +55,101 @@ controladas por la [escalera de confianza](security-and-permissions.md).
 
 ## Módulos
 
-Los módulos añaden capacidades opcionales (embeddings, visión, STT) sin inflar el
-núcleo. Instalar uno requiere confirmación por defecto.
+Un módulo es código Python (`module.toml` + un punto de entrada) que se ejecuta dentro
+de Veles — añade capacidades opcionales (proveedores de memoria, embeddings, visión,
+STT) sin inflar el núcleo. Instalar uno requiere confirmación por defecto, y se carga
+en cada ejecución solo mientras sus archivos sigan coincidiendo con lo que aprobaste
+(consulta [mantén las instalaciones bajo control](../../en/how-to/extension-registries.md#keep-installs-honest)).
 
 ```bash
-veles module list
+veles module list                              # both scopes, with a `scope` column
 veles module add https://github.com/org/module.git
-veles module remove <name>
+veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
+veles module show <name> [--user]
+veles module remove <name> [--user]
+veles module approve <name> [--user]
 ```
+
+Los módulos viven en dos ámbitos, igual que las skills y las herramientas: locales al
+proyecto (`<project>/.veles/modules/`) y globales del usuario (`~/.veles/modules/`,
+cargados en todos los proyectos). Un módulo de usuario pasa por la misma puerta de
+aprobación que uno de proyecto, y la puerta se ejecuta antes de comparar nombres. Si un
+módulo de proyecto y uno de usuario comparten nombre, se carga el de proyecto aprobado
+y Veles avisa de que el de usuario queda oculto; un módulo de proyecto sin aprobar se
+omite (la advertencia nombra su directorio) y se carga el de usuario. Dos módulos
+aprobados del mismo ámbito con el mismo nombre — se carga el primero (ordenado por
+directorio), los demás avisan y se omiten. `veles module {show,approve,remove}` toman
+el nombre del manifiesto (el que muestra `list`) y rechazan un nombre que declare más
+de un directorio del ámbito, listándolos; `veles module add` se niega a instalar un
+módulo cuyo nombre ya declare otro directorio del ámbito.
+
+### Escribir un módulo que añade un proveedor de memoria
+
+El punto de entrada `register(api)` de un módulo puede llamar a
+`api.add_memory_provider(name, factory)` para conectar una fuente de memoria externa a
+la recuperación. `name` debe coincidir con una sección `[memory.external.<name>]` de
+`~/.veles/config.toml`; a `factory` se le pasa esa sección (un `dict`) y debe devolver
+un objeto que implemente el protocolo `MemoryProvider` de Veles
+(`veles.core.memory.provider`), o `None` para omitir el proveedor:
+
+```toml
+# module.toml
+[module]
+name = "my-provider"
+description = "Recalls memories from my external store."
+entrypoint = "my_provider.py:register"
+version = "0.1.0"
+```
+
+```python
+# my_provider.py
+from veles.core.memory.provider import RecallHit
+
+
+class MyProvider:
+    name = "my-provider"
+
+    def recall(self, query: str, *, limit: int) -> list[RecallHit]:
+        ...  # query the external store, return RecallHit objects
+
+
+def _build(cfg: dict) -> MyProvider | None:
+    api_key = cfg.get("api_key")
+    return MyProvider() if api_key else None
+
+
+def register(api) -> None:
+    api.add_memory_provider("my-provider", _build)
+```
+
+```toml
+# ~/.veles/config.toml
+[memory.external.my-provider]
+api_key = "..."
+```
+
+Un proveedor que además implemente `ingest(title, body, *, insight_id) -> bool` (el
+protocolo `IngestingMemoryProvider`) recibe también las escrituras de Veles, no solo
+las lecturas. Si dos módulos registran el mismo nombre de proveedor, la carga del
+segundo falla — se omite con una advertencia y no queda nada registrado a medias. Una
+sección configurada en `config.toml` cuyo módulo no está instalado muestra una sola
+advertencia con el comando de instalación; la recuperación sigue funcionando sin él.
+
+El registro incluye Honcho, Mem0 y Supermemory como módulos de proveedor listos para
+usar — instálalos con `veles registry install --user {honcho,mem0,supermemory}`,
+luego ejecuta el comando `uv tool install veles-ai --with '<package>'` que muestra la
+instalación (cada uno declara un SDK — `mem0ai>=2.0`, `honcho-ai>=2.5`,
+`supermemory>=3.62` — que Veles nunca instala por ti) y rellena la sección
+`[memory.external.<name>]` correspondiente:
+
+- **mem0**: `api_key`, `user_id`, opcionalmente `agent_id` (recupera también los
+  recuerdos de ese agente) y `host`. La telemetría del SDK está desactivada por
+  defecto; cada recuperación hace una petición extra `GET /v1/ping/`.
+- **supermemory**: `api_key`, opcionalmente `user_id` (enviado como el `container_tag`
+  de la búsqueda) y `base_url`.
+- **honcho**: `api_key`, `workspace_id`, opcionalmente `peer_id` (busca solo en los
+  mensajes de ese peer) y `base_url`. Cada recuperación hace un get-or-create del
+  workspace — crea `workspace_id` si aún no existe.
 
 ## Descubrir más
 

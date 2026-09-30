@@ -89,21 +89,37 @@ url = "https://mcp.example.com/mcp"
 disabled_tools = { github = ["delete_repository"], search = ["raw_query"] }
 ```
 
-## Kiểm tra và thử nghiệm
+## Phê duyệt, kiểm tra và thử nghiệm
 
 ```bash
-veles mcp list              # every configured server: transport, status, tool count
+veles mcp approve github    # review the recipe, type `yes` — the server may now start
+veles mcp list              # every configured server: transport, approved, status, tool count
 veles mcp test github       # connect to one server and list its tools
 ```
 
-`veles mcp list` luôn thoát với mã 0 — nó là một công cụ kiểm tra, không phải cổng kiểm tra sức khỏe.
-`veles mcp test` thoát với mã 1 khi kết nối thất bại và mã 2 khi tên máy chủ không xác định.
+Một máy chủ chỉ khởi động sau khi bạn phê duyệt đúng công thức (recipe) của nó.
+`veles mcp approve` hiển thị toàn bộ bảng — `command`, `args`, các giá trị `env` (một
+`PATH` ở đó quyết định tệp nhị phân nào được chạy; các tham chiếu `${VAR}` hiện như
+đã viết), `url`, `transport` và mọi khóa khác — và ghi lại một hash của bảng đúng như
+trong `config.toml`, trước khi mở rộng `${VAR}`: vì vậy xoay vòng token vẫn giữ phê
+duyệt, còn mọi chỉnh sửa bảng (một dự án được clone, một đối số bị đổi) khiến máy chủ
+thành `changed` và ngăn nó khởi động cho đến khi bạn phê duyệt lại. Phê duyệt bao gồm
+dòng lệnh; các tệp nó chạy từ dự án (một script trong `args`) không được ghim — hãy
+xem xét cả chúng. Các phê duyệt được lưu ở `~/.veles/mcp-approvals.json`. `veles
+registry install` một extension MCP hiển thị cùng recipe đó trong phần xác nhận và
+phê duyệt nó; `veles registry uninstall` thu hồi phê duyệt.
+
+`veles mcp list` luôn thoát với mã 0 — nó là một công cụ kiểm tra, không phải cổng
+kiểm tra sức khỏe; nó không bao giờ khởi động một máy chủ chưa được phê duyệt.
+`veles mcp test` thoát với mã 1 khi máy chủ chưa được phê duyệt hoặc kết nối thất bại,
+và mã 2 khi tên máy chủ không xác định.
 
 ## Cách các công cụ xuất hiện
 
-Sau khi được cấu hình, các máy chủ sẽ được gắn kết (mount) **tự động** trong lần `veles run` /
-khởi động TUI / khởi động daemon kế tiếp — không có cờ "bật MCP" riêng biệt, sự hiện diện của
-cấu hình chính là công tắc. Mỗi công cụ được đưa vào registry thông thường dưới dạng `mcp_<server>_<tool>`
+Sau khi được cấu hình và phê duyệt, các máy chủ sẽ được gắn kết (mount) **tự động**
+trong lần `veles run` / khởi động TUI / khởi động daemon kế tiếp — không có cờ "bật
+MCP" riêng biệt. Một máy chủ chưa được phê duyệt sẽ bị bỏ qua, kèm một cảnh báo cho
+mỗi tiến trình. Mỗi công cụ được đưa vào registry thông thường dưới dạng `mcp_<server>_<tool>`
 và có thể được agent gọi như bất kỳ công cụ tích hợp sẵn nào. Các schema được làm sạch (giới hạn
 tên/độ dài, loại bỏ ký tự điều khiển) để một máy chủ không đáng tin cậy không thể chèn nội dung vào prompt.
 Các gợi ý (hint) của công cụ được ánh xạ tới thang tin cậy: các công cụ có tính phá hủy luôn yêu cầu xác nhận, các công cụ

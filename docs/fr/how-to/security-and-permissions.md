@@ -62,9 +62,63 @@ correspondante, sauf si vous passez `--no-env-fallback`.
 
 ## Le bac à sable
 
-Les outils peuvent lire à l'intérieur du projet actif et de `~/.veles/`, et
-écrire uniquement dans les zones inscriptibles de la mise en page (`wiki/`, `.veles/`
-par défaut). Remplacez les racines pour les configurations avancées avec
-`VELES_SANDBOX_ROOTS` (séparées par `:`). Les récupérations d'URL conservent une
-liste de blocage SSRF ; `VELES_FETCH_ALLOW_PRIVATE=1` lève le blocage du réseau
-privé.
+Les outils peuvent lire à l'intérieur du projet actif, de `~/.veles/skills/` et de
+`~/.veles/locales/`, et écrire uniquement dans le projet — ou uniquement dans les
+zones inscriptibles de la mise en page, quand celle-ci en déclare. Remplacez les
+racines pour les configurations avancées avec `VELES_SANDBOX_ROOTS` (séparées par
+`:`). Les récupérations d'URL conservent une liste de blocage SSRF ;
+`VELES_FETCH_ALLOW_PRIVATE=1` lève le blocage du réseau privé.
+
+Dans le `.veles/` du projet, les outils de fichiers de l'agent ne peuvent écrire que
+dans `skills/`, `tools/`, `tmp/`, `plans/`, `memory/` et `artifacts/`. Tout le reste —
+`trust.json`, `config.toml`, `project.toml`, `modules/`, `wiki.toml`, `memory.db` — ne
+change que par les commandes `veles` et les outils propres à Veles. Les outils de
+fichiers refusent aussi tout autre répertoire `.veles/` du projet (celui d'un
+sous-projet, ou un que l'agent planterait dans `wiki/`), à n'importe quelle
+profondeur. Ainsi, via ses outils de fichiers, l'agent ne peut ni s'accorder la
+confiance ni ajouter du code que Veles exécuterait (un outil qu'il écrit dans
+`.veles/tools/` ne se charge qu'après votre approbation de son fichier). Les autres
+graphies du même fichier (casse, `..`, lien symbolique) sont refusées aussi.
+
+Les fichiers qui s'exécutent sans commande explicite ou qui pilotent une CLI d'agent —
+tout ce qui se trouve sous `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`,
+`.vscode/`, `.devcontainer/`, `.husky/`, ainsi que `.envrc`, `.mcp.json`,
+`.pre-commit-config.yaml`, `lefthook.yml`, à n'importe quelle profondeur, plus le
+répertoire `core.hooksPath` du dépôt et la cible d'un `.git` qui est un lien
+symbolique — les outils de fichiers de l'agent ne les écrivent qu'après votre
+confirmation de cette écriture. Les autorisations de confiance et l'autopilot ne la
+couvrent pas ; le daemon demande dans le canal, et une exécution par lots sans
+personne à qui demander refuse.
+
+Les fournisseurs `claude-cli` et `gemini-cli` s'exécutent comme un modèle avec les
+seuls outils de Veles : leurs propres outils shell, d'édition de fichiers et web, les
+réglages et hooks `.claude/` du projet, et les autres serveurs MCP ne s'appliquent
+pas, et chaque outil Veles qu'ils appellent passe par l'échelle de confiance
+ci-dessus (personne ne peut répondre à une invite là-bas, donc tout ce qui n'est pas
+déjà accordé est refusé).
+
+Limites connues :
+
+- `run_shell` est un shell : une fois que vous l'accordez (ou sous autopilot), il peut
+  écrire n'importe lequel des fichiers ci-dessus sans la confirmation par fichier.
+- Une approbation MCP fige la ligne de commande du serveur, pas les fichiers qu'il
+  exécute depuis le projet (un script nommé dans `args`) — relisez-les aussi.
+- Avec un fournisseur CLI, les exécutions qui pré-autorisent des outils uniquement
+  pour elles-mêmes (tâches d'arrière-plan du daemon, `veles research`) ne le
+  transmettent pas à la CLI déléguée : ses outils Veles ont besoin d'une autorisation
+  permanente via `veles trust set` ou d'une fenêtre d'autopilot. Le mode de
+  planification de l'exécution parente ne leur parvient pas non plus.
+- `gemini-cli` fait confiance au dossier du projet pour son exécution, donc gemini lit
+  aussi le `.env` du projet — gardez-y hors les réglages gemini que vous ne voulez pas
+  que l'agent oriente.
+- Sur une machine avec des politiques gemini gérées (système), gemini ignore la
+  politique que Veles lui passe, donc `gemini-cli` n'y est pas limité aux outils de
+  Veles.
+
+Les chemins contenant des caractères de contrôle (séquences d'échappement de
+terminal, surcharges bidi) sont refusés, et les confirmations, l'invite de confiance
+et l'aperçu du diff affichent ces caractères échappés — un appel d'outil ne peut pas
+falsifier le texte que vous approuvez.
+
+Les serveurs MCP d'une configuration ne démarrent qu'après votre approbation — voir
+[serveurs MCP externes](external-mcp-servers.md#approuver-inspecter-et-tester).

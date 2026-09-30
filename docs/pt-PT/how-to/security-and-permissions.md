@@ -62,8 +62,63 @@ correspondente, a menos que passe `--no-env-fallback`.
 
 ## A sandbox
 
-As ferramentas podem ler dentro do projeto ativo e de `~/.veles/`, e escrever
-apenas nas zonas graváveis do layout (`wiki/`, `.veles/` por omissão).
-Substitua as raízes para configurações avançadas com `VELES_SANDBOX_ROOTS`
-(separadas por `:`). A obtenção de URLs mantém uma lista de negação de SSRF;
-`VELES_FETCH_ALLOW_PRIVATE=1` levanta o bloqueio da rede privada.
+As ferramentas podem ler dentro do projeto ativo, de `~/.veles/skills/` e de
+`~/.veles/locales/`, e escrever apenas dentro do projeto — ou apenas nas zonas
+graváveis do layout, quando o layout as declara. Substitua as raízes para
+configurações avançadas com `VELES_SANDBOX_ROOTS` (separadas por `:`). A obtenção
+de URLs mantém uma lista de negação de SSRF; `VELES_FETCH_ALLOW_PRIVATE=1` levanta
+o bloqueio da rede privada.
+
+Dentro de `.veles/` do projeto, as ferramentas de ficheiros do agente só podem
+escrever em `skills/`, `tools/`, `tmp/`, `plans/`, `memory/` e `artifacts/`. Tudo o
+resto aí — `trust.json`, `config.toml`, `project.toml`, `modules/`, `wiki.toml`,
+`memory.db` — só muda através de comandos `veles` e das ferramentas do próprio
+Veles. As ferramentas de ficheiros recusam também qualquer outro diretório
+`.veles/` do projeto (o de um subprojeto, ou um que o agente plantasse em `wiki/`)
+a qualquer profundidade. Assim, através das suas ferramentas de ficheiros, o agente
+não pode conceder confiança a si próprio nem adicionar código que o Veles
+executaria (uma ferramenta que escreva em `.veles/tools/` só é carregada depois de
+aprovar o seu ficheiro). Outras grafias do mesmo ficheiro (maiúsculas/minúsculas,
+`..`, um symlink) também são recusadas.
+
+Ficheiros que são executados sem um comando explícito ou que orientam uma CLI de
+agente — tudo em `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`,
+`.vscode/`, `.devcontainer/`, `.husky/`, e `.envrc`, `.mcp.json`,
+`.pre-commit-config.yaml`, `lefthook.yml`, a qualquer profundidade, mais o
+diretório `core.hooksPath` do repositório e o destino de um `.git` que seja
+symlink — as ferramentas de ficheiros do agente só escrevem depois de confirmar
+essa escrita. Concessões de confiança e o autopilot não a cobrem; o daemon
+pergunta no canal, e uma execução em lote sem ninguém a quem perguntar recusa.
+
+Os fornecedores `claude-cli` e `gemini-cli` funcionam como um modelo apenas com as
+ferramentas do Veles: o seu próprio shell, edição de ficheiros e ferramentas web,
+as definições e hooks `.claude/` do projeto e outros servidores MCP não se
+aplicam, e cada ferramenta do Veles que chamam passa pela escada de confiança
+acima (ninguém pode responder a um pedido aí, por isso tudo o que ainda não foi
+concedido é recusado).
+
+Limites conhecidos:
+
+- `run_shell` é um shell: depois de o conceder (ou sob autopilot), pode escrever
+  qualquer um dos ficheiros acima sem a confirmação por ficheiro.
+- Uma aprovação MCP fixa a linha de comando do servidor, não os ficheiros que ele
+  executa a partir do projeto (um script indicado em `args`) — reveja-os também.
+- Com um fornecedor CLI, as execuções que pré-autorizam ferramentas apenas para si
+  próprias (tarefas de fundo do daemon, `veles research`) não transmitem isso à CLI
+  delegada: as suas ferramentas do Veles precisam de uma concessão permanente
+  `veles trust set` ou de uma janela de autopilot. O modo de planeamento da
+  execução principal também não as alcança.
+- O `gemini-cli` confia na pasta do projeto durante a sua execução, por isso o
+  gemini lê também o `.env` do projeto — mantenha fora dele as definições do gemini
+  que não quer que o agente controle.
+- Numa máquina com políticas gemini geridas (do sistema), o gemini ignora a política
+  que o Veles lhe passa, pelo que o `gemini-cli` não fica limitado às ferramentas do
+  Veles aí.
+
+Caminhos com caracteres de controlo (sequências de escape de terminal, substituições
+bidi) são recusados, e as confirmações, o pedido de confiança e a pré-visualização
+do diff mostram esses caracteres escapados — uma chamada de ferramenta não pode
+forjar o texto que aprova.
+
+Os servidores MCP de uma configuração só arrancam depois de os aprovar — veja
+[servidores MCP externos](external-mcp-servers.md).

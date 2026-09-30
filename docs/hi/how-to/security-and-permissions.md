@@ -61,8 +61,52 @@ veles secret set OPENROUTER_API_KEY --project myproj   # सिर्फ़ ए�
 
 ## Sandbox
 
-Tools सक्रिय project और `~/.veles/` के अंदर पढ़ सकते हैं, और केवल layout के
-writable zones (डिफ़ॉल्ट रूप से `wiki/`, `.veles/`) में लिख सकते हैं। उन्नत setups
-के लिए roots को `VELES_SANDBOX_ROOTS` (`:`-separated) से override करें। URL
-fetches एक SSRF deny-list रखते हैं; `VELES_FETCH_ALLOW_PRIVATE=1`
-private-network block को हटा देता है।
+Tools सक्रिय project, `~/.veles/skills/` और `~/.veles/locales/` के अंदर पढ़ सकते हैं,
+और केवल project के अंदर लिख सकते हैं — या केवल layout के writable zones में, जब layout
+उन्हें declare करता हो। उन्नत setups के लिए roots को `VELES_SANDBOX_ROOTS`
+(`:`-separated) से override करें। URL fetches एक SSRF deny-list रखते हैं;
+`VELES_FETCH_ALLOW_PRIVATE=1` private-network block को हटा देता है।
+
+project के `.veles/` के अंदर agent के file tools केवल `skills/`, `tools/`, `tmp/`,
+`plans/`, `memory/` और `artifacts/` में लिख सकते हैं। वहाँ बाकी सब —
+`trust.json`, `config.toml`, `project.toml`, `modules/`, `wiki.toml`, `memory.db` —
+केवल `veles` commands और Veles के अपने tools से बदलता है। file tools project की किसी भी
+अन्य `.veles/` directory को भी (किसी subproject की, या जिसे agent `wiki/` में रोप दे) किसी भी
+गहराई पर अस्वीकार करते हैं। इसलिए अपने file tools से agent न खुद को trust दे सकता है, न ऐसा code
+जोड़ सकता है जिसे Veles चलाए (`.veles/tools/` में लिखा गया tool तभी load होता है जब आप उसकी
+file approve करें)। उसी file की अन्य spellings (case, `..`, symlink) भी अस्वीकार की जाती हैं।
+
+ऐसी files जो बिना explicit command के चलती हैं या किसी agent CLI को steer करती हैं — `.git/`,
+`.githooks/`, `.claude/`, `.gemini/`, `.codex/`, `.vscode/`, `.devcontainer/`, `.husky/` के
+अंतर्गत सब कुछ, और `.envrc`, `.mcp.json`, `.pre-commit-config.yaml`, `lefthook.yml`, किसी भी
+गहराई पर, साथ ही repo की `core.hooksPath` directory और वह जगह जहाँ symlinked `.git` इशारा करता
+है — agent के file tools इनमें तभी लिखते हैं जब आप उस write को confirm करें। Trust grants और
+autopilot इसे cover नहीं करते; daemon channel में पूछता है, और जिस batch run में पूछने वाला कोई
+न हो वह अस्वीकार कर देता है।
+
+`claude-cli` और `gemini-cli` providers केवल Veles के tools वाले model की तरह चलते हैं: उनके अपने
+shell, file-edit और web tools, project की `.claude/` settings और hooks, और अन्य MCP servers
+लागू नहीं होते, और उनके द्वारा बुलाया गया हर Veles tool ऊपर की trust ladder से गुज़रता है (वहाँ
+कोई prompt का जवाब नहीं दे सकता, इसलिए जो पहले से granted नहीं है वह अस्वीकार हो जाता है)।
+
+ज्ञात सीमाएँ:
+
+- `run_shell` एक shell है: एक बार आप इसे grant कर दें (या autopilot में), यह ऊपर की किसी भी
+  file को per-file confirmation के बिना लिख सकता है।
+- MCP approval server की command line को pin करता है, उन files को नहीं जिन्हें वह project से
+  चलाता है (`args` में नामित script) — उन्हें भी review करें।
+- CLI provider के साथ, जो runs tools को केवल अपने लिए pre-authorise करते हैं (daemon background
+  jobs, `veles research`) वे इसे delegated CLI तक नहीं पहुँचाते: उसके Veles tools को standing
+  `veles trust set` grant या autopilot window चाहिए। parent run का planning mode भी उन तक नहीं
+  पहुँचता।
+- `gemini-cli` अपने run के लिए project folder पर भरोसा करता है, इसलिए gemini project की `.env`
+  भी पढ़ता है — gemini की वे settings उसमें न रखें जिन्हें आप agent से steer नहीं करवाना चाहते।
+- managed (system) gemini policies वाली machine पर, gemini उस policy को ignore करता है जो Veles
+  उसे देता है, इसलिए वहाँ `gemini-cli` केवल Veles के tools तक सीमित नहीं रहता।
+
+control characters वाले paths (terminal escapes, bidi overrides) अस्वीकार किए जाते हैं, और
+confirmations, trust prompt और diff preview ऐसे characters को escaped दिखाते हैं — कोई tool call
+उस text को forge नहीं कर सकता जिसे आप approve करते हैं।
+
+config के MCP servers तभी start होते हैं जब आप उन्हें approve करें — देखें
+[external MCP servers](external-mcp-servers.md)।

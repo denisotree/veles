@@ -59,8 +59,54 @@ tương ứng, trừ khi bạn truyền `--no-env-fallback`.
 
 ## Sandbox
 
-Các công cụ có thể đọc bên trong dự án đang hoạt động và `~/.veles/`, và chỉ ghi
-được vào các vùng cho phép ghi của layout (mặc định là `wiki/`, `.veles/`). Ghi đè
-các root cho những thiết lập nâng cao bằng `VELES_SANDBOX_ROOTS` (ngăn cách bằng
-`:`). Việc tải URL duy trì một danh sách chặn SSRF; `VELES_FETCH_ALLOW_PRIVATE=1`
-gỡ bỏ chặn mạng riêng (private network).
+Các công cụ có thể đọc bên trong dự án đang hoạt động, `~/.veles/skills/` và
+`~/.veles/locales/`, và chỉ ghi được bên trong dự án — hoặc chỉ vào các vùng cho phép
+ghi của layout, khi layout có khai báo. Ghi đè các root cho những thiết lập nâng cao
+bằng `VELES_SANDBOX_ROOTS` (ngăn cách bằng `:`). Việc tải URL duy trì một danh sách
+chặn SSRF; `VELES_FETCH_ALLOW_PRIVATE=1` gỡ bỏ chặn mạng riêng (private network).
+
+Bên trong `.veles/` của dự án, các công cụ tệp của agent chỉ được ghi vào `skills/`,
+`tools/`, `tmp/`, `plans/`, `memory/` và `artifacts/`. Mọi thứ còn lại ở đó —
+`trust.json`, `config.toml`, `project.toml`, `modules/`, `wiki.toml`, `memory.db` —
+chỉ thay đổi qua các lệnh `veles` và các công cụ của chính Veles. Các công cụ tệp
+cũng từ chối mọi thư mục `.veles/` khác trong dự án (của một subproject, hoặc một
+thư mục agent cố cài vào `wiki/`) ở bất kỳ độ sâu nào. Vì vậy, qua các công cụ tệp,
+agent không thể tự cấp quyền tin cậy cho mình hay thêm mã mà Veles sẽ chạy (một công
+cụ nó ghi vào `.veles/tools/` chỉ được nạp sau khi bạn duyệt tệp của nó). Các cách
+viết khác của cùng một tệp (hoa/thường, `..`, symlink) cũng bị từ chối.
+
+Các tệp tự chạy mà không cần lệnh tường minh, hoặc điều khiển một agent CLI — mọi thứ
+dưới `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`, `.vscode/`,
+`.devcontainer/`, `.husky/`, và `.envrc`, `.mcp.json`, `.pre-commit-config.yaml`,
+`lefthook.yml`, ở bất kỳ độ sâu nào, cộng với thư mục `core.hooksPath` của repo và
+nơi một `.git` dạng symlink trỏ tới — các công cụ tệp của agent chỉ ghi sau khi bạn
+xác nhận lần ghi đó. Các quyền trust và autopilot không bao gồm việc này; daemon hỏi
+trong kênh, còn một lần chạy batch không có ai để hỏi thì từ chối.
+
+Các provider `claude-cli` và `gemini-cli` chạy như một model chỉ với các công cụ của
+Veles: shell, công cụ sửa tệp và web riêng của chúng, cài đặt và hook `.claude/` của
+dự án, cùng các máy chủ MCP khác đều không áp dụng, và mọi công cụ Veles chúng gọi
+đều đi qua thang trust ở trên (ở đó không ai trả lời được prompt, nên bất cứ thứ gì
+chưa được cấp đều bị từ chối).
+
+Các giới hạn đã biết:
+
+- `run_shell` là một shell: một khi bạn cấp quyền cho nó (hoặc dưới autopilot), nó có
+  thể ghi bất kỳ tệp nào ở trên mà không cần xác nhận theo từng tệp.
+- Một phê duyệt MCP ghim dòng lệnh của máy chủ, không ghim các tệp nó chạy từ dự án
+  (một script nêu trong `args`) — hãy xem xét cả chúng.
+- Với một provider CLI, các lần chạy chỉ tiền cấp quyền công cụ cho riêng mình (tác vụ
+  nền của daemon, `veles research`) không truyền điều đó cho CLI được ủy quyền: các
+  công cụ Veles của nó cần một quyền cấp thường trực `veles trust set` hoặc một cửa
+  sổ autopilot. Chế độ lập kế hoạch của lần chạy cha cũng không tới được chúng.
+- `gemini-cli` tin cậy thư mục dự án trong lần chạy của nó, nên gemini cũng đọc `.env`
+  của dự án — đừng để trong đó các cài đặt gemini mà bạn không muốn agent điều khiển.
+- Trên máy có chính sách gemini được quản lý (cấp hệ thống), gemini bỏ qua chính sách
+  Veles truyền vào, nên ở đó `gemini-cli` không bị giới hạn trong các công cụ của Veles.
+
+Đường dẫn chứa ký tự điều khiển (chuỗi escape của terminal, ký tự đảo chiều bidi) bị
+từ chối, còn các xác nhận, lời nhắc trust và bản xem trước diff hiển thị các ký tự đó
+ở dạng đã escape — một lệnh gọi công cụ không thể làm giả văn bản bạn duyệt.
+
+Các máy chủ MCP trong cấu hình chỉ khởi động sau khi bạn duyệt chúng — xem
+[các máy chủ MCP bên ngoài](external-mcp-servers.md).

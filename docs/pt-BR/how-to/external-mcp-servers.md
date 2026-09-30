@@ -89,21 +89,35 @@ Defina `[mcp] disabled_tools` — uma tabela que mapeia cada servidor aos nomes 
 disabled_tools = { github = ["delete_repository"], search = ["raw_query"] }
 ```
 
-## Inspecionar e testar
+## Aprovar, inspecionar e testar
 
 ```bash
-veles mcp list              # every configured server: transport, status, tool count
+veles mcp approve github    # review the recipe, type `yes` — the server may now start
+veles mcp list              # every configured server: transport, approved, status, tool count
 veles mcp test github       # connect to one server and list its tools
 ```
 
-`veles mcp list` sempre sai com 0 — é um inspetor, não um portão de saúde.
-`veles mcp test` sai com 1 quando a conexão falha e com 2 para um nome de servidor desconhecido.
+Um servidor só inicia depois que você aprova a receita exata dele. `veles mcp approve`
+mostra a tabela inteira — `command`, `args`, os valores de `env` (um `PATH` ali decide
+qual binário roda; referências `${VAR}` aparecem como escritas), `url`, `transport` e
+qualquer outra chave — e registra um hash da tabela como está em `config.toml`, antes
+da expansão de `${VAR}`: assim, rotacionar um token mantém a aprovação, enquanto
+qualquer edição na tabela (um projeto clonado, um argumento alterado) deixa o servidor
+como `changed` e impede que ele inicie até que você o aprove de novo. A aprovação cobre
+a linha de comando; os arquivos que ela executa a partir do projeto (um script em
+`args`) não ficam fixados — revise esses também. As aprovações ficam em
+`~/.veles/mcp-approvals.json`. `veles registry install` de uma extensão MCP mostra a
+mesma receita na confirmação e a aprova; `veles registry uninstall` a revoga.
+
+`veles mcp list` sempre sai com 0 — é um inspetor, não um portão de saúde; nunca inicia
+um servidor não aprovado. `veles mcp test` sai com 1 quando o servidor não está
+aprovado ou a conexão falha, e com 2 para um nome de servidor desconhecido.
 
 ## Como as ferramentas aparecem
 
-Uma vez configurados, os servidores são montados **automaticamente** no próximo `veles run` /
-TUI / início do daemon — não há uma flag separada de "habilitar MCP"; a presença da
-configuração é o interruptor. Cada ferramenta entra no registro normal como `mcp_<server>_<tool>`
+Uma vez configurados e aprovados, os servidores são montados **automaticamente** no
+próximo `veles run` / TUI / início do daemon — não há uma flag separada de "habilitar
+MCP". Um servidor não aprovado é ignorado, com um aviso por processo. Cada ferramenta entra no registro normal como `mcp_<server>_<tool>`
 e pode ser chamada pelo agente como qualquer ferramenta nativa. Os schemas são higienizados (limites de nome/tamanho,
 remoção de caracteres de controle) para que um servidor não confiável não consiga injetar conteúdo no prompt.
 As dicas de ferramenta mapeiam para a escada de confiança: ferramentas destrutivas sempre confirmam, ferramentas somente leitura

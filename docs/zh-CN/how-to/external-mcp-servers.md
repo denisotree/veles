@@ -76,18 +76,21 @@ url = "https://mcp.example.com/mcp"
 disabled_tools = { github = ["delete_repository"], search = ["raw_query"] }
 ```
 
-## 检查与测试
+## 批准、检查与测试
 
 ```bash
-veles mcp list              # every configured server: transport, status, tool count
+veles mcp approve github    # review the recipe, type `yes` — the server may now start
+veles mcp list              # every configured server: transport, approved, status, tool count
 veles mcp test github       # connect to one server and list its tools
 ```
 
-`veles mcp list` 始终以 0 退出——它是一个检查器，而非健康门禁。当连接失败时 `veles mcp test` 以 1 退出，当服务器名称未知时以 2 退出。
+服务器只有在你批准了它的确切配方后才会启动。`veles mcp approve` 会显示整张表——`command`、`args`、`env` 的值（其中的 `PATH` 决定运行哪个二进制文件；`${VAR}` 引用按原样显示）、`url`、`transport` 以及其他任何键——并记录 `config.toml` 中该表原样内容的哈希，即在 `${VAR}` 展开之前计算，因此轮换令牌不会使批准失效，而对该表的任何修改（克隆来的项目、改动过的参数）都会使服务器变为 `changed`，在你重新批准之前不会启动。批准只覆盖命令行；它从项目中运行的文件（`args` 里的脚本）不会被固定——也请审查它们。批准记录保存在 `~/.veles/mcp-approvals.json`。安装 MCP 扩展的 `veles registry install` 会在确认时显示同样的配方并完成批准；`veles registry uninstall` 会撤销批准。
+
+`veles mcp list` 始终以 0 退出——它是一个检查器，而非健康门禁；它绝不会启动未批准的服务器。当服务器未批准或连接失败时 `veles mcp test` 以 1 退出，当服务器名称未知时以 2 退出。
 
 ## 工具如何出现
 
-配置完成后，服务器会在下一次 `veles run` / TUI / 守护进程启动时**自动**挂载——没有单独的“启用 MCP”开关，配置的存在本身就是开关。每个工具以 `mcp_<server>_<tool>` 的形式进入正常的注册表，可由智能体像任何内置工具一样调用。Schema 会经过净化（名称/长度限制、控制字符剥离），这样不受信任的服务器无法注入到提示中。工具提示会映射到信任阶梯：破坏性工具始终需要确认，只读工具无需提示，其余一切走常规的[信任](security-and-permissions.md)流程——如果你不想每次都被询问，可用 `veles trust set` 授予长期批准。
+配置并批准后，服务器会在下一次 `veles run` / TUI / 守护进程启动时**自动**挂载——没有单独的“启用 MCP”开关。未批准的服务器会被跳过，每个进程只给出一次警告。每个工具以 `mcp_<server>_<tool>` 的形式进入正常的注册表，可由智能体像任何内置工具一样调用。Schema 会经过净化（名称/长度限制、控制字符剥离），这样不受信任的服务器无法注入到提示中。工具提示会映射到信任阶梯：破坏性工具始终需要确认，只读工具无需提示，其余一切走常规的[信任](security-and-permissions.md)流程——如果你不想每次都被询问，可用 `veles trust set` 授予长期批准。
 
 ## 故障处理
 

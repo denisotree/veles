@@ -60,8 +60,59 @@ correspondente, a menos que você passe `--no-env-fallback`.
 
 ## O sandbox
 
-As tools podem ler dentro do projeto ativo e de `~/.veles/`, e escrever apenas nas
-zonas graváveis do layout (`wiki/`, `.veles/` por padrão). Sobrescreva as raízes para
+As tools podem ler dentro do projeto ativo, de `~/.veles/skills/` e de
+`~/.veles/locales/`, e escrever apenas dentro do projeto — ou apenas nas zonas
+graváveis do layout, quando o layout as declara. Sobrescreva as raízes para
 configurações avançadas com `VELES_SANDBOX_ROOTS` (separadas por `:`). As buscas de URL
 mantêm uma deny-list de SSRF; `VELES_FETCH_ALLOW_PRIVATE=1` remove o bloqueio de rede
 privada.
+
+Dentro do `.veles/` do projeto, as tools de arquivo do agente só podem escrever em
+`skills/`, `tools/`, `tmp/`, `plans/`, `memory/` e `artifacts/`. Todo o resto —
+`trust.json`, `config.toml`, `project.toml`, `modules/`, `wiki.toml`, `memory.db` — só
+muda por comandos `veles` e pelas tools do próprio Veles. As tools de arquivo também
+recusam qualquer outro diretório `.veles/` do projeto (o de um subprojeto, ou um que o
+agente plantaria em `wiki/`) em qualquer profundidade. Assim, pelas suas tools de
+arquivo o agente não consegue conceder confiança a si mesmo nem adicionar código que o
+Veles executaria (uma tool que ele escreve em `.veles/tools/` só carrega depois que
+você aprova o arquivo dela). Outras grafias do mesmo arquivo (maiúsculas/minúsculas,
+`..`, um symlink) também são recusadas.
+
+Arquivos que rodam sem um comando explícito ou que direcionam uma CLI de agente —
+qualquer coisa sob `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`,
+`.vscode/`, `.devcontainer/`, `.husky/`, e `.envrc`, `.mcp.json`,
+`.pre-commit-config.yaml`, `lefthook.yml`, em qualquer profundidade, mais o diretório
+`core.hooksPath` do repositório e o destino de um `.git` que seja symlink — as tools de
+arquivo do agente só os escrevem depois que você confirma essa escrita. Concessões de
+confiança e o autopilot não a cobrem; o daemon pergunta no canal, e uma execução em
+lote sem ninguém para perguntar recusa.
+
+Os provedores `claude-cli` e `gemini-cli` rodam como um modelo apenas com as tools do
+Veles: as próprias tools de shell, edição de arquivos e web deles, as configurações e
+hooks de `.claude/` do projeto e outros servidores MCP não se aplicam, e toda tool do
+Veles que eles chamam passa pela escada de confiança acima (ninguém pode responder a
+uma pergunta ali, então tudo que ainda não foi concedido é recusado).
+
+Limites conhecidos:
+
+- `run_shell` é um shell: depois que você o concede (ou sob autopilot), ele pode
+  escrever qualquer um dos arquivos acima sem a confirmação por arquivo.
+- Uma aprovação de MCP fixa a linha de comando do servidor, não os arquivos que ele
+  executa a partir do projeto (um script citado em `args`) — revise esses também.
+- Com um provedor CLI, execuções que pré-autorizam tools só para si mesmas (jobs em
+  segundo plano do daemon, `veles research`) não repassam isso à CLI delegada: as tools
+  do Veles dela precisam de uma concessão permanente com `veles trust set` ou de uma
+  janela de autopilot. O modo de planejamento da execução pai também não chega a elas.
+- `gemini-cli` confia na pasta do projeto durante a sua execução, então o gemini também
+  lê o `.env` do projeto — mantenha fora dele as configurações do gemini que você não
+  quer que o agente direcione.
+- Em uma máquina com políticas gemini gerenciadas (do sistema), o gemini ignora a
+  política que o Veles passa, então lá o `gemini-cli` não fica limitado às tools do
+  Veles.
+
+Caminhos com caracteres de controle (escapes de terminal, sobrescritas bidi) são
+recusados, e as confirmações, o prompt de confiança e a prévia do diff mostram esses
+caracteres escapados — uma chamada de tool não consegue forjar o texto que você aprova.
+
+Servidores MCP de uma configuração só iniciam depois que você os aprova — veja
+[servidores MCP externos](external-mcp-servers.md#aprovar-inspecionar-e-testar).

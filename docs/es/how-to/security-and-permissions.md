@@ -62,9 +62,64 @@ correspondiente a menos que pases `--no-env-fallback`.
 
 ## El sandbox
 
-Las herramientas pueden leer dentro del proyecto activo y de `~/.veles/`, y
-escribir solo en las zonas escribibles del layout (`wiki/`, `.veles/` por
-defecto). Sobrescribe las raíces para configuraciones avanzadas con
-`VELES_SANDBOX_ROOTS` (separadas por `:`). Las descargas de URL mantienen una
-lista de denegación contra SSRF; `VELES_FETCH_ALLOW_PRIVATE=1` elimina el bloqueo
-de redes privadas.
+Las herramientas pueden leer dentro del proyecto activo, `~/.veles/skills/` y
+`~/.veles/locales/`, y escribir solo dentro del proyecto — o solo en las zonas
+escribibles del layout, cuando este las declara. Sobrescribe las raíces para
+configuraciones avanzadas con `VELES_SANDBOX_ROOTS` (separadas por `:`). Las
+descargas de URL mantienen una lista de denegación contra SSRF;
+`VELES_FETCH_ALLOW_PRIVATE=1` elimina el bloqueo de redes privadas.
+
+Dentro del `.veles/` del proyecto, las herramientas de archivos del agente solo pueden
+escribir en `skills/`, `tools/`, `tmp/`, `plans/`, `memory/` y `artifacts/`. Todo lo
+demás — `trust.json`, `config.toml`, `project.toml`, `modules/`, `wiki.toml`,
+`memory.db` — cambia solo mediante comandos `veles` y las herramientas propias de
+Veles. Las herramientas de archivos también rechazan cualquier otro directorio
+`.veles/` del proyecto (el de un subproyecto, o uno que el agente plantaría en
+`wiki/`) a cualquier profundidad. Así, con sus herramientas de archivos el agente no
+puede concederse confianza a sí mismo ni añadir código que Veles ejecutaría (una
+herramienta que escriba en `.veles/tools/` se carga solo después de que apruebes su
+archivo). Otras formas de escribir el mismo archivo (mayúsculas/minúsculas, `..`, un
+symlink) también se rechazan.
+
+Los archivos que se ejecutan sin un comando explícito o que dirigen a una CLI de agente
+— todo lo que esté bajo `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`,
+`.vscode/`, `.devcontainer/`, `.husky/`, y `.envrc`, `.mcp.json`,
+`.pre-commit-config.yaml`, `lefthook.yml`, a cualquier profundidad, además del
+directorio `core.hooksPath` del repositorio y el destino de un `.git` que sea un
+symlink — las herramientas de archivos del agente los escriben solo después de que
+confirmes esa escritura. Las concesiones de confianza y el autopilot no la cubren; el
+daemon pregunta en el canal, y una ejecución por lotes sin nadie a quien preguntar la
+rechaza.
+
+Los proveedores `claude-cli` y `gemini-cli` se ejecutan como un modelo con las
+herramientas de Veles únicamente: sus propias herramientas de shell, edición de
+archivos y web, los ajustes y hooks de `.claude/` del proyecto y otros servidores MCP
+no se aplican, y toda herramienta de Veles que llamen pasa por la escalera de
+confianza anterior (nadie puede responder a una pregunta ahí, así que todo lo que no
+esté ya concedido se rechaza).
+
+Límites conocidos:
+
+- `run_shell` es un shell: una vez que lo concedes (o bajo autopilot) puede escribir
+  cualquiera de los archivos anteriores sin la confirmación por archivo.
+- Una aprobación de MCP fija la línea de comandos del servidor, no los archivos que
+  ejecuta desde el proyecto (un script indicado en `args`) — revísalos también.
+- Con un proveedor CLI, las ejecuciones que preautorizan herramientas solo para sí
+  mismas (tareas en segundo plano del daemon, `veles research`) no se lo transmiten a
+  la CLI delegada: sus herramientas de Veles necesitan una concesión permanente con
+  `veles trust set` o una ventana de autopilot. El modo de planificación de la
+  ejecución padre tampoco les llega.
+- `gemini-cli` confía en la carpeta del proyecto durante su ejecución, así que gemini
+  también lee el `.env` del proyecto — mantén fuera de él los ajustes de gemini que no
+  quieras que el agente dirija.
+- En una máquina con políticas de gemini gestionadas (del sistema), gemini ignora la
+  política que le pasa Veles, así que allí `gemini-cli` no se limita a las
+  herramientas de Veles.
+
+Las rutas con caracteres de control (secuencias de escape de terminal, sobrescrituras
+bidi) se rechazan, y las confirmaciones, el aviso de confianza y la vista previa del
+diff muestran esos caracteres escapados — una llamada a una herramienta no puede
+falsificar el texto que apruebas.
+
+Los servidores MCP de una configuración se inician solo después de que los apruebes —
+consulta [servidores MCP externos](external-mcp-servers.md#aprobar-inspeccionar-y-probar).
