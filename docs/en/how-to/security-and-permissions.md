@@ -69,19 +69,22 @@ Inside the project's `.veles/` the agent's file tools may write only to `skills/
 `trust.json`, `config.toml`, `project.toml`, `modules/`, `wiki.toml`, `memory.db` —
 changes only through `veles` commands and Veles' own tools. The file tools also refuse
 any other `.veles/` directory in the project (a subproject's, or one the agent would plant
-in `wiki/`), and the configs of the delegated CLIs — `.claude/`, `.gemini/` and
-`.mcp.json` — at any depth. So through its file tools the agent can't grant itself trust
-or add code that Veles or a delegated CLI would run (a tool it writes to `.veles/tools/`
-loads only after you approve its file). Other spellings of the same file (case, `..`, a
-symlink) are refused too.
+in `wiki/`) at any depth. So through its file tools the agent can't grant itself trust
+or add code that Veles would run (a tool it writes to `.veles/tools/` loads only after you
+approve its file). Other spellings of the same file (case, `..`, a symlink) are refused
+too.
 
-Known limits:
+Files that run without an explicit command or steer an agent CLI — anything under
+`.git/`, `.claude/`, `.gemini/`, `.codex/`, `.vscode/`, `.devcontainer/`, `.husky/`, and
+`.envrc`, `.mcp.json`, at any depth — are written only after you type `yes`. Trust grants
+and autopilot don't cover these writes; with nobody to ask (daemon, batch) they're refused.
 
-- With the `claude-cli` or `gemini-cli` provider the delegated CLI runs its own tools
-  under its own permission model, not Veles' trust ladder (`gemini-cli` is started with
-  `--yolo`). Use those providers only in projects you'd let that CLI edit unattended.
-- An MCP approval pins the server's command line, not the files it runs from the project
-  (a script named in `args`) — review those too.
+The `claude-cli` and `gemini-cli` providers run as a model with Veles' tools only: their
+own shell, file-edit and web tools, the project's `.claude/` settings and hooks, and
+other MCP servers don't apply, so every action goes through the trust ladder above.
+
+Known limit: an MCP approval pins the server's command line, not the files it runs from
+the project (a script named in `args`) — review those too.
 
 Paths with control characters (terminal escapes, bidi overrides) are refused, and
 confirmations, the trust prompt and the diff preview show such characters escaped —
