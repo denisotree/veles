@@ -49,7 +49,7 @@ class PromptsMixin:
         Cancel so a stray Enter never deletes."""
         import threading
 
-        from veles.core.text import shown, shown_multiline
+        from veles.core.text import gutter, shown, shown_multiline
 
         if not sys.stdin.isatty():
             return False
@@ -60,11 +60,13 @@ class PromptsMixin:
         # recipe review body), so it keeps `\n`/`\t` literal (`shown_multiline`)
         # while still escaping any other control character.
         op = shown(op)
-        summary = shown_multiline(summary)
+        # Every summary line sits under a `│` gutter, so a multi-line body can't
+        # print a line that passes for this prompt's own text.
+        summary = gutter(shown_multiline(summary)) if summary else ""
         self.console.print()
         self.console.print(f"⚠ {op}", style=self.theme.error, markup=False)
         if summary:
-            self.console.print(f"  {summary}", style=self.theme.muted, markup=False)
+            self.console.print(summary, style=self.theme.muted, markup=False)
         self.q_question = t("repl.confirm_critical", op=op)
         self.q_options = [t("repl.confirm_yes"), t("repl.confirm_cancel")]
         self.q_values = ["yes", "no"]

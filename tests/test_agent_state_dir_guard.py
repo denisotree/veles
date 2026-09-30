@@ -322,23 +322,18 @@ def test_lookalike_dir_is_not_state(project) -> None:
 
 
 # A nested `.veles/` becomes a project of its own (`find_project_root` picks the
-# nearest one), and `.claude/` / `.gemini/` / `.mcp.json` configure the delegated
-# CLIs outside the trust ladder — all managed, at any depth, in any case.
+# nearest one) — managed, at any depth, in any case. (Agent CLI config such as
+# `.claude/` is confirm-gated instead: tests/test_protected_paths.py.)
 _NESTED_MANAGED = (
     "sub/.veles/trust.json",
     "sub/.VELES/modules/x/module.toml",
     "wiki/.veles/project.toml",
     ".veles/skills/x/.veles/project.toml",
-    ".claude/settings.json",
-    "sub/.Claude/settings.local.json",
-    ".gemini/settings.json",
-    ".mcp.json",
-    "sub/.mcp.json",
 )
 
 
 @pytest.mark.parametrize("rel", _NESTED_MANAGED)
-def test_nested_state_and_cli_config_refused(project, rel: str) -> None:
+def test_nested_state_refused(project, rel: str) -> None:
     target = project.root / rel
     assert _refused(write_file(rel, _GRANT))
     assert _refused(make_dir(rel))

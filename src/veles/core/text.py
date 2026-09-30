@@ -22,6 +22,12 @@ def shown_multiline(value: object) -> str:
     return "".join(c if c in "\n\t" or c.isprintable() else repr(c)[1:-1] for c in str(value))
 
 
+def gutter(text: str, prefix: str = "  │ ") -> str:
+    """Every line of `text` under `prefix` — so a confirmation's quoted body can't
+    print a line that passes for the prompt's own text."""
+    return "\n".join(prefix + line for line in text.split("\n"))
+
+
 def ellipsize(text: str, cap: int) -> str:
     """`text` on one line, cut to `cap` characters with a trailing `…` when longer."""
     line = text.strip().replace("\n", " ")

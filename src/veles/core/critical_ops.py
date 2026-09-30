@@ -92,10 +92,10 @@ def _default_confirmer(op: str, summary: str) -> bool:
     # `mcp/approvals.py::describe_recipe`, install summaries with `Source:
     # .../Target: ...` lines) — `shown_multiline()` keeps those newlines
     # literal while still escaping any other injected control character.
-    from veles.core.text import shown, shown_multiline
+    from veles.core.text import gutter, shown, shown_multiline
 
     op = shown(op)
-    summary = shown_multiline(summary)
+    summary = gutter(shown_multiline(summary)) if summary else ""
     if not sys.stdin.isatty():
         print(
             f"\nCRITICAL: {op} requires interactive confirmation; non-TTY context refuses.",

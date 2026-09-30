@@ -54,6 +54,8 @@ def guard_write(p: Path, project) -> str | None:
     - Inside the project root → M117d writable-zone check from the active
       layout pack; a write outside the declared zones is refused with the
       allowed-zones hint.
+    - Through `.git/`, `.claude/`, `.envrc`, … (`writable.needs_confirmation`)
+      → M39 hard-confirm: those files run on their own or steer an agent CLI.
     """
     if project is None:
         return None
@@ -67,7 +69,12 @@ def guard_write(p: Path, project) -> str | None:
         if not ok:
             return f"<refused: write to {p} outside active project not confirmed>"
         return None
-    from veles.core.layout.writable import is_veles_managed, is_writable, writable_zones
+    from veles.core.layout.writable import (
+        is_veles_managed,
+        is_writable,
+        needs_confirmation,
+        writable_zones,
+    )
 
     if is_veles_managed(project, p):
         return (
@@ -81,6 +88,15 @@ def guard_write(p: Path, project) -> str | None:
             f"<refused: {shown(display_path(p, project))} is outside the "
             f"active layout-pack's writable zones. Allowed: {zones_hint}>"
         )
+    if needs_confirmation(project, p):
+        shown_path = shown(display_path(p, project))
+        ok = confirm_critical(
+            f"write auto-executed or agent config file {shown_path}",
+            "Files here run without an explicit command (git hooks, .envrc, editor "
+            "tasks) or configure an agent CLI; trust grants and autopilot don't cover it.",
+        )
+        if not ok:
+            return f"<refused: write to {shown_path} not confirmed>"
     return None
 
 

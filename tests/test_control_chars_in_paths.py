@@ -110,8 +110,8 @@ def test_default_confirmer_keeps_newlines_in_multiline_summary(
     assert "\x1b" not in err  # the injected ESC is still escaped
     assert "\\x1b" in err
     lines = err.splitlines()
-    assert any(line.strip().startswith("Source:") for line in lines)
-    assert any(line.strip().startswith("Target: /dest") for line in lines)
+    assert "  │ Source: pkg\\x1b[2K" in lines
+    assert "  │ Target: /dest" in lines
 
 
 # ---------------- diff preview: control chars in content escaped ----------------

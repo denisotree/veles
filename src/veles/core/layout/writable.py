@@ -76,12 +76,30 @@ AGENT_WRITABLE_STATE: tuple[str, ...] = ("skills", "tools", "tmp", "plans", "mem
 # the agent edits it like any other file it generated.
 _ALWAYS_WRITABLE_FILES: tuple[str, ...] = ("AGENTS.md",)
 
-# Path components the agent's file tools may never write, at any depth in the
-# project (the active `.veles/` alone keeps its `AGENT_WRITABLE_STATE`): another
-# Veles state dir (run veles there and it loads the planted trust and modules),
-# and the config of the delegated `claude`/`gemini` CLIs (hooks, permissions,
-# MCP servers they run outside Veles' trust ladder). Compared NFC + casefolded.
-_MANAGED_NAMES = frozenset({".veles", ".claude", ".gemini", ".mcp.json"})
+# Tier 1 — never writable by the agent's file tools, at any depth in the project
+# (the active `.veles/` alone keeps its `AGENT_WRITABLE_STATE`): another Veles
+# state dir — run veles there and it loads the planted trust and modules.
+# Compared NFC + casefolded, like every name below.
+_MANAGED_NAMES = frozenset({".veles"})
+
+# Tier 2 — writable only after a hard confirmation (`confirm_critical`: no trust
+# grant or autopilot covers it, no human means no): files that run without an
+# explicit command (git hooks, `.envrc`, editor tasks, dev containers, commit
+# hooks) and the config of agent CLIs (hooks, permissions, MCP servers they run
+# outside Veles' trust ladder). Matched as any path component, at any depth.
+_CONFIRM_NAMES = frozenset(
+    {
+        ".git",
+        ".claude",
+        ".gemini",
+        ".codex",
+        ".vscode",
+        ".devcontainer",
+        ".husky",
+        ".envrc",
+        ".mcp.json",
+    }
+)
 
 
 def _folded(name: str) -> str:
@@ -157,8 +175,18 @@ def writable_zones(project: Project) -> tuple[str, ...]:
 def is_veles_managed(project: Project, path: str | Path) -> bool:
     """True iff `path` is Veles-managed, closed to the agent's file tools: the
     project's `.veles/` outside `AGENT_WRITABLE_STATE`, or any path through a
-    nested `.veles/`, `.claude/`, `.gemini/` or a `.mcp.json`."""
+    nested `.veles/`."""
     return _state_verdict(project, (project.root / path).resolve()) is False
+
+
+def needs_confirmation(project: Project, path: str | Path) -> bool:
+    """True iff a write to `path` needs a hard confirmation: a component of its
+    in-project path is one of `_CONFIRM_NAMES` (`.git/`, `.claude/`, `.envrc`, …)."""
+    try:
+        parts = (project.root / path).resolve().relative_to(project.root.resolve()).parts
+    except ValueError:
+        return False
+    return any(_folded(part) in _CONFIRM_NAMES for part in parts)
 
 
 def _state_verdict(project: Project, abs_path: Path) -> bool | None:
@@ -171,10 +199,9 @@ def _state_verdict(project: Project, abs_path: Path) -> bool | None:
     root) would otherwise open all of `.veles/`, and any link can be retargeted
     after the check.
 
-    Any other path component named in `_MANAGED_NAMES` (a nested
-    `sub/.veles/`, `.claude/`, `.gemini/`, `.mcp.json`) is refused outright:
-    Veles loads the nearest `.veles/project.toml` with its trust and modules,
-    and a delegated CLI runs its own config files outside the trust ladder."""
+    Any other path component named in `_MANAGED_NAMES` (a nested `sub/.veles/`)
+    is refused outright: Veles loads the nearest `.veles/project.toml` with its
+    trust and modules."""
     state = project.state_dir
     in_state = is_inside(abs_path, state, fold=True)
     try:
