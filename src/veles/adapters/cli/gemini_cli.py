@@ -8,10 +8,12 @@ gemini emits line-delimited JSON events of the form
 which we map onto TextDelta events.
 
 Tool bridging works only when an MCP-config has been planted at
-`<mcp_settings_dir>/.gemini/settings.json` (M14). Note: as of gemini-cli
-0.40.x, headless `-p` mode does NOT load MCP servers from any settings.json,
-so `supports_tools=True` is structurally accurate but practically inert
-until upstream gemini supports headless MCP (Veles M17 territory).
+`<mcp_settings_dir>/.gemini/settings.json` (M14) and the server is allow-listed
+with `--allowed-mcp-server-names veles`.
+
+The spawned gemini runs Veles' tools only (`gemini_policy.toml`, admin tier):
+its own shell/file/web tools are denied. A machine with system (managed) gemini
+policies makes gemini ignore `--admin-policy` — Veles can't enforce it there.
 """
 
 from __future__ import annotations
@@ -56,8 +58,11 @@ class GeminiCLIProvider(CLIProvider):
             cmd += ["--output-format", "stream-json"]
         # Only Veles' tools run (`_POLICY`): gemini's own shell/file tools would
         # bypass Veles' trust ladder and sandbox. Headless default mode turns
-        # anything left to ask into a denial.
-        cmd += ["--approval-mode", "default", "--admin-policy", str(_POLICY)]
+        # anything left to ask into a denial. `--skip-trust`: headless gemini
+        # refuses an untrusted folder outright; the workspace settings it then
+        # reads are Veles-generated (`.gemini/` writes by the agent need a hard
+        # confirm) and the policy still limits it to Veles' tools.
+        cmd += ["--approval-mode", "default", "--admin-policy", str(_POLICY), "--skip-trust"]
         if self._mcp_settings_dir is not None:
             # gemini -p ignores workspace mcpServers unless explicitly allow-listed.
             cmd += ["--allowed-mcp-server-names", "veles"]

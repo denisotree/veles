@@ -29,6 +29,7 @@ def _help_then_result(monkeypatch, captured: dict, help_text: str) -> None:
         if cmd[-1] == "--help":
             return _FakeProc(stdout=help_text)
         captured["cmd"] = list(cmd)
+        captured["cwd"] = kwargs.get("cwd")
         return _FakeProc(stdout='{"type":"result","result":"ok"}\n')
 
     monkeypatch.setattr(subprocess, "run", fake_run)
@@ -40,12 +41,14 @@ def test_isolated_with_restricted_when_the_cli_has_it(monkeypatch, tmp_path) -> 
     _help_then_result(monkeypatch, captured, "  --restricted   Restricted mode ...")
     cfg = tmp_path / "mcp.json"
     cfg.write_text("{}")
-    ClaudeCLIProvider(mcp_config_path=cfg).create_message(
+    ClaudeCLIProvider(mcp_config_path=cfg, workdir=tmp_path).create_message(
         [Message(role="user", content="x")], model="m"
     )
     cmd = captured["cmd"]
     assert "--restricted" in cmd and "--strict-mcp-config" in cmd
+    assert cmd[cmd.index("--tools") + 1] == ""  # no built-in Read/Edit/Write either
     assert cmd[cmd.index("--allowedTools") + 1] == "mcp__veles"
+    assert captured["cwd"] == str(tmp_path)
 
 
 def test_isolated_by_hand_on_an_older_cli(monkeypatch) -> None:

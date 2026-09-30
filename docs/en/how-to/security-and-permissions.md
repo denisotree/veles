@@ -75,16 +75,27 @@ approve its file). Other spellings of the same file (case, `..`, a symlink) are 
 too.
 
 Files that run without an explicit command or steer an agent CLI — anything under
-`.git/`, `.claude/`, `.gemini/`, `.codex/`, `.vscode/`, `.devcontainer/`, `.husky/`, and
-`.envrc`, `.mcp.json`, at any depth — are written only after you type `yes`. Trust grants
-and autopilot don't cover these writes; with nobody to ask (daemon, batch) they're refused.
+`.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`, `.vscode/`, `.devcontainer/`,
+`.husky/`, and `.envrc`, `.mcp.json`, `.pre-commit-config.yaml`, `lefthook.yml`, at any
+depth — the agent's file tools write only after you confirm that write. Trust grants and
+autopilot don't cover it; the daemon asks in the channel, and a batch run with nobody to
+ask refuses.
 
 The `claude-cli` and `gemini-cli` providers run as a model with Veles' tools only: their
 own shell, file-edit and web tools, the project's `.claude/` settings and hooks, and
-other MCP servers don't apply, so every action goes through the trust ladder above.
+other MCP servers don't apply, and every Veles tool they call goes through the trust
+ladder above (nobody can answer a prompt there, so anything not already granted is
+refused).
 
-Known limit: an MCP approval pins the server's command line, not the files it runs from
-the project (a script named in `args`) — review those too.
+Known limits:
+
+- `run_shell` is a shell: once you grant it (or under autopilot) it can write any of
+  the files above without the per-file confirmation, and a custom `core.hooksPath`
+  directory under another name isn't recognised.
+- An MCP approval pins the server's command line, not the files it runs from the project
+  (a script named in `args`) — review those too.
+- On a machine with managed (system) gemini policies, gemini ignores the policy Veles
+  passes, so `gemini-cli` isn't limited to Veles' tools there.
 
 Paths with control characters (terminal escapes, bidi overrides) are refused, and
 confirmations, the trust prompt and the diff preview show such characters escaped —

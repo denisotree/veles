@@ -341,3 +341,42 @@ def test_handle_tools_call_persists_budget_snapshot(tmp_path) -> None:
         assert loaded == BudgetSnapshot(limit=50_000, consumed=350)
     finally:
         reset_budget(token)
+
+
+def _call(server: MCPServer, name: str, arguments: dict) -> str:
+    resp = server.handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": name, "arguments": arguments},
+        }
+    )
+    assert resp is not None
+    return resp["result"]["content"][0]["text"]
+
+
+def test_tools_call_goes_through_the_trust_ladder(monkeypatch, tmp_path) -> None:
+    """A delegated CLI calling Veles tools gets no more than the agent loop:
+    without a trust grant `run_shell`/`write_file` are refused, not run."""
+    import veles.core.permission  # noqa: F401  (import order the app uses)
+    from veles.core.context import reset_active_project, set_active_project
+    from veles.core.tools import registry as builtin
+
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("VELES_TRUST_AUTO_ALLOW", raising=False)
+    project = init_project(tmp_path / "proj", name="proj")
+    token = set_active_project(project)
+    try:
+        server = MCPServer(builtin, ["run_shell", "write_file", "read_file"])
+        marker = project.root / "marker"
+        out = _call(server, "run_shell", {"command": f"touch {marker}"})
+        assert out.startswith("<refused:") and "veles trust set run_shell" in out
+        assert not marker.exists()
+        assert _call(server, "write_file", {"path": "a.md", "content": "x"}).startswith("<refused:")
+        assert not (project.root / "a.md").exists()
+
+        monkeypatch.setenv("VELES_TRUST_AUTO_ALLOW", "1")  # a standing grant lets it through
+        assert _call(server, "write_file", {"path": "a.md", "content": "x"}).startswith("wrote")
+    finally:
+        reset_active_project(token)

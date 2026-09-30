@@ -18,7 +18,7 @@ from veles.core.critical_ops import (
 )
 from veles.core.project import init_project
 from veles.core.tools.builtin.edit_file import edit_file
-from veles.core.tools.builtin.file_ops import make_dir, move_file
+from veles.core.tools.builtin.file_ops import delete_file, make_dir, move_file
 from veles.core.tools.builtin.write_file import write_file
 
 _PROTECTED = (
@@ -32,6 +32,9 @@ _PROTECTED = (
     ".devcontainer/devcontainer.json",
     ".husky/pre-push",
     "sub/.mcp.json",
+    ".githooks/pre-commit",
+    ".pre-commit-config.yaml",
+    "lefthook.yml",
 )
 
 
@@ -88,6 +91,24 @@ def test_edit_make_dir_and_move_are_gated(project, answers) -> None:
     write_file("notes.md", "x")
     assert "not confirmed" in move_file("notes.md", ".git/hooks/post-merge")
     assert (project.root / "notes.md").exists()
+
+
+def test_delete_and_move_out_of_git_are_gated(project, answers) -> None:
+    hook = project.root / ".git" / "hooks" / "pre-commit"
+    hook.parent.mkdir(parents=True)
+    hook.write_text("#!/bin/sh\n", encoding="utf-8")
+    assert "<refused" in delete_file(".git/hooks/pre-commit")
+    assert "<refused" in move_file(".git/hooks/pre-commit", "notes.md")
+    assert hook.exists() and not (project.root / "notes.md").exists()
+
+
+def test_innocent_symlink_into_git_hooks_is_gated(project, answers) -> None:
+    """The guard sees the resolved path, so a link named `docs` into `.git/hooks`
+    doesn't slip a hook past it."""
+    (project.root / ".git" / "hooks").mkdir(parents=True)
+    (project.root / "docs").symlink_to(project.root / ".git" / "hooks")
+    assert "not confirmed" in write_file("docs/pre-commit", "x")
+    assert not (project.root / ".git" / "hooks" / "pre-commit").exists()
 
 
 @pytest.mark.parametrize("rel", ["docs/git.md", "src/claude.py", "envrc", "sub/vscode/a"])

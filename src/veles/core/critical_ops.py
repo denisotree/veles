@@ -12,9 +12,11 @@ Current call sites:
 - `cli.py` install commands (`veles skill add`, `veles module add`):
   third-party code that will execute on the user's machine. `--yes` is
   parsed but ignored for these paths.
-- `tools/builtin/write_file.py`: writes resolved outside the active
-  project root (i.e. into user-global `~/.veles/`) — the agent could
-  install code there otherwise.
+- `tools/builtin/fs_write_guard.py::guard_write` (every file-tool write):
+  writes resolved outside the active project root (i.e. into user-global
+  `~/.veles/`) — the agent could install code there otherwise — and writes
+  to auto-executed / agent CLI config paths (`writable.needs_confirmation`:
+  `.git/`, `.claude/`, `.envrc`, …).
 
 In M39 scope now:
 - `tools/builtin/file_ops.py::delete_file` (DESTRUCTIVE) — routes here per

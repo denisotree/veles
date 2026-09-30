@@ -35,14 +35,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   symlink spellings of a closed file are refused; `wiki_rename_page` works only on wiki pages.
   Any other `.veles/` in the project (a subproject's, or one planted in `wiki/`) is refused at
   any depth.
-- Files that run on their own or steer an agent CLI — anything under `.git/`, `.claude/`,
-  `.gemini/`, `.codex/`, `.vscode/`, `.devcontainer/`, `.husky/`, and `.envrc`, `.mcp.json` —
-  at any depth are written by the agent only after you type `yes`; trust grants and autopilot
-  don't cover it, and with nobody to ask (daemon, batch) the write is refused.
+- Files that run on their own or steer an agent CLI — anything under `.git/`, `.githooks/`,
+  `.claude/`, `.gemini/`, `.codex/`, `.vscode/`, `.devcontainer/`, `.husky/`, and `.envrc`,
+  `.mcp.json`, `.pre-commit-config.yaml`, `lefthook.yml` — at any depth are written by the
+  agent's file tools only after you confirm; trust grants and autopilot don't cover it.
 - The `claude-cli` and `gemini-cli` providers run as a model with Veles' tools only: claude
-  starts `--restricted --strict-mcp-config` (no Bash, no project `.claude/` settings or hooks,
-  no `.mcp.json` servers), gemini starts without `--yolo` under an admin policy that allows the
-  Veles MCP server and denies its own shell/file tools.
+  starts `--restricted --strict-mcp-config --tools ""` in the project root (no built-in tools,
+  no project `.claude/` settings or hooks, no `.mcp.json` servers); gemini starts without
+  `--yolo` under an admin policy that allows the Veles MCP server and denies its own tools.
+- The Veles MCP server (what the delegated CLIs call) runs every tool call through the trust
+  ladder; before, `run_shell`, `write_file` and `fetch_url` ran there without it.
 - Multi-line values in the trust/approval prompt and critical confirmations are indented, so
   they can't fake the prompt's own lines; Telegram prompts escape control characters too.
 - MCP servers from `[mcp.servers.*]` start only after `veles mcp approve <name>`, which shows
@@ -57,7 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Agent file tools no longer edit `.veles/` config files — change them with `veles` commands
   (`veles trust`, `veles route`, `veles mcp approve`, `veles module`, …) or by hand.
 - With `--provider claude-cli`/`gemini-cli` the delegated CLI no longer uses its own shell,
-  file-edit or web tools — the agent works through Veles' tools. `claude-cli` needs a Claude
+  file-edit or web tools — the agent works through Veles' tools, and nobody can answer a trust
+  prompt there: grant what it needs up front (`veles trust set write_file --scope project`). `claude-cli` needs a Claude
   Code that has `--restricted` for the full isolation; older versions fall back to
   `--setting-sources user --tools ""`.
 - Project MCP servers (`[mcp.servers.*]`) start only after `veles mcp approve <name>` — an

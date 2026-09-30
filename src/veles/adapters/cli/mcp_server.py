@@ -119,12 +119,36 @@ class MCPServer:
             )
         return _success(req.get("id"), {"tools": out})
 
+    def _permission_refusal(self, name: str, arguments: dict[str, Any]) -> str | None:
+        """The same Permission Engine the agent loop runs (trust ladder, untrusted
+        egress, planning mode). Nobody can answer a prompt over this pipe, so
+        anything short of `allow` — an ask included — is refused; a standing
+        `veles trust set` grant or an autopilot window still lets it through."""
+        from veles.core.permission import evaluate
+
+        try:
+            entry = self._registry.get(name)
+        except KeyError:
+            return f"<refused: unknown tool {name!r}>"
+        decision = evaluate(entry, arguments)
+        if decision.allowed:
+            return None
+        return (
+            f"<refused: {name} needs Veles permission ({decision.reason or decision.rule}); "
+            f"the user can grant it with `veles trust set {name}`>"
+        )
+
     def _handle_tools_call(self, req: dict[str, Any]) -> dict[str, Any]:
         params = req.get("params") or {}
         name = params.get("name") or ""
         arguments = params.get("arguments") or {}
         if name not in self._tool_names:
             return _error(req.get("id"), -32602, f"tool {name!r} not exposed")
+        refusal = self._permission_refusal(name, arguments)
+        if refusal is not None:
+            return _success(
+                req.get("id"), {"content": [{"type": "text", "text": refusal}], "isError": True}
+            )
         try:
             output = self._registry.dispatch(name, arguments)
         except Exception as exc:

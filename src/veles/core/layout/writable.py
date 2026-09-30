@@ -29,7 +29,9 @@ zones and would otherwise refuse these):
   own skills, tools and scratch space (`AGENT_WRITABLE_STATE`). The rest of
   `.veles/` (trust.json, config.toml, modules/, memory.db, …) is Veles'
   state and always refused (`is_veles_managed`), whatever the pack says —
-  as is any nested `.veles/`, `.claude/`, `.gemini/` or `.mcp.json`.
+  as is any nested `.veles/`. Auto-executed files and agent CLI config
+  (`.git/`, `.claude/`, `.envrc`, … — `needs_confirmation`) are writable only
+  after a hard confirmation.
 - `AGENTS.md`     — the project's context file. Veles generates it for
   every layout (`scaffold.apply_scaffold`), so the agent may edit it
   like any other file it generated, no matter how restrictive the pack's
@@ -84,12 +86,20 @@ _MANAGED_NAMES = frozenset({".veles"})
 
 # Tier 2 — writable only after a hard confirmation (`confirm_critical`: no trust
 # grant or autopilot covers it, no human means no): files that run without an
-# explicit command (git hooks, `.envrc`, editor tasks, dev containers, commit
-# hooks) and the config of agent CLIs (hooks, permissions, MCP servers they run
-# outside Veles' trust ladder). Matched as any path component, at any depth.
+# explicit command (git hooks incl. the `.githooks`/pre-commit/lefthook
+# conventions, `.envrc`, editor tasks, dev containers) and the config of agent
+# CLIs (hooks, permissions, MCP servers they run outside Veles' trust ladder).
+# Matched as any path component, at any depth. Not covered: a custom
+# `core.hooksPath` directory with another name.
 _CONFIRM_NAMES = frozenset(
     {
         ".git",
+        ".githooks",
+        ".pre-commit-config.yaml",
+        "lefthook.yml",
+        "lefthook.yaml",
+        ".lefthook.yml",
+        ".lefthook.yaml",
         ".claude",
         ".gemini",
         ".codex",

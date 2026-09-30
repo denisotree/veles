@@ -163,7 +163,7 @@ def make_tool_aware_provider(
         from veles.adapters.cli.mcp_config import DEFAULT_SKILL_MODEL, build_mcp_config
 
         mcp_path = build_mcp_config(project, skill_model=skill_model or DEFAULT_SKILL_MODEL)
-        return ClaudeCLIProvider(mcp_config_path=mcp_path)
+        return ClaudeCLIProvider(mcp_config_path=mcp_path, workdir=project.root)
     if name == "gemini-cli":
         from veles.adapters.cli.gemini_cli import GeminiCLIProvider
         from veles.adapters.cli.mcp_config import DEFAULT_SKILL_MODEL, build_gemini_mcp_settings
