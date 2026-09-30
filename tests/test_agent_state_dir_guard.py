@@ -230,6 +230,20 @@ def _page(project, rel: str = "wiki/concepts/a.md", body: str = "# A\n\nkeep me\
     return page
 
 
+def test_wiki_rename_reports_pages_it_could_not_repair(project, monkeypatch) -> None:
+    import veles.modules.wiki.tools as wt
+
+    _page(project, "wiki/concepts/a.md", "# A\n")
+    blocked = _page(project, "wiki/concepts/b.md", "# B\n\nsee [[a]]\n")
+    real_guard = wt.guard_write
+    monkeypatch.setattr(
+        wt, "guard_write", lambda p, proj: "<refused>" if p == blocked else real_guard(p, proj)
+    )
+    msg = wt.wiki_rename_page("wiki/concepts/a.md", "concepts", "c")
+    assert "1 page(s) skipped" in msg, msg
+    assert "[[a]]" in blocked.read_text(encoding="utf-8")
+
+
 @pytest.mark.parametrize(
     "spelling",
     [

@@ -72,7 +72,8 @@ def test_ctrl_c_in_busy_escalates_to_force_quit(app, monkeypatch) -> None:
 
     forced = {"n": 0}
     monkeypatch.setattr(app, "_force_quit", lambda: forced.__setitem__("n", forced["n"] + 1))
-    monkeypatch.setattr(app, "_spawn", lambda *_a, **_k: None)  # no live loop in the test
+    # No live loop in the test: close the coroutine instead of scheduling it.
+    monkeypatch.setattr(app, "_spawn", lambda coro, *_a, **_k: coro.close())
     ev = types.SimpleNamespace(app=types.SimpleNamespace(exit=lambda: None))
 
     app._on_ctrl_c(ev)  # first: cooperative cancel, no force-quit

@@ -51,6 +51,30 @@ def test_isolated_with_restricted_when_the_cli_has_it(monkeypatch, tmp_path) -> 
     assert captured["cwd"] == str(tmp_path)
 
 
+def test_fallback_flags_warn_once(monkeypatch, capsys) -> None:
+    captured: dict = {}
+    _help_then_result(monkeypatch, captured, "  --print  ...")
+    p = ClaudeCLIProvider()
+    p.create_message([Message(role="user", content="x")], model="m")
+    p.create_message([Message(role="user", content="x")], model="m")
+    assert capsys.readouterr().err.count("--restricted") == 1
+
+
+def test_factory_runs_claude_in_the_active_project(monkeypatch, tmp_path) -> None:
+    from veles.core.context import reset_active_project, set_active_project
+    from veles.core.project import init_project
+    from veles.core.provider_factory import make_provider
+
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    project = init_project(tmp_path / "proj", name="proj")
+    token = set_active_project(project)
+    try:
+        p = make_provider("claude-cli")
+    finally:
+        reset_active_project(token)
+    assert p._cwd() == str(project.root)
+
+
 def test_isolated_by_hand_on_an_older_cli(monkeypatch) -> None:
     captured: dict = {}
     _help_then_result(monkeypatch, captured, "  --print  ...")
