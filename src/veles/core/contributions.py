@@ -20,7 +20,7 @@ import importlib
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from veles.core.text import shown
 
@@ -175,6 +175,55 @@ class DreamStep:
 register_point(Point("dream_step", kind=DreamStep))
 
 
+@dataclass(frozen=True, slots=True)
+class CuratorTarget:
+    """Where the curator's agent persists a distilled session when `engine` is on.
+    `prepare(project)` readies the store; `instructions(project, session_id)` returns
+    `(intro, persist_steps, log_step)` prompt text; `persist_tools` are the tools whose
+    use means the distillation persisted."""
+
+    engine: str
+    prepare: Callable[..., None]
+    instructions: Callable[..., tuple[str, str, str]]
+    persist_tools: tuple[str, ...]
+
+
+register_point(Point("curator_target", kind=CuratorTarget))
+
+
+class PageInfo(Protocol):
+    """A page a module exposes to core heuristics (subproject clustering)."""
+
+    rel_path: str
+    title: str
+    summary: str
+    category: str
+
+
+@dataclass(frozen=True, slots=True)
+class PageSource:
+    """`pages(project)` — a module's pages for subproject clustering, when `engine`
+    (if any) is on for the project."""
+
+    pages: Callable[..., list[PageInfo]]
+    engine: str | None = None
+
+
+register_point(Point("subproject_source", kind=PageSource))
+
+
+def active(project: Project | None, point: str) -> list[Contribution]:
+    """Contributions to `point` whose `engine` (if the object has one) is enabled."""
+    from veles.core.layout.engines import engine_enabled
+
+    out: list[Contribution] = []
+    for c in contributions(point):
+        engine = getattr(c.obj, "engine", None)
+        if engine is None or engine_enabled(project, engine):
+            out.append(c)
+    return out
+
+
 def load_tool_sets(project: Project | None) -> set[str]:
     """Load every contributed tool set the project can use; return the names of
     the tools it can't (sets whose engine its layout doesn't enable) so callers
@@ -199,10 +248,14 @@ __all__ = [
     "BUILTIN_MODULES",
     "CONTRIBUTION_POINTS",
     "Contribution",
+    "CuratorTarget",
     "DreamStep",
     "Engine",
+    "PageInfo",
+    "PageSource",
     "Point",
     "ToolSet",
+    "active",
     "call_each",
     "check",
     "contributions",

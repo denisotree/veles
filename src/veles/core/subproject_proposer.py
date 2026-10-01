@@ -55,7 +55,7 @@ from veles.core.text_cluster import cluster_indices
 from veles.core.timeutil import utc_iso
 
 if TYPE_CHECKING:
-    from veles.modules.wiki.wiki import WikiPageInfo
+    from veles.core.contributions import PageInfo
 
 _CLUSTER_CATEGORIES = frozenset({"concepts", "entities"})
 _DEFAULT_MIN_PAGES = 4
@@ -113,25 +113,24 @@ def detect_clusters(
     min_pages: int = _DEFAULT_MIN_PAGES,
     min_similarity: float = _DEFAULT_MIN_SIMILARITY,
 ) -> list[Cluster]:
-    """Find thematic clusters in `wiki/concepts/` + `wiki/entities/`.
+    """Find thematic clusters among `concepts`/`entities` pages that modules
+    contribute (`subproject_source` — e.g. the wiki engine's pages).
 
     Two pages are connected when their title-token Jaccard similarity
     is ≥ `min_similarity`. Connected components of size ≥ `min_pages`
     become clusters. Returns clusters sorted by score descending.
 
-    Clustering operates on wiki pages, so it is a no-op (empty list) on any
-    layout whose wiki engine is off — gated here, not only in the callers, so
-    `veles subproject suggest` can't construct a Wiki on a bare/notes project.
+    A source whose engine is off for the project contributes nothing, so this
+    is a no-op (empty list) on a bare/notes project.
     """
-    from veles.core.layout.engines import wiki_enabled
+    from veles.core.contributions import active
 
-    if not wiki_enabled(project):
-        return []
-
-    from veles.modules.wiki.wiki import Wiki
-
-    wiki = Wiki(project.wiki_root)
-    pages = [p for p in wiki.list_pages() if p.category in _CLUSTER_CATEGORIES]
+    pages = [
+        p
+        for c in active(project, "subproject_source")
+        for p in c.obj.pages(project)  # type: ignore[attr-defined]
+        if p.category in _CLUSTER_CATEGORIES
+    ]
     if len(pages) < min_pages:
         return []
 
@@ -150,7 +149,7 @@ def detect_clusters(
     return clusters
 
 
-def _build_cluster_summary(pages: list[WikiPageInfo]) -> tuple[str, str]:
+def _build_cluster_summary(pages: list[PageInfo]) -> tuple[str, str]:
     """Pick a slug + one-line rationale for a cluster.
 
     Slug = the 1-2 most-frequent shared tokens across cluster titles
