@@ -19,8 +19,16 @@ def register(api) -> None:
     """Everything the wiki engine adds to Veles, as contributions (release A)."""
     import importlib
 
-    from veles.core.contributions import CuratorTarget, DreamStep, Engine, PageSource, ToolSet
+    from veles.core.contributions import (
+        BackgroundOp,
+        CuratorTarget,
+        DreamStep,
+        Engine,
+        PageSource,
+        ToolSet,
+    )
     from veles.modules.wiki import curator
+    from veles.modules.wiki.background import run_ingest_job
     from veles.modules.wiki.dream import lint_step, reindex_step
     from veles.modules.wiki.prompt import wiki_prompt
     from veles.modules.wiki.recall import wiki_recall
@@ -52,6 +60,11 @@ def register(api) -> None:
     api.contribute("subproject_source", "wiki", PageSource(pages=curator.pages, engine="wiki"))
     api.contribute("self_doc", "wiki", curator.self_doc)
     api.contribute("scaffold", "wiki", curator.scaffold)
+    api.contribute(
+        "background_op",
+        "ingest",
+        BackgroundOp(kind="ingest", toolset="ingest", run=run_ingest_job),
+    )
 
 
 # The wiki engine's agent tools — present only when the layout enables the engine.

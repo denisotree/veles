@@ -218,6 +218,20 @@ register_point(Point("self_doc"))
 register_point(Point("scaffold"))
 
 
+@dataclass(frozen=True, slots=True)
+class BackgroundOp:
+    """A daemon job kind a module owns. `run(job, *, spawn_agent, project) -> str`
+    does the work; `spawn_agent(system_prompt)` builds a sub-agent capped to the
+    `toolset` named here (e.g. `"ingest"`). Returns the job's summary text."""
+
+    kind: str
+    toolset: str
+    run: Callable[..., str]
+
+
+register_point(Point("background_op", kind=BackgroundOp))
+
+
 def active(project: Project | None, point: str) -> list[Contribution]:
     """Contributions to `point` whose `engine` (if the object has one) is enabled."""
     from veles.core.layout.engines import engine_enabled
@@ -253,6 +267,7 @@ def load_tool_sets(project: Project | None) -> set[str]:
 __all__ = [
     "BUILTIN_MODULES",
     "CONTRIBUTION_POINTS",
+    "BackgroundOp",
     "Contribution",
     "CuratorTarget",
     "DreamStep",
