@@ -118,6 +118,30 @@ def test_load_cache_permissive_on_corrupt_json(project: Project) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("not json", encoding="utf-8")
     assert load_cache(project, model="m1") == {}
+    assert not path.exists()  # the legacy file is dropped, never re-read
+
+
+def test_legacy_json_is_imported_into_memory_db_once(project: Project) -> None:
+    import json
+
+    from veles.core.skill_embedding import cache_path
+
+    path = cache_path(project)
+    path.write_text(
+        json.dumps({"model": "m1", "vectors": {"h": {"name": "auth", "vector": [0.5, 0.25]}}}),
+        encoding="utf-8",
+    )
+    out = load_cache(project, model="m1")
+    assert out["h"].name == "auth" and out["h"].vector == [0.5, 0.25]
+    assert not path.exists()
+    assert load_cache(project, model="m1")["h"].vector == [0.5, 0.25]  # now from memory.db
+
+
+def test_save_cache_never_writes_json(project: Project) -> None:
+    from veles.core.skill_embedding import cache_path
+
+    save_cache(project, model="m1", vectors={"h": _CacheEntry(name="x", vector=[1.0])})
+    assert not cache_path(project).exists()
 
 
 # ---- compute_skill_vectors ----

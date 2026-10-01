@@ -18,12 +18,11 @@ Two surfaces:
    sentence-transformers adapter slots in without touching the LLM
    protocol.
 
-2. JSON cache at `<project>/.veles/skill_embeddings.json`. Keyed on
-   `sha256(name + description + body)` so an unchanged skill reuses
-   its vector across runs. Cache invalidation is implicit: editing the
-   skill body changes the hash, orphaning the old cache entry.
-   Orphans accumulate over time but cost ~6KB per stale entry; a
-   future `veles skill dedup --vacuum` can prune them.
+2. Cache in memory.db (`skill_embeddings` table; was the JSON file
+   `<project>/.veles/skill_embeddings.json`, imported once and deleted).
+   Keyed on `sha256(name + description + body)` so an unchanged skill
+   reuses its vector across runs; editing the body changes the hash.
+   `save_cache` replaces the set, so stale entries don't accumulate.
 
 3. `OpenAIEmbeddingAdapter` against the `openai` SDK works for both
    direct OpenAI and any OpenAI-compatible relay (set `base_url` to
@@ -35,12 +34,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import struct
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from veles.core.io_utils import atomic_write_text
 from veles.core.project import Project
 from veles.core.skills import Skill
 
@@ -132,50 +131,69 @@ def skill_embed_text(skill: Skill, *, body_cap: int = 4_000) -> str:
 
 
 def load_cache(project: Project, *, model: str) -> dict[str, _CacheEntry]:
-    """Return `{fingerprint: _CacheEntry}` for the given model.
+    """Return `{fingerprint: _CacheEntry}` for the given model, from memory.db.
 
-    Cache misses for *different* models silently return empty — the
-    cache stores one model at a time. Switching the routed model
-    therefore invalidates the cache wholesale (which is the desired
-    behaviour: two models' vector spaces aren't comparable).
-    """
-    path = cache_path(project)
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    if data.get("model") != model:
-        return {}
-    raw = data.get("vectors")
-    if not isinstance(raw, dict):
-        return {}
-    out: dict[str, _CacheEntry] = {}
-    for fp, entry in raw.items():
-        if not isinstance(fp, str) or not isinstance(entry, dict):
-            continue
-        name = entry.get("name")
-        vector = entry.get("vector")
-        if not isinstance(name, str) or not isinstance(vector, list):
-            continue
-        if not all(isinstance(v, int | float) for v in vector):
-            continue
-        out[fp] = _CacheEntry(name=name, vector=[float(v) for v in vector])
-    return out
+    A different model's vectors are never returned — two models' vector spaces
+    aren't comparable. A legacy `.veles/skill_embeddings.json` is imported on
+    first use and deleted (a corrupt one is just deleted)."""
+    from veles.core.memory.store import local_connection
+
+    with local_connection(project) as conn:
+        _import_legacy_json(project, conn)
+        rows = conn.execute(
+            "SELECT fingerprint, name, vector FROM skill_embeddings WHERE model = ?", (model,)
+        ).fetchall()
+    return {fp: _CacheEntry(name=name, vector=_unpack(blob)) for fp, name, blob in rows}
 
 
 def save_cache(project: Project, *, model: str, vectors: dict[str, _CacheEntry]) -> None:
-    body = {
-        "model": model,
-        "vectors": {
-            fp: {"name": entry.name, "vector": entry.vector}
-            for fp, entry in sorted(vectors.items())
-        },
-    }
-    atomic_write_text(cache_path(project), json.dumps(body, indent=2) + "\n")
+    """Replace the stored vectors with `vectors` (one model at a time, as before)."""
+    from veles.core.memory.store import local_connection
+
+    with local_connection(project) as conn:
+        conn.execute("DELETE FROM skill_embeddings")
+        conn.executemany(
+            "INSERT INTO skill_embeddings(fingerprint, model, name, vector) VALUES (?, ?, ?, ?)",
+            [(fp, model, e.name, _pack(e.vector)) for fp, e in sorted(vectors.items())],
+        )
+        conn.commit()
+
+
+def _pack(vector: list[float]) -> bytes:
+    return struct.pack(f"<{len(vector)}d", *vector)
+
+
+def _unpack(blob: bytes) -> list[float]:
+    return list(struct.unpack(f"<{len(blob) // 8}d", blob))
+
+
+def _import_legacy_json(project: Project, conn) -> None:
+    path = cache_path(project)
+    if not path.is_file():
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        data = None
+    model = data.get("model") if isinstance(data, dict) else None
+    raw = data.get("vectors") if isinstance(data, dict) else None
+    if isinstance(model, str) and isinstance(raw, dict):
+        rows = [
+            (fp, model, e["name"], _pack([float(v) for v in e["vector"]]))
+            for fp, e in raw.items()
+            if isinstance(fp, str)
+            and isinstance(e, dict)
+            and isinstance(e.get("name"), str)
+            and isinstance(e.get("vector"), list)
+            and all(isinstance(v, int | float) for v in e["vector"])
+        ]
+        conn.executemany(
+            "INSERT OR REPLACE INTO skill_embeddings(fingerprint, model, name, vector)"
+            " VALUES (?, ?, ?, ?)",
+            rows,
+        )
+        conn.commit()
+    path.unlink(missing_ok=True)
 
 
 # ---- top-level driver ----
