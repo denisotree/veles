@@ -161,6 +161,20 @@ register_point(Point("tool", kind=ToolSet))
 register_point(Point("prompt"))
 
 
+@dataclass(frozen=True, slots=True)
+class DreamStep:
+    """A dream-cycle step a module owns. `run(project, result, *, dry_run)` fills its
+    fields of the `DreamResult`; `skip_flag` names the `dream_cycle` keyword that
+    skips it (e.g. `"skip_lint"`)."""
+
+    name: str
+    run: Callable[..., None]
+    skip_flag: str
+
+
+register_point(Point("dream_step", kind=DreamStep))
+
+
 def load_tool_sets(project: Project | None) -> set[str]:
     """Load every contributed tool set the project can use; return the names of
     the tools it can't (sets whose engine its layout doesn't enable) so callers
@@ -185,6 +199,7 @@ __all__ = [
     "BUILTIN_MODULES",
     "CONTRIBUTION_POINTS",
     "Contribution",
+    "DreamStep",
     "Engine",
     "Point",
     "ToolSet",

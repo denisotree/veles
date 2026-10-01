@@ -6,7 +6,7 @@ import os
 import time
 from pathlib import Path
 
-from veles.core.dreaming import DreamResult, _step_reindex
+from veles.core.dreaming import DreamResult
 from veles.modules.wiki.wiki import Wiki
 
 
@@ -46,13 +46,19 @@ def test_reindex_if_stale_rebuilds_on_newer_file(tmp_path: Path) -> None:
     assert indexed >= 1
 
 
-def test_dream_reindex_step_records_count(tmp_path: Path) -> None:
-    wiki = _make_wiki(tmp_path)
+def test_dream_reindex_step_records_count(tmp_path: Path, monkeypatch) -> None:
+    """The wiki engine's `reindex` dream step (a contribution since release A)."""
+    from veles.core.project import init_project
+    from veles.modules.wiki.dream import reindex_step
+
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    project = init_project(tmp_path / "p", name="p", layout="llm-wiki")
+    wiki = Wiki(project.wiki_root)
     wiki.write_page(category="concepts", slug="a", title="A", content="body")
     # Drop db to guarantee stale path.
-    db = tmp_path / "wiki_index.db"
+    db = project.wiki_root / "wiki_index.db"
     if db.exists():
         db.unlink()
     result = DreamResult()
-    _step_reindex(wiki, result)
+    reindex_step(project, result, dry_run=False)
     assert result.reindexed_pages >= 1

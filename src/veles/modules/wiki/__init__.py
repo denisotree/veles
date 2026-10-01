@@ -19,7 +19,8 @@ def register(api) -> None:
     """Everything the wiki engine adds to Veles, as contributions (release A)."""
     import importlib
 
-    from veles.core.contributions import Engine, ToolSet
+    from veles.core.contributions import DreamStep, Engine, ToolSet
+    from veles.modules.wiki.dream import lint_step, reindex_step
     from veles.modules.wiki.prompt import wiki_prompt
     from veles.modules.wiki.recall import wiki_recall
 
@@ -35,6 +36,8 @@ def register(api) -> None:
     )
     api.contribute("recall", "wiki", wiki_recall)
     api.contribute("prompt", "wiki", wiki_prompt)
+    api.contribute("dream_step", "lint", DreamStep("lint", lint_step, "skip_lint"))
+    api.contribute("dream_step", "reindex", DreamStep("reindex", reindex_step, "skip_reindex"))
 
 
 # The wiki engine's agent tools — present only when the layout enables the engine.
