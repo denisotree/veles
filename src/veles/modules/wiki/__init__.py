@@ -50,6 +50,8 @@ def register(api) -> None:
         ),
     )
     api.contribute("subproject_source", "wiki", PageSource(pages=curator.pages, engine="wiki"))
+    api.contribute("self_doc", "wiki", curator.self_doc)
+    api.contribute("scaffold", "wiki", curator.scaffold)
 
 
 # The wiki engine's agent tools — present only when the layout enables the engine.

@@ -40,7 +40,7 @@ def generate_self_doc(
     tools: list[tuple[str, str]] | None = None,
 ) -> SelfDocReport:
     """Collect all project self-knowledge into a `SelfDocReport`."""
-    from veles.core.layout.engines import wiki_enabled
+    from veles.core.contributions import active
     from veles.core.memory import SessionStore
     from veles.core.routing import KNOWN_TASKS, route
     from veles.core.skills import discover_skills
@@ -55,16 +55,12 @@ def generate_self_doc(
         sessions = store.list_sessions(limit=99_999)
     session_count = len(sessions)
 
-    # --- wiki pages (only when the layout enables the wiki engine) ---
-    wiki_page_count = 0
+    # --- pages modules expose (the wiki engine's, when the layout enables it) ---
+    pages = [p for c in active(project, "subproject_source") for p in c.obj.pages(project)]  # type: ignore[attr-defined]
+    wiki_page_count = len(pages)
     wiki_categories: dict[str, int] = {}
-    if wiki_enabled(project):
-        from veles.modules.wiki.wiki import Wiki
-
-        pages = Wiki(project.wiki_root).list_pages()
-        wiki_page_count = len(pages)
-        for page in pages:
-            wiki_categories[page.category] = wiki_categories.get(page.category, 0) + 1
+    for page in pages:
+        wiki_categories[page.category] = wiki_categories.get(page.category, 0) + 1
 
     # --- skills ---
     raw_skills = discover_skills(project)
@@ -224,23 +220,17 @@ def refresh_self_doc(
 ) -> str:
     """Generate, render, persist. Returns the project-relative path.
 
-    Wiki engine on → `wiki/self-doc/overview.md` (FTS-indexed, recall
-    surfaces it). Off → `.veles/memory/self-doc.md` (M163)."""
-    from veles.core.layout.engines import wiki_enabled
+    A module `self_doc` writer takes it when it can (the wiki engine →
+    `wiki/self-doc/overview.md`, FTS-indexed so recall surfaces it); otherwise
+    `.veles/memory/self-doc.md` (M163)."""
+    from veles.core.contributions import call_each
     from veles.core.memory.artefacts import append_memory_log
 
     report = generate_self_doc(project, tools=tools)
     content = render_self_doc(report)
-    if wiki_enabled(project):
-        from veles.modules.wiki.wiki import Wiki
-
-        wiki = Wiki(project.wiki_root)
-        rel_path = wiki.write_page(
-            category="self-doc",
-            slug="overview",
-            title="Self-Documentation",
-            content=content,
-        )
+    taken = [p for p in call_each("self_doc", lambda c: c.obj(project, content)) if p]  # type: ignore[operator]
+    if taken:
+        rel_path = taken[0]
     else:
         out = project.memory_dir / "self-doc.md"
         out.parent.mkdir(parents=True, exist_ok=True)

@@ -4,6 +4,9 @@ as wiki pages (plus a memory insight); wiki pages feed subproject clustering."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from veles.core.layout.manifest import LayoutManifest
 from veles.core.project import Project
 from veles.modules.wiki.wiki import Wiki, WikiPageInfo
 
@@ -31,3 +34,20 @@ def instructions(project: Project, session_id: str) -> tuple[str, str, str]:
 
 def pages(project: Project) -> list[WikiPageInfo]:
     return Wiki(project.wiki_root).list_pages()
+
+
+def self_doc(project: Project, content: str) -> str | None:
+    """The `self_doc` contribution: `wiki/self-doc/overview.md` when the engine is on."""
+    from veles.core.layout.engines import wiki_enabled
+
+    if not wiki_enabled(project):
+        return None
+    return Wiki(project.wiki_root).write_page(
+        category="self-doc", slug="overview", title="Self-Documentation", content=content
+    )
+
+
+def scaffold(root: Path, manifest: LayoutManifest) -> None:
+    """The `scaffold` contribution: the wiki tree for a pack that asks for the engine."""
+    if manifest.engine_enabled("wiki"):
+        Wiki(root).ensure_layout()

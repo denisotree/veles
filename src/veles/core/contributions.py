@@ -210,6 +210,12 @@ class PageSource:
 
 
 register_point(Point("subproject_source", kind=PageSource))
+# (project, content) -> project-relative path, or None when it doesn't take it
+# — consumer: core/self_doc.py
+register_point(Point("self_doc"))
+# (root: Path, manifest: LayoutManifest) -> None, for every applied pack
+# — consumer: core/layout/scaffold.py
+register_point(Point("scaffold"))
 
 
 def active(project: Project | None, point: str) -> list[Contribution]:
