@@ -20,6 +20,7 @@ def register(api) -> None:
     import importlib
 
     from veles.core.contributions import Engine, ToolSet
+    from veles.modules.wiki.prompt import wiki_prompt
     from veles.modules.wiki.recall import wiki_recall
 
     api.contribute("engine", "wiki", Engine("wiki"))
@@ -33,6 +34,7 @@ def register(api) -> None:
         ),
     )
     api.contribute("recall", "wiki", wiki_recall)
+    api.contribute("prompt", "wiki", wiki_prompt)
 
 
 # The wiki engine's agent tools — present only when the layout enables the engine.

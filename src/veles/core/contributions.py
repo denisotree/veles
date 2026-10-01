@@ -157,6 +157,8 @@ class ToolSet:
 
 
 register_point(Point("tool", kind=ToolSet))
+# (project, *, include_index: bool) -> list[str] stable blocks — consumer: runtime/prompt.py
+register_point(Point("prompt"))
 
 
 def load_tool_sets(project: Project | None) -> set[str]:
