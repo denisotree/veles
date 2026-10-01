@@ -45,20 +45,15 @@ def load_skills(
 
     After builtins and skills come external MCP servers (`[mcp.servers.*]`,
     mounted as `mcp_<server>_<tool>`; no MCP-SDK cost when the section is
-    absent) and file-based project/user tools. Wiki-engine tools are dropped from
-    `base_tools` when the layout pack does not enable the engine, so the model
-    never sees their schemas.
+    absent) and file-based project/user tools. Module tool sets (the wiki engine's,
+    agent-ops') come from `tool` contributions; a set whose engine the layout pack
+    doesn't enable is never imported and its tools drop out of `base_tools`, so
+    the model never sees their schemas.
     """
-    from veles.core.layout.engines import wiki_enabled
+    from veles.core.contributions import load_tool_sets
 
-    if wiki_enabled(project):
-        # The wiki engine lives in modules/, so a non-wiki project never imports it.
-        import veles.modules.wiki.tools
-    else:
-        gated = set(TOOLSETS.get("engine-wiki", ()))
-        base_tools = tuple(t for t in base_tools if t not in gated)
-    # Agent-ops command tools (job_add/…) live in a module but are always on.
-    import veles.modules.agentops.tools  # noqa: F401
+    gated = load_tool_sets(project)
+    base_tools = tuple(t for t in base_tools if t not in gated)
 
     skills = discover_skills(project, include_layout=True, cache_ttl=skills_cache_ttl)
     full = registry.subset(registry.list_names())

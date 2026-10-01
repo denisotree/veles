@@ -71,18 +71,13 @@ def _live_tools(project: Project, conn) -> tuple[list[LiveTool], tuple[Path, ...
     strip builtins from the live process, so `veles tool list` typed inside a
     REPL session would change the agent's own toolset.
     """
-    from veles.core.layout.engines import wiki_enabled
+    from veles.core.contributions import load_tool_sets
     from veles.core.tools import registry as builtin_registry
     from veles.core.tools.loader import load_into_registry
-    from veles.core.tools.toolsets import TOOLSETS
 
-    # M163: wiki tools exist only when the layout pack enables the engine —
-    # importing the module is what registers them, so the gate is the import.
-    if wiki_enabled(project):
-        import veles.modules.wiki.tools
-    import veles.modules.agentops.tools  # noqa: F401
-
-    gated: set[str] = set() if wiki_enabled(project) else set(TOOLSETS.get("engine-wiki", ()))
+    # M163: module tools (wiki) exist only when the layout enables their engine —
+    # loading a contributed tool set is what registers them, so the gate is the load.
+    gated = load_tool_sets(project)
     live: Registry = builtin_registry.subset(
         [n for n in builtin_registry.list_names() if n not in gated]
     )

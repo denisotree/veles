@@ -17,11 +17,36 @@ from veles.modules.wiki.wiki import Wiki, WikiPageInfo
 
 def register(api) -> None:
     """Everything the wiki engine adds to Veles, as contributions (release A)."""
-    from veles.core.contributions import Engine
+    import importlib
+
+    from veles.core.contributions import Engine, ToolSet
     from veles.modules.wiki.recall import wiki_recall
 
     api.contribute("engine", "wiki", Engine("wiki"))
+    api.contribute(
+        "tool",
+        "wiki",
+        ToolSet(
+            load=lambda: importlib.import_module("veles.modules.wiki.tools"),
+            tools=WIKI_TOOLS,
+            engine="wiki",
+        ),
+    )
     api.contribute("recall", "wiki", wiki_recall)
 
 
-__all__ = ["Wiki", "WikiPageInfo", "ingest_user_message", "register"]
+# The wiki engine's agent tools — present only when the layout enables the engine.
+WIKI_TOOLS: tuple[str, ...] = (
+    "wiki_list_pages",
+    "wiki_read_page",
+    "wiki_search",
+    "wiki_write_page",
+    "wiki_add_category",
+    "wiki_append_log",
+    "wiki_ingest",
+    "wiki_rename_page",
+    "wiki_add",
+)
+
+
+__all__ = ["WIKI_TOOLS", "Wiki", "WikiPageInfo", "ingest_user_message", "register"]

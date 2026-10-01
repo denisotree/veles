@@ -11,3 +11,15 @@ enables the wiki content engine).
 
 def register(api) -> None:
     """Everything agent-ops adds to Veles, as contributions (release A)."""
+    import importlib
+
+    from veles.core.contributions import ToolSet
+
+    api.contribute(
+        "tool",
+        "agentops",
+        ToolSet(
+            load=lambda: importlib.import_module("veles.modules.agentops.tools"),
+            tools=("job_add", "job_list", "job_remove", "research"),
+        ),
+    )

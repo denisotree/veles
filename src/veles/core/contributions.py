@@ -26,6 +26,7 @@ from veles.core.text import shown
 
 if TYPE_CHECKING:
     from veles.core.modules import ModuleRegistry
+    from veles.core.project import Project
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,15 +146,50 @@ register_point(Point("engine", kind=Engine))
 register_point(Point("recall"))
 
 
+@dataclass(frozen=True, slots=True)
+class ToolSet:
+    """Agent tools a module owns. `load()` imports the code that registers them
+    (`@tool`); `engine` gates them on a content engine the project's layout enables."""
+
+    load: Callable[[], object]
+    tools: tuple[str, ...]
+    engine: str | None = None
+
+
+register_point(Point("tool", kind=ToolSet))
+
+
+def load_tool_sets(project: Project | None) -> set[str]:
+    """Load every contributed tool set the project can use; return the names of
+    the tools it can't (sets whose engine its layout doesn't enable) so callers
+    drop them from toolsets that list them."""
+    from veles.core.layout.engines import engine_enabled
+
+    gated: set[str] = set()
+
+    def load(c: Contribution) -> None:
+        ts = c.obj
+        assert isinstance(ts, ToolSet)
+        if ts.engine is not None and not engine_enabled(project, ts.engine):
+            gated.update(ts.tools)
+            return
+        ts.load()
+
+    call_each("tool", load)
+    return gated
+
+
 __all__ = [
     "BUILTIN_MODULES",
     "CONTRIBUTION_POINTS",
     "Contribution",
     "Engine",
     "Point",
+    "ToolSet",
     "call_each",
     "check",
     "contributions",
+    "load_tool_sets",
     "register_point",
     "reset_builtin_contributions",
 ]
