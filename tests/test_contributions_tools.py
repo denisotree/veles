@@ -66,6 +66,7 @@ def test_tool_set_of_an_enabled_engine_is_loaded(tmp_path, monkeypatch) -> None:
 
 
 def test_mcp_server_hides_wiki_tools_on_a_bare_project(tmp_path, monkeypatch) -> None:
+    import contextvars
     import io
     import json
 
@@ -77,7 +78,8 @@ def test_mcp_server_hides_wiki_tools_on_a_bare_project(tmp_path, monkeypatch) ->
     monkeypatch.setattr("sys.stdin", io.StringIO(request))
     out = io.StringIO()
     monkeypatch.setattr("sys.stdout", out)
-    main(["--project-root", str(project.root)])
+    # main() sets the active project for its process; isolate it from later tests.
+    contextvars.copy_context().run(main, ["--project-root", str(project.root)])
     names = {t["name"] for t in json.loads(out.getvalue().splitlines()[0])["result"]["tools"]}
     assert "read_file" in names
     assert not any(n.startswith("wiki_") for n in names)
