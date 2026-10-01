@@ -29,14 +29,17 @@ _cache: dict[tuple[str, str], tuple[float, tuple[str, ...]]] = {}
 
 
 def engine_enabled(project: Project | None, engine: str) -> bool:
-    """True when the project's active layout pack declares `engine`.
+    """True when the project's active layout pack declares `engine` AND a loaded
+    module contributes it (`api.contribute("engine", …)`).
 
     No project, or a layout name that resolves to no pack → no engines
     (a project that opted out of any content layout gets no content
     machinery)."""
-    if project is None:
+    if project is None or engine not in _enabled_engines(project):
         return False
-    return engine in _enabled_engines(project)
+    from veles.core.contributions import contributions
+
+    return any(c.name == engine for c in contributions("engine"))
 
 
 def wiki_enabled(project: Project | None) -> bool:

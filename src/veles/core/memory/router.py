@@ -35,7 +35,6 @@ from veles.core.memory.rerank import (
 )
 from veles.core.project import Project
 from veles.core.safety import scan_for_injection
-from veles.core.subproject import load_subprojects, resolve_subproject_path
 from veles.core.text import ellipsize
 
 if TYPE_CHECKING:
@@ -153,10 +152,24 @@ class MemoryRouter:
                 name: asyncio.ensure_future(asyncio.to_thread(fn, query, limit=limit))
                 for name, fn in (
                     ("about", self._collect_about_veles),
-                    ("wiki", self._collect_wiki),
                     ("extra", self._collect_extra),
                 )
             }
+        )
+        # Module contributions (e.g. the wiki engine): one stream per contributor,
+        # named after it, run like the other file-touching collectors.
+        from veles.core.contributions import call_each
+
+        tasks.update(
+            call_each(
+                "recall",
+                lambda c: (
+                    c.name,
+                    asyncio.ensure_future(
+                        asyncio.to_thread(c.obj, self._project, query, limit=limit)  # type: ignore[arg-type]
+                    ),
+                ),
+            )
         )
         await asyncio.wait(tasks.values(), timeout=deadline_sec)
 
@@ -228,41 +241,6 @@ class MemoryRouter:
                     score=float(h.score),
                 )
             )
-        return hits
-
-    def _collect_wiki(self, query: str, *, limit: int) -> list[RecallHit]:
-        """Wiki-engine collector (M163: layout-gated). A project whose
-        layout pack doesn't enable the wiki engine contributes no wiki
-        hits; recall still works off insights/rules/turns/extras. The
-        same check applies per subproject — each child's own layout
-        decides."""
-        from veles.core.layout.engines import wiki_enabled
-        from veles.modules.wiki.wiki import Wiki
-
-        hits: list[RecallHit] = []
-        if wiki_enabled(self._project):
-            hits.extend(
-                RecallHit(rel_path=p.rel_path, title=p.title, summary=p.summary)
-                for p in Wiki(self._project.wiki_root).search(query, limit=limit)
-            )
-        sub_limit = max(1, limit // 2)
-        for sub in load_subprojects(self._project):
-            sub_root = resolve_subproject_path(self._project, sub)
-            # v2: subproject wiki lives at `<sub_root>/wiki/`, container
-            # is the subproject root itself.
-            if not (sub_root / ".veles").is_dir():
-                continue
-            if not _subproject_wiki_enabled(sub_root):
-                continue
-            sub_wiki = Wiki(sub_root)
-            for page in sub_wiki.search(query, limit=sub_limit):
-                hits.append(
-                    RecallHit(
-                        rel_path=f"{sub.slug}:{page.rel_path}",
-                        title=f"[{sub.slug}] {page.title}",
-                        summary=page.summary,
-                    )
-                )
         return hits
 
     async def _collect_insights(self, query: str, *, limit: int) -> list[RecallHit]:
@@ -378,18 +356,6 @@ def _local_query_vector(query: str) -> list[float] | None:
     except Exception:
         return None
     return vecs[0] if vecs else None
-
-
-def _subproject_wiki_enabled(sub_root) -> bool:
-    """Best-effort wiki-engine check for a subproject (its own layout
-    decides). Unloadable child → no wiki hits from it."""
-    from veles.core.layout.engines import wiki_enabled
-    from veles.core.project import load_project
-
-    try:
-        return wiki_enabled(load_project(sub_root))
-    except Exception:
-        return False
 
 
 def _load_recall_deadline(project: Project) -> float:

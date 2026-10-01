@@ -14,4 +14,14 @@ Submodules:
 from veles.modules.wiki.ingest import ingest_user_message
 from veles.modules.wiki.wiki import Wiki, WikiPageInfo
 
-__all__ = ["Wiki", "WikiPageInfo", "ingest_user_message"]
+
+def register(api) -> None:
+    """Everything the wiki engine adds to Veles, as contributions (release A)."""
+    from veles.core.contributions import Engine
+    from veles.modules.wiki.recall import wiki_recall
+
+    api.contribute("engine", "wiki", Engine("wiki"))
+    api.contribute("recall", "wiki", wiki_recall)
+
+
+__all__ = ["Wiki", "WikiPageInfo", "ingest_user_message", "register"]

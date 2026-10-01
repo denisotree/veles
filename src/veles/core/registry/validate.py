@@ -46,7 +46,13 @@ PERMISSIVE_LICENSES = frozenset(
         "MPL-2.0",
     }
 )
-_PROVIDES_PREFIXES = ("hook:", "tool:", "platform:", "provider:", "memory:")
+
+
+def _provides_prefixes() -> tuple[str, ...]:
+    """`hook:` plus one `<point>:` per declared contribution point."""
+    from veles.core.contributions import CONTRIBUTION_POINTS
+
+    return ("hook:", *(f"{p}:" for p in CONTRIBUTION_POINTS))
 
 
 @dataclass
@@ -204,9 +210,10 @@ def _check_kind(ext: Extension, payload: Path) -> list[str]:
 
 def _check_module(ext: Extension, payload: Path) -> list[str]:
     errors: list[str] = []
-    bad = [p for p in ext.provides if not p.startswith(_PROVIDES_PREFIXES)]
+    prefixes = _provides_prefixes()
+    bad = [p for p in ext.provides if not p.startswith(prefixes)]
     if bad:
-        errors.append(f"provides entries must start with {', '.join(_PROVIDES_PREFIXES)}: {bad}")
+        errors.append(f"provides entries must start with {', '.join(prefixes)}: {bad}")
     try:
         manifest = parse_manifest((payload / "module.toml").read_text(encoding="utf-8"))
         entry, _ = entrypoint_file(payload, manifest.entrypoint)
@@ -230,9 +237,12 @@ payload = Path(sys.argv[1])
 manifest = parse_manifest((payload / "module.toml").read_text(encoding="utf-8"))
 registry = ModuleRegistry()
 load_module(ModuleHandle(manifest.name, manifest, payload), registry)
+from veles.core.contributions import CONTRIBUTION_POINTS
 print(json.dumps({
     "hooks": [h for h in HOOK_NAMES if any(True for _ in registry.iter_hooks(h))],
-    "memory": [name for name, _m, _f in registry.iter_memory_providers()],
+    "contributions": [
+        f"{p}:{c.name}" for p in CONTRIBUTION_POINTS for c in registry.contributions(p)
+    ],
 }))
 """
 _CODE_TIMEOUT_S = 600
@@ -301,7 +311,7 @@ def _tail(run: subprocess.CompletedProcess[str]) -> str:
 
 
 def _registered(run: subprocess.CompletedProcess[str]) -> set[str] | None:
-    """Parses the dry run's last stdout line into `{"hook:<name>", "memory:<name>"}`.
+    """Parses the dry run's last stdout line into `{"hook:<name>", "<point>:<name>"}`.
     Untrusted output (the module can lie) — any shape mismatch is a `None`, never
     an exception."""
     lines = run.stdout.strip().splitlines()
@@ -314,12 +324,12 @@ def _registered(run: subprocess.CompletedProcess[str]) -> set[str] | None:
     if not isinstance(payload, dict):
         return None
     hooks = payload.get("hooks")
-    memory = payload.get("memory")
+    added = payload.get("contributions")
     if not isinstance(hooks, list) or not all(isinstance(h, str) for h in hooks):
         return None
-    if not isinstance(memory, list) or not all(isinstance(m, str) for m in memory):
+    if not isinstance(added, list) or not all(isinstance(a, str) for a in added):
         return None
-    return {f"hook:{h}" for h in hooks} | {f"memory:{m}" for m in memory}
+    return {f"hook:{h}" for h in hooks} | set(added)
 
 
 def _run_module(
@@ -342,7 +352,7 @@ def _run_module(
     registered = _registered(run)
     if registered is None:
         return [f"register() failed (no hook/provider list from the dry run):\n{_tail(run)}"]
-    declared = {p for p in ext.provides if p.startswith(("hook:", "memory:"))}
+    declared = {p for p in ext.provides if p.startswith(_provides_prefixes())}
     if registered != declared:
         errors.append(
             f"provides declares {sorted(declared)} but register() adds {sorted(registered)}"

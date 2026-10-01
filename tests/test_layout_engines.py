@@ -196,6 +196,19 @@ def test_self_doc_lands_in_wiki_when_engine_on(wiki_project: Project) -> None:
 # ---- sanity ----
 
 
+def test_engine_needs_a_contributing_module(wiki_project: Project, monkeypatch) -> None:
+    """The pack asking for `wiki` is not enough: some module must contribute it."""
+    from veles.core import contributions as contrib
+
+    assert wiki_enabled(wiki_project)
+    monkeypatch.setattr(contrib, "BUILTIN_MODULES", ())
+    contrib.reset_builtin_contributions()
+    try:
+        assert not wiki_enabled(wiki_project)
+    finally:
+        contrib.reset_builtin_contributions()
+
+
 def test_engine_flags(nowiki_project: Project, wiki_project: Project) -> None:
     assert not wiki_enabled(nowiki_project)
     assert wiki_enabled(wiki_project)

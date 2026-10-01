@@ -7,3 +7,7 @@ pluggable, never baked into `src/veles/core/`. Imported unconditionally by
 the agent runs — unlike the wiki tools, which exist only when the layout pack
 enables the wiki content engine).
 """
+
+
+def register(api) -> None:
+    """Everything agent-ops adds to Veles, as contributions (release A)."""

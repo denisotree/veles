@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from veles.core.contributions import CONTRIBUTION_POINTS, Contribution, check
 from veles.core.module_manifest import (
     ManifestError,
     ModuleManifest,
@@ -77,8 +78,28 @@ ProviderFactory = Callable[[dict[str, Any]], object | None]
 class ModuleRegistry:
     def __init__(self) -> None:
         self._hooks: dict[str, list[tuple[str, HookFn]]] = {n: [] for n in HOOK_NAMES}
-        self._memory_providers: dict[str, tuple[str, ProviderFactory]] = {}
+        self._contributions: dict[str, list[Contribution]] = {}
         self.modules: list[str] = []
+
+    def add_contribution(self, point: str, name: str, module_name: str, obj: object) -> None:
+        """`ValueError` for an unknown point, an object the point doesn't take, or a
+        name already contributed to a keyed point."""
+        check(point, name, obj)
+        self._refuse_taken(point, name)
+        self._contributions.setdefault(point, []).append(
+            Contribution(point, name, obj, module_name)
+        )
+
+    def contributions(self, point: str) -> list[Contribution]:
+        return list(self._contributions.get(point, ()))
+
+    def _refuse_taken(self, point: str, name: str) -> None:
+        """`ValueError` when a keyed point already has a contribution named `name`."""
+        if not CONTRIBUTION_POINTS[point].keyed:
+            return
+        for c in self._contributions.get(point, ()):
+            if c.name == name:
+                raise ValueError(f"{point} {name!r} is already registered by {c.module!r}")
 
     def add_hook(self, hook_name: str, module_name: str, fn: HookFn) -> None:
         if hook_name not in HOOK_NAMES:
@@ -93,14 +114,11 @@ class ModuleRegistry:
 
         if not is_slug(name):
             raise ValueError(f"memory provider name {name!r} must match [a-z0-9][a-z0-9-]*")
-        if name in self._memory_providers:
-            owner = self._memory_providers[name][0]
-            raise ValueError(f"memory provider {name!r} is already registered by {owner!r}")
-        self._memory_providers[name] = (module_name, factory)
+        self.add_contribution("memory", name, module_name, factory)
 
     def iter_memory_providers(self) -> Iterator[tuple[str, str, ProviderFactory]]:
-        for name, (module_name, factory) in self._memory_providers.items():
-            yield name, module_name, factory
+        for c in self.contributions("memory"):
+            yield c.name, c.module, c.obj  # type: ignore[misc]
 
     def merge_from(self, other: ModuleRegistry, module_name: str) -> None:
         """Fold `other` (a scratch registry a single module's `register()` populated)
@@ -113,18 +131,18 @@ class ModuleRegistry:
         module that raises never leaves hooks or providers behind (`api.add_hook` /
         `api.add_memory_provider` only ever mutate the scratch copy).
 
-        A memory-provider name that collides with one already in self is treated as a
-        load failure too: raises `ValueError` (the caller turns it into a
-        `ModuleLoadError`) before anything is merged, so a colliding module leaves
+        A contribution name that collides with one already in self (for a keyed point)
+        is treated as a load failure too: raises `ValueError` (the caller turns it into
+        a `ModuleLoadError`) before anything is merged, so a colliding module leaves
         nothing behind either — checked first so the merge itself is all-or-nothing.
         """
-        for name in other._memory_providers:
-            if name in self._memory_providers:
-                owner = self._memory_providers[name][0]
-                raise ValueError(f"memory provider {name!r} is already registered by {owner!r}")
-        for hook_name, entries in other._hooks.items():
-            self._hooks[hook_name].extend(entries)
-        self._memory_providers.update(other._memory_providers)
+        for point, entries in other._contributions.items():
+            for c in entries:
+                self._refuse_taken(point, c.name)
+        for hook_name, hooks in other._hooks.items():
+            self._hooks[hook_name].extend(hooks)
+        for point, entries in other._contributions.items():
+            self._contributions.setdefault(point, []).extend(entries)
         self.modules.append(module_name)
 
 
@@ -140,6 +158,10 @@ class ModuleAPI:
 
     def add_memory_provider(self, name: str, factory: ProviderFactory) -> None:
         self._registry.add_memory_provider(name, self._module_name, factory)
+
+    def contribute(self, point: str, name: str, obj: object) -> None:
+        """Add `obj` to contribution `point` (see `veles.core.contributions`)."""
+        self._registry.add_contribution(point, name, self._module_name, obj)
 
 
 # ---- ContextVar for the active registry ----

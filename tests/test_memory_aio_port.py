@@ -151,7 +151,7 @@ def test_recall_keeps_what_finished_when_a_collector_hangs(tmp_path: Path, monke
             time.sleep(30)
             return []
 
-        monkeypatch.setattr(MemoryRouter, "_collect_wiki", hang)
+        monkeypatch.setattr(MemoryRouter, "_collect_extra", hang)
 
         t0 = time.perf_counter()
         hits = MemoryRouter(project, store=store).recall("kafka consumer lag", deadline_sec=0.3)
