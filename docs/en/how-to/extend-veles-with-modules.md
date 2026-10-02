@@ -80,5 +80,5 @@ that verb without the module.
 name = "my-engine"
 kind = "module"
 provides = ["engine:my-engine", "prompt:my-engine"]
-requires_extensions = []   # full refs of extensions this one needs, e.g. "public:official/wiki"
+requires_extensions = []   # full refs of the modules/layouts/skills this one needs, e.g. "public:official/wiki"
 ```

@@ -144,3 +144,40 @@ def test_validate_reports_unknown_and_cyclic_dependencies(tmp_path) -> None:
     errors = "\n".join(validate_registry(root).errors)
     assert "mine:g/nope" in errors
     assert "cycle" in errors
+
+
+def test_validate_refuses_an_mcp_recipe_as_a_dependency(tmp_path) -> None:
+    root = write_registry(tmp_path / "r", name="mine")
+    write_extension(root, "g", "srv", kind="mcp", files={}, mcp='command = "x"')
+    write_extension(root, "g", "s")  # a skill
+    write_extension(root, "g", "m", kind="module", files=_MODULE_FILES)
+    write_extension(root, "g", "a", extra_ext='requires_extensions = ["mine:g/srv"]')
+    write_extension(root, "g", "b", extra_ext='requires_extensions = ["mine:g/m", "mine:g/s"]')
+    errors = validate_registry(root).errors
+    assert any(
+        e.startswith("g/a:") and "only a module, a layout or a skill" in e for e in errors
+    ), errors
+    assert not any(e.startswith("g/b:") for e in errors), errors
+
+
+def test_validate_checks_refs_into_a_connected_registry(tmp_path) -> None:
+    other = tmp_path / "other"
+    make_git_registry(other, skills=("alpha",))
+    write_extension(other, "official", "engine", kind="module", files=_MODULE_FILES)
+    commit_all(other, "engine")
+    remove_source("public")
+    add_source(str(other))  # connected as `private`
+    root = write_registry(tmp_path / "r", name="mine")
+    write_extension(root, "g", "ok", extra_ext='requires_extensions = ["private:official/engine"]')
+    write_extension(root, "g", "sk", extra_ext='requires_extensions = ["private:official/alpha"]')
+    write_extension(root, "g", "gone", extra_ext='requires_extensions = ["private:official/nope"]')
+    write_extension(root, "g", "far", extra_ext='requires_extensions = ["acme:g/x"]')
+    report = validate_registry(root)
+    errors = "\n".join(report.errors)
+    assert "g/ok:" not in errors
+    assert "g/sk:" not in errors  # a skill in another registry is a valid dependency
+    assert "g/gone:" in errors and "private:official/nope" in errors
+    # A registry this environment doesn't connect can't be checked: a reviewer
+    # note, not a failure (a company registry is connected under any local name).
+    assert "acme:g/x" not in errors
+    assert any("acme:g/x" in r and "not connected" in r for r in report.review), report.review

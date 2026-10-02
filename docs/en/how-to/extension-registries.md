@@ -66,7 +66,9 @@ it needs too: one confirmation lists every package, dependencies install first,
 and if any of them fails nothing from that call is left behind. A layout's
 dependencies install for the user, like the layout itself. `veles registry
 uninstall wiki` refuses while an installed extension needs it (`--force`
-overrides); `verify` and `doctor` report a missing dependency.
+overrides); `verify` and `doctor` report a missing dependency. A dependency
+can be a module, a layout or a skill — a module or a layout can bring the
+skills its workflow uses — but not an `mcp` recipe.
 
 When the same name is installed both for the user and in the project,
 `uninstall` and `upgrade` ask which one: pass `--user` or `--project`.
@@ -133,7 +135,9 @@ entry point parse, a skill's `SKILL.md` frontmatter is valid, a layout's
 `layout.toml` loads, an `mcp` recipe matches the `[mcp.servers]` schema), that
 `version` grew if the payload or source changed, that `public = true`
 registries only accept permissive licenses, that every `requires_extensions`
-ref into the same registry exists and the refs form no cycle, and that a
+ref names an existing module, layout or skill — in the same registry or in the
+connected registry it names (a registry not connected where `validate` runs is
+left to the reviewer, with a note) — and the refs form no cycle, and that a
 module imports Veles **only through `veles.sdk`** (its tests are exempt — they
 run against a pinned Veles; see [extend Veles with modules](extend-veles-with-modules.md)).
 `--run-code` additionally imports

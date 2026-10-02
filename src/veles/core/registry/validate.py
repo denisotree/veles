@@ -18,6 +18,8 @@ from pathlib import Path
 from veles.core.frontmatter import parse_frontmatter
 from veles.core.layout.manifest import LayoutManifestError, read_manifest
 from veles.core.module_manifest import ManifestError, entrypoint_file, parse_manifest
+from veles.core.registry.catalog import ResolveError, resolve
+from veles.core.registry.config import list_sources
 from veles.core.registry.hashing import bytecode_paths, git_dirs, tree_sha256
 from veles.core.registry.model import (
     EXTENSION_FILE,
@@ -101,7 +103,7 @@ def validate_registry(
                 f"duplicate name {ext.name!r}: {ext.group}/ and {seen[ext.name].group}/"
             )
         seen.setdefault(ext.name, ext)
-    report.errors += _check_dependencies(entries, meta.name)
+    _check_dependencies(entries, meta.name, report)
     touched: frozenset[str] = frozenset()
     if base is None:
         targets = entries
@@ -136,20 +138,36 @@ def validate_registry(
     return report
 
 
-def _check_dependencies(entries: list[Extension], registry: str) -> list[str]:
-    """Every `requires_extensions` ref into this registry names a real extension,
-    and those refs form no cycle. Refs into other registries can't be checked here."""
+_DEPENDENCY_KINDS = frozenset({"module", "layout", "skill"})
+
+
+def _check_dependencies(entries: list[Extension], registry: str, report: ValidationReport) -> None:
+    """Every `requires_extensions` ref names a module, layout or skill that exists —
+    in this registry, or in the connected registry the ref names (a registry not
+    connected here gets a reviewer note: refs carry the local source name, which a
+    fresh CI home doesn't have) — and the refs form no cycle."""
     by_ref = {f"{registry}:{e.group}/{e.name}": e for e in entries}
-    errors: list[str] = []
     for ext in by_ref.values():
         for dep in ext.requires_extensions:
-            if dep.startswith(f"{registry}:") and dep not in by_ref:
-                errors.append(f"{ext.group}/{ext.name}: requires_extensions: no extension {dep}")
+            where = f"{ext.group}/{ext.name}: requires_extensions"
+            prefix = dep.partition(":")[0]
+            if prefix != registry and not _connected(prefix):
+                report.review.append(
+                    f"{where}: {dep} can't be checked — {prefix!r} is not connected here"
+                )
+                continue
+            kind, problem = _dependency_kind(dep, by_ref, registry)
+            if problem is None and kind not in _DEPENDENCY_KINDS:
+                problem = (
+                    f"{dep} is a {kind} — only a module, a layout or a skill can be a dependency"
+                )
+            if problem is not None:
+                report.errors.append(f"{where}: {problem}")
     done: set[str] = set()
 
     def visit(ref: str, stack: list[str]) -> None:
         if ref in stack:
-            errors.append(f"requires_extensions cycle: {' → '.join([*stack, ref])}")
+            report.errors.append(f"requires_extensions cycle: {' → '.join([*stack, ref])}")
             return
         if ref in done or ref not in by_ref:
             return
@@ -159,7 +177,23 @@ def _check_dependencies(entries: list[Extension], registry: str) -> list[str]:
 
     for ref in by_ref:
         visit(ref, [])
-    return errors
+
+
+def _connected(name: str) -> bool:
+    return any(s.name == name for s in list_sources())
+
+
+def _dependency_kind(
+    dep: str, by_ref: dict[str, Extension], registry: str
+) -> tuple[str | None, str | None]:
+    """(kind, None) for a dependency that exists, (None, why) for one that doesn't."""
+    if dep.startswith(f"{registry}:"):
+        target = by_ref.get(dep)
+        return (target.kind, None) if target is not None else (None, f"no extension {dep}")
+    try:
+        return resolve(dep).ext.kind, None
+    except ResolveError as exc:
+        return None, f"{dep}: {exc}"
 
 
 def _check(

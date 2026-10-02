@@ -80,5 +80,5 @@ Recall резервирует `insights`, `turns`, `about` и `extra`; `Backgrou
 name = "my-engine"
 kind = "module"
 provides = ["engine:my-engine", "prompt:my-engine"]
-requires_extensions = []   # полные ссылки на нужные расширения, например "public:official/wiki"
+requires_extensions = []   # полные ссылки на нужные модули/раскладки/навыки, например "public:official/wiki"
 ```
