@@ -85,6 +85,8 @@ class ModuleRegistry:
         self._hooks: dict[str, list[tuple[str, HookFn]]] = {n: [] for n in HOOK_NAMES}
         self._contributions: dict[str, list[Contribution]] = {}
         self.modules: list[str] = []
+        # Module name → its directory, for modules loaded from one (their `skills/`).
+        self.module_dirs: dict[str, Path] = {}
 
     def add_contribution(self, point: str, name: str, module_name: str, obj: object) -> None:
         """`ValueError` for an unknown point, an object the point doesn't take, or a
@@ -257,6 +259,7 @@ def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
         try:
             refuse_builtin_collisions(scratch)
             registry.merge_from(scratch, handle.name)
+            registry.module_dirs[handle.name] = handle.dir
         except ValueError as exc:
             raise ModuleLoadError(str(exc)) from exc
     except BaseException:
