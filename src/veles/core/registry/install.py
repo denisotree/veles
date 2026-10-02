@@ -240,7 +240,8 @@ def uninstall(
     dependants = [r.name for r in load_records() if ref and ref in r.requires_extensions]
     if dependants and not force:
         raise InstallError(
-            f"{', '.join(sorted(dependants))} need {name!r} — uninstall them first "
+            f"{', '.join(sorted(dependants))} {'needs' if len(dependants) == 1 else 'need'} "
+            f"{name!r} — uninstall {'it' if len(dependants) == 1 else 'them'} first "
             "(or pass --force)"
         )
     remove_installed(rec)

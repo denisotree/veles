@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.3] — 2026-10-02
+
 `veles init` creates a bare project by default; the wiki engine and the `llm-wiki` and
 `notes` layouts ship from the extension registry, and registry modules build on a public
 `veles.sdk`. No existing project silently loses its wiki.
@@ -49,9 +51,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tools reach `claude`/`gemini` delegates.
 - `veles doctor` checks the layout's context file (e.g. the wiki's `INDEX.md`) instead of
   INDEX.md/LOG.md, and names the install when the layout is missing.
-- An MCP server approval also covers the project scripts its recipe runs (`command`/`args`
-  naming files in the project): editing such a script revokes the approval. Recipes that run
-  no project files keep their approvals.
+- An MCP server approval also covers the project code its recipe runs (a `command` that is a
+  project file, `args` that are scripts by suffix or executable bit): editing such a script
+  revokes the approval; data files the server writes don't. Stdio servers start in the
+  project root. Recipes that run no project files keep their approvals.
+- A layout pack that isn't installed fails closed in the write guard: only `.veles/`'s agent
+  dirs and `AGENTS.md` stay writable until it is (a not-yet-reinstalled `llm-wiki` project
+  stays permissive and `notes` keeps its `notes/` zone, as before).
 - The write guard protects the hooks directory git actually uses (`git rev-parse --git-path
   hooks`: every config level, an enclosing repository, a `.git` file).
 - New wiki projects no longer build the search index at init; search scans pages until dream
