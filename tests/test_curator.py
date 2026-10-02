@@ -231,7 +231,7 @@ def test_curate_one_session_budget_exhausted_after_persist_counts_as_success(
     """If the budget (or any other stop) kills the run AFTER the persist tools
     ran, the distillation already landed — retrying would only duplicate the
     wiki page. Success is 'the work persisted', whatever the stop reason."""
-    project = init_project(tmp_path, name="t")
+    project = init_project(tmp_path, name="t", layout="llm-wiki")
     store = SessionStore(project.memory_db_path)
     sid = _seed_session(store, n_turns=2, age_sec=120)
     session = store.get_session(sid)

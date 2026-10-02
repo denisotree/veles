@@ -60,8 +60,6 @@ def test_find_layout_returns_default(isolated_home: Path) -> None:
     assert entry is not None
     assert entry.manifest.name == LAYOUT_DEFAULT
     assert entry.scope == "builtin"
-    # The pack root contains the `skills/` directory (sanity, not strict spec).
-    assert (entry.root / "skills").is_dir()
 
 
 def test_find_layout_unknown_returns_none(isolated_home: Path) -> None:
@@ -143,7 +141,7 @@ def test_malformed_pack_silently_skipped(isolated_home: Path, tmp_path: Path) ->
 
 def test_llm_wiki_pack_declares_three_operations(isolated_home: Path) -> None:
     """The shipped llm-wiki pack covers ingest/query/lint per VISION §5.2."""
-    entry = find_layout(LAYOUT_DEFAULT, project=None)
+    entry = find_layout("llm-wiki", project=None)
     assert entry is not None
     op_names = {op.name for op in entry.manifest.operations}
     assert {"ingest", "query", "lint"} <= op_names

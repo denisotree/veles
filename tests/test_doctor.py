@@ -35,7 +35,7 @@ from veles.core.trace import TraceRecord, TraceWriter, trace_path_for_project
 def _make_project(tmp_path: Path) -> Project:
     state = tmp_path / ".veles"
     state.mkdir(parents=True, exist_ok=True)
-    return Project(root=tmp_path, name="test", created_at=0.0)
+    return Project(root=tmp_path, name="test", created_at=0.0, layout_name="llm-wiki")
 
 
 # ---------- CheckResult / DoctorReport ----------

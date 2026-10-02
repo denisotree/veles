@@ -19,7 +19,7 @@ from veles.modules.wiki.wiki import Wiki
 
 @pytest.fixture()
 def project_with_cluster(tmp_path: Path):
-    project = init_project(tmp_path / "demo", name="demo")
+    project = init_project(tmp_path / "demo", name="demo", layout="llm-wiki")
     wiki = Wiki(project.wiki_root)
     for slug, title in [
         ("frontend-auth", "Frontend authentication"),

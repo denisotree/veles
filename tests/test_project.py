@@ -55,7 +55,7 @@ def test_init_project_creates_skeleton(tmp_path: Path) -> None:
     """v2 layout: wiki lives in `<root>/wiki/` (project content); raw
     sources in `<root>/sources/`. `.veles/` keeps only daemon-internal
     state (project.toml, skills/, later memory.db/etc.)."""
-    p = init_project(tmp_path, name="alpha")
+    p = init_project(tmp_path, name="alpha", layout="llm-wiki")
     assert (tmp_path / ".veles").is_dir()
     assert (tmp_path / ".veles" / "project.toml").is_file()
     assert (tmp_path / ".veles" / "skills").is_dir()

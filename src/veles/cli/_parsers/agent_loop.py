@@ -19,10 +19,10 @@ def _register_init(sub: argparse._SubParsersAction) -> None:
     )
     init.add_argument(
         "--layout",
-        default="llm-wiki",
+        default=None,
         help=(
-            "Layout pack for the user-content scaffold (default: llm-wiki). "
-            "Discovered from ~/.veles/layouts/ and the builtin packs."
+            "Layout pack for the user-content scaffold (default: bare; at a terminal "
+            "`veles init` asks). Installed packs and those in your registries are offered."
         ),
     )
     init.add_argument(

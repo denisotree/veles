@@ -151,7 +151,7 @@ def test_existing_insights_default_to_full_confidence(tmp_path: Path) -> None:
 def test_save_insight_row_persists_confidence(tmp_path: Path) -> None:
     from veles.core.tools.builtin.memory_save import save_insight_row
 
-    project = init_project(tmp_path / "p", name="p")
+    project = init_project(tmp_path / "p", name="p", layout="llm-wiki")
     rid = save_insight_row(
         title="inferred",
         body="tentative recovery note",
@@ -174,7 +174,7 @@ def test_recall_filters_low_confidence_insight(tmp_path: Path) -> None:
     a trusted one still surfaces."""
     from veles.core.memory.router import MemoryRouter
 
-    project = init_project(tmp_path / "p", name="p")
+    project = init_project(tmp_path / "p", name="p", layout="llm-wiki")
     store = SessionStore(project.memory_db_path)
     try:
         _insert_with_confidence(
@@ -218,7 +218,7 @@ def test_recall_surfaces_insight_via_sql_path(tmp_path: Path) -> None:
     """Insight reaches recall through the SQL source even with no wiki pages."""
     from veles.core.memory.router import MemoryRouter
 
-    project = init_project(tmp_path / "p", name="p")
+    project = init_project(tmp_path / "p", name="p", layout="llm-wiki")
     store = SessionStore(project.memory_db_path)
     try:
         _insert_insight(store, title="ratelimit fix", body="bump nginx worker_connections to 4096")
@@ -240,7 +240,7 @@ def test_recall_returns_insight_alongside_wiki_pages(tmp_path: Path) -> None:
     from veles.core.memory.router import MemoryRouter
     from veles.modules.wiki.wiki import Wiki
 
-    project = init_project(tmp_path / "p", name="p")
+    project = init_project(tmp_path / "p", name="p", layout="llm-wiki")
     wiki = Wiki(project.wiki_root)
     wiki.write_page(
         category="concepts",

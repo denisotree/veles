@@ -392,12 +392,14 @@ def project_wizard_steps(cwd: Path) -> list:
 
 @dataclass
 class LayoutPickerStep:
-    """Pick the project's content layout-pack (default `llm-wiki`).
+    """Pick the project's content layout-pack (default `bare`).
 
     M162: runs BEFORE BootstrapStep so `init_project(layout=...)`
     scaffolds exactly what the chosen pack declares — no post-hoc
     project.toml rewrite, no leftover skeleton from the default pack.
     Single-pack installations auto-confirm without showing the screen.
+    Only installed packs are listed: installing one needs the terminal
+    confirmation, which a full-screen app can't host (`veles init` offers it).
     """
 
     name: str = "layout-picker"
@@ -426,7 +428,10 @@ class LayoutPickerStep:
             ChoiceScreen(
                 title=self.title,
                 items=items,
-                subtitle="Layouts shape how the agent stores user content. Default: llm-wiki.",
+                subtitle=(
+                    "Layouts shape how the agent stores user content. Default: bare. "
+                    "More: `veles registry search --kind layout`."
+                ),
                 default=LAYOUT_DEFAULT,
             )
         )

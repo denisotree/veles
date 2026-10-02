@@ -20,7 +20,7 @@ from veles.modules.wiki.wiki import Wiki
 
 @pytest.fixture()
 def project(tmp_path: Path) -> Project:
-    return init_project(tmp_path / "demo", name="demo")
+    return init_project(tmp_path / "demo", name="demo", layout="llm-wiki")
 
 
 def _seed_pages(wiki: Wiki, pages: list[tuple[str, str, str]]) -> None:

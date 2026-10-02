@@ -46,7 +46,7 @@ def user_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_init_llm_wiki_scaffolds_wiki_tree(tmp_path: Path) -> None:
-    project = init_project(tmp_path / "p", name="p")  # default layout
+    project = init_project(tmp_path / "p", name="p", layout="llm-wiki")
     assert (project.root / "wiki" / "concepts").is_dir()
     assert (project.root / "sources").is_dir()
     agents = (project.root / "AGENTS.md").read_text(encoding="utf-8")

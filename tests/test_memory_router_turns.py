@@ -16,7 +16,7 @@ from veles.modules.wiki.wiki import Wiki
 
 @pytest.fixture()
 def project(tmp_path: Path) -> Project:
-    return init_project(tmp_path / "demo", name="demo")
+    return init_project(tmp_path / "demo", name="demo", layout="llm-wiki")
 
 
 def test_recall_returns_empty_when_query_blank(project: Project) -> None:

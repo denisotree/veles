@@ -148,7 +148,7 @@ def tmp_project(tmp_path):
     from veles.core.memory import SessionStore
     from veles.core.project import init_project
 
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
     store = SessionStore(project.memory_db_path)
     return project, store
 

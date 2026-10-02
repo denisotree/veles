@@ -35,14 +35,14 @@ def _write_skill(skills_dir: Path, name: str, body: str, *, description: str = "
 def test_default_layout_skills_discovered(isolated_home: Path, tmp_path: Path) -> None:
     """A fresh project on the builtin `llm-wiki` pack sees ingest /
     query / lint skills via mount_layout_skills."""
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
     skills = mount_layout_skills(project)
     names = {s.name for s in skills}
     assert {"ingest", "query", "lint"} <= names
 
 
 def test_pack_skills_have_builtin_scope(isolated_home: Path, tmp_path: Path) -> None:
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
     skills = mount_layout_skills(project)
     for s in skills:
         assert s.scope == "builtin"
@@ -51,7 +51,7 @@ def test_pack_skills_have_builtin_scope(isolated_home: Path, tmp_path: Path) -> 
 def test_pack_skill_has_expected_tools(isolated_home: Path, tmp_path: Path) -> None:
     """The `ingest` skill in llm-wiki declares fetch_url / read_file /
     wiki_write_page / wiki_append_log per its frontmatter."""
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
     skills = mount_layout_skills(project)
     by_name = {s.name: s for s in skills}
     ingest = by_name["ingest"]
@@ -62,7 +62,7 @@ def test_unknown_layout_returns_empty(isolated_home: Path, tmp_path: Path) -> No
     """If the project points at a layout that doesn't exist, we don't
     crash — we return an empty list and let the agent run with just
     project + user skills."""
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
     # Mutate project.toml to reference a non-existent pack
     toml_path = project.project_toml_path
     text = toml_path.read_text(encoding="utf-8")
@@ -79,7 +79,7 @@ def test_unknown_layout_returns_empty(isolated_home: Path, tmp_path: Path) -> No
 
 
 def test_discover_skills_includes_layout_pack(isolated_home: Path, tmp_path: Path) -> None:
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
     skills = discover_skills(project, include_layout=True)
     names = {s.name for s in skills}
     assert {"ingest", "query", "lint"} <= names
@@ -88,7 +88,7 @@ def test_discover_skills_includes_layout_pack(isolated_home: Path, tmp_path: Pat
 def test_project_skill_shadows_pack_skill(isolated_home: Path, tmp_path: Path) -> None:
     """If a project ships its own `ingest` SKILL.md, it overrides the
     layout-pack version. The override invariant: project > user > pack."""
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
     _write_skill(
         project.skills_dir,
         "ingest",
@@ -103,7 +103,7 @@ def test_project_skill_shadows_pack_skill(isolated_home: Path, tmp_path: Path) -
 
 
 def test_user_skill_shadows_pack_skill(isolated_home: Path, tmp_path: Path) -> None:
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
     user_skills = isolated_home / ".veles" / "skills"
     _write_skill(user_skills, "query", "user-level query body", description="user query")
     skills = discover_skills(project, include_layout=True)
@@ -115,7 +115,7 @@ def test_user_skill_shadows_pack_skill(isolated_home: Path, tmp_path: Path) -> N
 
 def test_project_shadows_user_shadows_pack(isolated_home: Path, tmp_path: Path) -> None:
     """Full three-way override: project > user > pack on the same name."""
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
     user_skills = isolated_home / ".veles" / "skills"
     _write_skill(user_skills, "lint", "user lint body", description="user lint")
     _write_skill(project.skills_dir, "lint", "project lint body", description="project lint")
@@ -129,7 +129,7 @@ def test_pack_skill_with_extends_field_loaded(isolated_home: Path, tmp_path: Pat
     `extends:` field set in pack frontmatter is honoured. (None of the
     shipped llm-wiki skills use it, but the loader path must remain
     uniform across scopes.)"""
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
     skills = mount_layout_skills(project)
     # All shipped llm-wiki skills don't use extends — they're standalone.
     for s in skills:

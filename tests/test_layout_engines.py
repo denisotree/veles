@@ -42,7 +42,7 @@ def nowiki_project(tmp_path: Path, user_home: Path) -> Project:
 
 @pytest.fixture()
 def wiki_project(tmp_path: Path) -> Project:
-    return init_project(tmp_path / "w", name="w")  # default llm-wiki
+    return init_project(tmp_path / "w", name="w", layout="llm-wiki")
 
 
 # ---- toolset gating ----

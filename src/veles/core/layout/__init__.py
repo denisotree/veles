@@ -16,7 +16,7 @@ Public surface:
 - `discover_layouts(project)` — returns the list of available packs
   in priority order (project → user → builtin)
 - `find_layout(project, name)` — pick a specific pack by name
-- `LAYOUT_DEFAULT` — `"llm-wiki"`, the dropdown default in `veles init`
+- `LAYOUT_DEFAULT` — `"bare"`, the default in `veles init` (from `core.project`)
 - `apply_scaffold(pack, root, name)` — pack-driven init skeleton (M162)
 - `wiki_enabled(project)` / `engine_enabled(project, name)` — content
   engine activation checks (M162)

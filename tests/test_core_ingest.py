@@ -83,7 +83,7 @@ def test_ingest_system_prompt_injects_layout_behaviour(isolated_home: Path, tmp_
     from tests.conftest import StubProvider
     from veles.cli.module_commands import module_system_prompt
 
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
     prompt = module_system_prompt(
         project,
         StubProvider(),

@@ -14,6 +14,7 @@ always come from `public:official/<name>`.
 
 from __future__ import annotations
 
+import contextlib
 import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -108,6 +109,22 @@ def install_hint(project: Project) -> str | None:
     return f"veles registry update && veles registry install {refs}"
 
 
+def available_layouts() -> list[str]:
+    """Layout names to offer in `veles init` / the wizard: installed packs (the
+    default first), then layouts in the cached registries (no network) — picking
+    one of those installs it."""
+    from veles.core.layout.discovery import discover_layouts
+    from veles.core.project import LAYOUT_DEFAULT
+    from veles.core.registry.catalog import search
+
+    names = [p.manifest.name for p in discover_layouts(None)]
+    with contextlib.suppress(Exception):  # no readable registry → installed packs only
+        found, _ = search(kind="layout", sync_missing=False)
+        names += [f.ext.name for f in found]
+    ordered = [LAYOUT_DEFAULT, *names]
+    return list(dict.fromkeys(ordered))
+
+
 def reset_warnings() -> None:
     """Test hook."""
     _warned.clear()
@@ -165,6 +182,7 @@ __all__ = [
     "MIGRATED_LAYOUTS",
     "EngineNeed",
     "LayoutNeed",
+    "available_layouts",
     "ensure_extension",
     "ensure_project_extensions",
     "install_hint",

@@ -26,7 +26,7 @@ from veles.modules.wiki.wiki import Wiki
 
 
 def _make_root(tmp_path: Path, *, name: str = "root") -> Project:
-    return init_project(tmp_path / name, name=name)
+    return init_project(tmp_path / name, name=name, layout="llm-wiki")
 
 
 # ---------- registry I/O ----------

@@ -10,8 +10,8 @@ Layout:
     ├── AGENTS.md             project context
     ├── CLAUDE.md → AGENTS.md
     ├── GEMINI.md → AGENTS.md
-    ├── INDEX.md, LOG.md      (Wiki — user content, llm-wiki layout)
-    ├── wiki/, sources/       (user content, llm-wiki layout)
+    ├── …                     user content shaped by the layout pack (none for
+    │                         `bare`, the default; wiki/, sources/ for llm-wiki)
     └── .veles/
         ├── project.toml      {name, created_at, schema_version, layout}
         ├── memory.db         (SessionStore — populated lazily on first run)
@@ -45,6 +45,11 @@ _SYMLINK_TARGETS = ("CLAUDE.md", "GEMINI.md")
 # `.veles/` keeps daemon-internal state only: project.toml, memory.db,
 # registries, tmp.
 _SCHEMA_VERSION = 2
+# The layout a new project gets: nothing in the user's directory but AGENTS.md.
+LAYOUT_DEFAULT = "bare"
+# The layout of a project.toml with no `layout` key (written before M117): those
+# projects were all wiki projects.
+LEGACY_LAYOUT = "llm-wiki"
 # M34: keep the constant for any external callers that imported it,
 # but produce content via agents_md_schema.default_template() so the
 # fresh-init AGENTS.md passes `validate()` out of the box.
@@ -65,12 +70,10 @@ class Project:
     created_at: float
     schema_version: int = _SCHEMA_VERSION
     # M117: which layout-pack organises the user-content side of the
-    # project. Default `"llm-wiki"` (the builtin Karpathy pack); users
-    # can switch via the wizard (M117 follow-up) or by editing the
-    # `layout` key in project.toml directly. Resolved at load time —
-    # callers like the daemon factory and `veles init` read it via
-    # `discover_layouts(project)`.
-    layout_name: str = "llm-wiki"
+    # project. Default `LAYOUT_DEFAULT` (`bare`); users pick another in
+    # `veles init` / the wizard, or edit the `layout` key in project.toml.
+    # Resolved at load time via `find_layout(project.layout_name, project)`.
+    layout_name: str = "bare"
 
     @property
     def state_dir(self) -> Path:
@@ -155,7 +158,7 @@ def load_project(root: Path) -> Project:
     proj = data.get("project") or {}
     layout_name = proj.get("layout")
     if not isinstance(layout_name, str) or not layout_name.strip():
-        layout_name = "llm-wiki"
+        layout_name = LEGACY_LAYOUT
     project = Project(
         root=root,
         name=str(proj.get("name") or root.name),
@@ -175,7 +178,7 @@ def init_project(
     *,
     name: str | None = None,
     force: bool = False,
-    layout: str = "llm-wiki",
+    layout: str = LAYOUT_DEFAULT,
 ) -> Project:
     """Create the project skeleton. Returns the new Project.
 
@@ -305,7 +308,7 @@ def _write_project_toml(
     name: str,
     created_at: float,
     schema_version: int = _SCHEMA_VERSION,
-    layout_name: str = "llm-wiki",
+    layout_name: str = LAYOUT_DEFAULT,
 ) -> None:
     project = {
         "name": name,

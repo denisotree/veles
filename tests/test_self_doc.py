@@ -17,7 +17,7 @@ from veles.modules.wiki.wiki import Wiki
 
 
 def _make_project(tmp_path: Path):
-    return init_project(tmp_path / "proj", name="testproject")
+    return init_project(tmp_path / "proj", name="testproject", layout="llm-wiki")
 
 
 def _empty_report(**kwargs) -> SelfDocReport:

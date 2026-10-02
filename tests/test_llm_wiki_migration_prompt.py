@@ -44,7 +44,7 @@ def test_llm_wiki_run_prompt_contains_migration_behaviour(
 ) -> None:
     from veles.runtime.prompt import build_run_system_prompt
 
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
 
     prompt = build_run_system_prompt(project, prompt="migrate this folder into the wiki")
 
@@ -63,7 +63,7 @@ def test_llm_wiki_prompt_declares_migration_and_log_patch_rules(
     raw -> sources/, article -> wiki page, log -> merge-or-create."""
     from veles.runtime.prompt import _load_layout_prompt
 
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
 
     text = _load_layout_prompt(project)
 
@@ -80,7 +80,7 @@ def test_llm_wiki_prompt_declares_migration_and_log_patch_rules(
 def test_llm_wiki_behaviour_prompt_file_resolves_and_is_non_empty(
     isolated_home: Path, tmp_path: Path
 ) -> None:
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
     pack = find_layout(project.layout_name, project)
 
     assert pack is not None
@@ -128,7 +128,7 @@ def test_behaviour_prompt_covers_multi_topic_extraction(
     fan out — page identity is the TOPIC, never the filename/date."""
     from veles.runtime.prompt import _load_layout_prompt
 
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
     text = _load_layout_prompt(project)
 
     assert text is not None
@@ -144,7 +144,7 @@ def test_behaviour_prompt_covers_valueless_source(isolated_home: Path, tmp_path:
     page and is archived, not deleted."""
     from veles.runtime.prompt import _load_layout_prompt
 
-    project = init_project(tmp_path / "proj", name="proj")
+    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
     text = _load_layout_prompt(project)
 
     assert text is not None
