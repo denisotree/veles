@@ -227,3 +227,18 @@ def test_module_remove_takes_the_manifest_name(tmp_path: Path, monkeypatch) -> N
     monkeypatch.chdir(project.root)
     assert main(["module", "remove", "--yes", "demo"]) == 0
     assert not d.exists()
+
+
+def test_module_list_marks_what_does_not_load(tmp_path: Path, monkeypatch, capsys) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    _write_module(user_modules_dir() / "demo", "demo")
+    _write_module(project.modules_dir / "a-demo", "demo")
+    _write_module(project.modules_dir / "b-demo", "demo")
+    monkeypatch.chdir(project.root)
+    assert main(["module", "list"]) == 0
+    rows = [line for line in capsys.readouterr().out.splitlines() if line.startswith("demo")]
+    assert len(rows) == 3
+    user, first, second = rows
+    assert "user" in user and "shadowed by the project's" in user
+    assert "project" in first and "shadowed" not in first and "duplicate" not in first
+    assert "duplicate name — ignored" in second

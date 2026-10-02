@@ -712,7 +712,7 @@ def _check_extensions(project: Project | None) -> CheckResult:
             status="warn",
             message=f"could not verify extensions: {shown(exc)}",
         )
-    broken = [i for i in issues if i.problem in ("missing", "modified")]
+    broken = [i for i in issues if i.problem in ("missing", "modified", "missing-dependency")]
     revoked = [i for i in issues if i.problem in ("yanked", "removed")]
     ahead = [i for i in issues if i.problem == "upstream-ahead"]
     if broken:

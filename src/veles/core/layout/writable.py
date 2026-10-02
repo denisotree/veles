@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import configparser
 import logging
+import subprocess
 import unicodedata
 from pathlib import Path
 
@@ -207,12 +208,18 @@ def needs_confirmation(project: Project, path: str | Path) -> bool:
 def _protected_targets(project: Project) -> list[Path]:
     """Where a root-level protected entry that is a symlink really points (the
     guard sees resolved paths, so `.git -> gitdata` would hide `gitdata/hooks`),
-    plus the repo's `core.hooksPath`. An unreadable git config adds nothing."""
+    plus the hooks dir git actually uses (`core.hooksPath` from any config level,
+    an enclosing repo, a `.git` file) and the one the project's own `.git/config`
+    names — both, since git may be missing or may answer for an enclosing repo
+    while the project's config is broken. An unreadable config adds nothing."""
     out = [
         (project.root / name).resolve()
         for name in _CONFIRM_NAMES
         if (project.root / name).is_symlink()
     ]
+    hooks_dir = _git_hooks_dir(project.root)
+    if hooks_dir is not None:
+        out.append(hooks_dir)
     # Git's config is INI-like: keys may lack a value, values may be quoted and
     # carry a trailing `;`/`#` comment. A value that can't be resolved (unknown
     # `~user`, a NUL) adds nothing — it must never make the write guard throw.
@@ -227,6 +234,30 @@ def _protected_targets(project: Project) -> list[Path]:
     except (OSError, UnicodeDecodeError, configparser.Error, RuntimeError, ValueError):
         pass
     return out
+
+
+def _git_hooks_dir(root: Path) -> Path | None:
+    """`git rev-parse --git-path hooks` from `root`: the hooks dir with every config
+    level applied. None when git is missing, slow, or `root` is not in a repo
+    (dubious ownership included) — the caller falls back to parsing the config.
+    `rev-parse` reads no index and runs no hooks or fsmonitor."""
+    try:
+        run = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--git-path", "hooks"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    out = run.stdout.strip()
+    if run.returncode != 0 or not out:
+        return None
+    try:
+        return (root / Path(out).expanduser()).resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
 
 
 def _state_verdict(project: Project, abs_path: Path) -> bool | None:
