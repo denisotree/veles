@@ -35,8 +35,8 @@ modules, layouts and skills it builds on. The new-project wizard offers registry
   Veles' MCP server, not a fixed list of five wiki tools.
 - Installing a missing extension when a session starts loads only the new modules; already
   loaded modules no longer run their entrypoint a second time.
-- An install that loses a race with another install of the same extension fails cleanly
-  instead of deleting the other one's copy.
+- An install or upgrade that loses a race with another install of the same extension fails
+  cleanly instead of deleting the other one's copy.
 
 ## [1.2.3] — 2026-10-02
 
