@@ -102,10 +102,9 @@ def test_refusal_message_lists_allowed_zones(isolated_home: Path, tmp_path: Path
 # ---- permissive fallback ----
 
 
-def test_unknown_layout_falls_back_to_permissive(isolated_home: Path, tmp_path: Path) -> None:
-    """When the layout-pack doesn't resolve, fall back to permissive
-    (any path inside the project root is writable). Preserves the
-    pre-M117 contract for projects on custom layouts."""
+def test_unknown_layout_fails_closed(isolated_home: Path, tmp_path: Path) -> None:
+    """When the layout-pack doesn't resolve (not installed), its zones are
+    unknown: writes outside the always-writable paths are refused until it is."""
     from veles.core.project import load_project
 
     project = init_project(tmp_path / "proj2", name="proj2")
@@ -123,4 +122,4 @@ def test_unknown_layout_falls_back_to_permissive(isolated_home: Path, tmp_path: 
         msg = write_file(str(target), "ok")
     finally:
         reset_active_project(token)
-    assert "wrote" in msg
+    assert msg.startswith("<refused") and "writable zones" in msg

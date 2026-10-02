@@ -59,7 +59,7 @@ def prepare(
         assert isinstance(c.obj, CliCommand)
         commands.setdefault(c.name, c.obj)
     if verb not in commands:
-        _exit_with_install_hint(verb)
+        _exit_with_install_hint(verb, project)
     _add_parsers(parser, commands)
     return ModuleVerbs(registry, commands)
 
@@ -133,17 +133,24 @@ def _add_parsers(parser: argparse.ArgumentParser, commands: dict[str, CliCommand
             add_common_run_flags(p)
 
 
-def _exit_with_install_hint(verb: str) -> None:
+def _exit_with_install_hint(verb: str, project: Project) -> None:
+    """An extension that isn't installed provides `verb` (per the cached
+    catalogs), or the project itself is missing its layout/engine (e.g. an
+    llm-wiki project after upgrading, before any `registry update`): say what to
+    install. Otherwise argparse reports an ordinary unknown verb."""
     from veles.core.registry.catalog import providers_of
+    from veles.core.registry.ensure import install_hint
 
     refs = providers_of(f"cli_command:{verb}")
-    if not refs:
-        return  # an ordinary unknown verb — argparse reports it
-    installs = " or ".join(f"`veles registry install {ref}`" for ref in refs)
-    print(
-        f"veles: error: `veles {verb}` comes from an extension that isn't installed — {installs}",
-        file=sys.stderr,
-    )
+    if refs:
+        installs = " or ".join(f"`veles registry install {ref}`" for ref in refs)
+        reason = f"comes from an extension that isn't installed — {installs}"
+    else:
+        hint = install_hint(project)
+        if hint is None:
+            return
+        reason = f"is unknown, and this project's layout isn't fully installed — `{hint}`"
+    print(f"veles: error: `veles {verb}` {reason}", file=sys.stderr)
     raise SystemExit(2)
 
 

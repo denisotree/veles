@@ -47,12 +47,13 @@ def native_binaries(root: Path) -> list[str]:
 
 def non_sdk_imports(root: Path) -> list[str]:
     """`<file>:<line> <module>` for every import of Veles outside `veles.sdk` in a
-    module's runtime code. Tests are exempt: they run in registry CI against a
-    pinned Veles and may build fixtures from internals."""
+    module's runtime code. The top-level `tests/` directory is exempt: tests run
+    in registry CI against a pinned Veles and may build fixtures from internals.
+    (A file elsewhere is runtime code whatever its name.)"""
     found: list[str] = []
     for path in sorted(root.rglob("*.py")):
         rel = path.relative_to(root).as_posix()
-        if rel.startswith("tests/") or path.name.startswith("test_") or path.name == "conftest.py":
+        if rel.startswith("tests/"):
             continue
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=rel)
@@ -62,7 +63,11 @@ def non_sdk_imports(root: Path) -> list[str]:
             if isinstance(node, ast.Import):
                 names = [a.name for a in node.names]
             elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-                names = [node.module]
+                # `from veles import sdk` names the module veles.sdk itself.
+                names = [
+                    f"{node.module}.{a.name}" if node.module == "veles" else node.module
+                    for a in node.names
+                ]
             else:
                 continue
             found += [f"{rel}:{node.lineno} {n}" for n in names if _outside_sdk(n)]

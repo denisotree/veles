@@ -76,7 +76,8 @@ def ensure_extension(need: Need, project: Project | None, *, interactive: bool) 
             return False
         found = _resolve(spec)
         print(f"{_label(need)} is not installed; it is in the registry as {found.ref}.")
-        _install(found, project=project)
+        # An engine module serves every project whose pack asks for it.
+        _install(found, project=project, user_scope=isinstance(need, EngineNeed))
         return True
     except Exception as exc:  # registry down, declined, bad manifest, anything at all
         _warn(need, ref_for(need) or need.name, reason=str(exc))
@@ -154,10 +155,10 @@ def _resolve(spec: str) -> Any:
     return resolve(spec)
 
 
-def _install(found: Any, *, project: Project | None) -> None:
+def _install(found: Any, *, project: Project | None, user_scope: bool) -> None:
     from veles.core.registry.install import install
 
-    install(found, project=project)
+    install(found, project=project, user_scope=user_scope)
 
 
 def _label(need: Need) -> str:

@@ -238,7 +238,6 @@ def init_project(
     # Lazy import — `core.layout.discovery` imports Project from this
     # module; importing it at the top would be a cycle.
     from veles.core.layout.discovery import find_layout
-    from veles.core.layout.scaffold import apply_scaffold
 
     pack = find_layout(layout, project=None)
     if pack is None:
@@ -249,7 +248,7 @@ def init_project(
     # M272: before the scaffold writes a template AGENTS.md — once it exists,
     # `apply_scaffold` leaves it alone, which is exactly what keeps the import.
     _import_existing_context_files(root)
-    apply_scaffold(pack, root, resolved_name)
+    _apply_scaffold_with_modules(pack, root, resolved_name, layout)
 
     if healing_foreign_memory:
         print(
@@ -318,6 +317,32 @@ def _write_project_toml(
         "layout": layout_name,
     }
     atomic_write_text(path, dump_toml({"project": project}))
+
+
+def _apply_scaffold_with_modules(pack, root: Path, name: str, layout: str) -> None:
+    """`apply_scaffold`, with the installed modules' scaffolds (e.g. the wiki's
+    tree) when the caller has no module registry active — `veles init` and the
+    wizards run before any project, so none is loaded yet."""
+    from veles.core.layout.scaffold import apply_scaffold
+    from veles.core.modules import (
+        current_module_registry,
+        reset_module_registry,
+        set_module_registry,
+    )
+
+    if pack is None or not pack.manifest.engines or current_module_registry() is not None:
+        apply_scaffold(pack, root, name)
+        return
+    from veles.core.module_loading import load_project_modules
+
+    modules = load_project_modules(
+        Project(root=root, name=name, created_at=0.0, layout_name=layout)
+    )
+    token = set_module_registry(modules)
+    try:
+        apply_scaffold(pack, root, name)
+    finally:
+        reset_module_registry(token)
 
 
 def _import_existing_context_files(root: Path) -> None:

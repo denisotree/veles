@@ -54,8 +54,8 @@ def fake_install(monkeypatch):
         calls.append(f"resolve {spec}")
         return SimpleNamespace(ref=spec, ext=SimpleNamespace(kind="layout"))
 
-    def install(found, *, project):
-        calls.append(f"install {found.ref}")
+    def install(found, *, project, user_scope):
+        calls.append(f"install {found.ref}" + (" --user" if user_scope else ""))
 
     monkeypatch.setattr(ensure, "_resolve", resolve)
     monkeypatch.setattr(ensure, "_install", install)
@@ -118,7 +118,8 @@ def test_engine_need_installs_the_provider(home, fake_install, monkeypatch) -> N
         catalog, "providers_of", lambda t: ["corp:eng/ghost"] if t == "engine:ghost" else []
     )
     assert ensure_extension(EngineNeed("ghost"), None, interactive=True) is True
-    assert fake_install == ["resolve corp:eng/ghost", "install corp:eng/ghost"]
+    # An engine module serves every project with a pack that asks for it.
+    assert fake_install == ["resolve corp:eng/ghost", "install corp:eng/ghost --user"]
 
 
 def test_offline_or_declined_is_false_with_one_warning(home, monkeypatch, capsys) -> None:
@@ -134,7 +135,7 @@ def test_offline_or_declined_is_false_with_one_warning(home, monkeypatch, capsys
 def test_install_error_never_escapes(home, monkeypatch, capsys) -> None:
     monkeypatch.setattr(ensure, "_resolve", lambda spec: SimpleNamespace(ref=spec))
 
-    def boom(found, *, project):
+    def boom(found, *, project, user_scope):
         raise RuntimeError("anything at all")
 
     monkeypatch.setattr(ensure, "_install", boom)
@@ -155,6 +156,20 @@ def test_cli_verb_on_a_project_with_a_missing_layout_warns_and_runs(
     err = capsys.readouterr().err
     assert err.count("warning: layout 'ghost-layout' is not installed") == 1
     assert agents.read_text(encoding="utf-8") == before
+
+
+def test_a_module_verb_in_an_upgraded_project_names_the_install(home, capsys, monkeypatch) -> None:
+    """`veles add` in an llm-wiki project after the upgrade, before any
+    `registry update`: no cached catalog knows the verb, but the project's own
+    missing layout explains it."""
+    from veles.cli import main
+
+    project = _project_with_layout(home, "llm-wiki")
+    monkeypatch.chdir(project.root)
+    with pytest.raises(SystemExit) as exc:
+        main(["add", "notes.md"])
+    assert exc.value.code == 2
+    assert "veles registry install public:official/llm-wiki" in capsys.readouterr().err
 
 
 def test_layout_sync_names_the_install(home, capsys, monkeypatch) -> None:

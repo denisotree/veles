@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any, Literal
@@ -48,22 +49,42 @@ def recipe_hash(raw: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(raw, sort_keys=True, default=str).encode()).hexdigest()
 
 
+# Files a recipe names in `args` that are code (a data file like `--db-path
+# data.db` changes on every run and must not revoke the approval).
+_SCRIPT_SUFFIXES = frozenset(
+    {".py", ".js", ".mjs", ".cjs", ".ts", ".mts", ".sh", ".bash", ".rb", ".pl", ".php", ".lua"}
+)
+
+
 def project_files(project_root: Path, raw: dict[str, Any]) -> list[Path]:
-    """Files inside the project that the recipe's `command`/`args` name (e.g. a
-    `python tools/server.py` recipe): a clone can edit them, so the approval
-    covers their content too."""
+    """Code inside the project that the recipe runs — the `command` when it is a
+    project file, and `args` that are scripts (by suffix or executable bit), e.g.
+    `python tools/server.py`: a clone can edit them, so the approval covers
+    their content too. Servers run from the project root (`parse_servers(cwd=)`),
+    so names resolve against it."""
     root = Path(project_root).resolve()
     args = raw.get("args")
-    tokens = [raw.get("command"), *(args if isinstance(args, list) else [])]
     found: list[Path] = []
-    for token in tokens:
+    command = raw.get("command")
+    tokens = [(command, True), *((a, False) for a in (args if isinstance(args, list) else []))]
+    for token, is_command in tokens:
         if not isinstance(token, str) or not token:
             continue
         for candidate in {token, token.partition("=")[2]} - {""}:
             path = (root / candidate).resolve()
-            if path.is_file() and path.is_relative_to(root) and path not in found:
+            if not (path.is_file() and path.is_relative_to(root)) or path in found:
+                continue
+            if is_command or path.suffix.lower() in _SCRIPT_SUFFIXES or os.access(path, os.X_OK):
                 found.append(path)
     return sorted(found)
+
+
+def _file_digest(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 16), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def approval_hash(project_root: Path, raw: dict[str, Any]) -> str:
@@ -77,7 +98,7 @@ def approval_hash(project_root: Path, raw: dict[str, Any]) -> str:
     h = hashlib.sha256(recipe_hash(raw).encode())
     for path in files:
         h.update(f"\0{path.relative_to(root).as_posix()}\0".encode())
-        h.update(hashlib.sha256(path.read_bytes()).hexdigest().encode())
+        h.update(_file_digest(path).encode())
     return "files:" + h.hexdigest()
 
 

@@ -61,6 +61,20 @@ def test_module_may_import_veles_only_through_the_sdk(tmp_path: Path) -> None:
     assert "test_demo.py" not in errors
 
 
+def test_sdk_rule_exempts_only_the_tests_directory(tmp_path: Path) -> None:
+    from veles.core.registry.scan import non_sdk_imports
+
+    payload = tmp_path / "m"
+    (payload / "tests").mkdir(parents=True)
+    (payload / "test_util.py").write_text("from veles.core import project\n", encoding="utf-8")
+    (payload / "conftest.py").write_text("import veles.runtime.prompt\n", encoding="utf-8")
+    (payload / "ok.py").write_text("from veles import sdk\n", encoding="utf-8")
+    (payload / "tests" / "test_x.py").write_text("import veles.core.project\n", encoding="utf-8")
+    hits = "\n".join(non_sdk_imports(payload))
+    assert "test_util.py:1" in hits and "conftest.py:1" in hits
+    assert "ok.py" not in hits and "tests/" not in hits
+
+
 def test_clean_registry_passes(tmp_path: Path) -> None:
     root = write_registry(tmp_path / "r")
     write_extension(root, "official", "alpha")

@@ -57,7 +57,7 @@ def _list(args: argparse.Namespace, project: Project) -> int:
     from veles.mcp.config import load_raw_mcp_servers, parse_servers
 
     raw = load_raw_mcp_servers(project)
-    configs = parse_servers(raw)
+    configs = parse_servers(raw, cwd=project.root)
     if not configs:
         print(
             "no MCP servers configured.\n"
@@ -106,7 +106,7 @@ def _test(args: argparse.Namespace, project: Project) -> int:
     from veles.mcp.sanitize import normalize_tool_name, sanitize_text
 
     raw = load_raw_mcp_servers(project)
-    configs = parse_servers(raw)
+    configs = parse_servers(raw, cwd=project.root)
     cfg = configs.get(args.server)
     if cfg is None:
         known = ", ".join(sorted(configs)) or "(none)"

@@ -104,6 +104,39 @@ def test_edited_project_script_revokes_the_approval(project: Project) -> None:
     assert approvals.approval_state(project.root, "local", raw) == "changed"
 
 
+def test_a_data_file_the_server_writes_does_not_revoke(project: Project) -> None:
+    """Only code is covered: `--db-path data.db` changes every time the server
+    runs, and must not revoke the approval."""
+    (project.root / "data.db").write_bytes(b"v1")
+    _write_config(
+        project,
+        '[mcp.servers.db]\ncommand = "uvx"\nargs = ["mcp-server-sqlite", "--db-path", "data.db"]\n',
+    )
+    raw = load_raw_mcp_servers(project)["db"]
+    _approve_current(project, "db")
+    (project.root / "data.db").write_bytes(b"v2 - the server wrote rows")
+    assert approvals.approval_state(project.root, "db", raw) == "yes"
+
+
+def test_flag_spelling_of_a_script_is_covered(project: Project) -> None:
+    (project.root / "srv.py").write_text("print(1)\n", encoding="utf-8")
+    _write_config(project, '[mcp.servers.s]\ncommand = "python"\nargs = ["--script=srv.py"]\n')
+    raw = load_raw_mcp_servers(project)["s"]
+    _approve_current(project, "s")
+    (project.root / "srv.py").write_text("print(2)\n", encoding="utf-8")
+    assert approvals.approval_state(project.root, "s", raw) == "changed"
+
+
+def test_servers_run_from_the_project_root(project: Project) -> None:
+    """A relative script path resolves against the project, as the approval
+    hashed it — never against wherever `veles` was started."""
+    from veles.mcp.config import parse_servers
+
+    _write_config(project, '[mcp.servers.s]\ncommand = "python"\nargs = ["server.py"]\n')
+    cfg = parse_servers(load_raw_mcp_servers(project), cwd=project.root)["s"]
+    assert cfg.cwd == str(project.root)
+
+
 def test_recipe_without_project_files_keeps_its_plain_hash(project: Project, tmp_path) -> None:
     """Approvals recorded before project files were hashed stay valid."""
     _touch_server(project, tmp_path / "x")

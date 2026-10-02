@@ -590,3 +590,14 @@ def test_summariser_input_is_trimmed_from_the_front_to_the_limit() -> None:
     assert tokens <= limit
     assert rendered == render_transcript(kept)
     assert kept == naive
+
+
+def test_compression_note_points_at_a_tool_every_project_has() -> None:
+    """The summary lives under `.veles/memory/sessions/` — a file `read_file`
+    reads in any layout (no wiki tool exists on the default bare layout)."""
+    from veles.core.context_compressor import _build_compression_note
+
+    note = _build_compression_note(
+        summary_path=".veles/memory/sessions/s.md", n_turns_dropped=3, active_plan_refs=None
+    )
+    assert "read_file" in note and "wiki_read_page" not in note

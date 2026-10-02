@@ -27,10 +27,12 @@ logged as warnings and skipped — MCP config errors never break startup.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import os
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from veles.core.project import Project
@@ -63,6 +65,9 @@ class McpServerConfig:
     timeout_s: float = DEFAULT_TIMEOUT_S
     connect_timeout_s: float = DEFAULT_CONNECT_TIMEOUT_S
     enabled: bool = True
+    # Where a stdio server starts: the project root, so relative paths in its
+    # recipe mean what its approval hashed.
+    cwd: str | None = None
 
 
 def interpolate_env(value: str) -> str:
@@ -167,8 +172,11 @@ def load_raw_mcp_servers(project: Project) -> dict[str, Any]:
     return get_section(load_project_config(project), "mcp", "servers")
 
 
-def parse_servers(servers: dict[str, Any]) -> dict[str, McpServerConfig]:
-    """Validate raw `[mcp.servers]` tables.
+def parse_servers(
+    servers: dict[str, Any], *, cwd: Path | None = None
+) -> dict[str, McpServerConfig]:
+    """Validate raw `[mcp.servers]` tables; `cwd` (the project root) is where
+    stdio servers start.
 
     Returns `{}` when there are none. Disabled servers are kept in
     the result (with `enabled=False`) so `veles mcp list` can show them;
@@ -187,7 +195,7 @@ def parse_servers(servers: dict[str, Any]) -> dict[str, McpServerConfig]:
             continue
         cfg = parse_server(name, raw)
         if cfg is not None:
-            out[name] = cfg
+            out[name] = dataclasses.replace(cfg, cwd=str(cwd)) if cwd is not None else cfg
     return out
 
 
