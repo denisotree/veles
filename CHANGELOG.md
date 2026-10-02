@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] — 2026-10-02
+
+Modules add to Veles through typed contribution points; the wiki engine is now a module like
+any other, and core no longer imports it.
+
 ### Added
 
 - `api.contribute(point, name, obj)` — one typed way for a module to add to Veles. Points:
