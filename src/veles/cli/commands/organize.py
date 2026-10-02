@@ -70,6 +70,16 @@ def cmd_organize(args: argparse.Namespace, project: Project) -> int:
 
     resolved = resolve_operation(project, _OP_NAME)
     if resolved is None:
+        from veles.core.registry.ensure import install_hint
+
+        hint = install_hint(project)
+        if hint is not None:
+            print(
+                f"error: layout pack {project.layout_name!r} (or an engine it needs) is not "
+                f"installed — `{hint}`",
+                file=sys.stderr,
+            )
+            return 2
         print(
             f"error: the active layout pack {project.layout_name!r} exposes no "
             "`organize` operation — nothing to reorganize.\n"

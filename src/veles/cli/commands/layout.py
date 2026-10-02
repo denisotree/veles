@@ -12,6 +12,7 @@ can see the target structure to migrate into.
 from __future__ import annotations
 
 import argparse
+import sys
 
 from veles.core.project import Project
 
@@ -29,6 +30,15 @@ def _sync(project: Project) -> int:
 
     before = _dir_set(project)
     pack = find_layout(project.layout_name, project)
+    if pack is None:
+        from veles.core.registry.ensure import install_hint
+
+        print(
+            f"error: layout pack {project.layout_name!r} is not installed — "
+            f"`{install_hint(project)}`",
+            file=sys.stderr,
+        )
+        return 2
     # `name` is the AGENTS.md {name}/title substitution — the PROJECT name, not
     # the layout name (passing the layout name re-titles a default AGENTS.md).
     apply_scaffold(pack, project.root, project.name)  # module scaffolds included

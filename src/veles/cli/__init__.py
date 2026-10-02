@@ -117,6 +117,14 @@ def _run_in_project(args, command, modules=None) -> int:
 
     token = set_active_project(project)
     mod_token = set_module_registry(modules or _load_project_modules(project))
+    from veles.core.registry.ensure import ensure_project_extensions
+
+    # A missing layout or engine is offered for install when a session starts at a
+    # terminal (REPL, `veles run`); every other verb just warns once and goes on.
+    interactive = args.command in (None, "run") and sys.stdin.isatty()
+    if ensure_project_extensions(project, interactive=interactive):
+        reset_module_registry(mod_token)
+        mod_token = set_module_registry(_load_project_modules(project))
     try:
         return command(args, project)
     finally:
