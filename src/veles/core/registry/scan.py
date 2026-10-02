@@ -33,6 +33,36 @@ def scan_python(root: Path) -> list[str]:
     return findings
 
 
+def non_sdk_imports(root: Path) -> list[str]:
+    """`<file>:<line> <module>` for every import of Veles outside `veles.sdk` in a
+    module's runtime code. Tests are exempt: they run in registry CI against a
+    pinned Veles and may build fixtures from internals."""
+    found: list[str] = []
+    for path in sorted(root.rglob("*.py")):
+        rel = path.relative_to(root).as_posix()
+        if rel.startswith("tests/") or path.name.startswith("test_") or path.name == "conftest.py":
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=rel)
+        except (SyntaxError, UnicodeDecodeError):
+            continue  # `scan_python` already reports it
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                names = [node.module]
+            else:
+                continue
+            found += [f"{rel}:{node.lineno} {n}" for n in names if _outside_sdk(n)]
+    return found
+
+
+def _outside_sdk(name: str) -> bool:
+    if name != "veles" and not name.startswith("veles."):
+        return False
+    return not (name == "veles.sdk" or name.startswith("veles.sdk."))
+
+
 def _classify(node: ast.AST) -> str | None:
     if isinstance(node, ast.Import | ast.ImportFrom):
         names = (

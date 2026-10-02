@@ -30,7 +30,7 @@ from veles.core.registry.model import (
     scan_registry,
 )
 from veles.core.registry.repo import RegistryRepoError, changed_paths, fetch_git_source, file_at
-from veles.core.registry.scan import scan_python
+from veles.core.registry.scan import non_sdk_imports, scan_python
 from veles.core.registry.versions import is_newer, satisfies
 
 PERMISSIVE_LICENSES = frozenset(
@@ -241,6 +241,7 @@ def _check_module(ext: Extension, payload: Path) -> list[str]:
     bad = [p for p in ext.provides if not p.startswith(prefixes)]
     if bad:
         errors.append(f"provides entries must start with {', '.join(prefixes)}: {bad}")
+    errors += [f"{hit} — import from veles.sdk instead" for hit in non_sdk_imports(payload)]
     try:
         manifest = parse_manifest((payload / "module.toml").read_text(encoding="utf-8"))
         entry, _ = entrypoint_file(payload, manifest.entrypoint)
