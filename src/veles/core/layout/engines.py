@@ -1,17 +1,16 @@
-"""Layout-engine resolution — the single chokepoint for "is the wiki
-content engine active in this project?" (M162).
+"""Layout-engine resolution — the single chokepoint for "is content engine X
+active in this project?" (M162).
 
-Core ships optional *content engines* (today: `wiki` — the Karpathy
-LLM-Wiki machinery in `modules/wiki/` and its `wiki_*` tools). A layout
-pack activates an engine by declaring it in its manifest:
+Modules contribute *content engines* (e.g. the registry's `wiki` module). A
+layout pack activates an engine by declaring it in its manifest:
 
     [layout.engines]
     wiki = true
 
-Every call site that touches wiki machinery conditionally goes through
-`wiki_enabled(project)` rather than re-implementing manifest lookups.
-The result is cached per (project root, layout name, manifest mtime) —
-recall and agent-build are hot paths, manifest edits are rare.
+Every call site goes through `engine_enabled(project, name)` rather than
+re-implementing manifest lookups. The manifest part is cached per (project
+root, layout name, manifest mtime) — recall and agent-build are hot paths,
+manifest edits are rare.
 """
 
 from __future__ import annotations
@@ -21,8 +20,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from veles.core.project import Project
-
-_ENGINE_WIKI = "wiki"
 
 # (resolved project root, layout name) -> (manifest mtime, enabled engines)
 _cache: dict[tuple[str, str], tuple[float, tuple[str, ...]]] = {}
@@ -40,10 +37,6 @@ def engine_enabled(project: Project | None, engine: str) -> bool:
     from veles.core.contributions import contributions
 
     return any(c.name == engine for c in contributions("engine"))
-
-
-def wiki_enabled(project: Project | None) -> bool:
-    return engine_enabled(project, _ENGINE_WIKI)
 
 
 def clear_engine_cache() -> None:
@@ -77,4 +70,4 @@ def _manifest_mtime(source: Path | None) -> float:
         return 0.0
 
 
-__all__ = ["clear_engine_cache", "engine_enabled", "wiki_enabled"]
+__all__ = ["clear_engine_cache", "engine_enabled"]

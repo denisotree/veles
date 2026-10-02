@@ -11,13 +11,12 @@ from veles.core.self_doc import (
     refresh_self_doc,
     render_self_doc,
 )
-from veles.modules.wiki.wiki import Wiki
 
 # ---- helpers ----
 
 
 def _make_project(tmp_path: Path):
-    return init_project(tmp_path / "proj", name="testproject", layout="llm-wiki")
+    return init_project(tmp_path / "proj", name="testproject")
 
 
 def _empty_report(**kwargs) -> SelfDocReport:
@@ -56,14 +55,6 @@ def test_generate_self_doc_counts_sessions(tmp_path: Path) -> None:
         store.create_session(title="test session")
     report = generate_self_doc(project)
     assert report.session_count == 1
-
-
-def test_generate_self_doc_counts_wiki_pages(tmp_path: Path) -> None:
-    project = _make_project(tmp_path)
-    wiki = Wiki(project.wiki_root)
-    wiki.write_page(category="concepts", slug="alpha", title="Alpha", content="## Alpha\n\nHello.")
-    report = generate_self_doc(project)
-    assert report.wiki_page_count == 1
 
 
 def test_generate_self_doc_lists_skills(tmp_path: Path) -> None:
@@ -145,21 +136,11 @@ def test_render_self_doc_empty_wiki_message() -> None:
 # ---- refresh_self_doc ----
 
 
-def test_refresh_self_doc_creates_wiki_page(tmp_path: Path) -> None:
+def test_refresh_self_doc_writes_memory_page_without_a_page_store(tmp_path: Path) -> None:
     project = _make_project(tmp_path)
     rel = refresh_self_doc(project)
-    page_path = project.wiki_root / rel
-    assert page_path.is_file()
-    assert "# Self-Documentation" in page_path.read_text()
-
-
-def test_refresh_self_doc_idempotent(tmp_path: Path) -> None:
-    project = _make_project(tmp_path)
-    refresh_self_doc(project)
-    refresh_self_doc(project)
-    pages = Wiki(project.wiki_root).list_pages()
-    self_doc_pages = [p for p in pages if p.category == "self-doc"]
-    assert len(self_doc_pages) == 1
+    assert rel == ".veles/memory/self-doc.md"
+    assert "# Self-Documentation" in (project.root / rel).read_text()
 
 
 def test_refresh_self_doc_logs_op(tmp_path: Path) -> None:

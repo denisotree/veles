@@ -21,7 +21,7 @@ from veles.core.tools.builtin.read_file import read_file
 @pytest.fixture()
 def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
-    p = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
+    p = init_project(tmp_path / "proj", name="proj")
     token = set_active_project(p)
     yield p
     reset_active_project(token)

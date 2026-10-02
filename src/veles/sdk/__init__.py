@@ -22,6 +22,9 @@ from veles.core.slug import normalize_slug, now_timestamp_slug
 from veles.core.text import first_heading, shown, title_and_summary
 from veles.core.timeutil import utc_iso
 
+# `import veles.sdk` makes every part reachable (`veles.sdk.tools.tool`, …).
+from veles.sdk import contributions, jobs, layout, memory, tools  # noqa: F401
+
 __all__ = [
     "Project",
     "current_origin",

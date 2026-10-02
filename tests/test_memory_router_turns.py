@@ -1,4 +1,4 @@
-"""M58 — MemoryRouter merge of wiki + turn hits."""
+"""M58 — MemoryRouter turn hits (the wiki side lives with the wiki module)."""
 
 from __future__ import annotations
 
@@ -11,12 +11,11 @@ from veles.core.memory import SessionStore
 from veles.core.memory.router import MemoryRouter
 from veles.core.project import Project, init_project
 from veles.core.provider import Message
-from veles.modules.wiki.wiki import Wiki
 
 
 @pytest.fixture()
 def project(tmp_path: Path) -> Project:
-    return init_project(tmp_path / "demo", name="demo", layout="llm-wiki")
+    return init_project(tmp_path / "demo", name="demo")
 
 
 def test_recall_returns_empty_when_query_blank(project: Project) -> None:
@@ -26,15 +25,6 @@ def test_recall_returns_empty_when_query_blank(project: Project) -> None:
     finally:
         store.close()
     assert out == []
-
-
-def test_recall_returns_wiki_only_without_store(project: Project) -> None:
-    """No store passed = the M22 behaviour (wiki only)."""
-    wiki = Wiki(project.wiki_root)
-    wiki.write_page(category="concepts", slug="alpha", title="Alpha", content="alpha topic body")
-    out = MemoryRouter(project).recall("alpha", limit=5)
-    assert any(h.rel_path == "wiki/concepts/alpha.md" for h in out)
-    assert not any(h.rel_path.startswith("turn:") for h in out)
 
 
 def test_recall_pulls_turn_hits_when_store_provided(project: Project) -> None:
@@ -86,11 +76,6 @@ def test_recall_turn_summary_truncates_long_content(project: Project) -> None:
 
 
 def test_recall_caps_at_limit(project: Project) -> None:
-    wiki = Wiki(project.wiki_root)
-    for i in range(10):
-        wiki.write_page(
-            category="concepts", slug=f"w{i}", title=f"W{i}", content="overflowtoken body"
-        )
     store = SessionStore(project.memory_db_path)
     try:
         sid = store.create_session()

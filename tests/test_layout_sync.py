@@ -1,8 +1,8 @@
 """`veles layout sync` — re-apply the pack scaffold to an existing project.
 
-`apply_scaffold` runs only at init; when a pack later gains categories (e.g. the
-wiki pack's diary/tasks/projects), existing projects need `sync` to materialise
-them on disk (so they're visible in the injected workspace map).
+`apply_scaffold` runs only at init; when a pack later gains directories,
+existing projects need `sync` to materialise them on disk (so they're visible in
+the injected workspace map). (Wiki categories are tested with the wiki module.)
 """
 
 from __future__ import annotations
@@ -29,24 +29,23 @@ def _fresh_engine_cache():
 @pytest.fixture()
 def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
-    p = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
+    pack = tmp_path / "home" / ".veles" / "layouts" / "dirs"
+    pack.mkdir(parents=True)
+    (pack / "layout.toml").write_text(
+        '[layout]\nname = "dirs"\n[layout.scaffold]\ndirs = ["notes", "notes/diary"]\n',
+        encoding="utf-8",
+    )
+    p = init_project(tmp_path / "proj", name="proj", layout="dirs")
     token = set_active_project(p)
     yield p
     reset_active_project(token)
 
 
-def test_sync_creates_newly_declared_category(project, capsys) -> None:
-    # A project declares a new category (as the agent would) but the dir isn't
-    # materialised yet — sync creates it.
-    from veles.modules.wiki.wiki import add_project_category
-
-    add_project_category(project.wiki_root, "diary")
-    shutil.rmtree(project.root / "wiki" / "diary", ignore_errors=True)
-    assert not (project.root / "wiki" / "diary").is_dir()
-
+def test_sync_recreates_a_missing_scaffold_dir(project, capsys) -> None:
+    shutil.rmtree(project.root / "notes" / "diary")
     rc = cmd_layout(argparse.Namespace(layout_command="sync"), project)
     assert rc == 0
-    assert (project.root / "wiki" / "diary").is_dir()
+    assert (project.root / "notes" / "diary").is_dir()
     assert "created" in capsys.readouterr().out
 
 

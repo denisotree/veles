@@ -30,13 +30,19 @@ def test_run_accepts_stream_flag() -> None:
     assert args.stream is True
 
 
-def test_add_accepts_stream_flag() -> None:
-    """`veles add` is the wiki module's verb; `run_flags` gives it the agent flags."""
+def test_module_verb_with_run_flags_accepts_stream() -> None:
+    """A module verb with `run_flags` (e.g. the wiki's `veles add`) gets the agent flags."""
     from veles.cli.module_commands import _add_parsers
-    from veles.modules.wiki.cli import ADD_COMMAND
+    from veles.core.contributions import CliCommand
 
+    verb = CliCommand(
+        help="h",
+        add_arguments=lambda p: p.add_argument("source"),
+        run=lambda a, p, h: 0,
+        run_flags=True,
+    )
     parser = _build_parser()
-    _add_parsers(parser, {"add": ADD_COMMAND})
+    _add_parsers(parser, {"add": verb})
     args = parser.parse_args(["add", "--stream", "./TASK.md"])
     assert args.command == "add"
     assert args.stream is True

@@ -230,8 +230,8 @@ def test_curate_one_session_budget_exhausted_after_persist_counts_as_success(
 ) -> None:
     """If the budget (or any other stop) kills the run AFTER the persist tools
     ran, the distillation already landed — retrying would only duplicate the
-    wiki page. Success is 'the work persisted', whatever the stop reason."""
-    project = init_project(tmp_path, name="t", layout="llm-wiki")
+    page / insight. Success is 'the work persisted', whatever the stop reason."""
+    project = init_project(tmp_path, name="t")
     store = SessionStore(project.memory_db_path)
     sid = _seed_session(store, n_turns=2, age_sec=120)
     session = store.get_session(sid)
@@ -242,7 +242,7 @@ def test_curate_one_session_budget_exhausted_after_persist_counts_as_success(
             text="<budget exhausted: 100342/100000 tokens>",
             iterations=5,
             stopped_reason="budget_exhausted",
-            invoked_tools=frozenset({"wiki_write_page"}),
+            invoked_tools=frozenset({"memory_save_insight"}),
         )
         return result, TokenBudget(limit=100_000)
 

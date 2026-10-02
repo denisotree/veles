@@ -404,9 +404,11 @@ def test_project_trust_grant_lets_the_call_through(monkeypatch, tmp_path) -> Non
         reset_active_project(token)
 
 
-def test_main_exposes_wiki_tools_for_a_wiki_project(monkeypatch, tmp_path) -> None:
+def test_main_lists_no_wiki_tools_without_the_wiki_module(monkeypatch, tmp_path) -> None:
+    """The wiki tools in `_MCP_TOOLS` are listed only when they exist — the wiki
+    module (from the registry) registers them."""
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
-    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
+    project = init_project(tmp_path / "proj", name="proj")
     request = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}) + "\n"
     monkeypatch.setattr("sys.stdin", io.StringIO(request))
     out = io.StringIO()
@@ -414,4 +416,5 @@ def test_main_exposes_wiki_tools_for_a_wiki_project(monkeypatch, tmp_path) -> No
     # main() sets the active project for its process; isolate it from later tests.
     contextvars.copy_context().run(main, ["--project-root", str(project.root)])
     names = {t["name"] for t in json.loads(out.getvalue().splitlines()[0])["result"]["tools"]}
-    assert {"wiki_read_page", "wiki_write_page"} <= names
+    assert "read_file" in names
+    assert not any(n.startswith("wiki_") for n in names)

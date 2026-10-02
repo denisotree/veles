@@ -59,7 +59,6 @@ class Contribution:
 CONTRIBUTION_POINTS: dict[str, Point] = {}
 
 BUILTIN_MODULES: tuple[str, ...] = (
-    "veles.modules.wiki",
     "veles.modules.agentops",
     "veles.modules.organize",
 )

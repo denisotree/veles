@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 
+from veles.core.contributions import PageSource
 from veles.core.memory.injector import build_proposals_block
+from veles.core.modules import ModuleAPI, ModuleRegistry, reset_module_registry, set_module_registry
 from veles.core.project import Project, init_project
 from veles.core.subproject_proposer import (
     Cluster,
@@ -15,17 +19,40 @@ from veles.core.subproject_proposer import (
     recent_proposals,
     write_proposals,
 )
-from veles.modules.wiki.wiki import Wiki
+
+
+@dataclass(frozen=True)
+class _Page:
+    rel_path: str
+    title: str
+    summary: str
+    category: str
+
+
+# The page list of the running test's page source.
+_PAGES: list[list[_Page]] = []
 
 
 @pytest.fixture()
-def project(tmp_path: Path) -> Project:
-    return init_project(tmp_path / "demo", name="demo", layout="llm-wiki")
+def project(tmp_path: Path) -> Iterator[Project]:
+    """A project plus a module that offers pages for clustering (`subproject_source`),
+    filled per test through `_PAGES[-1]`."""
+    pages: list[_Page] = []
+    scratch, reg = ModuleRegistry(), ModuleRegistry()
+    ModuleAPI(scratch, "pages").contribute(
+        "subproject_source", "pages", PageSource(pages=lambda project: list(pages))
+    )
+    reg.merge_from(scratch, "pages")
+    token = set_module_registry(reg)
+    _PAGES.append(pages)
+    yield init_project(tmp_path / "demo", name="demo")
+    _PAGES.pop()
+    reset_module_registry(token)
 
 
-def _seed_pages(wiki: Wiki, pages: list[tuple[str, str, str]]) -> None:
+def _seed_pages(wiki: list[_Page], pages: list[tuple[str, str, str]]) -> None:
     for category, slug, title in pages:
-        wiki.write_page(category=category, slug=slug, title=title, content="placeholder body")
+        wiki.append(_Page(f"wiki/{category}/{slug}.md", title, "placeholder body", category))
 
 
 # ---- detect_clusters ----
@@ -36,7 +63,7 @@ def test_returns_empty_when_no_pages(project: Project) -> None:
 
 
 def test_returns_empty_below_min_pages(project: Project) -> None:
-    wiki = Wiki(project.wiki_root)
+    wiki = _PAGES[-1]
     _seed_pages(
         wiki,
         [
@@ -48,7 +75,7 @@ def test_returns_empty_below_min_pages(project: Project) -> None:
 
 
 def test_detects_single_cluster_in_concepts(project: Project) -> None:
-    wiki = Wiki(project.wiki_root)
+    wiki = _PAGES[-1]
     _seed_pages(
         wiki,
         [
@@ -66,7 +93,7 @@ def test_detects_single_cluster_in_concepts(project: Project) -> None:
 
 
 def test_detects_two_distinct_clusters(project: Project) -> None:
-    wiki = Wiki(project.wiki_root)
+    wiki = _PAGES[-1]
     _seed_pages(
         wiki,
         [
@@ -88,7 +115,7 @@ def test_detects_two_distinct_clusters(project: Project) -> None:
 
 
 def test_ignores_unrelated_categories(project: Project) -> None:
-    wiki = Wiki(project.wiki_root)
+    wiki = _PAGES[-1]
     # Sessions / sources / insights are excluded by design (M32 _NOISE_CATEGORIES analog).
     _seed_pages(
         wiki,
@@ -103,7 +130,7 @@ def test_ignores_unrelated_categories(project: Project) -> None:
 
 
 def test_entities_are_also_clustered(project: Project) -> None:
-    wiki = Wiki(project.wiki_root)
+    wiki = _PAGES[-1]
     _seed_pages(
         wiki,
         [
@@ -119,7 +146,7 @@ def test_entities_are_also_clustered(project: Project) -> None:
 
 
 def test_high_similarity_threshold_yields_no_clusters(project: Project) -> None:
-    wiki = Wiki(project.wiki_root)
+    wiki = _PAGES[-1]
     _seed_pages(
         wiki,
         [
@@ -134,7 +161,7 @@ def test_high_similarity_threshold_yields_no_clusters(project: Project) -> None:
 
 
 def test_clusters_sorted_by_score_desc(project: Project) -> None:
-    wiki = Wiki(project.wiki_root)
+    wiki = _PAGES[-1]
     # Strong cluster: 5 pages all with frontend+auth tokens
     _seed_pages(
         wiki,

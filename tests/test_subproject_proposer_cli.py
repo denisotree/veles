@@ -3,32 +3,46 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from veles.cli.commands import subprojects as subprojects_cmd
+from veles.core.contributions import PageSource
+from veles.core.modules import ModuleAPI, ModuleRegistry, reset_module_registry, set_module_registry
 from veles.core.project import init_project
 from veles.core.subproject_proposer import (
     Cluster,
     recent_proposals,
     write_proposals,
 )
-from veles.modules.wiki.wiki import Wiki
 
-
-@pytest.fixture()
-def project_with_cluster(tmp_path: Path):
-    project = init_project(tmp_path / "demo", name="demo", layout="llm-wiki")
-    wiki = Wiki(project.wiki_root)
+_PAGES = [
+    SimpleNamespace(
+        rel_path=f"wiki/concepts/{slug}.md", title=title, summary="", category="concepts"
+    )
     for slug, title in [
         ("frontend-auth", "Frontend authentication"),
         ("frontend-routes", "Frontend routes"),
         ("frontend-state", "Frontend state management"),
         ("frontend-build", "Frontend build pipeline"),
-    ]:
-        wiki.write_page(category="concepts", slug=slug, title=title, content="body")
-    return project
+    ]
+]
+
+
+@pytest.fixture()
+def project_with_cluster(tmp_path: Path) -> Iterator:
+    """A project whose page source (a module's `subproject_source`) holds one cluster."""
+    scratch, reg = ModuleRegistry(), ModuleRegistry()
+    ModuleAPI(scratch, "pages").contribute(
+        "subproject_source", "pages", PageSource(pages=lambda project: list(_PAGES))
+    )
+    reg.merge_from(scratch, "pages")
+    token = set_module_registry(reg)
+    yield init_project(tmp_path / "demo", name="demo")
+    reset_module_registry(token)
 
 
 def _ns(**fields):

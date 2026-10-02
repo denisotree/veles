@@ -112,7 +112,7 @@ def test_unknown_layout_falls_back_to_permissive(isolated_home: Path, tmp_path: 
     toml_path = project.project_toml_path
     text = toml_path.read_text(encoding="utf-8")
     toml_path.write_text(
-        text.replace('layout = "llm-wiki"', 'layout = "ghost-pack"'),
+        text.replace('layout = "bare"', 'layout = "ghost-pack"'),
         encoding="utf-8",
     )
     reloaded = load_project(project.root)

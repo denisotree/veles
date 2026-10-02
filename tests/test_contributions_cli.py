@@ -79,13 +79,6 @@ def test_unknown_verb_points_at_the_extension(project, capsys, monkeypatch) -> N
     assert "veles registry install public:official/ghost" in err
 
 
-def test_wiki_add_is_a_module_verb(project, capsys) -> None:
-    rc = main(["add", "https://example.com", "--project-root", str(project.root)])
-    assert rc == 2
-    err = capsys.readouterr().err
-    assert "wiki content engine" in err and "bare" in err
-
-
 def test_providers_of_reads_cached_catalogs_only(monkeypatch) -> None:
     from types import SimpleNamespace
 

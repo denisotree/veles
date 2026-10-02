@@ -16,6 +16,7 @@ from veles.core.doctor import (
     _check_agents_md,
     _check_agents_md_identity,
     _check_approval_audit,
+    _check_context_file,
     _check_embedding_backend,
     _check_events_health,
     _check_provider_keys,
@@ -25,17 +26,16 @@ from veles.core.doctor import (
     _check_trace_health,
     _check_user_config,
     _check_user_home,
-    _check_wiki_files,
     run_all,
 )
 from veles.core.project import Project
 from veles.core.trace import TraceRecord, TraceWriter, trace_path_for_project
 
 
-def _make_project(tmp_path: Path) -> Project:
+def _make_project(tmp_path: Path, layout: str = "bare") -> Project:
     state = tmp_path / ".veles"
     state.mkdir(parents=True, exist_ok=True)
-    return Project(root=tmp_path, name="test", created_at=0.0, layout_name="llm-wiki")
+    return Project(root=tmp_path, name="test", created_at=0.0, layout_name=layout)
 
 
 # ---------- CheckResult / DoctorReport ----------
@@ -218,20 +218,26 @@ def test_symlinks_pointing_elsewhere_warns(tmp_path: Path) -> None:
     assert "CLAUDE.md" in r.message
 
 
-def test_wiki_files_missing(tmp_path: Path) -> None:
-    proj = _make_project(tmp_path)
-    r = _check_wiki_files(proj)
+def test_context_file_missing(tmp_path: Path, wiki_engine: str) -> None:
+    r = _check_context_file(_make_project(tmp_path, wiki_engine))
     assert r.status == "warn"
     assert "INDEX.md" in r.message
-    assert "LOG.md" in r.message
 
 
-def test_wiki_files_present(tmp_path: Path) -> None:
-    proj = _make_project(tmp_path)
+def test_context_file_present(tmp_path: Path, wiki_engine: str) -> None:
+    proj = _make_project(tmp_path, wiki_engine)
     (tmp_path / "INDEX.md").write_text("# idx")
-    (tmp_path / "LOG.md").write_text("# log")
-    r = _check_wiki_files(proj)
-    assert r.status == "ok"
+    assert _check_context_file(proj).status == "ok"
+
+
+def test_context_file_not_required_by_bare(tmp_path: Path) -> None:
+    assert _check_context_file(_make_project(tmp_path)).status == "info"
+
+
+def test_missing_layout_names_the_install(tmp_path: Path) -> None:
+    r = _check_context_file(_make_project(tmp_path, "llm-wiki"))
+    assert r.status == "warn"
+    assert "public:official/llm-wiki" in (r.fix_hint or "")
 
 
 def test_trace_health_no_file(tmp_path: Path) -> None:
@@ -334,11 +340,10 @@ def test_run_all_skips_project_checks_when_no_project(monkeypatch: pytest.Monkey
     assert not report.has_errors
 
 
-def test_run_all_with_project_returns_full_list(tmp_path: Path) -> None:
-    proj = _make_project(tmp_path)
+def test_run_all_with_project_returns_full_list(tmp_path: Path, wiki_engine: str) -> None:
+    proj = _make_project(tmp_path, wiki_engine)
     (tmp_path / "AGENTS.md").write_text("# x")
     (tmp_path / "INDEX.md").write_text("# idx")
-    (tmp_path / "LOG.md").write_text("# log")
     (tmp_path / "CLAUDE.md").symlink_to("AGENTS.md")
     (tmp_path / "GEMINI.md").symlink_to("AGENTS.md")
     report = run_all(proj)
@@ -347,7 +352,7 @@ def test_run_all_with_project_returns_full_list(tmp_path: Path) -> None:
     assert statuses["active_project"] == "ok"
     assert statuses["agents_md"] == "ok"
     assert statuses["symlinks"] == "ok"
-    assert statuses["wiki_files"] == "ok"
+    assert statuses["context_file"] == "ok"
 
 
 def test_text_output_includes_glyphs(tmp_path: Path) -> None:

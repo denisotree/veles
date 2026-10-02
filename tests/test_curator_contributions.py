@@ -26,15 +26,6 @@ def _with(point: str, name: str, obj: object):
     return set_module_registry(reg)
 
 
-def test_wiki_project_curates_into_wiki_pages(home) -> None:
-    from veles.runtime.learning import curation_plan
-
-    project = init_project(home / "w", name="w", layout="llm-wiki")
-    plan = curation_plan(project, "sess-1")
-    assert "wiki_write_page" in plan.persist_steps
-    assert "wiki_write_page" in plan.persist_tools
-
-
 def test_bare_project_curates_into_memory_only(home) -> None:
     from veles.runtime.learning import curation_plan
 

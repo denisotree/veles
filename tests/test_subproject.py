@@ -22,11 +22,10 @@ from veles.core.subproject import (
     subprojects_path,
     unregister_subproject,
 )
-from veles.modules.wiki.wiki import Wiki
 
 
 def _make_root(tmp_path: Path, *, name: str = "root") -> Project:
-    return init_project(tmp_path / name, name=name, layout="llm-wiki")
+    return init_project(tmp_path / name, name=name)
 
 
 # ---------- registry I/O ----------
@@ -159,20 +158,6 @@ def test_init_refuses_already_initialised(tmp_path: Path) -> None:
 # ---------- MemoryRouter recall integration ----------
 
 
-def test_recall_includes_subproject_hits(tmp_path: Path) -> None:
-    parent = _make_root(tmp_path)
-    child = init_subproject(parent, "frontend")
-    # Seed pages: parent has nothing matching, child has a page on "auth".
-    Wiki(child.wiki_root).write_page(
-        slug="auth", title="Auth flow", category="concepts", content="OAuth pkce details"
-    )
-    router = MemoryRouter(parent)
-    hits = router.recall("OAuth pkce")
-    assert any(h.rel_path.startswith("frontend:") for h in hits)
-    sub_hit = next(h for h in hits if h.rel_path.startswith("frontend:"))
-    assert sub_hit.title.startswith("[frontend]")
-
-
 def test_recall_skips_subprojects_without_initialised_wiki(tmp_path: Path) -> None:
     """Registered subproject whose .veles/ has been deleted is skipped silently."""
     parent = _make_root(tmp_path)
@@ -181,23 +166,6 @@ def test_recall_skips_subprojects_without_initialised_wiki(tmp_path: Path) -> No
     # Should not crash; falls back to empty hit list (parent wiki has nothing).
     hits = router.recall("anything")
     assert hits == []
-
-
-def test_recall_caps_total_hits(tmp_path: Path) -> None:
-    parent = _make_root(tmp_path)
-    child = init_subproject(parent, "frontend")
-    parent_wiki = Wiki(parent.wiki_root)
-    child_wiki = Wiki(child.wiki_root)
-    for i in range(5):
-        parent_wiki.write_page(
-            slug=f"p{i}", title=f"Parent {i}", category="concepts", content="auth flow"
-        )
-        child_wiki.write_page(
-            slug=f"c{i}", title=f"Child {i}", category="concepts", content="auth flow"
-        )
-    router = MemoryRouter(parent)
-    hits = router.recall("auth flow", limit=5)
-    assert len(hits) <= 5
 
 
 def test_recall_returns_empty_for_blank_query(tmp_path: Path) -> None:

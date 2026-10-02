@@ -1,8 +1,6 @@
-"""M204 Phase 2: async-by-context `wiki_add` + the daemon notify/resume path.
+"""M204 Phase 2: the daemon notify/resume path of a background-op job.
 
-Under a chat/daemon context (origin set) a recursive `wiki_add` must NOT run
-inline — it submits a STRUCTURED one-shot job (`kind="ingest"`, `once:+0s`,
-`deliver_to=<concrete origin>`) and returns immediately. When the job
+When a structured one-shot job (e.g. the wiki module's `kind="ingest"`)
 completes, the daemon notifies the originating chat and RESUMES the session
 (a queued follow-up turn) — or degrades to notify-only when no session is
 mapped or the resume-depth cap is hit (auto-resume loop guard).
@@ -17,19 +15,8 @@ from typing import Any
 
 import pytest
 
-from veles.core.context import (
-    current_resume_depth,
-    reset_active_project,
-    reset_origin,
-    set_active_project,
-    set_origin,
-)
-from veles.core.orchestration.delegation import (
-    reset_subagent_factory,
-    set_subagent_factory,
-)
+from veles.core.context import current_resume_depth
 from veles.core.project import init_project
-from veles.modules.wiki.tools import wiki_add
 
 
 @pytest.fixture(autouse=True)
@@ -40,102 +27,8 @@ def _isolated_user_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     return home
 
 
-# ---- wiki_add async predicate ----
-
-
-@dataclass
-class _Recorder:
-    built: list[Any] = field(default_factory=list)
-
-    def factory(self, *, system_prompt: str, tools: list[str]):
-        @dataclass
-        class _StubAgent:
-            system_prompt: str
-            tools: list[str]
-
-            def run(self, prompt: str, **_kw: Any):
-                @dataclass
-                class _RR:
-                    text: str = "ok"
-                    session_id: str | None = "w1"
-                    usage: Any = None
-
-                return _RR()
-
-        a = _StubAgent(system_prompt=system_prompt, tools=list(tools))
-        self.built.append(a)
-        return a
-
-
 def _project(tmp_path: Path):
     return init_project(tmp_path / "proj", name="bg")
-
-
-def test_recursive_with_origin_submits_structured_job(tmp_path: Path) -> None:
-    project = _project(tmp_path)
-    ptok = set_active_project(project)
-    otok = set_origin("telegram:12345")
-    rec = _Recorder()
-    ftok = set_subagent_factory(rec.factory)
-    try:
-        docs = tmp_path / "docs"
-        docs.mkdir()
-        (docs / "a.md").write_text("a", encoding="utf-8")
-        out = wiki_add(str(docs), recursive=True)
-        assert "background" in out.lower()
-        assert rec.built == []  # nothing ran inline
-
-        from veles.core.jobs_store import JobsStore
-
-        store = JobsStore(project.memory_db_path)
-        jobs = [store.get_job(j.id) for j in store.list_jobs()]
-        store.close()
-        assert len(jobs) == 1
-        job = jobs[0]
-        assert job is not None
-        assert job.kind == "ingest"
-        assert job.schedule.kind == "once"
-        assert job.deliver_to == "telegram:12345"  # CONCRETE origin, never "origin"
-        assert job.params is not None
-        assert job.params["source"] == str(docs)
-        assert job.params["resume_depth"] == 0
-    finally:
-        reset_subagent_factory(ftok)
-        reset_origin(otok)
-        reset_active_project(ptok)
-
-
-def test_recursive_without_origin_runs_inline(tmp_path: Path) -> None:
-    project = _project(tmp_path)
-    ptok = set_active_project(project)
-    rec = _Recorder()
-    ftok = set_subagent_factory(rec.factory)
-    try:
-        docs = tmp_path / "docs"
-        docs.mkdir()
-        (docs / "a.md").write_text("a", encoding="utf-8")
-        wiki_add(str(docs), recursive=True)
-        assert len(rec.built) == 1  # ran inline (REPL path)
-    finally:
-        reset_subagent_factory(ftok)
-        reset_active_project(ptok)
-
-
-def test_single_file_with_origin_stays_inline(tmp_path: Path) -> None:
-    project = _project(tmp_path)
-    ptok = set_active_project(project)
-    otok = set_origin("telegram:12345")
-    rec = _Recorder()
-    ftok = set_subagent_factory(rec.factory)
-    try:
-        f = tmp_path / "a.md"
-        f.write_text("a", encoding="utf-8")
-        wiki_add(str(f))
-        assert len(rec.built) == 1  # single file is fast — no background job
-    finally:
-        reset_subagent_factory(ftok)
-        reset_origin(otok)
-        reset_active_project(ptok)
 
 
 # ---- notify + resume ----

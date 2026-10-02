@@ -12,11 +12,20 @@ from veles.core.project import init_project, load_project
 
 @pytest.fixture()
 def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
-    return tmp_path / "home"
+    """A user home with `notes`, a pack whose only writable zone is `notes/`."""
+    home = tmp_path / "home"
+    monkeypatch.setenv("VELES_USER_HOME", str(home))
+    pack = home / ".veles" / "layouts" / "notes"
+    pack.mkdir(parents=True)
+    (pack / "layout.toml").write_text(
+        '[layout]\nname = "notes"\n[layout.scaffold]\ndirs = ["notes/"]\n'
+        '[[layout.writable_zones]]\npath = "notes/"\n',
+        encoding="utf-8",
+    )
+    return home
 
 
-# ---- llm-wiki defaults (M189: permissive — declares no writable_zones) ----
+# ---- default (bare) and other zone-less packs are permissive (M189) ----
 
 
 def test_wiki_path_writable_under_llm_wiki(isolated_home: Path, tmp_path: Path) -> None:
@@ -100,7 +109,7 @@ def test_unknown_layout_permissive(isolated_home: Path, tmp_path: Path) -> None:
     toml_path = project.project_toml_path
     text = toml_path.read_text(encoding="utf-8")
     toml_path.write_text(
-        text.replace('layout = "llm-wiki"', 'layout = "ghost-pack"'),
+        text.replace('layout = "bare"', 'layout = "ghost-pack"'),
         encoding="utf-8",
     )
     reloaded = load_project(project.root)
@@ -145,9 +154,7 @@ def test_writable_zones_permissive_when_no_pack(isolated_home: Path, tmp_path: P
     project = init_project(tmp_path / "proj", name="proj")
     toml_path = project.project_toml_path
     toml_path.write_text(
-        toml_path.read_text(encoding="utf-8").replace(
-            'layout = "llm-wiki"', 'layout = "ghost-pack"'
-        ),
+        toml_path.read_text(encoding="utf-8").replace('layout = "bare"', 'layout = "ghost-pack"'),
         encoding="utf-8",
     )
     reloaded = load_project(project.root)

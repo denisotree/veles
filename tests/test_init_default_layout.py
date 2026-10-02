@@ -74,16 +74,21 @@ def test_cli_init_asks_for_a_layout_at_a_tty(home, monkeypatch) -> None:
     from veles.cli import main
     from veles.cli.commands import init as init_cmd
 
+    pack = home / "home" / ".veles" / "layouts" / "journal"
+    pack.mkdir(parents=True)
+    (pack / "layout.toml").write_text('[layout]\nname = "journal"\n', encoding="utf-8")
     seen: list[str] = []
+    answers = iter(["no-such-layout", "journal"])  # a wrong answer is asked again
 
     def prompter(prompt: str, default: str | None) -> str:
         seen.append(prompt)
-        return "notes"
+        return next(answers)
 
     monkeypatch.setattr(init_cmd, "_is_tty", lambda: True)
     monkeypatch.setattr(init_cmd, "_prompter", prompter)
     (home / "p").mkdir()
     monkeypatch.chdir(home / "p")
     assert main(["init"]) == 0
-    assert "bare" in seen[0] and "notes" in seen[0]
-    assert load_project(home / "p").layout_name == "notes"
+    assert "bare" in seen[0] and "journal" in seen[0]
+    assert len(seen) == 2
+    assert load_project(home / "p").layout_name == "journal"

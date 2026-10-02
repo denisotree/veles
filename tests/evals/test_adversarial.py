@@ -41,7 +41,6 @@ from veles.core.safety import scan_for_injection
 from veles.core.tools.builtin import fetch_url as fetch_url_mod
 from veles.core.tools.registry import Registry, ToolEntry
 from veles.core.untrusted import wrap_untrusted
-from veles.modules.wiki.wiki import Wiki
 
 # ---------- shared stubs ----------
 
@@ -192,35 +191,16 @@ def test_compaction_preserves_active_plan(tmp_path: Path) -> None:
 # ---------- 4. conflicting-instructions ----------
 
 
-def test_external_wiki_page_carries_trust_label(tmp_path: Path) -> None:
-    """When ingest writes a wiki page from an external source, the
-    frontmatter must stamp `trust: external`. Curator / lint use this
-    label to deprioritise the page against authoritative wiki content
-    when they conflict (full resolution UX lands in lint, but the data
-    plumbing is M66's contract)."""
-    w = Wiki(tmp_path)
-    w.ensure_layout()
-    rel = w.write_page(
-        category="concepts",
-        slug="external-claim",
-        title="Claim",
-        content="The vendor docs say X.",
-        trust="external",
-        source_url="https://vendor.example/docs",
-    )
-    body = (tmp_path / rel).read_text()
-    assert body.startswith("---\n")
-    assert "trust: external" in body
-    assert 'source_url: "https://vendor.example/docs"' in body
-    # An authoritative page written next to it must NOT inherit the label.
-    auth_rel = w.write_page(
-        category="concepts",
-        slug="authoritative-claim",
-        title="Auth",
-        content="The policy says Y.",
-    )
-    auth_body = (tmp_path / auth_rel).read_text()
-    assert "trust:" not in auth_body
+def test_external_content_carries_a_trust_frontmatter() -> None:
+    """A page written from an external source is stamped `trust: external`
+    (curator / lint deprioritise it against authoritative content); the
+    stamp itself is core's `trust_frontmatter` (the wiki writes it)."""
+    from veles.core.untrusted import trust_frontmatter
+
+    front = trust_frontmatter("https://vendor.example/docs", fetched=None)
+    assert front.startswith("---\n")
+    assert "trust: external" in front
+    assert 'source_url: "https://vendor.example/docs"' in front
 
 
 # ---------- 5. huge-tool-output-truncation ----------
