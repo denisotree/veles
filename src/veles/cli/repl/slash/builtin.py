@@ -157,8 +157,9 @@ def _session(line: str, ctx: SlashContext) -> SlashResult:
 
 
 def _save(line: str, ctx: SlashContext) -> SlashResult:
-    """`/save <slug>` — keep the last assistant reply: as `wiki/queries/<slug>.md`
-    when the layout has a wiki, otherwise as a memory insight.
+    """`/save <slug>` — keep the last assistant reply: in the project's page store
+    (category `queries`; the wiki → `wiki/queries/<slug>.md`) when there is one,
+    otherwise as a memory insight.
 
     M87 also had `/save` with no argument list "pending insight candidates",
     and a matching slug commit one. Nothing ever produced a candidate — not in
@@ -166,7 +167,8 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
     slug" and was removed. Insights are extracted automatically by the curator
     and dream passes.
     """
-    from veles.core.layout.engines import wiki_enabled
+    from veles.core.contributions import page_store
+    from veles.core.memory.artefacts import append_memory_log
 
     if not line:
         return SlashResult.err("/save needs a slug, e.g. `/save graph-traversal-notes`")
@@ -176,11 +178,8 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
         return SlashResult.err("/save: nothing to save yet (no assistant response in this run)")
     title = first_heading(last) or slug.replace("-", " ").title()
 
-    # On layouts without the wiki engine (bare/notes), there is no
-    # `wiki/queries/` to write to — keep the reply as a memory insight
-    # instead of crashing on a Wiki the layout never created.
-    if not wiki_enabled(ctx.project):
-        from veles.core.memory.artefacts import append_memory_log
+    store = page_store(ctx.project)
+    if store is None:
         from veles.core.tools.builtin.memory_save import save_insight_row
 
         rid = save_insight_row(
@@ -192,17 +191,12 @@ def _save(line: str, ctx: SlashContext) -> SlashResult:
             append_memory_log(ctx.project, op="tui-save-insight", summary=f"-> insight #{rid}")
         return SlashResult.ok(f"saved insight #{rid}")
 
-    # Legacy path: save the last assistant reply under wiki/queries/. Import
-    # the wiki module only here, after the engine gate above — a non-wiki
-    # project never reaches this branch and never imports it.
-    from veles.modules.wiki.wiki import Wiki
-
-    wiki = Wiki(ctx.project.wiki_root)
     try:
-        rel = wiki.write_page(category="queries", slug=slug, title=title, content=last)
+        rel = store.write(ctx.project, "queries", slug, title, last)
     except ValueError as exc:
         return SlashResult.err(f"/save failed: {exc}")
-    wiki.append_log(op="tui-save", summary=f"saved last response to {rel}")
+    with contextlib.suppress(Exception):
+        append_memory_log(ctx.project, op="tui-save", summary=f"saved last response to {rel}")
     return SlashResult.ok(f"saved to {rel}")
 
 

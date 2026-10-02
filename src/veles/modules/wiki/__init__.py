@@ -30,6 +30,7 @@ def register(api) -> None:
         DreamStep,
         Engine,
         PageSource,
+        PageStore,
         ToolSet,
     )
 
@@ -58,7 +59,11 @@ def register(api) -> None:
         ),
     )
     api.contribute("subproject_source", "wiki", PageSource(pages=curator.pages, engine="wiki"))
-    api.contribute("self_doc", "wiki", curator.self_doc)
+    api.contribute(
+        "page_store",
+        "wiki",
+        PageStore(write=curator.write_page, read=curator.read_page, engine="wiki"),
+    )
     api.contribute("scaffold", "wiki", curator.scaffold)
     api.contribute(
         "background_op",

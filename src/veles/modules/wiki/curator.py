@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from veles.modules.wiki.wiki import Wiki, WikiPageInfo, wiki_enabled
+from veles.modules.wiki.wiki import Wiki, WikiPageInfo
 from veles.sdk import Project
 from veles.sdk.layout import LayoutManifest
 
@@ -36,13 +36,18 @@ def pages(project: Project) -> list[WikiPageInfo]:
     return Wiki(project.wiki_root).list_pages()
 
 
-def self_doc(project: Project, content: str) -> str | None:
-    """The `self_doc` contribution: `wiki/self-doc/overview.md` when the engine is on."""
-    if not wiki_enabled(project):
-        return None
+def write_page(project: Project, category: str, slug: str, title: str, content: str) -> str:
+    """The `page_store` contribution's writer: `wiki/<category>/<slug>.md`."""
     return Wiki(project.wiki_root).write_page(
-        category="self-doc", slug="overview", title="Self-Documentation", content=content
+        category=category, slug=slug, title=title, content=content
     )
+
+
+def read_page(project: Project, category: str, slug: str) -> str | None:
+    try:
+        return Wiki(project.wiki_root).read_page(f"wiki/{category}/{slug}.md")
+    except (OSError, ValueError):
+        return None
 
 
 def scaffold(root: Path, manifest: LayoutManifest) -> None:

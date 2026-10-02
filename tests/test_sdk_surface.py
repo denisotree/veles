@@ -33,6 +33,7 @@ _SURFACE: dict[str, dict[str, str]] = {
         "Engine": "veles.core.contributions",
         "PageInfo": "veles.core.contributions",
         "PageSource": "veles.core.contributions",
+        "PageStore": "veles.core.contributions",
         "ToolSet": "veles.core.contributions",
         "active": "veles.core.contributions",
         "contributions": "veles.core.contributions",

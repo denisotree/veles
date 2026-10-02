@@ -247,9 +247,31 @@ class PageSource:
 
 
 register_point(Point("subproject_source", kind=PageSource))
-# (project, content) -> project-relative path, or None when it doesn't take it
-# — consumer: core/self_doc.py
-register_point(Point("self_doc"))
+
+
+@dataclass(frozen=True, slots=True)
+class PageStore:
+    """A module that keeps pages. `write(project, category, slug, title, content)`
+    returns the project-relative path (raises `ValueError` on a bad slug);
+    `read(project, category, slug)` returns the page text or None. Active when
+    `engine` (if any) is on for the project."""
+
+    write: Callable[..., str]
+    read: Callable[..., str | None]
+    engine: str | None = None
+
+
+# — consumers: core/self_doc.py (category "self-doc"), the REPL's /save and
+#   `veles self-doc show`
+register_point(Point("page_store", kind=PageStore))
+
+
+def page_store(project: Project | None) -> PageStore | None:
+    """The project's active page store — the first one, when several are."""
+    found = active(project, "page_store")
+    return found[0].obj if found else None  # type: ignore[return-value]
+
+
 # (root: Path, manifest: LayoutManifest) -> None, for every applied pack
 # — consumer: core/layout/scaffold.py
 register_point(Point("scaffold"))
@@ -313,6 +335,7 @@ __all__ = [
     "Engine",
     "PageInfo",
     "PageSource",
+    "PageStore",
     "Point",
     "ToolSet",
     "active",
@@ -321,6 +344,7 @@ __all__ = [
     "check",
     "contributions",
     "load_tool_sets",
+    "page_store",
     "refuse_builtin_collisions",
     "register_point",
     "reset_builtin_contributions",
