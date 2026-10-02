@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] — 2026-10-02
+
+Modules add to Veles through typed contribution points; the wiki engine is now a module like
+any other, and core no longer imports it.
+
+### Added
+
+- `api.contribute(point, name, obj)` — one typed way for a module to add to Veles. Points:
+  `engine`, `tool`, `recall`, `prompt`, `dream_step`, `curator_target`, `subproject_source`,
+  `self_doc`, `scaffold`, `background_op` and `memory` (`api.add_memory_provider` is now a
+  shortcut for it). A contribution to an unknown point, of the wrong kind or under a taken name
+  refuses the module; one that fails when called is skipped with a warning. A registry module
+  lists them in `provides` as `<point>:<name>`; `validate --run-code` checks the list. See
+  `docs/en/how-to/extend-veles-with-modules.md`.
+- The project-tree map is refreshed after turns (at most every 10 minutes), not only at `init`.
+
+### Changed
+
+- The wiki engine, agent-ops and organize load as built-in modules through these points; core
+  no longer imports the wiki engine. No change in behaviour.
+- Skill-similarity embeddings live in `memory.db`; `.veles/skill_embeddings.json` is imported
+  once and removed.
+- `provides` in a registry `extension.toml` accepts `hook:` plus one `<point>:` per contribution
+  point, and `validate --run-code` checks every entry: `tool:` now means a `ToolSet`
+  contribution, and the unchecked `platform:`/`provider:` prefixes are gone until those points
+  exist.
+
 ## [1.2.1] — 2026-09-30
 
 Follow-ups to 1.2.0: tighter write protection, safer registry validation, synced translations.

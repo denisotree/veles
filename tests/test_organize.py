@@ -144,7 +144,9 @@ def test_toolset_membership() -> None:
     from veles.core.tools.toolsets import TOOLSETS
 
     assert "move_file" in TOOLSETS["organize"]
-    assert "wiki_rename_page" in TOOLSETS["engine-wiki"]
+    from veles.modules.wiki import WIKI_TOOLS
+
+    assert "wiki_rename_page" in WIKI_TOOLS  # the wiki engine's own tool set
     # propose mode uses the read-only builtin set — no mutation tools.
     assert "move_file" not in TOOLSETS["builtin"]
 

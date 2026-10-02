@@ -44,6 +44,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from veles.core.contributions import DreamStep, contributions
 from veles.core.curator_state import CuratorState, load, save_atomic
 from veles.core.file_lock import file_lock
 from veles.core.memory import hide_insight
@@ -58,7 +59,6 @@ if TYPE_CHECKING:
 
     from veles.core.project import Project
     from veles.core.provider import Provider
-    from veles.modules.wiki.wiki import Wiki
 
 logger = logging.getLogger(__name__)
 
@@ -220,20 +220,12 @@ def dream_cycle(  # noqa: PLR0913
     if not project.project_toml_path.is_file():
         result.notes.append("skipped: project marker (project.toml) missing")
         return result
-    from veles.core.layout.engines import wiki_enabled
-
     state_path = _dream_state_path(project)
     state = load(state_path)
-    # M163: wiki-facing steps (lint, FTS reindex) run only when the
-    # layout pack enables the wiki engine; the rest of the dream operates
-    # on layout-independent memory.
-    if wiki_enabled(project):
-        from veles.modules.wiki.wiki import Wiki
-
-        wiki = Wiki(project.wiki_root)
-    else:
-        wiki = None
     model = consolidation_model or _DEFAULT_CONSOLIDATION_MODEL
+    # Module steps (e.g. the wiki engine's lint and reindex), each skippable by
+    # the `dream_cycle` keyword it names; the steps gate themselves on their engine.
+    skips = {"skip_lint": skip_lint, "skip_reindex": skip_reindex}
 
     with file_lock(_dream_lock_path(project)):
         if not skip_insights and insight_history_loader is not None and provider is not None:
@@ -256,12 +248,15 @@ def dream_cycle(  # noqa: PLR0913
             _run_dream_step(
                 "promote", lambda: _step_promote(project, result, dry_run=dry_run), result
             )
-        if not skip_lint and wiki is not None:
+        for step in [c.obj for c in contributions("dream_step")]:
+            assert isinstance(step, DreamStep)
+            if skips.get(step.skip_flag):
+                continue
             _run_dream_step(
-                "lint", lambda: _step_lint(project, wiki, result, dry_run=dry_run), result
+                step.name,
+                lambda step=step: step.run(project, result, dry_run=dry_run),
+                result,
             )
-        if not skip_reindex and not dry_run and wiki is not None:
-            _run_dream_step("reindex", lambda: _step_reindex(wiki, result), result)
         if include_consolidation:
             _run_dream_step(
                 "insight_dedup",
@@ -564,30 +559,6 @@ def _step_promote(project: Project, result: DreamResult, *, dry_run: bool) -> No
     if not candidates or dry_run:
         return
     write_promote_proposals(project, candidates)
-
-
-def _step_lint(project: Project, wiki: Wiki, result: DreamResult, *, dry_run: bool) -> None:
-    from veles.modules.wiki.linter import render_report, run_lint
-
-    report = run_lint(wiki)
-    result.lint_findings = len(report.all_findings)
-    if result.lint_findings == 0 or dry_run:
-        return
-    rendered = render_report(report)
-    slug = f"dream-lint-{now_timestamp_slug()}"
-    write_proposal(
-        project,
-        slug=slug,
-        title="Dream: wiki lint",
-        content=rendered,
-    )
-    append_memory_log(project, op="dream_lint", summary=f"{result.lint_findings} findings")
-
-
-def _step_reindex(wiki: Wiki, result: DreamResult) -> None:
-    """M84: refresh the wiki FTS index when dream notices it's stale.
-    Cheap when fresh (mtime check), full rebuild otherwise."""
-    result.reindexed_pages = wiki.reindex_if_stale()
 
 
 _CONSOLIDATION_INSIGHTS_LIMIT = 20

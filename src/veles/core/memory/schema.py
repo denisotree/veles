@@ -134,6 +134,17 @@ CREATE TABLE IF NOT EXISTS skill_uses (
 
 CREATE INDEX IF NOT EXISTS idx_skill_uses_skill ON skill_uses(skill_id, invoked_at DESC);
 
+-- Skill-similarity embeddings (M61): one vector per (skill fingerprint, model),
+-- float64 so a vector reads back exactly as written. Replaced the JSON cache
+-- `.veles/skill_embeddings.json` (imported once, then deleted).
+CREATE TABLE IF NOT EXISTS skill_embeddings (
+    fingerprint TEXT NOT NULL,
+    model       TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    vector      BLOB NOT NULL,
+    PRIMARY KEY (fingerprint, model)
+);
+
 CREATE TABLE IF NOT EXISTS rules (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     kind            TEXT NOT NULL CHECK (kind IN ('format','do','dont','preference')),

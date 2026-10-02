@@ -88,6 +88,10 @@ veles module approve <name> [--user]
 
 ### Написать модуль, добавляющий провайдер памяти
 
+Провайдер памяти — одна из нескольких точек вклада; про инструменты, recall,
+блоки промпта, шаги dream и остальное см.
+[расширение Veles модулем](extend-veles-with-modules.md).
+
 Точка входа модуля `register(api)` может вызвать
 `api.add_memory_provider(name, factory)`, чтобы подключить внешний источник
 памяти к recall. `name` должно совпадать с секцией `[memory.external.<name>]`

@@ -43,9 +43,9 @@ from veles.core.io_utils import read_fresh_json, write_stamped_json
 from veles.core.memory import SessionInfo, SessionStore
 from veles.core.memory.artefacts import append_memory_log
 from veles.core.project import Project
+from veles.core.project_tree_runner import scan_project_tree
 from veles.core.provider import Message
 from veles.core.routing import route
-from veles.modules.wiki.wiki import Wiki
 
 # Subproject proposer rerun cadence — 7d between automatic refreshes of
 # `.veles/memory/proposals/`. The detector is cheap (~tens of ms), but
@@ -97,10 +97,9 @@ def _run_curator_pass(
     — callers print the user-facing summary so each entry-point keeps
     its existing tone.
     """
-    from veles.core.layout.engines import wiki_enabled
+    from veles.core.contributions import call_active
 
-    if wiki_enabled(project):
-        Wiki(project.wiki_root).ensure_layout()
+    call_active(project, "curator_target", lambda c: c.obj.prepare(project))  # type: ignore[attr-defined]
     state_path = project.state_dir / "curator.state.json"
     state = load_curator_state(state_path)
     cutoff = time.time() - CURATE_QUIET_WINDOW_SEC
@@ -247,6 +246,7 @@ def maybe_run_post_turn_curator(args: argparse.Namespace, project: Project) -> N
     # consolidation). Neither may block the user's turn.
     _maybe_surface_skill_suggestions(project)
     _maybe_run_post_turn_dream(args, project)
+    maybe_rescan_tree(project)
 
 
 def _maybe_surface_skill_suggestions(project: Project) -> None:
@@ -325,12 +325,11 @@ def maybe_run_subproject_proposer(args: argparse.Namespace, project: Project) ->
         return
     if getattr(args, "no_proposer", False):
         return
-    from veles.core.layout.engines import wiki_enabled
+    from veles.core.contributions import active
 
-    # The subproject proposer clusters wiki pages — a no-op on layouts whose
-    # wiki engine is off (bare/notes). Gating here keeps `detect_clusters`
-    # (which constructs a Wiki) from ever running on a non-wiki layout.
-    if not wiki_enabled(project):
+    # The proposer clusters pages modules contribute (the wiki's) — a no-op when
+    # no source is active for the project (bare/notes); don't even stamp then.
+    if not active(project, "subproject_source"):
         return
 
     if _ran_recently(project, _PROPOSER_STATE_FILE, _PROPOSER_IDLE_THRESHOLD_SEC):
@@ -464,38 +463,14 @@ def _curate_one_session(
     project: Project,
 ) -> bool:
     # Imported at call time so a test's patch on the owning module applies.
-    from veles.core.layout.engines import wiki_enabled
     from veles.runtime.registry import load_skills, make_tool_aware_provider, qualify_for_provider
     from veles.runtime.run import print_run_summary, run_agent_streaming_aware
 
     messages = store.load_messages(session.id)
     serialized = truncate_session_messages(messages, CURATE_TURN_LIMIT, CURATE_CHARS_LIMIT)
     created_iso = _dt.datetime.fromtimestamp(session.created_at, tz=_dt.UTC).isoformat()
-    # M163: the wiki-page half of curation exists only when the layout
-    # pack enables the wiki engine; without it the distillation lands in
-    # SQL memory alone (memory_save_insight / memory_save_rule).
-    if wiki_enabled(project):
-        persist_steps = (
-            f'- Call wiki_write_page(category="sessions", slug="{session.id}",'
-            " title=..., content=...).\n"
-            "- Call memory_save_insight(title=<same title>, body=<a 2-4 sentence"
-            ' summary>, category="curated-session", file_path=<the wiki page path>)'
-            " so the insight surfaces in /insights and recall.\n"
-        )
-        log_step = (
-            '- Call wiki_append_log(op="curate",'
-            f' summary="<one-line summary>: session {session.id}").\n'
-            "- Reply with one sentence confirming the page path.\n\n"
-        )
-        intro = "Distill this Veles session into a single persistent wiki page."
-    else:
-        persist_steps = (
-            "- Call memory_save_insight(title=<same title>, body=<the distilled"
-            ' content>, category="curated-session") so it surfaces in /insights'
-            " and recall.\n"
-        )
-        log_step = "- Reply with one sentence confirming the insight was saved.\n\n"
-        intro = "Distill this Veles session into one durable memory insight."
+    plan = curation_plan(project, session.id)
+    intro, persist_steps, log_step = plan.intro, plan.persist_steps, plan.log_step
     system_prompt = (
         f"You are the Veles curator. {intro}"
         " Skip greetings, error retries, and tool noise;"
@@ -554,7 +529,57 @@ def _curate_one_session(
     # by non-empty final prose re-curated the same session after every turn,
     # duplicating wiki pages forever — the real criterion is "did the
     # distillation persist", i.e. did a persist tool actually run.
-    return bool({"wiki_write_page", "memory_save_insight"} & result.invoked_tools)
+    return bool(plan.persist_tools & result.invoked_tools)
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class CurationPlan:
+    intro: str
+    persist_steps: str
+    log_step: str
+    persist_tools: frozenset[str]
+
+
+def curation_plan(project: Project, session_id: str) -> CurationPlan:
+    """How the curator's agent persists `session_id`: into an active module's store
+    (`curator_target` — e.g. the wiki engine's pages, alongside memory) or, with
+    none, into SQL memory alone (memory_save_insight / memory_save_rule)."""
+    from veles.core.contributions import CuratorTarget, call_active
+
+    def plan_for(c) -> CurationPlan:
+        target = c.obj
+        assert isinstance(target, CuratorTarget)
+        intro, persist_steps, log_step = target.instructions(project, session_id)
+        tools = frozenset({"memory_save_insight", *target.persist_tools})
+        return CurationPlan(intro, persist_steps, log_step, tools)
+
+    plans = call_active(project, "curator_target", plan_for)
+    if plans:
+        return plans[0]
+    return CurationPlan(
+        intro="Distill this Veles session into one durable memory insight.",
+        persist_steps=(
+            "- Call memory_save_insight(title=<same title>, body=<the distilled"
+            ' content>, category="curated-session") so it surfaces in /insights'
+            " and recall.\n"
+        ),
+        log_step="- Reply with one sentence confirming the insight was saved.\n\n",
+        persist_tools=frozenset({"memory_save_insight"}),
+    )
+
+
+_TREE_RESCAN_STATE = "tree-scan.state.json"
+TREE_RESCAN_MIN_SEC = 600
+
+
+def maybe_rescan_tree(project: Project) -> None:
+    """M118b: refresh the project-tree map after turns, at most once per
+    `TREE_RESCAN_MIN_SEC` (the scanner skips unchanged files). Never raises."""
+    if _ran_recently(project, _TREE_RESCAN_STATE, TREE_RESCAN_MIN_SEC):
+        return
+    with contextlib.suppress(Exception):
+        scan_project_tree(project)
+        _stamp(project, _TREE_RESCAN_STATE)
 
 
 def maybe_refresh_self_doc(project: Project) -> None:

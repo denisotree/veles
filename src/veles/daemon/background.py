@@ -59,7 +59,7 @@ def attach_background_runners(
     if args is not None and store is not None:
         from veles.daemon.agent_factory import make_scoped_subagent_factory
         from veles.daemon.background_ops import (
-            make_ingest_kind_handler,
+            make_contributed_kind_handlers,
             make_on_op_finished,
             make_research_kind_handler,
         )
@@ -68,7 +68,7 @@ def attach_background_runners(
         # daemon's `[daemon.<name>] model` applies to its workers too.
         session = state.session_name
         kind_handlers = {
-            "ingest": make_ingest_kind_handler(
+            **make_contributed_kind_handlers(
                 args, project=project, store=store, daemon_session=session
             ),
             "research": make_research_kind_handler(

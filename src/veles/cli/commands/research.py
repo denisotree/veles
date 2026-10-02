@@ -47,14 +47,11 @@ def cmd_research(args: argparse.Namespace, project: Project) -> int:
     )
     # Read + network + wiki-read only, built straight off the builtin singleton
     # (no project skills — explorers gather, they don't run skill sub-agents).
-    # M163: wiki-engine tools drop out when the layout doesn't enable them.
-    from veles.core.layout.engines import wiki_enabled
-    from veles.core.tools.toolsets import TOOLSETS
+    # M163: module tools (wiki) drop out when the layout doesn't enable their engine.
+    from veles.core.contributions import load_tool_sets
 
-    explorer_tools = list(RESEARCH_EXPLORER_TOOLS)
-    if not wiki_enabled(project):
-        gated = set(TOOLSETS.get("engine-wiki", ()))
-        explorer_tools = [t for t in explorer_tools if t not in gated]
+    gated = load_tool_sets(project)
+    explorer_tools = [t for t in RESEARCH_EXPLORER_TOOLS if t not in gated]
     research_registry = builtin_registry.subset(explorer_tools)
     # Each explorer fans out web_search/fetch_url calls; without a compressor a
     # multi-fetch explorer can overflow the model context. Same compressor the

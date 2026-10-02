@@ -117,7 +117,8 @@ def test_recursive_on_missing_dir_errors(rec: _Recorder, tmp_path: Path) -> None
 
 def test_toolset_membership() -> None:
     from veles.core.tools.toolsets import TOOLSETS
+    from veles.modules.wiki import WIKI_TOOLS
 
-    assert "wiki_add" in TOOLSETS["engine-wiki"]
+    assert "wiki_add" in WIKI_TOOLS  # the wiki engine's own tool set
     assert "wiki_add" in TOOLSETS["run"]
     assert "wiki_add" in TOOLSETS["ingest"]

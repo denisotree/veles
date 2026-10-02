@@ -6,3 +6,7 @@ operation dispatcher and the `move_file` primitive live here so core stays
 tools/skills" (VISION §5.2). The `veles organize` command
 (`cli/commands/organize.py`) builds and runs the agent on top of them.
 """
+
+
+def register(api) -> None:
+    """Everything organize adds to Veles, as contributions (release A)."""

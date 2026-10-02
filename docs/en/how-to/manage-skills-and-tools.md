@@ -84,6 +84,10 @@ in the scope already declares.
 
 ### Write a module that adds a memory provider
 
+Memory providers are one of several contribution points — for tools, recall,
+prompt blocks, dream steps and the rest, see
+[extend Veles with a module](extend-veles-with-modules.md).
+
 A module's `register(api)` entrypoint can call
 `api.add_memory_provider(name, factory)` to plug an external memory source
 into recall. `name` must match a `[memory.external.<name>]` section in

@@ -27,6 +27,9 @@ by hand, it stops loading until you run `veles module approve <name>`.
 A module can plug a memory source into recall with
 `api.add_memory_provider(name, factory)` in its `register(api)`, matched to a
 `[memory.external.<name>]` config section — that's how Honcho, Mem0 and
-Supermemory work as registry modules.
+Supermemory work as registry modules. More generally, `api.contribute(point,
+name, obj)` adds tools, recall, prompt blocks, dream steps, a curator target,
+a scaffold or a daemon job kind — the built-in wiki engine is a module that
+does exactly this (see how-to/extend-veles-with-modules).
 
 Example: `veles module list`.

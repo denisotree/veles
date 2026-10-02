@@ -73,10 +73,13 @@ def test_wiki_tools_present_when_engine_on(wiki_project: Project) -> None:
 
 
 def test_engine_wiki_toolset_declared() -> None:
-    from veles.core.tools.toolsets import TOOLSETS
+    """The wiki engine declares its tools through its `tool` contribution."""
+    from veles.core.contributions import ToolSet, contributions
 
-    assert "wiki_search" in TOOLSETS["engine-wiki"]
-    assert "wiki_write_page" in TOOLSETS["engine-wiki"]
+    sets = [c.obj for c in contributions("tool") if c.name == "wiki"]
+    assert len(sets) == 1 and isinstance(sets[0], ToolSet) and sets[0].engine == "wiki"
+    assert "wiki_search" in sets[0].tools
+    assert "wiki_write_page" in sets[0].tools
 
 
 # ---- system prompt ----
@@ -194,6 +197,19 @@ def test_self_doc_lands_in_wiki_when_engine_on(wiki_project: Project) -> None:
 
 
 # ---- sanity ----
+
+
+def test_engine_needs_a_contributing_module(wiki_project: Project, monkeypatch) -> None:
+    """The pack asking for `wiki` is not enough: some module must contribute it."""
+    from veles.core import contributions as contrib
+
+    assert wiki_enabled(wiki_project)
+    monkeypatch.setattr(contrib, "BUILTIN_MODULES", ())
+    contrib.reset_builtin_contributions()
+    try:
+        assert not wiki_enabled(wiki_project)
+    finally:
+        contrib.reset_builtin_contributions()
 
 
 def test_engine_flags(nowiki_project: Project, wiki_project: Project) -> None:

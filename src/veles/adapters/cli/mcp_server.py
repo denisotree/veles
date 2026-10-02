@@ -257,17 +257,14 @@ def main(argv: list[str] | None = None) -> int:
         snap = load_budget_snapshot(budget_path)
         if snap is not None:
             set_budget(TokenBudget(limit=snap.limit, consumed=snap.consumed))
-    # M163: wiki-engine tools exist only when the project's layout enables the
-    # engine — registered here the way `runtime/registry.py` does, else dropped.
-    from veles.core.layout.engines import wiki_enabled
+    # M163: module tools (wiki) exist only when the project's layout enables their
+    # engine — loaded here the way `runtime/registry.py` does, else dropped.
+    from veles.core.contributions import load_tool_sets
 
-    if wiki_enabled(project):
-        import veles.modules.wiki.tools  # noqa: F401  (registers wiki_*)
+    gated = load_tool_sets(project)
     composite = registry.subset(registry.list_names())
     skill_names = _register_project_skills(composite, project, args.skill_model)
-    tool_names = list(_MCP_TOOLS)
-    if not wiki_enabled(project):
-        tool_names = [t for t in tool_names if not t.startswith("wiki_")]
+    tool_names = [t for t in _MCP_TOOLS if t not in gated]
     server = MCPServer(composite, tool_names + skill_names, budget_path=budget_path)
     return server.serve(stdin=sys.stdin, stdout=sys.stdout)
 

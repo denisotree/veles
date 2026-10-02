@@ -42,6 +42,7 @@ _BASELINE = {
     "how-to/run-as-daemon.md": 14,  # M234 added the HTTP section
     "reference/cli.md": 14,
     "how-to/extension-registries.md": 13,  # extension-registry spec; en+ru only by design
+    "how-to/extend-veles-with-modules.md": 13,  # module-author reference; en+ru only by design
 }
 
 

@@ -2024,7 +2024,7 @@ wheels = [
 
 [[package]]
 name = "veles-ai"
-version = "1.2.1"
+version = "1.2.2"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

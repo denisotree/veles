@@ -36,12 +36,12 @@ def apply_scaffold(pack: LayoutDirectory | None, root: Path, name: str) -> None:
     from veles.core.agents_md_schema import is_default_template, title_of
 
     if pack is not None:
+        from veles.core.contributions import call_each
+
         for rel in pack.manifest.scaffold_dirs:
             (root / rel).mkdir(parents=True, exist_ok=True)
-        if pack.manifest.engine_enabled("wiki"):
-            from veles.modules.wiki.wiki import Wiki
-
-            Wiki(root).ensure_layout()
+        # Module scaffolds (e.g. the wiki engine's layout when the pack asks for it).
+        call_each("scaffold", lambda c: c.obj(root, pack.manifest))  # type: ignore[operator]
 
     agents_md = root / "AGENTS.md"
     if not agents_md.exists():

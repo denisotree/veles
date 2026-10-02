@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextvars
 import io
 import json
 from pathlib import Path
@@ -408,6 +409,7 @@ def test_main_exposes_wiki_tools_for_a_wiki_project(monkeypatch, tmp_path) -> No
     monkeypatch.setattr("sys.stdin", io.StringIO(request))
     out = io.StringIO()
     monkeypatch.setattr("sys.stdout", out)
-    main(["--project-root", str(project.root)])
+    # main() sets the active project for its process; isolate it from later tests.
+    contextvars.copy_context().run(main, ["--project-root", str(project.root)])
     names = {t["name"] for t in json.loads(out.getvalue().splitlines()[0])["result"]["tools"]}
     assert {"wiki_read_page", "wiki_write_page"} <= names
