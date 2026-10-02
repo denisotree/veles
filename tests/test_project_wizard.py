@@ -122,17 +122,6 @@ def test_intro_uses_active_locale(
     assert "No Veles project found" in err
 
 
-def test_init_triggers_wiki_reindex(tmp_cwd: Path) -> None:
-    token = pw.set_project_wizard_prompter(_scripted(["y", "n", "n", "n"]))
-    try:
-        project = pw.run_project_wizard(tmp_cwd)
-    finally:
-        pw.reset_project_wizard_prompter(token)
-    assert project is not None
-    # The FTS sidecar lands at <wiki_root>/wiki_index.db after reindex.
-    assert (project.wiki_root / "wiki_index.db").is_file()
-
-
 def test_gate_blocks_when_no_tty(tmp_cwd: Path) -> None:
     # Pytest stdin is typically non-TTY; this should naturally return False.
     assert pw.should_run_project_wizard(_args(), tmp_cwd) is False

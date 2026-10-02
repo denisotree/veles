@@ -14,7 +14,6 @@ ask_channel = "Connect a chat channel (e.g. Telegram) to this project?"
 ask_channel_type = "Channel type"
 channel_field_required = "  ! a required {channel} field was left blank; skipping channel setup."
 channel_written = "  · wrote {channel} channel → {path}"
-indexed_wiki = "  · indexed {pages} wiki page(s) into the FTS database."
 
 [rules_digest]
 header = "House rules (learned from this project)"

@@ -25,18 +25,13 @@ def cmd_layout(args: argparse.Namespace, project: Project) -> int:
 
 def _sync(project: Project) -> int:
     from veles.core.layout.discovery import find_layout
-    from veles.core.layout.engines import wiki_enabled
     from veles.core.layout.scaffold import apply_scaffold
 
     before = _dir_set(project)
     pack = find_layout(project.layout_name, project)
     # `name` is the AGENTS.md {name}/title substitution — the PROJECT name, not
     # the layout name (passing the layout name re-titles a default AGENTS.md).
-    apply_scaffold(pack, project.root, project.name)
-    if wiki_enabled(project):
-        from veles.modules.wiki.wiki import Wiki
-
-        Wiki(project.wiki_root).ensure_layout()
+    apply_scaffold(pack, project.root, project.name)  # module scaffolds included
     after = _dir_set(project)
 
     created = sorted(after - before)

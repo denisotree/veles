@@ -14,7 +14,6 @@ ask_channel = "Подключить чат-канал (например, Telegra
 ask_channel_type = "Тип канала"
 channel_field_required = "  ! обязательное поле канала {channel} пустое; настройка пропущена."
 channel_written = "  · записан канал {channel} → {path}"
-indexed_wiki = "  · проиндексировано {pages} страниц(ы) wiki в FTS-базу."
 
 [goal]
 confirm_line = "Давай проверим, верно ли я понял что нужно: {summary}"

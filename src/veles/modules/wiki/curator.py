@@ -51,6 +51,8 @@ def read_page(project: Project, category: str, slug: str) -> str | None:
 
 
 def scaffold(root: Path, manifest: LayoutManifest) -> None:
-    """The `scaffold` contribution: the wiki tree for a pack that asks for the engine."""
+    """The `scaffold` contribution: the wiki tree for a pack that asks for the engine.
+    No FTS index here — search falls back to a page scan until dream's reindex
+    step builds one, so init leaves no index file behind."""
     if manifest.engine_enabled("wiki"):
         Wiki(root).ensure_layout()
