@@ -294,13 +294,15 @@ def test_main_loads_budget_snapshot_into_context(monkeypatch, tmp_path) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     sentinel_token = set_budget(None)
     try:
-        rc = main(
+        # main() sets the module registry for its process; isolate it from later tests.
+        rc = contextvars.copy_context().run(
+            main,
             [
                 "--project-root",
                 str(tmp_path),
                 "--budget-file",
                 str(snap_path),
-            ]
+            ],
         )
         assert rc == 0
         budget = captured["budget"]

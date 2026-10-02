@@ -257,14 +257,20 @@ def main(argv: list[str] | None = None) -> int:
         snap = load_budget_snapshot(budget_path)
         if snap is not None:
             set_budget(TokenBudget(limit=snap.limit, consumed=snap.consumed))
+    # The same approved user/project modules the parent CLI loaded — a registry-installed
+    # engine (wiki) must exist here too.
+    from veles.core.contributions import load_tool_sets
+    from veles.core.module_loading import load_project_modules
+    from veles.core.modules import set_module_registry
+
+    set_module_registry(load_project_modules(project))
     # M163: module tools (wiki) exist only when the project's layout enables their
     # engine — loaded here the way `runtime/registry.py` does, else dropped.
-    from veles.core.contributions import load_tool_sets
-
     gated = load_tool_sets(project)
     composite = registry.subset(registry.list_names())
     skill_names = _register_project_skills(composite, project, args.skill_model)
-    tool_names = [t for t in _MCP_TOOLS if t not in gated]
+    available = set(composite.list_names())
+    tool_names = [t for t in _MCP_TOOLS if t not in gated and t in available]
     server = MCPServer(composite, tool_names + skill_names, budget_path=budget_path)
     return server.serve(stdin=sys.stdin, stdout=sys.stdout)
 

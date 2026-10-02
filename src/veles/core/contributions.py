@@ -18,6 +18,7 @@ from __future__ import annotations
 import functools
 import importlib
 import sys
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
@@ -133,8 +134,17 @@ def _call[T](point: str, found: list[Contribution], fn: Callable[[Contribution],
     return out
 
 
-@functools.cache
+_builtin_lock = threading.RLock()
+
+
 def _builtin_registry() -> ModuleRegistry:
+    # Daemon worker threads can ask first at the same moment; the builtins load once.
+    with _builtin_lock:
+        return _load_builtins()
+
+
+@functools.cache
+def _load_builtins() -> ModuleRegistry:
     from veles.core.modules import ModuleAPI, ModuleRegistry
 
     registry = ModuleRegistry()
@@ -153,7 +163,7 @@ def _builtin_registry() -> ModuleRegistry:
 
 def reset_builtin_contributions() -> None:
     """Forget the loaded builtins (tests swap `BUILTIN_MODULES`)."""
-    _builtin_registry.cache_clear()
+    _load_builtins.cache_clear()
     _warned.clear()
 
 

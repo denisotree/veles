@@ -10,14 +10,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from veles.core.modules import (
-    ModuleHandle,
-    ModuleLoadError,
-    ModuleRegistry,
-    discover_modules,
-    discover_modules_in,
-    load_module,
-)
+from veles.core.modules import ModuleRegistry
 from veles.core.project import (
     Project,
     ProjectNotFound,
@@ -26,78 +19,12 @@ from veles.core.project import (
 )
 from veles.core.project_registry import Registry as ProjectRegistry
 from veles.core.slug import normalize_slug as _normalize_slug
-from veles.core.text import shown
-
-
-def _dedup_by_name(handles: list[ModuleHandle], *, scope: str) -> list[ModuleHandle]:
-    """Two module dirs in the same scope sharing a manifest `name`: keep only the
-    first (sorted by dir — `discover_modules_in` already sorts) and warn about the rest."""
-    seen: dict[str, ModuleHandle] = {}
-    out: list[ModuleHandle] = []
-    for h in handles:
-        if h.name in seen:
-            print(
-                f"warning: duplicate {scope} module name {h.name!r} at {shown(h.dir)} "
-                f"(already loading from {shown(seen[h.name].dir)}) — ignored",
-                file=sys.stderr,
-            )
-            continue
-        seen[h.name] = h
-        out.append(h)
-    return out
-
-
-def _admitted(handles: list[ModuleHandle], *, project_root: Path | None) -> list[ModuleHandle]:
-    """The handles the load gate admits in this scope (`project_root` None = user);
-    each refused one is named by its dir."""
-    from veles.core.registry.gate import admit_module
-
-    flag = "--user " if project_root is None else ""
-    out: list[ModuleHandle] = []
-    for handle in handles:
-        refusal = admit_module(handle.dir, project_root=project_root)
-        if refusal is None:
-            out.append(handle)
-            continue
-        print(
-            f"warning: skipping module {handle.name!r} at {shown(handle.dir)}: "
-            f"{shown(refusal)} — review "
-            f"it, then `veles module approve {flag}{handle.name}`",
-            file=sys.stderr,
-        )
-    return out
 
 
 def _load_project_modules(project: Project) -> ModuleRegistry:
-    """User-level modules (`~/.veles/modules/`) first, then the project's. Every module
-    passes the gate first; only then does an approved project module replace a same-named
-    user-level one, so an unapproved dir can never disable an approved module."""
-    from veles.core.user_paths import user_modules_dir
+    from veles.core.module_loading import load_project_modules
 
-    project_handles = _dedup_by_name(
-        _admitted(discover_modules(project), project_root=project.root), scope="project"
-    )
-    overridden = {h.name for h in project_handles}
-    user_handles = _dedup_by_name(
-        _admitted(discover_modules_in(user_modules_dir()), project_root=None), scope="user"
-    )
-    handles: list[ModuleHandle] = []
-    for h in user_handles:
-        if h.name in overridden:
-            print(
-                f"warning: module {h.name!r} in the project overrides the user-level one",
-                file=sys.stderr,
-            )
-            continue
-        handles.append(h)
-    handles.extend(project_handles)
-    registry = ModuleRegistry()
-    for handle in handles:
-        try:
-            load_module(handle, registry)
-        except ModuleLoadError as exc:
-            print(f"warning: skipping module {handle.name!r}: {shown(exc)}", file=sys.stderr)
-    return registry
+    return load_project_modules(project)
 
 
 def _resolve_active_project(args: argparse.Namespace) -> Project | None:
