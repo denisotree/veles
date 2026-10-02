@@ -30,7 +30,7 @@ from veles.core.registry.model import (
     scan_registry,
 )
 from veles.core.registry.repo import RegistryRepoError, changed_paths, fetch_git_source, file_at
-from veles.core.registry.scan import non_sdk_imports, scan_python
+from veles.core.registry.scan import native_binaries, non_sdk_imports, scan_python
 from veles.core.registry.versions import is_newer, satisfies
 
 PERMISSIVE_LICENSES = frozenset(
@@ -194,6 +194,7 @@ def _check(
             errors.append(f".git is not allowed in an extension payload: {git}")
         errors += _check_kind(ext, payload)
         report.review += [f"{ext.group}/{ext.name}: {f}" for f in scan_python(payload)]
+        report.review += [f"{ext.group}/{ext.name}: {f}" for f in native_binaries(payload)]
         if ext.requires:
             report.review.append(
                 f"{ext.group}/{ext.name}: pip requirements {', '.join(ext.requires)}"

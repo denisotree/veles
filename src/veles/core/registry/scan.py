@@ -33,6 +33,18 @@ def scan_python(root: Path) -> list[str]:
     return findings
 
 
+_NATIVE_SUFFIXES = (".so", ".pyd", ".dylib", ".dll")
+
+
+def native_binaries(root: Path) -> list[str]:
+    """Compiled libraries in a payload — code a reviewer cannot read."""
+    return [
+        f"{p.relative_to(root).as_posix()}: native binary (unreviewable code)"
+        for p in sorted(root.rglob("*"))
+        if p.is_file() and (p.suffix in _NATIVE_SUFFIXES or ".so." in p.name)
+    ]
+
+
 def non_sdk_imports(root: Path) -> list[str]:
     """`<file>:<line> <module>` for every import of Veles outside `veles.sdk` in a
     module's runtime code. Tests are exempt: they run in registry CI against a
