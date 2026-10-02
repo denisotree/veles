@@ -33,14 +33,19 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
-from veles.core.fts import escape_query
-from veles.core.io_utils import load_optional_toml
-from veles.core.safety import scan_for_injection
-from veles.core.slug import normalize_slug as _normalize_slug
-from veles.core.text import title_and_summary
-from veles.core.timeutil import utc_iso
+from veles.sdk import Project, load_optional_toml, title_and_summary, utc_iso
+from veles.sdk import normalize_slug as _normalize_slug
+from veles.sdk.contributions import engine_enabled
+from veles.sdk.memory import escape_query
+from veles.sdk.tools import scan_for_injection
 
 logger = logging.getLogger(__name__)
+
+
+def wiki_enabled(project: Project | None) -> bool:
+    """True when the project's layout pack asks for the wiki engine."""
+    return engine_enabled(project, "wiki")
+
 
 _INDEX_FILE = "INDEX.md"
 _LOG_FILE = "LOG.md"
@@ -149,7 +154,7 @@ def _resolve_wiki_categories(root: Path) -> tuple[str, ...]:
         n = (data.get("project") or {}).get("layout")
         if isinstance(n, str) and n.strip():
             name = n.strip()
-        from veles.core.layout.discovery import find_layout
+        from veles.sdk.layout import find_layout
 
         pack = find_layout(name, project=None)
         if pack is not None:
@@ -236,7 +241,7 @@ class Wiki:
         self.ensure_layout()
         body = content if content.lstrip().startswith("#") else f"# {title}\n\n{content}"
         if trust != "authoritative" or source_url is not None:
-            from veles.core.untrusted import trust_frontmatter
+            from veles.sdk.tools import trust_frontmatter
 
             if trust == "external":
                 frontmatter = trust_frontmatter(source_url or "", fetched=None)

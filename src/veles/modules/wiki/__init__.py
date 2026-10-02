@@ -2,7 +2,7 @@
 
 Extracted from `core/` (2026-06-19): the wiki is ONE optional content pattern,
 not a core principle (VISION §4/§5.2). It's active only when a layout pack
-enables `[layout.engines] wiki = true` (`core.layout.engines.wiki_enabled`).
+enables `[layout.engines] wiki = true` (`wiki.wiki_enabled`).
 
 Submodules:
 - `wiki`   — the `Wiki` store (write/read/search, INDEX/LOG, FTS reindex).
@@ -19,7 +19,12 @@ def register(api) -> None:
     """Everything the wiki engine adds to Veles, as contributions (release A)."""
     import importlib
 
-    from veles.core.contributions import (
+    from veles.modules.wiki import curator
+    from veles.modules.wiki.background import run_ingest_job
+    from veles.modules.wiki.dream import lint_step, reindex_step
+    from veles.modules.wiki.prompt import wiki_prompt
+    from veles.modules.wiki.recall import wiki_recall
+    from veles.sdk.contributions import (
         BackgroundOp,
         CuratorTarget,
         DreamStep,
@@ -27,11 +32,6 @@ def register(api) -> None:
         PageSource,
         ToolSet,
     )
-    from veles.modules.wiki import curator
-    from veles.modules.wiki.background import run_ingest_job
-    from veles.modules.wiki.dream import lint_step, reindex_step
-    from veles.modules.wiki.prompt import wiki_prompt
-    from veles.modules.wiki.recall import wiki_recall
 
     api.contribute("engine", "wiki", Engine("wiki"))
     api.contribute(

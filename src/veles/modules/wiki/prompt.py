@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from veles.core.layout.engines import wiki_enabled
-from veles.core.project import Project
+from veles.modules.wiki.wiki import wiki_enabled
+from veles.sdk import Project
 
 # Bounds for the wiki-layout workspace map.
 _WS_ROOT_LIMIT = 50
@@ -31,7 +31,7 @@ def wiki_prompt(project: Project, *, include_index: bool) -> list[str]:
     """Stable blocks, in order; none when the layout doesn't enable the engine."""
     if not wiki_enabled(project):
         return []
-    from veles.runtime.prompt import load_context_file
+    from veles.sdk.layout import load_context_file
 
     blocks: list[str] = []
     if include_index:

@@ -6,9 +6,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from veles.core.layout.manifest import LayoutManifest
-from veles.core.project import Project
-from veles.modules.wiki.wiki import Wiki, WikiPageInfo
+from veles.modules.wiki.wiki import Wiki, WikiPageInfo, wiki_enabled
+from veles.sdk import Project
+from veles.sdk.layout import LayoutManifest
 
 
 def prepare(project: Project) -> None:
@@ -38,8 +38,6 @@ def pages(project: Project) -> list[WikiPageInfo]:
 
 def self_doc(project: Project, content: str) -> str | None:
     """The `self_doc` contribution: `wiki/self-doc/overview.md` when the engine is on."""
-    from veles.core.layout.engines import wiki_enabled
-
     if not wiki_enabled(project):
         return None
     return Wiki(project.wiki_root).write_page(

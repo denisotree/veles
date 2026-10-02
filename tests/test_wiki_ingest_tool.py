@@ -62,7 +62,7 @@ def test_wiki_ingest_url_calls_fetch_and_writes(
         def fake_fetch(url: str, max_bytes: int = 200_000, **kwargs: Any) -> str:
             return f"# Fetched\n\nfrom {url}"
 
-        monkeypatch.setattr("veles.core.tools.builtin.fetch_url.fetch_url", fake_fetch)
+        monkeypatch.setattr("veles.sdk.tools.fetch_url", fake_fetch)
         from veles.modules.wiki.tools import wiki_ingest
 
         result = wiki_ingest("https://example.com/post")

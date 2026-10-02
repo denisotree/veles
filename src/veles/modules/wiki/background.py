@@ -10,7 +10,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from veles.core.project import Project
 from veles.modules.wiki.ingest import (
     INGEST_AGENT_SYSTEM_PROMPT,
     IngestOutcome,
@@ -18,6 +17,7 @@ from veles.modules.wiki.ingest import (
     ingest_user_message,
     run_batch_ingest,
 )
+from veles.sdk import Project
 
 # Per-project serialization of wiki-mutating ops (audit: cross-JOB dedup).
 # `JobRunner` runs up to `max_parallel` jobs — two concurrent recursive

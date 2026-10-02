@@ -6,14 +6,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from veles.core.layout.engines import wiki_enabled
-from veles.core.memory.artefacts import append_memory_log, write_proposal
-from veles.core.slug import now_timestamp_slug
-from veles.modules.wiki.wiki import Wiki
+from veles.modules.wiki.wiki import Wiki, wiki_enabled
+from veles.sdk import now_timestamp_slug
+from veles.sdk.memory import append_memory_log, write_proposal
 
 if TYPE_CHECKING:
-    from veles.core.dreaming import DreamResult
-    from veles.core.project import Project
+    from veles.sdk import Project
+    from veles.sdk.memory import DreamResult
 
 
 def lint_step(project: Project, result: DreamResult, *, dry_run: bool) -> None:

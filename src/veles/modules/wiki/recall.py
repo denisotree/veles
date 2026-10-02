@@ -7,11 +7,10 @@ per subproject — each child's own layout decides.
 
 from __future__ import annotations
 
-from veles.core.layout.engines import wiki_enabled
-from veles.core.memory.router import RecallHit
-from veles.core.project import Project, load_project
-from veles.core.subproject import load_subprojects, resolve_subproject_path
-from veles.modules.wiki.wiki import Wiki
+from veles.modules.wiki.wiki import Wiki, wiki_enabled
+from veles.sdk import Project, load_project
+from veles.sdk.layout import load_subprojects, resolve_subproject_path
+from veles.sdk.memory import RecallHit
 
 
 def wiki_recall(project: Project, query: str, *, limit: int) -> list[RecallHit]:

@@ -26,6 +26,7 @@ _RULES: dict[str, tuple[str, ...]] = {
     "veles.adapters": ("veles.cli", "veles.daemon", "veles.channels", "veles.tui", "veles.runtime"),
     "veles.mcp": ("veles.cli", "veles.daemon", "veles.channels", "veles.tui", "veles.runtime"),
     "veles.runtime": ("veles.cli", "veles.daemon", "veles.channels", "veles.tui"),
+    "veles.sdk": ("veles.cli", "veles.daemon", "veles.channels", "veles.tui"),
     "veles.modules": ("veles.cli", "veles.daemon", "veles.tui"),
     "veles.channels": ("veles.cli", "veles.daemon", "veles.tui"),
     "veles.daemon": ("veles.cli", "veles.tui"),

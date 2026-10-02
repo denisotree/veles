@@ -16,14 +16,9 @@ from __future__ import annotations
 import contextlib
 from pathlib import Path
 
-from veles.core.context import current_project
-from veles.core.path_guard import is_inside, resolve_safe
-from veles.core.risk import RiskClass
-from veles.core.slug import normalize_slug
-from veles.core.text import first_heading, shown
-from veles.core.tools.builtin.fs_write_guard import guard_write
-from veles.core.tools.registry import tool
 from veles.modules.wiki.wiki import Wiki
+from veles.sdk import current_project, first_heading, normalize_slug, shown
+from veles.sdk.tools import RiskClass, guard_write, is_inside, resolve_safe, tool
 
 
 def _default_wiki() -> Wiki:
@@ -241,12 +236,12 @@ def wiki_ingest(
     text: str
     fetched_url: str | None = None
     if source.startswith(("http://", "https://")):
-        from veles.core.tools.builtin.fetch_url import fetch_url
+        from veles.sdk.tools import fetch_url
 
         text = fetch_url(source)
         fetched_url = source
     else:
-        from veles.core.tools.builtin.read_file import read_file
+        from veles.sdk.tools import read_file
 
         text = read_file(source)
     inferred_title = title or first_heading(text) or source.rsplit("/", 1)[-1]
@@ -290,19 +285,19 @@ def wiki_add(source: str, recursive: bool = False, glob: str = "*") -> str:
     """
     from pathlib import Path
 
-    from veles.core.orchestration.delegation import (
-        MAX_DELEGATE_DEPTH,
-        current_delegate_depth,
-        current_subagent_factory,
-        enter_delegate,
-        exit_delegate,
-    )
     from veles.modules.wiki.ingest import (
         INGEST_AGENT_SYSTEM_PROMPT,
         IngestOutcome,
         batch_ingest_files,
         ingest_user_message,
         run_batch_ingest,
+    )
+    from veles.sdk.jobs import (
+        MAX_DELEGATE_DEPTH,
+        current_delegate_depth,
+        current_subagent_factory,
+        enter_delegate,
+        exit_delegate,
     )
 
     factory = current_subagent_factory()
@@ -330,7 +325,7 @@ def wiki_add(source: str, recursive: bool = False, glob: str = "*") -> str:
         # directory is a LONG job — submit a structured one-shot job and return
         # now; the daemon notifies + resumes this chat when it finishes. A plain
         # REPL turn (no origin) runs inline below.
-        from veles.core.context import current_origin
+        from veles.sdk import current_origin
 
         origin = current_origin()
         if origin:
@@ -346,7 +341,7 @@ def wiki_add(source: str, recursive: bool = False, glob: str = "*") -> str:
     worker_tools = _ingest_worker_tools()
 
     def spawn_one(path: Path) -> IngestOutcome:
-        from veles.core.orchestration.workers import spawn
+        from veles.sdk.jobs import spawn
 
         handle = spawn(
             "worker",
@@ -377,7 +372,7 @@ def _submit_background_ingest(src, glob: str, origin: str) -> str:
     "origin" is undeliverable from a detached/restarted job) and doubles as
     the SessionMap key the resume path uses. `resume_depth` carries the
     auto-resume loop guard."""
-    from veles.core.jobs_store import submit_oneshot_job
+    from veles.sdk.jobs import submit_oneshot_job
 
     project = current_project()
     if project is None:
@@ -400,8 +395,7 @@ def _ingest_worker_tools() -> list[str]:
     sub-delegation, intersected with the calling agent's own scope (S1 — a
     worker may never exceed its parent). `[ingest]` already has no
     `run_shell`/`fetch_url` (B1: ingested content is untrusted)."""
-    from veles.core.agent_state import current_toolset
-    from veles.core.tools.toolsets import TOOLSETS
+    from veles.sdk.tools import TOOLSETS, current_toolset
 
     base = [t for t in TOOLSETS["ingest"] if t not in ("wiki_add", "delegate")]
     parent = current_toolset()
