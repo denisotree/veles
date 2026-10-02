@@ -293,6 +293,31 @@ register_point(
 )
 
 
+@dataclass(frozen=True, slots=True)
+class SlashReply:
+    """What a module's slash command answers: `text` to show; `submit_prompt`, when
+    set, runs as the next agent turn; `error` marks the text as an error."""
+
+    text: str = ""
+    submit_prompt: str | None = None
+    error: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class SlashCommand:
+    """A REPL command `/<contribution name>`: `run(project, arg) -> SlashReply`.
+    Shown only where `engine` (if any) is on; builtin command names stay builtin."""
+
+    run: Callable[..., SlashReply]
+    summary: str = ""
+    usage: str = ""
+    engine: str | None = None
+
+
+# — consumer: cli/repl/slash/builtin.py (build_default_registry)
+register_point(Point("slash_command", kind=SlashCommand))
+
+
 def active(project: Project | None, point: str) -> list[Contribution]:
     """Contributions to `point` whose `engine` (if the object has one) is enabled."""
     from veles.core.layout.engines import engine_enabled
@@ -337,6 +362,8 @@ __all__ = [
     "PageSource",
     "PageStore",
     "Point",
+    "SlashCommand",
+    "SlashReply",
     "ToolSet",
     "active",
     "call_active",

@@ -214,59 +214,6 @@ def _history(line: str, ctx: SlashContext) -> SlashResult:
     return SlashResult.ok("\n".join(rows))
 
 
-# ---------------- wiki (M83) ----------------
-
-
-def _wiki(line: str, ctx: SlashContext) -> SlashResult:
-    """`/wiki add <path|url>` — agent ingests a source into the wiki.
-    `/wiki query <question>` — agent answers from the wiki using
-    wiki_search/wiki_read_page. Both delegate to the live agent turn so
-    the TUI doesn't fork a second runtime."""
-    from veles.core.layout.engines import wiki_enabled
-
-    if not wiki_enabled(ctx.project):
-        return SlashResult.err(
-            f"/wiki: the active layout pack {ctx.project.layout_name!r} does "
-            "not enable the wiki engine"
-        )
-    del ctx
-    if not line:
-        return SlashResult.err("/wiki: expected add <path|url> | query <question>")
-    parts = line.split(maxsplit=1)
-    sub = parts[0]
-    arg = parts[1].strip() if len(parts) > 1 else ""
-    if sub == "add":
-        return _wiki_add(arg)
-    if sub == "query":
-        return _wiki_query(arg)
-    return SlashResult.err(f"/wiki: unknown subcommand {sub!r}; try add/query")
-
-
-def _wiki_add(source: str) -> SlashResult:
-    from veles.modules.wiki.ingest import ingest_user_message
-
-    if not source:
-        return SlashResult.err("/wiki add needs a path or URL")
-    return SlashResult(
-        text=f"ingesting {source} into the wiki…",
-        submit_prompt=ingest_user_message(source),
-    )
-
-
-def _wiki_query(question: str) -> SlashResult:
-    if not question:
-        return SlashResult.err("/wiki query needs a question string")
-    prompt = (
-        f"Search the project wiki to answer: {question}\n\n"
-        "Use wiki_search and wiki_read_page tools to find relevant pages, "
-        "then summarize what we already know. Cite page paths in your reply."
-    )
-    return SlashResult(
-        text=f"querying wiki for: {question}",
-        submit_prompt=prompt,
-    )
-
-
 # ---------------- /model ----------------
 
 
@@ -605,13 +552,11 @@ def build_default_registry(project: Project | None = None) -> SlashRegistry:
     """Wires every shipped command. New phases extend the registry by
     importing this and calling `register` on the returned instance.
 
-    `/wiki` is registered only when the active layout enables the wiki engine
-    (so it never shows in `/help` or completion on bare/notes layouts). When
-    `project` is None (e.g. unit tests), the wiki command is kept — the
-    omission is opt-out, scoped to a project that explicitly has no wiki."""
-    from veles.core.layout.engines import wiki_enabled
-
-    wiki_on = project is None or wiki_enabled(project)
+    Module commands (`slash_command` contributions, e.g. the wiki's `/wiki`) come
+    last: an engine-bound one only where its engine is on (so it never shows in
+    `/help` or completion elsewhere). When `project` is None (e.g. unit tests),
+    every contributed command is kept."""
+    from veles.core.contributions import page_store
 
     reg = SlashRegistry()
 
@@ -629,19 +574,11 @@ def build_default_registry(project: Project | None = None) -> SlashRegistry:
     )
 
     save_summary = (
-        "save last answer as wiki/queries/<slug>.md"
-        if wiki_on
+        "save last answer as a page (queries/<slug>)"
+        if project is None or page_store(project) is not None
         else "save last answer to project memory"
     )
     reg.register("/save", _save, summary=save_summary, usage="/save <slug>")
-
-    if wiki_on:
-        reg.register(
-            "/wiki",
-            _wiki,
-            summary="add <path|url>: ingest a source · query <q>: answer from the wiki",
-            usage="/wiki add|query <arg>",
-        )
 
     reg.register("/model", _model, summary="show or set the active model", usage="/model [<id>]")
     reg.register(
@@ -677,4 +614,36 @@ def build_default_registry(project: Project | None = None) -> SlashRegistry:
     )
     reg.register("/daemon", _daemon, summary="open the daemon control panel")
 
+    _register_module_commands(reg, project)
     return reg
+
+
+def _register_module_commands(reg: SlashRegistry, project: Project | None) -> None:
+    import sys
+
+    from veles.core.contributions import SlashCommand, active, contributions
+
+    found = contributions("slash_command") if project is None else active(project, "slash_command")
+    taken = set(reg.names())
+    for c in found:
+        name = f"/{c.name}"
+        if name in taken:
+            print(
+                f"warning: module {c.module} can't add {name} — a builtin command has it",
+                file=sys.stderr,
+            )
+            continue
+        cmd = c.obj
+        assert isinstance(cmd, SlashCommand)
+        reg.register(name, _module_handler(cmd), summary=cmd.summary, usage=cmd.usage)
+
+
+def _module_handler(cmd: Any) -> Callable[[str, SlashContext], SlashResult]:
+    def handle(line: str, ctx: SlashContext) -> SlashResult:
+        try:
+            reply = cmd.run(ctx.project, line)
+        except Exception as exc:  # a module's bug must not end the REPL session
+            return SlashResult.err(f"{type(exc).__name__}: {exc}")
+        return SlashResult(text=reply.text, is_error=reply.error, submit_prompt=reply.submit_prompt)
+
+    return handle

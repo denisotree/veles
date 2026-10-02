@@ -24,6 +24,7 @@ def register(api) -> None:
     from veles.modules.wiki.dream import lint_step, reindex_step
     from veles.modules.wiki.prompt import wiki_prompt
     from veles.modules.wiki.recall import wiki_recall
+    from veles.modules.wiki.slash import wiki_command
     from veles.sdk.contributions import (
         BackgroundOp,
         CuratorTarget,
@@ -31,6 +32,7 @@ def register(api) -> None:
         Engine,
         PageSource,
         PageStore,
+        SlashCommand,
         ToolSet,
     )
 
@@ -59,6 +61,16 @@ def register(api) -> None:
         ),
     )
     api.contribute("subproject_source", "wiki", PageSource(pages=curator.pages, engine="wiki"))
+    api.contribute(
+        "slash_command",
+        "wiki",
+        SlashCommand(
+            run=wiki_command,
+            summary="add <path|url>: ingest a source · query <q>: answer from the wiki",
+            usage="/wiki add|query <arg>",
+            engine="wiki",
+        ),
+    )
     api.contribute(
         "page_store",
         "wiki",
