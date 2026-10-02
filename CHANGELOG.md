@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.4] — 2026-10-03
+
+A module can be a complete, reusable bundle: it ships its own skills and pulls the
+modules, layouts and skills it builds on. The new-project wizard offers registry layouts.
+
+### Added
+
+- A module ships skills in `skills/<name>/SKILL.md`; they mount for every project that loads
+  the module, below the project's and the user's own skills and above the layout's. They
+  belong to the module's approved tree — editing one keeps the module unloaded until it is
+  approved again.
+- Skills can be dependencies: `requires_extensions` lists modules, layouts and skills, and
+  installing a combined module installs the whole chain under one confirmation, in the
+  module's scope.
+- The new-project wizard (the one an agent command opens in a directory with no project)
+  lists the layouts in your cached registries next to the installed ones and installs the
+  pick — the full-screen wizard hands the terminal back for the confirmation. A layout that
+  can't be had leaves you with a `bare` project and the reason.
+
+### Fixed
+
+- `veles registry validate` checks that a dependency is a module, layout or skill (not an
+  `mcp` recipe) and resolves refs into connected registries; a ref into a registry that
+  isn't connected where it runs becomes a note for the reviewer.
+- A delegated `claude`/`gemini` CLI gets every tool of the project's loaded modules through
+  Veles' MCP server, not a fixed list of five wiki tools.
+- Installing a missing extension when a session starts loads only the new modules; already
+  loaded modules no longer run their entrypoint a second time.
+- An install that loses a race with another install of the same extension fails cleanly
+  instead of deleting the other one's copy.
+
 ## [1.2.3] — 2026-10-02
 
 `veles init` creates a bare project by default; the wiki engine and the `llm-wiki` and
