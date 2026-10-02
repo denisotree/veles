@@ -146,6 +146,28 @@ def test_validate_reports_unknown_and_cyclic_dependencies(tmp_path) -> None:
     assert "cycle" in errors
 
 
+def test_losing_an_install_race_never_deletes_the_winners_copy(remote, tmp_path) -> None:
+    """Install B passed its collision check, then sat at the confirmation prompt while
+    install A finished. B must fail and leave A's copy alone."""
+    project = init_project(tmp_path / "p", name="p", layout="bare")
+    found = resolve("alpha")
+    target = install_mod._target_dir(found, project, user_scope=False)
+
+    def winner_finishes_meanwhile(op: str, summary: str) -> bool:
+        target.mkdir(parents=True)
+        (target / "SKILL.md").write_text("winner\n", encoding="utf-8")
+        return True
+
+    token = set_critical_confirmer(winner_finishes_meanwhile)
+    try:
+        with pytest.raises(InstallError, match="already exists"):
+            install(found, project=project)
+    finally:
+        reset_critical_confirmer(token)
+    assert (target / "SKILL.md").read_text(encoding="utf-8") == "winner\n"
+    assert load_records() == []
+
+
 def test_validate_refuses_an_mcp_recipe_as_a_dependency(tmp_path) -> None:
     root = write_registry(tmp_path / "r", name="mine")
     write_extension(root, "g", "srv", kind="mcp", files={}, mcp='command = "x"')

@@ -26,7 +26,13 @@ from veles.core.registry.catalog import Found
 from veles.core.registry.gate import now_iso
 from veles.core.registry.hashing import copy_ignore, tree_sha256
 from veles.core.registry.model import EXTENSION_FILE
-from veles.core.registry.records import InstallRecord, drop_record, load_records, put_record
+from veles.core.registry.records import (
+    InstallRecord,
+    drop_record,
+    install_lock,
+    load_records,
+    put_record,
+)
 from veles.core.registry.repo import RegistryRepoError, fetch_git_source
 from veles.core.registry.versions import satisfies
 from veles.core.user_paths import user_home, user_modules_dir, user_skills_dir
@@ -91,14 +97,20 @@ def install(
     if to_confirm and not confirm_critical(op, "\n\n".join(describe(f) for f, _ in to_confirm)):
         raise InstallError("aborted")
     done: list[InstallRecord] = []
-    try:
-        for item, scope in plan:
-            done.append(_install_one(item, project, user_scope=scope))
-    except InstallError:
-        for rec in reversed(done):
-            with contextlib.suppress(InstallError):
-                remove_installed(rec)
-        raise
+    # ponytail: one global install lock — installs serialise across extensions too;
+    # per-target locks if that ever matters (installs are rare and user-driven).
+    with install_lock():
+        try:
+            for item, scope in plan:
+                # Re-checked under the lock: another install may have finished while
+                # this one waited at the confirmation prompt — its copy isn't ours.
+                _check_collision(item, project, user_scope=scope)
+                done.append(_install_one(item, project, user_scope=scope))
+        except InstallError:
+            for rec in reversed(done):
+                with contextlib.suppress(InstallError):
+                    remove_installed(rec)
+            raise
     return done[-1]
 
 
