@@ -225,7 +225,11 @@ def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
         raise ModuleLoadError(str(exc)) from exc
     if not file_path.is_file():
         raise ModuleLoadError(f"entrypoint file {str(file_path)!r} not found")
-    spec = importlib.util.spec_from_file_location(f"_veles_module_{handle.name}", file_path)
+    # The entrypoint is a package rooted at the module dir, so a multi-file module
+    # imports its own files relatively (`from .helpers import x`).
+    spec = importlib.util.spec_from_file_location(
+        f"_veles_module_{handle.name}", file_path, submodule_search_locations=[str(handle.dir)]
+    )
     if spec is None or spec.loader is None:
         raise ModuleLoadError(f"could not build import spec for {file_path}")
     module = importlib.util.module_from_spec(spec)
@@ -256,7 +260,8 @@ def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
         except ValueError as exc:
             raise ModuleLoadError(str(exc)) from exc
     except BaseException:
-        sys.modules.pop(spec.name, None)
+        for loaded in [m for m in sys.modules if m == spec.name or m.startswith(spec.name + ".")]:
+            sys.modules.pop(loaded, None)
         raise
 
 
