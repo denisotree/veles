@@ -4,6 +4,7 @@
 [project_wizard]
 intro_no_project = "No Veles project found at {cwd}."
 ask_initialize = "Initialize this directory as a Veles project? It will add `.veles/` and an `AGENTS.md` template, and index existing project files."
+ask_layout = "Layout"
 created_state = "  · created {state_dir} and AGENTS.md skeleton."
 ready = "<project '{name}' ready. edit AGENTS.md to add context.>"
 ask_provider_override = "Pin a project-specific provider/model? (default: inherit user-level)"

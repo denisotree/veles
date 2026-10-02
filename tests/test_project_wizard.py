@@ -310,3 +310,42 @@ def test_maybe_wrapper_threads_suppress_flag_into_tui(
 
     pw.maybe_run_project_wizard(_args(_suppress_wizard_daemon_autostart=True), tmp_cwd)
     assert captured.get("autostart_daemon") is False
+
+
+# ---------------- layout ----------------
+
+
+def _user_pack(name: str) -> None:
+    from veles.core.user_paths import user_home
+
+    pack = user_home() / "layouts" / name
+    pack.mkdir(parents=True)
+    (pack / "layout.toml").write_text(
+        f'[layout]\nname = "{name}"\ndescription = "d"\n', encoding="utf-8"
+    )
+
+
+def test_wizard_asks_for_a_layout_when_there_is_a_choice(tmp_cwd: Path) -> None:
+    _user_pack("journal")
+    token = pw.set_project_wizard_prompter(_scripted(["y", "journal", "n", "n"]))
+    try:
+        project = pw.run_project_wizard(tmp_cwd)
+    finally:
+        pw.reset_project_wizard_prompter(token)
+    assert project is not None and project.layout_name == "journal"
+
+
+def test_wizard_falls_back_to_bare_when_the_layout_cannot_be_had(
+    tmp_cwd: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    from veles.core.registry import ensure
+
+    monkeypatch.setattr(ensure, "available_layouts", lambda: ["bare", "llm-wiki"])
+    monkeypatch.setattr(ensure, "ensure_layout", lambda name, *, interactive: False)
+    token = pw.set_project_wizard_prompter(_scripted(["y", "llm-wiki", "n", "n"]))
+    try:
+        project = pw.run_project_wizard(tmp_cwd)
+    finally:
+        pw.reset_project_wizard_prompter(token)
+    assert project is not None and project.layout_name == "bare"
+    assert "llm-wiki" in capsys.readouterr().err

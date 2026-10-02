@@ -6,9 +6,11 @@ user-level wizard's shape: pre-Textual stdin prompts, ContextVar-backed
 prompter for tests, every step opt-in with skip-by-default.
 
 Steps (each gated by its own y/N, default `n` = skip):
-  1. Bootstrap — confirm + run `init_project(cwd)`. This step is the
-     wizard's gate; declining returns None and the caller exits with
-     the standard "no project found" error.
+  1. Bootstrap — confirm, pick a layout (asked only when there is more
+     than one; a registry layout is installed now, or the default is used),
+     then `init_project(cwd, layout=...)`. This step is the wizard's gate;
+     declining returns None and the caller exits with the standard "no
+     project found" error.
   2. Provider override — optional `.veles/config.toml` `[engine]` block.
      Default = inherit from user-level config.
   3. Channel — optional. Pick a type from the platform registry (M172),
@@ -31,7 +33,7 @@ from pathlib import Path
 
 from veles.cli.wizard import _ask_choice, _default_prompter
 from veles.core.i18n import t
-from veles.core.project import Project, ProjectAlreadyExists, init_project
+from veles.core.project import LAYOUT_DEFAULT, Project, ProjectAlreadyExists, init_project
 from veles.core.project_config import (
     load_project_config as _load_project_toml,
 )
@@ -95,8 +97,9 @@ def run_project_wizard(cwd: Path) -> Project | None:
     if not _ask_yes_no(prompter, t("project_wizard.ask_initialize"), default=True):
         return None
 
+    layout = _step_layout(prompter)
     try:
-        project = init_project(cwd, name=None, force=False)
+        project = init_project(cwd, name=None, force=False, layout=layout)
     except ProjectAlreadyExists:
         # Race: someone created `.veles/` since the gate; load and continue.
         from veles.core.project import load_project
@@ -112,6 +115,19 @@ def run_project_wizard(cwd: Path) -> Project | None:
 
 
 # ---------------- steps ----------------
+
+
+def _step_layout(prompter: Prompter) -> str:
+    """Which layout pack the project gets. Asked only when there is a choice; a
+    registry layout is offered for install, and one that can't be had falls back
+    to the default."""
+    from veles.core.registry import ensure
+
+    choices = tuple(ensure.available_layouts())
+    if len(choices) < 2:
+        return LAYOUT_DEFAULT
+    layout = _ask_choice(prompter, t("project_wizard.ask_layout"), choices, default=LAYOUT_DEFAULT)
+    return ensure.layout_or_default(layout, interactive=True)
 
 
 def _step_provider_override(project: Project, prompter: Prompter) -> None:
