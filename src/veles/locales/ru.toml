@@ -4,6 +4,7 @@
 [project_wizard]
 intro_no_project = "В {cwd} не найден проект Veles."
 ask_initialize = "Инициализировать данную директорию как проект Veles? Добавятся дополнительные файлы (.veles/ + AGENTS.md), а файлы проекта будут проиндексированы"
+ask_layout = "Раскладка"
 created_state = "  · создан {state_dir}, написан AGENTS.md skeleton."
 ready = "<проект '{name}' готов. Отредактируй AGENTS.md, чтобы добавить контекст.>"
 ask_provider_override = "Закрепить provider/модель за проектом? (по умолчанию: наследовать user-level)"

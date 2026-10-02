@@ -97,6 +97,28 @@ def ensure_project_extensions(project: Project, *, interactive: bool) -> bool:
     return installed
 
 
+def ensure_layout(name: str, *, interactive: bool) -> bool:
+    """True when layout `name` is installed, or got installed now (offered at a
+    terminal, with its dependencies)."""
+    from veles.core.layout.discovery import find_layout
+
+    if find_layout(name, None) is not None:
+        return True
+    return ensure_extension(LayoutNeed(name), None, interactive=interactive)
+
+
+def layout_or_default(name: str, *, interactive: bool) -> str:
+    """The layout a new project gets when the user picked `name` in a wizard:
+    `name` when it is here or got installed now, else the default (said aloud —
+    `ensure_extension` has already printed why and how to install it)."""
+    from veles.core.project import LAYOUT_DEFAULT
+
+    if name == LAYOUT_DEFAULT or ensure_layout(name, interactive=interactive):
+        return name
+    print(f"Creating a {LAYOUT_DEFAULT!r} project instead of {name!r}.", file=sys.stderr)
+    return LAYOUT_DEFAULT
+
+
 def install_hint(project: Project) -> str | None:
     """`veles registry install …` for the project's missing layout or engines, or
     None when nothing is missing. For error messages."""
@@ -185,8 +207,10 @@ __all__ = [
     "LayoutNeed",
     "available_layouts",
     "ensure_extension",
+    "ensure_layout",
     "ensure_project_extensions",
     "install_hint",
+    "layout_or_default",
     "needs_for",
     "ref_for",
 ]

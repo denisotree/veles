@@ -238,8 +238,14 @@ def _cleanup_backup(backup: _Backup) -> None:
 
 
 def _restore(rec: InstallRecord, backup: _Backup) -> None:
-    from veles.core.registry.records import put_record
+    from veles.core.registry.records import load_records, put_record
 
+    if any(r.path == rec.path for r in load_records()):
+        # Another install of this extension finished between our remove and our
+        # install — its copy and record are not ours to replace. (A copy left by
+        # an interrupted install of ours has no record, and is replaced below.)
+        _cleanup_backup(backup)
+        return
     if backup.dir is not None:
         shutil.rmtree(rec.path, ignore_errors=True)
         backup.dir.rename(rec.path)

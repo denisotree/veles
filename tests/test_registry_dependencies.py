@@ -144,3 +144,119 @@ def test_validate_reports_unknown_and_cyclic_dependencies(tmp_path) -> None:
     errors = "\n".join(validate_registry(root).errors)
     assert "mine:g/nope" in errors
     assert "cycle" in errors
+
+
+def test_losing_an_install_race_never_deletes_the_winners_copy(remote, tmp_path) -> None:
+    """Install B passed its collision check, then sat at the confirmation prompt while
+    install A finished. B must fail and leave A's copy alone."""
+    project = init_project(tmp_path / "p", name="p", layout="bare")
+    found = resolve("alpha")
+    target = install_mod._target_dir(found, project, user_scope=False)
+
+    def winner_finishes_meanwhile(op: str, summary: str) -> bool:
+        target.mkdir(parents=True)
+        (target / "SKILL.md").write_text("winner\n", encoding="utf-8")
+        return True
+
+    token = set_critical_confirmer(winner_finishes_meanwhile)
+    try:
+        with pytest.raises(InstallError, match="already exists"):
+            install(found, project=project)
+    finally:
+        reset_critical_confirmer(token)
+    assert (target / "SKILL.md").read_text(encoding="utf-8") == "winner\n"
+    assert load_records() == []
+
+
+def _module_named(name: str) -> dict[str, str]:
+    return {**_MODULE_FILES, "module.toml": _MODULE_FILES["module.toml"].replace("engine", name)}
+
+
+def _combined_remote(tmp_path: Path) -> None:
+    """`suite` (module) needs `base` (module), which needs the skill `helper`;
+    the layout `pack` needs `helper` too."""
+    root = tmp_path / "combined"
+    make_git_registry(root, skills=("helper",))
+    needs_helper = 'requires_extensions = ["private:official/helper"]'
+    write_extension(
+        root, "official", "base", kind="module", files=_module_named("base"), extra_ext=needs_helper
+    )
+    write_extension(
+        root,
+        "official",
+        "suite",
+        kind="module",
+        files=_module_named("suite"),
+        extra_ext='requires_extensions = ["private:official/base"]',
+    )
+    write_extension(
+        root, "official", "pack", kind="layout", files=_LAYOUT_FILES, extra_ext=needs_helper
+    )
+    commit_all(root, "combined")
+    remove_source("public")
+    add_source(str(root))
+
+
+def test_a_module_pulls_the_skill_it_needs_into_the_project(tmp_path, asked) -> None:
+    _combined_remote(tmp_path)
+    project = init_project(tmp_path / "p", name="p", layout="bare")
+    install(resolve("base"), project=project)
+    assert _names() == {"base", "helper"}
+    assert (project.skills_dir / "helper").is_dir()
+    assert len(asked) == 1
+
+
+def test_a_combined_module_pulls_its_chain_for_the_user(tmp_path, asked) -> None:
+    _combined_remote(tmp_path)
+    project = init_project(tmp_path / "p", name="p", layout="bare")
+    install(resolve("suite"), project=project, user_scope=True)
+    assert _names() == {"suite", "base", "helper"}
+    assert (user_modules_dir() / "base").is_dir()
+    assert (user_home() / "skills" / "helper").is_dir()
+    assert len(asked) == 1
+
+
+def test_a_layout_pulls_the_skill_it_needs_for_the_user(tmp_path, asked) -> None:
+    _combined_remote(tmp_path)
+    project = init_project(tmp_path / "p", name="p", layout="bare")
+    install(resolve("pack"), project=project)
+    assert _names() == {"pack", "helper"}
+    assert (user_home() / "skills" / "helper").is_dir()
+    assert len(asked) == 1
+
+
+def test_validate_refuses_an_mcp_recipe_as_a_dependency(tmp_path) -> None:
+    root = write_registry(tmp_path / "r", name="mine")
+    write_extension(root, "g", "srv", kind="mcp", files={}, mcp='command = "x"')
+    write_extension(root, "g", "s")  # a skill
+    write_extension(root, "g", "m", kind="module", files=_MODULE_FILES)
+    write_extension(root, "g", "a", extra_ext='requires_extensions = ["mine:g/srv"]')
+    write_extension(root, "g", "b", extra_ext='requires_extensions = ["mine:g/m", "mine:g/s"]')
+    errors = validate_registry(root).errors
+    assert any(
+        e.startswith("g/a:") and "only a module, a layout or a skill" in e for e in errors
+    ), errors
+    assert not any(e.startswith("g/b:") for e in errors), errors
+
+
+def test_validate_checks_refs_into_a_connected_registry(tmp_path) -> None:
+    other = tmp_path / "other"
+    make_git_registry(other, skills=("alpha",))
+    write_extension(other, "official", "engine", kind="module", files=_MODULE_FILES)
+    commit_all(other, "engine")
+    remove_source("public")
+    add_source(str(other))  # connected as `private`
+    root = write_registry(tmp_path / "r", name="mine")
+    write_extension(root, "g", "ok", extra_ext='requires_extensions = ["private:official/engine"]')
+    write_extension(root, "g", "sk", extra_ext='requires_extensions = ["private:official/alpha"]')
+    write_extension(root, "g", "gone", extra_ext='requires_extensions = ["private:official/nope"]')
+    write_extension(root, "g", "far", extra_ext='requires_extensions = ["acme:g/x"]')
+    report = validate_registry(root)
+    errors = "\n".join(report.errors)
+    assert "g/ok:" not in errors
+    assert "g/sk:" not in errors  # a skill in another registry is a valid dependency
+    assert "g/gone:" in errors and "private:official/nope" in errors
+    # A registry this environment doesn't connect can't be checked: a reviewer
+    # note, not a failure (a company registry is connected under any local name).
+    assert "acme:g/x" not in errors
+    assert any("acme:g/x" in r and "not connected" in r for r in report.review), report.review

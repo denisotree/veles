@@ -191,3 +191,23 @@ def test_ambiguous_engine_providers_install_nothing(
     assert fake_install == []
     err = capsys.readouterr().err
     assert "a:x/g" in err and "b:y/g" in err
+
+
+def test_ensure_layout_true_for_an_installed_pack(home) -> None:
+    assert ensure.ensure_layout("bare", interactive=False) is True
+
+
+def test_ensure_layout_offers_a_missing_pack(home, monkeypatch) -> None:
+    seen: list[object] = []
+    monkeypatch.setattr(
+        ensure, "ensure_extension", lambda need, project, *, interactive: seen.append(need) or True
+    )
+    assert ensure.ensure_layout("journal", interactive=True) is True
+    assert seen == [LayoutNeed("journal")]
+
+
+def test_layout_or_default_falls_back_and_says_so(home, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(ensure, "ensure_layout", lambda name, *, interactive: False)
+    assert ensure.layout_or_default("llm-wiki", interactive=True) == "bare"
+    assert "llm-wiki" in capsys.readouterr().err
+    assert ensure.layout_or_default("bare", interactive=True) == "bare"

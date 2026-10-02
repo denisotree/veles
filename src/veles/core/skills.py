@@ -80,7 +80,11 @@ def discover_skills(
     Resolution order, highest priority first:
       1. `<project>/.veles/skills/`           (scope = "project")
       2. `~/.veles/skills/`                   (scope = "user")
-      3. Active layout-pack's `skills/`       (scope = "builtin", M117b)
+      3. Loaded modules' `skills/`            (scope = "builtin", 1.2.4)
+      4. Active layout-pack's `skills/`       (scope = "builtin", M117b)
+      5. Veles' builtin skills                (scope = "builtin", M120b)
+
+    Levels 3–5 mount only with `include_layout=True`.
 
     The `include_layout` toggle defaults False to preserve the M40 era
     contract (discover_skills returns only on-disk user-or-project
@@ -148,16 +152,10 @@ def _discover_skills_uncached(
         merged.append(s)
         seen.add(s.name)
     if include_layout:
-        for s in mount_layout_skills(project):
-            if s.name in seen:
-                continue
-            merged.append(s)
-            seen.add(s.name)
-        # M120b: builtin Veles skills (tool_authoring, tool_installer)
-        # mount alongside the layout-pack so they're available
-        # regardless of which layout the project picked. They're at
-        # the same lowest priority — project/user overrides win.
-        for s in mount_builtin_skills():
+        # Below the project's and user's own: the loaded modules' skills, then the
+        # layout-pack's, then (M120b) Veles' builtin skills (tool_authoring,
+        # tool_installer), available whichever layout the project picked.
+        for s in [*mount_module_skills(), *mount_layout_skills(project), *mount_builtin_skills()]:
             if s.name in seen:
                 continue
             merged.append(s)
@@ -201,6 +199,20 @@ def _apply_db_telemetry(project: Project, skills: list[Skill]) -> None:
                     skill.last_used = utc_iso(float(t.last_used_at))
     except Exception:  # pragma: no cover - never block skill discovery
         logger.debug("skill telemetry overlay failed", exc_info=True)
+
+
+def mount_module_skills() -> list[Skill]:
+    """Skills the loaded modules ship under `skills/<name>/SKILL.md`, in load order.
+    Read-only like a layout's: they are part of the module's approved tree."""
+    from veles.core.modules import current_module_registry
+
+    reg = current_module_registry()
+    if reg is None:
+        return []
+    out: list[Skill] = []
+    for d in reg.module_dirs.values():
+        out += _discover_in_dir(d / "skills", scope="builtin")
+    return out
 
 
 def mount_layout_skills(project: Project) -> list[Skill]:
