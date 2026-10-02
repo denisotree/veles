@@ -7,9 +7,10 @@ REPL doesn't fork a second runtime."""
 
 from __future__ import annotations
 
-from veles.modules.wiki.ingest import ingest_user_message
 from veles.sdk import Project
 from veles.sdk.contributions import SlashReply
+
+from .ingest import ingest_user_message
 
 
 def wiki_command(project: Project, line: str) -> SlashReply:

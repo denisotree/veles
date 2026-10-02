@@ -6,8 +6,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from veles.modules.wiki.wiki import wiki_enabled
 from veles.sdk import Project
+
+from .wiki import wiki_enabled
 
 # Bounds for the wiki-layout workspace map.
 _WS_ROOT_LIMIT = 50

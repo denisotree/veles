@@ -11,21 +11,12 @@ Submodules:
 - `ingest` — ingest user-message template (system prompt is the run prompt, M203).
 """
 
-from veles.modules.wiki.ingest import ingest_user_message
-from veles.modules.wiki.wiki import Wiki, WikiPageInfo
+from .ingest import ingest_user_message
+from .wiki import Wiki, WikiPageInfo
 
 
 def register(api) -> None:
     """Everything the wiki engine adds to Veles, as contributions (release A)."""
-    import importlib
-
-    from veles.modules.wiki import curator
-    from veles.modules.wiki.background import run_ingest_job
-    from veles.modules.wiki.cli import ADD_COMMAND
-    from veles.modules.wiki.dream import lint_step, reindex_step
-    from veles.modules.wiki.prompt import wiki_prompt
-    from veles.modules.wiki.recall import wiki_recall
-    from veles.modules.wiki.slash import wiki_command
     from veles.sdk.contributions import (
         BackgroundOp,
         CuratorTarget,
@@ -37,12 +28,20 @@ def register(api) -> None:
         ToolSet,
     )
 
+    from . import curator
+    from .background import run_ingest_job
+    from .cli import ADD_COMMAND
+    from .dream import lint_step, reindex_step
+    from .prompt import wiki_prompt
+    from .recall import wiki_recall
+    from .slash import wiki_command
+
     api.contribute("engine", "wiki", Engine("wiki"))
     api.contribute(
         "tool",
         "wiki",
         ToolSet(
-            load=lambda: importlib.import_module("veles.modules.wiki.tools"),
+            load=_load_tools,
             tools=WIKI_TOOLS,
             engine="wiki",
         ),
@@ -84,6 +83,12 @@ def register(api) -> None:
         "ingest",
         BackgroundOp(kind="ingest", toolset="ingest", run=run_ingest_job),
     )
+
+
+def _load_tools() -> None:
+    """Import the `@tool` definitions (registers them) — only for projects whose
+    layout enables the engine."""
+    from . import tools  # noqa: F401
 
 
 # The wiki engine's agent tools — present only when the layout enables the engine.

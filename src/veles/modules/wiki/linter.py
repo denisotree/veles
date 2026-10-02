@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from veles.modules.wiki.wiki import Wiki, WikiPageInfo
+    from .wiki import Wiki, WikiPageInfo
 
 
 _DEFAULT_STALE_DAYS = 365
@@ -154,7 +154,7 @@ def find_broken_links(wiki: Wiki) -> list[LintFinding]:
     to every check Veles had. That blind spot let an agent report a passing
     cross-link audit while 102 of its 159 links were broken.
     """
-    from veles.modules.wiki.links import unresolved_links
+    from .links import unresolved_links
 
     pages = wiki.list_pages()
     known = {p.rel_path.rsplit("/", 1)[-1].removesuffix(".md") for p in pages}

@@ -6,9 +6,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from veles.modules.wiki.wiki import Wiki, wiki_enabled
 from veles.sdk import now_timestamp_slug
 from veles.sdk.memory import append_memory_log, write_proposal
+
+from .wiki import Wiki, wiki_enabled
 
 if TYPE_CHECKING:
     from veles.sdk import Project
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
 def lint_step(project: Project, result: DreamResult, *, dry_run: bool) -> None:
     if not wiki_enabled(project):
         return
-    from veles.modules.wiki.linter import render_report, run_lint
+    from .linter import render_report, run_lint
 
     report = run_lint(Wiki(project.wiki_root))
     result.lint_findings = len(report.all_findings)

@@ -6,9 +6,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from veles.modules.wiki.wiki import Wiki, WikiPageInfo
 from veles.sdk import Project
 from veles.sdk.layout import LayoutManifest
+
+from .wiki import Wiki, WikiPageInfo
 
 
 def prepare(project: Project) -> None:

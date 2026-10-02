@@ -1,6 +1,7 @@
 """The wiki module imports Veles only through `veles.sdk` — the same rule
 `veles registry validate` enforces on registry modules, checked here before the
-wiki moves to the registry."""
+wiki moves to the registry. Its own files are imported relatively: in the
+registry it loads as `_veles_module_wiki`, not `veles.modules.wiki`."""
 
 from __future__ import annotations
 
@@ -8,7 +9,7 @@ import ast
 from pathlib import Path
 
 _MODULE = Path(__file__).resolve().parent.parent / "src" / "veles" / "modules" / "wiki"
-_ALLOWED = ("veles.sdk", "veles.modules.wiki")
+_ALLOWED = ("veles.sdk",)
 
 
 def _allowed(name: str) -> bool:

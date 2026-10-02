@@ -11,16 +11,17 @@ import argparse
 import sys
 from pathlib import Path
 
-from veles.modules.wiki.ingest import (
+from veles.sdk import Project
+from veles.sdk.contributions import CliCommand, CommandHost
+from veles.sdk.tools import TOOLSETS
+
+from .ingest import (
     IngestOutcome,
     batch_ingest_files,
     ingest_user_message,
     run_batch_ingest,
 )
-from veles.modules.wiki.wiki import Wiki, wiki_enabled
-from veles.sdk import Project
-from veles.sdk.contributions import CliCommand, CommandHost
-from veles.sdk.tools import TOOLSETS
+from .wiki import Wiki, wiki_enabled
 
 # Used only if the run prompt assembles empty (it always carries at least the
 # identity header). It still states the content-aware contract, never a 1:1 dump.

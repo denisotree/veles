@@ -16,9 +16,10 @@ from __future__ import annotations
 import contextlib
 from pathlib import Path
 
-from veles.modules.wiki.wiki import Wiki
 from veles.sdk import current_project, first_heading, normalize_slug, shown
 from veles.sdk.tools import RiskClass, guard_write, is_inside, resolve_safe, tool
+
+from .wiki import Wiki
 
 
 def _default_wiki() -> Wiki:
@@ -102,7 +103,7 @@ def wiki_write_page(category: str, slug: str, title: str, content: str) -> str:
     # audit its own links credibly — one wrote "all resolve … NONE unresolved"
     # into LOG.md while 102 of 159 were broken, and the CHECK advisor believed
     # it. Checked AFTER the write so a page may legitimately link to itself.
-    from veles.modules.wiki.links import render_link_warning
+    from .links import render_link_warning
 
     unresolved, total = wiki.check_links(content)
     return f"wrote {rel}" + render_link_warning(unresolved, total=total)
@@ -119,7 +120,7 @@ def wiki_add_category(name: str) -> str:
     created. Nested paths like `projects/work` are allowed. After this,
     `wiki_write_page(category="<name>", …)` works. Idempotent.
     """
-    from veles.modules.wiki.wiki import add_project_category
+    from .wiki import add_project_category
 
     proj = current_project()
     if proj is None:
@@ -285,19 +286,20 @@ def wiki_add(source: str, recursive: bool = False, glob: str = "*") -> str:
     """
     from pathlib import Path
 
-    from veles.modules.wiki.ingest import (
-        INGEST_AGENT_SYSTEM_PROMPT,
-        IngestOutcome,
-        batch_ingest_files,
-        ingest_user_message,
-        run_batch_ingest,
-    )
     from veles.sdk.jobs import (
         MAX_DELEGATE_DEPTH,
         current_delegate_depth,
         current_subagent_factory,
         enter_delegate,
         exit_delegate,
+    )
+
+    from .ingest import (
+        INGEST_AGENT_SYSTEM_PROMPT,
+        IngestOutcome,
+        batch_ingest_files,
+        ingest_user_message,
+        run_batch_ingest,
     )
 
     factory = current_subagent_factory()
