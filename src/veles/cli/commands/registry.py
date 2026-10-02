@@ -145,7 +145,7 @@ def _upgrade(args: argparse.Namespace, project: Project | None) -> int:
     rc = 0
     for name in names:
         try:
-            rec = upgrade(name, project=project)
+            rec = upgrade(name, project=project, user_scope=_scope(args))
         except _ERRORS as exc:
             print(f"{name}: error: {shown(exc)}", file=sys.stderr)
             rc = 1
@@ -155,9 +155,16 @@ def _upgrade(args: argparse.Namespace, project: Project | None) -> int:
 
 
 def _uninstall(args: argparse.Namespace, project: Project | None) -> int:
-    rec = uninstall(args.name, project=project)
+    rec = uninstall(args.name, project=project, force=args.force, user_scope=_scope(args))
     print(f"<removed {rec.kind} {rec.name!r}>", file=sys.stderr)
     return 0
+
+
+def _scope(args: argparse.Namespace) -> bool | None:
+    """`--user` → the user-level install, `--project` → this project's, neither → either."""
+    if getattr(args, "user", False):
+        return True
+    return False if getattr(args, "project", False) else None
 
 
 def _verify(args: argparse.Namespace, project: Project | None) -> int:

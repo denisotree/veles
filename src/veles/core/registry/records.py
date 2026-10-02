@@ -30,6 +30,9 @@ class InstallRecord:
     version: str = ""
     commit: str = ""
     installed_at: str = ""
+    # Refs of the extensions this one needs (`requires_extensions`), so uninstall
+    # can refuse to pull one out from under it.
+    requires_extensions: tuple[str, ...] = ()
 
 
 def _store_path() -> Path:
@@ -46,8 +49,11 @@ def load_records() -> list[InstallRecord]:
     for item in raw:
         if not isinstance(item, dict):
             continue
+        fields = {k: v for k, v in item.items() if k in names}
+        if isinstance(fields.get("requires_extensions"), list):
+            fields["requires_extensions"] = tuple(fields["requires_extensions"])
         try:
-            out.append(InstallRecord(**{k: v for k, v in item.items() if k in names}))
+            out.append(InstallRecord(**fields))
         except TypeError:
             continue
     return out

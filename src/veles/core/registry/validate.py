@@ -101,6 +101,7 @@ def validate_registry(
                 f"duplicate name {ext.name!r}: {ext.group}/ and {seen[ext.name].group}/"
             )
         seen.setdefault(ext.name, ext)
+    report.errors += _check_dependencies(entries, meta.name)
     touched: frozenset[str] = frozenset()
     if base is None:
         targets = entries
@@ -133,6 +134,32 @@ def validate_registry(
     finally:
         shutil.rmtree(root / ".tmp" / "validate", ignore_errors=True)
     return report
+
+
+def _check_dependencies(entries: list[Extension], registry: str) -> list[str]:
+    """Every `requires_extensions` ref into this registry names a real extension,
+    and those refs form no cycle. Refs into other registries can't be checked here."""
+    by_ref = {f"{registry}:{e.group}/{e.name}": e for e in entries}
+    errors: list[str] = []
+    for ext in by_ref.values():
+        for dep in ext.requires_extensions:
+            if dep.startswith(f"{registry}:") and dep not in by_ref:
+                errors.append(f"{ext.group}/{ext.name}: requires_extensions: no extension {dep}")
+    done: set[str] = set()
+
+    def visit(ref: str, stack: list[str]) -> None:
+        if ref in stack:
+            errors.append(f"requires_extensions cycle: {' → '.join([*stack, ref])}")
+            return
+        if ref in done or ref not in by_ref:
+            return
+        for dep in by_ref[ref].requires_extensions:
+            visit(dep, [*stack, ref])
+        done.add(ref)
+
+    for ref in by_ref:
+        visit(ref, [])
+    return errors
 
 
 def _check(

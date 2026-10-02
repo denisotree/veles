@@ -127,10 +127,10 @@ def test_upgrade_all_isolates_failures(tmp_path: Path, capsys, monkeypatch) -> N
 
     real_upgrade = registry_cmd.upgrade
 
-    def flaky(name, *, project):
+    def flaky(name, *, project, user_scope=None):
         if name == "alpha":
             raise InstallError("boom")
-        return real_upgrade(name, project=project)
+        return real_upgrade(name, project=project, user_scope=user_scope)
 
     monkeypatch.setattr(registry_cmd, "upgrade", flaky)
 

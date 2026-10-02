@@ -8,6 +8,7 @@ does not.
 
 from __future__ import annotations
 
+import contextlib
 import shutil
 from pathlib import Path
 
@@ -49,6 +50,8 @@ def describe(found: Found) -> str:
         lines.append(f"  provides: {', '.join(ext.provides)}")
     if ext.requires:
         lines.append(f"  pip requirements: {', '.join(ext.requires)}")
+    if ext.requires_extensions:
+        lines.append(f"  needs: {', '.join(ext.requires_extensions)}")
     if ext.kind == "module":
         lines.append("  A module's code runs inside Veles on every turn. Review it first.")
     if ext.kind == "mcp" and ext.mcp is not None:
@@ -72,6 +75,68 @@ def install(
     force: bool = False,
     confirmed: bool = False,
 ) -> InstallRecord:
+    """Install `found` plus whatever it `requires_extensions` that isn't installed
+    yet — dependencies first, one confirmation for the whole set; a failure removes
+    everything this call installed. Returns `found`'s record."""
+    plan = _plan(found, project, user_scope=user_scope)
+    for item, scope in plan:
+        _preflight(item, project, user_scope=scope, force=force)
+    deps = len(plan) - 1
+    op = f"install {found.ref} {found.ext.version}" + (
+        f" (+ {deps} dependenc{'y' if deps == 1 else 'ies'})" if deps else ""
+    )
+    # `confirmed`: the caller already showed `found` itself (e.g. `upgrade`) — a
+    # dependency it never saw is still asked about.
+    to_confirm = plan[:-1] if confirmed else plan
+    if to_confirm and not confirm_critical(op, "\n\n".join(describe(f) for f, _ in to_confirm)):
+        raise InstallError("aborted")
+    done: list[InstallRecord] = []
+    try:
+        for item, scope in plan:
+            done.append(_install_one(item, project, user_scope=scope))
+    except InstallError:
+        for rec in reversed(done):
+            with contextlib.suppress(InstallError):
+                remove_installed(rec)
+        raise
+    return done[-1]
+
+
+def record_ref(rec: InstallRecord) -> str | None:
+    return f"{rec.registry}:{rec.group}/{rec.name}" if rec.registry else None
+
+
+def _plan(found: Found, project: Project | None, *, user_scope: bool) -> list[tuple[Found, bool]]:
+    """`found` and its missing dependencies, dependencies first, each with its scope.
+    A layout is user-level, so what it needs is installed for the user too."""
+    from veles.core.registry.catalog import ResolveError, resolve
+
+    have = {record_ref(r) for r in installed_records(project)}
+    order: list[tuple[Found, bool]] = []
+    planned: set[str] = set()
+
+    def visit(item: Found, stack: list[str], scope: bool) -> None:
+        if item.ref in stack:
+            raise InstallError(f"dependency cycle: {' → '.join([*stack, item.ref])}")
+        if item.ref in planned:
+            return
+        dep_scope = scope or item.ext.kind == "layout"
+        for ref in item.ext.requires_extensions:
+            if ref in have:
+                continue
+            try:
+                dep = resolve(ref)
+            except ResolveError as exc:
+                raise InstallError(f"{item.ref} needs {ref}: {exc}") from exc
+            visit(dep, [*stack, item.ref], dep_scope)
+        planned.add(item.ref)
+        order.append((item, scope))
+
+    visit(found, [], user_scope)
+    return order
+
+
+def _preflight(found: Found, project: Project | None, *, user_scope: bool, force: bool) -> None:
     ext = found.ext
     if ext.yanked and not force:
         raise InstallError(f"{found.ref} is yanked: {ext.yanked} (pass --force to install anyway)")
@@ -89,10 +154,10 @@ def install(
     # Cheap collision checks run before the confirmation prompt — no point asking the
     # user to confirm an install that is going to fail on a name clash anyway.
     _check_collision(found, project, user_scope=user_scope)
-    if not confirmed and not confirm_critical(
-        f"install {found.ref} {ext.version}", describe(found)
-    ):
-        raise InstallError("aborted")
+
+
+def _install_one(found: Found, project: Project | None, *, user_scope: bool) -> InstallRecord:
+    ext = found.ext
     if ext.kind == "mcp":
         assert project is not None
         return _install_mcp(found, project)
@@ -142,23 +207,42 @@ def installed_records(project: Project | None) -> list[InstallRecord]:
     return [r for r in load_records() if r.project in (None, root)]
 
 
-def resolve_one_record(name: str, *, project: Project | None) -> InstallRecord:
+def resolve_one_record(
+    name: str, *, project: Project | None, user_scope: bool | None = None
+) -> InstallRecord:
     """The single installed record for `name`, or raise if it's missing/ambiguous.
+    `user_scope` narrows to the user-level (True) or this project's (False) installs.
 
     Shared by `uninstall` and `registry.maintenance.upgrade` — both need exactly
     one installed record for a bare name before they can act on it.
     """
     matches = [r for r in installed_records(project) if r.name == name]
+    if user_scope is not None:
+        matches = [r for r in matches if (r.project is None) == user_scope]
     if not matches:
         raise InstallError(f"{name!r} is not installed here")
     if len(matches) > 1:
+        if len({r.project is None for r in matches}) > 1:
+            raise InstallError(
+                f"{name!r} is installed both for the user and in this project — pass --user "
+                "for the user-level one, or --project for this project's"
+            )
         kinds = ", ".join(sorted(r.kind for r in matches))
         raise InstallError(f"{name!r} is installed as several kinds ({kinds}); remove by hand")
     return matches[0]
 
 
-def uninstall(name: str, *, project: Project | None) -> InstallRecord:
-    rec = resolve_one_record(name, project=project)
+def uninstall(
+    name: str, *, project: Project | None, force: bool = False, user_scope: bool | None = None
+) -> InstallRecord:
+    rec = resolve_one_record(name, project=project, user_scope=user_scope)
+    ref = record_ref(rec)
+    dependants = [r.name for r in load_records() if ref and ref in r.requires_extensions]
+    if dependants and not force:
+        raise InstallError(
+            f"{', '.join(sorted(dependants))} need {name!r} — uninstall them first "
+            "(or pass --force)"
+        )
     remove_installed(rec)
     return rec
 
@@ -262,4 +346,5 @@ def _record(found: Found, *, path: str, digest: str, project: Project | None) ->
         version=found.ext.version,
         commit=found.commit,
         installed_at=now_iso(),
+        requires_extensions=found.ext.requires_extensions,
     )
