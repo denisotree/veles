@@ -160,12 +160,9 @@ def test_bare_job_output_root(bare_project: Project) -> None:
 
 
 def test_bare_veles_add_errors_cleanly(bare_project: Project, capsys) -> None:
-    import argparse
+    from veles.cli import main
 
-    from veles.cli.commands.ingest import _run_ingest_cli
-
-    args = argparse.Namespace(provider="openrouter")
-    rc = _run_ingest_cli(args, bare_project, source="https://example.com")
+    rc = main(["add", "https://example.com", "--project-root", str(bare_project.root)])
     assert rc == 2
     err = capsys.readouterr().err
     assert "wiki content engine" in err

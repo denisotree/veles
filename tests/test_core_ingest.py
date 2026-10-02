@@ -81,10 +81,16 @@ def test_ingest_system_prompt_injects_layout_behaviour(isolated_home: Path, tmp_
     so the llm-wiki behaviour (M190/M203) is injected — not the retired
     single-page dump."""
     from tests.conftest import StubProvider
-    from veles.cli.commands.ingest import ingest_system_prompt
+    from veles.cli.module_commands import module_system_prompt
 
     project = init_project(tmp_path / "proj", name="proj")
-    prompt = ingest_system_prompt(project, StubProvider(), ("read_file", "wiki_write_page"))
+    prompt = module_system_prompt(
+        project,
+        StubProvider(),
+        ("read_file", "wiki_write_page"),
+        "ingest a source into the wiki",
+        "",
+    )
 
     assert prompt is not None
     assert "Layout behaviour instructions" in prompt

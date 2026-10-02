@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from veles.core.contributions import (
     BackgroundOp,
+    CliCommand,
+    CommandHost,
     Contribution,
     CuratorTarget,
     DreamStep,
@@ -21,6 +23,8 @@ from veles.core.layout.engines import engine_enabled
 
 __all__ = [
     "BackgroundOp",
+    "CliCommand",
+    "CommandHost",
     "Contribution",
     "CuratorTarget",
     "DreamStep",

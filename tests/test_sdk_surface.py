@@ -27,6 +27,8 @@ _SURFACE: dict[str, dict[str, str]] = {
     },
     "veles.sdk.contributions": {
         "BackgroundOp": "veles.core.contributions",
+        "CliCommand": "veles.core.contributions",
+        "CommandHost": "veles.core.contributions",
         "Contribution": "veles.core.contributions",
         "CuratorTarget": "veles.core.contributions",
         "DreamStep": "veles.core.contributions",

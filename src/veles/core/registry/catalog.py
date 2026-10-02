@@ -95,6 +95,17 @@ def search(
     return [f for f in found if matches(f)], warnings
 
 
+def providers_of(token: str) -> list[str]:
+    """Refs of the cached-registry extensions whose `provides` lists `token`
+    (e.g. `engine:wiki`, `cli_command:add`). Never touches the network; an
+    unreadable registry is skipped."""
+    try:
+        found, _ = available(sync_missing=False)
+    except (ResolveError, RegistryConfigError, OSError):
+        return []
+    return [f.ref for f in found if token in f.ext.provides]
+
+
 def resolve(spec: str) -> Found:
     """`name`, `group/name`, `registry:name` or `registry:group/name` → the one matching
     extension.

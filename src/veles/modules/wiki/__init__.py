@@ -21,6 +21,7 @@ def register(api) -> None:
 
     from veles.modules.wiki import curator
     from veles.modules.wiki.background import run_ingest_job
+    from veles.modules.wiki.cli import ADD_COMMAND
     from veles.modules.wiki.dream import lint_step, reindex_step
     from veles.modules.wiki.prompt import wiki_prompt
     from veles.modules.wiki.recall import wiki_recall
@@ -61,6 +62,7 @@ def register(api) -> None:
         ),
     )
     api.contribute("subproject_source", "wiki", PageSource(pages=curator.pages, engine="wiki"))
+    api.contribute("cli_command", "add", ADD_COMMAND)
     api.contribute(
         "slash_command",
         "wiki",

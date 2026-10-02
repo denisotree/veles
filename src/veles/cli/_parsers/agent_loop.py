@@ -107,27 +107,6 @@ def _register_run(sub: argparse._SubParsersAction) -> None:
     )
 
 
-def _register_add(sub: argparse._SubParsersAction) -> None:
-    add = sub.add_parser("add", help="Read a source and write a wiki page.")
-    add.add_argument(
-        "source",
-        help="A file path, directory, or URL (http://, https://) to add.",
-    )
-    add.add_argument(
-        "--recursive",
-        "-r",
-        action="store_true",
-        help="When SOURCE is a directory, ingest matching files under it (one page each).",
-    )
-    add.add_argument(
-        "--glob",
-        default="*",
-        metavar="PATTERN",
-        help="With --recursive, only ingest files matching this glob (default: '*').",
-    )
-    add_common_run_flags(add)
-
-
 def _register_organize(sub: argparse._SubParsersAction) -> None:
     org = sub.add_parser(
         "organize",
@@ -210,7 +189,6 @@ def _register_research(sub: argparse._SubParsersAction) -> None:
 def register(sub: argparse._SubParsersAction) -> None:
     _register_init(sub)
     _register_run(sub)
-    _register_add(sub)
     _register_organize(sub)
     _register_curate(sub)
     _register_research(sub)

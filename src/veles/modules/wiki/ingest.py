@@ -3,8 +3,8 @@ REPL `/wiki add` slash command so the kickoff turn is identical between
 entry points.
 
 M203 retired the single-page `INGEST_SYSTEM_PROMPT`: `veles add` now builds
-its system prompt via `cli.commands.ingest.ingest_system_prompt`
-(→ `build_run_system_prompt`), so the llm-wiki layout behaviour (topic
+its system prompt through the CLI host (`CommandHost.run_agent` →
+`build_run_system_prompt`), so the llm-wiki layout behaviour (topic
 extraction → find-or-create-or-patch) drives ingestion instead of a hardcoded
 1:1 dump. The REPL `/wiki add` path already ran under the full run prompt.
 Keeping this module pure ASCII makes it easy to import from both surfaces.

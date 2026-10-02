@@ -318,6 +318,39 @@ class SlashCommand:
 register_point(Point("slash_command", kind=SlashCommand))
 
 
+class CommandHost(Protocol):
+    """What the CLI does for a module's command: `run_agent` builds an agent the
+    way `veles run` does (provider, key check, the project's run system prompt for
+    `prompt_hint`, the given `tools`), runs `message` as one turn — a callable is
+    called only once the provider is ready — and returns the exit code."""
+
+    def run_agent(
+        self,
+        message: str | Callable[[], str],
+        *,
+        tools: tuple[str, ...],
+        prompt_hint: str,
+        fallback_prompt: str = "",
+    ) -> int: ...
+
+
+@dataclass(frozen=True, slots=True)
+class CliCommand:
+    """A `veles <contribution name>` verb: `add_arguments(parser)` declares its
+    arguments; `run(args, project, host: CommandHost) -> int` runs it inside the
+    project. `run_flags` adds the shared agent flags (`--provider`, `--model`, …).
+    Builtin verb names stay builtin."""
+
+    help: str
+    add_arguments: Callable[..., None]
+    run: Callable[..., int]
+    run_flags: bool = False
+
+
+# — consumer: cli/__init__.py + cli/module_commands.py
+register_point(Point("cli_command", kind=CliCommand))
+
+
 def active(project: Project | None, point: str) -> list[Contribution]:
     """Contributions to `point` whose `engine` (if the object has one) is enabled."""
     from veles.core.layout.engines import engine_enabled
@@ -354,6 +387,8 @@ __all__ = [
     "BUILTIN_MODULES",
     "CONTRIBUTION_POINTS",
     "BackgroundOp",
+    "CliCommand",
+    "CommandHost",
     "Contribution",
     "CuratorTarget",
     "DreamStep",
