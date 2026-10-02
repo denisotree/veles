@@ -13,7 +13,7 @@ keychain or environment variables (see [environment variables](environment-varia
 | `~/.veles/` | User-global | `config.toml`, trust grants, cross-project skills/tools, model cache, locales, registry |
 | `<project>/.veles/` | Project-local | `project.toml`, `config.toml`, `memory.db`, project skills/tools, plans, runtime artefacts |
 | `<project>/AGENTS.md` | Project | The context file injected into the agent (symlinked to `CLAUDE.md` / `GEMINI.md`) |
-| `<project>/wiki/`, `sources/` | Project | User content (the default LLM-Wiki layout) |
+| `<project>/wiki/`, `sources/`, … | Project | User content, as the layout pack lays it out (e.g. the LLM-Wiki) |
 
 `VELES_USER_HOME` redirects `~` (so user state lands at `<override>/.veles/`).
 See [project layout](project-layout.md) for the full tree.

@@ -6,13 +6,8 @@ import argparse
 from pathlib import Path
 from types import SimpleNamespace
 
-from veles.core.contributions import BackgroundOp, contributions
+from veles.core.contributions import BackgroundOp
 from veles.core.modules import ModuleAPI, ModuleRegistry, reset_module_registry, set_module_registry
-
-
-def test_wiki_contributes_the_ingest_op() -> None:
-    ops = {c.obj.kind: c.obj for c in contributions("background_op")}  # type: ignore[attr-defined]
-    assert "ingest" in ops and ops["ingest"].toolset == "ingest"
 
 
 def test_daemon_builds_a_handler_per_contributed_op(tmp_path: Path, monkeypatch) -> None:
@@ -42,7 +37,7 @@ def test_daemon_builds_a_handler_per_contributed_op(tmp_path: Path, monkeypatch)
         )
     finally:
         reset_module_registry(token)
-    assert set(handlers) >= {"fake", "ingest"}
+    assert "fake" in handlers
     assert handlers["fake"](SimpleNamespace(params={"x": 1})) == "done 1"
     assert seen == {"agent": "agent<SYSTEM>", "project": "P"}
     assert "run" in factories

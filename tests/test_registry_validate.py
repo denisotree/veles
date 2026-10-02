@@ -40,6 +40,41 @@ def test_memory_provider_provides_checked(tmp_path: Path) -> None:
     assert "memory:mp" in errors
 
 
+def test_module_may_import_veles_only_through_the_sdk(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "r")
+    files = {
+        **_MODULE_FILES,
+        "demo.py": (
+            "from veles.sdk import Project\n"
+            "import veles.sdk.tools\n"
+            "from veles.core.project import init_project\n"
+            "import veles.runtime.prompt\n" + _MODULE_FILES["demo.py"]
+        ),
+        # Tests run against a pinned Veles in CI; they may use internals for fixtures.
+        "tests/test_demo.py": "from veles.core.project import init_project\n",
+    }
+    write_extension(root, "official", "demo", kind="module", files=files)
+    errors = "\n".join(validate_registry(root).errors)
+    assert "demo.py:3 veles.core.project" in errors
+    assert "demo.py:4 veles.runtime.prompt" in errors
+    assert "veles.sdk" not in errors.replace("veles.sdk instead", "")
+    assert "test_demo.py" not in errors
+
+
+def test_sdk_rule_exempts_only_the_tests_directory(tmp_path: Path) -> None:
+    from veles.core.registry.scan import non_sdk_imports
+
+    payload = tmp_path / "m"
+    (payload / "tests").mkdir(parents=True)
+    (payload / "test_util.py").write_text("from veles.core import project\n", encoding="utf-8")
+    (payload / "conftest.py").write_text("import veles.runtime.prompt\n", encoding="utf-8")
+    (payload / "ok.py").write_text("from veles import sdk\n", encoding="utf-8")
+    (payload / "tests" / "test_x.py").write_text("import veles.core.project\n", encoding="utf-8")
+    hits = "\n".join(non_sdk_imports(payload))
+    assert "test_util.py:1" in hits and "conftest.py:1" in hits
+    assert "ok.py" not in hits and "tests/" not in hits
+
+
 def test_clean_registry_passes(tmp_path: Path) -> None:
     root = write_registry(tmp_path / "r")
     write_extension(root, "official", "alpha")

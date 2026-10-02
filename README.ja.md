@@ -43,7 +43,7 @@ veles        # interactive REPL (bare `veles` with no subcommand)
 
 **複利的に効くメモリ** — すべてのセッションは Curator によってプロジェクトごとのメモリ(インサイト、振る舞いのルール、セッションダイジェスト。`.veles/` 内)へと蒸留されます。エージェントは関連する事実や過去の判断を自動的に思い出すため、同じ文脈を何度も説明し直す必要がなくなります。メモリは*どの*コンテンツレイアウトの下でも機能します。
 
-**差し替え可能なコンテンツレイアウト** — `veles init` はデフォルトで Karpathy 流の LLM ウィキを生成します。`--layout notes` ならフラットなノートディレクトリ、`--layout bare` なら構造をいっさい持たせません(コードリポジトリに最適)。カスタムレイアウトパックは `~/.veles/layouts/` に置く単一の TOML ファイルです。
+**差し替え可能なコンテンツレイアウト** — `veles init` はデフォルトでは構造をいっさい追加しません(`bare`。コードリポジトリに最適)。Karpathy 流の LLM ウィキなら `llm-wiki`、フラットなノートディレクトリなら `notes` を選べば、どちらも拡張レジストリからその場でインストールされます。カスタムレイアウトパックは `~/.veles/layouts/` に置く単一の TOML ファイルです。
 
 **プロバイダー非依存のルーティング** — OpenRouter、Anthropic、OpenAI、Gemini、Ollama、llamacpp、あるいはあなたの `claude` / `gemini` CLI サブスクリプション。タスクの種類ごと(プランニング、圧縮、インサイト)に異なるモデルへルーティングできます。
 
@@ -123,17 +123,17 @@ veles secret set OPENROUTER_API_KEY    # prompts for value, stores in keychain
 ### コンテンツレイアウトを選ぶ
 
 ```bash
-veles init                  # default: Karpathy-style LLM wiki (sources/ + wiki/)
-veles init --layout notes   # a single flat notes/ directory
-veles init --layout bare    # no content scaffold — code repos, free-form work
+veles init                      # default: bare — no content scaffold (at a terminal it asks)
+veles init --layout llm-wiki    # Karpathy-style LLM wiki (sources/ + wiki/), from the registry
+veles init --layout notes       # a single flat notes/ directory, from the registry
 ```
 
-エージェント自身のメモリ(インサイト、ルール、セッションダイジェスト。`.veles/` 内)は、どのレイアウトの下でも同じように機能します。カスタムパックは `~/.veles/layouts/<name>/` に置く 1 つの `layout.toml` です。
+未インストールのレイアウトは、必要なものとあわせてインストールを提案されます(確認は 1 回だけ)。エージェント自身のメモリ(インサイト、ルール、セッションダイジェスト。`.veles/` 内)は、どのレイアウトの下でも同じように機能します。カスタムパックは `~/.veles/layouts/<name>/` に置く 1 つの `layout.toml` です。
 
 ### ナレッジベースを構築する(llm-wiki レイアウト)
 
 ```bash
-veles add paper.pdf                   # read a source → write a wiki page
+veles add paper.pdf                   # read a source → write a wiki page (the wiki module's verb)
 veles add https://example.com/post    # web pages, PDFs, plain text
 
 veles run "What do we know about the authentication design?"
@@ -324,7 +324,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | 新しいプロジェクトを作成 |
 | `veles run "<prompt>"` | シングルターンのエージェント実行 |
 | `veles` | インタラクティブな REPL |
-| `veles add <file\|url>` | ソースを取り込み → トピック別のウィキページ群へ |
+| `veles add <file\|url>` | ソースを取り込み → トピック別のウィキページ群へ(`wiki` モジュール由来、llm-wiki レイアウト) |
 | `veles organize` | アクティブなレイアウトに沿ってプロジェクトの内容を再編成（提案してから適用）|
 | `veles research "<question>"` | 多角的なディープリサーチ |
 | `veles curate` | セッションをウィキへ統合 |

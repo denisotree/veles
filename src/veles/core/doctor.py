@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Literal
 
 from veles.core.approval import list_approvals
-from veles.core.layout.engines import wiki_enabled
 from veles.core.project import Project
 from veles.core.timeutil import utc_iso
 from veles.core.trace import cache_fragmentation_alert, read_records, trace_path_for_project
@@ -613,29 +612,37 @@ def _check_symlinks(project: Project | None) -> CheckResult:
     return CheckResult(name="symlinks", status="ok", message="CLAUDE.md and GEMINI.md → AGENTS.md")
 
 
-def _check_wiki_files(project: Project | None) -> CheckResult:
+def _check_context_file(project: Project | None) -> CheckResult:
+    """The layout pack's `context_file` (e.g. the wiki's INDEX.md), when it names one."""
+    from veles.core.layout.discovery import find_layout
+    from veles.core.registry.ensure import install_hint
+
+    name = "context_file"
     if project is None:
-        return CheckResult(name="wiki_files", status="info", message="no active project")
-    if not wiki_enabled(project):
+        return CheckResult(name=name, status="info", message="no active project")
+    pack = find_layout(project.layout_name, project)
+    if pack is None:
         return CheckResult(
-            name="wiki_files",
-            status="info",
-            message=(
-                f"layout '{project.layout_name}' has no wiki engine — INDEX.md/LOG.md not required"
-            ),
-        )
-    missing: list[str] = []
-    for name in ("INDEX.md", "LOG.md"):
-        if not (project.root / name).exists():
-            missing.append(name)
-    if missing:
-        return CheckResult(
-            name="wiki_files",
+            name=name,
             status="warn",
-            message=f"missing: {', '.join(missing)}",
-            fix_hint="run `veles dream` to regenerate INDEX.md",
+            message=f"layout {project.layout_name!r} is not installed",
+            fix_hint=install_hint(project) or "",
         )
-    return CheckResult(name="wiki_files", status="ok", message="INDEX.md and LOG.md present")
+    context = pack.manifest.context_file
+    if not context:
+        return CheckResult(
+            name=name,
+            status="info",
+            message=f"layout '{project.layout_name}' declares no context file",
+        )
+    if not (project.root / context).exists():
+        return CheckResult(
+            name=name,
+            status="warn",
+            message=f"missing: {context}",
+            fix_hint="run `veles dream` (or `veles layout sync`) to regenerate it",
+        )
+    return CheckResult(name=name, status="ok", message=f"{context} present")
 
 
 def _check_trace_health(project: Project | None) -> CheckResult:
@@ -712,7 +719,7 @@ def _check_extensions(project: Project | None) -> CheckResult:
             status="warn",
             message=f"could not verify extensions: {shown(exc)}",
         )
-    broken = [i for i in issues if i.problem in ("missing", "modified")]
+    broken = [i for i in issues if i.problem in ("missing", "modified", "missing-dependency")]
     revoked = [i for i in issues if i.problem in ("yanked", "removed")]
     ahead = [i for i in issues if i.problem == "upstream-ahead"]
     if broken:
@@ -796,7 +803,7 @@ def run_all(project: Project | None) -> DoctorReport:
         _check_agents_md_sections,
         _check_registry_paths,
         _check_symlinks,
-        _check_wiki_files,
+        _check_context_file,
         _check_trace_health,
         _check_events_health,
         _check_approval_audit,

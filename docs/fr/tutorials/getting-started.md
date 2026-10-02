@@ -60,9 +60,11 @@ mkdir my-notes && cd my-notes
 veles init my-notes
 ```
 
-Cela crée `AGENTS.md` (le contexte de votre projet), `sources/` et `wiki/` (la
-[mise en page LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md) par défaut), ainsi
-que `.veles/` (l'état machine). Voir [mise en page du projet](../reference/project-layout.md).
+Cela crée `AGENTS.md` (le contexte de votre projet) et `.veles/` (l'état machine) —
+la mise en page `bare` par défaut n'ajoute rien d'autre. Dans un terminal, `veles init`
+demande quelle [mise en page](../explanation/layout-packs-and-llm-wiki.md) utiliser ;
+choisissez `llm-wiki` (installée depuis le registre sur-le-champ) pour obtenir
+`sources/` et `wiki/`. Voir [mise en page du projet](../reference/project-layout.md).
 
 ## 4. Lancer votre première requête
 

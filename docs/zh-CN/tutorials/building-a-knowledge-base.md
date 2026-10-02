@@ -4,13 +4,23 @@
 
 在本教程中，你会把一个 Veles 项目变成一个鲜活的知识库：摄入
 几份来源资料，让 Veles 撰写 wiki 页面，提出问题，并整合你
-学到的内容。这是默认的 **LLM-Wiki** 工作流。约需 15 分钟。
+学到的内容。这是 **LLM-Wiki** 工作流。约需 15 分钟。
 
 你应该先完成[快速上手](getting-started.md)。
 
+## 0. 使用 llm-wiki 布局
+
+wiki 来自扩展注册表。新项目请在 `veles init` 时选择它（或传入 `--layout llm-wiki`）；Veles 会提议将该布局连同它所需的 `wiki` 模块一起安装。对于已有项目：
+
+```bash
+veles registry install llm-wiki      # the layout + the wiki module, one confirmation
+```
+
+然后在 `.veles/project.toml` 中设置 `layout = "llm-wiki"`，再运行 `veles layout sync`。
+
 ## 思路
 
-一个 Veles 项目有两个内容区：
+一个 wiki 项目有两个内容区：
 
 - `sources/` — 你提供给它的原始、不可变资料（对智能体只读）。
 - `wiki/` — 智能体自身的、由 LLM 生成的知识（它唯一会写入

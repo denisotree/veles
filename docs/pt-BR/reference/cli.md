@@ -29,7 +29,7 @@ Cria um novo projeto Veles no diretório atual (um diretório de estado `.veles/
 | Flag | Padrão | Finalidade |
 |---|---|---|
 | `name` (posicional) | basename do cwd | Nome do projeto |
-| `--layout <name>` | `llm-wiki` | Pacote de layout para o esqueleto de conteúdo (`llm-wiki`, `notes`, `bare` ou um pacote customizado de `~/.veles/layouts/`) |
+| `--layout <name>` | `bare` (perguntado em um terminal) | Pacote de layout para o esqueleto de conteúdo (`bare`, um pacote instalado de um registro como `llm-wiki` ou `notes`, ou um pacote customizado de `~/.veles/layouts/`). Um pacote não instalado é oferecido para instalação; recusar não cria nada |
 | `--force` | desligado | Recria `.veles/` mesmo que já exista |
 
 ### `veles schema {validate,edit,fix}`
@@ -40,7 +40,9 @@ Valida ou edita o `AGENTS.md` (o arquivo de contexto do projeto).
 - `fix` — adiciona interativamente as seções ausentes via um assistente com LLM.
 
 ### `veles self-doc [refresh|show]`
-Gera e exibe a autodocumentação do projeto (`wiki/self-doc/overview.md`).
+Gera e exibe a autodocumentação do projeto — no armazenamento de páginas do layout
+quando ele tem um (a wiki: `wiki/self-doc/overview.md`), senão em
+`.veles/memory/self-doc.md`.
 `veles self-doc` sem argumentos mostra a página atual; `refresh` a regenera.
 
 ### `veles doctor`
@@ -110,12 +112,14 @@ injeção/compressão acima e ainda:
 | `--theme <name>` | config ou `everforest` | Tema de cores (everforest, dracula, gruvbox, tokyo-night, catppuccin) |
 
 ### `veles add <source>`
+*(do módulo `wiki` — `veles registry install llm-wiki` ou `… install wiki`)*
 Lê uma fonte (um arquivo local ou uma URL `http(s)://`) e a sintetiza em uma
-página de wiki. Aceita as flags compartilhadas do loop do agente.
+página de wiki. Sem o módulo, `veles add` é um comando desconhecido e o erro
+indica a instalação. Aceita as flags compartilhadas do loop do agente.
 
 ### `veles curate`
-Executa uma passada do curador: compacta sessões não processadas em páginas de
-`wiki/sessions/`.
+Executa uma passada do curador: compacta sessões não processadas em insights de memória (e em páginas de
+`wiki/sessions/` quando o engine de wiki está ativo).
 
 | Flag | Padrão | Finalidade |
 |---|---|---|

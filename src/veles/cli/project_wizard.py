@@ -39,7 +39,6 @@ from veles.core.project_config import (
     save_project_config as _save_project_toml,
 )
 from veles.core.providers import PROVIDER_VALUES as _PROVIDER_CHOICES
-from veles.modules.wiki.wiki import Wiki
 
 Prompter = Callable[[str, str | None], str]
 """(prompt_label, default_value) -> raw_answer."""
@@ -105,22 +104,8 @@ def run_project_wizard(cwd: Path) -> Project | None:
         project = load_project(cwd)
     print(t("project_wizard.created_state", state_dir=project.state_dir), file=sys.stderr)
 
-    from veles.core.layout.engines import wiki_enabled
-
     _step_provider_override(project, prompter)
     _step_channel(project, prompter)
-
-    # Seed the FTS index so the post-init promise — "files will be
-    # indexed" — actually holds. Cheap (empty / few-page) wiki rebuild.
-    # M162: only when the layout pack activates the wiki engine.
-    pages = 0
-    if wiki_enabled(project):
-        try:
-            pages = Wiki(project.wiki_root).reindex_if_stale()
-        except Exception:
-            pages = 0
-    if pages:
-        print(t("project_wizard.indexed_wiki", pages=pages), file=sys.stderr)
 
     print("\n" + t("project_wizard.ready", name=project.name) + "\n", file=sys.stderr)
     return project

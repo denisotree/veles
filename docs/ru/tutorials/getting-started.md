@@ -59,9 +59,11 @@ mkdir my-notes && cd my-notes
 veles init my-notes
 ```
 
-Это создаёт `AGENTS.md` (контекст вашего проекта), `sources/` и `wiki/`
-(раскладка [LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md) по умолчанию) и
-`.veles/` (машинное состояние). См. [раскладку проекта](../reference/project-layout.md).
+Это создаёт `AGENTS.md` (контекст вашего проекта) и `.veles/` (машинное
+состояние) — раскладка по умолчанию `bare` больше ничего не добавляет. В
+терминале `veles init` спрашивает, какую [раскладку](../explanation/layout-packs-and-llm-wiki.md)
+взять; выберите `llm-wiki` (она поставится из реестра тут же), чтобы получить
+`sources/` и `wiki/`. См. [раскладку проекта](../reference/project-layout.md).
 
 ## 4. Запустите первый промпт
 

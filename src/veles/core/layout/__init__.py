@@ -2,9 +2,9 @@
 
 A **layout-pack** declares how a project organises its user-facing
 content — directories, writable zones, and the named operations the
-agent uses to interact with that content. The default pack ships
-inside Veles (`builtin/llm-wiki/`); users can add custom packs to
-`<project>/.veles/layouts/<name>/` or `~/.veles/layouts/<name>/`.
+agent uses to interact with that content. Veles ships only `bare`; more
+packs (llm-wiki, notes, …) come from extension registries into
+`~/.veles/layouts/<name>/`, or live in `<project>/.veles/layouts/<name>/`.
 
 Design rule (VISION §5.2): the core makes no assumptions about how
 user content is stored. Project memory (`<cwd>/.veles/`) stays
@@ -16,10 +16,9 @@ Public surface:
 - `discover_layouts(project)` — returns the list of available packs
   in priority order (project → user → builtin)
 - `find_layout(project, name)` — pick a specific pack by name
-- `LAYOUT_DEFAULT` — `"llm-wiki"`, the dropdown default in `veles init`
+- `LAYOUT_DEFAULT` — `"bare"`, the default in `veles init` (from `core.project`)
 - `apply_scaffold(pack, root, name)` — pack-driven init skeleton (M162)
-- `wiki_enabled(project)` / `engine_enabled(project, name)` — content
-  engine activation checks (M162)
+- `engine_enabled(project, name)` — content engine activation check (M162)
 """
 
 from veles.core.layout.discovery import (
@@ -31,7 +30,6 @@ from veles.core.layout.discovery import (
 from veles.core.layout.engines import (
     clear_engine_cache,
     engine_enabled,
-    wiki_enabled,
 )
 from veles.core.layout.manifest import (
     LayoutManifest,
@@ -57,6 +55,5 @@ __all__ = [
     "find_layout",
     "is_writable",
     "read_manifest",
-    "wiki_enabled",
     "writable_zones",
 ]

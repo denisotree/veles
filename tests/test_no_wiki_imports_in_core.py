@@ -3,8 +3,8 @@
 Everything the wiki adds reaches core through `api.contribute(...)`
 (`veles.core.contributions`). An `import veles.modules.wiki…` anywhere in these
 packages — at module level or inside a function, even under TYPE_CHECKING —
-re-couples core to one content engine. `cli/` and `tui/` join this list in
-release B, when the wiki moves to the registry.
+re-couples core to one content engine. Since release B (the wiki ships from the
+registry) this covers the CLI, the TUI and the SDK too.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import ast
 from pathlib import Path
 
 _SRC = Path(__file__).resolve().parent.parent / "src" / "veles"
-_LOCKED = ("core", "runtime", "adapters", "daemon")
+_LOCKED = ("core", "runtime", "adapters", "daemon", "cli", "tui", "sdk")
 _ENGINE = "veles.modules.wiki"
 
 

@@ -57,9 +57,11 @@ mkdir my-notes && cd my-notes
 veles init my-notes
 ```
 
-This creates `AGENTS.md` (your project context), `sources/` and `wiki/` (the
-default [LLM-Wiki layout](../explanation/layout-packs-and-llm-wiki.md)), and
-`.veles/` (machine state). See [project layout](../reference/project-layout.md).
+This creates `AGENTS.md` (your project context) and `.veles/` (machine state) —
+the default `bare` layout adds nothing else. At a terminal, `veles init` asks
+which [layout](../explanation/layout-packs-and-llm-wiki.md) to use; pick
+`llm-wiki` (installed from the registry on the spot) to get `sources/` and
+`wiki/`. See [project layout](../reference/project-layout.md).
 
 ## 4. Run your first prompt
 

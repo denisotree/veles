@@ -43,7 +43,7 @@ veles        # interactive REPL (just run `veles` with no subcommand)
 
 **复利式内存**——每一次会话都会被 Curator 提炼成按项目划分的内存（洞见、行为规则、会话摘要，存放在 `.veles/` 中）。智能体会自动回忆起相关事实和过去的决策——你不必再反复解释相同的上下文。内存在*任何*内容布局下都能工作。
 
-**可插拔的内容布局**——`veles init` 默认搭建一个 Karpathy 风格的 LLM wiki；`--layout notes` 给你一个扁平的笔记目录；`--layout bare` 则完全不添加任何结构（非常适合代码仓库）。自定义布局包只是 `~/.veles/layouts/` 下的一个 TOML 文件。
+**可插拔的内容布局**——`veles init` 默认不添加任何结构（`bare`，非常适合代码仓库）；选择 `llm-wiki` 得到 Karpathy 风格的 LLM wiki，或选择 `notes` 得到扁平的笔记目录，二者都会当场从扩展注册表安装。自定义布局包只是 `~/.veles/layouts/` 下的一个 TOML 文件。
 
 **与厂商无关的路由**——OpenRouter、Anthropic、OpenAI、Gemini、Ollama、llamacpp，或者你的 `claude`/`gemini` CLI 订阅。不同类型的任务（规划、压缩、洞见提取）可以路由到不同的模型。
 
@@ -123,17 +123,17 @@ veles secret set OPENROUTER_API_KEY    # prompts for value, stores in keychain
 ### 选择一种内容布局
 
 ```bash
-veles init                  # default: Karpathy-style LLM wiki (sources/ + wiki/)
-veles init --layout notes   # a single flat notes/ directory
-veles init --layout bare    # no content scaffold — code repos, free-form work
+veles init                      # default: bare — no content scaffold (at a terminal it asks)
+veles init --layout llm-wiki    # Karpathy-style LLM wiki (sources/ + wiki/), from the registry
+veles init --layout notes       # a single flat notes/ directory, from the registry
 ```
 
-智能体自身的内存（洞见、规则、会话摘要，存放在 `.veles/` 中）在每一种布局下的工作方式都完全相同。自定义布局包是 `~/.veles/layouts/<name>/` 下的一个 `layout.toml`。
+未安装的布局会被提示安装（附带其所需内容，只需一次确认）。智能体自身的内存（洞见、规则、会话摘要，存放在 `.veles/` 中）在每一种布局下的工作方式都完全相同。自定义布局包是 `~/.veles/layouts/<name>/` 下的一个 `layout.toml`。
 
 ### 构建知识库（llm-wiki 布局）
 
 ```bash
-veles add paper.pdf                   # read a source → write a wiki page
+veles add paper.pdf                   # read a source → write a wiki page (the wiki module's verb)
 veles add https://example.com/post    # web pages, PDFs, plain text
 
 veles run "What do we know about the authentication design?"
@@ -325,7 +325,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | 创建一个新项目 |
 | `veles run "<prompt>"` | 单轮智能体运行 |
 | `veles` | 交互式 REPL（无子命令） |
-| `veles add <file\|url>` | 摄取一个来源 → 按主题拆分的 wiki 页面 |
+| `veles add <file\|url>` | 摄取一个来源 → 按主题拆分的 wiki 页面（来自 `wiki` 模块，llm-wiki 布局） |
 | `veles organize` | 按当前布局重新组织项目内容（先提议后应用）|
 | `veles research "<question>"` | 多角度深度研究 |
 | `veles curate` | 将会话整合进 wiki |

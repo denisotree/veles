@@ -39,7 +39,6 @@ from veles.core.project_config import (
     save_project_config as _save_project_toml,
 )
 from veles.core.providers import ALL_PROVIDERS as _ALL_PROVIDERS
-from veles.modules.wiki.wiki import Wiki
 from veles.tui.wizard.screens import (
     ChoiceScreen,
     ConfirmScreen,
@@ -292,7 +291,7 @@ class DaemonModeStep:
                 question=(
                     "Run this project as a long-lived daemon? "
                     "A daemon enables `veles daemon` picker control, "
-                    "remote sessions, and channel integration (e.g. Telegram)."
+                    "remote sessions, and channel integration."
                 ),
                 default=False,
             )
@@ -374,16 +373,6 @@ class RecapStep:
         ch = ctx.answers.get("channel")
         if ch:
             lines.append(f"  · channel: {ch['channel']} ({ch['status']})")
-        from veles.core.layout.engines import wiki_enabled
-
-        pages = 0
-        if wiki_enabled(project):
-            try:
-                pages = Wiki(project.wiki_root).reindex_if_stale()
-            except Exception:
-                pages = 0
-        if pages:
-            lines.append(f"  · indexed {pages} wiki page(s)")
         await ctx.app.push_screen_wait(ProgressScreen(title=self.title, lines=lines))
         return WizardOutcome.NEXT
 
@@ -403,12 +392,14 @@ def project_wizard_steps(cwd: Path) -> list:
 
 @dataclass
 class LayoutPickerStep:
-    """Pick the project's content layout-pack (default `llm-wiki`).
+    """Pick the project's content layout-pack (default `bare`).
 
     M162: runs BEFORE BootstrapStep so `init_project(layout=...)`
     scaffolds exactly what the chosen pack declares — no post-hoc
     project.toml rewrite, no leftover skeleton from the default pack.
     Single-pack installations auto-confirm without showing the screen.
+    Only installed packs are listed: installing one needs the terminal
+    confirmation, which a full-screen app can't host (`veles init` offers it).
     """
 
     name: str = "layout-picker"
@@ -437,7 +428,10 @@ class LayoutPickerStep:
             ChoiceScreen(
                 title=self.title,
                 items=items,
-                subtitle="Layouts shape how the agent stores user content. Default: llm-wiki.",
+                subtitle=(
+                    "Layouts shape how the agent stores user content. Default: bare. "
+                    "More: `veles registry search --kind layout`."
+                ),
                 default=LAYOUT_DEFAULT,
             )
         )

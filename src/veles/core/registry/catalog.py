@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,7 +14,10 @@ from veles.core.registry.config import (
     list_sources,
 )
 from veles.core.registry.model import Extension, scan_registry
-from veles.core.registry.repo import RegistryRepoError, ensure_cache, head_commit
+from veles.core.registry.repo import RegistryRepoError, ensure_cache, fetched_at, head_commit
+
+# A clone older than this may miss yanks and fixes; listing and search say so.
+STALE_AFTER_DAYS = 7
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +77,14 @@ def scan_source(
             raise RegistryRepoError("not fetched yet — run `veles registry update`")
     commit = head_commit(root)
     entries, errors = scan_registry(root)
+    age_days = int((time.time() - fetched_at(root)) // 86400)
+    if age_days >= STALE_AFTER_DAYS:
+        errors.append(
+            (
+                root,
+                f"last fetched {age_days} days ago — run `veles registry update` for yanks/fixes",
+            )
+        )
     return [Found(source.name, ext, commit, root) for ext in entries], errors
 
 
@@ -93,6 +105,17 @@ def search(
         return needle in haystack
 
     return [f for f in found if matches(f)], warnings
+
+
+def providers_of(token: str) -> list[str]:
+    """Refs of the cached-registry extensions whose `provides` lists `token`
+    (e.g. `engine:wiki`, `cli_command:add`). Never touches the network; an
+    unreadable registry is skipped."""
+    try:
+        found, _ = available(sync_missing=False)
+    except (ResolveError, RegistryConfigError, OSError):
+        return []
+    return [f.ref for f in found if token in f.ext.provides]
 
 
 def resolve(spec: str) -> Found:

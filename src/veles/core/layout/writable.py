@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import configparser
 import logging
+import subprocess
 import unicodedata
 from pathlib import Path
 
@@ -126,8 +127,10 @@ def is_writable(project: Project, path: str | Path) -> bool:
     Otherwise this is a **universal, opt-in** contract: if the active
     pack declares `writable_zones` in its `layout.toml`, `path` must fall
     inside a non-readonly declared zone. If the pack declares NO zones
-    at all — as `llm-wiki` does since M189 — there is no restriction and
-    every in-project path is writable. Gates writes only; reads stay
+    at all — as `bare` and `llm-wiki` — there is no restriction and every
+    in-project path is writable. A pack that isn't installed fails closed
+    (only the always-writable paths), except the layouts that moved to the
+    registry, whose zones are known. Gates writes only; reads stay
     project-wide via `path_guard` regardless of this check.
 
     `path` is normalised relative to `project.root`. Absolute paths
@@ -157,9 +160,8 @@ def is_writable(project: Project, path: str | Path) -> bool:
     zones = _effective_writable_zones(project)
     if not zones:
         # Contract anchor (M189): a layout that declares NO writable_zones
-        # is UNRESTRICTED — every path inside the project root is writable.
-        # This covers both "no pack resolves" and "pack resolves but its
-        # manifest declares zero writable_zones" (e.g. llm-wiki, bare).
+        # is UNRESTRICTED — every path inside the project root is writable
+        # (e.g. bare, llm-wiki). A pack that doesn't resolve fails closed.
         return True
     for zone in zones:
         # Zone may be `wiki/` or `wiki` — match both forms.
@@ -179,7 +181,7 @@ def writable_zones(project: Project) -> tuple[str, ...]:
     return (
         tuple(f"{state}/{name}/" for name in AGENT_WRITABLE_STATE)
         + _ALWAYS_WRITABLE_FILES
-        + tuple(z if z.endswith("/") else z + "/" for z in pack_zones)
+        + tuple(z if z.endswith("/") else z + "/" for z in pack_zones if z not in _NOTHING)
     )
 
 
@@ -207,12 +209,18 @@ def needs_confirmation(project: Project, path: str | Path) -> bool:
 def _protected_targets(project: Project) -> list[Path]:
     """Where a root-level protected entry that is a symlink really points (the
     guard sees resolved paths, so `.git -> gitdata` would hide `gitdata/hooks`),
-    plus the repo's `core.hooksPath`. An unreadable git config adds nothing."""
+    plus the hooks dir git actually uses (`core.hooksPath` from any config level,
+    an enclosing repo, a `.git` file) and the one the project's own `.git/config`
+    names — both, since git may be missing or may answer for an enclosing repo
+    while the project's config is broken. An unreadable config adds nothing."""
     out = [
         (project.root / name).resolve()
         for name in _CONFIRM_NAMES
         if (project.root / name).is_symlink()
     ]
+    hooks_dir = _git_hooks_dir(project.root)
+    if hooks_dir is not None:
+        out.append(hooks_dir)
     # Git's config is INI-like: keys may lack a value, values may be quoted and
     # carry a trailing `;`/`#` comment. A value that can't be resolved (unknown
     # `~user`, a NUL) adds nothing — it must never make the write guard throw.
@@ -227,6 +235,30 @@ def _protected_targets(project: Project) -> list[Path]:
     except (OSError, UnicodeDecodeError, configparser.Error, RuntimeError, ValueError):
         pass
     return out
+
+
+def _git_hooks_dir(root: Path) -> Path | None:
+    """`git rev-parse --git-path hooks` from `root`: the hooks dir with every config
+    level applied. None when git is missing, slow, or `root` is not in a repo
+    (dubious ownership included) — the caller falls back to parsing the config.
+    `rev-parse` reads no index and runs no hooks or fsmonitor."""
+    try:
+        run = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--git-path", "hooks"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    out = run.stdout.strip()
+    if run.returncode != 0 or not out:
+        return None
+    try:
+        return (root / Path(out).expanduser()).resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
 
 
 def _state_verdict(project: Project, abs_path: Path) -> bool | None:
@@ -260,18 +292,26 @@ def _state_verdict(project: Project, abs_path: Path) -> bool | None:
     )
 
 
+# The zones of the layouts that moved to the registry, for a project whose pack
+# isn't reinstalled yet (`llm-wiki` declares none — it stays permissive).
+_MIGRATED_LAYOUT_ZONES: dict[str, list[str]] = {"llm-wiki": [], "notes": ["notes/"]}
+# A pack that doesn't resolve may have declared zones we can't see: fail closed.
+_NOTHING = ["\0"]
+
+
 def _effective_writable_zones(project: Project) -> list[str]:
-    """Pull writable zones from the active layout-pack. Empty list
-    when no pack resolves or the pack declares no zones."""
+    """Writable zones of the active layout-pack; empty when the pack declares
+    none (unrestricted). A pack that doesn't resolve yields a zone nothing
+    matches, so only the always-writable paths stay open."""
     try:
         from veles.core.layout.discovery import find_layout
 
         pack = find_layout(project.layout_name, project=project)
     except Exception as exc:
         logger.debug("layout lookup failed: %s", exc)
-        return []
+        pack = None
     if pack is None:
-        return []
+        return list(_MIGRATED_LAYOUT_ZONES.get(project.layout_name, _NOTHING))
     return list(pack.manifest.writable_path_strings())
 
 

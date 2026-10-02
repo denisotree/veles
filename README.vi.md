@@ -43,7 +43,7 @@ veles        # interactive REPL (just run `veles` with no subcommand)
 
 **Bộ nhớ tích lũy** — Mỗi phiên đều được Curator chắt lọc thành bộ nhớ riêng của từng dự án (insight, quy tắc hành vi, bản tóm tắt phiên trong `.veles/`). Agent tự động nhớ lại các sự kiện liên quan và những quyết định trong quá khứ — bạn không còn phải giải thích lại cùng một bối cảnh nữa. Bộ nhớ hoạt động dưới *bất kỳ* layout nội dung nào.
 
-**Layout nội dung có thể tùy biến** — `veles init` mặc định dựng sẵn một wiki LLM kiểu Karpathy; `--layout notes` cho bạn một thư mục ghi chú phẳng; `--layout bare` không thêm cấu trúc nào cả (lý tưởng cho các kho mã nguồn). Các gói layout tùy chỉnh chỉ là một file TOML duy nhất trong `~/.veles/layouts/`.
+**Layout nội dung có thể tùy biến** — `veles init` mặc định không thêm cấu trúc nào (`bare`, lý tưởng cho các kho mã nguồn); chọn `llm-wiki` cho wiki LLM kiểu Karpathy hoặc `notes` cho thư mục ghi chú phẳng, cả hai đều được cài ngay từ registry tiện ích mở rộng. Các gói layout tùy chỉnh chỉ là một file TOML duy nhất trong `~/.veles/layouts/`.
 
 **Định tuyến không phụ thuộc nhà cung cấp** — OpenRouter, Anthropic, OpenAI, Gemini, Ollama, llamacpp, hoặc gói thuê bao CLI `claude`/`gemini` của bạn. Các loại tác vụ khác nhau (lập kế hoạch, nén, trích xuất insight) có thể định tuyến đến các mô hình khác nhau.
 
@@ -123,17 +123,17 @@ veles secret set OPENROUTER_API_KEY    # prompts for value, stores in keychain
 ### Chọn một layout nội dung
 
 ```bash
-veles init                  # default: Karpathy-style LLM wiki (sources/ + wiki/)
-veles init --layout notes   # a single flat notes/ directory
-veles init --layout bare    # no content scaffold — code repos, free-form work
+veles init                      # default: bare — no content scaffold (at a terminal it asks)
+veles init --layout llm-wiki    # Karpathy-style LLM wiki (sources/ + wiki/), from the registry
+veles init --layout notes       # a single flat notes/ directory, from the registry
 ```
 
-Bộ nhớ riêng của agent (insight, quy tắc, bản tóm tắt phiên trong `.veles/`) hoạt động y hệt nhau dưới mọi layout. Các gói tùy chỉnh chỉ là một file `layout.toml` trong `~/.veles/layouts/<name>/`.
+Layout chưa được cài sẽ được đề nghị cài đặt (kèm những thứ nó cần, chỉ với một lần xác nhận). Bộ nhớ riêng của agent (insight, quy tắc, bản tóm tắt phiên trong `.veles/`) hoạt động y hệt nhau dưới mọi layout. Các gói tùy chỉnh chỉ là một file `layout.toml` trong `~/.veles/layouts/<name>/`.
 
 ### Xây dựng cơ sở tri thức (layout llm-wiki)
 
 ```bash
-veles add paper.pdf                   # read a source → write a wiki page
+veles add paper.pdf                   # read a source → write a wiki page (the wiki module's verb)
 veles add https://example.com/post    # web pages, PDFs, plain text
 
 veles run "What do we know about the authentication design?"
@@ -325,7 +325,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | Tạo một dự án mới |
 | `veles run "<prompt>"` | Lần chạy agent một lượt |
 | `veles` | REPL tương tác (không có lệnh con) |
-| `veles add <file\|url>` | Nạp một nguồn → các trang wiki theo chủ đề |
+| `veles add <file\|url>` | Nạp một nguồn → các trang wiki theo chủ đề (từ module `wiki`, layout llm-wiki) |
 | `veles organize` | Tổ chức lại nội dung dự án theo layout đang dùng (đề xuất rồi áp dụng) |
 | `veles research "<question>"` | Nghiên cứu sâu nhiều góc độ |
 | `veles curate` | Hợp nhất các phiên vào wiki |

@@ -4,13 +4,25 @@
 
 Trong hướng dẫn này bạn sẽ biến một dự án Veles thành một cơ sở tri thức sống:
 nạp một vài nguồn, để Veles viết các trang wiki, đặt câu hỏi, và củng cố những gì
-bạn đã học. Đây là quy trình **LLM-Wiki** mặc định. Khoảng 15 phút.
+bạn đã học. Đây là quy trình **LLM-Wiki**. Khoảng 15 phút.
 
 Bạn nên hoàn thành [Bắt đầu](getting-started.md) trước.
 
+## 0. Dùng layout llm-wiki
+
+Wiki đến từ registry tiện ích mở rộng. Với dự án mới, hãy chọn nó khi `veles init`
+(hoặc truyền `--layout llm-wiki`); Veles đề nghị cài layout cùng module `wiki` mà nó
+cần. Với dự án có sẵn:
+
+```bash
+veles registry install llm-wiki      # the layout + the wiki module, one confirmation
+```
+
+rồi đặt `layout = "llm-wiki"` trong `.veles/project.toml`, sau đó chạy `veles layout sync`.
+
 ## Ý tưởng
 
-Một dự án Veles có hai vùng nội dung:
+Một dự án wiki có hai vùng nội dung:
 
 - `sources/` — tài liệu thô, bất biến mà bạn cung cấp (chỉ đọc đối với agent).
 - `wiki/` — tri thức do chính agent tạo ra bằng LLM (vùng duy nhất nó ghi nội

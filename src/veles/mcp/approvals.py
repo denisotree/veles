@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any, Literal
@@ -48,14 +49,75 @@ def recipe_hash(raw: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(raw, sort_keys=True, default=str).encode()).hexdigest()
 
 
-def describe_recipe(name: str, raw: dict[str, Any]) -> str:
+# Files a recipe names in `args` that are code (a data file like `--db-path
+# data.db` changes on every run and must not revoke the approval).
+_SCRIPT_SUFFIXES = frozenset(
+    {".py", ".js", ".mjs", ".cjs", ".ts", ".mts", ".sh", ".bash", ".rb", ".pl", ".php", ".lua"}
+)
+
+
+def project_files(project_root: Path, raw: dict[str, Any]) -> list[Path]:
+    """Code inside the project that the recipe runs — the `command` when it is a
+    project file, and `args` that are scripts (by suffix or executable bit), e.g.
+    `python tools/server.py`: a clone can edit them, so the approval covers
+    their content too. Servers run from the project root (`parse_servers(cwd=)`),
+    so names resolve against it."""
+    root = Path(project_root).resolve()
+    args = raw.get("args")
+    found: list[Path] = []
+    command = raw.get("command")
+    tokens = [(command, True), *((a, False) for a in (args if isinstance(args, list) else []))]
+    for token, is_command in tokens:
+        if not isinstance(token, str) or not token:
+            continue
+        for candidate in {token, token.partition("=")[2]} - {""}:
+            path = (root / candidate).resolve()
+            if not (path.is_file() and path.is_relative_to(root)) or path in found:
+                continue
+            if is_command or path.suffix.lower() in _SCRIPT_SUFFIXES or os.access(path, os.X_OK):
+                found.append(path)
+    return sorted(found)
+
+
+def _file_digest(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 16), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def approval_hash(project_root: Path, raw: dict[str, Any]) -> str:
+    """What an approval records: the recipe hash, plus — when the recipe runs
+    project files — their contents. A recipe that names none keeps its plain
+    `recipe_hash`, so approvals recorded before files were covered stay valid."""
+    files = project_files(project_root, raw)
+    if not files:
+        return recipe_hash(raw)
+    root = Path(project_root).resolve()
+    h = hashlib.sha256(recipe_hash(raw).encode())
+    for path in files:
+        h.update(f"\0{path.relative_to(root).as_posix()}\0".encode())
+        h.update(_file_digest(path).encode())
+    return "files:" + h.hexdigest()
+
+
+def describe_recipe(name: str, raw: dict[str, Any], project_root: Path | None = None) -> str:
     """The whole raw recipe as the user must review it before approving: every key
     (env values included — `PATH` decides which binary runs; `${VAR}` references
-    appear verbatim), escaped because the config is untrusted, plus the short hash."""
+    appear verbatim), escaped because the config is untrusted, the project files it
+    runs, plus the short hash."""
     lines = [f"  MCP server {shown(name)}:"]
     for key in sorted(raw):
         value = json.dumps(raw[key], ensure_ascii=False, sort_keys=True, default=str)
         lines.append(f"    {shown(key)} = {shown(value)}")
+    if project_root is not None:
+        root = Path(project_root).resolve()
+        for path in project_files(root, raw):
+            lines.append(
+                f"    runs project file {shown(path.relative_to(root).as_posix())} — "
+                "review it too; editing it revokes the approval"
+            )
     lines.append(f"    recipe sha256 {recipe_hash(raw)[:12]}")
     lines.append("  Approving lets Veles start this command whenever the project is opened.")
     return "\n".join(lines)
@@ -77,7 +139,11 @@ def approval_state(project_root: Path, name: str, raw: dict[str, Any]) -> Approv
     recorded = entry.get(name) if isinstance(entry, dict) else None
     if not isinstance(recorded, str):
         return "no"
-    return "yes" if recorded == recipe_hash(raw) else "changed"
+    try:
+        current = approval_hash(project_root, raw)
+    except OSError:  # a named project file vanished or became unreadable
+        return "changed"
+    return "yes" if recorded == current else "changed"
 
 
 def _locked() -> AbstractContextManager[None]:
@@ -88,8 +154,9 @@ def _locked() -> AbstractContextManager[None]:
 
 
 def approve(project_root: Path, name: str, raw: dict[str, Any]) -> str:
-    """Record `raw` as the approved recipe for `name`. Returns the hash."""
-    digest = recipe_hash(raw)
+    """Record `raw` (and the project files it runs) as approved for `name`.
+    Returns the hash."""
+    digest = approval_hash(project_root, raw)
     with _locked():
         data = _load()
         entry = data.get(_key(project_root))

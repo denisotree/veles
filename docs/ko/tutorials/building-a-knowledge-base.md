@@ -2,13 +2,23 @@
 
 > 🌐 **언어:** [English](../../en/tutorials/building-a-knowledge-base.md) · [简体中文](../../zh-CN/tutorials/building-a-knowledge-base.md) · [繁體中文](../../zh-TW/tutorials/building-a-knowledge-base.md) · [日本語](../../ja/tutorials/building-a-knowledge-base.md) · **한국어** · [Español](../../es/tutorials/building-a-knowledge-base.md) · [Français](../../fr/tutorials/building-a-knowledge-base.md) · [Italiano](../../it/tutorials/building-a-knowledge-base.md) · [Português (BR)](../../pt-BR/tutorials/building-a-knowledge-base.md) · [Português (PT)](../../pt-PT/tutorials/building-a-knowledge-base.md) · [Русский](../../ru/tutorials/building-a-knowledge-base.md) · [العربية](../../ar/tutorials/building-a-knowledge-base.md) · [हिन्दी](../../hi/tutorials/building-a-knowledge-base.md) · [বাংলা](../../bn/tutorials/building-a-knowledge-base.md) · [Tiếng Việt](../../vi/tutorials/building-a-knowledge-base.md)
 
-이 튜토리얼에서는 Veles 프로젝트를 살아있는 지식 베이스로 만듭니다: 몇 가지 소스를 인제스트하고, Veles가 위키 페이지를 작성하게 하고, 질문을 던지고, 학습한 내용을 통합합니다. 이것이 기본 **LLM-Wiki** 워크플로입니다. 약 15분 소요됩니다.
+이 튜토리얼에서는 Veles 프로젝트를 살아있는 지식 베이스로 만듭니다: 몇 가지 소스를 인제스트하고, Veles가 위키 페이지를 작성하게 하고, 질문을 던지고, 학습한 내용을 통합합니다. 이것이 **LLM-Wiki** 워크플로입니다. 약 15분 소요됩니다.
 
 먼저 [시작하기](getting-started.md)를 완료해야 합니다.
 
+## 0. llm-wiki 레이아웃 사용하기
+
+위키는 확장 레지스트리에서 제공됩니다. 새 프로젝트는 `veles init`에서 선택하세요(또는 `--layout llm-wiki`를 전달). Veles가 레이아웃과 그에 필요한 `wiki` 모듈을 함께 설치하도록 제안합니다. 기존 프로젝트는 다음과 같이 합니다:
+
+```bash
+veles registry install llm-wiki      # the layout + the wiki module, one confirmation
+```
+
+그리고 `.veles/project.toml`에 `layout = "llm-wiki"`를 설정한 뒤 `veles layout sync`를 실행하세요.
+
 ## 개념
 
-Veles 프로젝트에는 두 개의 콘텐츠 영역이 있습니다:
+위키 프로젝트에는 두 개의 콘텐츠 영역이 있습니다:
 
 - `sources/` — 제공하는 원시적이고 불변의 자료 (에이전트는 읽기 전용).
 - `wiki/` — 에이전트 자체의 LLM이 생성한 지식 (에이전트가 콘텐츠를 쓰는 유일한 영역).

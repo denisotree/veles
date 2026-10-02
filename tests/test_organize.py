@@ -1,9 +1,8 @@
 """M175 — `veles organize`: layout-driven reorg as a built-in module.
 
 Covers: operation resolution per layout, the path-guarded `move_file`
-primitive, `wiki_rename_page` (move + back-reference repair), the no-op
-exit on a layout without an organize operation, and the batch-add file
-collector.
+primitive, and the no-op exit on a layout without an organize operation.
+(The llm-wiki/notes recipes and `wiki_rename_page` are tested in the registry.)
 """
 
 from __future__ import annotations
@@ -36,18 +35,21 @@ def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 # ---- operation resolution (layout-driven dispatch) ----
 
 
-def test_llm_wiki_resolves_organize(isolated_home: Path, tmp_path: Path) -> None:
-    p = init_project(tmp_path / "w", name="w", layout="llm-wiki")
+def test_pack_operation_resolves_to_its_skill(isolated_home: Path, tmp_path: Path) -> None:
+    pack = isolated_home / ".veles" / "layouts" / "tidy"
+    (pack / "skills" / "tidy-up").mkdir(parents=True)
+    (pack / "layout.toml").write_text(
+        '[layout]\nname = "tidy"\n[[layout.operations]]\nname = "organize"\nskill = "tidy-up"\n',
+        encoding="utf-8",
+    )
+    (pack / "skills" / "tidy-up" / "SKILL.md").write_text(
+        "---\nname: tidy-up\ndescription: Sort notes/ by topic.\n---\n\nMove files under notes/.\n",
+        encoding="utf-8",
+    )
+    p = init_project(tmp_path / "t", name="t", layout="tidy")
     resolved = resolve_operation(p, "organize")
     assert resolved is not None
-    assert resolved.skill == "organize"
-    assert "wiki" in resolved.body.lower()
-
-
-def test_notes_resolves_organize(isolated_home: Path, tmp_path: Path) -> None:
-    p = init_project(tmp_path / "n", name="n", layout="notes")
-    resolved = resolve_operation(p, "organize")
-    assert resolved is not None
+    assert resolved.skill == "tidy-up"
     assert "notes/" in resolved.body
 
 
@@ -71,7 +73,7 @@ def test_organize_on_bare_exits_two(isolated_home: Path, tmp_path: Path, capsys)
 
 @pytest.fixture()
 def wiki_project(isolated_home: Path, tmp_path: Path):
-    p = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
+    p = init_project(tmp_path / "proj", name="proj")
     (p.root / "wiki" / "concepts").mkdir(parents=True, exist_ok=True)
     (p.root / "wiki" / "entities").mkdir(parents=True, exist_ok=True)
     token = set_active_project(p)
@@ -90,8 +92,8 @@ def test_move_file_within_writable_zone(wiki_project) -> None:
 
 
 def test_move_file_to_project_root_succeeds(wiki_project) -> None:
-    """M189: llm-wiki declares no writable_zones, so it is permissive —
-    moving a file to a bare project-root path is no longer refused."""
+    """M189: a pack that declares no writable_zones is permissive — moving a
+    file to a bare project-root path is not refused."""
     src = wiki_project.root / "wiki" / "concepts" / "b.md"
     src.write_text("# B\n", encoding="utf-8")
     dst = wiki_project.root / "escaped.md"
@@ -111,32 +113,6 @@ def test_move_file_errors_on_existing_dst(wiki_project) -> None:
     assert src.exists()
 
 
-# ---- wiki_rename_page (move + back-reference repair) ----
-
-
-def test_wiki_rename_page_moves_and_repairs_links(wiki_project) -> None:
-    import veles.modules.wiki.tools as wt
-    from veles.modules.wiki.wiki import Wiki
-
-    wiki = Wiki(wiki_project.wiki_root)
-    wiki.ensure_layout()
-    wiki.write_page(category="queries", slug="old-note", title="Old Note", content="raw")
-    wiki.write_page(
-        category="concepts",
-        slug="topic",
-        title="Topic",
-        content="See [[old-note]] for context.",
-    )
-
-    msg = wt.wiki_rename_page("wiki/queries/old-note.md", "concepts", "new-note")
-    assert "renamed" in msg
-    assert (wiki_project.wiki_root / "wiki" / "concepts" / "new-note.md").is_file()
-    assert not (wiki_project.wiki_root / "wiki" / "queries" / "old-note.md").exists()
-    topic = (wiki_project.wiki_root / "wiki" / "concepts" / "topic.md").read_text(encoding="utf-8")
-    assert "[[new-note]]" in topic
-    assert "[[old-note]]" not in topic
-
-
 # ---- toolset wiring ----
 
 
@@ -144,27 +120,5 @@ def test_toolset_membership() -> None:
     from veles.core.tools.toolsets import TOOLSETS
 
     assert "move_file" in TOOLSETS["organize"]
-    from veles.modules.wiki import WIKI_TOOLS
-
-    assert "wiki_rename_page" in WIKI_TOOLS  # the wiki engine's own tool set
     # propose mode uses the read-only builtin set — no mutation tools.
     assert "move_file" not in TOOLSETS["builtin"]
-
-
-# ---- batch add file collection ----
-
-
-def test_batch_ingest_skips_dot_dirs(tmp_path: Path) -> None:
-    # M204: the collector moved to the module kernel (shared by CLI + wiki_add).
-    from veles.modules.wiki.ingest import batch_ingest_files as _batch_ingest_files
-
-    (tmp_path / "docs").mkdir()
-    (tmp_path / "docs" / "a.md").write_text("a", encoding="utf-8")
-    (tmp_path / "docs" / "b.md").write_text("b", encoding="utf-8")
-    (tmp_path / ".git").mkdir()
-    (tmp_path / ".git" / "config.md").write_text("x", encoding="utf-8")
-    (tmp_path / "notes.txt").write_text("t", encoding="utf-8")
-
-    md = _batch_ingest_files(tmp_path, "*.md")
-    names = {p.name for p in md}
-    assert names == {"a.md", "b.md"}  # .git/config.md and notes.txt excluded

@@ -13,7 +13,7 @@ keychain বা এনভায়রনমেন্ট ভ্যারিয়
 | `~/.veles/` | User-global | `config.toml`, trust গ্রান্ট, ক্রস-প্রজেক্ট skills/tools, মডেল ক্যাশ, locales, registry |
 | `<project>/.veles/` | Project-local | `project.toml`, `config.toml`, `memory.db`, প্রজেক্ট skills/tools, plans, রানটাইম আর্টিফ্যাক্ট |
 | `<project>/AGENTS.md` | Project | এজেন্টে ইনজেক্ট করা কনটেক্সট ফাইল (`CLAUDE.md` / `GEMINI.md`-এ symlink করা) |
-| `<project>/wiki/`, `sources/` | Project | ইউজার কন্টেন্ট (ডিফল্ট LLM-Wiki লেআউট) |
+| `<project>/wiki/`, `sources/`, … | Project | ইউজার কন্টেন্ট, লেআউট প্যাক যেভাবে সাজায় (যেমন LLM-Wiki) |
 
 `VELES_USER_HOME` `~` রিডাইরেক্ট করে (ফলে ইউজার স্টেট `<override>/.veles/`-এ যায়)।
 সম্পূর্ণ ট্রির জন্য দেখুন [প্রজেক্ট লেআউট](project-layout.md)।

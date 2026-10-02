@@ -57,21 +57,18 @@ def _write_user_pack(isolated_home: Path, name: str, description: str = "") -> P
     return pack_dir
 
 
-# ---- builtin packs: picker offered, default llm-wiki ----
+# ---- only the builtin pack: no picker, default bare ----
 
 
-async def test_builtin_packs_offer_picker_with_llm_wiki_default(
-    isolated_home: Path, tmp_path: Path
-) -> None:
-    """M164 ships three builtin packs (llm-wiki / bare / notes), so the
-    picker always shows; accepting the default records llm-wiki."""
-    app = _StubApp(responses=["llm-wiki"])
+async def test_single_builtin_pack_auto_picks_bare(isolated_home: Path, tmp_path: Path) -> None:
+    """Veles ships only `bare`; with no other installed pack the picker is
+    skipped and the default recorded."""
+    app = _StubApp(responses=[])
     ctx = _StubCtx(app=app)
-    step = LayoutPickerStep()
-    outcome = await step.run(ctx)
+    outcome = await LayoutPickerStep().run(ctx)
     assert outcome == WizardOutcome.NEXT
-    assert ctx.answers["layout"] == "llm-wiki"
-    assert len(app.pushed) == 1
+    assert ctx.answers["layout"] == "bare"
+    assert app.pushed == []
 
 
 # ---- multi-pack: picker offered ----

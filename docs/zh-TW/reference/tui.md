@@ -33,7 +33,7 @@ Run modes 的說明請見 [Run modes](../explanation/modes.md)。
 | `/model` | 開啟模型選擇器 |
 | `/mode` | 切換 run mode（auto/planning/writing/goal） |
 | `/session` | 開啟 session picker（恢復） |
-| `/save` | 儲存／命名目前的 session |
+| `/save` | 儲存最後一則回答——若有 layout 頁面儲存區則存為其中的一頁（wiki：`wiki/queries/<slug>.md`），否則存為專案記憶 insight |
 | `/history` | 顯示 session 歷史 |
 | `/tokens` | Token 用量（輸入／輸出／每 turn／每 session） |
 | `/context` | 目前的 context 大小與上限對比 |
@@ -41,7 +41,7 @@ Run modes 的說明請見 [Run modes](../explanation/modes.md)。
 | `/insights` | 顯示專案學到的 insights |
 | `/rules` | 顯示專案的 rules 摘要 |
 | `/schema` | 驗證／修正 `AGENTS.md` |
-| `/wiki` | 針對目前 layout 的 wiki 操作 |
+| `/wiki` | 來自 `wiki` 模組的 wiki 操作——僅在目前 layout 啟用 wiki engine 時可用（例如 `llm-wiki`）。模組可以用同樣的方式新增自己的 `/指令` |
 | `/daemon` | 開啟 daemon 控制面板（project → daemons → channels） |
 
 > 無論你是直接啟動 TUI 或從另一個畫面推送過來，這組 slash 指令都相同。Channels（例如 Telegram）會公開它們自己、各自獨立的指令集。

@@ -57,9 +57,11 @@ mkdir my-notes && cd my-notes
 veles init my-notes
 ```
 
-ينشئ هذا `AGENTS.md` (سياق مشروعك)، و`sources/` و`wiki/` (تخطيط
-[LLM-Wiki الافتراضي](../explanation/layout-packs-and-llm-wiki.md))، و
-`.veles/` (حالة الآلة). راجع [تخطيط المشروع](../reference/project-layout.md).
+ينشئ هذا `AGENTS.md` (سياق مشروعك) و`.veles/` (حالة الآلة) —
+التخطيط الافتراضي `bare` لا يضيف شيئًا آخر. في الطرفية يسأل `veles init`
+أيَّ [تخطيط](../explanation/layout-packs-and-llm-wiki.md) تستخدم؛ اختر
+`llm-wiki` (يُثبَّت من السجلّ فورًا) لتحصل على `sources/` و
+`wiki/`. راجع [تخطيط المشروع](../reference/project-layout.md).
 
 ## 4. شغّل موجِّهك الأول
 

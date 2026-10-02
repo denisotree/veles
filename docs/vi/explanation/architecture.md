@@ -60,7 +60,8 @@ vào **theo nhu cầu** thay vì đổ hết vào ngay từ đầu.
 
 - `<project>/.veles/` — bộ nhớ, cấu hình, kỹ năng/công cụ cục bộ của dự án này.
 - `~/.veles/` — cấu hình toàn cục theo người dùng, kỹ năng/công cụ liên-dự-án, cache, trust.
-- `<project>/AGENTS.md`, `wiki/`, `sources/` — nội dung của bạn (bố cục LLM-Wiki).
+- `<project>/AGENTS.md` và những gì layout của bạn thêm vào (ví dụ `wiki/`, `sources/`
+  cho layout LLM-Wiki) — nội dung của bạn.
 
 Xem [bố cục dự án](../reference/project-layout.md).
 
@@ -73,7 +74,8 @@ một CLI ngoài được khởi chạy ở đó thấy được cùng một ng�
 
 ## Các mặt tương tác (surfaces)
 
-- **CLI** (`veles run`, `veles add`, …) — dùng một lần và dùng trong script.
+- **CLI** (`veles run`, `veles organize`, …, cùng các verb do module thêm như
+  `veles add` của wiki) — dùng một lần và dùng trong script.
 - **TUI** (`veles tui`) — REPL tương tác với [các chế độ chạy](modes.md).
 - **Daemon + kênh** — API không giao diện, Telegram, các tác vụ theo lịch.
 

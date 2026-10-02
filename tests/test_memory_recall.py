@@ -1,9 +1,10 @@
 """Unit + integration tests for per-turn memory recall.
 
 Covers:
-- MemoryRouter (wraps Wiki.search) — recall_* tests.
+- MemoryRouter on a project without content engines — recall_* tests.
 - build_memory_context_block — injector_* tests.
 - system_prompt_from_args integration — prompt_* tests.
+(Recall from wiki pages is tested with the wiki module.)
 """
 
 from __future__ import annotations
@@ -14,62 +15,17 @@ from pathlib import Path
 from veles.core.memory.injector import build_memory_context_block
 from veles.core.memory.router import MemoryRouter, RecallHit
 from veles.core.project import init_project
-from veles.modules.wiki.wiki import Wiki
-
-
-def _seed_wiki(project_root: Path, pages: list[tuple[str, str, str, str]]) -> Wiki:
-    # v2: wiki container is the project root, not `.veles/`.
-    wiki = Wiki(project_root)
-    wiki.ensure_layout()
-    for category, slug, title, content in pages:
-        wiki.write_page(category=category, slug=slug, title=title, content=content)
-    return wiki
-
 
 # ---------- MemoryRouter ----------
 
 
-def test_recall_empty_wiki_returns_empty(tmp_path: Path) -> None:
+def test_recall_empty_project_returns_empty(tmp_path: Path) -> None:
     project = init_project(tmp_path, name="t")
     assert MemoryRouter(project).recall("anything") == []
 
 
-def test_recall_returns_pages_matching_query(tmp_path: Path) -> None:
-    project = init_project(tmp_path, name="t")
-    _seed_wiki(
-        project.root,
-        [
-            (
-                "concepts",
-                "llm-wiki",
-                "LLM Wiki",
-                "Karpathy three-layer pattern: sources, wiki, schema.",
-            ),
-            ("entities", "anthropic", "Anthropic", "AI safety company building Claude."),
-            ("concepts", "tokens", "Token Budget", "TokenBudget tracks cumulative LLM cost."),
-        ],
-    )
-    hits = MemoryRouter(project).recall("Karpathy three-layer")
-    paths = [h.rel_path for h in hits]
-    assert "wiki/concepts/llm-wiki.md" in paths
-
-
-def test_recall_respects_limit(tmp_path: Path) -> None:
-    project = init_project(tmp_path, name="t")
-    _seed_wiki(
-        project.root,
-        [
-            ("concepts", f"page-{i}", f"Page {i}", f"Repeats keyword karpathy {i} times.")
-            for i in range(8)
-        ],
-    )
-    hits = MemoryRouter(project).recall("karpathy", limit=3)
-    assert len(hits) <= 3
-
-
 def test_recall_empty_query_returns_empty(tmp_path: Path) -> None:
     project = init_project(tmp_path, name="t")
-    _seed_wiki(project.root, [("concepts", "x", "X", "body")])
     assert MemoryRouter(project).recall("") == []
     assert MemoryRouter(project).recall("   ") == []
 
@@ -191,24 +147,7 @@ def _run_args(prompt: str = "test prompt") -> argparse.Namespace:
     )
 
 
-def test_prompt_includes_memory_context_when_wiki_has_matches(tmp_path: Path) -> None:
-    from veles.runtime.prompt import system_prompt_from_args
-
-    project = init_project(tmp_path, name="t")
-    _seed_wiki(
-        project.root,
-        [
-            ("concepts", "karpathy-wiki", "Karpathy Wiki", "Three-layer LLM Wiki pattern."),
-        ],
-    )
-    args = _run_args(prompt="Karpathy three-layer wiki")
-    prompt = system_prompt_from_args(args, project)
-    assert prompt is not None
-    assert "<memory-context>" in prompt
-    assert "wiki/concepts/karpathy-wiki.md" in prompt
-
-
-def test_prompt_no_memory_context_when_wiki_empty(tmp_path: Path) -> None:
+def test_prompt_no_memory_context_when_nothing_matches(tmp_path: Path) -> None:
     from veles.runtime.prompt import system_prompt_from_args
 
     project = init_project(tmp_path, name="t")
@@ -224,7 +163,6 @@ def test_prompt_skips_recall_with_empty_prompt(tmp_path: Path) -> None:
     from veles.runtime.prompt import system_prompt_from_args
 
     project = init_project(tmp_path, name="t")
-    _seed_wiki(project.root, [("concepts", "x", "X", "body keyword")])
     args = _run_args(prompt="")
     prompt = system_prompt_from_args(args, project)
     if prompt is not None:

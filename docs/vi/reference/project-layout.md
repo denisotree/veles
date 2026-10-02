@@ -7,15 +7,16 @@
 ## `veles init` tạo ra những gì
 
 Nửa nội dung-người-dùng phụ thuộc vào layout pack được chọn (`--layout`,
-mặc định `llm-wiki`); nửa trạng thái `.veles/` thì giống nhau ở mọi nơi.
+mặc định `bare` — không có gì ngoài `AGENTS.md`); nửa trạng thái `.veles/` thì giống
+nhau ở mọi nơi. Bên dưới là một dự án dùng layout `llm-wiki` từ registry:
 
 ```
-my-project/                  # veles init  (default llm-wiki layout)
+my-project/                  # veles init --layout llm-wiki
 ├── AGENTS.md                # project context (injected into the agent)
 ├── CLAUDE.md → AGENTS.md    # symlink, so a `claude` CLI picks up the same context
 ├── GEMINI.md → AGENTS.md    # symlink, for a `gemini` CLI
-├── sources/                 # raw, immutable source material (agent-readonly)
-├── wiki/                    # the LLM-writable knowledge zone
+├── sources/                 # (llm-wiki) raw source material, readonly by convention
+├── wiki/                    # (llm-wiki) the LLM-writable knowledge zone
 │   ├── concepts/ entities/ queries/ self-doc/ sessions/
 └── .veles/                  # project state (do not commit; machine-managed)
     ├── project.toml         # name, created_at, schema_version, layout
@@ -29,8 +30,8 @@ my-project/                  # veles init  (default llm-wiki layout)
     └── skills/              # project-local skills
 ```
 
-Với `--layout notes`, nửa nội dung chỉ là một thư mục `notes/` duy nhất; với
-`--layout bare` thì hoàn toàn không có scaffold nội dung nào. `wiki/INDEX.md` (catalog
+Với `bare` mặc định thì hoàn toàn không có scaffold nội dung nào; với `notes` (từ
+registry) nó chỉ là một thư mục `notes/` duy nhất. `INDEX.md` của wiki (catalog
 theo nhu cầu) được tạo khi wiki lớn dần; `config.toml`, `tools/`, và `plans/` xuất
 hiện dưới `.veles/` khi bạn cấu hình một thứ gì đó, khi agent viết ra một công cụ,
 hoặc khi bạn chạy một goal.
@@ -67,7 +68,8 @@ Xem [Bộ nhớ dự án & vòng lặp học hỏi](../explanation/project-memor
 
 ## Layout pack
 
-`veles init --layout {llm-wiki|notes|bare|<custom>}` chọn layout nội dung; pack sở
-hữu scaffold, template AGENTS.md, các vùng cho phép ghi, và việc engine wiki (các
-công cụ wiki, tiêm prompt INDEX, recall wiki) có hoạt động hay không. Xem
+`veles init --layout {bare|llm-wiki|notes|<custom>}` chọn layout nội dung (chỉ `bare`
+được tích hợp sẵn; các pack khác đến từ registry và được đề nghị cài); pack sở
+hữu scaffold, template AGENTS.md, các vùng cho phép ghi, và engine nội dung nào (ví dụ
+wiki: các công cụ wiki, tiêm prompt INDEX, recall wiki) mà nó yêu cầu. Xem
 [layout pack & LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).

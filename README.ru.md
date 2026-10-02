@@ -43,7 +43,7 @@ veles        # интерактивный REPL (просто `veles` без по
 
 **Накопительная память** — каждая сессия дистиллируется Куратором в проектную память (инсайты, поведенческие правила, дайджесты сессий в `.veles/`). Агент автоматически вспоминает релевантные факты и прошлые решения — вам больше не нужно заново объяснять один и тот же контекст. Память работает при *любой* раскладке контента.
 
-**Подключаемые раскладки контента** — `veles init` по умолчанию разворачивает LLM-вики в стиле Карпати; `--layout notes` даёт плоский каталог заметок; `--layout bare` не добавляет вообще никакой структуры (идеально для репозиториев с кодом). Свои пакеты раскладок — это один TOML-файл в `~/.veles/layouts/`.
+**Подключаемые раскладки контента** — `veles init` по умолчанию не добавляет никакой структуры (`bare` — идеально для репозиториев с кодом); `llm-wiki` даёт LLM-вики в стиле Карпати, `notes` — плоский каталог заметок, обе ставятся из реестра расширений прямо при выборе. Свои пакеты раскладок — это один TOML-файл в `~/.veles/layouts/`.
 
 **Маршрутизация, независимая от провайдера** — OpenRouter, Anthropic, OpenAI, Gemini, Ollama, llamacpp или ваша подписка на CLI `claude`/`gemini`. Разные типы задач (планирование, сжатие, инсайты) можно направлять на разные модели.
 
@@ -123,17 +123,17 @@ veles secret set OPENROUTER_API_KEY    # prompts for value, stores in keychain
 ### Выберите раскладку контента
 
 ```bash
-veles init                  # default: Karpathy-style LLM wiki (sources/ + wiki/)
-veles init --layout notes   # a single flat notes/ directory
-veles init --layout bare    # no content scaffold — code repos, free-form work
+veles init                      # по умолчанию bare — без контент-каркаса (в терминале спросит)
+veles init --layout llm-wiki    # LLM-вики в стиле Карпати (sources/ + wiki/), из реестра
+veles init --layout notes       # один плоский каталог notes/, из реестра
 ```
 
-Собственная память агента (инсайты, правила, дайджесты сессий в `.veles/`) работает одинаково при любой раскладке. Свои пакеты — это один `layout.toml` в `~/.veles/layouts/<name>/`.
+Неустановленную раскладку Veles предлагает поставить (со всем, что ей нужно, одним подтверждением). Собственная память агента (инсайты, правила, дайджесты сессий в `.veles/`) работает одинаково при любой раскладке. Свои пакеты — это один `layout.toml` в `~/.veles/layouts/<name>/`.
 
 ### Соберите базу знаний (раскладка llm-wiki)
 
 ```bash
-veles add paper.pdf                   # read a source → write a wiki page
+veles add paper.pdf                   # источник → wiki-страница (команда модуля wiki)
 veles add https://example.com/post    # web pages, PDFs, plain text
 
 veles run "What do we know about the authentication design?"
@@ -325,7 +325,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | Создать новый проект |
 | `veles run "<prompt>"` | Однократный запуск агента |
 | `veles` | Интерактивный REPL (без подкоманды) |
-| `veles add <file\|url>` | Добавить источник → тематические вики-страницы |
+| `veles add <file\|url>` | Добавить источник → тематические вики-страницы (модуль `wiki`, раскладка llm-wiki) |
 | `veles organize` | Реорганизовать контент по активному layout (предложить и применить) |
 | `veles research "<question>"` | Глубокое многостороннее исследование |
 | `veles curate` | Консолидировать сессии в вики |

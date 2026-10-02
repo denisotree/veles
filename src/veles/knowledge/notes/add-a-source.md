@@ -1,12 +1,15 @@
 ---
 title: Add a source to the wiki
 topics: [add, source, ingest, wiki, page, file, url]
-related: ["cmd:add"]
+related: []
 ---
 
 Run `veles add <path-or-url>` to read a source and write a wiki page from it
 (this replaced the old `ingest` verb). The source can be a local file, a
-directory, or an `http(s)://` URL.
+directory, or an `http(s)://` URL. `veles add` comes from the wiki module in the
+registry (`veles registry install llm-wiki` brings it with the layout), so it
+exists only where that module is installed; the project's layout must enable the
+wiki engine.
 
 Use `--recursive` with a directory (optionally `--glob PATTERN`) to ingest
 every matching file underneath it, one wiki page per file.

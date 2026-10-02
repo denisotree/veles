@@ -6,15 +6,15 @@
 
 ## `veles init` が生成するもの
 
-ユーザーコンテンツ側は選択したレイアウトパック（`--layout`、デフォルトは `llm-wiki`）に依存しますが、`.veles/` の状態側はどのレイアウトでも同一です。
+ユーザーコンテンツ側は選択したレイアウトパック（`--layout`、デフォルトは `bare` — `AGENTS.md` 以外は何もなし）に依存しますが、`.veles/` の状態側はどのレイアウトでも同一です。以下は、レジストリの `llm-wiki` レイアウトを使うプロジェクトです。
 
 ```
-my-project/                  # veles init  (default llm-wiki layout)
+my-project/                  # veles init --layout llm-wiki
 ├── AGENTS.md                # project context (injected into the agent)
 ├── CLAUDE.md → AGENTS.md    # symlink, so a `claude` CLI picks up the same context
 ├── GEMINI.md → AGENTS.md    # symlink, for a `gemini` CLI
-├── sources/                 # raw, immutable source material (agent-readonly)
-├── wiki/                    # the LLM-writable knowledge zone
+├── sources/                 # (llm-wiki) raw source material, readonly by convention
+├── wiki/                    # (llm-wiki) the LLM-writable knowledge zone
 │   ├── concepts/ entities/ queries/ self-doc/ sessions/
 └── .veles/                  # project state (do not commit; machine-managed)
     ├── project.toml         # name, created_at, schema_version, layout
@@ -28,7 +28,7 @@ my-project/                  # veles init  (default llm-wiki layout)
     └── skills/              # project-local skills
 ```
 
-`--layout notes` の場合、コンテンツ側は単一の `notes/` ディレクトリになります。`--layout bare` の場合、コンテンツのスキャフォールドはまったく作成されません。`wiki/INDEX.md`（オンデマンドのカタログ）は wiki の成長に合わせて生成されます。`config.toml`、`tools/`、`plans/` は、何かを設定したとき、エージェントがツールを書いたとき、あるいはゴールを実行したときに `.veles/` 配下に現れます。
+デフォルトの `bare` ではコンテンツのスキャフォールドはまったく作成されません。`notes`（レジストリ由来）では単一の `notes/` ディレクトリになります。`INDEX.md`（wiki のオンデマンドのカタログ）は wiki の成長に合わせて生成されます。`config.toml`、`tools/`、`plans/` は、何かを設定したとき、エージェントがツールを書いたとき、あるいはゴールを実行したときに `.veles/` 配下に現れます。
 
 ## 状態ディレクトリ
 
@@ -58,4 +58,4 @@ Veles のプロジェクトメモリは、あなたのコンテンツとは分�
 
 ## レイアウトパック
 
-`veles init --layout {llm-wiki|notes|bare|<custom>}` はコンテンツレイアウトを選びます。パックはスキャフォールド、AGENTS.md テンプレート、書き込み可能ゾーン、そして wiki エンジン（wiki ツール、INDEX プロンプト注入、wiki 想起）が有効かどうかを所有します。[レイアウトパックと LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md) を参照してください。
+`veles init --layout {bare|llm-wiki|notes|<custom>}` はコンテンツレイアウトを選びます（組み込みは `bare` のみで、他はレジストリから提供され、インストールが提案されます）。パックはスキャフォールド、AGENTS.md テンプレート、書き込み可能ゾーン、そして要求するコンテンツエンジン（例: wiki の場合は wiki ツール、INDEX プロンプト注入、wiki 想起）を所有します。[レイアウトパックと LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md) を参照してください。

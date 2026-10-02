@@ -46,8 +46,8 @@ Type `/` in the composer; `Tab` completes. The registered commands are:
 | `/sessions` | Open a picker of recent sessions and resume one |
 | `/resume <id-prefix>` | Resume a session by id prefix |
 | `/history [N]` | List recent sessions (default 20) |
-| `/save <slug>` | Save the last answer — a wiki page under `wiki/queries/` on layouts with the wiki engine, otherwise a project-memory insight |
-| `/wiki add <path\|url>` / `/wiki query <question>` | Wiki ops — only registered when the active layout enables the wiki engine (e.g. the default `llm-wiki` layout) |
+| `/save <slug>` | Save the last answer — a page in the layout's page store (the wiki: `wiki/queries/<slug>.md`) when there is one, otherwise a project-memory insight |
+| `/wiki add <path\|url>` / `/wiki query <question>` | Wiki ops from the `wiki` module — only where the active layout enables the wiki engine (e.g. `llm-wiki`). Modules can add their own `/commands` the same way |
 | `/model [<id>]` | No id: open the inline filterable model picker. With an id: set it directly |
 | `/theme [<name>]` | No name: open the inline filterable theme picker. With a name: set it directly |
 | `/mode [<name>]` | Show or set the run mode (`auto`/`planning`/`writing`/`goal`); `Shift+Tab` cycles |

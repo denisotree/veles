@@ -44,7 +44,7 @@ response  ──►  saved to memory  ──►  learning triggers (insights, cu
 
 - `<project>/.veles/` — このプロジェクトのメモリ、設定、ローカルのスキル/ツール。
 - `~/.veles/` — ユーザーグローバルの設定、プロジェクト横断のスキル/ツール、キャッシュ、トラスト。
-- `<project>/AGENTS.md`、`wiki/`、`sources/` — あなたのコンテンツ（LLM-Wiki レイアウト）。
+- `<project>/AGENTS.md` と、レイアウトが追加するもの（例: LLM-Wiki レイアウトの `wiki/`、`sources/`）— あなたのコンテンツ。
 
 [プロジェクトレイアウト](../reference/project-layout.md)を参照。
 
@@ -54,7 +54,7 @@ response  ──►  saved to memory  ──►  learning triggers (insights, cu
 
 ## 操作面（サーフェス）
 
-- **CLI**（`veles run`、`veles add`、…）— ワンショットおよびスクリプト用途。
+- **CLI**（`veles run`、`veles organize`、…、および wiki の `veles add` のようにモジュールが追加する動詞）— ワンショットおよびスクリプト用途。
 - **TUI**（`veles tui`）— [実行モード](modes.md)を備えたインタラクティブな REPL。
 - **デーモン + チャネル** — ヘッドレス API、Telegram、スケジュールジョブ。
 

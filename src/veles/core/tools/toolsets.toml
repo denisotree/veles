@@ -128,8 +128,8 @@ tools = [
 # `veles organize --apply` — reorganize project content. Read-only baseline +
 # generic file mutation + the organize module's `move_file` primitive +
 # memory writes. Wiki reorg tools (wiki_write_page/append_log/rename_page) come
-# in via engine-wiki and are auto-subtracted on non-wiki layouts by
-# `_load_skills`. The default (propose) run uses the read-only `builtin` set
+# from the wiki module's tool set and are dropped on layouts without the wiki
+# engine by `load_skills`. The default (propose) run uses the read-only `builtin` set
 # instead — mutation tools appear only with --apply.
 includes = ["builtin"]
 tools = [

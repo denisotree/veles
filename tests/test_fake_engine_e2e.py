@@ -62,7 +62,7 @@ def test_every_point_reaches_its_consumer(engine, tmp_path, monkeypatch) -> None
     assert "dream" in engine.CALLS  # dream_step
 
     assert "fake_do" in curation_plan(project, "s").persist_tools  # curator_target
-    assert refresh_self_doc(project) == "fake/self-doc.md"  # self_doc
+    assert refresh_self_doc(project) == "fake/self-doc/overview.md"  # page_store
     clusters = detect_clusters(project, min_pages=2)  # subproject_source
     assert [c.pages for c in clusters] == [["f/1.md", "f/2.md"]]
     import argparse

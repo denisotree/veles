@@ -23,7 +23,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | 플래그 | 기본값 | 용도 |
 |---|---|---|
 | `name` (위치 인자) | cwd 베이스명 | 프로젝트 이름 |
-| `--layout <name>` | `llm-wiki` | 콘텐츠 스캐폴드용 레이아웃 팩(`llm-wiki`, `notes`, `bare`, 또는 `~/.veles/layouts/`의 커스텀 팩) |
+| `--layout <name>` | `bare` (터미널에서는 질문함) | 콘텐츠 스캐폴드용 레이아웃 팩(`bare`, `llm-wiki`나 `notes`처럼 레지스트리에서 설치한 팩, 또는 `~/.veles/layouts/`의 커스텀 팩). 설치되지 않은 팩은 설치를 제안하며, 거부하면 아무것도 생성되지 않음 |
 | `--force` | off | `.veles/`가 이미 있어도 다시 생성 |
 
 ### `veles schema {validate,edit,fix}`
@@ -34,7 +34,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 - `fix` — LLM 마법사로 누락된 섹션을 대화형으로 추가합니다.
 
 ### `veles self-doc [refresh|show]`
-프로젝트 자체 문서(`wiki/self-doc/overview.md`)를 생성하고 표시합니다. 인자 없는 `veles self-doc`은 현재 페이지를 보여주고, `refresh`는 다시 생성합니다.
+프로젝트 자체 문서를 생성하고 표시합니다 — 레이아웃에 페이지 저장소가 있으면 그곳에(위키: `wiki/self-doc/overview.md`), 없으면 `.veles/memory/self-doc.md`에 저장됩니다. 인자 없는 `veles self-doc`은 현재 페이지를 보여주고, `refresh`는 다시 생성합니다.
 
 ### `veles doctor`
 사용자 전역 상태와 활성 프로젝트에 대해 상태 점검을 실행합니다. 활성 프로젝트가 있든 없든 동작합니다.
@@ -94,10 +94,13 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `--theme <name>` | config 또는 `everforest` | 색상 테마(everforest, dracula, gruvbox, tokyo-night, catppuccin) |
 
 ### `veles add <source>`
-소스(로컬 파일 또는 `http(s)://` URL)를 읽어 위키 페이지로 종합합니다. 공통 에이전트 루프 플래그를 받습니다.
+*(`wiki` 모듈에서 제공 — `veles registry install llm-wiki` 또는 `… install wiki`)*
+소스(로컬 파일 또는 `http(s)://` URL)를 읽어 위키 페이지로 종합합니다. 모듈이 없으면 `veles add`는 알 수 없는 명령이며, 오류 메시지가 설치 방법을 알려줍니다.
+
+모듈도 같은 방식으로 자체 동사를 추가할 수 있으며, 해당 모듈이 있는 프로젝트 안의 `veles --help`에 표시됩니다. 공통 에이전트 루프 플래그를 받습니다.
 
 ### `veles curate`
-큐레이터를 한 번 실행합니다. 미처리 세션을 `wiki/sessions/` 페이지로 압축합니다.
+큐레이터를 한 번 실행합니다. 미처리 세션을 메모리 인사이트로 압축합니다(위키 엔진이 켜져 있으면 `wiki/sessions/` 페이지로도).
 
 | 플래그 | 기본값 | 용도 |
 |---|---|---|

@@ -64,11 +64,19 @@ def _list(args: argparse.Namespace, project: Project) -> int:
         print("(no modules)")
         return 0
     print(f"{'name':<20}  {'scope':<8}  {'version':<10}  description")
+    project_names = {h.name for scope, h in rows if scope == "project"}
+    seen: set[tuple[str, str]] = set()
     for scope, h in rows:
         version = h.manifest.version or "—"
         desc = shown(h.manifest.description)
         if len(desc) > 60:
             desc = desc[:57] + "..."
+        # The same rules the loader applies (`core/module_loading.py`).
+        if (scope, h.name) in seen:
+            desc = f"[duplicate name — ignored: {shown(h.dir)}] {desc}"
+        elif scope == "user" and h.name in project_names:
+            desc = f"[shadowed by the project's] {desc}"
+        seen.add((scope, h.name))
         print(f"{h.name:<20}  {scope:<8}  {shown(version):<10}  {desc}")
     return 0
 

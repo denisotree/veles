@@ -30,7 +30,7 @@ from veles.core.registry.model import (
     scan_registry,
 )
 from veles.core.registry.repo import RegistryRepoError, changed_paths, fetch_git_source, file_at
-from veles.core.registry.scan import scan_python
+from veles.core.registry.scan import native_binaries, non_sdk_imports, scan_python
 from veles.core.registry.versions import is_newer, satisfies
 
 PERMISSIVE_LICENSES = frozenset(
@@ -101,6 +101,7 @@ def validate_registry(
                 f"duplicate name {ext.name!r}: {ext.group}/ and {seen[ext.name].group}/"
             )
         seen.setdefault(ext.name, ext)
+    report.errors += _check_dependencies(entries, meta.name)
     touched: frozenset[str] = frozenset()
     if base is None:
         targets = entries
@@ -135,6 +136,32 @@ def validate_registry(
     return report
 
 
+def _check_dependencies(entries: list[Extension], registry: str) -> list[str]:
+    """Every `requires_extensions` ref into this registry names a real extension,
+    and those refs form no cycle. Refs into other registries can't be checked here."""
+    by_ref = {f"{registry}:{e.group}/{e.name}": e for e in entries}
+    errors: list[str] = []
+    for ext in by_ref.values():
+        for dep in ext.requires_extensions:
+            if dep.startswith(f"{registry}:") and dep not in by_ref:
+                errors.append(f"{ext.group}/{ext.name}: requires_extensions: no extension {dep}")
+    done: set[str] = set()
+
+    def visit(ref: str, stack: list[str]) -> None:
+        if ref in stack:
+            errors.append(f"requires_extensions cycle: {' → '.join([*stack, ref])}")
+            return
+        if ref in done or ref not in by_ref:
+            return
+        for dep in by_ref[ref].requires_extensions:
+            visit(dep, [*stack, ref])
+        done.add(ref)
+
+    for ref in by_ref:
+        visit(ref, [])
+    return errors
+
+
 def _check(
     ext: Extension, meta: RegistryMeta, report: ValidationReport, work: Path
 ) -> tuple[list[str], Path | None]:
@@ -167,6 +194,7 @@ def _check(
             errors.append(f".git is not allowed in an extension payload: {git}")
         errors += _check_kind(ext, payload)
         report.review += [f"{ext.group}/{ext.name}: {f}" for f in scan_python(payload)]
+        report.review += [f"{ext.group}/{ext.name}: {f}" for f in native_binaries(payload)]
         if ext.requires:
             report.review.append(
                 f"{ext.group}/{ext.name}: pip requirements {', '.join(ext.requires)}"
@@ -214,6 +242,7 @@ def _check_module(ext: Extension, payload: Path) -> list[str]:
     bad = [p for p in ext.provides if not p.startswith(prefixes)]
     if bad:
         errors.append(f"provides entries must start with {', '.join(prefixes)}: {bad}")
+    errors += [f"{hit} — import from veles.sdk instead" for hit in non_sdk_imports(payload)]
     try:
         manifest = parse_manifest((payload / "module.toml").read_text(encoding="utf-8"))
         entry, _ = entrypoint_file(payload, manifest.entrypoint)

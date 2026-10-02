@@ -43,6 +43,10 @@ def _bootstrap_daemon(project, *, name: str | None = None) -> None:
 
     set_active_project(project)
     set_module_registry(_load_project_modules(project))
+    from veles.core.registry.ensure import ensure_project_extensions
+
+    # No terminal to ask at: a missing layout/engine is one warning in the log.
+    ensure_project_extensions(project, interactive=False)
 
     # M226: images arriving on a channel are described by the project's own
     # vision route (`[vision]` in config.toml). Installed here so every

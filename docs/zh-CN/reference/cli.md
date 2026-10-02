@@ -23,7 +23,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | 参数 | 默认值 | 用途 |
 |---|---|---|
 | `name`（位置参数） | 当前目录名 | 项目名称 |
-| `--layout <name>` | `llm-wiki` | 内容脚手架使用的 layout 包（`llm-wiki`、`notes`、`bare`，或来自 `~/.veles/layouts/` 的自定义包） |
+| `--layout <name>` | `bare`（在终端中会询问） | 内容脚手架使用的 layout 包（`bare`、从注册表安装的包如 `llm-wiki` 或 `notes`，或来自 `~/.veles/layouts/` 的自定义包）。未安装的包会提示安装；拒绝则不会创建任何内容 |
 | `--force` | 关闭 | 即使 `.veles/` 已存在也重新创建 |
 
 ### `veles schema {validate,edit,fix}`
@@ -34,7 +34,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 - `fix` — 通过 LLM 向导交互式地补全缺失的章节。
 
 ### `veles self-doc [refresh|show]`
-生成并显示项目自文档（`wiki/self-doc/overview.md`）。不带参数的 `veles self-doc` 显示当前页面；`refresh` 会重新生成它。
+生成并显示项目自文档 —— 若布局有页面存储则存入其中（wiki：`wiki/self-doc/overview.md`），否则存入 `.veles/memory/self-doc.md`。不带参数的 `veles self-doc` 显示当前页面；`refresh` 会重新生成它。
 
 ### `veles doctor`
 对用户全局状态和当前活动项目运行健康检查。无论是否有活动项目都可用。
@@ -94,10 +94,13 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `--theme <name>` | 来自配置或 `everforest` | 配色主题（everforest、dracula、gruvbox、tokyo-night、catppuccin） |
 
 ### `veles add <source>`
-读取一个来源（本地文件或 `http(s)://` URL）并将其综合成一个 wiki 页面。接受共享 agent-loop 参数。
+*（来自 `wiki` 模块 —— `veles registry install llm-wiki` 或 `… install wiki`）*
+读取一个来源（本地文件或 `http(s)://` URL）并将其综合成一个 wiki 页面。没有该模块时，`veles add` 是未知命令，错误信息会指明安装方式。接受共享 agent-loop 参数。
+
+模块可以用同样的方式添加自己的命令；它们会出现在装有该模块的项目内的 `veles --help` 中。
 
 ### `veles curate`
-运行一轮 curator：将未处理的 session 压缩为 `wiki/sessions/` 页面。
+运行一轮 curator：将未处理的 session 压缩为记忆洞察（wiki 引擎开启时还包括 `wiki/sessions/` 页面）。
 
 | 参数 | 默认值 | 用途 |
 |---|---|---|

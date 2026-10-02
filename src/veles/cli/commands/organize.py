@@ -17,7 +17,8 @@ import argparse
 import sys
 import time
 
-from veles.core.layout.engines import wiki_enabled
+from veles.core.contributions import call_each
+from veles.core.layout.discovery import find_layout
 from veles.core.memory.artefacts import proposals_dir, write_proposal
 from veles.core.project import Project
 from veles.core.tools.toolsets import TOOLSETS
@@ -69,6 +70,16 @@ def cmd_organize(args: argparse.Namespace, project: Project) -> int:
 
     resolved = resolve_operation(project, _OP_NAME)
     if resolved is None:
+        from veles.core.registry.ensure import install_hint
+
+        hint = install_hint(project)
+        if hint is not None:
+            print(
+                f"error: layout pack {project.layout_name!r} (or an engine it needs) is not "
+                f"installed — `{hint}`",
+                file=sys.stderr,
+            )
+            return 2
         print(
             f"error: the active layout pack {project.layout_name!r} exposes no "
             "`organize` operation — nothing to reorganize.\n"
@@ -89,10 +100,10 @@ def cmd_organize(args: argparse.Namespace, project: Project) -> int:
     # toolset can resolve it — lazy, exactly like the wiki engine.
     import veles.modules.organize.tools  # noqa: F401
 
-    if wiki_enabled(project):
-        from veles.modules.wiki.wiki import Wiki
-
-        Wiki(project.wiki_root).ensure_layout()
+    # Module trees (e.g. the wiki's categories) must exist before files move into them.
+    pack = find_layout(project.layout_name, project)
+    if pack is not None:
+        call_each("scaffold", lambda c: c.obj(project.root, pack.manifest))  # type: ignore[operator]
 
     toolset = "organize" if apply else "builtin"
     tools = TOOLSETS[toolset]

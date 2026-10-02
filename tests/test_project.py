@@ -52,23 +52,14 @@ def test_find_project_root_stops_at_first(tmp_path: Path) -> None:
 
 
 def test_init_project_creates_skeleton(tmp_path: Path) -> None:
-    """v2 layout: wiki lives in `<root>/wiki/` (project content); raw
-    sources in `<root>/sources/`. `.veles/` keeps only daemon-internal
-    state (project.toml, skills/, later memory.db/etc.)."""
+    """`.veles/` keeps only Veles' own state (project.toml, skills/, later
+    memory.db/etc.); the default `bare` layout adds no content dirs."""
     p = init_project(tmp_path, name="alpha")
     assert (tmp_path / ".veles").is_dir()
     assert (tmp_path / ".veles" / "project.toml").is_file()
     assert (tmp_path / ".veles" / "skills").is_dir()
-    # Wiki is *not* under `.veles/` anymore.
-    assert not (tmp_path / ".veles" / "wiki").exists()
-    assert not (tmp_path / ".veles" / "sources").exists()
-    # It sits in the root, next to AGENTS.md.
-    assert (tmp_path / "wiki" / "concepts").is_dir()
-    assert (tmp_path / "wiki" / "entities").is_dir()
-    assert (tmp_path / "wiki" / "queries").is_dir()
-    # M203: `sources` is not a wiki page category; raw sources live at root level.
-    assert not (tmp_path / "wiki" / "sources").exists()
-    assert (tmp_path / "sources").is_dir()  # raw sources at root level
+    assert not (tmp_path / "wiki").exists()
+    assert not (tmp_path / "sources").exists()
     assert p.name == "alpha"
     assert p.schema_version == 2
     # `wiki_root` is the container — `Wiki` adds `wiki/`/`sources/` itself.

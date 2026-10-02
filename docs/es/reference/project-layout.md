@@ -7,15 +7,16 @@ Qué crea `veles init`, dónde guarda Veles su estado y el esquema de la memoria
 ## Qué produce `veles init`
 
 La mitad de contenido de usuario depende del pack de layout elegido (`--layout`,
-por defecto `llm-wiki`); la mitad de estado en `.veles/` es idéntica en todas partes.
+por defecto `bare` — nada más que `AGENTS.md`); la mitad de estado en `.veles/` es
+idéntica en todas partes. A continuación, un proyecto con el layout `llm-wiki` del registro:
 
 ```
-my-project/                  # veles init  (default llm-wiki layout)
+my-project/                  # veles init --layout llm-wiki
 ├── AGENTS.md                # project context (injected into the agent)
 ├── CLAUDE.md → AGENTS.md    # symlink, so a `claude` CLI picks up the same context
 ├── GEMINI.md → AGENTS.md    # symlink, for a `gemini` CLI
-├── sources/                 # raw, immutable source material (agent-readonly)
-├── wiki/                    # the LLM-writable knowledge zone
+├── sources/                 # (llm-wiki) raw source material, readonly by convention
+├── wiki/                    # (llm-wiki) the LLM-writable knowledge zone
 │   ├── concepts/ entities/ queries/ self-doc/ sessions/
 └── .veles/                  # project state (do not commit; machine-managed)
     ├── project.toml         # name, created_at, schema_version, layout
@@ -29,9 +30,9 @@ my-project/                  # veles init  (default llm-wiki layout)
     └── skills/              # project-local skills
 ```
 
-Con `--layout notes` la mitad de contenido es un único directorio `notes/`; con
-`--layout bare` no hay andamiaje de contenido en absoluto. `wiki/INDEX.md` (el
-catálogo bajo demanda) se genera a medida que la wiki crece; `config.toml`, `tools/`
+Con el `bare` por defecto no hay andamiaje de contenido en absoluto; con `notes`
+(del registro) es un único directorio `notes/`. `INDEX.md` (el catálogo bajo
+demanda de la wiki) se genera a medida que la wiki crece; `config.toml`, `tools/`
 y `plans/` aparecen bajo `.veles/` en cuanto configuras algo, un agente
 escribe una herramienta o ejecutas un objetivo.
 
@@ -68,8 +69,9 @@ para ver cómo se escriben y se recuperan.
 
 ## Packs de layout
 
-`veles init --layout {llm-wiki|notes|bare|<custom>}` elige el layout de
-contenido; el pack es dueño del andamiaje, la plantilla de AGENTS.md, las zonas
-escribibles y de si el motor de wiki (herramientas de wiki, inyección del prompt
-INDEX, recuperación de wiki) está activo. Consulta
+`veles init --layout {bare|llm-wiki|notes|<custom>}` elige el layout de
+contenido (solo `bare` es integrado; los demás vienen de un registro y se ofrecen
+para instalar); el pack es dueño del andamiaje, la plantilla de AGENTS.md, las
+zonas escribibles y de qué motor de contenido (p. ej. la wiki: herramientas de
+wiki, inyección del prompt INDEX, recuperación de wiki) pide. Consulta
 [Packs de layout y la LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).

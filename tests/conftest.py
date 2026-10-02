@@ -338,3 +338,39 @@ def isolated_user_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Itera
     veles_dir = home_root / ".veles"
     veles_dir.mkdir(exist_ok=True)
     yield veles_dir
+
+
+_FIXTURE_LAYOUTS = Path(__file__).parent / "fixtures" / "layouts"
+
+
+@pytest.fixture
+def wiki_engine(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
+    """Core's side of a content engine without the wiki itself (it ships from the
+    registry): the `wiki-test` layout (asks for the `wiki` engine, context file
+    INDEX.md) is discoverable whatever user home a test sets, and a stub module
+    contributes the engine. Yields the layout name."""
+    from veles.core.contributions import Engine
+    from veles.core.layout import clear_engine_cache, discovery
+    from veles.core.modules import (
+        ModuleAPI,
+        ModuleRegistry,
+        reset_module_registry,
+        set_module_registry,
+    )
+
+    real_roots = discovery._search_roots
+    monkeypatch.setattr(
+        discovery,
+        "_search_roots",
+        lambda project: [*real_roots(project), ("user", _FIXTURE_LAYOUTS)],
+    )
+    scratch, registry = ModuleRegistry(), ModuleRegistry()
+    ModuleAPI(scratch, "wiki-stub").contribute("engine", "wiki", Engine("wiki"))
+    registry.merge_from(scratch, "wiki-stub")
+    token = set_module_registry(registry)
+    clear_engine_cache()
+    try:
+        yield "wiki-test"
+    finally:
+        reset_module_registry(token)
+        clear_engine_cache()

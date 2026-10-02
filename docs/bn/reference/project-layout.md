@@ -7,15 +7,16 @@
 ## `veles init` কী তৈরি করে
 
 ব্যবহারকারীর কন্টেন্ট অংশটি নির্ভর করে বেছে নেওয়া layout pack-এর উপর (`--layout`,
-ডিফল্ট `llm-wiki`); `.veles/` state অংশটি সর্বত্র অভিন্ন।
+ডিফল্ট `bare` — `AGENTS.md` ছাড়া কিছুই নয়); `.veles/` state অংশটি সর্বত্র অভিন্ন।
+নিচে রেজিস্ট্রির `llm-wiki` layout-এ একটি প্রজেক্ট:
 
 ```
-my-project/                  # veles init  (default llm-wiki layout)
+my-project/                  # veles init --layout llm-wiki
 ├── AGENTS.md                # project context (injected into the agent)
 ├── CLAUDE.md → AGENTS.md    # symlink, so a `claude` CLI picks up the same context
 ├── GEMINI.md → AGENTS.md    # symlink, for a `gemini` CLI
-├── sources/                 # raw, immutable source material (agent-readonly)
-├── wiki/                    # the LLM-writable knowledge zone
+├── sources/                 # (llm-wiki) raw source material, readonly by convention
+├── wiki/                    # (llm-wiki) the LLM-writable knowledge zone
 │   ├── concepts/ entities/ queries/ self-doc/ sessions/
 └── .veles/                  # project state (do not commit; machine-managed)
     ├── project.toml         # name, created_at, schema_version, layout
@@ -29,8 +30,8 @@ my-project/                  # veles init  (default llm-wiki layout)
     └── skills/              # project-local skills
 ```
 
-`--layout notes` দিয়ে কন্টেন্ট অংশটি হয় একটিমাত্র `notes/` ডিরেক্টরি; `--layout bare`
-দিয়ে কোনো কন্টেন্ট scaffold-ই থাকে না। wiki বড় হওয়ার সাথে সাথে `wiki/INDEX.md`
+ডিফল্ট `bare` দিয়ে কোনো কন্টেন্ট scaffold-ই থাকে না; `notes` (রেজিস্ট্রি থেকে) দিয়ে
+এটি একটিমাত্র `notes/` ডিরেক্টরি। wiki বড় হওয়ার সাথে সাথে wiki-র `INDEX.md`
 (on-demand catalog) তৈরি হয়; `config.toml`, `tools/`, ও `plans/` `.veles/`-এর অধীনে তখনই
 আসে যখন আপনি কিছু কনফিগার করেন, কোনো agent একটি tool লেখে, বা আপনি একটি goal চালান।
 
@@ -67,7 +68,8 @@ insight view, session digest, proposal, system-ops journal)।
 
 ## Layout pack
 
-`veles init --layout {llm-wiki|notes|bare|<custom>}` কন্টেন্ট layout বেছে নেয়;
-pack-টি scaffold, AGENTS.md template, writable অঞ্চল, এবং wiki engine (wiki tool,
-INDEX prompt injection, wiki recall) সক্রিয় কিনা তা নিয়ন্ত্রণ করে। দেখুন
+`veles init --layout {bare|llm-wiki|notes|<custom>}` কন্টেন্ট layout বেছে নেয় (শুধু
+`bare` বিল্টইন; বাকিগুলো রেজিস্ট্রি থেকে আসে এবং ইনস্টলের প্রস্তাব দেওয়া হয়);
+pack-টি scaffold, AGENTS.md template, writable অঞ্চল, এবং কোন content engine
+(যেমন wiki: wiki tool, INDEX prompt injection, wiki recall) চায় তা নিয়ন্ত্রণ করে। দেখুন
 [layout pack ও LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)।

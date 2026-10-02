@@ -13,7 +13,7 @@ Veles настраивается двумя файлами TOML и наборо�
 | `~/.veles/` | User-global | `config.toml`, trust-разрешения, навыки/инструменты между проектами, кэш моделей, локали, реестр |
 | `<project>/.veles/` | Project-local | `project.toml`, `config.toml`, `memory.db`, навыки/инструменты проекта, планы, runtime-артефакты |
 | `<project>/AGENTS.md` | Project | Контекстный файл, внедряемый в агента (симлинкуется на `CLAUDE.md` / `GEMINI.md`) |
-| `<project>/wiki/`, `sources/` | Project | Пользовательский контент (раскладка LLM-Wiki по умолчанию) |
+| `<project>/wiki/`, `sources/`, … | Project | Пользовательский контент, как его раскладывает пакет (например, LLM-Wiki) |
 
 `VELES_USER_HOME` перенаправляет `~` (так что состояние пользователя попадёт в
 `<override>/.veles/`). Полное дерево см. в [раскладке проекта](project-layout.md).

@@ -52,7 +52,7 @@ mkdir my-notes && cd my-notes
 veles init my-notes
 ```
 
-這會建立 `AGENTS.md`（你的專案脈絡）、`sources/` 與 `wiki/`（預設的 [LLM-Wiki 版面](../explanation/layout-packs-and-llm-wiki.md)），以及 `.veles/`（機器狀態）。參見[專案版面](../reference/project-layout.md)。
+這會建立 `AGENTS.md`（你的專案脈絡）與 `.veles/`（機器狀態）——預設的 `bare` 版面不會再新增其他東西。在終端機中，`veles init` 會詢問要使用哪種[版面](../explanation/layout-packs-and-llm-wiki.md)；選擇 `llm-wiki`（會當場從登錄表安裝）即可得到 `sources/` 與 `wiki/`。參見[專案版面](../reference/project-layout.md)。
 
 ## 4. 執行你的第一個提示
 

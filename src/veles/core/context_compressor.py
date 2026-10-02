@@ -178,7 +178,7 @@ def _build_compression_note(
     """
     note = (
         f"\n\n[CONTEXT-COMPRESSION] {n_turns_dropped} earlier turns of this "
-        f"session were summarised into {summary_path}; use wiki_read_page "
+        f"session were summarised into {summary_path}; use read_file "
         f"to retrieve when needed."
     )
     if active_plan_refs:

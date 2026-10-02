@@ -209,6 +209,7 @@ class McpClientManager:
                 command=cfg.command or "",
                 args=list(cfg.args),
                 env={**os.environ, **cfg.env} if cfg.env else None,
+                cwd=cfg.cwd,
             )
             read, write = await stack.enter_async_context(stdio_client(params))
             return read, write

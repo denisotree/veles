@@ -11,7 +11,7 @@ Veles は 2 つの TOML ファイルと一連の状態ディレクトリで設�
 | `~/.veles/` | ユーザーグローバル | `config.toml`、trust の付与、プロジェクト横断のスキル/ツール、モデルキャッシュ、ロケール、レジストリ |
 | `<project>/.veles/` | プロジェクトローカル | `project.toml`、`config.toml`、`memory.db`、プロジェクトのスキル/ツール、プラン、実行時アーティファクト |
 | `<project>/AGENTS.md` | プロジェクト | エージェントに注入されるコンテキストファイル（`CLAUDE.md` / `GEMINI.md` にシンボリックリンクされる） |
-| `<project>/wiki/`, `sources/` | プロジェクト | ユーザーコンテンツ（デフォルトの LLM-Wiki レイアウト） |
+| `<project>/wiki/`, `sources/`, … | プロジェクト | レイアウトパックが配置するユーザーコンテンツ（例: LLM-Wiki） |
 
 `VELES_USER_HOME` は `~` をリダイレクトします（ユーザー状態は `<override>/.veles/` に置かれます）。ツリー全体については[プロジェクトレイアウト](project-layout.md)を参照してください。
 

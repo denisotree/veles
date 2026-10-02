@@ -7,15 +7,16 @@
 ## ما الذي ينتجه `veles init`
 
 يعتمد نصف محتوى المستخدم على حزمة البنية المختارة (`--layout`، والافتراضي
-`llm-wiki`)؛ أما نصف الحالة في `.veles/` فهو متطابق في كل مكان.
+`bare` — لا شيء سوى `AGENTS.md`)؛ أما نصف الحالة في `.veles/` فهو متطابق
+في كل مكان. أدناه، مشروع على تخطيط `llm-wiki` من السجلّ:
 
 ```
-my-project/                  # veles init  (default llm-wiki layout)
+my-project/                  # veles init --layout llm-wiki
 ├── AGENTS.md                # project context (injected into the agent)
 ├── CLAUDE.md → AGENTS.md    # symlink, so a `claude` CLI picks up the same context
 ├── GEMINI.md → AGENTS.md    # symlink, for a `gemini` CLI
-├── sources/                 # raw, immutable source material (agent-readonly)
-├── wiki/                    # the LLM-writable knowledge zone
+├── sources/                 # (llm-wiki) raw source material, readonly by convention
+├── wiki/                    # (llm-wiki) the LLM-writable knowledge zone
 │   ├── concepts/ entities/ queries/ self-doc/ sessions/
 └── .veles/                  # project state (do not commit; machine-managed)
     ├── project.toml         # name, created_at, schema_version, layout
@@ -29,8 +30,8 @@ my-project/                  # veles init  (default llm-wiki layout)
     └── skills/              # project-local skills
 ```
 
-مع `--layout notes` يكون نصف المحتوى مجرد دليل `notes/` واحد؛ ومع
-`--layout bare` لا يوجد أي هيكل للمحتوى على الإطلاق. ويُولَّد `wiki/INDEX.md`
+مع `bare` الافتراضي لا يوجد أي هيكل للمحتوى على الإطلاق؛ ومع `notes` (من
+السجلّ) يكون مجرد دليل `notes/` واحد. ويُولَّد `INDEX.md` الخاص بالويكي
 (الفهرس عند الطلب) مع نمو الويكي؛ بينما يظهر `config.toml` و`tools/`
 و`plans/` ضمن `.veles/` بمجرد أن تضبط شيئًا، أو يكتب وكيلٌ أداة،
 أو تشغّل هدفًا.
@@ -67,8 +68,9 @@ my-project/                  # veles init  (default llm-wiki layout)
 
 ## حزم البنية
 
-يختار `veles init --layout {llm-wiki|notes|bare|<custom>}` بنية المحتوى؛
+يختار `veles init --layout {bare|llm-wiki|notes|<custom>}` بنية المحتوى
+(`bare` وحده مضمّن؛ والباقي يأتي من سجلّ ويُعرض تثبيته)؛
 وتمتلك الحزمة الهيكل، وقالب AGENTS.md، والمناطق القابلة للكتابة،
-وما إذا كان محرك الويكي (أدوات الويكي، حقن موجّه INDEX، استدعاء الويكي)
-نشطًا. راجع
+وأيّ محرّك محتوى (مثل الويكي: أدوات الويكي، حقن موجّه INDEX، استدعاء الويكي)
+تطلبه. راجع
 [حزم البنية وLLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).

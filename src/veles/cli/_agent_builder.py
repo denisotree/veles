@@ -1,6 +1,6 @@
 """Shared agent-construction spine for agent-driven CLI verbs (M152).
 
-`cmd_run` and `_run_ingest_cli` (and any future agent verb) repeat the
+`cmd_run` and `CliHost.run_agent` (module verbs, e.g. `veles add`) repeat the
 same construction sequence: ensure the provider API key → make the
 provider → resolve the system prompt → optionally build a history
 compressor → load project skills into a tool registry → construct the

@@ -6,15 +6,15 @@
 
 ## `veles init` 會產生什麼
 
-使用者內容那一半取決於所選的 layout pack（`--layout`，預設為 `llm-wiki`）；而 `.veles/` 狀態那一半在任何情況下都相同。
+使用者內容那一半取決於所選的 layout pack（`--layout`，預設為 `bare`——除 `AGENTS.md` 外什麼都沒有）；而 `.veles/` 狀態那一半在任何情況下都相同。以下是登錄表中 `llm-wiki` 版面的專案：
 
 ```
-my-project/                  # veles init  (default llm-wiki layout)
+my-project/                  # veles init --layout llm-wiki
 ├── AGENTS.md                # project context (injected into the agent)
 ├── CLAUDE.md → AGENTS.md    # symlink, so a `claude` CLI picks up the same context
 ├── GEMINI.md → AGENTS.md    # symlink, for a `gemini` CLI
-├── sources/                 # raw, immutable source material (agent-readonly)
-├── wiki/                    # the LLM-writable knowledge zone
+├── sources/                 # (llm-wiki) raw source material, readonly by convention
+├── wiki/                    # (llm-wiki) the LLM-writable knowledge zone
 │   ├── concepts/ entities/ queries/ self-doc/ sessions/
 └── .veles/                  # project state (do not commit; machine-managed)
     ├── project.toml         # name, created_at, schema_version, layout
@@ -28,7 +28,7 @@ my-project/                  # veles init  (default llm-wiki layout)
     └── skills/              # project-local skills
 ```
 
-使用 `--layout notes` 時，內容那一半是單一的 `notes/` 目錄；使用 `--layout bare` 時則完全沒有任何內容 scaffold。`wiki/INDEX.md`（隨選載入的目錄）會隨著 wiki 成長而產生；當你設定了某項組態、agent 寫出一個 tool，或你執行了一個 goal 之後，`config.toml`、`tools/` 與 `plans/` 才會出現在 `.veles/` 底下。
+使用預設的 `bare` 時完全沒有任何內容 scaffold；使用 `notes`（來自登錄表）時則是單一的 `notes/` 目錄。`INDEX.md`（wiki 的隨選載入目錄）會隨著 wiki 成長而產生；當你設定了某項組態、agent 寫出一個 tool，或你執行了一個 goal 之後，`config.toml`、`tools/` 與 `plans/` 才會出現在 `.veles/` 底下。
 
 ## 狀態目錄
 
@@ -58,4 +58,4 @@ Veles 的專案記憶是一個**結構化的 artefact**，與你的內容分離�
 
 ## Layout packs
 
-`veles init --layout {llm-wiki|notes|bare|<custom>}` 選擇內容 layout；pack 擁有 scaffold、AGENTS.md 範本、可寫入區域，以及 wiki engine（wiki tools、INDEX prompt 注入、wiki recall）是否啟用。請見 [layout packs & the LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)。
+`veles init --layout {bare|llm-wiki|notes|<custom>}` 選擇內容 layout（只有 `bare` 是內建的；其餘來自登錄表，並會提議安裝）；pack 擁有 scaffold、AGENTS.md 範本、可寫入區域，以及它所要求的內容 engine（例如 wiki：wiki tools、INDEX prompt 注入、wiki recall）。請見 [layout packs & the LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)。

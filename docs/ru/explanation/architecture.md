@@ -61,7 +61,8 @@ response  ──►  saved to memory  ──►  learning triggers (insights, cu
 
 - `<project>/.veles/` — память этого проекта, конфигурация, локальные навыки/инструменты.
 - `~/.veles/` — пользовательская глобальная конфигурация, межпроектные навыки/инструменты, кэши, доверие.
-- `<project>/AGENTS.md`, `wiki/`, `sources/` — ваш контент (раскладка LLM-Wiki).
+- `<project>/AGENTS.md` и то, что добавляет раскладка (например, `wiki/`,
+  `sources/` у LLM-Wiki), — ваш контент.
 
 См. [структуру проекта](../reference/project-layout.md).
 
@@ -74,7 +75,8 @@ response  ──►  saved to memory  ──►  learning triggers (insights, cu
 
 ## Поверхности
 
-- **CLI** (`veles run`, `veles add`, …) — одноразовое и скриптовое использование.
+- **CLI** (`veles run`, `veles organize`, … плюс команды модулей, например
+  `veles add` модуля wiki) — одноразовое и скриптовое использование.
 - **TUI** (`veles tui`) — интерактивный REPL с [режимами выполнения](modes.md).
 - **Демон + каналы** — безголовое API, Telegram, задачи по расписанию.
 

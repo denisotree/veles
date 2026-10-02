@@ -13,7 +13,7 @@ residem no chaveiro do SO ou em variáveis de ambiente (ver [variáveis de ambie
 | `~/.veles/` | Global do utilizador | `config.toml`, concessões de confiança, skills/ferramentas transversais a projectos, cache de modelos, locales, registo |
 | `<project>/.veles/` | Local do projecto | `project.toml`, `config.toml`, `memory.db`, skills/ferramentas do projecto, planos, artefactos de runtime |
 | `<project>/AGENTS.md` | Projecto | O ficheiro de contexto injectado no agente (com symlink para `CLAUDE.md` / `GEMINI.md`) |
-| `<project>/wiki/`, `sources/` | Projecto | Conteúdo do utilizador (o layout LLM-Wiki predefinido) |
+| `<project>/wiki/`, `sources/`, … | Projecto | Conteúdo do utilizador, tal como o layout pack o organiza (p. ex. a LLM-Wiki) |
 
 `VELES_USER_HOME` redirecciona o `~` (para que o estado do utilizador fique em
 `<override>/.veles/`). Ver [estrutura do projecto](project-layout.md) para a árvore completa.

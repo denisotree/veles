@@ -14,7 +14,10 @@ module or skill to `~/.veles/`, loaded in every project — that's how you set u
 a memory-provider module (Honcho, Mem0, Supermemory). `veles registry verify`
 reports changed, yanked, removed or outdated installs (and vendored copies whose
 upstream moved ahead); `veles registry upgrade` moves to a
-newer version and shows the diff.
+newer version and shows the diff. Layouts come from here too:
+`veles registry install llm-wiki` installs the wiki layout together with the
+`wiki` module it needs, under one confirmation. A project whose layout isn't
+installed offers the install when you open it at a terminal.
 
 A module only loads while its files match what you approved. After editing one on
 purpose, run `veles module approve <name>`.

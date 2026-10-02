@@ -38,7 +38,7 @@ def test_apply_scaffold_regenerates_stale_default(tmp_path: Path) -> None:
     root = tmp_path / "proj"
     root.mkdir()
     (root / "AGENTS.md").write_text(_DEFAULT.format(name="mind-palace"), encoding="utf-8")
-    pack = find_layout("llm-wiki", project=None)
+    pack = find_layout("bare", project=None)
     apply_scaffold(pack, root, "proj")
     new = (root / "AGENTS.md").read_text(encoding="utf-8")
     assert new.splitlines()[0] == "# proj"
@@ -50,7 +50,7 @@ def test_apply_scaffold_preserves_customised(tmp_path: Path) -> None:
     root.mkdir()
     custom = "# Whatever I Want\n\nMy real project context, no marker.\n"
     (root / "AGENTS.md").write_text(custom, encoding="utf-8")
-    pack = find_layout("llm-wiki", project=None)
+    pack = find_layout("bare", project=None)
     apply_scaffold(pack, root, "proj")
     assert (root / "AGENTS.md").read_text(encoding="utf-8") == custom
 
@@ -60,7 +60,7 @@ def test_apply_scaffold_keeps_default_with_matching_title(tmp_path: Path) -> Non
     root.mkdir()
     same = _DEFAULT.format(name="proj")
     (root / "AGENTS.md").write_text(same, encoding="utf-8")
-    pack = find_layout("llm-wiki", project=None)
+    pack = find_layout("bare", project=None)
     apply_scaffold(pack, root, "proj")
     # Regenerated-or-not, the title is right and no churn changes the identity.
     assert (root / "AGENTS.md").read_text(encoding="utf-8").splitlines()[0] == "# proj"
@@ -77,7 +77,7 @@ def test_init_regenerates_cloned_agents_md(tmp_path: Path) -> None:
     (root / "AGENTS.md").write_text(_DEFAULT.format(name="mind-palace"), encoding="utf-8")
     (root / ".veles" / "memory.db").write_bytes(b"sqlite-ish bytes")  # foreign memory
 
-    project = init_project(root, name="main", layout="llm-wiki")
+    project = init_project(root, name="main")
     assert project.name == "main"
     agents = (root / "AGENTS.md").read_text(encoding="utf-8")
     assert agents.splitlines()[0] == "# main"
@@ -88,6 +88,6 @@ def test_init_warns_about_carried_over_memory(tmp_path: Path, capsys) -> None:
     root = tmp_path / "main"
     (root / ".veles").mkdir(parents=True)
     (root / ".veles" / "memory.db").write_bytes(b"x")
-    init_project(root, name="main", layout="llm-wiki")
+    init_project(root, name="main")
     err = capsys.readouterr().err
     assert "memory.db" in err and "prior project" in err

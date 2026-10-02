@@ -44,12 +44,7 @@ def _refresh(project: Project) -> int:
 
 
 def _show(project: Project) -> int:
-    from veles.modules.wiki.wiki import Wiki
+    from veles.core.self_doc import read_self_doc
 
-    wiki = Wiki(project.wiki_root)
-    try:
-        content = wiki.read_page("wiki/self-doc/overview.md")
-        print(content)
-    except Exception:
-        print("(no self-doc yet; run `veles self-doc refresh`)")
+    print(read_self_doc(project) or "(no self-doc yet; run `veles self-doc refresh`)")
     return 0

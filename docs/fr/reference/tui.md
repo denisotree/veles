@@ -35,7 +35,7 @@ Tapez `/` dans le composeur ; `Tab` complète. Les commandes enregistrées sont 
 | `/model` | Ouvrir le sélecteur de modèle |
 | `/mode` | Changer de mode d'exécution (auto/planning/writing/goal) |
 | `/session` | Ouvrir le sélecteur de session (reprise) |
-| `/save` | Enregistrer / nommer la session courante |
+| `/save <slug>` | Enregistrer la dernière réponse — une page dans le magasin de pages de la mise en page (le wiki : `wiki/queries/<slug>.md`) s'il y en a un, sinon un insight de la mémoire du projet |
 | `/history` | Afficher l'historique des sessions |
 | `/tokens` | Consommation de tokens (entrée / sortie / par tour / par session) |
 | `/context` | Taille du contexte courant par rapport à la limite |
@@ -43,7 +43,7 @@ Tapez `/` dans le composeur ; `Tab` complète. Les commandes enregistrées sont 
 | `/insights` | Afficher les insights appris pour le projet |
 | `/rules` | Afficher le condensé des règles du projet |
 | `/schema` | Valider / corriger `AGENTS.md` |
-| `/wiki` | Opérations wiki pour la mise en page active |
+| `/wiki add <path\|url>` / `/wiki query <question>` | Opérations wiki du module `wiki` — uniquement là où la mise en page active active le moteur wiki (p. ex. `llm-wiki`). Les modules peuvent ajouter leurs propres `/commands` de la même façon |
 | `/daemon` | Ouvrir le panneau de contrôle du daemon (projet → daemons → canaux) |
 
 > L'ensemble des commandes slash est le même que vous lanciez la TUI directement ou

@@ -35,7 +35,7 @@ Gõ `/` trong composer; `Tab` để hoàn thành. Các lệnh đã đăng ký l�
 | `/model` | Mở trình chọn model |
 | `/mode` | Chuyển chế độ chạy (auto/planning/writing/goal) |
 | `/session` | Mở trình chọn session (tiếp tục) |
-| `/save` | Lưu / đặt tên session hiện tại |
+| `/save <slug>` | Lưu câu trả lời cuối — một trang trong page store của layout (wiki: `wiki/queries/<slug>.md`) nếu có, nếu không thì một insight trong bộ nhớ dự án |
 | `/history` | Hiển thị lịch sử session |
 | `/tokens` | Mức sử dụng token (vào / ra / mỗi lượt / mỗi session) |
 | `/context` | Kích thước ngữ cảnh hiện tại so với giới hạn |
@@ -43,7 +43,7 @@ Gõ `/` trong composer; `Tab` để hoàn thành. Các lệnh đã đăng ký l�
 | `/insights` | Hiển thị các insight đã học cho dự án |
 | `/rules` | Hiển thị bản tóm tắt các quy tắc của dự án |
 | `/schema` | Kiểm tra / sửa `AGENTS.md` |
-| `/wiki` | Các thao tác wiki cho layout đang hoạt động |
+| `/wiki add <path\|url>` / `/wiki query <question>` | Thao tác wiki từ module `wiki` — chỉ ở nơi layout đang hoạt động bật engine wiki (ví dụ `llm-wiki`). Module có thể thêm các `/lệnh` riêng theo cách tương tự |
 | `/daemon` | Mở bảng điều khiển daemon (dự án → daemon → channel) |
 
 > Bộ lệnh slash là như nhau dù bạn khởi chạy TUI trực tiếp hay đẩy nó từ một màn

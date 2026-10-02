@@ -30,7 +30,7 @@ Crea un nuovo progetto Veles nella directory corrente (una directory di stato
 | Flag | Default | Scopo |
 |---|---|---|
 | `name` (posizionale) | basename della cwd | Nome del progetto |
-| `--layout <name>` | `llm-wiki` | Layout pack per lo scaffold dei contenuti (`llm-wiki`, `notes`, `bare` o un pack personalizzato da `~/.veles/layouts/`) |
+| `--layout <name>` | `bare` (chiesto in un terminale) | Layout pack per lo scaffold dei contenuti (`bare`, un pack installato da un registry come `llm-wiki` o `notes`, o un pack personalizzato da `~/.veles/layouts/`). Un pack non installato viene proposto per l'installazione; rifiutando non viene creato nulla |
 | `--force` | off | Ricrea `.veles/` anche se esiste già |
 
 ### `veles schema {validate,edit,fix}`
@@ -42,7 +42,9 @@ Convalida o modifica `AGENTS.md` (il file di contesto del progetto).
   guidata LLM.
 
 ### `veles self-doc [refresh|show]`
-Genera e visualizza l'auto-documentazione del progetto (`wiki/self-doc/overview.md`).
+Genera e visualizza l'auto-documentazione del progetto — nel page store del layout
+se ne ha uno (la wiki: `wiki/self-doc/overview.md`), altrimenti in
+`.veles/memory/self-doc.md`.
 `veles self-doc` da solo mostra la pagina corrente; `refresh` la rigenera.
 
 ### `veles doctor`
@@ -113,12 +115,14 @@ sopra e:
 | `--theme <name>` | config o `everforest` | Tema di colori (everforest, dracula, gruvbox, tokyo-night, catppuccin) |
 
 ### `veles add <source>`
+*(dal modulo `wiki` — `veles registry install llm-wiki` o `… install wiki`)*
 Legge una sorgente (un file locale o un URL `http(s)://`) e la sintetizza in una
-pagina wiki. Accetta i flag condivisi del ciclo dell'agente.
+pagina wiki. Senza il modulo, `veles add` è un comando sconosciuto e l'errore indica
+l'installazione. Accetta i flag condivisi del ciclo dell'agente.
 
 ### `veles curate`
-Esegue un passaggio del curator: compatta le sessioni non elaborate in pagine
-`wiki/sessions/`.
+Esegue un passaggio del curator: compatta le sessioni non elaborate in insight di memoria (e in pagine
+`wiki/sessions/` quando l'engine wiki è attivo).
 
 | Flag | Default | Scopo |
 |---|---|---|

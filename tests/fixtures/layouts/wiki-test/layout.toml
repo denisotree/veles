@@ -1,0 +1,7 @@
+[layout]
+name = "wiki-test"
+description = "Test pack: asks for the wiki engine (supplied by the `wiki_engine` fixture's stub)."
+context_file = "INDEX.md"
+
+[layout.engines]
+wiki = true

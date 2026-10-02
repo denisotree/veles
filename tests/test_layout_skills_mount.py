@@ -2,8 +2,7 @@
 
 A project's active layout-pack contributes its `skills/<name>/SKILL.md`
 files to the discover list, at builtin priority (overridden by project
-and user level). Default `llm-wiki` pack ships `ingest`, `query`, `lint`
-— after M117b they're agent-callable without any wiring.
+and user level) — agent-callable without any wiring.
 """
 
 from __future__ import annotations
@@ -16,59 +15,61 @@ from veles.core.project import init_project, load_project
 from veles.core.skills import discover_skills, mount_layout_skills
 
 
-@pytest.fixture()
-def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
-    return tmp_path / "home"
-
-
-def _write_skill(skills_dir: Path, name: str, body: str, *, description: str = "") -> None:
+def _write_skill(
+    skills_dir: Path, name: str, body: str, *, description: str = "", tools: str = ""
+) -> None:
     sd = skills_dir / name
     sd.mkdir(parents=True, exist_ok=True)
-    fm = f"---\nname: {name}\ndescription: {description or f'skill {name}'}\n---\n{body}\n"
+    extra = f"tools: [{tools}]\n" if tools else ""
+    fm = f"---\nname: {name}\ndescription: {description or f'skill {name}'}\n{extra}---\n{body}\n"
     (sd / "SKILL.md").write_text(fm, encoding="utf-8")
+
+
+@pytest.fixture()
+def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A user home with a `skilled` layout pack shipping ingest / query / lint."""
+    home = tmp_path / "home"
+    monkeypatch.setenv("VELES_USER_HOME", str(home))
+    pack = home / ".veles" / "layouts" / "skilled"
+    pack.mkdir(parents=True)
+    (pack / "layout.toml").write_text('[layout]\nname = "skilled"\n', encoding="utf-8")
+    _write_skill(pack / "skills", "ingest", "pack ingest", tools="read_file, write_file")
+    _write_skill(pack / "skills", "query", "pack query")
+    _write_skill(pack / "skills", "lint", "pack lint")
+    return home
+
+
+def _project(tmp_path: Path):
+    return init_project(tmp_path / "proj", name="proj", layout="skilled")
 
 
 # ---- mount_layout_skills directly ----
 
 
-def test_default_layout_skills_discovered(isolated_home: Path, tmp_path: Path) -> None:
-    """A fresh project on the builtin `llm-wiki` pack sees ingest /
-    query / lint skills via mount_layout_skills."""
-    project = init_project(tmp_path / "proj", name="proj")
-    skills = mount_layout_skills(project)
-    names = {s.name for s in skills}
+def test_pack_skills_discovered(isolated_home: Path, tmp_path: Path) -> None:
+    names = {s.name for s in mount_layout_skills(_project(tmp_path))}
     assert {"ingest", "query", "lint"} <= names
 
 
 def test_pack_skills_have_builtin_scope(isolated_home: Path, tmp_path: Path) -> None:
-    project = init_project(tmp_path / "proj", name="proj")
-    skills = mount_layout_skills(project)
-    for s in skills:
+    for s in mount_layout_skills(_project(tmp_path)):
         assert s.scope == "builtin"
 
 
 def test_pack_skill_has_expected_tools(isolated_home: Path, tmp_path: Path) -> None:
-    """The `ingest` skill in llm-wiki declares fetch_url / read_file /
-    wiki_write_page / wiki_append_log per its frontmatter."""
-    project = init_project(tmp_path / "proj", name="proj")
-    skills = mount_layout_skills(project)
-    by_name = {s.name: s for s in skills}
-    ingest = by_name["ingest"]
-    assert "wiki_write_page" in ingest.tools
+    by_name = {s.name: s for s in mount_layout_skills(_project(tmp_path))}
+    assert "read_file" in by_name["ingest"].tools
 
 
 def test_unknown_layout_returns_empty(isolated_home: Path, tmp_path: Path) -> None:
     """If the project points at a layout that doesn't exist, we don't
     crash — we return an empty list and let the agent run with just
     project + user skills."""
-    project = init_project(tmp_path / "proj", name="proj")
-    # Mutate project.toml to reference a non-existent pack
+    project = _project(tmp_path)
     toml_path = project.project_toml_path
     text = toml_path.read_text(encoding="utf-8")
     toml_path.write_text(
-        text.replace('layout = "llm-wiki"', 'layout = "ghost-pack"'),
-        encoding="utf-8",
+        text.replace('layout = "skilled"', 'layout = "ghost-pack"'), encoding="utf-8"
     )
     reloaded = load_project(project.root)
     assert reloaded.layout_name == "ghost-pack"
@@ -79,58 +80,39 @@ def test_unknown_layout_returns_empty(isolated_home: Path, tmp_path: Path) -> No
 
 
 def test_discover_skills_includes_layout_pack(isolated_home: Path, tmp_path: Path) -> None:
-    project = init_project(tmp_path / "proj", name="proj")
-    skills = discover_skills(project, include_layout=True)
-    names = {s.name for s in skills}
+    names = {s.name for s in discover_skills(_project(tmp_path), include_layout=True)}
     assert {"ingest", "query", "lint"} <= names
 
 
 def test_project_skill_shadows_pack_skill(isolated_home: Path, tmp_path: Path) -> None:
-    """If a project ships its own `ingest` SKILL.md, it overrides the
-    layout-pack version. The override invariant: project > user > pack."""
-    project = init_project(tmp_path / "proj", name="proj")
+    """The override invariant: project > user > pack."""
+    project = _project(tmp_path)
     _write_skill(
-        project.skills_dir,
-        "ingest",
-        "project-local ingest body",
-        description="project ingest override",
+        project.skills_dir, "ingest", "project-local ingest body", description="project override"
     )
-    skills = discover_skills(project, include_layout=True)
-    by_name = {s.name: s for s in skills}
-    # Project version wins
+    by_name = {s.name: s for s in discover_skills(project, include_layout=True)}
     assert by_name["ingest"].scope == "project"
     assert "project-local ingest body" in by_name["ingest"].body
 
 
 def test_user_skill_shadows_pack_skill(isolated_home: Path, tmp_path: Path) -> None:
-    project = init_project(tmp_path / "proj", name="proj")
-    user_skills = isolated_home / ".veles" / "skills"
-    _write_skill(user_skills, "query", "user-level query body", description="user query")
-    skills = discover_skills(project, include_layout=True)
-    by_name = {s.name: s for s in skills}
-    # User version wins over pack version
+    project = _project(tmp_path)
+    _write_skill(isolated_home / ".veles" / "skills", "query", "user-level query body")
+    by_name = {s.name: s for s in discover_skills(project, include_layout=True)}
     assert by_name["query"].scope == "user"
     assert "user-level query body" in by_name["query"].body
 
 
 def test_project_shadows_user_shadows_pack(isolated_home: Path, tmp_path: Path) -> None:
-    """Full three-way override: project > user > pack on the same name."""
-    project = init_project(tmp_path / "proj", name="proj")
-    user_skills = isolated_home / ".veles" / "skills"
-    _write_skill(user_skills, "lint", "user lint body", description="user lint")
-    _write_skill(project.skills_dir, "lint", "project lint body", description="project lint")
-    skills = discover_skills(project, include_layout=True)
-    by_name = {s.name: s for s in skills}
+    project = _project(tmp_path)
+    _write_skill(isolated_home / ".veles" / "skills", "lint", "user lint body")
+    _write_skill(project.skills_dir, "lint", "project lint body")
+    by_name = {s.name: s for s in discover_skills(project, include_layout=True)}
     assert by_name["lint"].scope == "project"
 
 
 def test_pack_skill_with_extends_field_loaded(isolated_home: Path, tmp_path: Path) -> None:
-    """The layout-pack SKILL.md goes through the same parser, so any
-    `extends:` field set in pack frontmatter is honoured. (None of the
-    shipped llm-wiki skills use it, but the loader path must remain
-    uniform across scopes.)"""
-    project = init_project(tmp_path / "proj", name="proj")
-    skills = mount_layout_skills(project)
-    # All shipped llm-wiki skills don't use extends — they're standalone.
-    for s in skills:
+    """Pack SKILL.md goes through the same parser as every other scope, so a
+    pack skill without `extends:` loads standalone."""
+    for s in mount_layout_skills(_project(tmp_path)):
         assert s.extends is None

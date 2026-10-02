@@ -34,9 +34,10 @@ def _module(root: Path, body: str) -> ModuleHandle:
 
 
 def test_a_user_module_cannot_take_a_builtin_name(tmp_path) -> None:
-    body = (
-        "from veles.core.contributions import Engine\n"
-        "def register(api):\n    api.contribute('engine', 'wiki', Engine('wiki'))\n"
+    body = (  # `tool:agentops` belongs to the builtin agentops module
+        "from veles.core.contributions import ToolSet\n"
+        "def register(api):\n"
+        "    api.contribute('tool', 'agentops', ToolSet(load=lambda: None, tools=()))\n"
     )
     with pytest.raises(ModuleLoadError, match="already registered"):
         load_module(_module(tmp_path, body), ModuleRegistry())

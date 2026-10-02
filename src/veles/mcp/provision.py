@@ -37,7 +37,7 @@ def ensure_mcp_project_tools(project: Project) -> list[str]:
         from veles.mcp.config import load_raw_mcp_servers, parse_servers
 
         raw = load_raw_mcp_servers(project)
-        configs = parse_servers(raw)
+        configs = parse_servers(raw, cwd=project.root)
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("MCP tool provisioning skipped: %s", exc)
         return []
