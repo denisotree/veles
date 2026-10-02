@@ -7,8 +7,10 @@ import io
 import json
 from pathlib import Path
 
+import pytest
+
 from veles.adapters.cli.mcp_server import (
-    _MCP_TOOLS,
+    _CORE_TOOLS,
     MCPServer,
     _parse_args,
     _register_project_skills,
@@ -212,10 +214,9 @@ def test_serve_handles_empty_lines() -> None:
     assert len(lines) == 1
 
 
-def test_mcp_tools_constant_is_non_empty() -> None:
-    assert len(_MCP_TOOLS) >= 5
-    assert "read_file" in _MCP_TOOLS
-    assert "wiki_write_page" in _MCP_TOOLS
+def test_core_tools_name_no_module_tool() -> None:
+    assert "read_file" in _CORE_TOOLS
+    assert not any(n.startswith("wiki_") for n in _CORE_TOOLS)
 
 
 def test_parse_args_accepts_skill_model() -> None:
@@ -405,8 +406,8 @@ def test_project_trust_grant_lets_the_call_through(monkeypatch, tmp_path) -> Non
 
 
 def test_main_lists_no_wiki_tools_without_the_wiki_module(monkeypatch, tmp_path) -> None:
-    """The wiki tools in `_MCP_TOOLS` are listed only when they exist — the wiki
-    module (from the registry) registers them."""
+    """Wiki tools are listed only when they exist — the wiki module (from the
+    registry) registers them."""
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
     project = init_project(tmp_path / "proj", name="proj")
     request = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}) + "\n"
@@ -418,3 +419,44 @@ def test_main_lists_no_wiki_tools_without_the_wiki_module(monkeypatch, tmp_path)
     names = {t["name"] for t in json.loads(out.getvalue().splitlines()[0])["result"]["tools"]}
     assert "read_file" in names
     assert not any(n.startswith("wiki_") for n in names)
+
+
+@pytest.mark.parametrize(("engine", "listed"), [("None", True), ("'ghost'", False)])
+def test_main_lists_the_tools_of_a_loaded_module(monkeypatch, tmp_path, engine, listed) -> None:
+    """A module's tool set reaches the delegated CLI — core keeps no list of them —
+    unless the project's layout doesn't enable the engine the set is gated on."""
+    from veles.core.registry.gate import approve_module
+    from veles.core.tools.registry import registry as tool_registry
+    from veles.core.user_paths import user_modules_dir
+
+    # `@tool` registers into the process-wide registry and refuses a second
+    # registration — give this test its own copy.
+    monkeypatch.setattr(tool_registry, "_tools", dict(tool_registry._tools))
+    project = init_project(tmp_path / "proj", name="proj")
+    mod = user_modules_dir() / "echo"
+    mod.mkdir(parents=True)
+    (mod / "module.toml").write_text(
+        '[module]\nname = "echo"\ndescription = "d"\nentrypoint = "e.py:register"\n',
+        encoding="utf-8",
+    )
+    (mod / "e.py").write_text(
+        "from veles.sdk.contributions import ToolSet\n"
+        "def _load():\n"
+        "    from veles.sdk.tools import tool\n"
+        "    @tool(name='echo_back', description='echo')\n"
+        "    def echo_back(text: str) -> str:\n"
+        "        return text\n"
+        "def register(api):\n"
+        f"    ts = ToolSet(load=_load, tools=('echo_back',), engine={engine})\n"
+        "    api.contribute('tool', 'echo', ts)\n",
+        encoding="utf-8",
+    )
+    approve_module(mod, name="echo", project_root=None)
+    request = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}) + "\n"
+    monkeypatch.setattr("sys.stdin", io.StringIO(request))
+    out = io.StringIO()
+    monkeypatch.setattr("sys.stdout", out)
+    contextvars.copy_context().run(main, ["--project-root", str(project.root)])
+    names = {t["name"] for t in json.loads(out.getvalue().splitlines()[0])["result"]["tools"]}
+    assert ("echo_back" in names) is listed
+    assert "read_file" in names

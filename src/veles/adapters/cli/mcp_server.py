@@ -40,17 +40,8 @@ _SERVER_NAME = "veles"
 _SERVER_VERSION = "0.1"
 _DEFAULT_SKILL_MODEL = "anthropic/claude-sonnet-4.6"
 
-_MCP_TOOLS: tuple[str, ...] = (
-    "read_file",
-    "write_file",
-    "run_shell",
-    "fetch_url",
-    "wiki_list_pages",
-    "wiki_read_page",
-    "wiki_search",
-    "wiki_write_page",
-    "wiki_append_log",
-)
+# Core tools the delegated CLI gets; module tools come from their tool sets.
+_CORE_TOOLS: tuple[str, ...] = ("read_file", "write_file", "run_shell", "fetch_url")
 
 
 class MCPServer:
@@ -258,19 +249,27 @@ def main(argv: list[str] | None = None) -> int:
         if snap is not None:
             set_budget(TokenBudget(limit=snap.limit, consumed=snap.consumed))
     # The same approved user/project modules the parent CLI loaded — a registry-installed
-    # engine (wiki) must exist here too.
-    from veles.core.contributions import load_tool_sets
+    # module's tools must exist here too.
+    from veles.core.contributions import ToolSet, contributions, load_tool_sets
     from veles.core.module_loading import load_project_modules
     from veles.core.modules import set_module_registry
 
     set_module_registry(load_project_modules(project))
-    # M163: module tools (wiki) exist only when the project's layout enables their
-    # engine — loaded here the way `runtime/registry.py` does, else dropped.
+    # M163: a module's tools exist only when the project's layout enables the engine
+    # its tool set is gated on — loaded here the way `runtime/registry.py` does, else
+    # dropped. Every loaded tool set is offered; core keeps no list of module tools.
     gated = load_tool_sets(project)
     composite = registry.subset(registry.list_names())
     skill_names = _register_project_skills(composite, project, args.skill_model)
     available = set(composite.list_names())
-    tool_names = [t for t in _MCP_TOOLS if t not in gated and t in available]
+    module_tools = [
+        name for c in contributions("tool") if isinstance(c.obj, ToolSet) for name in c.obj.tools
+    ]
+    tool_names = [
+        name
+        for name in dict.fromkeys([*_CORE_TOOLS, *module_tools])
+        if name not in gated and name in available
+    ]
     server = MCPServer(composite, tool_names + skill_names, budget_path=budget_path)
     return server.serve(stdin=sys.stdin, stdout=sys.stdout)
 
