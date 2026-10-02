@@ -97,11 +97,9 @@ def _run_curator_pass(
     — callers print the user-facing summary so each entry-point keeps
     its existing tone.
     """
-    from veles.core.contributions import CuratorTarget, active
+    from veles.core.contributions import call_active
 
-    for c in active(project, "curator_target"):
-        assert isinstance(c.obj, CuratorTarget)
-        c.obj.prepare(project)
+    call_active(project, "curator_target", lambda c: c.obj.prepare(project))  # type: ignore[attr-defined]
     state_path = project.state_dir / "curator.state.json"
     state = load_curator_state(state_path)
     cutoff = time.time() - CURATE_QUIET_WINDOW_SEC
@@ -546,14 +544,18 @@ def curation_plan(project: Project, session_id: str) -> CurationPlan:
     """How the curator's agent persists `session_id`: into an active module's store
     (`curator_target` — e.g. the wiki engine's pages, alongside memory) or, with
     none, into SQL memory alone (memory_save_insight / memory_save_rule)."""
-    from veles.core.contributions import CuratorTarget, active
+    from veles.core.contributions import CuratorTarget, call_active
 
-    for c in active(project, "curator_target"):
+    def plan_for(c) -> CurationPlan:
         target = c.obj
         assert isinstance(target, CuratorTarget)
         intro, persist_steps, log_step = target.instructions(project, session_id)
         tools = frozenset({"memory_save_insight", *target.persist_tools})
         return CurationPlan(intro, persist_steps, log_step, tools)
+
+    plans = call_active(project, "curator_target", plan_for)
+    if plans:
+        return plans[0]
     return CurationPlan(
         intro="Distill this Veles session into one durable memory insight.",
         persist_steps=(

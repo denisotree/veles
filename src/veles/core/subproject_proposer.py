@@ -123,12 +123,12 @@ def detect_clusters(
     A source whose engine is off for the project contributes nothing, so this
     is a no-op (empty list) on a bare/notes project.
     """
-    from veles.core.contributions import active
+    from veles.core.contributions import call_active
 
     pages = [
         p
-        for c in active(project, "subproject_source")
-        for p in c.obj.pages(project)  # type: ignore[attr-defined]
+        for found in call_active(project, "subproject_source", lambda c: c.obj.pages(project))  # type: ignore[attr-defined]
+        for p in found
         if p.category in _CLUSTER_CATEGORIES
     ]
     if len(pages) < min_pages:

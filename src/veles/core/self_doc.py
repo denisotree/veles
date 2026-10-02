@@ -40,7 +40,7 @@ def generate_self_doc(
     tools: list[tuple[str, str]] | None = None,
 ) -> SelfDocReport:
     """Collect all project self-knowledge into a `SelfDocReport`."""
-    from veles.core.contributions import active
+    from veles.core.contributions import call_active
     from veles.core.memory import SessionStore
     from veles.core.routing import KNOWN_TASKS, route
     from veles.core.skills import discover_skills
@@ -56,7 +56,11 @@ def generate_self_doc(
     session_count = len(sessions)
 
     # --- pages modules expose (the wiki engine's, when the layout enables it) ---
-    pages = [p for c in active(project, "subproject_source") for p in c.obj.pages(project)]  # type: ignore[attr-defined]
+    pages = [
+        p
+        for found in call_active(project, "subproject_source", lambda c: c.obj.pages(project))  # type: ignore[attr-defined]
+        for p in found
+    ]
     wiki_page_count = len(pages)
     wiki_categories: dict[str, int] = {}
     for page in pages:

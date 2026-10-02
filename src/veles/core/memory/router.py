@@ -147,30 +147,18 @@ class MemoryRouter:
             "insights": asyncio.ensure_future(self._collect_insights(query, limit=limit)),
             "turns": asyncio.ensure_future(self._collect_turns(query, limit=limit)),
         }
-        tasks.update(
-            {
-                name: asyncio.ensure_future(asyncio.to_thread(fn, query, limit=limit))
-                for name, fn in (
-                    ("about", self._collect_about_veles),
-                    ("extra", self._collect_extra),
-                )
-            }
-        )
-        # Module contributions (e.g. the wiki engine): one stream per contributor,
-        # named after it, run like the other file-touching collectors.
+
+        def threaded(fn, *args):
+            return asyncio.ensure_future(asyncio.to_thread(fn, *args, limit=limit))
+
+        tasks["about"] = threaded(self._collect_about_veles, query)
+        # Module contributions (e.g. the wiki engine), one stream per contributor,
+        # named after it — before `extra`: rerank breaks ties on stream order, and
+        # 1.2.1 ranked the wiki ahead of external providers.
         from veles.core.contributions import call_each
 
-        tasks.update(
-            call_each(
-                "recall",
-                lambda c: (
-                    c.name,
-                    asyncio.ensure_future(
-                        asyncio.to_thread(c.obj, self._project, query, limit=limit)  # type: ignore[arg-type]
-                    ),
-                ),
-            )
-        )
+        tasks.update(call_each("recall", lambda c: (c.name, threaded(c.obj, self._project, query))))
+        tasks["extra"] = threaded(self._collect_extra, query)
         await asyncio.wait(tasks.values(), timeout=deadline_sec)
 
         streams: list[list[RecallHit]] = []

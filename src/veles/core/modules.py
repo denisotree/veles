@@ -26,7 +26,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from veles.core.contributions import CONTRIBUTION_POINTS, Contribution, check
+from veles.core.contributions import (
+    CONTRIBUTION_POINTS,
+    Contribution,
+    check,
+    refuse_builtin_collisions,
+)
 from veles.core.module_manifest import (
     ManifestError,
     ModuleManifest,
@@ -246,6 +251,7 @@ def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
         except Exception as exc:
             raise ModuleLoadError(f"register() raised {type(exc).__name__}: {exc}") from exc
         try:
+            refuse_builtin_collisions(scratch)
             registry.merge_from(scratch, handle.name)
         except ValueError as exc:
             raise ModuleLoadError(str(exc)) from exc

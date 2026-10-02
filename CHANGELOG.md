@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no longer imports the wiki engine. No change in behaviour.
 - Skill-similarity embeddings live in `memory.db`; `.veles/skill_embeddings.json` is imported
   once and removed.
+- `provides` in a registry `extension.toml` accepts `hook:` plus one `<point>:` per contribution
+  point, and `validate --run-code` checks every entry: `tool:` now means a `ToolSet`
+  contribution, and the unchecked `platform:`/`provider:` prefixes are gone until those points
+  exist.
 
 ## [1.2.1] — 2026-09-30
 

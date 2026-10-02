@@ -17,10 +17,12 @@ def register(api) -> None:
     api.contribute("prompt", "my-engine", my_prompt_blocks)
 ```
 
-`name` is unique within a point. A module that contributes to an unknown point,
-passes an object the point doesn't take, or repeats a name another module already
-used is refused at load time and the rest of Veles keeps working. A contribution
-that raises when called is skipped with one warning.
+`name` is unique within a point, Veles' own built-in modules included. A module that
+contributes to an unknown point, passes an object the point doesn't take, or repeats a
+name another module (built-in or not) already used is refused at load time and the rest
+of Veles keeps working. Recall reserves `insights`, `turns`, `about` and `extra`; a
+`BackgroundOp` or `DreamStep` is contributed under its own `kind`/`name`. A contribution
+that raises when called is skipped with a warning.
 
 ## Contribution points
 

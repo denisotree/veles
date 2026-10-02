@@ -32,11 +32,16 @@ if TYPE_CHECKING:
 @dataclass(frozen=True, slots=True)
 class Point:
     """`kind`: the type (or types) a contributed object must be an instance of;
-    `None` accepts any callable. `keyed`: names are unique within the point."""
+    `None` accepts any callable. `keyed`: names are unique within the point.
+    `reserved`: names core already uses for its own entries in the consumer.
+    `key`: the identity a consumer keys on (e.g. a `BackgroundOp`'s `kind`) —
+    it must equal the contributed name, so name uniqueness covers it."""
 
     name: str
     kind: type | tuple[type, ...] | None = None
     keyed: bool = True
+    reserved: frozenset[str] = frozenset()
+    key: Callable[[object], str] | None = None
 
     def accepts(self, obj: object) -> bool:
         return callable(obj) if self.kind is None else isinstance(obj, self.kind)
@@ -70,7 +75,20 @@ def check(point: str, name: str, obj: object) -> Point:
         raise ValueError(f"unknown contribution point {point!r}")
     if not declared.accepts(obj):
         raise ValueError(f"{point}:{name}: {type(obj).__name__} is not what {point!r} takes")
+    if name in declared.reserved:
+        raise ValueError(f"{point}:{name}: the name is reserved by core")
+    if declared.key is not None and declared.key(obj) != name:
+        raise ValueError(f"{point}:{name}: the name must equal its kind {declared.key(obj)!r}")
     return declared
+
+
+def refuse_builtin_collisions(registry: ModuleRegistry) -> None:
+    """`ValueError` when a user/project module's contribution takes a name a builtin
+    module already uses — a module never silently replaces Veles' own."""
+    builtin = _builtin_registry()
+    for point in CONTRIBUTION_POINTS:
+        for c in registry.contributions(point):
+            builtin._refuse_taken(point, c.name)
 
 
 def contributions(point: str) -> list[Contribution]:
@@ -90,8 +108,17 @@ _warned: set[tuple[str, str]] = set()
 def call_each[T](point: str, fn: Callable[[Contribution], T]) -> list[T]:
     """`fn` applied to each contribution of `point`; one that raises is skipped with
     one warning per (point, module) per process — a broken module never breaks core."""
+    return _call(point, contributions(point), fn)
+
+
+def call_active[T](project: Project | None, point: str, fn: Callable[[Contribution], T]) -> list[T]:
+    """`call_each` over the contributions whose engine the project enables (`active`)."""
+    return _call(point, active(project, point), fn)
+
+
+def _call[T](point: str, found: list[Contribution], fn: Callable[[Contribution], T]) -> list[T]:
     out: list[T] = []
-    for c in contributions(point):
+    for c in found:
         try:
             out.append(fn(c))
         except Exception as exc:
@@ -143,7 +170,7 @@ class Engine:
 register_point(Point("memory"))
 register_point(Point("engine", kind=Engine))
 # (project, query, *, limit) -> list[RecallHit] — consumer: core/memory/router.py
-register_point(Point("recall"))
+register_point(Point("recall", reserved=frozenset({"insights", "turns", "about", "extra"})))
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,7 +199,7 @@ class DreamStep:
     skip_flag: str
 
 
-register_point(Point("dream_step", kind=DreamStep))
+register_point(Point("dream_step", kind=DreamStep, key=lambda s: s.name))  # type: ignore[attr-defined]
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,7 +256,9 @@ class BackgroundOp:
     run: Callable[..., str]
 
 
-register_point(Point("background_op", kind=BackgroundOp))
+register_point(
+    Point("background_op", kind=BackgroundOp, key=lambda op: op.kind)  # type: ignore[attr-defined]
+)
 
 
 def active(project: Project | None, point: str) -> list[Contribution]:
@@ -277,10 +306,12 @@ __all__ = [
     "Point",
     "ToolSet",
     "active",
+    "call_active",
     "call_each",
     "check",
     "contributions",
     "load_tool_sets",
+    "refuse_builtin_collisions",
     "register_point",
     "reset_builtin_contributions",
 ]
