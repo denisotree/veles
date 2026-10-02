@@ -29,7 +29,10 @@ if TYPE_CHECKING:
     from veles.core.project import Project
 
 
-def load_project_modules(project: Project) -> ModuleRegistry:
+def load_project_modules(project: Project, into: ModuleRegistry | None = None) -> ModuleRegistry:
+    """The project's modules in a new registry — or, with `into` (after an install
+    mid-session), only the modules not already loaded there, added to it: an
+    entrypoint never runs twice in one process."""
     from veles.core.user_paths import user_modules_dir
 
     project_handles = _dedup_by_name(
@@ -46,8 +49,11 @@ def load_project_modules(project: Project) -> ModuleRegistry:
             continue
         handles.append(h)
     handles.extend(project_handles)
-    registry = ModuleRegistry()
+    registry = into if into is not None else ModuleRegistry()
+    loaded = set(registry.modules)
     for handle in handles:
+        if handle.name in loaded:
+            continue
         try:
             load_module(handle, registry)
         except ModuleLoadError as exc:
