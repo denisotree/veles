@@ -44,6 +44,54 @@ without breaking modules. A registry module **must** import Veles only from it �
 The entrypoint loads as a package rooted at the module directory, so the module's own
 files import relatively (`from .wiki import Wiki`).
 
+## What a module can carry
+
+One module can bundle everything a feature needs, so it installs — and is reused — as
+one piece:
+
+- **tools** — a `ToolSet` contribution (see below);
+- **skills** — `skills/<name>/SKILL.md` in the module directory. They mount for every
+  project that loads the module, below the project's and the user's own skills (a skill
+  of yours with the same name wins) and above the layout's. They are read-only: they
+  belong to the module's approved tree, so editing one keeps the whole module unloaded
+  until it is approved again;
+- **content engines, CLI verbs, `/` commands, recall, prompt and dream steps, hooks,
+  memory providers** — the contribution points below.
+
+Channels (Telegram and others) become module contributions in a later release.
+
+```text
+my-suite/
+  module.toml
+  __init__.py          # register(api): tool sets, commands, hooks…
+  tools.py
+  skills/
+    triage/SKILL.md     # mounted as the skill `triage`
+```
+
+### Combined modules
+
+A module can build on others: list the modules, layouts and skills it needs in
+`requires_extensions` of its `extension.toml`. Installing it installs the whole chain
+under one confirmation, dependencies first, in the module's own scope (the project, or
+the user with `--user`); if any part fails, nothing from that install is left behind.
+
+```toml
+# suite — reuses the `base` module, which itself brings the skill `helper`
+[extension]
+name = "suite"
+kind = "module"
+requires_extensions = ["public:official/base"]
+
+# base
+[extension]
+name = "base"
+kind = "module"
+requires_extensions = ["public:official/helper"]
+```
+
+`veles registry install suite` then installs `helper`, `base` and `suite`.
+
 ## Contribution points
 
 | Point | Object | What core does with it |

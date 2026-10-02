@@ -168,6 +168,63 @@ def test_losing_an_install_race_never_deletes_the_winners_copy(remote, tmp_path)
     assert load_records() == []
 
 
+def _module_named(name: str) -> dict[str, str]:
+    return {**_MODULE_FILES, "module.toml": _MODULE_FILES["module.toml"].replace("engine", name)}
+
+
+def _combined_remote(tmp_path: Path) -> None:
+    """`suite` (module) needs `base` (module), which needs the skill `helper`;
+    the layout `pack` needs `helper` too."""
+    root = tmp_path / "combined"
+    make_git_registry(root, skills=("helper",))
+    needs_helper = 'requires_extensions = ["private:official/helper"]'
+    write_extension(
+        root, "official", "base", kind="module", files=_module_named("base"), extra_ext=needs_helper
+    )
+    write_extension(
+        root,
+        "official",
+        "suite",
+        kind="module",
+        files=_module_named("suite"),
+        extra_ext='requires_extensions = ["private:official/base"]',
+    )
+    write_extension(
+        root, "official", "pack", kind="layout", files=_LAYOUT_FILES, extra_ext=needs_helper
+    )
+    commit_all(root, "combined")
+    remove_source("public")
+    add_source(str(root))
+
+
+def test_a_module_pulls_the_skill_it_needs_into_the_project(tmp_path, asked) -> None:
+    _combined_remote(tmp_path)
+    project = init_project(tmp_path / "p", name="p", layout="bare")
+    install(resolve("base"), project=project)
+    assert _names() == {"base", "helper"}
+    assert (project.skills_dir / "helper").is_dir()
+    assert len(asked) == 1
+
+
+def test_a_combined_module_pulls_its_chain_for_the_user(tmp_path, asked) -> None:
+    _combined_remote(tmp_path)
+    project = init_project(tmp_path / "p", name="p", layout="bare")
+    install(resolve("suite"), project=project, user_scope=True)
+    assert _names() == {"suite", "base", "helper"}
+    assert (user_modules_dir() / "base").is_dir()
+    assert (user_home() / "skills" / "helper").is_dir()
+    assert len(asked) == 1
+
+
+def test_a_layout_pulls_the_skill_it_needs_for_the_user(tmp_path, asked) -> None:
+    _combined_remote(tmp_path)
+    project = init_project(tmp_path / "p", name="p", layout="bare")
+    install(resolve("pack"), project=project)
+    assert _names() == {"pack", "helper"}
+    assert (user_home() / "skills" / "helper").is_dir()
+    assert len(asked) == 1
+
+
 def test_validate_refuses_an_mcp_recipe_as_a_dependency(tmp_path) -> None:
     root = write_registry(tmp_path / "r", name="mine")
     write_extension(root, "g", "srv", kind="mcp", files={}, mcp='command = "x"')
