@@ -14,7 +14,7 @@ d'environnement (voir [variables d'environnement](environment-variables.md)).
 | `~/.veles/` | Global à l'utilisateur | `config.toml`, autorisations de confiance, skills/outils inter-projets, cache des modèles, locales, registre |
 | `<project>/.veles/` | Local au projet | `project.toml`, `config.toml`, `memory.db`, skills/outils du projet, plans, artefacts d'exécution |
 | `<project>/AGENTS.md` | Projet | Le fichier de contexte injecté dans l'agent (lié symboliquement à `CLAUDE.md` / `GEMINI.md`) |
-| `<project>/wiki/`, `sources/` | Projet | Contenu utilisateur (la mise en page LLM-Wiki par défaut) |
+| `<project>/wiki/`, `sources/`, … | Projet | Contenu utilisateur, tel que le pack de mise en page l'organise (p. ex. le LLM-Wiki) |
 
 `VELES_USER_HOME` redirige `~` (l'état utilisateur se retrouve donc dans `<override>/.veles/`).
 Voir [mise en page du projet](project-layout.md) pour l'arborescence complète.

@@ -28,7 +28,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | العَلَم | الافتراضي | الغرض |
 |---|---|---|
 | `name` (موضعي) | اسم قاعدة الدليل الحالي | اسم المشروع |
-| `--layout <name>` | `llm-wiki` | حزمة التخطيط لسقالة المحتوى (`llm-wiki` أو `notes` أو `bare` أو حزمة مخصصة من `~/.veles/layouts/`) |
+| `--layout <name>` | `bare` (يُسأل عنه في الطرفية) | حزمة التخطيط لسقالة المحتوى (`bare`، أو حزمة مثبّتة من سجلّ مثل `llm-wiki` أو `notes`، أو حزمة مخصصة من `~/.veles/layouts/`). الحزمة غير المثبّتة يُعرض تثبيتها؛ والرفض لا ينشئ شيئًا |
 | `--force` | معطّل | إعادة إنشاء `.veles/` حتى لو كان موجودًا بالفعل |
 
 ### `veles schema {validate,edit,fix}`
@@ -39,7 +39,8 @@ veles [--no-wizard] <command> [subcommand] [options]
 - `fix` — أضِف الأقسام المفقودة تفاعليًا عبر معالج LLM.
 
 ### `veles self-doc [refresh|show]`
-وَلِّد التوثيق الذاتي للمشروع واعرضه (`wiki/self-doc/overview.md`).
+وَلِّد التوثيق الذاتي للمشروع واعرضه — في مخزن صفحات التخطيط إن كان له مخزن
+(الويكي: `wiki/self-doc/overview.md`)، وإلا في `.veles/memory/self-doc.md`.
 يعرض `veles self-doc` المجرّد الصفحة الحالية؛ بينما يعيد `refresh` توليدها.
 
 ### `veles doctor`
@@ -108,11 +109,17 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `--theme <name>` | حسب الإعداد أو `everforest` | سمة الألوان (everforest، dracula، gruvbox، tokyo-night، catppuccin) |
 
 ### `veles add <source>`
-اقرأ مصدرًا (ملفًا محليًا أو رابط `http(s)://`) واصهره في صفحة ويكي.
+*(من وحدة `wiki` — `veles registry install llm-wiki` أو `… install wiki`)*
+اقرأ مصدرًا (ملفًا محليًا أو رابط `http(s)://`) واصهره في صفحة ويكي. بدون
+الوحدة يكون `veles add` أمرًا غير معروف، ويذكر الخطأ كيفية التثبيت.
 يقبل أعلام حلقة الوكيل المشتركة.
 
+يمكن للوحدات إضافة أوامرها الخاصة بالطريقة نفسها؛ وتظهر في `veles --help`
+داخل مشروع فيه الوحدة.
+
 ### `veles curate`
-شغّل تمريرة منسّق واحدة: اضغط الجلسات غير المعالجة في صفحات `wiki/sessions/`.
+شغّل تمريرة منسّق واحدة: اضغط الجلسات غير المعالجة في رؤى الذاكرة (وفي صفحات
+`wiki/sessions/` عندما يكون محرّك الويكي مفعّلًا).
 
 | العَلَم | الافتراضي | الغرض |
 |---|---|---|

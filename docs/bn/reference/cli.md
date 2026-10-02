@@ -28,7 +28,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | ফ্ল্যাগ | ডিফল্ট | উদ্দেশ্য |
 |---|---|---|
 | `name` (positional) | cwd basename | প্রজেক্টের নাম |
-| `--layout <name>` | `llm-wiki` | কন্টেন্ট স্ক্যাফোল্ডের জন্য লেআউট প্যাক (`llm-wiki`, `notes`, `bare`, অথবা `~/.veles/layouts/` থেকে একটি কাস্টম প্যাক) |
+| `--layout <name>` | `bare` (টার্মিনালে জিজ্ঞেস করা হয়) | কন্টেন্ট স্ক্যাফোল্ডের জন্য লেআউট প্যাক (`bare`, কোনো রেজিস্ট্রি থেকে ইনস্টল করা প্যাক যেমন `llm-wiki` বা `notes`, অথবা `~/.veles/layouts/` থেকে একটি কাস্টম প্যাক)। ইনস্টল না থাকা প্যাকের ইনস্টলের প্রস্তাব দেওয়া হয়; প্রত্যাখ্যান করলে কিছুই তৈরি হয় না |
 | `--force` | off | `.veles/` ইতিমধ্যে বিদ্যমান থাকলেও পুনরায় তৈরি করে |
 
 ### `veles schema {validate,edit,fix}`
@@ -39,7 +39,8 @@ veles [--no-wizard] <command> [subcommand] [options]
 - `fix` — একটি LLM উইজার্ডের মাধ্যমে অনুপস্থিত সেকশন ইন্টারঅ্যাক্টিভভাবে যোগ করে।
 
 ### `veles self-doc [refresh|show]`
-প্রজেক্টের সেলফ-ডকুমেন্টেশন (`wiki/self-doc/overview.md`) তৈরি ও প্রদর্শন করে।
+প্রজেক্টের সেলফ-ডকুমেন্টেশন তৈরি ও প্রদর্শন করে — লেআউটের page store-এ, যদি থাকে
+(wiki: `wiki/self-doc/overview.md`), নইলে `.veles/memory/self-doc.md`-এ।
 শুধু `veles self-doc` বর্তমান পৃষ্ঠা দেখায়; `refresh` এটি পুনরায় তৈরি করে।
 
 ### `veles doctor`
@@ -108,11 +109,17 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `--theme <name>` | config or `everforest` | কালার থিম (everforest, dracula, gruvbox, tokyo-night, catppuccin) |
 
 ### `veles add <source>`
+*(`wiki` module থেকে — `veles registry install llm-wiki` বা `… install wiki`)*
 একটি সোর্স (একটি লোকাল ফাইল বা `http(s)://` URL) পড়ে এবং একটি উইকি পৃষ্ঠায়
-সংশ্লেষ করে। শেয়ার্ড এজেন্ট-লুপ ফ্ল্যাগ গ্রহণ করে।
+সংশ্লেষ করে। module ছাড়া `veles add` একটি অজানা কমান্ড এবং এরর ইনস্টলের নাম বলে দেয়।
+শেয়ার্ড এজেন্ট-লুপ ফ্ল্যাগ গ্রহণ করে।
+
+Module-গুলো একইভাবে নিজস্ব verb যোগ করতে পারে; module আছে এমন প্রজেক্টের ভেতরে সেগুলো
+`veles --help`-এ দেখা যায়।
 
 ### `veles curate`
-একটি কিউরেটর পাস চালায়: অপ্রসেসড সেশনগুলোকে `wiki/sessions/` পৃষ্ঠায় সংকুচিত করে।
+একটি কিউরেটর পাস চালায়: অপ্রসেসড সেশনগুলোকে মেমরি insight-এ সংকুচিত করে (এবং wiki engine
+চালু থাকলে `wiki/sessions/` পৃষ্ঠায়)।
 
 | ফ্ল্যাগ | ডিফল্ট | উদ্দেশ্য |
 |---|---|---|

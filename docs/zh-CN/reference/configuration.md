@@ -11,7 +11,7 @@ Veles 由两个 TOML 文件和一组状态目录进行配置。密钥（API key�
 | `~/.veles/` | 用户全局 | `config.toml`、trust 授权、跨项目 skills/tools、模型缓存、本地化、注册表 |
 | `<project>/.veles/` | 项目本地 | `project.toml`、`config.toml`、`memory.db`、项目级 skills/tools、plans、运行时临时数据 |
 | `<project>/AGENTS.md` | 项目 | 注入到 agent 中的上下文文件（符号链接到 `CLAUDE.md` / `GEMINI.md`） |
-| `<project>/wiki/`、`sources/` | 项目 | 用户内容（默认的 LLM-Wiki 布局） |
+| `<project>/wiki/`、`sources/`、… | 项目 | 用户内容，由布局包决定其组织方式（例如 LLM-Wiki） |
 
 `VELES_USER_HOME` 会重定向 `~`（这样用户状态会落到 `<override>/.veles/`）。完整目录树参见[项目布局](project-layout.md)。
 

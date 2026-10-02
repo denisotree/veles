@@ -44,7 +44,7 @@ response  ──►  saved to memory  ──►  learning triggers (insights, cu
 
 - `<project>/.veles/` —— 该项目的记忆、配置、本地技能/工具。
 - `~/.veles/` —— 用户全局配置、跨项目技能/工具、缓存、信任设置。
-- `<project>/AGENTS.md`、`wiki/`、`sources/` —— 你的内容（LLM-Wiki 布局）。
+- `<project>/AGENTS.md`、以及你的布局添加的内容（例如 LLM-Wiki 布局的 `wiki/`、`sources/`）—— 你的内容。
 
 参阅 [项目布局](../reference/project-layout.md)。
 
@@ -54,7 +54,7 @@ response  ──►  saved to memory  ──►  learning triggers (insights, cu
 
 ## 各类操作界面
 
-- **CLI**（`veles run`、`veles add`、……）—— 一次性和脚本化使用。
+- **CLI**（`veles run`、`veles organize`、……，以及模块添加的命令，如 wiki 的 `veles add`）—— 一次性和脚本化使用。
 - **TUI**（`veles tui`）—— 带 [运行模式](modes.md) 的交互式 REPL。
 - **守护进程 + 通道** —— 无头 API、Telegram、定时任务。
 

@@ -58,7 +58,7 @@ Veles는 의도적으로 **미니멀하고 깔끔하게 분리**되어 있습니
 
 - `<project>/.veles/` — 이 프로젝트의 메모리, 설정, 로컬 스킬/도구.
 - `~/.veles/` — 사용자 전역 설정, 크로스 프로젝트 스킬/도구, 캐시, 신뢰.
-- `<project>/AGENTS.md`, `wiki/`, `sources/` — 사용자 콘텐츠 (LLM-Wiki 레이아웃).
+- `<project>/AGENTS.md`와 레이아웃이 추가하는 것(예: LLM-Wiki 레이아웃의 `wiki/`, `sources/`) — 사용자 콘텐츠.
 
 [프로젝트 레이아웃](../reference/project-layout.md)을 참조하세요.
 
@@ -71,7 +71,7 @@ Veles는 의도적으로 **미니멀하고 깔끔하게 분리**되어 있습니
 
 ## 인터페이스
 
-- **CLI** (`veles run`, `veles add`, …) — 일회성 및 스크립트 사용.
+- **CLI** (`veles run`, `veles organize`, …, 그리고 위키의 `veles add`처럼 모듈이 추가하는 동사) — 일회성 및 스크립트 사용.
 - **TUI** (`veles tui`) — [실행 모드](modes.md)가 있는 인터랙티브 REPL.
 - **데몬 + 채널** — 헤드리스 API, Telegram, 예약 작업.
 

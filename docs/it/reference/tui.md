@@ -34,7 +34,7 @@ Digita `/` nel composer; `Tab` completa. I comandi registrati sono:
 | `/model` | Apre il selettore di modello |
 | `/mode` | Cambia modalità di esecuzione (auto/planning/writing/goal) |
 | `/session` | Apre il selettore di sessione (riprendi) |
-| `/save` | Salva / dà un nome alla sessione corrente |
+| `/save <slug>` | Salva l'ultima risposta — una pagina nel page store del layout (la wiki: `wiki/queries/<slug>.md`) se c'è, altrimenti un insight della memoria di progetto |
 | `/history` | Mostra la cronologia della sessione |
 | `/tokens` | Utilizzo dei token (in / out / per-turno / per-sessione) |
 | `/context` | Dimensione attuale del contesto vs il limite |
@@ -42,7 +42,7 @@ Digita `/` nel composer; `Tab` completa. I comandi registrati sono:
 | `/insights` | Mostra gli insight appresi per il progetto |
 | `/rules` | Mostra il digest delle regole del progetto |
 | `/schema` | Valida / corregge `AGENTS.md` |
-| `/wiki` | Operazioni wiki per il layout attivo |
+| `/wiki add <path\|url>` / `/wiki query <question>` | Operazioni wiki del modulo `wiki` — solo dove il layout attivo abilita l'engine wiki (es. `llm-wiki`). I moduli possono aggiungere i propri `/commands` allo stesso modo |
 | `/daemon` | Apre il pannello di controllo del daemon (progetto → daemon → canali) |
 
 > Il set di comandi slash è lo stesso sia che tu lanci la TUI direttamente sia che la spinga da

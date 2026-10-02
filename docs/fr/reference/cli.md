@@ -28,7 +28,7 @@ Crée un nouveau projet Veles dans le répertoire courant (un répertoire d'éta
 | Option | Défaut | Rôle |
 |---|---|---|
 | `name` (positionnel) | nom de base du cwd | Nom du projet |
-| `--layout <name>` | `llm-wiki` | Pack de mise en page pour l'ossature de contenu (`llm-wiki`, `notes`, `bare`, ou un pack personnalisé issu de `~/.veles/layouts/`) |
+| `--layout <name>` | `bare` (demandé dans un terminal) | Pack de mise en page pour l'ossature de contenu (`bare`, un pack installé depuis un registre comme `llm-wiki` ou `notes`, ou un pack personnalisé issu de `~/.veles/layouts/`). Un pack non installé est proposé à l'installation ; en cas de refus, rien n'est créé |
 | `--force` | désactivé | Recrée `.veles/` même s'il existe déjà |
 
 ### `veles schema {validate,edit,fix}`
@@ -39,7 +39,9 @@ Valide ou édite `AGENTS.md` (le fichier de contexte du projet).
 - `fix` — ajoute interactivement les sections manquantes via un assistant LLM.
 
 ### `veles self-doc [refresh|show]`
-Génère et affiche l'auto-documentation du projet (`wiki/self-doc/overview.md`).
+Génère et affiche l'auto-documentation du projet — dans le magasin de pages de la
+mise en page s'il y en a un (le wiki : `wiki/self-doc/overview.md`), sinon dans
+`.veles/memory/self-doc.md`.
 `veles self-doc` seul affiche la page courante ; `refresh` la régénère.
 
 ### `veles doctor`
@@ -109,11 +111,17 @@ ci-dessus, et :
 | `--theme <name>` | config ou `everforest` | Thème de couleurs (everforest, dracula, gruvbox, tokyo-night, catppuccin) |
 
 ### `veles add <source>`
+*(du module `wiki` — `veles registry install llm-wiki` ou `… install wiki`)*
 Lit une source (un fichier local ou une URL `http(s)://`) et la synthétise en une page
-wiki. Accepte les options partagées de la boucle d'agent.
+wiki. Sans le module, `veles add` est une commande inconnue et l'erreur nomme
+l'installation. Accepte les options partagées de la boucle d'agent.
+
+Les modules peuvent ajouter leurs propres verbes de la même façon ; ils apparaissent
+dans `veles --help` à l'intérieur d'un projet qui possède le module.
 
 ### `veles curate`
-Lance une passe du curateur : compacte les sessions non traitées en pages `wiki/sessions/`.
+Lance une passe du curateur : compacte les sessions non traitées en insights de mémoire (et en pages
+`wiki/sessions/` quand le moteur wiki est activé).
 
 | Option | Défaut | Rôle |
 |---|---|---|

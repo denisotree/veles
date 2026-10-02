@@ -28,7 +28,7 @@ Create a new Veles project in the current directory (a `.veles/` state directory
 | Flag | Default | Purpose |
 |---|---|---|
 | `name` (positional) | cwd basename | Project name |
-| `--layout <name>` | `llm-wiki` | Layout pack for the content scaffold (`llm-wiki`, `notes`, `bare`, or a custom pack from `~/.veles/layouts/`) |
+| `--layout <name>` | `bare` (asked at a terminal) | Layout pack for the content scaffold (`bare`, a pack installed from a registry such as `llm-wiki` or `notes`, or a custom pack from `~/.veles/layouts/`). A pack that isn't installed is offered for install; refusing creates nothing |
 | `--force` | off | Recreate `.veles/` even if it already exists |
 
 ### `veles schema {validate,edit,fix}`
@@ -39,8 +39,10 @@ Validate or edit `AGENTS.md` (the project context file).
 - `fix` — interactively add missing sections via an LLM wizard.
 
 ### `veles self-doc [refresh|show]`
-Generate and display project self-documentation (`wiki/self-doc/overview.md`).
-Bare `veles self-doc` shows the current page; `refresh` regenerates it.
+Generate and display project self-documentation — in the layout's page store
+when it has one (the wiki: `wiki/self-doc/overview.md`), otherwise
+`.veles/memory/self-doc.md`. Bare `veles self-doc` shows the current page;
+`refresh` regenerates it.
 
 ### `veles doctor`
 Run health checks over user-global state and the active project. Works with or
@@ -130,8 +132,13 @@ There is no `veles tui` or `veles repl` subcommand — the inline REPL is invoke
 as bare `veles`.
 
 ### `veles add <source>`
+*(from the `wiki` module — `veles registry install llm-wiki` or `… install wiki`)*
 Read a source (a local file, a directory, or an `http(s)://` URL) and
-synthesise it into a wiki page.
+synthesise it into a wiki page. Without the module, `veles add` is an unknown
+command and the error names the install.
+
+Modules can add their own verbs the same way; they appear in `veles --help`
+inside a project that has the module.
 
 | Flag | Default | Purpose |
 |---|---|---|
@@ -152,7 +159,8 @@ plan first; nothing changes without `--apply`.
 Plus the shared agent-loop flags.
 
 ### `veles curate`
-Run one curator pass: compact unprocessed sessions into `wiki/sessions/` pages.
+Run one curator pass: compact unprocessed sessions into memory insights (and
+`wiki/sessions/` pages when the wiki engine is on).
 
 | Flag | Default | Purpose |
 |---|---|---|

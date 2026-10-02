@@ -28,7 +28,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | Flag | Default | उद्देश्य |
 |---|---|---|
 | `name` (positional) | cwd basename | प्रोजेक्ट का नाम |
-| `--layout <name>` | `llm-wiki` | content scaffold के लिए layout pack (`llm-wiki`, `notes`, `bare`, या `~/.veles/layouts/` से कोई custom pack) |
+| `--layout <name>` | `bare` (terminal पर पूछा जाता है) | content scaffold के लिए layout pack (`bare`, किसी registry से install किया pack जैसे `llm-wiki` या `notes`, या `~/.veles/layouts/` से कोई custom pack)। जो pack installed नहीं है उसके install का प्रस्ताव मिलता है; मना करने पर कुछ नहीं बनता |
 | `--force` | off | `.veles/` को फिर से बनाएँ भले ही वह पहले से मौजूद हो |
 
 ### `veles schema {validate,edit,fix}`
@@ -39,7 +39,8 @@ veles [--no-wizard] <command> [subcommand] [options]
 - `fix` — एक LLM wizard के ज़रिए लुप्त sections को interactively जोड़ें।
 
 ### `veles self-doc [refresh|show]`
-प्रोजेक्ट self-documentation (`wiki/self-doc/overview.md`) उत्पन्न करें और दिखाएँ।
+प्रोजेक्ट self-documentation उत्पन्न करें और दिखाएँ — layout के page store में यदि उसके
+पास है (wiki: `wiki/self-doc/overview.md`), अन्यथा `.veles/memory/self-doc.md` में।
 सादा `veles self-doc` वर्तमान पेज दिखाता है; `refresh` इसे फिर से उत्पन्न करता है।
 
 ### `veles doctor`
@@ -108,11 +109,17 @@ interactive REPL खोलें। देखें [TUI संदर्भ](tui
 | `--theme <name>` | config या `everforest` | Color theme (everforest, dracula, gruvbox, tokyo-night, catppuccin) |
 
 ### `veles add <source>`
+*(`wiki` module से — `veles registry install llm-wiki` या `… install wiki`)*
 एक source (एक local file या `http(s)://` URL) पढ़ें और उसे एक wiki पेज में संश्लेषित
-करें। साझा agent-loop flags स्वीकार करता है।
+करें। module के बिना `veles add` एक अज्ञात command है और error install का नाम बताती है।
+साझा agent-loop flags स्वीकार करता है।
+
+Modules इसी तरह अपने verbs जोड़ सकते हैं; वे module वाले project के भीतर `veles --help`
+में दिखते हैं।
 
 ### `veles curate`
-एक curator pass चलाएँ: unprocessed sessions को `wiki/sessions/` पेजों में compact करें।
+एक curator pass चलाएँ: unprocessed sessions को memory insights में compact करें (और
+wiki engine चालू होने पर `wiki/sessions/` पेजों में)।
 
 | Flag | Default | उद्देश्य |
 |---|---|---|

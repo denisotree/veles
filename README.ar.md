@@ -43,7 +43,7 @@ veles        # interactive REPL (just run `veles` with no subcommand)
 
 **ذاكرة متراكمة** — يُختزَل كل جلسة بواسطة المُنسِّق (Curator) إلى ذاكرة خاصة بكل مشروع (استنتاجات، وقواعد سلوكية، وملخّصات جلسات في `.veles/`). يستدعي الوكيل تلقائيًا الحقائق ذات الصلة والقرارات السابقة — فتتوقف عن إعادة شرح السياق نفسه. وتعمل الذاكرة تحت *أي* تخطيط للمحتوى.
 
-**تخطيطات محتوى قابلة للتوصيل** — يُنشئ `veles init` افتراضيًا ويكي LLM على نمط Karpathy؛ ويمنحك `--layout notes` دليل ملاحظات مسطّحًا؛ بينما لا يضيف `--layout bare` أي بنية على الإطلاق (مثالي لمستودعات الشيفرة). حِزَم التخطيط المخصّصة هي مجرد ملف TOML واحد في `~/.veles/layouts/`.
+**تخطيطات محتوى قابلة للتوصيل** — لا يضيف `veles init` أي بنية افتراضيًا (`bare` — مثالي لمستودعات الشيفرة)؛ اختر `llm-wiki` لويكي LLM على نمط Karpathy أو `notes` لدليل ملاحظات مسطّح، وكلاهما يُثبَّتان من سجلّ الامتدادات على الفور. حِزَم التخطيط المخصّصة هي مجرد ملف TOML واحد في `~/.veles/layouts/`.
 
 **توجيه مستقل عن المورّد** — OpenRouter أو Anthropic أو OpenAI أو Gemini أو Ollama أو llamacpp أو اشتراك سطر الأوامر `claude`/`gemini` الخاص بك. ويمكن توجيه أنواع المهام المختلفة (التخطيط، الضغط، الاستنتاجات) إلى نماذج مختلفة.
 
@@ -123,17 +123,17 @@ veles secret set OPENROUTER_API_KEY    # prompts for value, stores in keychain
 ### اختر تخطيطًا للمحتوى
 
 ```bash
-veles init                  # default: Karpathy-style LLM wiki (sources/ + wiki/)
-veles init --layout notes   # a single flat notes/ directory
-veles init --layout bare    # no content scaffold — code repos, free-form work
+veles init                      # default: bare — no content scaffold (at a terminal it asks)
+veles init --layout llm-wiki    # Karpathy-style LLM wiki (sources/ + wiki/), from the registry
+veles init --layout notes       # a single flat notes/ directory, from the registry
 ```
 
-تعمل ذاكرة الوكيل الخاصّة (الاستنتاجات والقواعد وملخّصات الجلسات في `.veles/`) بالطريقة نفسها تحت كل تخطيط. والحِزَم المخصّصة هي ملف `layout.toml` واحد في `~/.veles/layouts/<name>/`.
+إذا لم يكن التخطيط مثبّتًا، يُعرض تثبيته مع ما يحتاجه، بتأكيد واحد. تعمل ذاكرة الوكيل الخاصّة (الاستنتاجات والقواعد وملخّصات الجلسات في `.veles/`) بالطريقة نفسها تحت كل تخطيط. والحِزَم المخصّصة هي ملف `layout.toml` واحد في `~/.veles/layouts/<name>/`.
 
 ### ابنِ قاعدة معرفة (تخطيط llm-wiki)
 
 ```bash
-veles add paper.pdf                   # read a source → write a wiki page
+veles add paper.pdf                   # read a source → write a wiki page (the wiki module's verb)
 veles add https://example.com/post    # web pages, PDFs, plain text
 
 veles run "What do we know about the authentication design?"
@@ -324,7 +324,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | إنشاء مشروع جديد |
 | `veles run "<prompt>"` | تشغيل وكيل بدورة واحدة |
 | `veles` | واجهة REPL التفاعلية (دون أمر فرعي) |
-| `veles add <file\|url>` | ابتلاع مصدر ← صفحات ويكي موضوعية |
+| `veles add <file\|url>` | ابتلاع مصدر ← صفحات ويكي موضوعية (من وحدة `wiki`، تخطيط llm-wiki) |
 | `veles organize` | إعادة تنظيم محتوى المشروع وفق التخطيط النشط (اقتراح ثم تطبيق) |
 | `veles research "<question>"` | بحث معمّق متعدّد الزوايا |
 | `veles curate` | دمج الجلسات في الويكي |

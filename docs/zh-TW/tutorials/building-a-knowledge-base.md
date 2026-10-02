@@ -2,13 +2,23 @@
 
 > 🌐 **語言：** [English](../../en/tutorials/building-a-knowledge-base.md) · [简体中文](../../zh-CN/tutorials/building-a-knowledge-base.md) · **繁體中文** · [日本語](../../ja/tutorials/building-a-knowledge-base.md) · [한국어](../../ko/tutorials/building-a-knowledge-base.md) · [Español](../../es/tutorials/building-a-knowledge-base.md) · [Français](../../fr/tutorials/building-a-knowledge-base.md) · [Italiano](../../it/tutorials/building-a-knowledge-base.md) · [Português (BR)](../../pt-BR/tutorials/building-a-knowledge-base.md) · [Português (PT)](../../pt-PT/tutorials/building-a-knowledge-base.md) · [Русский](../../ru/tutorials/building-a-knowledge-base.md) · [العربية](../../ar/tutorials/building-a-knowledge-base.md) · [हिन्दी](../../hi/tutorials/building-a-knowledge-base.md) · [বাংলা](../../bn/tutorials/building-a-knowledge-base.md) · [Tiếng Việt](../../vi/tutorials/building-a-knowledge-base.md)
 
-在本教學中，你會把一個 Veles 專案變成一座活的知識庫：匯入幾個來源、讓 Veles 寫出 wiki 頁面、提出問題，並整併你學到的內容。這是預設的 **LLM-Wiki** 工作流程。約需 15 分鐘。
+在本教學中，你會把一個 Veles 專案變成一座活的知識庫：匯入幾個來源、讓 Veles 寫出 wiki 頁面、提出問題，並整併你學到的內容。這是 **LLM-Wiki** 工作流程。約需 15 分鐘。
 
 你應該先完成 [Getting started](getting-started.md)。
 
+## 0. 使用 llm-wiki 版面
+
+wiki 來自擴充登錄表。新專案請在 `veles init` 時選擇它（或傳入 `--layout llm-wiki`）；Veles 會提議將該版面連同它所需的 `wiki` 模組一併安裝。對於既有專案：
+
+```bash
+veles registry install llm-wiki      # the layout + the wiki module, one confirmation
+```
+
+然後在 `.veles/project.toml` 中設定 `layout = "llm-wiki"`，再執行 `veles layout sync`。
+
 ## 概念
 
-一個 Veles 專案有兩個內容區域：
+一個 wiki 專案有兩個內容區域：
 
 - `sources/` — 你提供給它的原始、不可變動素材（對 agent 唯讀）。
 - `wiki/` — agent 自己、由 LLM 產生的知識（它唯一會寫入內容的區域）。

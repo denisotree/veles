@@ -23,7 +23,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | フラグ | デフォルト | 目的 |
 |---|---|---|
 | `name`（位置引数） | cwd のベース名 | プロジェクト名 |
-| `--layout <name>` | `llm-wiki` | コンテンツスキャフォールド用のレイアウトパック（`llm-wiki`、`notes`、`bare`、または `~/.veles/layouts/` のカスタムパック） |
+| `--layout <name>` | `bare`（ターミナルでは確認される） | コンテンツスキャフォールド用のレイアウトパック（`bare`、`llm-wiki` や `notes` のようにレジストリからインストールしたパック、または `~/.veles/layouts/` のカスタムパック）。未インストールのパックはインストールを提案され、拒否すると何も作成されない |
 | `--force` | オフ | `.veles/` が既に存在しても再作成する |
 
 ### `veles schema {validate,edit,fix}`
@@ -34,7 +34,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 - `fix` — LLM ウィザードを使って不足しているセクションを対話的に追加します。
 
 ### `veles self-doc [refresh|show]`
-プロジェクトの自己ドキュメント（`wiki/self-doc/overview.md`）を生成して表示します。引数なしの `veles self-doc` は現在のページを表示し、`refresh` は再生成します。
+プロジェクトの自己ドキュメントを生成して表示します — レイアウトにページストアがあればそこに（wiki では `wiki/self-doc/overview.md`）、なければ `.veles/memory/self-doc.md` に保存されます。引数なしの `veles self-doc` は現在のページを表示し、`refresh` は再生成します。
 
 ### `veles doctor`
 ユーザーグローバルの状態とアクティブなプロジェクトに対してヘルスチェックを実行します。アクティブなプロジェクトの有無にかかわらず動作します。
@@ -94,10 +94,13 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `--theme <name>` | 設定値または `everforest` | カラーテーマ（everforest、dracula、gruvbox、tokyo-night、catppuccin） |
 
 ### `veles add <source>`
-ソース（ローカルファイルまたは `http(s)://` URL）を読み込み、wiki ページに合成します。共通エージェントループフラグを受け付けます。
+*（`wiki` モジュール由来 — `veles registry install llm-wiki` または `… install wiki`）*
+ソース（ローカルファイルまたは `http(s)://` URL）を読み込み、wiki ページに合成します。モジュールがない場合、`veles add` は未知のコマンドとなり、エラーにインストール方法が示されます。
+
+モジュールも同様に独自の動詞を追加できます。それらは、そのモジュールがあるプロジェクト内の `veles --help` に表示されます。共通エージェントループフラグを受け付けます。
 
 ### `veles curate`
-キュレーターを 1 回実行します。未処理のセッションを `wiki/sessions/` ページにコンパクト化します。
+キュレーターを 1 回実行します。未処理のセッションをメモリのインサイトにコンパクト化します（wiki エンジンが有効なら `wiki/sessions/` ページにも）。
 
 | フラグ | デフォルト | 目的 |
 |---|---|---|

@@ -52,7 +52,7 @@ mkdir my-notes && cd my-notes
 veles init my-notes
 ```
 
-这会创建 `AGENTS.md`（你的项目上下文）、`sources/` 和 `wiki/`（默认的 [LLM-Wiki 布局](../explanation/layout-packs-and-llm-wiki.md)），以及 `.veles/`（机器状态）。参见[项目布局](../reference/project-layout.md)。
+这会创建 `AGENTS.md`（你的项目上下文）和 `.veles/`（机器状态）—— 默认的 `bare` 布局不会再添加其他内容。在终端中，`veles init` 会询问使用哪种[布局](../explanation/layout-packs-and-llm-wiki.md)；选择 `llm-wiki`（会当场从注册表安装）即可得到 `sources/` 和 `wiki/`。参见[项目布局](../reference/project-layout.md)。
 
 ## 4. 运行你的第一个 prompt
 

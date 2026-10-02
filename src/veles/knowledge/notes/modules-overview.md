@@ -29,7 +29,8 @@ A module can plug a memory source into recall with
 `[memory.external.<name>]` config section — that's how Honcho, Mem0 and
 Supermemory work as registry modules. More generally, `api.contribute(point,
 name, obj)` adds tools, recall, prompt blocks, dream steps, a curator target,
-a scaffold or a daemon job kind — the built-in wiki engine is a module that
-does exactly this (see how-to/extend-veles-with-modules).
+a page store, a `veles` verb, a REPL `/command`, a scaffold or a daemon job
+kind — the registry's wiki engine is a module that does exactly this (see
+how-to/extend-veles-with-modules). Modules import Veles through `veles.sdk`.
 
 Example: `veles module list`.

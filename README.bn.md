@@ -43,7 +43,7 @@ veles        # interactive REPL (just run `veles` with no subcommand)
 
 **ক্রমবর্ধমান মেমরি** — প্রতিটি সেশন Curator দ্বারা প্রকল্প-ভিত্তিক মেমরিতে পরিশোধিত হয় (অন্তর্দৃষ্টি, আচরণগত নিয়ম, `.veles/`-এ সেশন ডাইজেস্ট)। এজেন্ট প্রাসঙ্গিক তথ্য এবং অতীত সিদ্ধান্ত স্বয়ংক্রিয়ভাবে স্মরণ করে — আপনি বারবার একই প্রেক্ষাপট ব্যাখ্যা করা বন্ধ করেন। মেমরি *যেকোনো* কনটেন্ট লেআউটের অধীনে কাজ করে।
 
-**প্লাগেবল কনটেন্ট লেআউট** — `veles init` ডিফল্টভাবে একটি Karpathy-স্টাইল LLM উইকি স্ক্যাফোল্ড করে; `--layout notes` একটি ফ্ল্যাট নোট ডিরেক্টরি দেয়; `--layout bare` কোনো কাঠামো যোগ করে না (কোড রিপোজিটরির জন্য আদর্শ)। কাস্টম লেআউট প্যাক হলো `~/.veles/layouts/`-এ একটি একক TOML ফাইল।
+**প্লাগেবল কনটেন্ট লেআউট** — `veles init` ডিফল্টভাবে কোনো কাঠামো যোগ করে না (`bare` — কোড রিপোজিটরির জন্য আদর্শ); Karpathy-স্টাইল LLM উইকির জন্য `llm-wiki`, ফ্ল্যাট নোট ডিরেক্টরির জন্য `notes` বেছে নিন — দুটিই এক্সটেনশন রেজিস্ট্রি থেকে সঙ্গে সঙ্গে ইনস্টল হয়। কাস্টম লেআউট প্যাক হলো `~/.veles/layouts/`-এ একটি একক TOML ফাইল।
 
 **প্রোভাইডার-নিরপেক্ষ রাউটিং** — OpenRouter, Anthropic, OpenAI, Gemini, Ollama, llamacpp, অথবা আপনার `claude`/`gemini` CLI সাবস্ক্রিপশন। বিভিন্ন ধরনের কাজ (পরিকল্পনা, কম্প্রেশন, অন্তর্দৃষ্টি) বিভিন্ন মডেলে রাউট করা যায়।
 
@@ -123,17 +123,17 @@ veles secret set OPENROUTER_API_KEY    # prompts for value, stores in keychain
 ### একটি কনটেন্ট লেআউট বেছে নিন
 
 ```bash
-veles init                  # default: Karpathy-style LLM wiki (sources/ + wiki/)
-veles init --layout notes   # a single flat notes/ directory
-veles init --layout bare    # no content scaffold — code repos, free-form work
+veles init                      # default: bare — no content scaffold (at a terminal it asks)
+veles init --layout llm-wiki    # Karpathy-style LLM wiki (sources/ + wiki/), from the registry
+veles init --layout notes       # a single flat notes/ directory, from the registry
 ```
 
-এজেন্টের নিজস্ব মেমরি (অন্তর্দৃষ্টি, নিয়ম, `.veles/`-এ সেশন ডাইজেস্ট) প্রতিটি লেআউটের অধীনে একইভাবে কাজ করে। কাস্টম প্যাক হলো `~/.veles/layouts/<name>/`-এ একটি `layout.toml`।
+যে লেআউট ইনস্টল করা নেই, সেটি ইনস্টলের প্রস্তাব দেওয়া হয় (কী কী লাগবে তা সহ, একটি নিশ্চিতকরণে)। এজেন্টের নিজস্ব মেমরি (অন্তর্দৃষ্টি, নিয়ম, `.veles/`-এ সেশন ডাইজেস্ট) প্রতিটি লেআউটের অধীনে একইভাবে কাজ করে। কাস্টম প্যাক হলো `~/.veles/layouts/<name>/`-এ একটি `layout.toml`।
 
 ### একটি জ্ঞানভাণ্ডার তৈরি করুন (llm-wiki লেআউট)
 
 ```bash
-veles add paper.pdf                   # read a source → write a wiki page
+veles add paper.pdf                   # read a source → write a wiki page (the wiki module's verb)
 veles add https://example.com/post    # web pages, PDFs, plain text
 
 veles run "What do we know about the authentication design?"
@@ -325,7 +325,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | একটি নতুন প্রকল্প তৈরি করুন |
 | `veles run "<prompt>"` | একক-টার্ন এজেন্ট রান |
 | `veles` | ইন্টারঅ্যাকটিভ REPL (কোনো সাবকমান্ড নেই) |
-| `veles add <file\|url>` | একটি সোর্স ইনজেস্ট করুন → বিষয়ভিত্তিক উইকি পৃষ্ঠা |
+| `veles add <file\|url>` | একটি সোর্স ইনজেস্ট করুন → বিষয়ভিত্তিক উইকি পৃষ্ঠা (`wiki` মডিউল থেকে, llm-wiki লেআউট) |
 | `veles organize` | সক্রিয় লেআউট অনুযায়ী প্রকল্পের কনটেন্ট পুনর্গঠন করুন (প্রস্তাব-তারপর-প্রয়োগ) |
 | `veles research "<question>"` | গভীর বহুমাত্রিক গবেষণা |
 | `veles curate` | সেশনগুলোকে উইকিতে একত্রীকরণ করুন |

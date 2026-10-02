@@ -43,7 +43,7 @@ veles        # interactive REPL (just run `veles` with no subcommand)
 
 **Compounding memory** — Every session is distilled by the Curator into per-project memory (insights, behavioral rules, session digests in `.veles/`). The agent recalls relevant facts and past decisions automatically — you stop re-explaining the same context. Memory works under *any* content layout.
 
-**Pluggable content layouts** — `veles init` scaffolds a Karpathy-style LLM wiki by default; `--layout notes` gives a flat notes directory; `--layout bare` adds no structure at all (ideal for code repos). Custom layout packs are a single TOML file in `~/.veles/layouts/`.
+**Pluggable content layouts** — `veles init` adds no structure by default (`bare` — ideal for code repos); pick `llm-wiki` for a Karpathy-style LLM wiki or `notes` for a flat notes directory, both installed from the extension registry on the spot. Custom layout packs are a single TOML file in `~/.veles/layouts/`.
 
 **Provider-agnostic routing** — OpenRouter, Anthropic, OpenAI, Gemini, Ollama, llamacpp, or your `claude`/`gemini` CLI subscription. Different task types (planning, compression, insights) can route to different models.
 
@@ -123,17 +123,17 @@ veles secret set OPENROUTER_API_KEY    # prompts for value, stores in keychain
 ### Pick a content layout
 
 ```bash
-veles init                  # default: Karpathy-style LLM wiki (sources/ + wiki/)
-veles init --layout notes   # a single flat notes/ directory
-veles init --layout bare    # no content scaffold — code repos, free-form work
+veles init                      # default: bare — no content scaffold (at a terminal it asks)
+veles init --layout llm-wiki    # Karpathy-style LLM wiki (sources/ + wiki/), from the registry
+veles init --layout notes       # a single flat notes/ directory, from the registry
 ```
 
-The agent's own memory (insights, rules, session digests in `.veles/`) works identically under every layout. Custom packs are one `layout.toml` in `~/.veles/layouts/<name>/`.
+A layout that isn't installed is offered for install (with what it needs, under one confirmation). The agent's own memory (insights, rules, session digests in `.veles/`) works identically under every layout. Custom packs are one `layout.toml` in `~/.veles/layouts/<name>/`.
 
 ### Build a knowledge base (llm-wiki layout)
 
 ```bash
-veles add paper.pdf                   # read a source → write a wiki page
+veles add paper.pdf                   # read a source → write a wiki page (the wiki module's verb)
 veles add https://example.com/post    # web pages, PDFs, plain text
 
 veles run "What do we know about the authentication design?"
@@ -357,7 +357,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | Create a new project |
 | `veles run "<prompt>"` | Single-turn agent run |
 | `veles` | Interactive REPL (no subcommand) |
-| `veles add <file\|url>` | Ingest a source → topical wiki pages (llm-wiki layout) |
+| `veles add <file\|url>` | Ingest a source → topical wiki pages (from the `wiki` module, llm-wiki layout) |
 | `veles organize` | Reorganize project content per the active layout (propose-then-apply) |
 | `veles research "<question>"` | Deep multi-angle research |
 | `veles curate` | Distil sessions into project memory (`.veles/`, any layout) |

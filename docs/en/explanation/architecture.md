@@ -59,7 +59,8 @@ rather than dumped in up front.
 
 - `<project>/.veles/` — this project's memory, config, local skills/tools.
 - `~/.veles/` — user-global config, cross-project skills/tools, caches, trust.
-- `<project>/AGENTS.md`, `wiki/`, `sources/` — your content (the LLM-Wiki layout).
+- `<project>/AGENTS.md` and whatever your layout adds (e.g. `wiki/`, `sources/`
+  for the LLM-Wiki layout) — your content.
 
 See [project layout](../reference/project-layout.md).
 
@@ -72,7 +73,8 @@ external CLI launched there sees the same context. See
 
 ## The surfaces
 
-- **CLI** (`veles run`, `veles add`, …) — one-shot and scripted use.
+- **CLI** (`veles run`, `veles organize`, …, plus verbs modules add such as the
+  wiki's `veles add`) — one-shot and scripted use.
 - **TUI** (bare `veles`) — interactive REPL with [run modes](modes.md).
 - **Daemon + channels** — headless API, Telegram, scheduled jobs.
 

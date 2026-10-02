@@ -13,7 +13,7 @@ Secrets (API keys, bot tokens) इन files में **कभी** नहीं
 | `~/.veles/` | User-global | `config.toml`, trust grants, cross-project skills/tools, model cache, locales, registry |
 | `<project>/.veles/` | Project-local | `project.toml`, `config.toml`, `memory.db`, project skills/tools, plans, runtime artefacts |
 | `<project>/AGENTS.md` | Project | agent में inject होने वाली context file (`CLAUDE.md` / `GEMINI.md` से symlinked) |
-| `<project>/wiki/`, `sources/` | Project | user content (default LLM-Wiki layout) |
+| `<project>/wiki/`, `sources/`, … | Project | user content, जैसा layout pack उसे बिछाता है (जैसे LLM-Wiki) |
 
 `VELES_USER_HOME` `~` को redirect करता है (ताकि user state `<override>/.veles/` में रहे)।
 पूरे tree के लिए देखें [project layout](project-layout.md)।

@@ -4,14 +4,26 @@
 
 En este tutorial conviertes un proyecto de Veles en una base de conocimiento viva:
 ingieres unas cuantas fuentes, dejas que Veles escriba páginas de wiki, haces
-preguntas y consolidas lo que aprendiste. Este es el flujo **LLM-Wiki** por
-defecto. Unos 15 minutos.
+preguntas y consolidas lo que aprendiste. Este es el flujo **LLM-Wiki**.
+Unos 15 minutos.
 
 Antes deberías haber terminado [Primeros pasos](getting-started.md).
 
+## 0. Usa el layout llm-wiki
+
+La wiki viene del registro de extensiones. En un proyecto nuevo, elígela en
+`veles init` (o pasa `--layout llm-wiki`); Veles ofrece instalar el layout junto
+con el módulo `wiki` que necesita. Para un proyecto existente:
+
+```bash
+veles registry install llm-wiki      # the layout + the wiki module, one confirmation
+```
+
+y define `layout = "llm-wiki"` en `.veles/project.toml`, luego `veles layout sync`.
+
 ## La idea
 
-Un proyecto de Veles tiene dos zonas de contenido:
+Un proyecto wiki tiene dos zonas de contenido:
 
 - `sources/` — material en bruto e inmutable que le proporcionas (solo lectura
   para el agente).

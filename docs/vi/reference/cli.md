@@ -28,7 +28,7 @@ Tạo một dự án Veles mới trong thư mục hiện tại (một thư mục
 | Cờ | Mặc định | Mục đích |
 |---|---|---|
 | `name` (vị trí) | tên cơ sở của cwd | Tên dự án |
-| `--layout <name>` | `llm-wiki` | Gói layout cho bộ khung nội dung (`llm-wiki`, `notes`, `bare`, hoặc một gói tùy chỉnh từ `~/.veles/layouts/`) |
+| `--layout <name>` | `bare` (hỏi tại terminal) | Gói layout cho bộ khung nội dung (`bare`, một gói cài từ registry như `llm-wiki` hoặc `notes`, hoặc một gói tùy chỉnh từ `~/.veles/layouts/`). Gói chưa cài sẽ được đề nghị cài; từ chối thì không tạo gì |
 | `--force` | tắt | Tạo lại `.veles/` ngay cả khi nó đã tồn tại |
 
 ### `veles schema {validate,edit,fix}`
@@ -39,7 +39,8 @@ Kiểm tra hoặc chỉnh sửa `AGENTS.md` (file ngữ cảnh dự án).
 - `fix` — bổ sung tương tác các mục còn thiếu qua một trình hướng dẫn LLM.
 
 ### `veles self-doc [refresh|show]`
-Tạo và hiển thị tài liệu tự sinh của dự án (`wiki/self-doc/overview.md`).
+Tạo và hiển thị tài liệu tự sinh của dự án — trong page store của layout nếu có
+(wiki: `wiki/self-doc/overview.md`), nếu không thì `.veles/memory/self-doc.md`.
 `veles self-doc` không kèm gì sẽ hiển thị trang hiện tại; `refresh` tạo lại nó.
 
 ### `veles doctor`
@@ -108,11 +109,17 @@ agent dùng chung, `--resume`, các cờ chèn/nén `--no-*` ở trên, và:
 | `--theme <name>` | từ config hoặc `everforest` | Chủ đề màu (everforest, dracula, gruvbox, tokyo-night, catppuccin) |
 
 ### `veles add <source>`
+*(từ module `wiki` — `veles registry install llm-wiki` hoặc `… install wiki`)*
 Đọc một nguồn (file cục bộ hoặc URL `http(s)://`) và tổng hợp nó thành một
-trang wiki. Chấp nhận các cờ vòng lặp agent dùng chung.
+trang wiki. Không có module thì `veles add` là một lệnh không xác định và thông
+báo lỗi nêu cách cài. Chấp nhận các cờ vòng lặp agent dùng chung.
+
+Module có thể thêm verb riêng theo cách tương tự; chúng xuất hiện trong `veles --help`
+bên trong dự án có module đó.
 
 ### `veles curate`
-Chạy một lượt curator: nén các session chưa xử lý thành các trang `wiki/sessions/`.
+Chạy một lượt curator: nén các session chưa xử lý thành các insight bộ nhớ (và thành
+các trang `wiki/sessions/` khi engine wiki được bật).
 
 | Cờ | Mặc định | Mục đích |
 |---|---|---|

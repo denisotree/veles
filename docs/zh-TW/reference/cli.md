@@ -23,7 +23,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | 旗標 | 預設 | 用途 |
 |---|---|---|
 | `name`（位置引數） | cwd 的 basename | 專案名稱 |
-| `--layout <name>` | `llm-wiki` | 內容骨架所用的版面套件（`llm-wiki`、`notes`、`bare`，或來自 `~/.veles/layouts/` 的自訂套件） |
+| `--layout <name>` | `bare`（在終端機中會詢問） | 內容骨架所用的版面套件（`bare`、從登錄表安裝的套件如 `llm-wiki` 或 `notes`，或來自 `~/.veles/layouts/` 的自訂套件）。未安裝的套件會提議安裝；拒絕則不會建立任何內容 |
 | `--force` | 關閉 | 即使 `.veles/` 已存在也重新建立 |
 
 ### `veles schema {validate,edit,fix}`
@@ -34,7 +34,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 - `fix`——透過 LLM 精靈互動式補上缺漏的章節。
 
 ### `veles self-doc [refresh|show]`
-產生並顯示專案的自我文件（`wiki/self-doc/overview.md`）。單獨執行 `veles self-doc` 會顯示目前的頁面；`refresh` 會重新產生。
+產生並顯示專案的自我文件——若版面有頁面儲存區則存入其中（wiki：`wiki/self-doc/overview.md`），否則存入 `.veles/memory/self-doc.md`。單獨執行 `veles self-doc` 會顯示目前的頁面；`refresh` 會重新產生。
 
 ### `veles doctor`
 對使用者全域狀態與作用中的專案執行健康檢查。無論是否有作用中的專案都可運作。
@@ -94,10 +94,13 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `--theme <name>` | 設定檔或 `everforest` | 色彩主題（everforest、dracula、gruvbox、tokyo-night、catppuccin） |
 
 ### `veles add <source>`
-讀取一個來源（本機檔案或 `http(s)://` URL），並將其綜整成一個 wiki 頁面。接受共用代理迴圈旗標。
+*（來自 `wiki` 模組——`veles registry install llm-wiki` 或 `… install wiki`）*
+讀取一個來源（本機檔案或 `http(s)://` URL），並將其綜整成一個 wiki 頁面。沒有該模組時，`veles add` 是未知指令，錯誤訊息會指出安裝方式。接受共用代理迴圈旗標。
+
+模組可以用同樣的方式新增自己的指令；它們會出現在裝有該模組的專案內的 `veles --help` 中。
 
 ### `veles curate`
-執行一次 curator 處理：將未處理的工作階段壓縮為 `wiki/sessions/` 頁面。
+執行一次 curator 處理：將未處理的工作階段壓縮為記憶 insights（wiki engine 開啟時還包括 `wiki/sessions/` 頁面）。
 
 | 旗標 | 預設 | 用途 |
 |---|---|---|

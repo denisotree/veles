@@ -7,15 +7,16 @@ Cosa crea `veles init`, dove Veles conserva lo stato e lo schema della memoria d
 ## Cosa produce `veles init`
 
 La metà del contenuto utente dipende dal layout pack scelto (`--layout`,
-default `llm-wiki`); la metà di stato `.veles/` è identica ovunque.
+default `bare` — nient'altro che `AGENTS.md`); la metà di stato `.veles/` è identica
+ovunque. Di seguito, un progetto con il layout `llm-wiki` dal registry:
 
 ```
-my-project/                  # veles init  (layout llm-wiki di default)
+my-project/                  # veles init --layout llm-wiki
 ├── AGENTS.md                # contesto del progetto (iniettato nell'agente)
 ├── CLAUDE.md → AGENTS.md    # symlink, così una CLI `claude` recupera lo stesso contesto
 ├── GEMINI.md → AGENTS.md    # symlink, per una CLI `gemini`
-├── sources/                 # materiale sorgente grezzo e immutabile (sola lettura per l'agente)
-├── wiki/                    # la zona di conoscenza scrivibile dall'LLM
+├── sources/                 # (llm-wiki) materiale sorgente grezzo, sola lettura per convenzione
+├── wiki/                    # (llm-wiki) la zona di conoscenza scrivibile dall'LLM
 │   ├── concepts/ entities/ queries/ self-doc/ sessions/
 └── .veles/                  # stato del progetto (non committare; gestito dalla macchina)
     ├── project.toml         # name, created_at, schema_version, layout
@@ -29,9 +30,9 @@ my-project/                  # veles init  (layout llm-wiki di default)
     └── skills/              # skill locali al progetto
 ```
 
-Con `--layout notes` la metà del contenuto è una singola directory `notes/`; con
-`--layout bare` non c'è alcuno scaffold di contenuto. `wiki/INDEX.md` (il
-catalogo su richiesta) viene generato man mano che la wiki cresce; `config.toml`, `tools/`
+Con il `bare` di default non c'è alcuno scaffold di contenuto; con `notes` (dal
+registry) la metà del contenuto è una singola directory `notes/`. `INDEX.md` (il
+catalogo su richiesta della wiki) viene generato man mano che la wiki cresce; `config.toml`, `tools/`
 e `plans/` compaiono sotto `.veles/` una volta che configuri qualcosa, un agente
 scrive un tool o esegui un goal.
 
@@ -68,8 +69,9 @@ per come queste vengono scritte e richiamate.
 
 ## Layout pack
 
-`veles init --layout {llm-wiki|notes|bare|<custom>}` sceglie il layout del
-contenuto; il pack possiede lo scaffold, il template di AGENTS.md, le zone scrivibili
-e se il motore wiki (tool wiki, iniezione del prompt INDEX, recall
-wiki) è attivo. Vedi
+`veles init --layout {bare|llm-wiki|notes|<custom>}` sceglie il layout del
+contenuto (solo `bare` è integrato; gli altri vengono da un registry e sono proposti
+per l'installazione); il pack possiede lo scaffold, il template di AGENTS.md, le zone
+scrivibili e quale motore di contenuto (es. la wiki: tool wiki, iniezione del prompt
+INDEX, recall wiki) richiede. Vedi
 [layout pack e l'LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).

@@ -28,7 +28,7 @@ Crea un nuevo proyecto Veles en el directorio actual (un directorio de estado `.
 | Opción | Predeterminado | Propósito |
 |---|---|---|
 | `name` (posicional) | basename del cwd | Nombre del proyecto |
-| `--layout <name>` | `llm-wiki` | Paquete de layout para el andamiaje de contenido (`llm-wiki`, `notes`, `bare` o un paquete personalizado de `~/.veles/layouts/`) |
+| `--layout <name>` | `bare` (se pregunta en un terminal) | Paquete de layout para el andamiaje de contenido (`bare`, un paquete instalado desde un registro como `llm-wiki` o `notes`, o un paquete personalizado de `~/.veles/layouts/`). Un paquete no instalado se ofrece para instalar; si lo rechazas no se crea nada |
 | `--force` | desactivado | Recrea `.veles/` aunque ya exista |
 
 ### `veles schema {validate,edit,fix}`
@@ -39,8 +39,9 @@ Valida o edita `AGENTS.md` (el archivo de contexto del proyecto).
 - `fix` — añade interactivamente las secciones que falten mediante un asistente LLM.
 
 ### `veles self-doc [refresh|show]`
-Genera y muestra la autodocumentación del proyecto (`wiki/self-doc/overview.md`).
-`veles self-doc` a secas muestra la página actual; `refresh` la regenera.
+Genera y muestra la autodocumentación del proyecto — en el almacén de páginas del
+layout si lo tiene (la wiki: `wiki/self-doc/overview.md`), y si no en
+`.veles/memory/self-doc.md`. `veles self-doc` a secas muestra la página actual; `refresh` la regenera.
 
 ### `veles doctor`
 Ejecuta comprobaciones de salud sobre el estado global del usuario y el proyecto
@@ -109,11 +110,17 @@ inyección/compresión anteriores y:
 | `--theme <name>` | config o `everforest` | Tema de color (everforest, dracula, gruvbox, tokyo-night, catppuccin) |
 
 ### `veles add <source>`
+*(del módulo `wiki` — `veles registry install llm-wiki` o `… install wiki`)*
 Lee una fuente (un archivo local o una URL `http(s)://`) y la sintetiza en una
-página wiki. Acepta las opciones compartidas del bucle del agente.
+página wiki. Sin el módulo, `veles add` es un comando desconocido y el error
+nombra la instalación. Acepta las opciones compartidas del bucle del agente.
+
+Los módulos pueden añadir sus propios verbos del mismo modo; aparecen en
+`veles --help` dentro de un proyecto que tiene el módulo.
 
 ### `veles curate`
-Ejecuta una pasada del curador: compacta las sesiones sin procesar en páginas de `wiki/sessions/`.
+Ejecuta una pasada del curador: compacta las sesiones sin procesar en insights de memoria (y en páginas de
+`wiki/sessions/` cuando el engine de wiki está activo).
 
 | Opción | Predeterminado | Propósito |
 |---|---|---|

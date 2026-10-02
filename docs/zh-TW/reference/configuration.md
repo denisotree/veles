@@ -11,7 +11,7 @@ Veles 由兩個 TOML 檔案與一組狀態目錄來設定。機密（API 金鑰�
 | `~/.veles/` | 使用者全域 | `config.toml`、信任授權、跨專案技能／工具、模型快取、語系、登錄庫 |
 | `<project>/.veles/` | 專案本地 | `project.toml`、`config.toml`、`memory.db`、專案技能／工具、計畫、執行期暫態檔 |
 | `<project>/AGENTS.md` | 專案 | 注入代理的脈絡檔（以符號連結指向 `CLAUDE.md` / `GEMINI.md`） |
-| `<project>/wiki/`、`sources/` | 專案 | 使用者內容（預設的 LLM-Wiki 版面） |
+| `<project>/wiki/`、`sources/`、… | 專案 | 使用者內容，由 layout pack 決定其組織方式（例如 LLM-Wiki） |
 
 `VELES_USER_HOME` 會重新導向 `~`（因此使用者狀態會落在 `<override>/.veles/`）。完整的目錄樹參見[專案版面](project-layout.md)。
 

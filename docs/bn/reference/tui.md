@@ -33,7 +33,7 @@ composer-এ `/` টাইপ করুন; `Tab` দিয়ে completion হ
 | `/model` | model picker খোলা |
 | `/mode` | run mode পরিবর্তন (auto/planning/writing/goal) |
 | `/session` | session picker খোলা (resume) |
-| `/save` | বর্তমান session সংরক্ষণ / নামকরণ করা |
+| `/save <slug>` | শেষ উত্তর সংরক্ষণ — লেআউটের page store-এ একটি page (wiki: `wiki/queries/<slug>.md`) থাকলে, নইলে project-memory insight |
 | `/history` | session history দেখানো |
 | `/tokens` | token ব্যবহার (in / out / per-turn / per-session) |
 | `/context` | লিমিটের তুলনায় বর্তমান context-এর আকার |
@@ -41,7 +41,7 @@ composer-এ `/` টাইপ করুন; `Tab` দিয়ে completion হ
 | `/insights` | প্রজেক্টের জন্য শেখা insight দেখানো |
 | `/rules` | প্রজেক্টের rules digest দেখানো |
 | `/schema` | `AGENTS.md` যাচাই / সংশোধন করা |
-| `/wiki` | সক্রিয় layout-এর জন্য wiki অপারেশন |
+| `/wiki add <path\|url>` / `/wiki query <question>` | `wiki` module-এর wiki অপারেশন — শুধু যেখানে সক্রিয় layout wiki engine চালু করে (যেমন `llm-wiki`)। module একইভাবে নিজস্ব `/commands` যোগ করতে পারে |
 | `/daemon` | daemon কন্ট্রোল প্যানেল খোলা (project → daemons → channels) |
 
 > আপনি TUI সরাসরি চালু করুন বা অন্য কোনো screen থেকে এটি push করুন — slash সেট একই থাকে। Channel-গুলো (যেমন Telegram) তাদের নিজস্ব, আলাদা কমান্ড সেট প্রকাশ করে।

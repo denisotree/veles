@@ -4,13 +4,25 @@
 
 In this tutorial you turn a Veles project into a living knowledge base: ingest a
 few sources, let Veles write wiki pages, ask questions, and consolidate what you
-learned. This is the default **LLM-Wiki** workflow. About 15 minutes.
+learned. This is the **LLM-Wiki** workflow. About 15 minutes.
 
 You should have finished [Getting started](getting-started.md) first.
 
+## 0. Use the llm-wiki layout
+
+The wiki comes from the extension registry. For a new project pick it at
+`veles init` (or pass `--layout llm-wiki`); Veles offers to install the layout
+together with the `wiki` module it needs. For an existing project:
+
+```bash
+veles registry install llm-wiki      # the layout + the wiki module, one confirmation
+```
+
+and set `layout = "llm-wiki"` in `.veles/project.toml`, then `veles layout sync`.
+
 ## The idea
 
-A Veles project has two content zones:
+A wiki project has two content zones:
 
 - `sources/` — raw material you give it, kept as-is by convention (not
   hard-enforced — the agent can technically write anywhere in the project).

@@ -13,7 +13,7 @@ nằm trong keychain của hệ điều hành hoặc trong biến môi trường
 | `~/.veles/` | User-global | `config.toml`, các cấp quyền trust, skills/tools dùng chung nhiều dự án, cache model, locale, registry |
 | `<project>/.veles/` | Cục bộ theo dự án | `project.toml`, `config.toml`, `memory.db`, skills/tools của dự án, plan, các file tạm lúc chạy |
 | `<project>/AGENTS.md` | Dự án | File ngữ cảnh được chèn vào agent (symlink tới `CLAUDE.md` / `GEMINI.md`) |
-| `<project>/wiki/`, `sources/` | Dự án | Nội dung của người dùng (layout LLM-Wiki mặc định) |
+| `<project>/wiki/`, `sources/`, … | Dự án | Nội dung của người dùng, theo cách layout pack bố trí (ví dụ LLM-Wiki) |
 
 `VELES_USER_HOME` chuyển hướng `~` (nên trạng thái user nằm tại `<override>/.veles/`).
 Xem [layout dự án](project-layout.md) để biết cây thư mục đầy đủ.

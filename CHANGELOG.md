@@ -7,6 +7,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+`veles init` creates a bare project by default; the wiki engine and the `llm-wiki` and
+`notes` layouts ship from the extension registry, and registry modules build on a public
+`veles.sdk`. No existing project silently loses its wiki.
+
+### Added
+
+- `veles.sdk` — the public surface for modules (`veles.sdk`, `.contributions`, `.tools`,
+  `.memory`, `.layout`, `.jobs`). Its names are pinned by a test; changes are listed here.
+  `veles registry validate` refuses a registry module that imports Veles from anywhere else
+  (its tests are exempt).
+- Contribution points `cli_command` (a `veles <verb>`; the command gets a host that runs agent
+  turns the way `veles run` does), `slash_command` (a REPL `/command`) and `page_store` (keeps
+  pages: `/save` and the self-documentation page). A verb only an uninstalled registry
+  extension provides points at the install.
+- `requires_extensions` in `extension.toml`: installing an extension installs what it needs
+  under one confirmation and rolls the whole set back on failure; `uninstall` refuses to pull
+  a dependency out from under an installed extension (`--force`); `verify`/`doctor` report a
+  missing one; `validate` checks refs and cycles.
+- A project whose layout pack, or a content engine its pack asks for, isn't installed is
+  offered the install when `veles`/`veles run` start at a terminal; elsewhere Veles prints the
+  install command once and works without it. Former built-in layouts and the wiki engine
+  come from `public:official/*`. `layout sync`, `organize` and `doctor` name the install.
+- `veles init` asks for a layout at a terminal (installed packs plus layouts in your
+  registries); a layout that isn't installed is offered for install, and refusing creates
+  nothing.
+- A module may span several files and import them relatively — its entrypoint loads as a
+  package rooted at the module directory.
+- `veles registry uninstall`/`upgrade --user|--project` when a name is installed in both.
+- Reviewer report: native binaries (`.so`/`.pyd`/`.dylib`/`.dll`) in a payload; `search` and
+  `install` warn when a registry clone is a week old or more.
+- `veles module list` marks a user module shadowed by the project's and an ignored duplicate.
+
+### Changed
+
+- **`bare` is the default layout.** `init_project()` without `layout=` gives `bare` too.
+- The wiki engine (`veles add`, `/wiki`, the `wiki_*` tools, wiki recall, dream lint/reindex,
+  curated session pages) moved to the `wiki` module in the public registry; the `llm-wiki`
+  layout (with `structure_design`) and `notes` moved there too. Only `bare` is built in.
+- The delegated-CLI MCP server loads your approved modules, so a registry-installed wiki's
+  tools reach `claude`/`gemini` delegates.
+- `veles doctor` checks the layout's context file (e.g. the wiki's `INDEX.md`) instead of
+  INDEX.md/LOG.md, and names the install when the layout is missing.
+- An MCP server approval also covers the project scripts its recipe runs (`command`/`args`
+  naming files in the project): editing such a script revokes the approval. Recipes that run
+  no project files keep their approvals.
+- The write guard protects the hooks directory git actually uses (`git rev-parse --git-path
+  hooks`: every config level, an enclosing repository, a `.git` file).
+- New wiki projects no longer build the search index at init; search scans pages until dream
+  builds it.
+
+### Removed
+
+- `veles.core.layout.wiki_enabled` — use `engine_enabled(project, "wiki")`.
+- The `self_doc` contribution point — a module keeps the page through `page_store`.
+
+### Fixed
+
+- Install records are written under a lock, so two installs at once (or an install and
+  `module approve`) no longer drop each other's record.
+- `veles self-doc show` shows the page on projects without a wiki.
+
+### Upgrading from 1.2.2
+
+- `veles init` now creates a `bare` project; pass `--layout llm-wiki` (or pick it when asked)
+  for the wiki.
+- An `llm-wiki` or `notes` project — and one without a `layout` key — asks to install its
+  layout the first time you open it at a terminal, or run
+  `veles registry update && veles registry install llm-wiki`. Nothing in `wiki/` changes.
+  The daemon and channels keep working without the wiki until it is installed.
+- `veles add` and `/wiki` are commands of the `wiki` module.
+- Calling `init_project()` from code without `layout=` now gives `bare`.
+- A module that imported `veles.core…` keeps working in your project, but a registry module
+  must import `veles.sdk…` only.
+- Edits made to the built-in `llm-wiki` files inside the installed package are not carried
+  over.
+- Rolling back to 1.2.2 with the `wiki` module installed: 1.2.2 loads its built-in wiki and
+  skips the installed one with a warning.
+
 ## [1.2.2] — 2026-10-02
 
 Modules add to Veles through typed contribution points; the wiki engine is now a module like

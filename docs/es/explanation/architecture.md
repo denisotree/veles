@@ -64,7 +64,8 @@ entrada.
   locales de este proyecto.
 - `~/.veles/` — configuración global del usuario, skills/herramientas entre
   proyectos, cachés y confianza.
-- `<project>/AGENTS.md`, `wiki/`, `sources/` — tu contenido (el layout LLM-Wiki).
+- `<project>/AGENTS.md` y lo que añada tu layout (p. ej. `wiki/`, `sources/` para
+  el layout LLM-Wiki) — tu contenido.
 
 Consulta [estructura del proyecto](../reference/project-layout.md).
 
@@ -77,7 +78,8 @@ contexto. Consulta [múltiples proyectos](../how-to/multi-project-and-subproject
 
 ## Las superficies
 
-- **CLI** (`veles run`, `veles add`, …) — uso puntual y mediante scripts.
+- **CLI** (`veles run`, `veles organize`, …, más los verbos que añaden los módulos,
+  como el `veles add` de la wiki) — uso puntual y mediante scripts.
 - **TUI** (`veles tui`) — REPL interactivo con [modos de ejecución](modes.md).
 - **Daemon + canales** — API sin interfaz, Telegram, trabajos programados.
 

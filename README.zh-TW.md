@@ -43,7 +43,7 @@ veles        # interactive REPL (bare `veles` with no subcommand)
 
 **複利式記憶**——每次工作階段都會由策展器（Curator）提煉成各專案專屬的記憶（`.veles/` 中的洞見、行為規則、工作階段摘要）。代理會自動回想起相關的事實與過往的決策——你不必再重複解釋相同的脈絡。記憶在*任何*內容版面配置下都能運作。
 
-**可插拔的內容版面配置**——`veles init` 預設建立 Karpathy 風格的 LLM wiki 鷹架；`--layout notes` 提供一個扁平的筆記目錄；`--layout bare` 完全不加任何結構（最適合程式碼儲存庫）。自訂版面配置套件就是 `~/.veles/layouts/` 中的單一 TOML 檔案。
+**可插拔的內容版面配置**——`veles init` 預設不加任何結構（`bare`，最適合程式碼儲存庫）；選擇 `llm-wiki` 取得 Karpathy 風格的 LLM wiki，或選擇 `notes` 取得扁平的筆記目錄，兩者都會當場從擴充套件註冊表安裝。自訂版面配置套件就是 `~/.veles/layouts/` 中的單一 TOML 檔案。
 
 **與供應商無關的路由**——OpenRouter、Anthropic、OpenAI、Gemini、Ollama、llamacpp，或你的 `claude`／`gemini` CLI 訂閱。不同的任務類型（規劃、壓縮、洞見）可以路由到不同的模型。
 
@@ -123,17 +123,17 @@ veles secret set OPENROUTER_API_KEY    # prompts for value, stores in keychain
 ### 選擇內容版面配置
 
 ```bash
-veles init                  # default: Karpathy-style LLM wiki (sources/ + wiki/)
-veles init --layout notes   # a single flat notes/ directory
-veles init --layout bare    # no content scaffold — code repos, free-form work
+veles init                      # default: bare — no content scaffold (at a terminal it asks)
+veles init --layout llm-wiki    # Karpathy-style LLM wiki (sources/ + wiki/), from the registry
+veles init --layout notes       # a single flat notes/ directory, from the registry
 ```
 
-代理自身的記憶（`.veles/` 中的洞見、規則、工作階段摘要）在每一種版面配置下運作方式都完全相同。自訂套件就是 `~/.veles/layouts/<name>/` 中的一個 `layout.toml`。
+尚未安裝的版面配置會被提示安裝（附帶其所需內容，只需確認一次）。代理自身的記憶（`.veles/` 中的洞見、規則、工作階段摘要）在每一種版面配置下運作方式都完全相同。自訂套件就是 `~/.veles/layouts/<name>/` 中的一個 `layout.toml`。
 
 ### 建立知識庫（llm-wiki 版面配置）
 
 ```bash
-veles add paper.pdf                   # read a source → write a wiki page
+veles add paper.pdf                   # read a source → write a wiki page (the wiki module's verb)
 veles add https://example.com/post    # web pages, PDFs, plain text
 
 veles run "What do we know about the authentication design?"
@@ -324,7 +324,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | 建立新專案 |
 | `veles run "<prompt>"` | 單回合代理執行 |
 | `veles` | 互動式 REPL |
-| `veles add <file\|url>` | 攝取一個來源 → 依主題拆分的 wiki 頁面 |
+| `veles add <file\|url>` | 攝取一個來源 → 依主題拆分的 wiki 頁面（來自 `wiki` 模組，llm-wiki 版面配置） |
 | `veles organize` | 依目前佈局重新組織專案內容（先提議後套用）|
 | `veles research "<question>"` | 深度多角度研究 |
 | `veles curate` | 將工作階段整併進 wiki |

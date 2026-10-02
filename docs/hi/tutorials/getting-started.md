@@ -57,9 +57,11 @@ mkdir my-notes && cd my-notes
 veles init my-notes
 ```
 
-यह `AGENTS.md` (आपका प्रोजेक्ट context), `sources/` और `wiki/` (default
-[LLM-Wiki layout](../explanation/layout-packs-and-llm-wiki.md)), तथा `.veles/`
-(machine state) बनाता है। देखें [project layout](../reference/project-layout.md)।
+यह `AGENTS.md` (आपका प्रोजेक्ट context) और `.veles/` (machine state) बनाता है —
+default `bare` layout और कुछ नहीं जोड़ता। terminal पर `veles init` पूछता है कि कौन-सा
+[layout](../explanation/layout-packs-and-llm-wiki.md) उपयोग करना है; `sources/` और
+`wiki/` पाने के लिए `llm-wiki` चुनें (registry से उसी समय install होता है)।
+देखें [project layout](../reference/project-layout.md)।
 
 ## 4. अपना पहला prompt चलाएँ
 

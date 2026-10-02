@@ -14,7 +14,7 @@ risiedono nel keychain del sistema operativo o nelle variabili d'ambiente (vedi
 | `~/.veles/` | Globale utente | `config.toml`, concessioni di trust, skill/tool cross-progetto, cache dei modelli, locale, registro |
 | `<project>/.veles/` | Locale al progetto | `project.toml`, `config.toml`, `memory.db`, skill/tool del progetto, piani, artefatti di runtime |
 | `<project>/AGENTS.md` | Progetto | Il file di contesto iniettato nell'agente (collegato con symlink a `CLAUDE.md` / `GEMINI.md`) |
-| `<project>/wiki/`, `sources/` | Progetto | Contenuti utente (il layout LLM-Wiki di default) |
+| `<project>/wiki/`, `sources/`, … | Progetto | Contenuti utente, come li dispone il layout pack (es. la LLM-Wiki) |
 
 `VELES_USER_HOME` reindirizza `~` (così lo stato utente finisce in
 `<override>/.veles/`). Vedi [layout del progetto](project-layout.md) per l'albero

@@ -14,7 +14,7 @@ arquivos — eles ficam no chaveiro do SO ou em variáveis de ambiente (veja
 | `~/.veles/` | Global do usuário | `config.toml`, concessões de confiança, skills/tools entre projetos, cache de modelos, locales, registry |
 | `<project>/.veles/` | Local do projeto | `project.toml`, `config.toml`, `memory.db`, skills/tools do projeto, planos, artefatos de runtime |
 | `<project>/AGENTS.md` | Projeto | O arquivo de contexto injetado no agente (com symlink para `CLAUDE.md` / `GEMINI.md`) |
-| `<project>/wiki/`, `sources/` | Projeto | Conteúdo do usuário (o layout padrão LLM-Wiki) |
+| `<project>/wiki/`, `sources/`, … | Projeto | Conteúdo do usuário, como o pacote de layout o organiza (p. ex. o LLM-Wiki) |
 
 `VELES_USER_HOME` redireciona o `~` (de modo que o estado do usuário fica em
 `<override>/.veles/`). Veja [layout do projeto](project-layout.md) para a árvore completa.

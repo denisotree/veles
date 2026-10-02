@@ -43,7 +43,7 @@ veles        # interactive REPL (bare `veles` with no subcommand)
 
 **संचयी memory** — हर सेशन को Curator द्वारा per-project memory में distill किया जाता है (insights, behavioral rules, और `.veles/` में session digests)। एजेंट प्रासंगिक तथ्यों और पिछले निर्णयों को स्वतः याद रखता है — आपको वही context बार-बार समझाना नहीं पड़ता। Memory *किसी भी* content layout के तहत काम करती है।
 
-**Pluggable content layouts** — `veles init` डिफ़ॉल्ट रूप से एक Karpathy-शैली का LLM wiki तैयार करता है; `--layout notes` एक flat notes डायरेक्टरी देता है; `--layout bare` कोई संरचना नहीं जोड़ता (कोड रिपॉज़ के लिए आदर्श)। कस्टम layout packs `~/.veles/layouts/` में एक ही TOML फ़ाइल होते हैं।
+**Pluggable content layouts** — `veles init` डिफ़ॉल्ट रूप से कोई संरचना नहीं जोड़ता (`bare` — कोड रिपॉज़ के लिए आदर्श); Karpathy-शैली के LLM wiki के लिए `llm-wiki` या flat notes डायरेक्टरी के लिए `notes` चुनें — दोनों extension registry से उसी समय इंस्टॉल हो जाते हैं। कस्टम layout packs `~/.veles/layouts/` में एक ही TOML फ़ाइल होते हैं।
 
 **Provider-स्वतंत्र routing** — OpenRouter, Anthropic, OpenAI, Gemini, Ollama, llamacpp, या आपका `claude`/`gemini` CLI subscription। अलग-अलग task types (planning, compression, insights) अलग-अलग models पर route हो सकते हैं।
 
@@ -123,17 +123,17 @@ veles secret set OPENROUTER_API_KEY    # prompts for value, stores in keychain
 ### एक content layout चुनें
 
 ```bash
-veles init                  # default: Karpathy-style LLM wiki (sources/ + wiki/)
-veles init --layout notes   # a single flat notes/ directory
-veles init --layout bare    # no content scaffold — code repos, free-form work
+veles init                      # default: bare — no content scaffold (at a terminal it asks)
+veles init --layout llm-wiki    # Karpathy-style LLM wiki (sources/ + wiki/), from the registry
+veles init --layout notes       # a single flat notes/ directory, from the registry
 ```
 
-एजेंट की अपनी memory (`.veles/` में insights, rules, session digests) हर layout के तहत एक समान काम करती है। कस्टम packs `~/.veles/layouts/<name>/` में एक `layout.toml` होते हैं।
+जो layout इंस्टॉल नहीं है, उसे इंस्टॉल करने का प्रस्ताव दिया जाता है (उसकी ज़रूरतों के साथ, एक ही पुष्टि में)। एजेंट की अपनी memory (`.veles/` में insights, rules, session digests) हर layout के तहत एक समान काम करती है। कस्टम packs `~/.veles/layouts/<name>/` में एक `layout.toml` होते हैं।
 
 ### एक knowledge base बनाएं (llm-wiki layout)
 
 ```bash
-veles add paper.pdf                   # read a source → write a wiki page
+veles add paper.pdf                   # read a source → write a wiki page (the wiki module's verb)
 veles add https://example.com/post    # web pages, PDFs, plain text
 
 veles run "What do we know about the authentication design?"
@@ -324,7 +324,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | एक नया project बनाएँ |
 | `veles run "<prompt>"` | Single-turn agent run |
 | `veles` | Interactive REPL |
-| `veles add <file\|url>` | एक source को ingest करें → topical wiki pages |
+| `veles add <file\|url>` | एक source को ingest करें → topical wiki pages (`wiki` module से, llm-wiki layout) |
 | `veles organize` | सक्रिय layout के अनुसार project content पुनर्गठित करें (propose-then-apply) |
 | `veles research "<question>"` | Deep multi-angle research |
 | `veles curate` | सेशनों को wiki में consolidate करें |

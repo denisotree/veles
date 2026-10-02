@@ -29,7 +29,7 @@ Cria um novo projecto Veles no directório actual (um directório de estado `.ve
 | Opção | Predefinição | Finalidade |
 |---|---|---|
 | `name` (posicional) | nome base do cwd | Nome do projecto |
-| `--layout <name>` | `llm-wiki` | Pack de layout para o scaffold de conteúdo (`llm-wiki`, `notes`, `bare`, ou um pack personalizado de `~/.veles/layouts/`) |
+| `--layout <name>` | `bare` (perguntado num terminal) | Pack de layout para o scaffold de conteúdo (`bare`, um pack instalado de um registo como `llm-wiki` ou `notes`, ou um pack personalizado de `~/.veles/layouts/`). Um pack não instalado é oferecido para instalação; recusar não cria nada |
 | `--force` | desligado | Recria `.veles/` mesmo que já exista |
 
 ### `veles schema {validate,edit,fix}`
@@ -40,7 +40,9 @@ Valida ou edita o `AGENTS.md` (o ficheiro de contexto do projecto).
 - `fix` — adiciona interactivamente as secções em falta através de um assistente LLM.
 
 ### `veles self-doc [refresh|show]`
-Gera e mostra a auto-documentação do projecto (`wiki/self-doc/overview.md`).
+Gera e mostra a auto-documentação do projecto — no armazenamento de páginas do layout
+quando este tem um (a wiki: `wiki/self-doc/overview.md`), caso contrário em
+`.veles/memory/self-doc.md`.
 `veles self-doc` simples mostra a página actual; `refresh` regenera-a.
 
 ### `veles doctor`
@@ -110,12 +112,14 @@ do ciclo do agente, `--resume`, as opções `--no-*` de injecção/compressão a
 | `--theme <name>` | config ou `everforest` | Tema de cores (everforest, dracula, gruvbox, tokyo-night, catppuccin) |
 
 ### `veles add <source>`
+*(do módulo `wiki` — `veles registry install llm-wiki` ou `… install wiki`)*
 Lê uma fonte (um ficheiro local ou URL `http(s)://`) e sintetiza-a numa página de wiki.
+Sem o módulo, `veles add` é um comando desconhecido e o erro indica a instalação.
 Aceita as opções partilhadas do ciclo do agente.
 
 ### `veles curate`
-Executa uma passagem do curador: compacta as sessões não processadas em páginas
-`wiki/sessions/`.
+Executa uma passagem do curador: compacta as sessões não processadas em insights de memória (e em páginas
+`wiki/sessions/` quando a engine de wiki está ativa).
 
 | Opção | Predefinição | Finalidade |
 |---|---|---|

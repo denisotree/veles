@@ -60,7 +60,8 @@ context फ़ाइल (`AGENTS.md`) को जानबूझकर छोट�
 
 - `<project>/.veles/` — इस प्रोजेक्ट की memory, config, local skills/tools।
 - `~/.veles/` — user-global config, cross-project skills/tools, caches, trust।
-- `<project>/AGENTS.md`, `wiki/`, `sources/` — आपका कंटेंट (LLM-Wiki layout)।
+- `<project>/AGENTS.md` और जो कुछ आपका layout जोड़ता है (जैसे LLM-Wiki layout के लिए
+  `wiki/`, `sources/`) — आपका कंटेंट।
 
 देखें [project layout](../reference/project-layout.md)।
 
@@ -74,7 +75,8 @@ context फ़ाइल (`AGENTS.md`) को जानबूझकर छोट�
 
 ## surfaces
 
-- **CLI** (`veles run`, `veles add`, …) — one-shot और scripted उपयोग।
+- **CLI** (`veles run`, `veles organize`, …, साथ ही modules द्वारा जोड़े गए verbs, जैसे
+  wiki का `veles add`) — one-shot और scripted उपयोग।
 - **TUI** (`veles tui`) — [run modes](modes.md) के साथ इंटरैक्टिव REPL।
 - **Daemon + channels** — headless API, Telegram, scheduled jobs।
 

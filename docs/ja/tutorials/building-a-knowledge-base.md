@@ -2,13 +2,23 @@
 
 > 🌐 **言語:** [English](../../en/tutorials/building-a-knowledge-base.md) · [简体中文](../../zh-CN/tutorials/building-a-knowledge-base.md) · [繁體中文](../../zh-TW/tutorials/building-a-knowledge-base.md) · **日本語** · [한국어](../../ko/tutorials/building-a-knowledge-base.md) · [Español](../../es/tutorials/building-a-knowledge-base.md) · [Français](../../fr/tutorials/building-a-knowledge-base.md) · [Italiano](../../it/tutorials/building-a-knowledge-base.md) · [Português (BR)](../../pt-BR/tutorials/building-a-knowledge-base.md) · [Português (PT)](../../pt-PT/tutorials/building-a-knowledge-base.md) · [Русский](../../ru/tutorials/building-a-knowledge-base.md) · [العربية](../../ar/tutorials/building-a-knowledge-base.md) · [हिन्दी](../../hi/tutorials/building-a-knowledge-base.md) · [বাংলা](../../bn/tutorials/building-a-knowledge-base.md) · [Tiếng Việt](../../vi/tutorials/building-a-knowledge-base.md)
 
-このチュートリアルでは、Veles プロジェクトを生きたナレッジベースに変えていきます。いくつかのソースを取り込み、Veles に wiki ページを書かせ、質問し、学んだことを統合します。これがデフォルトの **LLM-Wiki** ワークフローです。所要時間は約 15 分です。
+このチュートリアルでは、Veles プロジェクトを生きたナレッジベースに変えていきます。いくつかのソースを取り込み、Veles に wiki ページを書かせ、質問し、学んだことを統合します。これが **LLM-Wiki** ワークフローです。所要時間は約 15 分です。
 
 先に [はじめに](getting-started.md) を完了しておいてください。
 
+## 0. llm-wiki レイアウトを使う
+
+wiki は拡張レジストリから提供されます。新しいプロジェクトでは `veles init` で選択します（または `--layout llm-wiki` を渡します）。Veles は、レイアウトと、それが必要とする `wiki` モジュールを一緒にインストールするよう提案します。既存のプロジェクトでは次のようにします。
+
+```bash
+veles registry install llm-wiki      # the layout + the wiki module, one confirmation
+```
+
+そして `.veles/project.toml` に `layout = "llm-wiki"` を設定し、`veles layout sync` を実行します。
+
 ## 考え方
 
-Veles プロジェクトには2つのコンテンツゾーンがあります:
+wiki プロジェクトには2つのコンテンツゾーンがあります:
 
 - `sources/` — あなたが与える生の不変な素材（エージェントには読み取り専用）。
 - `wiki/` — エージェント自身が生成する、LLM 生成のナレッジ（エージェントがコンテンツを書き込む唯一のゾーン）。

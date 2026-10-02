@@ -4,8 +4,9 @@
 
 Một **layout pack** định nghĩa cách *nội dung người dùng* của một dự án được tổ chức
 — có những thư mục nào, thư mục nào tác tử được phép ghi vào, và nó cung cấp những
-thao tác nào. Mặc định là **LLM-Wiki**. Đây là một tùy chọn về nội dung, **không
-phải** một nguyên tắc lõi của Veles.
+thao tác nào. Mặc định là **`bare`**, không thêm gì vào thư mục của bạn ngoài
+`.veles/` và `AGENTS.md`. **LLM-Wiki** là một tùy chọn từ registry tiện ích mở
+rộng, **không phải** một nguyên tắc lõi của Veles.
 
 ## Layout pack là gì
 
@@ -19,26 +20,40 @@ template tùy chọn). Manifest khai báo:
   bên trong pack.
 - **Scaffold** (`[layout.scaffold]`) — những gì `veles init` tạo ra: các thư mục và
   một template `AGENTS.md` tùy chọn (`{name}` được thay thế).
-- **Engine** (`[layout.engines]`) — phần máy móc nội dung lõi nào mà pack kích hoạt.
-  Hiện tại có một engine: `wiki`. Nếu không có nó, dự án sẽ không có công cụ wiki,
-  không có recall wiki, không có việc chèn INDEX.
+- **Engine** (`[layout.engines]`) — phần máy móc nội dung nào mà pack yêu cầu.
+  Một engine do một module cung cấp (module `wiki` của registry cung cấp `wiki`).
+  Nếu không có nó, dự án sẽ không có công cụ wiki, không có recall wiki, không có
+  việc chèn INDEX.
 - **Tệp ngữ cảnh (context file)** (`context_file`) — một tệp được chèn vào system
   prompt ổn định của tác tử (LLM-Wiki dùng `INDEX.md`).
 
-## Các pack tích hợp sẵn
+## Các pack có sẵn
 
-| Pack | Những gì `veles init --layout <name>` tạo ra |
-|---|---|
-| `llm-wiki` *(mặc định)* | [LLM-Wiki theo phong cách Karpathy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): `sources/` (chỉ-đọc), `wiki/` (tác tử ghi được), `INDEX.md` được chèn vào prompt, các kỹ năng `ingest`/`query`/`lint`, engine wiki được bật. |
-| `notes` | Một thư mục phẳng `notes/` duy nhất để tác tử ghi vào. Không có máy móc wiki. |
-| `bare` | Hoàn toàn không có scaffold nội dung — dành cho các repo mã nguồn và công việc tự do. Việc ghi được cho phép thoải mái bên trong thư mục gốc của dự án (vẫn chịu sự kiểm soát của trust ladder). |
+| Pack | Lấy từ đâu | Những gì `veles init --layout <name>` tạo ra |
+|---|---|---|
+| `bare` *(mặc định)* | tích hợp sẵn | Hoàn toàn không có scaffold nội dung — dành cho các repo mã nguồn và công việc tự do. Việc ghi được cho phép thoải mái bên trong thư mục gốc của dự án (vẫn chịu sự kiểm soát của trust ladder). |
+| `llm-wiki` | registry (`public:official/llm-wiki`, kéo theo module `wiki`) | [LLM-Wiki theo phong cách Karpathy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): `sources/` (thô, chỉ-đọc theo quy ước — không bị áp đặt), `wiki/` (tác tử ghi được), `INDEX.md` được chèn vào prompt, các kỹ năng `ingest`/`query`/`lint`/`organize`/`structure_design`, engine wiki được bật, cùng `veles add` và `/wiki`. Một prompt hành vi do layout khai báo (`templates/behaviour.md`) mang kỷ luật sources/wiki và các quy tắc migration/log-patch. |
+| `notes` | registry (`public:official/notes`) | Một thư mục phẳng `notes/` duy nhất để tác tử ghi vào. Không có máy móc wiki. |
+
+`veles init` tại terminal sẽ hỏi dùng pack nào (các pack đã cài và các pack có
+trong registry của bạn); chọn một pack chưa cài sẽ đề nghị cài nó.
+`veles registry install llm-wiki` cài sẵn từ trước.
+
+## Dự án từ trước 1.2.3
+
+Một dự án có layout chưa được cài (dự án `llm-wiki` sau khi nâng cấp, hoặc dự án
+không có khóa `layout` — tất cả đều từng là dự án wiki) vẫn mở bình thường. Tại
+terminal, `veles` và `veles run` đề nghị cài pack (cùng engine nó cần) chỉ với một
+lần xác nhận; ở nơi khác — daemon, kênh, các verb khác — Veles in lệnh cài đặt một
+lần và hoạt động không có wiki. Không có gì trong `wiki/` bị động đến.
 
 ## Layout tùy chỉnh
 
 Đặt một pack vào `~/.veles/layouts/<name>/layout.toml` (toàn cục theo người dùng)
 hoặc `<project>/.veles/layouts/<name>/` (cục bộ theo dự án; che khuất các pack cùng
 tên ở mức người dùng và tích hợp sẵn) rồi truyền `veles init --layout <name>`. Pack
-tích hợp `notes` là ví dụ tối thiểu để sao chép. Bạn cũng có thể mô tả các quy ước
+`notes` của registry là ví dụ tối thiểu để sao chép. Một pack yêu cầu engine mà không
+module nào đã cài cung cấp cũng nhận được đề nghị cài đặt tương tự. Bạn cũng có thể mô tả các quy ước
 trong `AGENTS.md` — layout áp đặt các vùng, còn AGENTS.md hướng dẫn hành vi.
 
 ## Những gì nó *không phải*
