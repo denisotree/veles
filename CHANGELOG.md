@@ -37,6 +37,9 @@ modules, layouts and skills it builds on. The new-project wizard offers registry
   loaded modules no longer run their entrypoint a second time.
 - An install or upgrade that loses a race with another install of the same extension fails
   cleanly instead of deleting the other one's copy.
+- REPL: Alt/Option-key editing works in terminals that speak the kitty keyboard protocol
+  (Ghostty, kitty, WezTerm, iTerm2 ≥ 3.5…). Option+Backspace deletes the previous word and
+  Option+B/F/D move or delete by word, instead of printing `[127;3u` into the input.
 - `veles registry update` says what happened to each registry (fetched, updated `old → new`,
   or already up to date) and what it holds — e.g. `7 extensions (4 modules, 2 layouts,
   1 MCP recipe)` — instead of a bare commit hash.

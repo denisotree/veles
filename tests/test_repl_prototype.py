@@ -707,6 +707,30 @@ def test_input_box_sizes_to_content(tmp_path) -> None:
         store.close()
 
 
+def test_kitty_alt_keys_parse_like_their_legacy_escape_prefix() -> None:
+    """Under the kitty protocol Alt+<key> arrives as CSI-u (`Option+Backspace` on a
+    Mac → `\\x1b[127;3u`). Each must reach prompt_toolkit as the same key presses as
+    the legacy `ESC <key>`, so word editing (backward-kill-word, Alt+B/F/D) works
+    instead of the raw sequence landing in the input."""
+    from prompt_toolkit.input.vt100_parser import Vt100Parser
+
+    from veles.cli.commands.repl import _register_kitty_sequences
+
+    _register_kitty_sequences()
+
+    def keys(data: str) -> list:
+        out: list = []
+        parser = Vt100Parser(out.append)
+        parser.feed_and_flush(data)
+        return [kp.key for kp in out]
+
+    assert keys("\x1b[127;3u") == keys("\x1b\x7f")  # Alt+Backspace → backward-kill-word
+    for ch in "bfd.":
+        assert keys(f"\x1b[{ord(ch)};3u") == keys(f"\x1b{ch}"), ch
+    # Russian layout: Alt+<letter> reports the Cyrillic codepoint → the physical key.
+    assert keys(f"\x1b[{ord('и')};3u") == keys("\x1bb")  # и sits on the B key
+
+
 def test_kitty_sequences_remap_and_binding(tmp_path) -> None:
     """With the kitty protocol enabled, Shift+Enter arrives as a distinct CSI-u
     sequence → the F24 carrier (bound to insert newline); Enter still submits.
