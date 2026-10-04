@@ -57,6 +57,34 @@ def test_empty_registry_does_not_break_the_cli(tmp_path: Path, capsys, monkeypat
     assert main(["registry", "verify"]) == 0
 
 
+def test_update_says_what_happened_and_what_is_inside(tmp_path: Path, capsys, monkeypatch) -> None:
+    remote = tmp_path / "remote"
+    make_git_registry(remote, skills=("alpha",))
+    project = init_project(tmp_path / "p", name="p")
+    monkeypatch.chdir(project.root)
+    main(["registry", "remove", "public"])
+    main(["registry", "add", str(remote)])
+    capsys.readouterr()
+
+    assert main(["registry", "update"]) == 0
+    main(["registry", "update"])
+    out = capsys.readouterr().out
+    assert "private: already up to date" in out
+    assert "1 extension (1 skill)" in out
+
+    files = {
+        "module.toml": '[module]\nname = "m"\ndescription = "d"\nentrypoint = "e.py:register"\n',
+        "e.py": "def register(api):\n    pass\n",
+    }
+    write_extension(remote, "official", "m", kind="module", files=files)
+    write_extension(remote, "official", "beta")
+    commit_all(remote, "more")
+    assert main(["registry", "update"]) == 0
+    out = capsys.readouterr().out
+    assert "private: updated " in out and " → " in out
+    assert "3 extensions (1 module, 2 skills)" in out
+
+
 def test_os_errors_are_reported_not_raised(tmp_path: Path, capsys) -> None:
     from tests.registry_helpers import write_registry
 

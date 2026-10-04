@@ -37,6 +37,9 @@ modules, layouts and skills it builds on. The new-project wizard offers registry
   loaded modules no longer run their entrypoint a second time.
 - An install or upgrade that loses a race with another install of the same extension fails
   cleanly instead of deleting the other one's copy.
+- `veles registry update` says what happened to each registry (fetched, updated `old → new`,
+  or already up to date) and what it holds — e.g. `7 extensions (4 modules, 2 layouts,
+  1 MCP recipe)` — instead of a bare commit hash.
 
 ## [1.2.3] — 2026-10-02
 
