@@ -82,6 +82,14 @@ def _locked() -> AbstractContextManager[None]:
     return file_lock(path.parent / (path.name + ".lock"))
 
 
+def install_lock() -> AbstractContextManager[None]:
+    """One install's write phase at a time: two installs of the same extension must
+    not both pass the collision check and then clobber each other's copy. A separate
+    file from the records lock, which `put_record` takes inside it."""
+    path = _store_path()
+    return file_lock(path.parent / "extensions.install.lock")
+
+
 def record_for_path(path: str) -> InstallRecord | None:
     return next((r for r in load_records() if r.path == path), None)
 

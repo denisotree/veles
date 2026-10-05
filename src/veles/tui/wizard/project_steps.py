@@ -398,8 +398,10 @@ class LayoutPickerStep:
     scaffolds exactly what the chosen pack declares — no post-hoc
     project.toml rewrite, no leftover skeleton from the default pack.
     Single-pack installations auto-confirm without showing the screen.
-    Only installed packs are listed: installing one needs the terminal
-    confirmation, which a full-screen app can't host (`veles init` offers it).
+    Installed packs and the layouts in the cached registries are listed;
+    picking a registry one installs it with the terminal handed back
+    (`App.suspend`, for the normal install confirmation), falling back to
+    the default when it can't be had.
     """
 
     name: str = "layout-picker"
@@ -407,22 +409,25 @@ class LayoutPickerStep:
 
     async def run(self, ctx: WizardContext) -> WizardOutcome:
         from veles.core.layout import LAYOUT_DEFAULT, discover_layouts
+        from veles.core.registry import ensure
 
         # Pre-bootstrap: no project exists yet, so discovery sees the
         # user-level and builtin packs (project-level packs can't exist
-        # before init by definition).
-        packs = discover_layouts(project=None)
-        if len(packs) <= 1:
-            ctx.answers["layout"] = packs[0].manifest.name if packs else LAYOUT_DEFAULT
+        # before init by definition); registry layouts come from the
+        # cached clones (no network).
+        installed = {p.manifest.name: p for p in discover_layouts(project=None)}
+        names = ensure.available_layouts()
+        if len(names) <= 1:
+            ctx.answers["layout"] = names[0] if names else LAYOUT_DEFAULT
             return WizardOutcome.NEXT
 
         items = [
             ChoiceItem(
-                label=f"{pack.manifest.name} ({pack.scope})",
-                value=pack.manifest.name,
-                description=pack.manifest.description or "",
+                label=f"{n} ({installed[n].scope})" if n in installed else f"{n} (registry)",
+                value=n,
+                description=(installed[n].manifest.description or "") if n in installed else "",
             )
-            for pack in packs
+            for n in names
         ]
         picked = await ctx.app.push_screen_wait(
             ChoiceScreen(
@@ -438,8 +443,25 @@ class LayoutPickerStep:
         nav = outcome_from_dismiss(picked)
         if nav is not None:
             return nav
-        ctx.answers["layout"] = picked or LAYOUT_DEFAULT
+        layout = picked or LAYOUT_DEFAULT
+        if layout not in installed:
+            layout = _install_layout(ctx, layout)
+        ctx.answers["layout"] = layout
         return WizardOutcome.NEXT
+
+
+def _install_layout(ctx: WizardContext, name: str) -> str:
+    """Install a registry layout picked in the wizard. The install's confirmation
+    is a terminal prompt, so the app hands the terminal back while it runs."""
+    from textual.app import SuspendNotSupported
+
+    from veles.core.registry import ensure
+
+    try:
+        with ctx.app.suspend():
+            return ensure.layout_or_default(name, interactive=True)
+    except SuspendNotSupported:
+        return ensure.layout_or_default(name, interactive=False)
 
 
 __all__ = [

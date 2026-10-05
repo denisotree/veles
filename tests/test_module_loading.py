@@ -84,3 +84,69 @@ def test_builtin_modules_load_once_across_threads(monkeypatch: pytest.MonkeyPatc
         t.join()
     contrib.reset_builtin_contributions()
     assert calls == ["fake.one"]
+
+
+def test_reload_into_an_existing_registry_runs_only_new_entrypoints(tmp_path: Path) -> None:
+    """After an install mid-session the CLI loads the new modules into the live
+    registry — an already-loaded module's entrypoint must not run a second time."""
+    from veles.core.module_loading import load_project_modules
+
+    project = init_project(tmp_path / "p", name="p")
+    runs = tmp_path / "runs"
+    one = _user_module("one")
+    (one / "m.py").write_text(
+        f"from pathlib import Path\n"
+        f"with Path({str(runs)!r}).open('a') as f:\n"
+        f"    f.write('one\\n')\n"
+        f"def register(api):\n"
+        f"    api.add_hook('pre_turn', lambda **kw: None)\n",
+        encoding="utf-8",
+    )
+    approve_module(one, name="one", project_root=None)
+    reg = load_project_modules(project)
+    approve_module(_user_module("two"), name="two", project_root=None)
+    assert load_project_modules(project, into=reg) is reg
+    assert set(reg.modules) == {"one", "two"}
+    assert runs.read_text(encoding="utf-8") == "one\n"
+
+
+def test_cli_session_sees_a_module_installed_at_its_start(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`_run_in_project`: an install offered at session start lands in the registry
+    the command runs with — the module installed before it is not loaded again."""
+    import argparse
+
+    from veles.cli import _run_in_project
+    from veles.core.registry import ensure
+
+    project = init_project(tmp_path / "p", name="p")
+    monkeypatch.chdir(project.root)
+    runs = tmp_path / "runs"
+    first = _user_module("first")
+    (first / "m.py").write_text(
+        f"from pathlib import Path\n"
+        f"with Path({str(runs)!r}).open('a') as f:\n"
+        f"    f.write('first\\n')\n"
+        f"def register(api):\n"
+        f"    api.add_hook('pre_turn', lambda **kw: None)\n",
+        encoding="utf-8",
+    )
+    approve_module(first, name="first", project_root=None)
+
+    def install_second(_project, *, interactive: bool) -> bool:
+        approve_module(_user_module("second"), name="second", project_root=None)
+        return True
+
+    monkeypatch.setattr(ensure, "ensure_project_extensions", install_second)
+    seen: dict = {}
+
+    def command(_args, _project) -> int:
+        reg = current_module_registry()
+        seen["modules"] = list(reg.modules) if reg is not None else None
+        return 0
+
+    args = argparse.Namespace(command="run", project_root=None, no_wizard=True)
+    assert _run_in_project(args, command) == 0
+    assert seen["modules"] == ["first", "second"]
+    assert runs.read_text(encoding="utf-8") == "first\n"

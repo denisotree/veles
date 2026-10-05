@@ -21,10 +21,10 @@ from veles.core.project_registry import Registry as ProjectRegistry
 from veles.core.slug import normalize_slug as _normalize_slug
 
 
-def _load_project_modules(project: Project) -> ModuleRegistry:
+def _load_project_modules(project: Project, into: ModuleRegistry | None = None) -> ModuleRegistry:
     from veles.core.module_loading import load_project_modules
 
-    return load_project_modules(project)
+    return load_project_modules(project, into)
 
 
 def _resolve_active_project(args: argparse.Namespace) -> Project | None:

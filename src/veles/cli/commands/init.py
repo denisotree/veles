@@ -11,9 +11,11 @@ from veles.core.project import LAYOUT_DEFAULT, ProjectAlreadyExists, init_projec
 
 def cmd_init(args: argparse.Namespace) -> int:
     from veles.cli._project import _register_project
+    from veles.core.registry import ensure
 
     layout = getattr(args, "layout", None) or (_ask_layout() if _is_tty() else LAYOUT_DEFAULT)
-    if not _layout_available(layout):
+    # An explicit pick that can't be had creates nothing (unlike the wizard's fallback).
+    if not ensure.ensure_layout(layout, interactive=_is_tty()):
         print(
             f"error: layout {layout!r} is not installed — nothing was created.",
             file=sys.stderr,
@@ -40,16 +42,6 @@ def _ask_layout() -> str:
 
     choices = tuple(available_layouts())
     return _ask_choice(_prompter, "Layout", choices, default=LAYOUT_DEFAULT)
-
-
-def _layout_available(name: str) -> bool:
-    """Installed, or installed now (offered at a terminal, with its dependencies)."""
-    from veles.core.layout.discovery import find_layout
-    from veles.core.registry import ensure
-
-    if find_layout(name, None) is not None:
-        return True
-    return ensure.ensure_extension(ensure.LayoutNeed(name), None, interactive=_is_tty())
 
 
 def _is_tty() -> bool:

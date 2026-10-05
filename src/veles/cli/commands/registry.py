@@ -10,7 +10,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from veles.core.project import Project
-from veles.core.registry.catalog import ResolveError, resolve, search
+from veles.core.registry.catalog import Found, ResolveError, resolve, scan_source, search
 from veles.core.registry.config import (
     RegistryConfigError,
     add_source,
@@ -98,12 +98,50 @@ def _update(args: argparse.Namespace, project: Project | None) -> int:
     sources = [get_source(args.name)] if args.name else list_sources()
     rc = 0
     for s in sources:
+        clone = cache_dir(s.name)
+        before = head_commit(clone)[:7] if (clone / ".git").is_dir() else None
         try:
-            print(f"{s.name}: {update(s)[:10]}")
+            after = update(s)[:7]
+            entries, errors = scan_source(s, sync_missing=False)
         except RegistryRepoError as exc:
             print(f"{s.name}: error: {shown(exc)}", file=sys.stderr)
             rc = 1
+            continue
+        if before is None:
+            what = f"fetched at {after}"
+        elif before == after:
+            what = f"already up to date at {after}"
+        else:
+            what = f"updated {before} → {after}"
+        print(f"{s.name}: {what} — {_census(entries)}")
+        for path, msg in errors:
+            print(f"warning: {s.name}: {shown(path)}: {msg}", file=sys.stderr)
     return rc
+
+
+_KIND_WORDS = {
+    "module": ("module", "modules"),
+    "layout": ("layout", "layouts"),
+    "skill": ("skill", "skills"),
+    "mcp": ("MCP recipe", "MCP recipes"),
+}
+
+
+def _census(entries: list[Found]) -> str:
+    """`3 extensions (1 module, 2 skills)` — or `no extensions`."""
+    if not entries:
+        return "no extensions"
+    counts: dict[str, int] = {}
+    for f in entries:
+        counts[f.ext.kind] = counts.get(f.ext.kind, 0) + 1
+    order = list(_KIND_WORDS)
+    parts = []
+    for kind in sorted(counts, key=lambda k: (order.index(k) if k in order else len(order), k)):
+        n = counts[kind]
+        one, many = _KIND_WORDS.get(kind, (kind, kind))
+        parts.append(f"{n} {one if n == 1 else many}")
+    total = len(entries)
+    return f"{total} extension{'' if total == 1 else 's'} ({', '.join(parts)})"
 
 
 def _search(args: argparse.Namespace, project: Project | None) -> int:
