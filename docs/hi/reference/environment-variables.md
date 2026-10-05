@@ -8,7 +8,9 @@ Veles इन्हें runtime पर पढ़ता है। API keys औ�
 ## Provider API keys
 
 API-key lookup cascade: OS keychain (project scope) → OS keychain (default scope)
-→ environment variable।
+→ environment variable। कोई provider कौन-से variables पढ़ता है, यह उसकी catalogue entry के `key_env`
+से आता है — `~/.veles/providers.toml` में आपकी अपनी entries अपने नाम खुद बताती हैं, और
+`veles secret set <VARIABLE>` key को वहाँ रखता है जहाँ वह provider उसे पढ़ता है।
 
 | Variable | Provider | टिप्पणियाँ |
 |---|---|---|
@@ -17,8 +19,9 @@ API-key lookup cascade: OS keychain (project scope) → OS keychain (default sco
 | `OPENAI_API_KEY` | openai | Direct OpenAI API |
 | `GEMINI_API_KEY` | gemini | Google Gemini के लिए primary key |
 | `GOOGLE_API_KEY` | gemini | Google Gemini के लिए fallback |
+| `OPENAI_COMPAT_API_KEY` | openai-compat | वैकल्पिक — ऐसे gateway के लिए जिसे key चाहिए |
 
-`claude-cli` और `gemini-cli` अपने ही binaries के ज़रिए authenticate होते हैं — कोई env var नहीं।
+`claude-cli` और `antigravity-cli` अपने ही binaries के ज़रिए authenticate होते हैं — कोई env var नहीं।
 
 ## Local providers
 
@@ -28,7 +31,7 @@ API-key lookup cascade: OS keychain (project scope) → OS keychain (default sco
 | `OLLAMA_HOST` | `OLLAMA_BASE_URL` का अनुसरण करता है | embeddings के लिए Ollama host |
 | `LLAMACPP_BASE_URL` | `http://localhost:8080/v1` | llama.cpp server endpoint |
 | `OPENAI_COMPAT_BASE_URL` | — (आवश्यक) | `openai-compat` provider के लिए endpoint |
-| `VELES_LOCAL_TOOLS` | off | local providers पर tool calling सक्षम करें (`1`/`true`) |
+| `VELES_LOCAL_TOOLS` | detect | local providers पर tool calling: `1` जबरन on करता है, `0` off; unset होने पर server से detect होती है |
 | `VELES_OLLAMA_EMBED_MODEL` | provider default | Ollama embedding model override करें |
 | `VELES_LOCAL_JSON_MODE` | on | उन local calls पर `response_format: json_object` भेजें जिन्हें JSON object लौटाना ही है (`0` से बंद) |
 

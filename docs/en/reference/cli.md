@@ -301,11 +301,12 @@ Per-task ensemble routing — which `provider:model` handles each task type
 
 ### `veles models <provider>`
 List models for a provider. Cloud providers (openrouter/openai/gemini) are cached
-24h; local providers are always live.
+24h; local providers and `antigravity-cli` are always live. An unknown provider is a
+one-line error listing what exists (exit `2`).
 
 | Flag | Default | Purpose |
 |---|---|---|
-| `provider` (positional) | — | One of the [provider names](#provider-names) |
+| `provider` (positional) | — | A provider id from the [catalogue](#provider-names) |
 | `--refresh` | off | Bypass the disk cache (cloud only) |
 | `--json` | off | Emit `{provider, source, models}` as JSON |
 
@@ -440,8 +441,12 @@ start`:
 
 ## Provider names
 
-`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` and `veles models` take any id in the provider catalogue — the builtin
+ones, your `~/.veles/providers.toml`, and providers from installed modules:
 
-Local providers (`ollama`, `llamacpp`, `openai-compat`) need no API key. See the
+`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`ollama` · `llamacpp` · `openai-compat` (builtin)
+
+A provider only a registry module offers (`antigravity-cli`) installs itself when you
+name it. Local providers (`ollama`, `llamacpp`, `openai-compat`) need no API key. See the
 [providers reference](providers.md) and [configure providers](../how-to/configure-providers.md).

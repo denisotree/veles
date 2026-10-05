@@ -254,11 +254,12 @@ connected registries में search करें (module, skill, layout pack, 
 
 ### `veles models <provider>`
 किसी provider के लिए models सूचीबद्ध करें। Cloud providers (openrouter/openai/gemini)
-24h के लिए cached होते हैं; local providers हमेशा live होते हैं।
+24h के लिए cached होते हैं; local providers और `antigravity-cli` हमेशा live होते हैं।
+अज्ञात provider एक पंक्ति की error है जो बताती है कि क्या-क्या मौजूद है (exit `2`)।
 
 | Flag | Default | उद्देश्य |
 |---|---|---|
-| `provider` (positional) | — | [provider names](#provider-names) में से एक |
+| `provider` (positional) | — | [catalogue](#provider-names) से एक provider id |
 | `--refresh` | off | disk cache को bypass करें (केवल cloud) |
 | `--json` | off | `{provider, source, models}` को JSON के रूप में निकालें |
 
@@ -390,8 +391,12 @@ module है; `run` और `add` उसके न होने पर उसे
 
 ## Provider names
 
-`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` और `veles models` provider catalogue की कोई भी id लेते हैं — builtin वाले,
+आपकी `~/.veles/providers.toml`, और installed modules के providers:
 
-Local providers (`ollama`, `llamacpp`, `openai-compat`) को कोई API key नहीं चाहिए। देखें
+`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`ollama` · `llamacpp` · `openai-compat` (builtin)
+
+जो provider केवल एक registry module देता है (`antigravity-cli`) वह नाम देने पर खुद install हो
+जाता है। Local providers (`ollama`, `llamacpp`, `openai-compat`) को कोई API key नहीं चाहिए। देखें
 [providers संदर्भ](providers.md) और [providers configure करें](../how-to/configure-providers.md)।

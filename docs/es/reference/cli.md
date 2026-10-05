@@ -256,11 +256,12 @@ Enrutamiento de ensamble por tarea — qué `provider:model` gestiona cada tipo 
 
 ### `veles models <provider>`
 Lista los modelos de un proveedor. Los proveedores en la nube (openrouter/openai/gemini)
-se cachean 24 h; los proveedores locales siempre están en vivo.
+se cachean 24 h; los proveedores locales y `antigravity-cli` siempre están en vivo. Un
+proveedor desconocido es un error de una línea que lista lo que existe (código de salida `2`).
 
 | Opción | Predeterminado | Propósito |
 |---|---|---|
-| `provider` (posicional) | — | Uno de los [nombres de proveedor](#provider-names) |
+| `provider` (posicional) | — | Un id de proveedor del [catálogo](#provider-names) |
 | `--refresh` | desactivado | Omite la caché en disco (solo nube) |
 | `--json` | desactivado | Emite `{provider, source, models}` como JSON |
 
@@ -393,8 +394,12 @@ start`:
 
 ## Nombres de proveedor
 
-`openrouter` (predeterminado) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` y `veles models` aceptan cualquier id del catálogo de proveedores — los
+integrados, tu `~/.veles/providers.toml` y los proveedores de los módulos instalados:
 
-Los proveedores locales (`ollama`, `llamacpp`, `openai-compat`) no necesitan clave de API. Consulta la
+`openrouter` (predeterminado) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`ollama` · `llamacpp` · `openai-compat` (integrados)
+
+Un proveedor que solo ofrece un módulo del registro (`antigravity-cli`) se instala solo
+cuando lo nombras. Los proveedores locales (`ollama`, `llamacpp`, `openai-compat`) no necesitan clave de API. Consulta la
 [referencia de proveedores](providers.md) y [configurar proveedores](../how-to/configure-providers.md).

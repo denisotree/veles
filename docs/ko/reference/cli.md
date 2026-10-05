@@ -226,11 +226,11 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `refresh [--force]` | `AGENTS.md`의 자연어 라우팅 힌트를 다시 파싱 |
 
 ### `veles models <provider>`
-프로바이더의 모델을 나열합니다. 클라우드 프로바이더(openrouter/openai/gemini)는 24시간 캐시되고, 로컬 프로바이더는 항상 실시간입니다.
+프로바이더의 모델을 나열합니다. 클라우드 프로바이더(openrouter/openai/gemini)는 24시간 캐시되고, 로컬 프로바이더와 `antigravity-cli`는 항상 실시간입니다. 알 수 없는 프로바이더는 존재하는 목록을 보여 주는 한 줄 오류입니다(종료 코드 `2`).
 
 | 플래그 | 기본값 | 용도 |
 |---|---|---|
-| `provider` (위치 인자) | — | [프로바이더 이름](#provider-names) 중 하나 |
+| `provider` (위치 인자) | — | [카탈로그](#provider-names)의 프로바이더 id |
 | `--refresh` | off | 디스크 캐시 우회(클라우드만 해당) |
 | `--json` | off | `{provider, source, models}`를 JSON으로 출력 |
 
@@ -356,6 +356,8 @@ HTTP+WS 데몬을 실행/제어합니다. 인자 없는 `veles daemon`은 **데�
 
 ## 프로바이더 이름
 
-`openrouter`(기본) · `anthropic` · `openai` · `gemini` · `claude-cli` · `gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider`와 `veles models`는 프로바이더 카탈로그의 모든 id를 받습니다 — 내장 프로바이더, 사용자의 `~/.veles/providers.toml`, 설치된 모듈이 제공하는 프로바이더입니다.
 
-로컬 프로바이더(`ollama`, `llamacpp`, `openai-compat`)는 API 키가 필요 없습니다. [프로바이더 레퍼런스](providers.md)와 [프로바이더 설정](../how-to/configure-providers.md)을 참고하세요.
+`openrouter`(기본) · `anthropic` · `openai` · `gemini` · `claude-cli` · `ollama` · `llamacpp` · `openai-compat`(내장)
+
+레지스트리 모듈만 제공하는 프로바이더(`antigravity-cli`)는 이름을 지정하면 스스로 설치됩니다. 로컬 프로바이더(`ollama`, `llamacpp`, `openai-compat`)는 API 키가 필요 없습니다. [프로바이더 레퍼런스](providers.md)와 [프로바이더 설정](../how-to/configure-providers.md)을 참고하세요.

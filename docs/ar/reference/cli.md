@@ -254,11 +254,12 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 ### `veles models <provider>`
 سرد نماذج مزوّد. المزوّدون السحابيون (openrouter/openai/gemini) مُخزَّنون
-مؤقتًا لمدة 24 ساعة؛ والمزوّدون المحليون دائمًا حيّون.
+مؤقتًا لمدة 24 ساعة؛ والمزوّدون المحليون و`antigravity-cli` دائمًا حيّون. المزوّد
+المجهول خطأ من سطر واحد يسرد ما هو موجود (رمز الخروج `2`).
 
 | العَلَم | الافتراضي | الغرض |
 |---|---|---|
-| `provider` (موضعي) | — | أحد [أسماء المزوّدين](#provider-names) |
+| `provider` (موضعي) | — | معرّف مزوّد من [الكتالوج](#provider-names) |
 | `--refresh` | معطّل | تجاوز التخزين المؤقت على القرص (السحابي فقط) |
 | `--json` | معطّل | إصدار `{provider, source, models}` بصيغة JSON |
 
@@ -391,8 +392,12 @@ start`:
 
 ## أسماء المزوّدين
 
-`openrouter` (الافتراضي) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+يقبل `--provider` و`veles models` أي معرّف في كتالوج المزوّدين — المضمَّنة،
+و`~/.veles/providers.toml` الخاص بك، ومزوّدو الوحدات المثبّتة:
 
+`openrouter` (الافتراضي) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`ollama` · `llamacpp` · `openai-compat` (مضمَّنة)
+
+المزوّد الذي توفّره وحدة من السجلّ فقط (`antigravity-cli`) يثبّت نفسه عند تسميته.
 لا يحتاج المزوّدون المحليون (`ollama` و`llamacpp` و`openai-compat`) إلى مفتاح API. راجع
 [مرجع المزوّدين](providers.md) و[تهيئة المزوّدين](../how-to/configure-providers.md).

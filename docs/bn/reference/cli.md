@@ -254,11 +254,12 @@ Module-গুলো একইভাবে নিজস্ব verb যোগ ক�
 
 ### `veles models <provider>`
 একটি প্রোভাইডারের মডেল তালিকাভুক্ত করে। ক্লাউড প্রোভাইডার (openrouter/openai/gemini)
-24 ঘণ্টা ক্যাশ করা হয়; লোকাল প্রোভাইডার সর্বদা লাইভ।
+24 ঘণ্টা ক্যাশ করা হয়; লোকাল প্রোভাইডার এবং `antigravity-cli` সর্বদা লাইভ। অজানা প্রোভাইডার
+হলে কী কী আছে তার তালিকাসহ এক লাইনের ত্রুটি দেখায় (exit `2`)।
 
 | ফ্ল্যাগ | ডিফল্ট | উদ্দেশ্য |
 |---|---|---|
-| `provider` (positional) | — | [প্রোভাইডার নাম](#provider-names)-এর একটি |
+| `provider` (positional) | — | [ক্যাটালগ](#provider-names)-এর একটি প্রোভাইডার id |
 | `--refresh` | off | ডিস্ক ক্যাশ বাইপাস করে (শুধু ক্লাউড) |
 | `--json` | off | `{provider, source, models}` JSON হিসেবে প্রদান করে |
 
@@ -391,8 +392,12 @@ start`-এ গৃহীত:
 
 ## প্রোভাইডার নাম
 
-`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` এবং `veles models` প্রোভাইডার ক্যাটালগের যেকোনো id নেয় — বিল্টইনগুলো,
+আপনার `~/.veles/providers.toml`, এবং ইনস্টল করা মডিউলের প্রোভাইডার:
 
-লোকাল প্রোভাইডারগুলোর (`ollama`, `llamacpp`, `openai-compat`) কোনো API কী লাগে না। দেখুন
+`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`ollama` · `llamacpp` · `openai-compat` (বিল্টইন)
+
+যে প্রোভাইডার শুধু একটি রেজিস্ট্রি মডিউল দেয় (`antigravity-cli`), তার নাম দিলে সেটি নিজে
+থেকেই ইনস্টল হয়। লোকাল প্রোভাইডারগুলোর (`ollama`, `llamacpp`, `openai-compat`) কোনো API কী লাগে না। দেখুন
 [প্রোভাইডার রেফারেন্স](providers.md) এবং [প্রোভাইডার কনফিগার করুন](../how-to/configure-providers.md)।

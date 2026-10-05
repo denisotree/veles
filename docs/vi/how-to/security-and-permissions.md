@@ -76,18 +76,24 @@ cụ nó ghi vào `.veles/tools/` chỉ được nạp sau khi bạn duyệt t�
 viết khác của cùng một tệp (hoa/thường, `..`, symlink) cũng bị từ chối.
 
 Các tệp tự chạy mà không cần lệnh tường minh, hoặc điều khiển một agent CLI — mọi thứ
-dưới `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`, `.vscode/`,
+dưới `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.agents/`, `.codex/`, `.vscode/`,
 `.devcontainer/`, `.husky/`, và `.envrc`, `.mcp.json`, `.pre-commit-config.yaml`,
 `lefthook.yml`, ở bất kỳ độ sâu nào, cộng với thư mục `core.hooksPath` của repo và
 nơi một `.git` dạng symlink trỏ tới — các công cụ tệp của agent chỉ ghi sau khi bạn
 xác nhận lần ghi đó. Các quyền trust và autopilot không bao gồm việc này; daemon hỏi
 trong kênh, còn một lần chạy batch không có ai để hỏi thì từ chối.
 
-Các provider `claude-cli` và `gemini-cli` chạy như một model chỉ với các công cụ của
-Veles: shell, công cụ sửa tệp và web riêng của chúng, cài đặt và hook `.claude/` của
+Các provider `claude-cli` và `antigravity-cli` chạy như một model chỉ với các công cụ
+của Veles: shell, công cụ sửa tệp và web riêng của chúng, cài đặt và hook `.claude/` của
 dự án, cùng các máy chủ MCP khác đều không áp dụng, và mọi công cụ Veles chúng gọi
 đều đi qua thang trust ở trên (ở đó không ai trả lời được prompt, nên bất cứ thứ gì
-chưa được cấp đều bị từ chối).
+chưa được cấp đều bị từ chối). Config MCP của chúng nằm trong
+`.veles/tmp/delegate-<pid>/`, mỗi tiến trình đang chạy một thư mục. `agy` chạy trong
+một workspace tạm ở đó, kèm `--dangerously-skip-permissions` khi nó có các công cụ của
+Veles — nếu không agy từ chối các lệnh gọi MCP ở chế độ headless — và một hook trong
+workspace đó từ chối mọi công cụ của chính nó; một hook bị lỗi cũng từ chối. Tệp hook
+nằm dưới `.agents/`, nên agy không thể ghi đè nó qua các công cụ của Veles nếu không có
+xác nhận của bạn.
 
 Các giới hạn đã biết:
 
@@ -96,13 +102,14 @@ Các giới hạn đã biết:
 - Một phê duyệt MCP ghim dòng lệnh của máy chủ, không ghim các tệp nó chạy từ dự án
   (một script nêu trong `args`) — hãy xem xét cả chúng.
 - Với một provider CLI, các lần chạy chỉ tiền cấp quyền công cụ cho riêng mình (tác vụ
-  nền của daemon, `veles research`) không truyền điều đó cho CLI được ủy quyền: các
-  công cụ Veles của nó cần một quyền cấp thường trực `veles trust set` hoặc một cửa
-  sổ autopilot. Chế độ lập kế hoạch của lần chạy cha cũng không tới được chúng.
-- `gemini-cli` tin cậy thư mục dự án trong lần chạy của nó, nên gemini cũng đọc `.env`
-  của dự án — đừng để trong đó các cài đặt gemini mà bạn không muốn agent điều khiển.
-- Trên máy có chính sách gemini được quản lý (cấp hệ thống), gemini bỏ qua chính sách
-  Veles truyền vào, nên ở đó `gemini-cli` không bị giới hạn trong các công cụ của Veles.
+  nền của daemon, `veles research`) không truyền điều đó cho CLI được ủy quyền: việc
+  tiền cấp quyền nằm trong tiến trình Veles, còn máy chủ MCP mà CLI khởi động là một
+  tiến trình riêng, nên các công cụ Veles của nó cần một quyền cấp thường trực
+  `veles trust set` hoặc một cửa sổ autopilot. Chế độ lập kế hoạch của lần chạy cha
+  cũng không tới được chúng.
+- `antigravity-cli` dựa vào việc agy tôn trọng `.agents/hooks.json` của workspace nó;
+  một bản phát hành agy ngừng đọc hook của workspace sẽ để các công cụ riêng của nó
+  mở dưới `--dangerously-skip-permissions`.
 
 Đường dẫn chứa ký tự điều khiển (chuỗi escape của terminal, ký tự đảo chiều bidi) bị
 từ chối, còn các xác nhận, lời nhắc trust và bản xem trước diff hiển thị các ký tự đó

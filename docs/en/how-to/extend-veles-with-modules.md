@@ -43,6 +43,7 @@ without breaking modules. A registry module **must** import Veles only from it �
 | `veles.sdk.channels` | the channel contract: `PlatformSpec`, `ChannelContext`, `ChannelCaps`, `ChannelGateway`, `CredField`, `RunBackend`, `RunBackendError`, `SessionMap` |
 | `veles.sdk.channel_checks` | checks a channel module's tests run on its spec: `check_builds_from_config`, `check_config_keys`, `check_delivers` |
 | `veles.sdk.media` | the speech-to-text and vision adapters a channel uses for voice and images |
+| `veles.sdk.providers` | the LLM provider contract: `ProviderSpec`, `ProviderContext`, the response types, and a CLI delegate's base (`CLIProvider`, `delegate_dir`, `veles_mcp_server`) |
 
 The entrypoint loads as a package rooted at the module directory, so the module's own
 files import relatively (`from .wiki import Wiki`).
@@ -115,6 +116,7 @@ requires_extensions = ["public:official/helper"]
 | `background_op` | `BackgroundOp(kind, toolset, run)` | a daemon job kind; `run(job, *, spawn_agent, project)` |
 | `memory` | factory (via `api.add_memory_provider`) | an external memory provider |
 | `platform` | `PlatformSpec(build, caps, cred_fields, config_keys)` | a messaging platform the daemon hosts as a channel (see below) |
+| `provider` | `ProviderSpec(label, build, …)` | an LLM provider in the catalogue: `--provider <name>`, `veles models`, routes and the wizards (see below); builtin ids are reserved |
 
 Objects that take an `engine` gate themselves on it; the others check
 `veles.sdk.contributions.engine_enabled(project, "<name>")` themselves when they
@@ -157,6 +159,47 @@ that is neither a cred field nor in `config_keys` is reported as a typo. A gatew
 loggers write to the daemon log. The module's own tests check the spec with
 `veles.sdk.channel_checks`, and list it in `extension.toml` as `provides =
 ["platform:mychat"]`.
+
+## An LLM provider
+
+A provider module contributes a `ProviderSpec` under the provider's id. `build(ctx)`
+gets a `ProviderContext` (`name`, `model`, `project`) and returns an object with
+`create_message(messages, tools=None, *, model, max_tokens)` — plus `stream_message`
+and `list_models` when it can:
+
+```python
+from veles.sdk.providers import ProviderResponse, ProviderSpec, TokenUsage
+
+
+class EchoProvider:
+    name = "echo"
+    supports_tools = False
+    supports_streaming = False
+
+    def create_message(self, messages, tools=None, *, model, max_tokens=4096):
+        return ProviderResponse(text=messages[-1].content, tool_calls=[], usage=TokenUsage())
+
+
+SPEC = ProviderSpec(label="Echo", build=lambda ctx: EchoProvider(), model_list="live")
+
+
+def register(api) -> None:
+    api.contribute("provider", "echo", SPEC)
+```
+
+`model_list` says how `veles models` lists it: `live` asks `list_models()` every
+time, `cached` keeps it for 24h, `curated` uses Veles' own table. A provider whose
+key lives in the keychain names its env vars in `key_env` and resolves the key itself.
+
+A **CLI delegate** — an agent CLI driven headless — subclasses `CLIProvider` and says
+how to build the command (`_build_cmd`), where to run it (`_cwd`) and how to read its
+event stream (`_new_state`); running, streaming and errors are shared. Its
+`build_tool_aware` build gives the CLI Veles' tools over MCP: write a config around
+`veles_mcp_server(project)` inside `delegate_dir(project)` (a directory of the running
+process, removed at exit) and set `mcp_tool_name` to how the CLI names an MCP tool, so
+prompts name Veles' tools that way. `official/antigravity-cli` in the public registry is
+a complete example. List the provider as `provides = ["provider:<id>"]`: naming that id
+in a config, a route or `--provider` then installs the module.
 
 ## Declare what a registry module provides
 

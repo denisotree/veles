@@ -79,19 +79,25 @@ você aprova o arquivo dela). Outras grafias do mesmo arquivo (maiúsculas/minú
 `..`, um symlink) também são recusadas.
 
 Arquivos que rodam sem um comando explícito ou que direcionam uma CLI de agente —
-qualquer coisa sob `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`,
-`.vscode/`, `.devcontainer/`, `.husky/`, e `.envrc`, `.mcp.json`,
+qualquer coisa sob `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.agents/`,
+`.codex/`, `.vscode/`, `.devcontainer/`, `.husky/`, e `.envrc`, `.mcp.json`,
 `.pre-commit-config.yaml`, `lefthook.yml`, em qualquer profundidade, mais o diretório
 `core.hooksPath` do repositório e o destino de um `.git` que seja symlink — as tools de
 arquivo do agente só os escrevem depois que você confirma essa escrita. Concessões de
 confiança e o autopilot não a cobrem; o daemon pergunta no canal, e uma execução em
 lote sem ninguém para perguntar recusa.
 
-Os provedores `claude-cli` e `gemini-cli` rodam como um modelo apenas com as tools do
-Veles: as próprias tools de shell, edição de arquivos e web deles, as configurações e
+Os provedores `claude-cli` e `antigravity-cli` rodam como um modelo apenas com as tools
+do Veles: as próprias tools de shell, edição de arquivos e web deles, as configurações e
 hooks de `.claude/` do projeto e outros servidores MCP não se aplicam, e toda tool do
 Veles que eles chamam passa pela escada de confiança acima (ninguém pode responder a
-uma pergunta ali, então tudo que ainda não foi concedido é recusado).
+uma pergunta ali, então tudo que ainda não foi concedido é recusado). A config de MCP
+deles fica em `.veles/tmp/delegate-<pid>/`, uma por processo em execução. O `agy` roda
+ali em um workspace temporário, com `--dangerously-skip-permissions` quando tem as tools
+do Veles — o agy recusa chamadas MCP em modo headless caso contrário — e um hook nesse
+workspace nega toda tool dele; um hook que falha também nega. O arquivo do hook fica
+sob `.agents/`, então o agy não consegue reescrevê-lo pelas tools do Veles sem a sua
+confirmação.
 
 Limites conhecidos:
 
@@ -100,15 +106,14 @@ Limites conhecidos:
 - Uma aprovação de MCP fixa a linha de comando do servidor, não os arquivos que ele
   executa a partir do projeto (um script citado em `args`) — revise esses também.
 - Com um provedor CLI, execuções que pré-autorizam tools só para si mesmas (jobs em
-  segundo plano do daemon, `veles research`) não repassam isso à CLI delegada: as tools
-  do Veles dela precisam de uma concessão permanente com `veles trust set` ou de uma
-  janela de autopilot. O modo de planejamento da execução pai também não chega a elas.
-- `gemini-cli` confia na pasta do projeto durante a sua execução, então o gemini também
-  lê o `.env` do projeto — mantenha fora dele as configurações do gemini que você não
-  quer que o agente direcione.
-- Em uma máquina com políticas gemini gerenciadas (do sistema), o gemini ignora a
-  política que o Veles passa, então lá o `gemini-cli` não fica limitado às tools do
-  Veles.
+  segundo plano do daemon, `veles research`) não repassam isso à CLI delegada: a
+  pré-autorização vive no processo do Veles, e o servidor MCP que a CLI inicia é outro,
+  então as tools do Veles dela precisam de uma concessão permanente com
+  `veles trust set` ou de uma janela de autopilot. O modo de planejamento da execução
+  pai também não chega a elas.
+- O `antigravity-cli` depende de o agy respeitar o `.agents/hooks.json` do seu
+  workspace; uma versão do agy que parasse de ler os hooks do workspace deixaria as
+  tools dele abertas sob `--dangerously-skip-permissions`.
 
 Caminhos com caracteres de controle (escapes de terminal, sobrescritas bidi) são
 recusados, e as confirmações, o prompt de confiança e a prévia do diff mostram esses

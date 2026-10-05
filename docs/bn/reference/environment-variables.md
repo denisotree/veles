@@ -8,7 +8,9 @@ Veles রানটাইমে এগুলো পড়ে। API কী ও �
 ## প্রোভাইডার API কী
 
 API-কী লুকআপ ক্যাসকেড: OS keychain (project scope) → OS keychain (default scope)
-→ এনভায়রনমেন্ট ভ্যারিয়েবল।
+→ এনভায়রনমেন্ট ভ্যারিয়েবল। একটি প্রোভাইডার কোন ভ্যারিয়েবল পড়ে তা আসে তার ক্যাটালগ
+এন্ট্রির `key_env` থেকে — `~/.veles/providers.toml`-এ আপনার নিজের এন্ট্রিগুলো নিজেদের
+নাম দেয়, আর `veles secret set <VARIABLE>` কী সেখানে রাখে যেখান থেকে সেই প্রোভাইডার পড়ে।
 
 | ভ্যারিয়েবল | প্রোভাইডার | নোট |
 |---|---|---|
@@ -17,8 +19,9 @@ API-কী লুকআপ ক্যাসকেড: OS keychain (project scope)
 | `OPENAI_API_KEY` | openai | সরাসরি OpenAI API |
 | `GEMINI_API_KEY` | gemini | Google Gemini-এর প্রাইমারি কী |
 | `GOOGLE_API_KEY` | gemini | Google Gemini-এর ফলব্যাক |
+| `OPENAI_COMPAT_API_KEY` | openai-compat | ঐচ্ছিক — যে গেটওয়ে কী চায় তার জন্য |
 
-`claude-cli` এবং `gemini-cli` তাদের নিজস্ব বাইনারির মাধ্যমে অথেনটিকেট করে — কোনো env var লাগে না।
+`claude-cli` এবং `antigravity-cli` তাদের নিজস্ব বাইনারির মাধ্যমে অথেনটিকেট করে — কোনো env var লাগে না।
 
 ## লোকাল প্রোভাইডার
 
@@ -28,7 +31,7 @@ API-কী লুকআপ ক্যাসকেড: OS keychain (project scope)
 | `OLLAMA_HOST` | follows `OLLAMA_BASE_URL` | embeddings-এর জন্য Ollama host |
 | `LLAMACPP_BASE_URL` | `http://localhost:8080/v1` | llama.cpp সার্ভার এন্ডপয়েন্ট |
 | `OPENAI_COMPAT_BASE_URL` | — (required) | `openai-compat` প্রোভাইডারের জন্য এন্ডপয়েন্ট |
-| `VELES_LOCAL_TOOLS` | off | লোকাল প্রোভাইডারে টুল কলিং সক্রিয় করে (`1`/`true`) |
+| `VELES_LOCAL_TOOLS` | detect | লোকাল প্রোভাইডারে টুল কলিং: `1` জোর করে চালু, `0` বন্ধ; সেট না থাকলে সার্ভার থেকে শনাক্ত করে |
 | `VELES_OLLAMA_EMBED_MODEL` | provider default | Ollama embedding মডেল ওভাররাইড করে |
 | `VELES_LOCAL_JSON_MODE` | on | যেসব local call-কে JSON object ফেরত দিতেই হবে, সেগুলোতে `response_format: json_object` পাঠায় (`0` দিলে বন্ধ) |
 

@@ -255,11 +255,13 @@ vụ (`default`, `curator`, `compressor`, `insights`, `skills`, `advisor`,
 
 ### `veles models <provider>`
 Liệt kê các model của một nhà cung cấp. Các nhà cung cấp đám mây
-(openrouter/openai/gemini) được cache 24h; các nhà cung cấp cục bộ luôn trực tiếp.
+(openrouter/openai/gemini) được cache 24h; các nhà cung cấp cục bộ và `antigravity-cli`
+luôn trực tiếp. Một nhà cung cấp không xác định là lỗi một dòng liệt kê những gì hiện có
+(exit `2`).
 
 | Cờ | Mặc định | Mục đích |
 |---|---|---|
-| `provider` (vị trí) | — | Một trong [các tên nhà cung cấp](#provider-names) |
+| `provider` (vị trí) | — | Một id nhà cung cấp trong [danh mục](#provider-names) |
 | `--refresh` | tắt | Bỏ qua cache trên đĩa (chỉ đám mây) |
 | `--json` | tắt | Xuất `{provider, source, models}` dạng JSON |
 
@@ -392,8 +394,13 @@ Kiểm tra các máy chủ MCP bên ngoài được cấu hình dưới `[mcp.se
 
 ## Tên nhà cung cấp
 
-`openrouter` (mặc định) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` và `veles models` nhận bất kỳ id nào trong danh mục nhà cung cấp — các
+nhà cung cấp tích hợp sẵn, `~/.veles/providers.toml` của bạn, và các nhà cung cấp từ
+module đã cài:
 
-Các nhà cung cấp cục bộ (`ollama`, `llamacpp`, `openai-compat`) không cần API
-key. Xem [tham khảo nhà cung cấp](providers.md) và [cấu hình nhà cung cấp](../how-to/configure-providers.md).
+`openrouter` (mặc định) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`ollama` · `llamacpp` · `openai-compat` (tích hợp sẵn)
+
+Một nhà cung cấp chỉ do một module registry cung cấp (`antigravity-cli`) tự cài đặt khi
+bạn gọi tên nó. Các nhà cung cấp cục bộ (`ollama`, `llamacpp`, `openai-compat`) không
+cần API key. Xem [tham khảo nhà cung cấp](providers.md) và [cấu hình nhà cung cấp](../how-to/configure-providers.md).

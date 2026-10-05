@@ -258,11 +258,13 @@ Routage par ensemble selon la tâche — quel `provider:model` traite chaque typ
 
 ### `veles models <provider>`
 Liste les modèles d'un fournisseur. Les fournisseurs cloud (openrouter/openai/gemini)
-sont mis en cache 24 h ; les fournisseurs locaux sont toujours en direct.
+sont mis en cache 24 h ; les fournisseurs locaux et `antigravity-cli` sont toujours en
+direct. Un fournisseur inconnu donne une erreur d'une ligne qui liste ce qui existe
+(code de sortie `2`).
 
 | Option | Défaut | Rôle |
 |---|---|---|
-| `provider` (positionnel) | — | L'un des [noms de fournisseurs](#noms-de-fournisseurs) |
+| `provider` (positionnel) | — | Un id de fournisseur du [catalogue](#noms-de-fournisseurs) |
 | `--refresh` | désactivé | Contourne le cache disque (cloud uniquement) |
 | `--json` | désactivé | Émet `{provider, source, models}` en JSON |
 
@@ -396,8 +398,13 @@ Acceptées par `run`, `add`, `tui`, `curate`, `research`, `job tick`, et `daemon
 
 ## Noms de fournisseurs
 
-`openrouter` (par défaut) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` et `veles models` acceptent n'importe quel id du catalogue des
+fournisseurs — les intégrés, votre `~/.veles/providers.toml` et les fournisseurs des
+modules installés :
 
-Les fournisseurs locaux (`ollama`, `llamacpp`, `openai-compat`) ne nécessitent aucune
-clé API. Voir la [référence des fournisseurs](providers.md) et [configurer les fournisseurs](../how-to/configure-providers.md).
+`openrouter` (par défaut) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`ollama` · `llamacpp` · `openai-compat` (intégrés)
+
+Un fournisseur que seul un module du registre propose (`antigravity-cli`) s'installe
+tout seul quand vous le nommez. Les fournisseurs locaux (`ollama`, `llamacpp`,
+`openai-compat`) ne nécessitent aucune clé API. Voir la [référence des fournisseurs](providers.md) et [configurer les fournisseurs](../how-to/configure-providers.md).

@@ -59,12 +59,8 @@ veles models ollama                     # confirm it's listed
 veles run --provider ollama --model qwen3:4b-instruct "Hello"
 ```
 
-Gọi tool **mặc định bị tắt** trên các nhà cung cấp cục bộ. Bật nó khi bạn đã chọn
-một model hỗ trợ tool:
-
-```bash
-export VELES_LOCAL_TOOLS=1
-```
+Gọi tool được **phát hiện** từ những gì máy chủ công bố. Buộc bật bằng
+`VELES_LOCAL_TOOLS=1` (hoặc buộc tắt bằng `=0`).
 
 Ghi đè endpoint nếu máy chủ của bạn không ở cổng mặc định:
 
@@ -74,13 +70,80 @@ export LLAMACPP_BASE_URL=http://localhost:8080/v1
 export OPENAI_COMPAT_BASE_URL=http://my-host:8000/v1   # required for openai-compat
 ```
 
-## Ủy thác cho một gói đăng ký CLI Claude / Gemini
+## Thêm nhà cung cấp của riêng bạn
 
-Nếu bạn đã xác thực CLI `claude` hoặc `gemini`, Veles có thể điều khiển nó:
+Bất kỳ API tương thích OpenAI được lưu trữ sẵn nào, hoặc một máy chủ do bạn chạy, đều
+trở thành nhà cung cấp chỉ với một mục trong `~/.veles/providers.toml` — không cần
+code. Id là tên bảng:
+
+```toml
+[providers.groq]
+kind = "openai-api"                          # a hosted API; needs a key
+label = "Groq"                               # shown in the wizards (optional)
+base_url = "https://api.groq.com/openai/v1"
+key_env = ["GROQ_API_KEY"]
+
+[providers.lmstudio]
+kind = "local"                               # a server you run; a key is optional
+base_url = "http://localhost:1234/v1"
+```
+
+Sau đó dùng nó như mọi nhà cung cấp tích hợp sẵn:
+
+```bash
+veles secret set GROQ_API_KEY      # into the keychain, where the groq entry reads it
+veles models groq
+veles run --provider groq --model llama-3.3-70b-versatile "..."
+```
+
+| Key | Ý nghĩa |
+|---|---|
+| `kind` | `openai-api` (một API được lưu trữ sẵn) hoặc `local` (một máy chủ do bạn chạy) |
+| `base_url` | endpoint tương thích OpenAI, kết thúc bằng `/v1` (hoặc tương đương của nhà cung cấp) |
+| `base_url_env` | một biến môi trường ghi đè `base_url` khi được đặt |
+| `key_env` | tên các biến môi trường mà key được đọc từ đó; keychain được thử trước |
+| `label`, `tagline` | cách các trình thiết lập hiển thị nó |
+| `tools` | `auto` (mặc định), `on` hoặc `off` — model có được dùng lời gọi tool hay không |
+
+Một mục có id tích hợp sẵn (`[providers.ollama]`) thay đổi cài đặt của nhà cung cấp
+đó — ví dụ `base_url` — nhưng không đổi loại (kind). Một file hỏng chỉ được báo một
+lần, và Veles tiếp tục với các nhà cung cấp tích hợp sẵn; `veles doctor` liệt kê
+những gì sai trong đó.
+
+Điểm khởi đầu cho các API phổ biến — **chưa được đội Veles kiểm chứng**, hãy xem tài
+liệu của nhà cung cấp để biết endpoint hiện hành:
+
+| id | `base_url` | `key_env` |
+|---|---|---|
+| `groq` | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` |
+| `deepseek` | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEY` |
+| `mistral` | `https://api.mistral.ai/v1` | `MISTRAL_API_KEY` |
+| `together` | `https://api.together.xyz/v1` | `TOGETHER_API_KEY` |
+| `xai` | `https://api.x.ai/v1` | `XAI_API_KEY` |
+| `fireworks` | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` |
+| `deepinfra` | `https://api.deepinfra.com/v1/openai` | `DEEPINFRA_API_KEY` |
+| `nebius` | `https://api.studio.nebius.com/v1` | `NEBIUS_API_KEY` |
+| `cerebras` | `https://api.cerebras.ai/v1` | `CEREBRAS_API_KEY` |
+| `zai` | `https://api.z.ai/api/paas/v4` | `ZAI_API_KEY` |
+| `moonshot` | `https://api.moonshot.ai/v1` | `MOONSHOT_API_KEY` |
+| `lmstudio` (`local`) | `http://localhost:1234/v1` | — |
+| `vllm` (`local`) | `http://localhost:8000/v1` | — |
+
+## Ủy thác cho một gói đăng ký Claude / Google
+
+Nếu bạn đã xác thực CLI `claude`, Veles có thể điều khiển nó:
 
 ```bash
 veles run --provider claude-cli "..."
-veles run --provider gemini-cli "..."
+```
+
+Với gói đăng ký Google, hãy cài và đăng nhập Antigravity CLI (`agy`) một lần, rồi gọi
+tên nhà cung cấp của nó — module `antigravity-cli` tự cài từ các registry đã kết nối
+của bạn ngay ở lần chạy đó:
+
+```bash
+veles run --provider antigravity-cli --model gemini-3.8-flash-high "..."
+veles models antigravity-cli
 ```
 
 Không cần API key — CLI tự lo việc xác thực.

@@ -9,7 +9,10 @@ les variables d'environnement servent de solution de repli et de surcharge.
 ## Clés d'API des fournisseurs
 
 Cascade de recherche d'une clé d'API : trousseau du système (portée projet) →
-trousseau du système (portée par défaut) → variable d'environnement.
+trousseau du système (portée par défaut) → variable d'environnement. Les variables
+qu'un fournisseur lit viennent du `key_env` de son entrée du catalogue — vos propres
+entrées de `~/.veles/providers.toml` nomment les leurs, et `veles secret set <VARIABLE>`
+stocke une clé là où ce fournisseur la lit.
 
 | Variable | Fournisseur | Remarques |
 |---|---|---|
@@ -18,8 +21,9 @@ trousseau du système (portée par défaut) → variable d'environnement.
 | `OPENAI_API_KEY` | openai | API OpenAI directe |
 | `GEMINI_API_KEY` | gemini | Clé principale pour Google Gemini |
 | `GOOGLE_API_KEY` | gemini | Solution de repli pour Google Gemini |
+| `OPENAI_COMPAT_API_KEY` | openai-compat | Facultative — pour une passerelle qui exige une clé |
 
-`claude-cli` et `gemini-cli` s'authentifient via leurs propres binaires — aucune variable d'environnement.
+`claude-cli` et `antigravity-cli` s'authentifient via leurs propres binaires — aucune variable d'environnement.
 
 ## Fournisseurs locaux
 
@@ -29,7 +33,7 @@ trousseau du système (portée par défaut) → variable d'environnement.
 | `OLLAMA_HOST` | suit `OLLAMA_BASE_URL` | Hôte Ollama pour les embeddings |
 | `LLAMACPP_BASE_URL` | `http://localhost:8080/v1` | Point de terminaison du serveur llama.cpp |
 | `OPENAI_COMPAT_BASE_URL` | — (requis) | Point de terminaison du fournisseur `openai-compat` |
-| `VELES_LOCAL_TOOLS` | désactivé | Active l'appel d'outils sur les fournisseurs locaux (`1`/`true`) |
+| `VELES_LOCAL_TOOLS` | détection | Appel d'outils sur les fournisseurs locaux : `1` le force, `0` le désactive ; non défini, il est détecté d'après le serveur |
 | `VELES_OLLAMA_EMBED_MODEL` | défaut du fournisseur | Surcharge le modèle d'embedding Ollama |
 | `VELES_LOCAL_JSON_MODE` | activé | Envoie `response_format: json_object` sur les appels locaux qui doivent renvoyer un objet JSON (`0` pour désactiver) |
 

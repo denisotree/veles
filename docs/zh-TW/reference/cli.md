@@ -226,11 +226,11 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `refresh [--force]` | 重新解析 `AGENTS.md` 中的自然語言路由提示 |
 
 ### `veles models <provider>`
-列出某供應商的模型。雲端供應商（openrouter／openai／gemini）會快取 24 小時；本機供應商一律即時取得。
+列出某供應商的模型。雲端供應商（openrouter／openai／gemini）會快取 24 小時；本機供應商與 `antigravity-cli` 一律即時取得。未知的供應商會得到一行錯誤，並列出現有的供應商（結束碼 `2`）。
 
 | 旗標 | 預設 | 用途 |
 |---|---|---|
-| `provider`（位置引數） | — | [供應商名稱](#provider-names)之一 |
+| `provider`（位置引數） | — | [目錄](#provider-names)中的某個供應商 id |
 | `--refresh` | 關閉 | 繞過磁碟快取（僅限雲端） |
 | `--json` | 關閉 | 以 JSON 輸出 `{provider, source, models}` |
 
@@ -356,6 +356,8 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 ## 供應商名稱
 
-`openrouter`（預設）· `anthropic` · `openai` · `gemini` · `claude-cli` · `gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` 與 `veles models` 接受供應商目錄中的任何 id——內建的、你的 `~/.veles/providers.toml` 中的，以及已安裝模組所提供的：
 
-本機供應商（`ollama`、`llamacpp`、`openai-compat`）不需 API 金鑰。參見[供應商參考](providers.md)與[設定供應商](../how-to/configure-providers.md)。
+`openrouter`（預設）· `anthropic` · `openai` · `gemini` · `claude-cli` · `ollama` · `llamacpp` · `openai-compat`（內建）
+
+只有登錄庫模組才提供的供應商（`antigravity-cli`）會在你指定它時自行安裝。本機供應商（`ollama`、`llamacpp`、`openai-compat`）不需 API 金鑰。參見[供應商參考](providers.md)與[設定供應商](../how-to/configure-providers.md)。

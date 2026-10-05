@@ -59,12 +59,8 @@ veles models ollama                     # confirm it's listed
 veles run --provider ollama --model qwen3:4b-instruct "Hello"
 ```
 
-local providers पर tool calling **default रूप से off है**। जब आप एक tool-सक्षम model
-चुन लें तो इसे सक्षम करें:
-
-```bash
-export VELES_LOCAL_TOOLS=1
-```
+Tool calling server जो advertise करता है उससे **detect** होती है। इसे जबरन on करने के लिए
+`VELES_LOCAL_TOOLS=1` दें (या off के लिए `=0`)।
 
 यदि आपका server default port पर नहीं है तो endpoints override करें:
 
@@ -74,13 +70,78 @@ export LLAMACPP_BASE_URL=http://localhost:8080/v1
 export OPENAI_COMPAT_BASE_URL=http://my-host:8000/v1   # required for openai-compat
 ```
 
-## एक Claude / Gemini CLI subscription को delegate करें
+## अपना provider जोड़ें
 
-यदि आपके पास `claude` या `gemini` CLI authenticated है, तो Veles उसे चला सकता है:
+कोई भी hosted OpenAI-compatible API, या आपका चलाया हुआ server, `~/.veles/providers.toml` में
+एक entry के साथ provider बन जाता है — कोई code नहीं। id table का नाम है:
+
+```toml
+[providers.groq]
+kind = "openai-api"                          # a hosted API; needs a key
+label = "Groq"                               # shown in the wizards (optional)
+base_url = "https://api.groq.com/openai/v1"
+key_env = ["GROQ_API_KEY"]
+
+[providers.lmstudio]
+kind = "local"                               # a server you run; a key is optional
+base_url = "http://localhost:1234/v1"
+```
+
+फिर इसे किसी भी builtin की तरह उपयोग करें:
+
+```bash
+veles secret set GROQ_API_KEY      # into the keychain, where the groq entry reads it
+veles models groq
+veles run --provider groq --model llama-3.3-70b-versatile "..."
+```
+
+| Key | अर्थ |
+|---|---|
+| `kind` | `openai-api` (एक hosted API) या `local` (आपका चलाया हुआ server) |
+| `base_url` | OpenAI-compatible endpoint, जो `/v1` (या provider के समकक्ष) पर समाप्त होता है |
+| `base_url_env` | एक env var जो set होने पर `base_url` को override करता है |
+| `key_env` | env var के नाम जिनसे key पढ़ी जाती है; keychain पहले आज़माया जाता है |
+| `label`, `tagline` | wizards इसे कैसे दिखाते हैं |
+| `tools` | `auto` (default), `on` या `off` — model को tool calls मिलें या नहीं |
+
+builtin id वाली entry (`[providers.ollama]`) उस provider की settings बदलती है — जैसे उसका
+`base_url` — पर उसका kind नहीं। टूटी हुई file की सूचना एक बार दी जाती है, और Veles
+builtin providers के साथ आगे चलता है; `veles doctor` बताता है कि उसमें क्या गड़बड़ है।
+
+आम APIs के लिए शुरुआती बिंदु — **Veles team द्वारा सत्यापित नहीं**, मौजूदा endpoint के लिए
+provider का documentation देखें:
+
+| id | `base_url` | `key_env` |
+|---|---|---|
+| `groq` | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` |
+| `deepseek` | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEY` |
+| `mistral` | `https://api.mistral.ai/v1` | `MISTRAL_API_KEY` |
+| `together` | `https://api.together.xyz/v1` | `TOGETHER_API_KEY` |
+| `xai` | `https://api.x.ai/v1` | `XAI_API_KEY` |
+| `fireworks` | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` |
+| `deepinfra` | `https://api.deepinfra.com/v1/openai` | `DEEPINFRA_API_KEY` |
+| `nebius` | `https://api.studio.nebius.com/v1` | `NEBIUS_API_KEY` |
+| `cerebras` | `https://api.cerebras.ai/v1` | `CEREBRAS_API_KEY` |
+| `zai` | `https://api.z.ai/api/paas/v4` | `ZAI_API_KEY` |
+| `moonshot` | `https://api.moonshot.ai/v1` | `MOONSHOT_API_KEY` |
+| `lmstudio` (`local`) | `http://localhost:1234/v1` | — |
+| `vllm` (`local`) | `http://localhost:8000/v1` | — |
+
+## एक Claude / Google subscription को delegate करें
+
+यदि आपके पास `claude` CLI authenticated है, तो Veles उसे चला सकता है:
 
 ```bash
 veles run --provider claude-cli "..."
-veles run --provider gemini-cli "..."
+```
+
+Google subscription के लिए, Antigravity CLI (`agy`) को install करें और एक बार log in करें,
+फिर उसके provider का नाम दें — `antigravity-cli` module उसी run पर आपकी connected
+registries से खुद install हो जाता है:
+
+```bash
+veles run --provider antigravity-cli --model gemini-3.8-flash-high "..."
+veles models antigravity-cli
 ```
 
 कोई API key नहीं चाहिए — CLI auth संभालता है।

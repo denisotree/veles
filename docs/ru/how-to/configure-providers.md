@@ -60,12 +60,8 @@ veles models ollama                     # confirm it's listed
 veles run --provider ollama --model qwen3:4b-instruct "Hello"
 ```
 
-Вызов инструментов **по умолчанию выключен** на локальных провайдерах. Включите
-его, когда выберете модель, поддерживающую инструменты:
-
-```bash
-export VELES_LOCAL_TOOLS=1
-```
+Вызов инструментов **определяется** по тому, что сообщает сервер. Принудительно
+включается `VELES_LOCAL_TOOLS=1` (выключается `=0`).
 
 Переопределите эндпоинты, если ваш сервер не на порту по умолчанию:
 
@@ -75,13 +71,78 @@ export LLAMACPP_BASE_URL=http://localhost:8080/v1
 export OPENAI_COMPAT_BASE_URL=http://my-host:8000/v1   # required for openai-compat
 ```
 
-## Делегирование подписке на CLI Claude / Gemini
+## Добавить свой провайдер
 
-Если у вас аутентифицирован CLI `claude` или `gemini`, Veles может им управлять:
+Любой размещённый OpenAI-совместимый API или ваш собственный сервер становится
+провайдером через запись в `~/.veles/providers.toml` — без кода. Id — имя таблицы:
+
+```toml
+[providers.groq]
+kind = "openai-api"                          # размещённый API; нужен ключ
+label = "Groq"                               # как показывать в мастерах (необязательно)
+base_url = "https://api.groq.com/openai/v1"
+key_env = ["GROQ_API_KEY"]
+
+[providers.lmstudio]
+kind = "local"                               # ваш сервер; ключ необязателен
+base_url = "http://localhost:1234/v1"
+```
+
+Дальше он работает как встроенный:
+
+```bash
+veles secret set GROQ_API_KEY      # в keychain, туда, где его читает запись groq
+veles models groq
+veles run --provider groq --model llama-3.3-70b-versatile "..."
+```
+
+| Ключ | Значение |
+|---|---|
+| `kind` | `openai-api` (размещённый API) или `local` (ваш сервер) |
+| `base_url` | OpenAI-совместимый эндпоинт, оканчивающийся на `/v1` (или аналог у провайдера) |
+| `base_url_env` | переменная окружения, которая, если задана, переопределяет `base_url` |
+| `key_env` | имена переменных окружения с ключом; сначала проверяется keychain |
+| `label`, `tagline` | как мастера показывают провайдер |
+| `tools` | `auto` (по умолчанию), `on` или `off` — получает ли модель вызовы инструментов |
+
+Запись со встроенным id (`[providers.ollama]`) меняет настройки этого провайдера —
+например, `base_url`, — но не его тип. О сломанном файле сообщается один раз, и Veles
+продолжает со встроенными провайдерами; `veles doctor` показывает, что в нём не так.
+
+Отправные точки для распространённых API — **не проверены командой Veles**, сверяйте
+актуальный эндпоинт с документацией провайдера:
+
+| id | `base_url` | `key_env` |
+|---|---|---|
+| `groq` | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` |
+| `deepseek` | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEY` |
+| `mistral` | `https://api.mistral.ai/v1` | `MISTRAL_API_KEY` |
+| `together` | `https://api.together.xyz/v1` | `TOGETHER_API_KEY` |
+| `xai` | `https://api.x.ai/v1` | `XAI_API_KEY` |
+| `fireworks` | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` |
+| `deepinfra` | `https://api.deepinfra.com/v1/openai` | `DEEPINFRA_API_KEY` |
+| `nebius` | `https://api.studio.nebius.com/v1` | `NEBIUS_API_KEY` |
+| `cerebras` | `https://api.cerebras.ai/v1` | `CEREBRAS_API_KEY` |
+| `zai` | `https://api.z.ai/api/paas/v4` | `ZAI_API_KEY` |
+| `moonshot` | `https://api.moonshot.ai/v1` | `MOONSHOT_API_KEY` |
+| `lmstudio` (`local`) | `http://localhost:1234/v1` | — |
+| `vllm` (`local`) | `http://localhost:8000/v1` | — |
+
+## Делегирование подписке Claude / Google
+
+Если у вас аутентифицирован CLI `claude`, Veles может им управлять:
 
 ```bash
 veles run --provider claude-cli "..."
-veles run --provider gemini-cli "..."
+```
+
+Для подписки Google один раз установите Antigravity CLI (`agy`) и войдите в него, затем
+назовите провайдер — модуль `antigravity-cli` установится из подключённых реестров при
+этом же запуске:
+
+```bash
+veles run --provider antigravity-cli --model gemini-3.8-flash-high "..."
+veles models antigravity-cli
 ```
 
 API-ключ не нужен — аутентификацию выполняет сам CLI.

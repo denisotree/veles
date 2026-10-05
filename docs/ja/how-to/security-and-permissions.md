@@ -72,16 +72,22 @@ veles secret set OPENROUTER_API_KEY --project myproj   # a key for one project o
 初めて読み込まれます）。同じファイルの別の表記（大文字小文字、`..`、シンボリックリンク）も拒否されます。
 
 明示的なコマンドなしで実行される、またはエージェント CLI を操作するファイル — `.git/`、`.githooks/`、
-`.claude/`、`.gemini/`、`.codex/`、`.vscode/`、`.devcontainer/`、`.husky/` 配下のすべて、および
+`.claude/`、`.gemini/`、`.agents/`、`.codex/`、`.vscode/`、`.devcontainer/`、`.husky/` 配下のすべて、および
 `.envrc`、`.mcp.json`、`.pre-commit-config.yaml`、`lefthook.yml`（いずれも任意の深さ）、さらにリポジトリの
 `core.hooksPath` ディレクトリと、シンボリックリンクの `.git` が指す先 — には、エージェントのファイルツールは
 その書き込みを確認した後にのみ書き込みます。トラストの付与やオートパイロットはこれをカバーしません。
 デーモンはチャンネルで確認を求め、確認する相手がいないバッチ実行は拒否します。
 
-`claude-cli` と `gemini-cli` プロバイダーは、Veles のツールだけを持つモデルとして動作します。
+`claude-cli` と `antigravity-cli` プロバイダーは、Veles のツールだけを持つモデルとして動作します。
 それら自身のシェル、ファイル編集、Web ツール、プロジェクトの `.claude/` の設定とフック、
 他の MCP サーバーは適用されず、呼び出す Veles のツールはすべて上記のトラストラダーを通ります
 （そこにはプロンプトに答える人がいないため、付与済みでないものは拒否されます）。
+それらの MCP 設定は `.veles/tmp/delegate-<pid>/` にあり、実行中のプロセスごとに 1 つです。
+`agy` はそこにある作業用の一時ワークスペースで実行され、Veles のツールを持つときは
+`--dangerously-skip-permissions` が付きます（付けないと agy はヘッドレスで MCP 呼び出しを拒否します）。
+そのワークスペースのフックが agy 自身のツールをすべて拒否し、失敗したフックも拒否になります。
+フックのファイルは `.agents/` 配下にあるため、agy が Veles のツール経由でそれを書き換えるには
+あなたの確認が必要です。
 
 既知の制限:
 
@@ -90,13 +96,13 @@ veles secret set OPENROUTER_API_KEY --project myproj   # a key for one project o
 - MCP の承認が固定するのはサーバーのコマンドラインであり、プロジェクトから実行されるファイル
   （`args` で指定されたスクリプト）ではありません。それらも確認してください。
 - CLI プロバイダーを使う場合、自分自身にだけツールを事前承認する実行（デーモンのバックグラウンドジョブ、
-  `veles research`）は、それを委譲先の CLI に引き継ぎません。その Veles ツールには恒久的な
+  `veles research`）は、それを委譲先の CLI に引き継ぎません。事前承認は Veles のプロセス内にあり、
+  CLI が起動する MCP サーバーは別のプロセスであるため、その Veles ツールには恒久的な
   `veles trust set` の付与かオートパイロットのウィンドウが必要です。親の実行のプランニングモードも
   同様に届きません。
-- `gemini-cli` は実行中プロジェクトフォルダーを信頼するため、gemini はプロジェクトの `.env` も読みます。
-  エージェントに操作させたくない gemini の設定はそこに置かないでください。
-- 管理された（システムの）gemini ポリシーがあるマシンでは、gemini は Veles が渡すポリシーを無視するため、
-  そこでは `gemini-cli` が Veles のツールだけに制限されません。
+- `antigravity-cli` は、agy がそのワークスペースの `.agents/hooks.json` に従うことを前提としています。
+  ワークスペースのフックを読まなくなった agy のリリースがあれば、`--dangerously-skip-permissions` の下で
+  agy 自身のツールが開いたままになります。
 
 制御文字（ターミナルのエスケープ、bidi オーバーライド）を含むパスは拒否され、確認、トラストのプロンプト、
 差分プレビューではそのような文字がエスケープして表示されます。ツール呼び出しが、あなたが承認する

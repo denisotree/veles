@@ -72,23 +72,28 @@ Veles 自己的工具修改。檔案工具也會拒絕專案中任何其他 `.ve
 同一檔案的其他寫法（大小寫、`..`、符號連結）同樣會被拒絕。
 
 無需明確指令就會執行、或會左右 agent CLI 的檔案 — `.git/`、`.githooks/`、`.claude/`、
-`.gemini/`、`.codex/`、`.vscode/`、`.devcontainer/`、`.husky/` 底下的任何內容，以及任意深度的
+`.gemini/`、`.agents/`、`.codex/`、`.vscode/`、`.devcontainer/`、`.husky/` 底下的任何內容，以及任意深度的
 `.envrc`、`.mcp.json`、`.pre-commit-config.yaml`、`lefthook.yml`，加上儲存庫的
 `core.hooksPath` 目錄以及符號連結的 `.git` 所指向的位置 — agent 的檔案工具只有在你確認該次寫入後才會寫入。
 信任授權與 autopilot 都不涵蓋這一點；daemon 會在頻道中詢問，而無人可問的批次執行則會拒絕。
 
-`claude-cli` 與 `gemini-cli` provider 僅以只帶 Veles 工具的模型身分執行：它們自帶的
+`claude-cli` 與 `antigravity-cli` provider 僅以只帶 Veles 工具的模型身分執行：它們自帶的
 shell、檔案編輯與網路工具、專案的 `.claude/` 設定與 hooks，以及其他 MCP 伺服器都不適用，
 而且它們呼叫的每個 Veles 工具都要經過上述 trust ladder（那裡沒人能回答提示，因此任何尚未授予的操作都會被拒絕）。
+它們的 MCP 設定位於 `.veles/tmp/delegate-<pid>/` 中，每個執行中的行程一份。`agy` 在其中的暫存工作區裡執行，
+當它擁有 Veles 的工具時會帶上 `--dangerously-skip-permissions`——否則 agy 在無介面模式下會拒絕 MCP 呼叫——
+而且該工作區中的一個 hook 會拒絕它自帶的每個工具；hook 本身失敗時同樣會拒絕。hook 檔案位於 `.agents/` 底下，
+因此未經你的確認，agy 無法透過 Veles 的工具改寫它。
 
 已知限制：
 
 - `run_shell` 就是一個 shell：一旦你授予它（或處於 autopilot 之下），它就能在沒有逐檔確認的情況下寫入上述任何檔案。
 - MCP 核可固定的是伺服器的命令列，而不是它從專案中執行的檔案（`args` 中指定的腳本）— 也請審查這些檔案。
 - 使用 CLI provider 時，僅為自身預先授權工具的執行（daemon 背景工作、`veles research`）不會把授權傳遞給被委派的 CLI：
-  其 Veles 工具需要常駐的 `veles trust set` 授權或 autopilot 視窗。父執行的規劃模式同樣不會傳遞給它們。
-- `gemini-cli` 會在其執行期間信任專案資料夾，因此 gemini 也會讀取專案的 `.env` — 請把你不希望 agent 左右的 gemini 設定放在它之外。
-- 在帶有受管（系統層級）gemini 政策的機器上，gemini 會忽略 Veles 傳入的政策，因此那裡的 `gemini-cli` 不再僅限於 Veles 的工具。
+  預先授權存在於 Veles 行程中，而該 CLI 啟動的 MCP 伺服器是另一個獨立行程，因此其 Veles 工具需要常駐的
+  `veles trust set` 授權或 autopilot 視窗。父執行的規劃模式同樣不會傳遞給它們。
+- `antigravity-cli` 依賴 agy 遵守其工作區的 `.agents/hooks.json`；如果某個 agy 版本不再讀取工作區 hook，
+  它自帶的工具在 `--dangerously-skip-permissions` 下就會處於開放狀態。
 
 包含控制字元（終端機跳脫序列、雙向覆寫）的路徑會被拒絕，確認、信任提示與 diff 預覽會以跳脫形式顯示這類字元 —
 tool 呼叫無法偽造你所核可的文字。

@@ -6,7 +6,7 @@ Veles 在运行时读取这些变量。API key 和 token 最好存放在操作�
 
 ## 提供方 API key
 
-API key 的查找级联：操作系统钥匙串（项目作用域）→ 操作系统钥匙串（默认作用域）→ 环境变量。
+API key 的查找级联：操作系统钥匙串（项目作用域）→ 操作系统钥匙串（默认作用域）→ 环境变量。提供方读取哪些变量取决于其目录条目的 `key_env`——你在 `~/.veles/providers.toml` 中自己的条目会指定各自的变量，而 `veles secret set <VARIABLE>` 会把 key 存放到该提供方读取它的位置。
 
 | 变量 | 提供方 | 备注 |
 |---|---|---|
@@ -15,8 +15,9 @@ API key 的查找级联：操作系统钥匙串（项目作用域）→ 操作�
 | `OPENAI_API_KEY` | openai | OpenAI 直连 API |
 | `GEMINI_API_KEY` | gemini | Google Gemini 的主 key |
 | `GOOGLE_API_KEY` | gemini | Google Gemini 的回退 key |
+| `OPENAI_COMPAT_API_KEY` | openai-compat | 可选——用于需要 key 的网关 |
 
-`claude-cli` 和 `gemini-cli` 通过各自的二进制程序进行认证——无需环境变量。
+`claude-cli` 和 `antigravity-cli` 通过各自的二进制程序进行认证——无需环境变量。
 
 ## 本地提供方
 
@@ -26,7 +27,7 @@ API key 的查找级联：操作系统钥匙串（项目作用域）→ 操作�
 | `OLLAMA_HOST` | 跟随 `OLLAMA_BASE_URL` | 用于 embeddings 的 Ollama 主机 |
 | `LLAMACPP_BASE_URL` | `http://localhost:8080/v1` | llama.cpp 服务器端点 |
 | `OPENAI_COMPAT_BASE_URL` | —（必填） | `openai-compat` 提供方的端点 |
-| `VELES_LOCAL_TOOLS` | 关闭 | 在本地提供方上启用 tool 调用（`1`/`true`） |
+| `VELES_LOCAL_TOOLS` | 检测 | 本地提供方上的 tool 调用：`1` 强制开启，`0` 关闭；未设置则根据服务器检测 |
 | `VELES_OLLAMA_EMBED_MODEL` | 提供方默认值 | 覆盖 Ollama 的 embedding 模型 |
 | `VELES_LOCAL_JSON_MODE` | 开启 | 对必须返回 JSON 对象的本地调用发送 `response_format: json_object`（`0` 关闭） |
 

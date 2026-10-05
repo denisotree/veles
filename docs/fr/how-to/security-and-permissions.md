@@ -81,8 +81,8 @@ confiance ni ajouter du code que Veles exécuterait (un outil qu'il écrit dans
 graphies du même fichier (casse, `..`, lien symbolique) sont refusées aussi.
 
 Les fichiers qui s'exécutent sans commande explicite ou qui pilotent une CLI d'agent —
-tout ce qui se trouve sous `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`,
-`.vscode/`, `.devcontainer/`, `.husky/`, ainsi que `.envrc`, `.mcp.json`,
+tout ce qui se trouve sous `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.agents/`,
+`.codex/`, `.vscode/`, `.devcontainer/`, `.husky/`, ainsi que `.envrc`, `.mcp.json`,
 `.pre-commit-config.yaml`, `lefthook.yml`, à n'importe quelle profondeur, plus le
 répertoire `core.hooksPath` du dépôt et la cible d'un `.git` qui est un lien
 symbolique — les outils de fichiers de l'agent ne les écrivent qu'après votre
@@ -90,12 +90,18 @@ confirmation de cette écriture. Les autorisations de confiance et l'autopilot n
 couvrent pas ; le daemon demande dans le canal, et une exécution par lots sans
 personne à qui demander refuse.
 
-Les fournisseurs `claude-cli` et `gemini-cli` s'exécutent comme un modèle avec les
+Les fournisseurs `claude-cli` et `antigravity-cli` s'exécutent comme un modèle avec les
 seuls outils de Veles : leurs propres outils shell, d'édition de fichiers et web, les
 réglages et hooks `.claude/` du projet, et les autres serveurs MCP ne s'appliquent
 pas, et chaque outil Veles qu'ils appellent passe par l'échelle de confiance
 ci-dessus (personne ne peut répondre à une invite là-bas, donc tout ce qui n'est pas
-déjà accordé est refusé).
+déjà accordé est refusé). Leur configuration MCP vit dans
+`.veles/tmp/delegate-<pid>/`, une par processus en cours. `agy` s'y exécute dans un
+espace de travail temporaire, avec `--dangerously-skip-permissions` quand il dispose des
+outils de Veles — sinon agy refuse les appels MCP en headless — et un hook de cet
+espace de travail refuse tous ses propres outils ; un hook qui échoue refuse aussi. Le
+fichier du hook se trouve sous `.agents/`, donc agy ne peut pas le réécrire via les
+outils de Veles sans votre confirmation.
 
 Limites connues :
 
@@ -105,15 +111,13 @@ Limites connues :
   exécute depuis le projet (un script nommé dans `args`) — relisez-les aussi.
 - Avec un fournisseur CLI, les exécutions qui pré-autorisent des outils uniquement
   pour elles-mêmes (tâches d'arrière-plan du daemon, `veles research`) ne le
-  transmettent pas à la CLI déléguée : ses outils Veles ont besoin d'une autorisation
-  permanente via `veles trust set` ou d'une fenêtre d'autopilot. Le mode de
-  planification de l'exécution parente ne leur parvient pas non plus.
-- `gemini-cli` fait confiance au dossier du projet pour son exécution, donc gemini lit
-  aussi le `.env` du projet — gardez-y hors les réglages gemini que vous ne voulez pas
-  que l'agent oriente.
-- Sur une machine avec des politiques gemini gérées (système), gemini ignore la
-  politique que Veles lui passe, donc `gemini-cli` n'y est pas limité aux outils de
-  Veles.
+  transmettent pas à la CLI déléguée : la pré-autorisation vit dans le processus Veles, et
+  le serveur MCP que la CLI démarre en est un autre, donc ses outils Veles ont besoin
+  d'une autorisation permanente via `veles trust set` ou d'une fenêtre d'autopilot. Le
+  mode de planification de l'exécution parente ne leur parvient pas non plus.
+- `antigravity-cli` suppose qu'agy respecte le `.agents/hooks.json` de son espace de
+  travail ; une version d'agy qui cesserait de lire les hooks de l'espace de travail
+  laisserait ses propres outils ouverts sous `--dangerously-skip-permissions`.
 
 Les chemins contenant des caractères de contrôle (séquences d'échappement de
 terminal, surcharges bidi) sont refusés, et les confirmations, l'invite de confiance
