@@ -161,19 +161,18 @@ async def test_session_command_with_active_session(session_map: SessionMap) -> N
     assert "ses-active-1" in sends[0][1]["text"]
 
 
-async def test_tokens_and_context_return_placeholders(
+async def test_tokens_and_context_before_a_session_ask_for_a_message(
     session_map: SessionMap,
 ) -> None:
-    """Until the daemon HTTP API exposes per-session usage, /tokens and
-    /context return WIP notices — they're in the menu so the surface
-    area matches TUI, but they don't lie about being unimplemented."""
+    """/tokens and /context report the chat's session (M116b); a chat with no
+    session yet is told to send a message first instead of an error."""
     daemon = _FakeDaemonClient()
     sends: list[tuple[str, dict[str, Any]]] = []
     gateway = _make_gateway(daemon, session_map, sends)
     await gateway._handle_update(_message_update(42, "/tokens"))
     await gateway._handle_update(_message_update(42, "/context"))
-    assert "tokens" in sends[0][1]["text"].lower()
-    assert "context" in sends[1][1]["text"].lower()
+    assert "send a message" in sends[0][1]["text"]
+    assert "send a message" in sends[1][1]["text"]
 
 
 async def test_unknown_command_hints_at_help(session_map: SessionMap) -> None:

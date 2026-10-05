@@ -7,8 +7,9 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
-from veles.channels.telegram._gateway import TelegramGateway
-from veles.core.platforms import ChannelCaps, ChannelContext, CredField, PlatformSpec
+from veles.sdk.channels import ChannelCaps, ChannelContext, CredField, PlatformSpec
+
+from ._gateway import TelegramGateway
 
 logger = logging.getLogger(__name__)
 

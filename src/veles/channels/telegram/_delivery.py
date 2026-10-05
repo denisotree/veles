@@ -19,16 +19,17 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from veles.channels.daemon_client import DaemonClientError
-from veles.channels.telegram._helpers import _PLACEHOLDER_TEXT, copy_button_markup
-from veles.channels.telegram_format import (
+from veles.sdk.channels import RunBackendError
+
+from ._format import (
     escape_html,
     markdown_to_telegram_html,
     split_telegram_html,
 )
+from ._helpers import _PLACEHOLDER_TEXT, copy_button_markup
 
 if TYPE_CHECKING:
-    from veles.channels.telegram._gateway import TelegramGateway
+    from ._gateway import TelegramGateway
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,7 @@ class TelegramDelivery:
                     # break the turn if the send fails.
                     with contextlib.suppress(Exception):
                         await self.send_manager_plan_notice(chat_id, event)
-        except DaemonClientError as exc:
+        except RunBackendError as exc:
             error = str(exc)
         return _TurnOutcome(
             text=completed_text or buffer or None,
@@ -179,8 +180,9 @@ class TelegramDelivery:
         agent's first tool call. Best-effort — a failed edit must not
         break the turn, so a failure just leaves the "..." in place and
         reports no ack (the final answer then overwrites it)."""
-        from veles.channels.telegram._helpers import ack_key_for_tool
-        from veles.core.i18n import t
+        from veles.sdk import t
+
+        from ._helpers import ack_key_for_tool
 
         try:
             edited = await self._gw._edit_message(

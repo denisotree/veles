@@ -51,9 +51,11 @@ from typing import Any
 
 import aiohttp
 
-from veles.channels.daemon_client import DaemonClientError
-from veles.channels.telegram._api import TelegramApi
-from veles.channels.telegram._buffer import (
+from veles.sdk import t
+from veles.sdk.channels import RunBackend, RunBackendError, SessionMap
+
+from ._api import TelegramApi
+from ._buffer import (
     _BUFFER_HARD_CAP,
     _DEBOUNCE_SECONDS,
     _FORWARD_BUFFER_HARD_CAP,
@@ -63,30 +65,27 @@ from veles.channels.telegram._buffer import (
     _is_relayed,
     _Kind,
 )
-from veles.channels.telegram._commands import dispatch, menu_descriptors, parse_command
-from veles.channels.telegram._delivery import TelegramDelivery
-from veles.channels.telegram._forwarded import (
+from ._commands import dispatch, menu_descriptors, parse_command
+from ._delivery import TelegramDelivery
+from ._format import escape_html
+from ._forwarded import (
     _forward_header,
     _has_forward,
     _render_forwarded,
 )
-from veles.channels.telegram._helpers import (
+from ._helpers import (
     _LONG_POLL_TIMEOUT,
     _POLL_RETRY_INITIAL,
     _POLL_RETRY_MAX,
     _TELEGRAM_API,
     _build_combined_prompt,
 )
-from veles.channels.telegram._media import TelegramMedia
-from veles.channels.telegram._prompts import (
+from ._media import TelegramMedia
+from ._prompts import (
     _build_buttons,
     _format_prompt_body,
     _PendingTelegramPrompt,
 )
-from veles.channels.telegram_format import escape_html
-from veles.core.chat_sessions import SessionMap
-from veles.core.i18n import t
-from veles.core.platforms import RunBackend
 
 logger = logging.getLogger(__name__)
 
@@ -484,7 +483,7 @@ class TelegramGateway:
             run = await self.daemon_client.submit_run(
                 text, session_id=session_id, origin=f"telegram:{chat_id}", **extra
             )
-        except (DaemonClientError, ValueError) as exc:
+        except (RunBackendError, ValueError) as exc:
             await self._send_message(chat_id, f"<daemon error: {exc}>")
             return None
         run_id = run.get("run_id")
@@ -557,10 +556,7 @@ class TelegramGateway:
 
         `thread_id` (forum topics) is accepted to satisfy the
         `PlatformDeliverer` signature but unused for direct chats."""
-        from veles.channels.telegram_format import (
-            markdown_to_telegram_html,
-            split_telegram_html,
-        )
+        from ._format import markdown_to_telegram_html, split_telegram_html
 
         del thread_id  # forum topics unsupported for direct delivery (M165)
         chunks = split_telegram_html(markdown_to_telegram_html(text or ""))
@@ -708,7 +704,7 @@ class TelegramGateway:
                 return
             try:
                 await self.daemon_client.submit_prompt_answer(pending.run_id, prompt_id, full_key)
-            except DaemonClientError as exc:
+            except RunBackendError as exc:
                 await self._api.answer_callback_query(callback_id, text=f"daemon error: {exc}")
                 return
             await self._api.answer_callback_query(callback_id, text="✓")
@@ -744,7 +740,7 @@ class TelegramGateway:
         mode = parts[1]
         try:
             await self.daemon_client.update_session(session_id, mode=mode)
-        except (DaemonClientError, AttributeError, ValueError) as exc:
+        except (RunBackendError, AttributeError, ValueError) as exc:
             await self._api.answer_callback_query(callback_id, text=f"could not set mode: {exc}")
             return
         await self._api.answer_callback_query(callback_id, text=f"✓ mode → {mode}")

@@ -20,15 +20,15 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from veles.channels.telegram._attachments import (
+from ._attachments import (
     _MAX_ATTACHMENT_BYTES,
     _reject_reason,
     _safe_filename,
 )
-from veles.channels.telegram_format import escape_html
+from ._format import escape_html
 
 if TYPE_CHECKING:
-    from veles.channels.telegram._gateway import TelegramGateway
+    from ._gateway import TelegramGateway
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class TelegramMedia:
         Adapter call runs in a thread because the typical STT
         implementation is sync HTTP/IO — keeps aiohttp's event loop
         responsive while a Whisper call burns 1-3 seconds."""
-        from veles.modules.stt import STTError, get_stt_adapter
+        from veles.sdk.media import STTError, get_stt_adapter
 
         gw = self._gw
         adapter = get_stt_adapter()
@@ -104,7 +104,7 @@ class TelegramMedia:
         turn already knows what the image shows. With neither — vision
         turned `off` and no attachment dir — the user gets a notice
         instead of a silently dropped message."""
-        from veles.modules.vision import VisionError, get_vision_adapter
+        from veles.sdk.media import VisionError, get_vision_adapter
 
         gw = self._gw
         adapter = get_vision_adapter()

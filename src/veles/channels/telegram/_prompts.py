@@ -19,8 +19,9 @@ import json as _json
 from dataclasses import dataclass
 from typing import Any
 
-from veles.channels.telegram_format import escape_html
-from veles.core.text import shown, shown_multiline
+from veles.sdk import shown, shown_multiline
+
+from ._format import escape_html
 
 
 @dataclass(slots=True)
@@ -116,7 +117,7 @@ def _format_prompt_body(kind: str, event: dict[str, Any]) -> str:
     with emoji and no raw Python `repr()` or dict dumps. Argument
     values run through `core.sanitize` so paths/secrets don't leak
     into the prompt body."""
-    from veles.core.sanitize import sanitize
+    from veles.sdk import sanitize
 
     tool = str(event.get("tool") or "?")
     if kind == "clarification":
@@ -166,7 +167,7 @@ def _render_prompt_args(args: Any) -> str:
 
     Scalar values inline, dicts/lists into a `<pre>` JSON block. Strings
     > 200 chars are trimmed. Empty/no args → `(none)`."""
-    from veles.core.sanitize import sanitize
+    from veles.sdk import sanitize
 
     if not isinstance(args, dict) or not args:
         return "(none)"

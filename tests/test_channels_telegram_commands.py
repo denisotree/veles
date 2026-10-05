@@ -168,24 +168,72 @@ async def test_dispatch_status_open_whitelist(session_map: SessionMap) -> None:
     assert "open" in reply.lower() or "no whitelist" in reply.lower()
 
 
-async def test_dispatch_tokens_is_placeholder(session_map: SessionMap) -> None:
-    gateway = _make_gateway(session_map)
+class _UsageClient:
+    """Backend stub with the M116b usage and the fields /settings reads."""
+
+    async def get_session_usage(self, session_id: str) -> dict:
+        return {
+            "session_id": session_id,
+            "tokens_in": 1200,
+            "tokens_out": 300,
+            "cache_read": 50,
+            "last_prompt_tokens": 25_000,
+            "context_window": 100_000,
+            "model": "z-ai/glm-5.3-flash",
+            "since_daemon_start": True,
+        }
+
+    async def get_session(self, session_id: str) -> dict:
+        return {"session_id": session_id, "mode": "default", "goal": None}
+
+    async def health(self) -> dict:
+        return {"model": "z-ai/glm-5.3-flash"}
+
+
+def _usage_gateway(session_map: SessionMap) -> TelegramGateway:
+    session_map.set("42", "ses-1")
+    return TelegramGateway(bot_token="X", daemon_client=_UsageClient(), session_map=session_map)  # type: ignore[arg-type]
+
+
+async def test_tokens_reports_the_sessions_usage(session_map: SessionMap) -> None:
+    reply = await dispatch(_usage_gateway(session_map), "42", "tokens", "")
+    assert reply is not None and "1200" in reply and "300" in reply and "50" in reply
+
+
+async def test_context_reports_occupancy_against_the_window(session_map: SessionMap) -> None:
+    reply = await dispatch(_usage_gateway(session_map), "42", "context", "")
+    assert reply is not None and "25000" in reply and "100000" in reply and "25%" in reply
+
+
+async def test_tokens_before_any_session_says_so(session_map: SessionMap) -> None:
+    gateway = TelegramGateway(bot_token="X", daemon_client=_UsageClient(), session_map=session_map)  # type: ignore[arg-type]
     reply = await dispatch(gateway, "42", "tokens", "")
-    assert reply is not None
-    # Must clearly communicate WIP / deferred status.
-    assert (
-        "not exposed" in reply.lower()
-        or "wip" in reply.lower()
-        or "deferred" in reply.lower()
-        or "/tokens" in reply
-    )
+    assert reply is not None and "send a message" in reply
 
 
-async def test_dispatch_context_is_placeholder(session_map: SessionMap) -> None:
-    gateway = _make_gateway(session_map)
-    reply = await dispatch(gateway, "42", "context", "")
-    assert reply is not None
-    assert "/context" in reply or "not exposed" in reply.lower()
+async def test_settings_shows_model_usage_and_mode_buttons(session_map: SessionMap) -> None:
+    """M116c: one message — model (fixed by config), session, usage, mode buttons."""
+    gateway = _usage_gateway(session_map)
+    sent: list[dict] = []
+
+    async def fake_send(method, payload):
+        sent.append({"method": method, **payload})
+        return {"message_id": 1, "chat": payload.get("chat_id")}
+
+    gateway._telegram_send = fake_send  # type: ignore[method-assign]
+    reply = await dispatch(gateway, "42", "settings", "")
+    assert reply == ""
+    message = next(s for s in sent if s["method"] == "sendMessage")
+    body = message["text"]
+    assert "z-ai/glm-5.3-flash" in body and "ses-1" in body and "1200" in body
+    buttons = [b for row in message["reply_markup"]["inline_keyboard"] for b in row]
+    assert buttons and all(b["callback_data"].startswith("mo:") for b in buttons)
+    assert any(b["text"].startswith("✓") for b in buttons)  # the current mode is marked
+
+
+async def test_settings_is_in_the_menu() -> None:
+    assert "settings" in {d["command"] for d in menu_descriptors()}
+    assert not any("WIP" in d["description"] for d in menu_descriptors())
 
 
 class _RecordingClient:

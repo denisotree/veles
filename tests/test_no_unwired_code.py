@@ -67,6 +67,11 @@ _REGISTERING_DECORATORS = ("tool", "property", "hook", "setter", "command")
 # by design, with its reason.
 _BASELINE = frozenset(
     {
+        # The public test kit for channel modules (`veles.sdk.channel_checks`):
+        # a registry channel's own tests call it on its platform spec.
+        "check_builds_from_config",
+        "check_config_keys",
+        "check_delivers",
         # An observation hook that lets tests read state from outside instead
         # of reaching into `_active_state` (reviewed 2026-09-22).
         "current_state",

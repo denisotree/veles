@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from veles.channels.telegram_format import escape_html
+from ._format import escape_html
 
 _MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
 _TEXTUAL_MIME_PREFIXES = ("text/",)

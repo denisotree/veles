@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from veles.channels.telegram._forwarded import _has_forward
+from ._forwarded import _has_forward
 
 # Debounce window. 1.5s covered only near-simultaneous updates (a forward
 # burst); a human who types a comment, switches chats and forwards a post

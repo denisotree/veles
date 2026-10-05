@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from veles.channels.telegram_format import (
+from veles.channels.telegram._format import (
     escape_html,
     markdown_to_telegram_html,
     split_telegram_html,

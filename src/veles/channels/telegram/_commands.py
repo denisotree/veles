@@ -30,7 +30,7 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from veles.channels.telegram import TelegramGateway
+    from ._gateway import TelegramGateway
 
 # Handler signature: `(gateway, chat_key, args) -> reply_text`.
 # Args is the substring after the command (e.g. for `/model gpt-4o`
@@ -52,14 +52,15 @@ async def _cmd_help(gateway: TelegramGateway, chat_key: str, args: str) -> str:
         "/rules [kind] — recent behavioral rules (preferences, dont)\n"
         "/goal &lt;task&gt; — run a goal in this chat (/goal · /goal cancel · /goal resume)\n"
         "/dream — trigger memory consolidation pass\n"
-        "/tokens — per-session token totals (work in progress)\n"
-        "/context — context window vs limit (work in progress)\n\n"
+        "/settings — model, session, usage and the mode buttons\n"
+        "/tokens — this session's token totals\n"
+        "/context — context window in use vs its limit\n\n"
         "Just send a message to chat with the agent."
     )
 
 
 async def _cmd_start(gateway: TelegramGateway, chat_key: str, args: str) -> str:
-    from veles.core.i18n import t
+    from veles.sdk import t
 
     del gateway, chat_key, args
     return t("telegram.start_greeting")
@@ -67,7 +68,7 @@ async def _cmd_start(gateway: TelegramGateway, chat_key: str, args: str) -> str:
 
 async def _cmd_reset(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     """Forget the chat's session so the next message starts fresh."""
-    from veles.core.i18n import t
+    from veles.sdk import t
 
     del args
     removed = gateway.session_map.reset(chat_key)
@@ -97,24 +98,75 @@ async def _cmd_status(gateway: TelegramGateway, chat_key: str, args: str) -> str
     )
 
 
-async def _cmd_tokens_placeholder(gateway: TelegramGateway, chat_key: str, args: str) -> str:
-    del gateway, chat_key, args
+async def _usage_lines(gateway: TelegramGateway, chat_key: str) -> tuple[str, str] | None:
+    """(tokens line, context line) for the chat's session (M116b), or None
+    before the chat has a session."""
+    from veles.sdk import t
+
+    sid = gateway.session_map.get(chat_key)
+    if not sid:
+        return None
+    u = await gateway.daemon_client.get_session_usage(sid)
+    window = int(u.get("context_window") or 0)
+    used = int(u.get("last_prompt_tokens") or 0)
+    pct = round(used / window * 100) if window else 0
     return (
-        "<b>tokens</b>\n"
-        "Per-session token totals are not exposed via the daemon's HTTP "
-        "API yet. Tracked in the TUI via <code>/tokens</code> — see "
-        "MILESTONES.md M116 follow-up for the planned bot mirror."
+        t(
+            "telegram.tokens_line",
+            tokens_in=u.get("tokens_in", 0),
+            tokens_out=u.get("tokens_out", 0),
+            cache=u.get("cache_read", 0),
+        ),
+        t("telegram.context_line", used=used, window=window, pct=pct),
     )
 
 
-async def _cmd_context_placeholder(gateway: TelegramGateway, chat_key: str, args: str) -> str:
-    del gateway, chat_key, args
-    return (
-        "<b>context</b>\n"
-        "Per-session context window usage isn't exposed via the daemon's "
-        "HTTP API yet. Tracked in the TUI via <code>/context</code> — "
-        "see MILESTONES.md M116 follow-up for the planned bot mirror."
-    )
+async def _cmd_tokens(gateway: TelegramGateway, chat_key: str, args: str) -> str:
+    from veles.sdk import t
+
+    del args
+    lines = await _usage_lines(gateway, chat_key)
+    return lines[0] if lines else t("telegram.no_session_yet")
+
+
+async def _cmd_context(gateway: TelegramGateway, chat_key: str, args: str) -> str:
+    from veles.sdk import t
+
+    del args
+    lines = await _usage_lines(gateway, chat_key)
+    return lines[1] if lines else t("telegram.no_session_yet")
+
+
+async def _cmd_settings(gateway: TelegramGateway, chat_key: str, args: str) -> str:
+    """M116c: the model (fixed by the daemon's config), the session, its usage
+    and the mode buttons, in one message. Tapping a mode is `/mode <mode>`."""
+    from veles.sdk import t
+
+    del args
+    sid = gateway.session_map.get(chat_key)
+    if not sid:
+        return t("telegram.no_session_yet")
+    client = gateway.daemon_client
+    info = await client.health()
+    try:
+        current = (await client.get_session(sid)).get("mode")
+    except Exception:
+        current = None  # the buttons still work; only the mark is missing
+    lines = [
+        t("telegram.settings_title"),
+        t("telegram.settings_model", model=info.get("model") or "?"),
+        t("telegram.settings_session", session=sid),
+        *(await _usage_lines(gateway, chat_key) or ()),
+    ]
+    try:
+        await gateway._send_message(
+            chat_key_to_int(chat_key),
+            "\n".join(lines),
+            reply_markup={"inline_keyboard": _mode_buttons(current)},
+        )
+    except Exception as exc:
+        return f"could not send settings: {exc}"
+    return ""
 
 
 # ---- agent modes via slash ----
@@ -197,6 +249,19 @@ _MODE_CHOICES = (
 )
 
 
+def _mode_buttons(current: str | None) -> list[list[dict[str, str]]]:
+    """One inline button per mode, the current one marked; a tap is `mo:<mode>`."""
+    return [
+        [
+            {
+                "text": f"{'✓ ' if name == current else ''}{name} — {desc}",
+                "callback_data": f"mo:{name}",
+            }
+        ]
+        for name, desc in _MODE_CHOICES
+    ]
+
+
 async def _cmd_mode(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     """List agent modes as inline buttons, the chat's current one marked.
     Tapping PATCHes the session's mode, and since M280 the next turn runs in
@@ -212,15 +277,7 @@ async def _cmd_mode(gateway: TelegramGateway, chat_key: str, args: str) -> str:
         current = (await client.get_session(session_id)).get("mode")
     except Exception:
         current = None  # the picker still works; only the mark is missing
-    buttons = [
-        [
-            {
-                "text": f"{'✓ ' if name == current else ''}{name} — {desc}",
-                "callback_data": f"mo:{name}",
-            }
-        ]
-        for name, desc in _MODE_CHOICES
-    ]
+    buttons = _mode_buttons(current)
     body = (
         "<b>Pick a mode</b> for this chat.\n"
         "It applies from your next message, until the daemon restarts."
@@ -242,7 +299,7 @@ def _resolve_project(gateway: TelegramGateway):
     if gateway.project_root is None:
         return None
     try:
-        from veles.core.project import load_project
+        from veles.sdk import load_project
 
         return load_project(gateway.project_root)
     except Exception:
@@ -255,7 +312,7 @@ async def _memory_rows(
     """Parse `[<filter>|all] [<N>]`, then `fetch(conn, filter, limit)` against the
     project's memory store. Returns `(filter, rows)`, or the reply text when
     there is no project or the store won't open."""
-    from veles.core.memory.store import open_store
+    from veles.sdk.memory import open_store
 
     parts = args.strip().split()
     shown_filter = parts[0].lower() if parts else None
@@ -286,7 +343,7 @@ async def _cmd_insights(gateway: TelegramGateway, chat_key: str, args: str) -> s
     """List recent rows from the `insights` table — mirrors the REPL
     `/insights`. Optional category filter as the first arg."""
     del chat_key
-    from veles.core.memory.inspectors import recent_insights
+    from veles.sdk.memory import recent_insights
 
     found = await _memory_rows(
         gateway, "insights", args, lambda c, f, n: recent_insights(c, category=f, limit=n)
@@ -311,7 +368,7 @@ async def _cmd_rules(gateway: TelegramGateway, chat_key: str, args: str) -> str:
     """List recent rows from the `rules` table — mirrors the REPL `/rules`.
     Optional kind filter as the first arg."""
     del chat_key
-    from veles.core.memory.inspectors import recent_rules
+    from veles.sdk.memory import recent_rules
 
     found = await _memory_rows(
         gateway, "rules", args, lambda c, f, n: recent_rules(c, kind=f, limit=n)
@@ -356,8 +413,9 @@ _HANDLERS: dict[str, CommandHandler] = {
     "reset": _cmd_reset,
     "session": _cmd_session,
     "status": _cmd_status,
-    "tokens": _cmd_tokens_placeholder,
-    "context": _cmd_context_placeholder,
+    "tokens": _cmd_tokens,
+    "context": _cmd_context,
+    "settings": _cmd_settings,
     "goal": _cmd_goal,
     "dream": _cmd_dream,
     "mode": _cmd_mode,
@@ -422,8 +480,9 @@ def menu_descriptors() -> list[dict[str, str]]:
         {"command": "rules", "description": "Recent behavioral rules (preferences, dont)"},
         {"command": "goal", "description": "Run a goal in this chat"},
         {"command": "dream", "description": "Run a memory consolidation pass now"},
-        {"command": "tokens", "description": "Token totals (WIP)"},
-        {"command": "context", "description": "Context window usage (WIP)"},
+        {"command": "settings", "description": "Model, session, usage and mode"},
+        {"command": "tokens", "description": "This session's token totals"},
+        {"command": "context", "description": "Context window in use"},
         {"command": "reset", "description": "Clear conversation history"},
     ]
 

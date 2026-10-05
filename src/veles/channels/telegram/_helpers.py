@@ -8,7 +8,7 @@ from __future__ import annotations
 import re as _re
 from pathlib import Path
 
-from veles.core.text import cut_with_note
+from veles.sdk import cut_with_note
 
 _TELEGRAM_API = "https://api.telegram.org"
 _LONG_POLL_TIMEOUT = 30

@@ -16,8 +16,8 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any
 
-from veles.channels.telegram._attachments import _MAX_ATTACHMENT_BYTES
-from veles.channels.telegram._helpers import (
+from ._attachments import _MAX_ATTACHMENT_BYTES
+from ._helpers import (
     _TELEGRAM_API,
     _html_to_plain,
     _is_parse_error,
@@ -25,7 +25,7 @@ from veles.channels.telegram._helpers import (
 )
 
 if TYPE_CHECKING:
-    from veles.channels.telegram._gateway import TelegramGateway
+    from ._gateway import TelegramGateway
 
 logger = logging.getLogger(__name__)
 
