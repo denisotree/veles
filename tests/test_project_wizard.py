@@ -272,7 +272,11 @@ def test_run_project_wizard_tui_respects_autostart_flag(
             pass
 
         def run(self):
-            return {"project": proj, "daemon": {"host": "127.0.0.1", "port": 8765}}
+            return {
+                "project": proj,
+                "daemon": {"host": "127.0.0.1", "port": 8765},
+                "channel": {"channel": "fake", "config_fields": {}, "status": "saved"},
+            }
 
     monkeypatch.setattr(pr, "WizardApp", _FakeApp)
     calls: list[tuple] = []
@@ -287,6 +291,30 @@ def test_run_project_wizard_tui_respects_autostart_flag(
     out2 = pr.run_project_wizard_tui(tmp_path, autostart_daemon=True)
     assert out2 is proj
     assert len(calls) == 1
+
+
+def test_wizard_does_not_autostart_a_daemon_without_a_channel(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """A daemon needs a channel: the wizard doesn't spawn one that would refuse."""
+    from veles.core.project import Project
+    from veles.tui.wizard import project_runner as pr
+
+    proj = Project(root=tmp_path, name="x", created_at=0.0, schema_version=2, layout_name="bare")
+
+    class _FakeApp:
+        def __init__(self, *a, **k) -> None:
+            pass
+
+        def run(self):
+            return {"project": proj, "daemon": {"host": "127.0.0.1", "port": 8765}}
+
+    monkeypatch.setattr(pr, "WizardApp", _FakeApp)
+    calls: list[tuple] = []
+    monkeypatch.setattr(pr, "_autostart_daemon", lambda p, d: calls.append((p, d)))
+    assert pr.run_project_wizard_tui(tmp_path, autostart_daemon=True) is proj
+    assert calls == []
+    assert "veles channel add" in capsys.readouterr().err
 
 
 def test_maybe_wrapper_threads_suppress_flag_into_tui(

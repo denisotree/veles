@@ -39,10 +39,11 @@ def _bootstrap_daemon(project, *, name: str | None = None) -> None:
     its own log file (`instance_log_path`)."""
     from veles.cli._project import _load_project_modules
     from veles.core.context import set_active_project
-    from veles.core.modules import set_module_registry
+    from veles.core.modules import current_module_registry, set_module_registry
 
     set_active_project(project)
-    set_module_registry(_load_project_modules(project))
+    # `daemon start` loaded them already (to check its channels); reuse that registry.
+    set_module_registry(current_module_registry() or _load_project_modules(project))
     from veles.core.registry.ensure import ensure_project_extensions
 
     # No terminal to ask at: a missing layout/engine is one warning in the log.

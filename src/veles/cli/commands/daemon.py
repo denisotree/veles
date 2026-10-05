@@ -154,8 +154,6 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
         )
         return 2
 
-    _warn_on_security_config_typos(project)
-
     # Named daemon session (M135): must already be declared (config block or
     # runtime_sessions row). Its `[daemon.<name>]` block is the declarative
     # source-of-truth for host/port — resolve them here so the whole
@@ -206,14 +204,31 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     # continuous curator on `args.provider`; a bare None silently disables it.
     args.provider = provider_name
 
-    # M173/M208: in an already-initialised project with no channel configured,
-    # run the Textual start wizard (bind + channel) before we detach. The
-    # fresh-project path already offers a channel inside the project wizard;
-    # this closes the gap for `daemon start` on an existing project. Parent
-    # only — the detached child re-enters with `--foreground` and must not
-    # re-prompt.
+    # Release C: a daemon hosts channels, and a channel's platform comes from a
+    # module. Load the modules, install the platform of every channel the config
+    # declares (the config is the user's decision), then refuse to start with no
+    # channel ready. The parent checks before it detaches; the `--foreground`
+    # child checks again — it is the authority for paths without a terminal
+    # (picker, wizard autostart, systemd).
+    from veles.core.channel_setup import channel_readiness, no_channel_message
+    from veles.core.module_loading import load_project_modules
+    from veles.core.modules import current_module_registry, set_module_registry
+    from veles.core.registry.ensure import ensure_channel_platforms
+
+    set_module_registry(load_project_modules(project, into=current_module_registry()))
+    ensure_channel_platforms(project, name)
+    # After the modules: a channel block's keys are known only from its platform.
+    _warn_on_security_config_typos(project)
+
+    # M173/M208: in an already-initialised project with no channel ready, run
+    # the Textual start wizard (bind + channel) before we detach. Parent only —
+    # the detached child re-enters with `--foreground` and must not re-prompt.
     if not getattr(args, "foreground", False):
         _maybe_run_start_wizard(args, project, session=name)
+    statuses = channel_readiness(project, name)
+    if not any(s.state == "ok" for s in statuses):
+        print(no_channel_message(statuses, name), file=sys.stderr)
+        return 1
 
     # M113: detach by default. The child re-enters this function with
     # `--foreground` set and falls through to the real server loop.
@@ -438,21 +453,17 @@ def _maybe_run_start_wizard(args: argparse.Namespace, project, *, session: str |
     (live 2026-07-09). Host/port picked in the wizard apply to THIS launch.
 
     Skips silently when non-interactive, opted out (`--no-wizard` /
-    `VELES_NO_WIZARD=1`), or a channel already exists. Falls back to the
-    legacy stdin offer (M173, shared `add_channel` flow) when Textual is
-    unavailable or the TUI fails."""
+    `VELES_NO_WIZARD=1`), or a channel is ready. Falls back to the legacy stdin
+    offer (M173, shared `add_channel` flow) when Textual is unavailable or the
+    TUI fails."""
     if getattr(args, "no_wizard", False) or os.environ.get("VELES_NO_WIZARD") == "1":
         return
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         return
-    from veles.core.project_config import get_section, load_project_config
+    from veles.core.channel_setup import channel_readiness
 
-    cfg = load_project_config(project)
-    channels = (
-        get_section(cfg, "daemon", session, "channels") if session else get_section(cfg, "channels")
-    )
-    if any(isinstance(v, dict) for v in channels.values()):
-        return  # a channel is already configured for this daemon
+    if any(s.state == "ok" for s in channel_readiness(project, session)):
+        return  # a daemon needs one ready channel, and this one has it
 
     host = str(getattr(args, "host", None) or DEFAULT_DAEMON_HOST)
     try:
@@ -486,7 +497,7 @@ def _offer_channel_stdin(project, *, session: str | None) -> None:
 
     if not _ask_yes_no(
         _default_prompter,
-        "No channel is connected to this daemon. Connect one now (e.g. Telegram)?",
+        "No channel is ready for this daemon — a daemon needs one. Connect one now?",
         default=False,
     ):
         return

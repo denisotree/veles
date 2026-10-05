@@ -45,8 +45,18 @@ def run_project_wizard_tui(
     answers = app.run() or {}
     project = answers.get("project")
     daemon = answers.get("daemon")
+    channel = answers.get("channel")
+    has_channel = isinstance(channel, dict) and channel.get("status") == "saved"
     if autostart_daemon and project is not None and isinstance(daemon, dict):
-        _autostart_daemon(project, daemon)
+        if has_channel:
+            _autostart_daemon(project, daemon)
+        else:
+            # A daemon hosts channels; without one it would refuse to start.
+            print(
+                "daemon not started: it needs a channel — connect one with "
+                "`veles channel add`, then `veles daemon start`.",
+                file=sys.stderr,
+            )
     return project
 
 

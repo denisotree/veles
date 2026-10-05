@@ -592,7 +592,7 @@ def test_daemon_picker_non_tty_falls_back_to_list(
 
 
 def test_daemon_start_honours_config_port(
-    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake_channel
 ) -> None:
     """The unnamed daemon must honour `[daemon] host/port` from config (what
     the project wizard writes) instead of always binding the argparse default.
@@ -639,7 +639,7 @@ def test_daemon_start_honours_config_port(
 
 
 def test_daemon_start_explicit_port_beats_config(
-    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake_channel
 ) -> None:
     """An explicit `--port` outranks the config block."""
     import argparse

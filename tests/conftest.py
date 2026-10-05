@@ -385,3 +385,16 @@ def fake_platform() -> Iterator[None]:
 
     with contributing({"fake": FAKE_SPEC}):
         yield
+
+
+@pytest.fixture
+def fake_channel(fake_platform, monkeypatch: pytest.MonkeyPatch) -> None:
+    """For daemon lifecycle tests: the daemon sees one ready channel (`fake`),
+    whatever project the test builds — a daemon without one does not start."""
+    from veles.core import channel_setup
+
+    monkeypatch.setattr(
+        channel_setup,
+        "channel_readiness",
+        lambda project, session=None: [channel_setup.ChannelStatus("fake", "ok")],
+    )
