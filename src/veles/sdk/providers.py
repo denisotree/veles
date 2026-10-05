@@ -5,14 +5,16 @@ A module contributes a provider with
 gets a `ProviderContext` and returns an object with `create_message` (and
 `stream_message`/`list_models` when it can). A CLI delegate subclasses
 `CLIProvider` and, for Veles' tools over MCP, writes a config around
-`veles_mcp_server(project)` inside `delegate_dir(project)`.
+`veles_mcp_server(project)` inside `delegate_dir(project)`. A CLI that reads its
+config from its working directory runs in `delegate_workspace(project, name)`,
+outside the project, so the project's own config files never reach it.
 """
 
 from __future__ import annotations
 
 from veles.adapters.cli import CLIProvider, StreamState, format_messages_as_prompt, iter_jsonl
 from veles.adapters.cli.mcp_config import veles_mcp_server
-from veles.core.delegate_dir import delegate_dir
+from veles.core.delegate_dir import delegate_dir, delegate_workspace
 from veles.core.provider import (
     Message,
     ProviderResponse,
@@ -37,6 +39,7 @@ __all__ = [
     "TokenUsage",
     "ToolCall",
     "delegate_dir",
+    "delegate_workspace",
     "format_messages_as_prompt",
     "iter_jsonl",
     "veles_mcp_server",

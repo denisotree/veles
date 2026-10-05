@@ -53,6 +53,41 @@ def test_a_dead_processes_dir_is_swept(tmp_path: Path) -> None:
     assert not stale.exists() and alive.exists()
 
 
+def test_a_delegate_workspace_sits_outside_every_project(
+    tmp_path: Path, isolated_user_home: Path
+) -> None:
+    """A CLI that reads config from its working directory and the folders above it
+    (agy: every `.agents/` up to the repo root) must not pick up the project's own."""
+    from veles.core.delegate_dir import delegate_workspace
+    from veles.core.user_paths import user_home
+
+    one = init_project(tmp_path / "one", name="one")
+    two = init_project(tmp_path / "two", name="two")
+    ws = delegate_workspace(one, "agy")
+    assert ws.is_dir() and ws.is_relative_to(user_home())
+    assert not ws.is_relative_to(one.root) and ws.name.endswith(f"-{os.getpid()}")
+    assert delegate_workspace(one, "agy") == ws
+    assert delegate_workspace(two, "agy") != ws  # keyed by project: one MCP config each
+
+
+def test_a_dead_processes_workspace_is_swept(tmp_path: Path, isolated_user_home: Path) -> None:
+    from veles.core import delegate_dir as mod
+
+    project = init_project(tmp_path / "p", name="p")
+    dead = subprocess.run(
+        [sys.executable, "-c", "import os; print(os.getpid())"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    parent = mod.delegate_workspace(project, "agy").parent
+    stale = parent / f"abc123-{dead}"
+    stale.mkdir()
+    mod._registered.clear()
+    mod.delegate_workspace(project, "agy")
+    assert not stale.exists()
+
+
 def test_mcp_config_lives_in_the_delegate_dir(tmp_path: Path) -> None:
     from veles.adapters.cli.mcp_config import build_mcp_config
     from veles.core.delegate_dir import delegate_budget_file, delegate_dir
