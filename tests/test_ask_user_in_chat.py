@@ -51,6 +51,10 @@ def _chat(tmp_path, options):
         token_store=TokenStore.load(tmp_path / "t.json"),
         agent_factory=factory,
     )
+    # The gateway is built by hand here; a started channel records its caps.
+    from veles.channels.telegram import TELEGRAM_SPEC
+
+    state.channel_caps["telegram"] = TELEGRAM_SPEC.caps
     log: list[dict] = []
 
     async def fake_send(method, payload):
@@ -155,8 +159,39 @@ def test_an_unanswered_question_times_out_to_no_answer() -> None:
     assert asyncio.run(scenario()) is None
 
 
-@pytest.mark.parametrize("origin, asks", [("telegram:42", True), (None, False), ("local", False)])
-def test_only_a_chat_origin_gets_questions(origin, asks) -> None:
+@pytest.mark.parametrize("origin, asks", [("fake:42", True), (None, False), ("local", False)])
+def test_only_a_running_chat_origin_gets_questions(tmp_path, origin, asks) -> None:
+    from veles.core.platforms import ChannelCaps
     from veles.daemon.turns import asks_questions
 
-    assert asks_questions(origin) is asks
+    state = build_state(
+        project=init_project(tmp_path / "p", name="p"),
+        store=None,  # type: ignore[arg-type]
+        token_store=TokenStore.load(),
+        agent_factory=lambda *a, **k: None,  # type: ignore[arg-type,return-value]
+    )
+    state.channel_caps["fake"] = ChannelCaps(asks_questions=True)
+    assert asks_questions(state, origin) is asks
+    assert asks_questions(state, "notrunning:1") is False
+
+
+def test_asks_questions_reads_state_from_a_thread(tmp_path) -> None:
+    """Workers run in `to_thread`/job threads; the answer comes from the daemon's
+    state, not from the module registry ContextVar."""
+    import threading
+
+    from veles.core.platforms import ChannelCaps
+    from veles.daemon.turns import asks_questions
+
+    state = build_state(
+        project=init_project(tmp_path / "p", name="p"),
+        store=None,  # type: ignore[arg-type]
+        token_store=TokenStore.load(),
+        agent_factory=lambda *a, **k: None,  # type: ignore[arg-type,return-value]
+    )
+    state.channel_caps["fake"] = ChannelCaps(asks_questions=True)
+    seen: list[bool] = []
+    worker = threading.Thread(target=lambda: seen.append(asks_questions(state, "fake:1")))
+    worker.start()
+    worker.join()
+    assert seen == [True]

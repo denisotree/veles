@@ -43,6 +43,15 @@ theme_header = "тема · {count} — печатай для фильтра · 
 no_themes = "темы не найдены"
 theme_cancelled = "выбор темы отменён"
 
+[prompt_options]
+once = "⏱ Один раз"
+always_project = "🔓 Всегда для этого проекта"
+refuse = "🚫 Отказать"
+yes = "✅ Разрешить"
+no = "❌ Запретить"
+critical_yes = "⚠️ Разрешить"
+critical_no = "🚫 Отменить"
+
 [telegram]
 start_greeting = "Привет! Я Veles. Просто пиши сообщение — я отвечу. Подсказка: /help — список команд."
 history_cleared = "История очищена."

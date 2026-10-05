@@ -558,6 +558,7 @@ async def _stop_background_runners(app: web.Application) -> None:
     state.channel_runners.clear()
     state.channel_tasks.clear()
     state.active_channels.clear()
+    state.channel_caps.clear()
 
 
 async def _drain_in_flight_runs(app: web.Application) -> None:

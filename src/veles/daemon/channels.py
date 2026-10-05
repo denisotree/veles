@@ -90,6 +90,7 @@ def start_channel_runners(state: DaemonState) -> None:
     or token is needed. Channels with missing creds (or an unregistered
     platform) are skipped with a warning rather than failing daemon startup.
     """
+    from veles.core.platforms import get_platform
     from veles.core.project_config import list_channel_configs, load_project_config
     from veles.daemon.in_process_backend import InProcessRunBackend
 
@@ -104,13 +105,11 @@ def start_channel_runners(state: DaemonState) -> None:
             continue
         state.channel_runners.append(gateway)
         state.active_channels.append(platform)
-        # Expose this channel as an outbound delivery target for the scheduler:
-        # a gateway implementing `deliver(chat_id, text, thread_id)` becomes
-        # reachable via `deliver_to = "<platform>:<chat>"`.
+        state.channel_caps[platform] = get_platform(platform).caps
+        # Every gateway delivers (`ChannelGateway.deliver`): the channel becomes
+        # reachable as `deliver_to = "<platform>:<chat>"`.
         if state.delivery_router is not None:
-            deliver_fn = getattr(gateway, "deliver", None)
-            if callable(deliver_fn):
-                state.delivery_router.register_deliverer(platform, deliver_fn)
+            state.delivery_router.register_deliverer(platform, gateway.deliver)
         task = asyncio.create_task(_run_channel_gateway(gateway))
         state.channel_tasks.append(task)
 

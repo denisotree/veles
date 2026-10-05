@@ -137,22 +137,21 @@ async def start_turn(
             subagent_factory=getattr(state, "subagent_factory", None),
             turn_lock=(state.session_lock(effective_session_id) if effective_session_id else None),
             deliver_hook=deliver_hook,
-            ask_channel=asks_questions(origin),
+            ask_channel=asks_questions(state, origin),
         ),
     )
     return handle
 
 
-# Channels whose gateway renders a `clarification_prompt` and takes the reply.
-_QUESTION_CHANNELS = frozenset({"telegram"})
-
-
-def asks_questions(origin: str | None) -> bool:
+def asks_questions(state: DaemonState, origin: str | None) -> bool:
     """M284: may the agent's `ask_user` wait for an answer from this turn's
-    origin? Only a chat that renders the question can; an HTTP caller or a
-    scheduled job gets "no human available" at once, as before, instead of a
-    run stalled for the prompt timeout."""
-    return bool(origin) and origin.split(":", 1)[0] in _QUESTION_CHANNELS  # type: ignore[union-attr]
+    origin? Only a running channel whose platform renders questions can; an HTTP
+    caller or a scheduled job gets "no human available" at once instead of a run
+    stalled for the prompt timeout."""
+    if not origin:
+        return False
+    caps = state.channel_caps.get(origin.split(":", 1)[0])
+    return bool(caps and caps.asks_questions)
 
 
 def _session_for_mode_turn(state: DaemonState, session_id: str) -> str:

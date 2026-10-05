@@ -50,6 +50,16 @@ theme_header = "theme · {count} — type to filter · ↑↓ · Enter · Esc"
 no_themes = "no themes found"
 theme_cancelled = "theme selection cancelled"
 
+[prompt_options]
+# Answers a channel offers for a trust / approval / critical-op question.
+once = "⏱ Once"
+always_project = "🔓 Always for this project"
+refuse = "🚫 Refuse"
+yes = "✅ Allow"
+no = "❌ Deny"
+critical_yes = "⚠️ Allow"
+critical_no = "🚫 Cancel"
+
 [telegram]
 start_greeting = "Hi! I'm Veles. Just send a message and I'll reply. Tip: /help lists the commands."
 history_cleared = "History cleared."

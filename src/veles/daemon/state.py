@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from veles.core.agent import Agent, RunResult
     from veles.core.dream_runner import DreamRunner
     from veles.core.job_runner import JobRunner
+    from veles.core.platforms import ChannelCaps
     from veles.core.reminder_runner import ReminderRunner
 
 # Agent modes a chat can be switched to (`PATCH /v1/sessions/{id}`, Telegram
@@ -123,6 +124,9 @@ class DaemonState:
     # really serving instead of re-deriving (and diverging) from config.
     # Kept in lockstep with `channel_runners` — cleared together on stop.
     active_channels: list[str] = field(default_factory=list)
+    # What each *running* channel's platform can do (asks_questions…). Read by
+    # turns from any thread — the module registry is a ContextVar, this is not.
+    channel_caps: dict[str, ChannelCaps] = field(default_factory=dict)
     # Runs curator/insights/etc. after a turn.
     post_turn_hook: Callable[[RunResult], None] | None = None
     # M170b: opt-in verify→escalate run before the `completed` event.
