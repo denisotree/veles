@@ -33,6 +33,22 @@ def _scripted_prompter(answers: dict[str, str]):
     return ask
 
 
+def test_add_channel_offers_and_installs_a_registry_platform(
+    tmp_path: Path, fake_platform, monkeypatch
+):
+    from veles.core.registry import ensure
+
+    project = init_project(tmp_path / "p", name="p")
+    asked: list[str] = []
+    monkeypatch.setattr(ensure, "available_platforms", lambda: ["fake", "slackish"])
+    monkeypatch.setattr(
+        ensure, "ensure_platform_interactive", lambda name: asked.append(name) or False
+    )
+    rc = add_channel(project, prompter=_scripted_prompter({"channel type": "slackish"}))
+    assert asked == ["slackish"] and rc == 2  # the install was declined → nothing written
+    assert get_section(load_project_config(project), "channels") == {}
+
+
 def test_add_telegram_to_default_daemon_writes_config_and_keychain(tmp_path: Path, fake_keyring):
     from veles.core.secrets import get_provider_key
 

@@ -17,6 +17,7 @@ visible extension seam, not an optimisation to skip.
 
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -39,21 +40,25 @@ async def collect_channel_via_modals(app: App, *, title: str) -> CollectResult |
     can route them to the keychain vs the config block via `apply_channel`.
     """
     from veles.core.platforms import get_platform, list_platforms
+    from veles.core.registry import ensure
     from veles.tui.wizard.screens.choice import ChoiceItem, ChoiceScreen
     from veles.tui.wizard.screens.input import InputScreen
     from veles.tui.wizard.step import CANCEL_SENTINEL
 
-    platforms = list_platforms()
+    installed = set(list_platforms())
+    platforms = ensure.available_platforms()
     if not platforms:
         return None
     channel = await app.push_screen_wait(
         ChoiceScreen(
             title,
-            [ChoiceItem(p, p) for p in platforms],
+            [ChoiceItem(p if p in installed else f"{p} (registry)", p) for p in platforms],
             default=platforms[0],
         )
     )
     if not channel or channel == CANCEL_SENTINEL:
+        return None
+    if channel not in installed and not _install_platform(app, channel):
         return None
     entry = get_platform(channel)
     secrets: dict[str, str] = {}
@@ -76,6 +81,24 @@ async def collect_channel_via_modals(app: App, *, title: str) -> CollectResult |
         else:
             config_fields[cred.key] = value
     return channel, secrets, config_fields
+
+
+def _install_platform(app: App, name: str) -> bool:
+    """Install a registry platform picked in the flow. Its confirmation is a
+    terminal prompt, so the app hands the terminal back while it runs."""
+    from textual.app import SuspendNotSupported
+
+    from veles.core.registry import ensure
+
+    try:
+        with app.suspend():
+            return ensure.ensure_platform_interactive(name)
+    except SuspendNotSupported:
+        print(
+            f"can't install here — run `veles registry install {name}`, then add the channel",
+            file=sys.stderr,
+        )
+        return False
 
 
 async def add_channel_via_modals(

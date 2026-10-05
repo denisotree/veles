@@ -60,7 +60,8 @@ def add_channel(
     otherwise the user is asked. Creds are always collected via the prompter so
     secrets never land in argv/history."""
     from veles.cli.wizard import _ask_choice
-    from veles.core.platforms import get_platform, list_platforms
+    from veles.core.platforms import get_platform
+    from veles.core.registry import ensure
 
     ask = _resolve_prompter(prompter)
     cfg = load_project_config(project)
@@ -77,13 +78,17 @@ def add_channel(
             )
             session = None if choice == _DEFAULT_LABEL else choice
 
-    # 2. channel type.
-    platforms = tuple(list_platforms())
+    # 2. channel type — installed platforms and those in the cached registries;
+    # a registry one is installed now (the normal confirmation).
+    platforms = tuple(ensure.available_platforms())
     if not platforms:
-        print("error: no channel platforms registered.")
+        print("error: no channel platform is installed or in your registries.")
         return 1
     if channel is None:
         channel = _ask_choice(ask, "Channel type", platforms, default=platforms[0])
+    if not ensure.ensure_platform_interactive(channel):
+        print(f"error: platform {channel!r} is not installed.")
+        return 2
     try:
         entry = get_platform(channel)
     except KeyError as exc:

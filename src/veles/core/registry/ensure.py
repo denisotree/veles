@@ -179,6 +179,40 @@ def ensure_channel_platforms(project: Project, session: str | None = None) -> li
     return [n.name for n in channel_needs(project, session)]
 
 
+def available_platforms() -> list[str]:
+    """Channel platforms to offer in a wizard: the installed ones (contributed by
+    a loaded module) first, then the `platform:<name>` providers in the cached
+    registries (no network) — picking one of those installs it."""
+    from veles.core.platforms import list_platforms
+    from veles.core.registry.catalog import search
+
+    names = list_platforms()
+    with contextlib.suppress(Exception):  # no readable registry → installed platforms only
+        found, _ = search(kind="module", sync_missing=False)
+        names += [
+            p.split(":", 1)[1] for f in found for p in f.ext.provides if p.startswith("platform:")
+        ]
+    return list(dict.fromkeys(names))
+
+
+def ensure_platform_interactive(name: str) -> bool:
+    """`name` is installed, or got installed now with the normal confirmation (a
+    wizard pick) and its module loaded into the live registry."""
+    from veles.core.module_loading import load_user_modules
+    from veles.core.modules import current_module_registry, set_module_registry
+    from veles.core.platforms import list_platforms
+
+    if name in list_platforms():
+        return True
+    if not ensure_extension(PlatformNeed(name), None, interactive=True):
+        return False
+    live = current_module_registry()
+    registry = load_user_modules(into=live)
+    if live is None:
+        set_module_registry(registry)
+    return name in list_platforms()
+
+
 def install_hint(project: Project) -> str | None:
     """`veles registry install …` for the project's missing layout or engines, or
     None when nothing is missing. For error messages."""
@@ -272,10 +306,12 @@ __all__ = [
     "LayoutNeed",
     "PlatformNeed",
     "available_layouts",
+    "available_platforms",
     "channel_needs",
     "ensure_channel_platforms",
     "ensure_extension",
     "ensure_layout",
+    "ensure_platform_interactive",
     "ensure_project_extensions",
     "install_hint",
     "layout_or_default",

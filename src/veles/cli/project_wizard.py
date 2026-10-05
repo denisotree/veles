@@ -157,10 +157,11 @@ def _step_channel(project: Project, prompter: Prompter) -> None:
     type prompt is always shown (even with one platform): it is the seam new
     channels register on."""
     from veles.cli.channel_wizard import apply_channel, collect_channel_fields
-    from veles.core.platforms import get_platform, list_platforms
+    from veles.core.platforms import get_platform
+    from veles.core.registry import ensure
     from veles.core.secrets import KeyringUnavailable
 
-    platforms = tuple(list_platforms())
+    platforms = tuple(ensure.available_platforms())
     if not platforms:
         return
     if not _ask_yes_no(prompter, t("project_wizard.ask_channel"), default=False):
@@ -168,6 +169,8 @@ def _step_channel(project: Project, prompter: Prompter) -> None:
     channel = _ask_choice(
         prompter, t("project_wizard.ask_channel_type"), platforms, default=platforms[0]
     )
+    if not ensure.ensure_platform_interactive(channel):
+        return
     try:
         entry = get_platform(channel)
     except KeyError as exc:
