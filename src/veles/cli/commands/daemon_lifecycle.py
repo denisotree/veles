@@ -379,6 +379,29 @@ def _stop_status_paths(args: argparse.Namespace):
     return _resolve_instance_paths(project, getattr(args, "name", None) or None)
 
 
+def _prepare_channels(project, session: str | None) -> None:
+    """Load the modules and install the platform of every channel the config
+    declares (the config is the user's decision)."""
+    from veles.core.module_loading import load_project_modules
+    from veles.core.modules import current_module_registry, set_module_registry
+    from veles.core.registry.ensure import ensure_channel_platforms
+
+    set_module_registry(load_project_modules(project, into=current_module_registry()))
+    ensure_channel_platforms(project, session)
+
+
+def _channel_ready_or_say_why(project, session: str | None) -> bool:
+    """A daemon hosts channels: False (after printing why and what to run) when
+    none is ready."""
+    from veles.core.channel_setup import channel_readiness, no_channel_message
+
+    statuses = channel_readiness(project, session)
+    if any(s.state == "ok" for s in statuses):
+        return True
+    print(no_channel_message(statuses, session), file=sys.stderr)
+    return False
+
+
 def _restart_named_session(args: argparse.Namespace, name: str) -> int:
     """`veles daemon restart --name <name>` — stop this project's named
     session (per-instance pid) and respawn it from its `[daemon.<name>]`
@@ -390,6 +413,10 @@ def _restart_named_session(args: argparse.Namespace, name: str) -> int:
     project = require_project(args)
     if project is None:
         return 2
+    # Checked before the stop: the new daemon would refuse, and the running one stays.
+    _prepare_channels(project, name)
+    if not _channel_ready_or_say_why(project, name):
+        return 1
     pid_path, _info = _resolve_instance_paths(project, name)
     pid = read_pid(pid_path)
     if pid and is_alive(pid):

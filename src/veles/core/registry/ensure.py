@@ -183,10 +183,21 @@ def available_platforms() -> list[str]:
     """Channel platforms to offer in a wizard: the installed ones (contributed by
     a loaded module) first, then the `platform:<name>` providers in the cached
     registries (no network) — picking one of those installs it."""
+    from veles.core.module_loading import load_user_modules
+    from veles.core.modules import (
+        current_module_registry,
+        reset_module_registry,
+        set_module_registry,
+    )
     from veles.core.platforms import list_platforms
     from veles.core.registry.catalog import search
 
-    names = list_platforms()
+    # A listing only: the user's modules are looked at in a scoped registry.
+    token = set_module_registry(load_user_modules(into=current_module_registry()))
+    try:
+        names = list_platforms()
+    finally:
+        reset_module_registry(token)
     with contextlib.suppress(Exception):  # no readable registry → installed platforms only
         found, _ = search(kind="module", sync_missing=False)
         names += [
@@ -198,19 +209,28 @@ def available_platforms() -> list[str]:
 def ensure_platform_interactive(name: str) -> bool:
     """`name` is installed, or got installed now with the normal confirmation (a
     wizard pick) and its module loaded into the live registry."""
-    from veles.core.module_loading import load_user_modules
-    from veles.core.modules import current_module_registry, set_module_registry
     from veles.core.platforms import list_platforms
 
+    _load_user_modules_into_live()
     if name in list_platforms():
         return True
     if not ensure_extension(PlatformNeed(name), None, interactive=True):
         return False
+    _load_user_modules_into_live()
+    return name in list_platforms()
+
+
+def _load_user_modules_into_live() -> None:
+    """User-level modules (where a platform installs) into the live registry —
+    a process that loaded no modules (the daemon picker, `veles init`) gets one;
+    a module already loaded is not loaded twice."""
+    from veles.core.module_loading import load_user_modules
+    from veles.core.modules import current_module_registry, set_module_registry
+
     live = current_module_registry()
     registry = load_user_modules(into=live)
     if live is None:
         set_module_registry(registry)
-    return name in list_platforms()
 
 
 def install_hint(project: Project) -> str | None:
@@ -253,12 +273,13 @@ def _spec(need: Need) -> str | None:
         return ref or need.name  # `resolve` reports a missing or ambiguous name
     from veles.core.registry import catalog
 
+    # With the official registry connected, the official ref is the only
+    # candidate (a stale cache is refreshed by `_resolve`); another provider
+    # counts only when that registry is not connected.
+    if ref is not None and _connected(ref.partition(":")[0]):
+        return ref
     point = "platform" if isinstance(need, PlatformNeed) else "engine"
     refs = catalog.providers_of(f"{point}:{need.name}")
-    # The official ref wins when it is there — or when nothing is cached yet
-    # (`resolve` syncs it); a single other provider is unambiguous too.
-    if ref is not None and (ref in refs or not refs):
-        return ref
     if len(refs) == 1:
         return refs[0]
     if refs:
@@ -268,10 +289,30 @@ def _spec(need: Need) -> str | None:
     return None
 
 
-def _resolve(spec: str) -> Any:
-    from veles.core.registry.catalog import resolve
+def _connected(registry: str) -> bool:
+    from veles.core.registry.config import RegistryConfigError, get_source
 
-    return resolve(spec)
+    try:
+        get_source(registry)
+    except RegistryConfigError:
+        return False
+    return True
+
+
+def _resolve(spec: str) -> Any:
+    """`resolve`, and once more after refreshing the named registry: its cache
+    may predate the package (an upgrade that moved a feature into the registry)."""
+    from veles.core.registry import catalog, repo
+    from veles.core.registry.config import get_source
+
+    try:
+        return catalog.resolve(spec)
+    except catalog.ResolveError:
+        registry = spec.rpartition(":")[0]
+        if not registry or not _connected(registry):
+            raise
+    repo.update(get_source(registry))
+    return catalog.resolve(spec)
 
 
 def _install(

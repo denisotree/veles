@@ -67,6 +67,12 @@ async def test_usage_sums_runs_and_keeps_the_latest_prompt_size(tmp_path) -> Non
     assert usage["since_daemon_start"] is True
 
 
+async def test_in_process_health_names_the_model_like_the_http_one(tmp_path) -> None:
+    """A gateway inside the daemon reads `health()["model"]` for `/settings`."""
+    health = await InProcessRunBackend(_state(tmp_path, [])).health()
+    assert health["model"] == "anthropic/claude-sonnet-4.6"
+
+
 async def test_an_unknown_session_reports_zeros(tmp_path) -> None:
     backend = InProcessRunBackend(_state(tmp_path, []))
     usage = await backend.get_session_usage("nope")

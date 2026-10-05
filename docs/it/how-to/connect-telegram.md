@@ -70,6 +70,8 @@ veles channel run --channel telegram \
 
 `veles channel run --channel telegram` installa prima il modulo se non c'è.
 
+Il daemon con cui comunica si avvia solo con un canale proprio pronto, quindi questa opzione va bene per un daemon che ospita già un canale diverso. Non eseguire lo stesso bot in entrambi i posti: Telegram consegna gli aggiornamenti di un bot a un solo poller, quindi il secondo fallisce.
+
 ## Gestire le sessioni di chat
 
 ```bash

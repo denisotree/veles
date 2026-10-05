@@ -299,8 +299,35 @@ async def test_cursor_and_focus_survive_stop_action(
         assert screen._tree.has_focus is True
 
 
-async def test_restart_kills_before_spawn_and_keeps_focus(
+async def test_restart_without_a_ready_channel_keeps_the_running_daemon(
     tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The new daemon would refuse to start — killing the old one first would
+    take a working daemon down."""
+    import veles.tui.screens.daemon_picker as dp
+
+    project = init_project(tmp_path / "p", name="p")
+    _seed_registry([_entry("p", project_path=str(tmp_path / "p"), pid=4242)])
+    seq: list[str] = []
+    monkeypatch.setattr(dp, "is_alive", lambda pid: True)
+    monkeypatch.setattr("veles.tui.screens._daemon_picker_data.is_alive", lambda pid: True)
+    monkeypatch.setattr("veles.daemon.registry.is_alive", lambda pid: True)
+    monkeypatch.setattr(dp.os, "kill", lambda pid, sig: seq.append("kill"))
+    monkeypatch.setattr(dp, "spawn_daemon_node", lambda node: (seq.append("spawn"), True)[1])
+
+    app = DaemonPickerApp(project=project)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.pause()
+        await pilot.press("r")
+        await pilot.pause()
+        await pilot.pause()
+        assert seq == []
+        assert "channel" in pilot.app.screen.last_action
+
+
+async def test_restart_kills_before_spawn_and_keeps_focus(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, fake_channel
 ) -> None:
     """Restart runs in a worker (non-blocking poll) and must SIGTERM the old
     process *before* spawning the new one, or the spawn races it for the port.

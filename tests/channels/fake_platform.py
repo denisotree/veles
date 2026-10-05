@@ -47,6 +47,25 @@ def register(api) -> None:
     api.contribute("platform", "fake", FAKE_SPEC)
 
 
+def install_as_user_module(name: str = "fakech") -> None:
+    """This file as an approved user-level module (what a registry install leaves
+    behind) — for paths that load modules themselves instead of reading a live
+    registry. Needs an isolated user home."""
+    from pathlib import Path
+
+    from veles.core.registry.gate import approve_module
+    from veles.core.user_paths import user_modules_dir
+
+    mod = user_modules_dir() / name
+    mod.mkdir(parents=True)
+    (mod / "module.toml").write_text(
+        f'[module]\nname = "{name}"\ndescription = "d"\nentrypoint = "e.py:register"\n',
+        encoding="utf-8",
+    )
+    (mod / "e.py").write_text(Path(__file__).read_text(encoding="utf-8"), encoding="utf-8")
+    approve_module(mod, name=name, project_root=None)
+
+
 @contextmanager
 def contributing(specs: Mapping[str, PlatformSpec]) -> Iterator[None]:
     """A live module registry whose module contributes `specs` (name → spec)."""

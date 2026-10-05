@@ -69,6 +69,8 @@ veles channel run --channel telegram \
 
 `veles channel run --channel telegram` module मौजूद न होने पर पहले उसे install करता है।
 
+यह जिस daemon से बात करता है, वह केवल तभी start होता है जब उसके साथ उसका अपना channel तैयार हो, इसलिए यह विकल्प ऐसे daemon के लिए ठीक है जो पहले से कोई दूसरा channel host कर रहा है। एक ही bot को दोनों जगह न चलाएँ: Telegram किसी bot के updates सिर्फ़ एक poller को देता है, इसलिए दूसरा fail हो जाता है।
+
 ## chat sessions manage करें
 
 ```bash

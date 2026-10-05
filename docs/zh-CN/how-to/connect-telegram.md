@@ -58,6 +58,8 @@ veles channel run --channel telegram \
 
 `veles channel run --channel telegram` 在模块缺失时会先安装它。
 
+它所连接的 daemon 只有在自带一个就绪的 channel 时才会启动，因此这种方式适用于已经托管了其他 channel 的 daemon。不要在两个地方运行同一个 bot：Telegram 只会把 bot 的更新交给一个轮询者，所以第二个会失败。
+
 ## 管理聊天会话
 
 ```bash

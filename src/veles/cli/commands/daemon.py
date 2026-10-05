@@ -50,10 +50,12 @@ from aiohttp import web
 
 from veles.cli.commands.daemon_lifecycle import (
     _bootstrap_daemon,
+    _channel_ready_or_say_why,
     _cleanup_daemon_exit,
     _detach_and_report,
     _graceful_stop,
     _mark_session_running,
+    _prepare_channels,
     _register_in_registry,
     _resolve_instance_paths,
     _restart_named_session,
@@ -210,13 +212,7 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     # channel ready. The parent checks before it detaches; the `--foreground`
     # child checks again — it is the authority for paths without a terminal
     # (picker, wizard autostart, systemd).
-    from veles.core.channel_setup import channel_readiness, no_channel_message
-    from veles.core.module_loading import load_project_modules
-    from veles.core.modules import current_module_registry, set_module_registry
-    from veles.core.registry.ensure import ensure_channel_platforms
-
-    set_module_registry(load_project_modules(project, into=current_module_registry()))
-    ensure_channel_platforms(project, name)
+    _prepare_channels(project, name)
     # After the modules: a channel block's keys are known only from its platform.
     _warn_on_security_config_typos(project)
 
@@ -225,9 +221,7 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     # the detached child re-enters with `--foreground` and must not re-prompt.
     if not getattr(args, "foreground", False):
         _maybe_run_start_wizard(args, project, session=name)
-    statuses = channel_readiness(project, name)
-    if not any(s.state == "ok" for s in statuses):
-        print(no_channel_message(statuses, name), file=sys.stderr)
+    if not _channel_ready_or_say_why(project, name):
         return 1
 
     # M113: detach by default. The child re-enters this function with
@@ -652,6 +646,13 @@ def _cmd_daemon_restart(args: argparse.Namespace) -> int:
     entry = registry.get(slug)
     if entry is None:
         print(f"error: no daemon named {slug!r} in registry.", file=sys.stderr)
+        return 1
+    # Checked before the stop: the new daemon would refuse, and the running one stays.
+    from veles.core.project import load_project
+
+    project = load_project(Path(entry.project_path))
+    _prepare_channels(project, None)
+    if not _channel_ready_or_say_why(project, None):
         return 1
     if is_alive(entry.pid) and not _graceful_stop(entry.pid, timeout=5.0):
         print(f"error: daemon pid {entry.pid} did not stop.", file=sys.stderr)

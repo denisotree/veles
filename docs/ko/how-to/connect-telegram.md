@@ -68,6 +68,8 @@ veles channel run --channel telegram \
 
 `veles channel run --channel telegram`은 모듈이 없으면 먼저 설치합니다.
 
+연결 대상 daemon은 자체적으로 준비된 채널이 있어야만 시작되므로, 이 방식은 이미 다른 채널을 호스팅하는 daemon에 적합합니다. 같은 봇을 두 곳에서 실행하지 마세요. Telegram은 봇의 업데이트를 하나의 poller에만 전달하므로 두 번째는 실패합니다.
+
 ## 채팅 세션 관리
 
 ```bash

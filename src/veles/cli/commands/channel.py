@@ -215,7 +215,7 @@ def _cmd_channel_run(args: argparse.Namespace) -> int:
         print(
             f"error: {channel} needs {', '.join(missing)} — pass {', '.join(hints)}"
             + (f", set {', '.join(envs)}" if envs else "")
-            + f", or store it with `veles channel add {channel}`",
+            + f", or store it with `veles channel add --channel {channel}`",
             file=sys.stderr,
         )
         return 2

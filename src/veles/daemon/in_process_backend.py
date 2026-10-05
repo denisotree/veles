@@ -87,11 +87,12 @@ class InProcessRunBackend:
 
     async def health(self) -> dict[str, Any]:
         """In-process equivalent of `DaemonClient.health`. The gateway
-        calls this to learn the daemon's fixed provider for /model."""
+        calls this to learn the daemon's fixed provider and model."""
         return {
             "status": "ok",
             "project": self._state.project.name,
             "provider": self._state.provider,
+            "model": self._state.default_model,
         }
 
     async def run_dream(self) -> dict[str, Any]:

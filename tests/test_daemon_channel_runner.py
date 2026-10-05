@@ -76,6 +76,7 @@ def test_enabled_but_no_token_skipped(state: DaemonState, caplog, fake_platform)
     # M110: warning now lands in the logger (and the daemon log file),
     # not on stderr — that's how the picker's log view will surface it.
     assert any("missing token" in rec.message for rec in caplog.records)
+    assert any("veles channel add --channel fake" in rec.getMessage() for rec in caplog.records)
 
 
 async def test_enabled_with_keychain_token_starts_gateway(

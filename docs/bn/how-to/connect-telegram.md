@@ -67,6 +67,8 @@ veles channel run --channel telegram \
 
 `veles channel run --channel telegram` module না থাকলে আগে সেটি install করে।
 
+এটি যে daemon-এর সঙ্গে কথা বলে, সেটি কেবল নিজের একটি প্রস্তুত channel নিয়েই start হয়, তাই এই বিকল্প এমন daemon-এর জন্য উপযুক্ত যা ইতিমধ্যে অন্য একটি channel host করছে। একই bot দুই জায়গায় চালাবেন না: Telegram একটি bot-এর update কেবল একটি poller-কে দেয়, তাই দ্বিতীয়টি fail করে।
+
 ## Chat session পরিচালনা করুন
 
 ```bash

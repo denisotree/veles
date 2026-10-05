@@ -64,6 +64,8 @@ veles channel run --channel telegram \
 
 `veles channel run --channel telegram` は、モジュールがなければ先にインストールします。
 
+接続先の daemon は、準備のできた専用のチャンネルを伴う場合にのみ起動するため、この方法はすでに別のチャンネルをホストしている daemon 向けです。同じ bot を両方の場所で実行しないでください。Telegram は bot のアップデートを 1 つのポーラーにしか渡さないため、2 つ目は失敗します。
+
 ## チャットセッションを管理する
 
 ```bash

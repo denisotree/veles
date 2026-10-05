@@ -711,10 +711,21 @@ def _check_channel_platforms(project: Project | None) -> CheckResult:
     never installs — the next daemon start does (the config is the decision)."""
     if project is None:
         return CheckResult(name="channel_platforms", status="info", message="no active project")
+    from veles.core.module_loading import load_project_modules
+    from veles.core.modules import (
+        current_module_registry,
+        reset_module_registry,
+        set_module_registry,
+    )
     from veles.core.registry.ensure import channel_needs, ref_for
 
     try:
-        needs = channel_needs(project, None)
+        # doctor loads no modules up front; a platform is "installed" when one contributes it.
+        token = set_module_registry(current_module_registry() or load_project_modules(project))
+        try:
+            needs = channel_needs(project, None)
+        finally:
+            reset_module_registry(token)
     except Exception as exc:
         return CheckResult(
             name="channel_platforms", status="warn", message=f"could not check channels: {exc}"

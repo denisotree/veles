@@ -29,6 +29,7 @@ def test_channel_run_requires_the_platform_secret(
     assert rc == 2
     err = capsys.readouterr().err
     assert "FAKE_TOKEN" in err
+    assert "`veles channel add --channel fake`" in err  # a command that runs
 
 
 def test_channel_run_requires_daemon_token(

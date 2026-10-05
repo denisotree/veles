@@ -58,7 +58,7 @@ def _build_channel_gateway(platform: str, channel_cfg: dict, *, backend, state: 
     if missing:
         logger.warning(
             "[channels.%s] enabled but missing %s (keychain veles:%s:%s or config) — "
-            "skipping; set it with `veles channel add %s`",
+            "skipping; set it with `veles channel add --channel %s`",
             platform,
             ", ".join(missing),
             platform,

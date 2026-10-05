@@ -69,6 +69,8 @@ veles channel run --channel telegram \
 
 `veles channel run --channel telegram` sẽ cài module trước nếu nó chưa có.
 
+Daemon mà nó kết nối tới chỉ khởi động khi có sẵn một channel riêng của nó, nên cách này phù hợp với một daemon đã host một channel khác. Đừng chạy cùng một bot ở cả hai nơi: Telegram chỉ giao các cập nhật của một bot cho một poller, nên cái thứ hai sẽ thất bại.
+
 ## Quản lý các phiên trò chuyện
 
 ```bash
