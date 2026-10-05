@@ -398,9 +398,12 @@ def channel_blocker(node: DaemonNode) -> str | None:
     from veles.core.channel_setup import channel_readiness, no_channel_message
     from veles.core.module_loading import load_project_modules
     from veles.core.modules import reset_module_registry, set_module_registry
-    from veles.core.project import load_project
+    from veles.core.project import ProjectNotFound, load_project
 
-    project = load_project(Path(node.project_path))
+    try:
+        project = load_project(Path(node.project_path))
+    except ProjectNotFound:
+        return f"{node.project_path} is no longer a Veles project"
     session = node.name if node.kind == "named" else None
     token = set_module_registry(load_project_modules(project))
     try:

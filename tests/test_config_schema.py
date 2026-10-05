@@ -77,6 +77,30 @@ def test_doctor_reports_config_typo_as_error(tmp_path, fake_platform) -> None:
     assert "roms" in cfg_check.message
 
 
+def test_doctor_checks_the_keys_of_an_installed_module_channel(
+    tmp_path, isolated_user_home
+) -> None:
+    """`veles doctor` loads no modules up front. A channel platform is a module
+    now, so without loading them a `whitlist` typo in its block went unreported
+    — the M201 check silently stopped covering Telegram."""
+    from tests.channels.fake_platform import install_as_user_module
+    from veles.core.doctor import run_all
+    from veles.core.modules import reset_module_registry, set_module_registry
+    from veles.core.project import init_project
+    from veles.core.project_config import save_project_config
+
+    install_as_user_module()
+    project = init_project(tmp_path / "proj", name="t")
+    save_project_config(project, {"channels": {"fake": {"enabled": True, "roms": ["@a"]}}})
+    token = set_module_registry(None)
+    try:
+        report = run_all(project)
+    finally:
+        reset_module_registry(token)
+    cfg_check = next(r for r in report.results if r.name == "config_schema")
+    assert cfg_check.status == "error" and "roms" in cfg_check.message
+
+
 def test_engine_client_knobs_validate_clean() -> None:
     """M266: `[engine] request_timeout_s`/`max_retries` are known keys.
 

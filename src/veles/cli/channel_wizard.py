@@ -144,8 +144,9 @@ def apply_channel(
     secrets: dict[str, str],
     config_fields: dict[str, object],
 ) -> None:
-    """Persist a collected channel binding: secret values to the keychain
-    (`set_provider_key(channel, …)`), non-secret fields + `enabled=true` to the
+    """Persist a collected channel binding: each secret value to its keychain
+    slot (`secret_slot`: the first secret field `<platform>`, any other
+    `<platform>.<key>`), non-secret fields + `enabled=true` to the
     config block (global `[channels.<type>]` or per-session
     `[daemon.<name>.channels.<type>]`). Pure of any prompting — reusable from
     the CLI wizard and the TUI.

@@ -73,6 +73,64 @@ async def test_in_process_health_names_the_model_like_the_http_one(tmp_path) -> 
     assert health["model"] == "anthropic/claude-sonnet-4.6"
 
 
+def _snap(prompt: int, out: int) -> UsageSnapshot:
+    return UsageSnapshot(
+        prompt_tokens=prompt,
+        completion_tokens=out,
+        total_tokens=prompt + out,
+        last_prompt_tokens=prompt,
+    )
+
+
+def test_a_mode_turn_counts_every_agent_it_ran(tmp_path, monkeypatch) -> None:
+    """A mode turn (a goal runs plan, steps and checks) builds several agents;
+    the turn's usage is all of them, and a synthetic ending still carries it."""
+    from veles.core.agent_events import TurnDone
+    from veles.daemon.mode_turn import make_mode_turn
+    from veles.daemon.state import ChatModeState
+
+    class _TwoAgents:
+        def run_turn(self, prompt, ctx):
+            ctx.post(TurnDone(RunResult(text="a", iterations=1, usage=_snap(100, 10))))
+            ctx.post(TurnDone(RunResult(text="b", iterations=1, usage=_snap(300, 30))))
+            ctx.post(TurnDone(RunResult(text="", iterations=0, stopped_reason="synthetic")))
+
+    monkeypatch.setattr("veles.core.modes.get_mode", lambda name: _TwoAgents())
+    state = _state(tmp_path, [])
+    state.chat_modes["ses-m"] = ChatModeState(mode="writing")
+    result = make_mode_turn(state, session_id="ses-m", prompt="go")(
+        lambda t: None, lambda e: None, lambda e: None
+    )
+    assert (result.usage.prompt_tokens, result.usage.completion_tokens) == (400, 40)
+    assert result.usage.last_prompt_tokens == 300
+
+
+async def test_a_manager_run_counts_its_workers(tmp_path, monkeypatch) -> None:
+    from veles.core.orchestration.manager import ManagerRunResult
+    from veles.core.orchestration.workers import WorkerHandle, WorkerPlan
+    from veles.daemon.runner import new_run_handle, run_manager_in_background
+
+    workers = (
+        WorkerHandle(role="explorer", prompt="…", result="x", tokens_in=50, tokens_out=5),
+        WorkerHandle(role="writer", prompt="…", result="done", tokens_in=70, tokens_out=7),
+    )
+    monkeypatch.setattr(
+        "veles.core.orchestration.decompose_and_run",
+        lambda prompt, *, agent_factory: ManagerRunResult(
+            final_text="done", handles=workers, plan=WorkerPlan(objective="o")
+        ),
+    )
+    finished = []
+    await run_manager_in_background(
+        new_run_handle(session_id="ses-x"),
+        worker_agent_factory=lambda **kw: None,
+        prompt="q",
+        on_finished=finished.append,
+    )
+    usage = finished[0].usage
+    assert (usage.prompt_tokens, usage.completion_tokens) == (120, 12)
+
+
 async def test_an_unknown_session_reports_zeros(tmp_path) -> None:
     backend = InProcessRunBackend(_state(tmp_path, []))
     usage = await backend.get_session_usage("nope")

@@ -195,9 +195,21 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     # daemon will actually boot on — not a bare `args.provider` that is
     # `None` when no `--provider` was passed. M135: named sessions add a
     # `[daemon.<name>] provider` layer below an explicit `--provider`.
-    from veles.core.model_resolver import resolve_effective_provider
+    from veles.core.model_resolver import (
+        ConfigurationError,
+        ensure_model_configured,
+        resolve_effective_model,
+        resolve_effective_provider,
+    )
 
     provider_name = resolve_effective_provider(args, project, daemon_session=name)
+    # The model is fixed for the daemon's lifetime: an unset one is a one-line
+    # error here, as for `veles run`, not a traceback from the agent factory.
+    try:
+        ensure_model_configured(resolve_effective_model(args, project, daemon_session=name))
+    except ConfigurationError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     if not _ensure_api_key(provider_name, project=project.name):
         return 2
     # M184: reflect the resolved provider (incl. any `[daemon.<name>]` override)
@@ -648,9 +660,17 @@ def _cmd_daemon_restart(args: argparse.Namespace) -> int:
         print(f"error: no daemon named {slug!r} in registry.", file=sys.stderr)
         return 1
     # Checked before the stop: the new daemon would refuse, and the running one stays.
-    from veles.core.project import load_project
+    from veles.core.project import ProjectNotFound, load_project
 
-    project = load_project(Path(entry.project_path))
+    try:
+        project = load_project(Path(entry.project_path))
+    except ProjectNotFound:
+        print(
+            f"error: daemon {slug!r} belongs to {entry.project_path}, which is no longer a "
+            f"Veles project; not restarting it (`veles daemon delete {slug}` forgets it).",
+            file=sys.stderr,
+        )
+        return 1
     _prepare_channels(project, None)
     if not _channel_ready_or_say_why(project, None):
         return 1

@@ -50,8 +50,9 @@ def check_builds_from_config(
 def check_config_keys(spec: PlatformSpec, config: Mapping[str, Any]) -> None:
     """Every key in a channel block is one the platform declares (its cred
     fields or `config_keys`) — else `veles daemon start` reports it as a typo."""
-    known = {"enabled"} | {f.key for f in spec.cred_fields} | set(spec.config_keys)
-    unknown = sorted(set(config) - known)
+    from veles.core.config_schema import platform_keys
+
+    unknown = sorted(set(config) - platform_keys(spec))
     assert not unknown, f"config keys the platform does not declare: {unknown}"
 
 

@@ -445,9 +445,11 @@ def _run_module(
                 "-p",
                 "no:cacheprovider",
                 # Async tests (a channel module's are mostly async) must run, not
-                # fail as unhandled coroutines; a missing plugin is an error.
+                # fail as unhandled coroutines. The plugin by its module name: a
+                # missing pytest-asyncio is then a loud error, where `-p asyncio`
+                # quietly loaded the stdlib module instead.
                 "-p",
-                "asyncio",
+                "pytest_asyncio",
                 "-o",
                 "asyncio_mode=auto",
                 "-c",

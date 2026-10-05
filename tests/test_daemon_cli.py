@@ -18,6 +18,24 @@ def _ns(**fields):
     return type("A", (), fields)()
 
 
+def test_daemon_start_without_a_model_says_so_instead_of_a_traceback(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
+) -> None:
+    """No `[engine] model` and no user default: a one-line error naming the
+    fix, before any channel work — `veles run` already behaved so."""
+    import argparse
+
+    from veles.core.project import init_project
+
+    init_project(tmp_path, name="p")
+    monkeypatch.chdir(tmp_path)
+    args = argparse.Namespace(
+        command="daemon", foreground=True, host="127.0.0.1", port=8765, provider="openrouter"
+    )
+    assert daemon_cmd._cmd_daemon_start(args) == 2
+    assert "no model configured" in capsys.readouterr().err
+
+
 # ---------------- M129: `veles daemon start` bootstraps a missing project ----------------
 
 
@@ -609,6 +627,7 @@ def test_daemon_start_honours_config_port(
     cfg.setdefault("daemon", {})
     cfg["daemon"]["host"] = "0.0.0.0"
     cfg["daemon"]["port"] = 8799
+    cfg["engine"] = {"model": "stub/model"}  # a daemon starts only with a model
     save_project_config(project, cfg)
 
     monkeypatch.setattr(cli_mod, "_resolve_active_project", lambda args: project)
@@ -652,6 +671,7 @@ def test_daemon_start_explicit_port_beats_config(
     project = init_project(tmp_path, name="p")
     cfg = load_project_config(project)
     cfg.setdefault("daemon", {})["port"] = 8799
+    cfg["engine"] = {"model": "stub/model"}  # a daemon starts only with a model
     save_project_config(project, cfg)
 
     monkeypatch.setattr(cli_mod, "_resolve_active_project", lambda args: project)

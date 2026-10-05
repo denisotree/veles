@@ -598,6 +598,12 @@ async def run_manager_in_background(
         # Emit the (possibly escalated) text as one final delta + completed
         # event so channels' existing buffering machinery picks it up unchanged.
         _post({"type": "text_delta", "delta": final_text})
+        # M116b: the workers' tokens are this run's (the manager writes nothing itself).
+        handle.usage = UsageSnapshot(
+            prompt_tokens=sum(h.tokens_in for h in result.handles),
+            completion_tokens=sum(h.tokens_out for h in result.handles),
+            total_tokens=sum(h.tokens_in + h.tokens_out for h in result.handles),
+        )
         await _complete(
             handle,
             text=final_text,

@@ -18,18 +18,9 @@ from veles.daemon.registry import (
 
 
 @pytest.fixture(autouse=True)
-def _isolate_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    from veles.core.modules import (
-        current_module_registry,
-        reset_module_registry,
-        set_module_registry,
-    )
-
+def _isolate_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "veles"))
-    # restart loads modules into the process-wide registry, as a CLI run does.
-    token = set_module_registry(current_module_registry())
-    yield tmp_path
-    reset_module_registry(token)
+    return tmp_path
 
 
 def _entry(slug: str = "demo", **kw) -> DaemonEntry:
@@ -95,6 +86,35 @@ def test_restart_without_a_ready_channel_leaves_the_running_daemon_alone(
 
     assert rc == 1 and stopped == [] and spawned == {}
     assert "channel" in capsys.readouterr().err
+
+
+def test_restart_of_a_daemon_whose_project_is_gone_says_so(monkeypatch, tmp_path, capsys) -> None:
+    import argparse
+    import shutil
+
+    daemon_cmd, project, stopped, spawned = _restart_harness(monkeypatch, tmp_path)
+    shutil.rmtree(project.root)
+    rc = daemon_cmd._cmd_daemon_restart(argparse.Namespace(target="demo", name=None))
+
+    assert rc == 1 and stopped == [] and spawned == {}
+    assert str(project.root) in capsys.readouterr().err
+
+
+def test_the_picker_reports_a_gone_project_instead_of_crashing(tmp_path) -> None:
+    from veles.tui.screens._daemon_picker_data import DaemonNode, channel_blocker
+
+    node = DaemonNode(
+        key="k",
+        kind="registry",
+        name="default",
+        host=None,
+        port=None,
+        pid=1,
+        status="running",
+        model=None,
+        project_path=str(tmp_path / "gone"),
+    )
+    assert "gone" in (channel_blocker(node) or "")
 
 
 def test_named_restart_without_a_ready_channel_leaves_it_alone(

@@ -75,15 +75,21 @@ def ref_for(need: Need) -> str | None:
 
 
 def ensure_extension(
-    need: Need, project: Project | None, *, interactive: bool, auto: bool = False
+    need: Need,
+    project: Project | None,
+    *,
+    interactive: bool,
+    auto: bool = False,
+    reason: str | None = None,
 ) -> bool:
     """True when `need` is met by installing it now; False (after one warning per
     need per process) otherwise. Never raises.
 
     `auto`: the user already decided (a channel declared in their config) — the
     install runs without a terminal and without asking, and says what it installs
-    and why. Only from the user's connected registries and only an unambiguous
-    ref (`_spec`); anything else is a warning and nothing is installed."""
+    and why (`reason`, e.g. "declared in [channels.telegram]"). Only from the
+    user's connected registries and only an unambiguous ref (`_spec`); anything
+    else is a warning and nothing is installed."""
     try:
         if not interactive and not auto:
             _warn(need, ref_for(need) or need.name)
@@ -95,7 +101,7 @@ def ensure_extension(
         if auto:
             print(
                 f"installing {found.ref} {getattr(found.ext, 'version', '')}".rstrip()
-                + f" (declared in [channels.{need.name}])",
+                + f" ({reason or 'declared in your config'})",
                 file=sys.stderr,
             )
         else:
@@ -169,8 +175,12 @@ def ensure_channel_platforms(project: Project, session: str | None = None) -> li
     from veles.core.modules import current_module_registry, set_module_registry
 
     installed = False
+    prefix = f"daemon.{session}.channels" if session else "channels"
     for need in channel_needs(project, session):
-        installed = ensure_extension(need, None, interactive=False, auto=True) or installed
+        why = f"declared in [{prefix}.{need.name}]"
+        installed = (
+            ensure_extension(need, None, interactive=False, auto=True, reason=why) or installed
+        )
     if installed:
         live = current_module_registry()
         registry = load_project_modules(project, into=live)
@@ -183,21 +193,13 @@ def available_platforms() -> list[str]:
     """Channel platforms to offer in a wizard: the installed ones (contributed by
     a loaded module) first, then the `platform:<name>` providers in the cached
     registries (no network) — picking one of those installs it."""
-    from veles.core.module_loading import load_user_modules
-    from veles.core.modules import (
-        current_module_registry,
-        reset_module_registry,
-        set_module_registry,
-    )
     from veles.core.platforms import list_platforms
     from veles.core.registry.catalog import search
 
-    # A listing only: the user's modules are looked at in a scoped registry.
-    token = set_module_registry(load_user_modules(into=current_module_registry()))
-    try:
-        names = list_platforms()
-    finally:
-        reset_module_registry(token)
+    # Into the live registry, not a scoped one: the pick then needs them loaded
+    # (`ensure_platform_interactive`), and an entrypoint runs once per process.
+    _load_user_modules_into_live()
+    names = list_platforms()
     with contextlib.suppress(Exception):  # no readable registry → installed platforms only
         found, _ = search(kind="module", sync_missing=False)
         names += [
@@ -336,8 +338,11 @@ def _warn(need: Need, ref: str, *, reason: str = "") -> None:
         return
     _warned.add(need)
     why = f" ({reason})" if reason else ""
+    # A missing layout or engine degrades the run; a missing platform is the
+    # caller's to report (no channel to start, no gateway to run).
+    degrades = "" if isinstance(need, PlatformNeed) else " — working without it"
     print(
-        f"warning: {_label(need)} is not installed{why} — working without it. "
+        f"warning: {_label(need)} is not installed{why}{degrades}. "
         f"Install: `veles registry update && veles registry install {ref}`",
         file=sys.stderr,
     )

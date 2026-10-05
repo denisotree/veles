@@ -91,6 +91,7 @@ def test_channel_run_refuses_unknown_channel(
     assert "slack" in err
     assert "fake" in err
     assert "error: no channel platform 'slack'" in err
+    assert "working without it" not in err  # it is the channel being run
 
 
 def test_channel_list_sessions_empty(isolated_user_home: Path, capsys) -> None:

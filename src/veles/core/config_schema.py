@@ -29,9 +29,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from veles.core.project_config import get_section
+
+if TYPE_CHECKING:
+    from veles.core.platforms import PlatformSpec
 
 # Keys valid under `[daemon]` (flat legacy scalars) and `[daemon.<name>]`.
 _DAEMON_KNOWN = frozenset(
@@ -83,6 +86,12 @@ def _channel_known_keys(platform: str) -> frozenset[str] | None:
         spec = get_platform(platform)
     except KeyError:
         return None
+    return platform_keys(spec)
+
+
+def platform_keys(spec: PlatformSpec) -> frozenset[str]:
+    """The keys a block of this platform may hold: the base ones, its cred
+    fields, its declared `config_keys` (`veles.sdk.channel_checks` checks the same)."""
     return _CHANNEL_BASE_KEYS | {f.key for f in spec.cred_fields} | spec.config_keys
 
 

@@ -154,7 +154,10 @@ def _cmd_channel_run(args: argparse.Namespace) -> int:
         from veles.core.modules import current_module_registry
         from veles.core.registry.ensure import PlatformNeed, ensure_extension
 
-        if ensure_extension(PlatformNeed(channel), None, interactive=False, auto=True):
+        need = PlatformNeed(channel)
+        if ensure_extension(
+            need, None, interactive=False, auto=True, reason="named with --channel"
+        ):
             load_user_modules(into=current_module_registry())
     try:
         spec = get_platform(channel)

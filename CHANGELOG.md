@@ -16,9 +16,9 @@ only with a working channel.
 ### Upgrading from 1.2.4
 
 - **Telegram installs itself.** A `[channels.telegram]` block in your config installs the
-  module from your connected registries on the next `veles daemon start` — no prompt,
-  since you declared the channel. Run `veles registry update` first if your registry cache
-  is old. Your bot token stays where it is (the keychain slot `telegram`).
+  module from the official registry on the next `veles daemon start` — no prompt, since
+  you declared the channel; a registry cache that predates the module is refreshed first.
+  Your bot token stays where it is (the keychain slot `telegram`).
 - **A daemon needs a working channel.** With no channel ready (module installed, secrets
   in place), `veles daemon start` offers to connect one at a terminal and otherwise
   refuses, naming the command to run. That includes a daemon used only for its HTTP API.
@@ -49,14 +49,20 @@ only with a working channel.
 ### Changed
 
 - Config validation checks a channel block against its platform's own keys; a block of a
-  platform that isn't installed is not checked.
+  platform that isn't installed is not checked. `veles doctor` loads the project's modules
+  for its checks, so an installed channel's keys are checked there too.
 - The daemon log also captures the loggers of loaded modules (a channel gateway's).
+- `veles daemon restart` (and restart in the daemon picker) checks that a channel is ready
+  before stopping the running daemon; with none, it leaves it running and says why.
 
 ### Fixed
 
 - `veles registry validate --run-code` runs an extension's async tests instead of failing
   them for want of an async plugin.
 - An unknown channel platform is reported without stray quotes.
+- `veles daemon start` with no model configured prints one line naming the fix instead of
+  a traceback.
+- `/tokens` counts goal, planning and manager runs too, not only plain turns.
 
 ## [1.2.4] — 2026-10-03
 
