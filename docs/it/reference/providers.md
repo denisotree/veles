@@ -73,8 +73,9 @@ da solo quando lo nomini.
 Il delegato è solo il modello: i tool di Veles lo raggiungono tramite un bridge MCP, e
 ogni chiamata passa per la scala di fiducia di Veles. La config del bridge si trova in
 una directory del processo in esecuzione, `.veles/tmp/delegate-<pid>/`, rimossa alla sua
-uscita. `agy` gira lì in un workspace temporaneo, non nel tuo progetto, dietro un gate
-che nega i suoi shell e tool per i file.
+uscita. `agy` gira in un workspace temporaneo fuori dal tuo progetto (sotto
+`~/.veles/tmp/`), quindi la config `.agents/` del progetto non lo raggiunge mai, dietro
+un gate che nega i suoi shell e tool per i file.
 
 ## Stato multimodale (vision / speech-to-text)
 

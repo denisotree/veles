@@ -88,12 +88,13 @@ autopilot इसे cover नहीं करते; daemon channel में �
 shell, file-edit और web tools, project की `.claude/` settings और hooks, और अन्य MCP servers
 लागू नहीं होते, और उनके द्वारा बुलाया गया हर Veles tool ऊपर की trust ladder से गुज़रता है (वहाँ
 कोई prompt का जवाब नहीं दे सकता, इसलिए जो पहले से granted नहीं है वह अस्वीकार हो जाता है)।
-उनका MCP config `.veles/tmp/delegate-<pid>/` में रहता है, हर चल रहे process के लिए एक।
-`agy` वहाँ एक scratch workspace में चलता है, और जब उसके पास Veles के tools हों तब
-`--dangerously-skip-permissions` के साथ — वरना agy headless MCP calls अस्वीकार कर देता है — और
-उस workspace का एक hook उसके अपने हर tool को deny करता है; जो hook fail हो वह भी deny करता है।
-Hook file `.agents/` के अंतर्गत है, इसलिए agy उसे Veles के tools से आपकी confirmation के बिना
-दोबारा नहीं लिख सकता।
+उनका MCP config `.veles/tmp/delegate-<pid>/` में रहता है, हर चल रहे process के लिए एक, जिसमें
+agent के file tools नहीं लिख सकते। `agy` project के बाहर, `~/.veles/tmp/` के अंतर्गत, एक scratch
+workspace में चलता है, इसलिए project के अपने `.agents/` hooks और MCP servers उस तक कभी नहीं
+पहुँचते। जब उसके पास Veles के tools हों तब वह `--dangerously-skip-permissions` के साथ चलता है —
+वरना agy headless MCP calls अस्वीकार कर देता है — और उस workspace का एक hook उसके अपने हर tool को
+deny करता है; जो hook fail हो वह भी deny करता है। Veles के file tools project के बाहर नहीं लिखते,
+इसलिए agy उस hook को उनके ज़रिए दोबारा नहीं लिख सकता।
 
 ज्ञात सीमाएँ:
 

@@ -88,10 +88,12 @@ their own shell, file-edit and web tools, the project's `.claude/` settings and 
 other MCP servers don't apply, and every Veles tool they call goes through the trust
 ladder above (nobody can answer a prompt there, so anything not already granted is
 refused). Their MCP config lives in `.veles/tmp/delegate-<pid>/`, one per running
-process. `agy` runs in a scratch workspace there, with `--dangerously-skip-permissions`
-when it has Veles' tools — agy refuses MCP calls headless otherwise — and a hook in that
-workspace denies every tool of its own; a hook that fails denies too. The hook file is
-under `.agents/`, so agy can't rewrite it through Veles' tools without your confirmation.
+process, which the agent's file tools can't write. `agy` runs in a scratch workspace
+outside the project, under `~/.veles/tmp/`, so the project's own `.agents/` hooks and
+MCP servers never reach it. It runs with `--dangerously-skip-permissions` when it has
+Veles' tools — agy refuses MCP calls headless otherwise — and a hook in that workspace
+denies every tool of its own; a hook that fails denies too. Veles' file tools can't
+write outside the project, so agy can't rewrite that hook through them.
 
 Known limits:
 

@@ -97,12 +97,15 @@ archivos y web, los ajustes y hooks de `.claude/` del proyecto y otros servidore
 no se aplican, y toda herramienta de Veles que llamen pasa por la escalera de
 confianza anterior (nadie puede responder a una pregunta ahí, así que todo lo que no
 esté ya concedido se rechaza). Su configuración de MCP vive en
-`.veles/tmp/delegate-<pid>/`, una por proceso en ejecución. `agy` se ejecuta allí en un
-espacio de trabajo temporal, con `--dangerously-skip-permissions` cuando tiene las
-herramientas de Veles — de lo contrario agy rechaza las llamadas MCP sin interfaz — y un
-hook en ese espacio de trabajo deniega todas sus herramientas propias; un hook que falla
-también deniega. El archivo del hook está bajo `.agents/`, así que agy no puede
-reescribirlo mediante las herramientas de Veles sin tu confirmación.
+`.veles/tmp/delegate-<pid>/`, una por proceso en ejecución, que las herramientas de
+archivos del agente no pueden escribir. `agy` se ejecuta en un espacio de trabajo
+temporal fuera del proyecto, bajo `~/.veles/tmp/`, así que los hooks y servidores MCP de
+`.agents/` del propio proyecto nunca le llegan. Se ejecuta con
+`--dangerously-skip-permissions` cuando tiene las herramientas de Veles — de lo
+contrario agy rechaza las llamadas MCP sin interfaz — y un hook en ese espacio de
+trabajo deniega todas sus herramientas propias; un hook que falla también deniega. Las
+herramientas de archivos de Veles no pueden escribir fuera del proyecto, así que agy no
+puede reescribir ese hook mediante ellas.
 
 Límites conocidos:
 

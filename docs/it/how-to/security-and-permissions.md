@@ -93,12 +93,14 @@ di Veles: i loro strumenti di shell, modifica file e web, le impostazioni e gli 
 `.claude/` del progetto e gli altri server MCP non si applicano, e ogni strumento di
 Veles che chiamano passa per la scala di fiducia qui sopra (lì nessuno può rispondere a
 una richiesta, quindi tutto ciò che non è già concesso viene rifiutato). La loro config
-MCP si trova in `.veles/tmp/delegate-<pid>/`, una per ogni processo in esecuzione. `agy`
-gira lì in un workspace temporaneo, con `--dangerously-skip-permissions` quando ha gli
-strumenti di Veles — altrimenti agy rifiuta le chiamate MCP in modalità headless — e un
-hook in quel workspace nega ogni suo strumento; anche un hook che fallisce nega. Il file
-dell'hook sta sotto `.agents/`, quindi agy non può riscriverlo tramite gli strumenti di
-Veles senza la tua conferma.
+MCP si trova in `.veles/tmp/delegate-<pid>/`, una per ogni processo in esecuzione, che gli
+strumenti per i file dell'agente non possono scrivere. `agy` gira in un workspace
+temporaneo fuori dal progetto, sotto `~/.veles/tmp/`, quindi gli hook e i server MCP di
+`.agents/` del progetto non lo raggiungono mai. Gira con `--dangerously-skip-permissions`
+quando ha gli strumenti di Veles — altrimenti agy rifiuta le chiamate MCP in modalità
+headless — e un hook in quel workspace nega ogni suo strumento; anche un hook che fallisce
+nega. Gli strumenti per i file di Veles non possono scrivere fuori dal progetto, quindi
+agy non può riscrivere quell'hook tramite essi.
 
 Limiti noti:
 

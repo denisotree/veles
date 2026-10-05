@@ -74,8 +74,10 @@ sozinho quando o nomeia.
 O delegado é apenas o modelo: as ferramentas do Veles chegam até ele por uma ponte MCP, e
 cada chamada passa pela escada de confiança do Veles. A configuração da ponte fica numa
 diretoria do processo em execução, `.veles/tmp/delegate-<pid>/`, removida quando este
-termina. O `agy` corre aí num espaço de trabalho temporário, e não no seu projecto, atrás
-de um filtro que nega o seu próprio shell e as suas ferramentas de ficheiros.
+termina. O `agy` corre num espaço de trabalho temporário fora do seu projecto (em
+`~/.veles/tmp/`), pelo que a configuração `.agents/` do próprio projecto nunca chega
+até ele, atrás de um filtro que nega o seu próprio shell e as suas ferramentas de
+ficheiros.
 
 ## Estado multimodal (visão / fala-para-texto)
 

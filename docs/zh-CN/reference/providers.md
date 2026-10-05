@@ -45,7 +45,7 @@ veles run --provider ollama --model qwen3:4b-instruct "..."
 
 如果你持有 Claude 或 Google 订阅，Veles 可以以无界面方式运行其 CLI 并充当协调者——无需单独的 API key。`claude-cli` 是内置的；`antigravity-cli`（即 `agy` CLI）是一个注册表模块，在你指定它时会自行安装。
 
-委托方只充当模型：Veles 的 tools 通过 MCP 桥接触达它，每一次调用都要经过 Veles 的信任阶梯。桥接的配置位于运行中进程的目录 `.veles/tmp/delegate-<pid>/` 中，进程退出时即被删除。`agy` 在该目录下的临时工作区中运行，而不是在你的项目里，并且有一道关卡会拒绝它自带的 shell 和文件 tools。
+委托方只充当模型：Veles 的 tools 通过 MCP 桥接触达它，每一次调用都要经过 Veles 的信任阶梯。桥接的配置位于运行中进程的目录 `.veles/tmp/delegate-<pid>/` 中，进程退出时即被删除。`agy` 在你项目之外（`~/.veles/tmp/` 下）的临时工作区中运行，因此项目自己的 `.agents/` 配置不会触及它，并且有一道关卡会拒绝它自带的 shell 和文件 tools。
 
 ## 多模态状态（视觉 / 语音转文字）
 

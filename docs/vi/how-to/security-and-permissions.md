@@ -88,12 +88,13 @@ của Veles: shell, công cụ sửa tệp và web riêng của chúng, cài đ�
 dự án, cùng các máy chủ MCP khác đều không áp dụng, và mọi công cụ Veles chúng gọi
 đều đi qua thang trust ở trên (ở đó không ai trả lời được prompt, nên bất cứ thứ gì
 chưa được cấp đều bị từ chối). Config MCP của chúng nằm trong
-`.veles/tmp/delegate-<pid>/`, mỗi tiến trình đang chạy một thư mục. `agy` chạy trong
-một workspace tạm ở đó, kèm `--dangerously-skip-permissions` khi nó có các công cụ của
+`.veles/tmp/delegate-<pid>/`, mỗi tiến trình đang chạy một thư mục, mà các công cụ tệp
+của agent không ghi vào được. `agy` chạy trong một workspace tạm bên ngoài dự án, dưới
+`~/.veles/tmp/`, nên các hook và máy chủ MCP trong `.agents/` của chính dự án không bao
+giờ đến được nó. Nó chạy kèm `--dangerously-skip-permissions` khi có các công cụ của
 Veles — nếu không agy từ chối các lệnh gọi MCP ở chế độ headless — và một hook trong
-workspace đó từ chối mọi công cụ của chính nó; một hook bị lỗi cũng từ chối. Tệp hook
-nằm dưới `.agents/`, nên agy không thể ghi đè nó qua các công cụ của Veles nếu không có
-xác nhận của bạn.
+workspace đó từ chối mọi công cụ của chính nó; một hook bị lỗi cũng từ chối. Các công
+cụ tệp của Veles không ghi ra ngoài dự án, nên agy không thể ghi đè hook đó qua chúng.
 
 Các giới hạn đã biết:
 

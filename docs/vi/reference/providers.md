@@ -72,8 +72,9 @@ gọi tên nó.
 Bên được ủy thác chỉ đóng vai trò model: các tool của Veles tiếp cận nó qua một cầu
 nối MCP, và mọi lời gọi đều đi qua thang tin cậy của Veles. Config của cầu nối nằm
 trong một thư mục của tiến trình đang chạy, `.veles/tmp/delegate-<pid>/`, được xóa
-khi tiến trình thoát. `agy` chạy ở đó trong một workspace tạm, không phải trong dự
-án của bạn, sau một cổng chặn shell và các tool tệp của chính nó.
+khi tiến trình thoát. `agy` chạy trong một workspace tạm bên ngoài dự án của bạn (dưới
+`~/.veles/tmp/`), nên config `.agents/` của chính dự án không bao giờ đến được nó, sau
+một cổng chặn shell và các tool tệp của chính nó.
 
 ## Trạng thái đa phương thức (vision / chuyển giọng nói thành văn bản)
 

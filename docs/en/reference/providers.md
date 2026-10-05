@@ -67,8 +67,9 @@ as coordinator — no separate API key. `claude-cli` is builtin; `antigravity-cl
 The delegate is only the model: Veles' tools reach it over an MCP bridge, and every
 call goes through Veles' trust ladder. The bridge's config lives in a directory of
 the running process, `.veles/tmp/delegate-<pid>/`, removed when it exits. `agy` runs
-in a scratch workspace there, not in your project, behind a gate that denies its own
-shell and file tools.
+in a scratch workspace outside your project (under `~/.veles/tmp/`), so the project's
+own `.agents/` config never reaches it, behind a gate that denies its own shell and
+file tools.
 
 ## Multimodal status (vision / speech-to-text)
 

@@ -81,11 +81,12 @@ batch run প্রত্যাখ্যান করে।
 file-edit ও web tool, প্রজেক্টের `.claude/` settings ও hook, এবং অন্য MCP server প্রযোজ্য হয় না, আর
 তারা যে Veles tool-ই কল করে তা উপরের trust ladder-এর মধ্য দিয়ে যায় (সেখানে prompt-এর উত্তর দেওয়ার কেউ
 নেই, তাই আগে থেকে grant না করা সবকিছু প্রত্যাখ্যাত হয়)। তাদের MCP config থাকে
-`.veles/tmp/delegate-<pid>/`-এ, প্রতিটি চলমান প্রসেসের জন্য একটি করে। `agy` সেখানে একটি scratch
-workspace-এ চলে, Veles-এর tool পেলে `--dangerously-skip-permissions` সহ — অন্যথায় agy headless অবস্থায়
-MCP কল প্রত্যাখ্যান করে — এবং সেই workspace-এর একটি hook তার নিজস্ব প্রতিটি tool বাতিল করে; যে hook ব্যর্থ হয়
-সেটিও বাতিল করে। hook ফাইলটি `.agents/`-এর অধীনে, তাই আপনার নিশ্চিতকরণ ছাড়া agy Veles-এর tool দিয়ে
-সেটি বদলাতে পারে না।
+`.veles/tmp/delegate-<pid>/`-এ, প্রতিটি চলমান প্রসেসের জন্য একটি করে, যেখানে agent-এর file tool
+লিখতে পারে না। `agy` প্রজেক্টের বাইরে, `~/.veles/tmp/`-এর অধীনে, একটি scratch workspace-এ চলে,
+তাই প্রজেক্টের নিজস্ব `.agents/` hook ও MCP server কখনও তার কাছে পৌঁছায় না। Veles-এর tool পেলে
+সে `--dangerously-skip-permissions` সহ চলে — অন্যথায় agy headless অবস্থায় MCP কল প্রত্যাখ্যান করে —
+এবং সেই workspace-এর একটি hook তার নিজস্ব প্রতিটি tool বাতিল করে; যে hook ব্যর্থ হয় সেটিও বাতিল করে।
+Veles-এর file tool প্রজেক্টের বাইরে লিখতে পারে না, তাই agy সেগুলো দিয়ে ওই hook বদলাতে পারে না।
 
 জানা সীমাবদ্ধতা:
 

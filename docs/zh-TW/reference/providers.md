@@ -45,7 +45,7 @@ veles run --provider ollama --model qwen3:4b-instruct "..."
 
 如果你持有 Claude 或 Google 訂閱，Veles 可以以無介面方式執行其 CLI 並充當協調者——不需另一個 API 金鑰。`claude-cli` 是內建的；`antigravity-cli`（即 `agy` CLI）是一個登錄庫模組，在你指定它時會自行安裝。
 
-委派方只充當模型：Veles 的工具透過 MCP 橋接觸及它，每一次呼叫都要經過 Veles 的信任階梯。橋接的設定位於執行中行程的目錄 `.veles/tmp/delegate-<pid>/` 內，行程結束時即被移除。`agy` 在該目錄下的暫存工作區中執行，而不是在你的專案裡，並且有一道關卡會拒絕它自帶的 shell 與檔案工具。
+委派方只充當模型：Veles 的工具透過 MCP 橋接觸及它，每一次呼叫都要經過 Veles 的信任階梯。橋接的設定位於執行中行程的目錄 `.veles/tmp/delegate-<pid>/` 內，行程結束時即被移除。`agy` 在你專案之外（`~/.veles/tmp/` 下）的暫存工作區中執行，因此專案自己的 `.agents/` 設定不會觸及它，並且有一道關卡會拒絕它自帶的 shell 與檔案工具。
 
 ## 多模態狀態（視覺／語音轉文字）
 

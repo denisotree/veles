@@ -80,10 +80,11 @@ Veles 自己的工具修改。檔案工具也會拒絕專案中任何其他 `.ve
 `claude-cli` 與 `antigravity-cli` provider 僅以只帶 Veles 工具的模型身分執行：它們自帶的
 shell、檔案編輯與網路工具、專案的 `.claude/` 設定與 hooks，以及其他 MCP 伺服器都不適用，
 而且它們呼叫的每個 Veles 工具都要經過上述 trust ladder（那裡沒人能回答提示，因此任何尚未授予的操作都會被拒絕）。
-它們的 MCP 設定位於 `.veles/tmp/delegate-<pid>/` 中，每個執行中的行程一份。`agy` 在其中的暫存工作區裡執行，
-當它擁有 Veles 的工具時會帶上 `--dangerously-skip-permissions`——否則 agy 在無介面模式下會拒絕 MCP 呼叫——
-而且該工作區中的一個 hook 會拒絕它自帶的每個工具；hook 本身失敗時同樣會拒絕。hook 檔案位於 `.agents/` 底下，
-因此未經你的確認，agy 無法透過 Veles 的工具改寫它。
+它們的 MCP 設定位於 `.veles/tmp/delegate-<pid>/` 中，每個執行中的行程一份，agent 的檔案工具無法寫入該目錄。`agy` 在專案之外、
+`~/.veles/tmp/` 下的暫存工作區裡執行，因此專案自己的 `.agents/` hooks 與 MCP 伺服器不會觸及它。
+它在擁有 Veles 的工具時會帶上 `--dangerously-skip-permissions`——否則 agy 在無介面模式下會拒絕 MCP 呼叫——
+而且該工作區中的一個 hook 會拒絕它自帶的每個工具；hook 本身失敗時同樣會拒絕。Veles 的檔案工具無法在專案之外寫入，
+因此 agy 無法透過它們改寫該 hook。
 
 已知限制：
 

@@ -75,8 +75,9 @@ instala sozinho quando você o nomeia.
 O delegado é apenas o modelo: as tools do Veles chegam até ele por uma ponte MCP, e
 toda chamada passa pela escada de confiança do Veles. A config da ponte fica em um
 diretório do processo em execução, `.veles/tmp/delegate-<pid>/`, removido quando ele
-termina. O `agy` roda ali em um workspace temporário, não no seu projeto, atrás de um
-gate que nega o shell e as tools de arquivo dele.
+termina. O `agy` roda em um workspace temporário fora do seu projeto (em
+`~/.veles/tmp/`), então a config `.agents/` do próprio projeto nunca chega a ele, atrás
+de um gate que nega o shell e as tools de arquivo dele.
 
 ## Status multimodal (visão / fala-para-texto)
 

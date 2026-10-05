@@ -55,7 +55,7 @@ veles secret set OPENROUTER_API_KEY --project myproj   # 한 프로젝트 전용
 
 명시적인 명령 없이 실행되거나 에이전트 CLI를 조종하는 파일 — `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.agents/`, `.codex/`, `.vscode/`, `.devcontainer/`, `.husky/` 아래의 모든 것, 그리고 `.envrc`, `.mcp.json`, `.pre-commit-config.yaml`, `lefthook.yml`(모두 어떤 깊이든), 그에 더해 저장소의 `core.hooksPath` 디렉터리와 심볼릭 링크된 `.git`이 가리키는 곳 — 에는 에이전트의 파일 도구가 사용자가 그 쓰기를 확인한 뒤에만 씁니다. 신뢰 부여와 자동 조종은 이를 포괄하지 않습니다. 데몬은 채널에서 묻고, 물어볼 사람이 없는 배치 실행은 거부합니다.
 
-`claude-cli`와 `antigravity-cli` 제공자는 Veles 도구만 가진 모델로 실행됩니다. 이들 자체의 셸, 파일 편집·웹 도구, 프로젝트의 `.claude/` 설정과 훅, 다른 MCP 서버는 적용되지 않으며, 이들이 호출하는 모든 Veles 도구는 위의 신뢰 계층을 거칩니다(그곳에서는 프롬프트에 답할 사람이 없으므로 아직 부여되지 않은 것은 모두 거부됩니다). 이들의 MCP 설정은 실행 중인 프로세스마다 하나씩 `.veles/tmp/delegate-<pid>/`에 있습니다. `agy`는 그곳의 스크래치 워크스페이스에서 실행되며, Veles 도구가 있을 때는 `--dangerously-skip-permissions`로 실행됩니다 — 그렇지 않으면 agy가 헤드리스 상태에서 MCP 호출을 거부하기 때문입니다. 그 워크스페이스의 훅이 agy 자체의 모든 도구를 거부하며, 실패하는 훅도 거부합니다. 훅 파일은 `.agents/` 아래에 있으므로, agy는 사용자의 확인 없이는 Veles 도구로 이를 다시 쓸 수 없습니다.
+`claude-cli`와 `antigravity-cli` 제공자는 Veles 도구만 가진 모델로 실행됩니다. 이들 자체의 셸, 파일 편집·웹 도구, 프로젝트의 `.claude/` 설정과 훅, 다른 MCP 서버는 적용되지 않으며, 이들이 호출하는 모든 Veles 도구는 위의 신뢰 계층을 거칩니다(그곳에서는 프롬프트에 답할 사람이 없으므로 아직 부여되지 않은 것은 모두 거부됩니다). 이들의 MCP 설정은 실행 중인 프로세스마다 하나씩 `.veles/tmp/delegate-<pid>/`에 있으며, 에이전트의 파일 도구는 이곳에 쓸 수 없습니다. `agy`는 프로젝트 밖, `~/.veles/tmp/` 아래의 스크래치 워크스페이스에서 실행되므로 프로젝트 자체의 `.agents/` 훅과 MCP 서버가 닿지 않습니다. Veles 도구가 있을 때는 `--dangerously-skip-permissions`로 실행됩니다 — 그렇지 않으면 agy가 헤드리스 상태에서 MCP 호출을 거부하기 때문입니다. 그 워크스페이스의 훅이 agy 자체의 모든 도구를 거부하며, 실패하는 훅도 거부합니다. Veles의 파일 도구는 프로젝트 밖에 쓸 수 없으므로, agy는 이를 통해 그 훅을 다시 쓸 수 없습니다.
 
 알려진 제한:
 

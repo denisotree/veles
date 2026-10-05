@@ -96,12 +96,14 @@ réglages et hooks `.claude/` du projet, et les autres serveurs MCP ne s'appliqu
 pas, et chaque outil Veles qu'ils appellent passe par l'échelle de confiance
 ci-dessus (personne ne peut répondre à une invite là-bas, donc tout ce qui n'est pas
 déjà accordé est refusé). Leur configuration MCP vit dans
-`.veles/tmp/delegate-<pid>/`, une par processus en cours. `agy` s'y exécute dans un
-espace de travail temporaire, avec `--dangerously-skip-permissions` quand il dispose des
-outils de Veles — sinon agy refuse les appels MCP en headless — et un hook de cet
-espace de travail refuse tous ses propres outils ; un hook qui échoue refuse aussi. Le
-fichier du hook se trouve sous `.agents/`, donc agy ne peut pas le réécrire via les
-outils de Veles sans votre confirmation.
+`.veles/tmp/delegate-<pid>/`, une par processus en cours, que les outils de fichiers de
+l'agent ne peuvent pas écrire. `agy` s'exécute dans un espace de travail temporaire hors
+du projet, sous `~/.veles/tmp/`, si bien que les hooks et serveurs MCP de `.agents/` du
+projet ne l'atteignent jamais. Il s'exécute avec `--dangerously-skip-permissions` quand il
+dispose des outils de Veles — sinon agy refuse les appels MCP en headless — et un hook de
+cet espace de travail refuse tous ses propres outils ; un hook qui échoue refuse aussi.
+Les outils de fichiers de Veles ne peuvent pas écrire hors du projet, donc agy ne peut
+pas réécrire ce hook via eux.
 
 Limites connues :
 

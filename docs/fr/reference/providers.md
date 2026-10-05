@@ -75,8 +75,9 @@ seul quand vous le nommez.
 Le délégué n'est que le modèle : les outils de Veles lui parviennent par un pont MCP, et
 chaque appel passe par l'échelle de confiance de Veles. La configuration du pont vit
 dans un répertoire du processus en cours, `.veles/tmp/delegate-<pid>/`, supprimé à sa
-sortie. `agy` s'y exécute dans un espace de travail temporaire, pas dans votre projet,
-derrière une barrière qui refuse ses propres outils shell et fichiers.
+sortie. `agy` s'exécute dans un espace de travail temporaire hors de votre projet (sous
+`~/.veles/tmp/`), si bien que la configuration `.agents/` du projet ne lui parvient
+jamais, derrière une barrière qui refuse ses propres outils shell et fichiers.
 
 ## État du multimodal (vision / reconnaissance vocale)
 

@@ -92,12 +92,14 @@ do Veles: as próprias tools de shell, edição de arquivos e web deles, as conf
 hooks de `.claude/` do projeto e outros servidores MCP não se aplicam, e toda tool do
 Veles que eles chamam passa pela escada de confiança acima (ninguém pode responder a
 uma pergunta ali, então tudo que ainda não foi concedido é recusado). A config de MCP
-deles fica em `.veles/tmp/delegate-<pid>/`, uma por processo em execução. O `agy` roda
-ali em um workspace temporário, com `--dangerously-skip-permissions` quando tem as tools
-do Veles — o agy recusa chamadas MCP em modo headless caso contrário — e um hook nesse
-workspace nega toda tool dele; um hook que falha também nega. O arquivo do hook fica
-sob `.agents/`, então o agy não consegue reescrevê-lo pelas tools do Veles sem a sua
-confirmação.
+deles fica em `.veles/tmp/delegate-<pid>/`, uma por processo em execução, e as tools de
+arquivo do agente não conseguem escrever nela. O `agy` roda em um workspace temporário
+fora do projeto, em `~/.veles/tmp/`, então os hooks e servidores MCP de `.agents/` do
+próprio projeto nunca chegam a ele. Ele roda com `--dangerously-skip-permissions` quando
+tem as tools do Veles — o agy recusa chamadas MCP em modo headless caso contrário — e um
+hook nesse workspace nega toda tool dele; um hook que falha também nega. As tools de
+arquivo do Veles não escrevem fora do projeto, então o agy não consegue reescrever esse
+hook por meio delas.
 
 Limites conhecidos:
 

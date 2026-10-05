@@ -42,8 +42,10 @@ CLI (`agy`) arrives as the `antigravity-cli` registry module; `gemini-cli` is go
   channel. The wizards list registry providers after the installed ones and install the
   pick.
 - `antigravity-cli` (registry module `official/antigravity-cli`): agy runs headless in a
-  scratch workspace under `.veles/tmp`, with Veles' tools over MCP behind a gate that denies
-  agy's own shell and file tools.
+  scratch workspace outside the project (`~/.veles/tmp/agy/`), so a project's own
+  `.agents/` hooks and MCP servers never reach it, with Veles' tools over MCP behind a gate
+  that denies agy's own shell and file tools. `veles.sdk.providers.delegate_workspace` gives
+  a module delegate such a directory.
 - `veles doctor` checks `~/.veles/providers.toml` and every provider your routes name.
 
 ### Changed
@@ -59,6 +61,9 @@ CLI (`agy`) arrives as the `antigravity-cli` registry module; `gemini-cli` is go
   atomically, removed at exit, swept when a crashed process left one.
 - An unknown provider in `veles run`, `veles models`, `veles dream` or `veles daemon start`
   is a one-line error instead of an argparse dump or a traceback.
+- A missing-key error names the command that stores the key where the provider reads it
+  (`veles secret set OPENROUTER_API_KEY`); it suggested `veles secret set <provider>`, a
+  slot nothing reads, and `veles secret add`, which doesn't exist.
 
 ## [1.2.5] — 2026-10-05
 

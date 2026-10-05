@@ -197,7 +197,9 @@ event stream (`_new_state`); running, streaming and errors are shared. Its
 `build_tool_aware` build gives the CLI Veles' tools over MCP: write a config around
 `veles_mcp_server(project)` inside `delegate_dir(project)` (a directory of the running
 process, removed at exit) and set `mcp_tool_name` to how the CLI names an MCP tool, so
-prompts name Veles' tools that way. `official/antigravity-cli` in the public registry is
+prompts name Veles' tools that way. A CLI that reads config from its working directory
+and the folders above it runs in `delegate_workspace(project, name)` — outside the
+project, so a cloned repo's own config files never reach it. `official/antigravity-cli` in the public registry is
 a complete example. List the provider as `provides = ["provider:<id>"]`: naming that id
 in a config, a route or `--provider` then installs the module.
 

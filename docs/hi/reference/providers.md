@@ -67,9 +67,10 @@ veles run --provider ollama --model qwen3:4b-instruct "..."
 
 Delegate केवल model है: Veles के tools उस तक एक MCP bridge के ज़रिए पहुँचते हैं, और हर
 call Veles की trust ladder से गुज़रती है। Bridge का config चल रहे process की एक directory में
-रहता है, `.veles/tmp/delegate-<pid>/`, जो process के exit होने पर हट जाती है। `agy` वहाँ एक
-scratch workspace में चलता है, आपके project में नहीं, एक ऐसे gate के पीछे जो उसके अपने
-shell और file tools को deny करता है।
+रहता है, `.veles/tmp/delegate-<pid>/`, जो process के exit होने पर हट जाती है। `agy` आपके
+project के बाहर (`~/.veles/tmp/` के अंतर्गत) एक scratch workspace में चलता है, इसलिए project का
+अपना `.agents/` config उस तक कभी नहीं पहुँचता, एक ऐसे gate के पीछे जो उसके अपने shell और
+file tools को deny करता है।
 
 ## Multimodal status (vision / speech-to-text)
 

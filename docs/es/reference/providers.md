@@ -73,8 +73,9 @@ nombras.
 El delegado es solo el modelo: las herramientas de Veles le llegan por un puente MCP, y
 cada llamada pasa por la escalera de confianza de Veles. La configuración del puente vive
 en un directorio del proceso en ejecución, `.veles/tmp/delegate-<pid>/`, que se elimina
-cuando termina. `agy` se ejecuta allí en un espacio de trabajo temporal, no en tu
-proyecto, tras una barrera que deniega sus propias herramientas de shell y de archivos.
+cuando termina. `agy` se ejecuta en un espacio de trabajo temporal fuera de tu proyecto
+(bajo `~/.veles/tmp/`), así que la configuración `.agents/` del propio proyecto nunca le
+llega, tras una barrera que deniega sus propias herramientas de shell y de archivos.
 
 ## Estado multimodal (visión / voz a texto)
 
