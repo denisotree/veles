@@ -21,13 +21,15 @@ def ensure_api_key(provider: str = "openrouter", *, project: str | None = None) 
     is `core.provider_factory.has_api_key`: keychain (project scope), keychain
     (default scope), then env vars.
     """
-    from veles.core.provider_factory import PROVIDER_API_KEY_ENVS, has_api_key
+    from veles.core.provider_factory import has_api_key
+    from veles.core.providers import find_provider
 
-    envs = PROVIDER_API_KEY_ENVS.get(provider)
-    if envs is None:
-        return True
+    spec = find_provider(provider)
+    if spec is None or not spec.needs_key:
+        return True  # Task 4 turns the unknown case into a check
     if has_api_key(provider, project=project):
         return True
+    envs = spec.key_env
     label = " (or ".join(envs) + ")" if len(envs) > 1 else envs[0]
     print(
         f"error: no API key for --provider {provider} "

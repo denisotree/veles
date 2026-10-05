@@ -30,7 +30,6 @@ from collections.abc import Callable
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 
-from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
 from veles.core.providers import list_providers
 from veles.core.user_config import (
     UserConfig,
@@ -131,10 +130,12 @@ def _ask_choice(prompter: Prompter, prompt: str, choices: tuple[str, ...], *, de
 
 
 def _hint_about_api_key(provider: str) -> None:
-    envs = PROVIDER_API_KEY_ENVS.get(provider)
-    if not envs:
-        # cli-delegate providers authenticate via their own binary.
-        return
+    from veles.core.providers import find_provider
+
+    spec = find_provider(provider)
+    if spec is None or not spec.needs_key:
+        return  # local servers and CLI delegates carry no key
+    envs = spec.key_env
     if any(os.environ.get(name) for name in envs):
         return
     label = " or ".join(envs)

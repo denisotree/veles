@@ -187,13 +187,13 @@ async def _pick_project_model(
 ) -> str | None:
     """Mirror of user-level ModelStep, scoped to the project."""
     from veles.cli.repl.model_fetcher import validate_and_fetch_models
-    from veles.core.provider_factory import LOCAL_PROVIDERS
+    from veles.core.provider_factory import needs_api_key
     from veles.core.secrets import get_provider_key
     from veles.tui.wizard.user_steps import model_choice_screen
 
     project: Project = ctx.answers["project"]
     slug = project.name
-    if provider in LOCAL_PROVIDERS:
+    if not needs_api_key(provider):
         api_key = "local"
     else:
         api_key = get_provider_key(provider, project=slug) or ""

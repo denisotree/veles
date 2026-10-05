@@ -41,16 +41,6 @@ from veles.core.provider import Provider
 if TYPE_CHECKING:
     from veles.adapters.local._base import LocalOpenAIBase
 
-PROVIDER_API_KEY_ENVS: dict[str, tuple[str, ...]] = {
-    "openrouter": ("OPENROUTER_API_KEY",),
-    "anthropic": ("ANTHROPIC_API_KEY",),
-    "openai": ("OPENAI_API_KEY",),
-    "gemini": ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
-}
-
-LOCAL_PROVIDERS: frozenset[str] = frozenset({"ollama", "llamacpp", "openai-compat"})
-CLI_PROVIDERS: frozenset[str] = frozenset({"claude-cli"})
-
 
 def needs_api_key(provider: str) -> bool:
     """False for a provider that carries no key (local servers, subscription CLIs)."""

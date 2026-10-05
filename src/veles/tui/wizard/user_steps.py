@@ -211,15 +211,15 @@ class ModelStep:
 
     async def run(self, ctx: WizardContext) -> WizardOutcome:
         from veles.cli.repl.model_fetcher import validate_and_fetch_models
-        from veles.core.provider_factory import LOCAL_PROVIDERS
+        from veles.core.provider_factory import needs_api_key
         from veles.core.secrets import get_provider_key
 
         provider = ctx.answers["default_provider"]
         api_status = ctx.answers.get("api_key_status", "")
-        # Resolve the key the user just configured; for local providers
-        # this is a sentinel ("local") because the adapter doesn't
-        # authenticate but still serves /models.
-        if provider in LOCAL_PROVIDERS:
+        # Resolve the key the user just configured; for a provider without a
+        # key this is a sentinel ("local"): a local adapter doesn't authenticate
+        # but still serves /models, a CLI delegate lists its curated models.
+        if not needs_api_key(provider):
             api_key = "local"
         elif api_status == "deferred":
             # No key configured — fall back to curated list so the picker

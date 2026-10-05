@@ -211,4 +211,4 @@ def test_missing_api_key_is_a_clean_vision_error(
 def test_local_provider_is_a_valid_vision_backend() -> None:
     """A local llava/qwen-vl behind ollama speaks the OpenAI wire format —
     that's the free way to give a text-only engine eyes."""
-    assert {"ollama", "llamacpp", "openai-compat"} <= backends.VISION_PROVIDERS
+    assert all(backends.vision_capable(p) for p in ("ollama", "llamacpp", "openai-compat"))

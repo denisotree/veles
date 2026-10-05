@@ -225,6 +225,22 @@ def tui_label(name: str) -> str:
     return f"{spec.label} ({spec.tagline})" if spec.tagline else spec.label
 
 
+def openai_wire_endpoint(name: str) -> tuple[str | None, str]:
+    """`(base_url, api_key)` of an OpenAI-wire provider — vision and embeddings
+    build their own SDK client from it. `base_url=None` means the SDK default."""
+    from veles.core.provider_factory import require_api_key, resolve_api_key
+
+    spec = get_provider(name)
+    if spec.wire != "openai-wire":
+        raise ValueError(f"provider {name!r} does not speak the OpenAI wire format")
+    url = spec.effective_base_url()
+    if url is None and spec.base_url_env:
+        raise ValueError(f"{name} needs {spec.base_url_env} set")
+    if spec.needs_key:
+        return url, require_api_key(name)
+    return url, resolve_api_key(name) or "local"  # the SDK insists on a non-empty key
+
+
 __all__ = [
     "RETIRED",
     "ModelList",
@@ -237,6 +253,7 @@ __all__ = [
     "get_provider",
     "is_cli_provider",
     "list_providers",
+    "openai_wire_endpoint",
     "tui_label",
     "user_catalog_path",
 ]

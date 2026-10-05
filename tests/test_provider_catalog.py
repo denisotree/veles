@@ -173,3 +173,52 @@ def test_context_carries_the_model_to_local_probes() -> None:
     with contributing({"probe": spec}):
         make_provider("probe", model="m-1")
     assert seen[0].name == "probe" and seen[0].model == "m-1"
+
+
+def test_a_user_providers_key_env_routes_to_its_slot(
+    isolated_user_home: Path, fake_keyring, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from veles.core.provider_factory import require_api_key
+    from veles.core.secrets import list_known_names, provider_for_env_name, set_provider_key
+
+    _user_catalogue(
+        '[providers.groq]\nkind = "openai-api"\n'
+        'base_url = "https://api.groq.com/openai/v1"\nkey_env = ["GROQ_API_KEY"]\n'
+    )
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    assert provider_for_env_name("GROQ_API_KEY") == "groq"
+    assert "GROQ_API_KEY" in list_known_names() and "GEMINI_API_KEY" in list_known_names()
+    set_provider_key("groq", "gsk-keychain")
+    assert require_api_key("groq") == "gsk-keychain"
+
+
+def test_openai_wire_endpoint_for_vision_and_embeddings(monkeypatch: pytest.MonkeyPatch) -> None:
+    from veles.core.providers import openai_wire_endpoint
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
+    assert openai_wire_endpoint("openrouter") == ("https://openrouter.ai/api/v1", "or-key")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://10.0.0.5:11434/v1")
+    assert openai_wire_endpoint("ollama") == ("http://10.0.0.5:11434/v1", "local")
+    monkeypatch.delenv("OPENAI_COMPAT_BASE_URL", raising=False)
+    with pytest.raises(ValueError, match="OPENAI_COMPAT_BASE_URL"):
+        openai_wire_endpoint("openai-compat")
+    with pytest.raises(ValueError, match="OpenAI wire"):
+        openai_wire_endpoint("anthropic")
+
+
+def test_the_hand_kept_lists_are_gone() -> None:
+    import veles.core.provider_factory as pf
+    import veles.core.providers as pr
+
+    for name in ("PROVIDER_API_KEY_ENVS", "LOCAL_PROVIDERS", "CLI_PROVIDERS"):
+        assert not hasattr(pf, name), name
+    for name in ("ALL_PROVIDERS", "PROVIDER_VALUES"):
+        assert not hasattr(pr, name), name
+
+
+def test_vision_follows_the_wire(isolated_user_home: Path) -> None:
+    from veles.core.vision import vision_capable
+
+    _user_catalogue('[providers.vllm]\nkind = "local"\nbase_url = "http://127.0.0.1:9/v1"\n')
+    assert vision_capable("vllm") and vision_capable("anthropic") and vision_capable("gemini")
+    assert not vision_capable("claude-cli") and not vision_capable("nope")

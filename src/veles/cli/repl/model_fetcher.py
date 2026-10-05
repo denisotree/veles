@@ -1,23 +1,23 @@
 """Resolve the model list for a given provider for the `/model` picker
 and the `veles models` CLI verb.
 
-Three strategies, picked per provider:
+Three strategies, named by the catalogue entry's `model_list`:
 
-- **Cloud cacheable** (`openrouter`, `openai`, `gemini`) — fetch via
+- **`cached`** (`openrouter`, `openai`, `gemini`) — fetch via
   the adapter's `list_models()`, cache the result on disk at
   `~/.veles/cache/models/<provider>.json` with a 24h TTL. Open the
   picker fast on cache hits; force a refresh via `refresh=True`
   (mapped from `/model refresh` or `veles models … --refresh`). Cloud
   results are merged with the curated fallback so familiar names stay
   visible even if the live API trims them.
-- **Local live-only** (`ollama`, `llamacpp`, `openai-compat`) — fetch
+- **`live`** (`ollama`, `llamacpp`, `openai-compat`) — fetch
   every time, **never cache**. A model installed locally (e.g. via
   `ollama pull`) must show up in the picker without a refresh dance,
   and the localhost round-trip is cheap enough that a cache only adds
   staleness. Live results are returned as-is (no merge with curated),
   because for local providers "what the server reports" is the ground
   truth.
-- **Curated-only** (`anthropic`, `claude-cli`) — no
+- **`curated`** (`anthropic`, `claude-cli`) — no
   network call. Anthropic's SDK does expose a listing endpoint, but
   the curated table is kept by an explicit project decision; cli
   delegates have no listing surface at all.
@@ -42,10 +42,15 @@ _logger = logging.getLogger(__name__)
 
 Source = Literal["live", "cache", "curated"]
 
-CLOUD_CACHEABLE: frozenset[str] = frozenset({"openrouter", "openai", "gemini"})
-LOCAL_LIVE_ONLY: frozenset[str] = frozenset({"ollama", "llamacpp", "openai-compat"})
-
 CACHE_TTL_SECONDS = 24 * 60 * 60
+
+
+def _strategy(provider: str) -> str:
+    """`cached` / `live` / `curated` — the catalogue entry's `model_list`."""
+    from veles.core.providers import find_provider
+
+    spec = find_provider(provider)
+    return spec.model_list if spec else "curated"
 
 
 @dataclass(frozen=True)
@@ -134,12 +139,14 @@ def validate_and_fetch_models(provider: str, api_key: str) -> tuple[bool, list[s
     finds out immediately if their key is wrong, and the model picker
     that follows shows the real catalogue rather than a curated guess.
     """
-    if provider not in CLOUD_CACHEABLE and provider not in LOCAL_LIVE_ONLY:
+    strategy = _strategy(provider)
+    if strategy == "curated":
         return True, known_models(provider), ""
-    from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
+    from veles.core.providers import find_provider
 
-    env_names = PROVIDER_API_KEY_ENVS.get(provider, ())
-    if not env_names and provider not in LOCAL_LIVE_ONLY:
+    spec = find_provider(provider)
+    env_names = spec.key_env if spec else ()
+    if not env_names and strategy != "live":
         return True, known_models(provider), ""
     saved: dict[str, str | None] = {n: os.environ.get(n) for n in env_names}
     try:
@@ -154,7 +161,7 @@ def validate_and_fetch_models(provider: str, api_key: str) -> tuple[bool, list[s
                 os.environ[name] = value
     if models is None:
         return False, [], "provider rejected the key or the request failed"
-    if provider in CLOUD_CACHEABLE:
+    if strategy == "cached":
         models = _merge_with_curated(models, provider)
     return True, models, ""
 
@@ -165,7 +172,8 @@ def fetch_models(provider: str, *, refresh: bool = False) -> ModelList:
     `refresh=True` skips the cache for cloud-cacheable providers (local
     providers are always live anyway, so the flag is a no-op there).
     """
-    if provider in CLOUD_CACHEABLE:
+    strategy = _strategy(provider)
+    if strategy == "cached":
         if not refresh:
             cached = _read_cache(provider)
             if cached is not None:
@@ -180,7 +188,7 @@ def fetch_models(provider: str, *, refresh: bool = False) -> ModelList:
             return ModelList(models=merged, source="live")
         return ModelList(models=known_models(provider), source="curated")
 
-    if provider in LOCAL_LIVE_ONLY:
+    if strategy == "live":
         live = _try_live(provider)
         if live is not None:
             return ModelList(models=live, source="live")

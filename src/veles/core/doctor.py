@@ -166,13 +166,16 @@ def _check_provider_keys(project: Project | None = None) -> CheckResult:
     `veles:OPENROUTER_API_KEY` entry, which the runtime has not read since M149
     — but only for a provider that has no working key, so someone with both a
     stale entry and a wizard key is not told to fix what is not broken."""
-    from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
+    from veles.core.providers import catalog
     from veles.core.secrets import get_provider_key, get_secret
 
     scope = project.name if project is not None else None
     sources: dict[str, str] = {}
     stranded: list[str] = []
-    for provider, env_names in PROVIDER_API_KEY_ENVS.items():
+    for provider, spec in catalog().items():
+        if not spec.needs_key:
+            continue
+        env_names = spec.key_env
         if get_provider_key(provider, project=scope, env_fallback=False):
             sources[provider] = "keychain"
         elif any(os.environ.get(n) for n in env_names):
