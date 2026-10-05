@@ -230,6 +230,18 @@ def test_openai_wire_endpoint_for_vision_and_embeddings(monkeypatch: pytest.Monk
         openai_wire_endpoint("anthropic")
 
 
+def test_no_base_url_never_falls_back_to_the_sdk_default(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A key for one company must not travel to another's default endpoint."""
+    from veles.core.providers import openai_wire_endpoint
+
+    _user_catalogue('[providers.groq]\nkind = "openai-api"\nkey_env = ["GROQ_API_KEY"]\n')
+    monkeypatch.setenv("GROQ_API_KEY", "gsk-secret")
+    with pytest.raises(ValueError, match="base_url"):
+        openai_wire_endpoint("groq")
+
+
 def test_the_hand_kept_lists_are_gone() -> None:
     import veles.core.provider_factory as pf
     import veles.core.providers as pr

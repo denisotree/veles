@@ -244,17 +244,19 @@ def user_catalog_problems() -> list[str]:
     return problems
 
 
-def openai_wire_endpoint(name: str) -> tuple[str | None, str]:
+def openai_wire_endpoint(name: str) -> tuple[str, str]:
     """`(base_url, api_key)` of an OpenAI-wire provider — vision and embeddings
-    build their own SDK client from it. `base_url=None` means the SDK default."""
+    build their own SDK client from it. Never the SDK's default URL: a key for one
+    company must not reach another's endpoint."""
     from veles.core.provider_factory import require_api_key, resolve_api_key
 
     spec = get_provider(name)
     if spec.wire != "openai-wire":
         raise ValueError(f"provider {name!r} does not speak the OpenAI wire format")
     url = spec.effective_base_url()
-    if url is None and spec.base_url_env:
-        raise ValueError(f"{name} needs {spec.base_url_env} set")
+    if url is None:
+        hint = spec.base_url_env or "base_url in ~/.veles/providers.toml"
+        raise ValueError(f"{name} has no base_url — set {hint}")
     if spec.needs_key:
         return url, require_api_key(name)
     return url, resolve_api_key(name) or "local"  # the SDK insists on a non-empty key
