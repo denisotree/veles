@@ -54,7 +54,7 @@ def ensure_api_key(provider: str = "openrouter", *, project: str | None = None) 
     label = " (or ".join(envs) + ")" if len(envs) > 1 else envs[0]
     print(
         f"error: no API key for --provider {provider} "
-        f"(set {label} or store via `veles secret set {provider}`)",
+        f"(set {label} or store via `veles secret set {envs[0]}`)",
         file=sys.stderr,
     )
     return False

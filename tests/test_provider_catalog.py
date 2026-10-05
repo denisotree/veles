@@ -230,6 +230,27 @@ def test_openai_wire_endpoint_for_vision_and_embeddings(monkeypatch: pytest.Monk
         openai_wire_endpoint("anthropic")
 
 
+def test_a_missing_key_names_the_command_that_stores_it(
+    isolated_user_home: Path, fake_keyring, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """The hint must name the env var — `veles secret set <id>` stores a flat entry
+    no provider reads, and `veles secret add` does not exist."""
+    from veles.cli._console import ensure_api_key
+    from veles.core.provider_factory import require_api_key
+
+    _user_catalogue(
+        '[providers.groq]\nkind = "openai-api"\n'
+        'base_url = "https://api.groq.com/openai/v1"\nkey_env = ["GROQ_API_KEY"]\n'
+    )
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    with pytest.raises(RuntimeError) as exc:
+        require_api_key("groq")
+    assert "veles secret set GROQ_API_KEY" in str(exc.value)
+    assert "secret add" not in str(exc.value)
+    assert ensure_api_key("groq") is False
+    assert "veles secret set GROQ_API_KEY" in capsys.readouterr().err
+
+
 def test_no_base_url_never_falls_back_to_the_sdk_default(
     isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
