@@ -32,6 +32,12 @@ _CLOSED = (
     ".veles/wiki.toml",
     ".veles/jobs/j.md",
     ".veles/NEW-FILE",
+    # A CLI delegate's run files: claude reads its --mcp-config here, the MCP child its
+    # budget — an agent that could rewrite them would run any command / reset the budget.
+    ".veles/tmp/delegate-1/mcp.json",
+    ".veles/tmp/delegate-1/budget.json",
+    ".veles/tmp/Delegate-1/mcp.json",
+    ".veles/tmp/delegate-1/agy/.agents/hooks.json",
 )
 _OPEN = (
     ".veles/skills/x/SKILL.md",

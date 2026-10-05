@@ -29,8 +29,6 @@ _PROTECTED = (
     "sub/.Claude/commands/x.md",
     ".gemini/settings.json",
     ".agents/mcp_config.json",
-    # antigravity-cli's tool gate: agy, over Veles' MCP, must not lift its own hook.
-    ".veles/tmp/delegate-1/agy/.agents/hooks.json",
     ".codex/config.toml",
     ".devcontainer/devcontainer.json",
     ".husky/pre-push",

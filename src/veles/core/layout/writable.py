@@ -59,6 +59,7 @@ import subprocess
 import unicodedata
 from pathlib import Path
 
+from veles.core.delegate_dir import DIR_PREFIX as _DELEGATE_PREFIX
 from veles.core.path_guard import is_inside
 from veles.core.project import Project
 
@@ -286,6 +287,11 @@ def _state_verdict(project: Project, abs_path: Path) -> bool | None:
         return False
     if not in_state:
         return None
+    # A CLI delegate's run files (`.veles/tmp/delegate-<pid>/`): claude runs whatever its
+    # --mcp-config names, and the MCP child trusts the budget there.
+    delegate = len(parts) > 2 and _folded(parts[1]) == "tmp"
+    if delegate and _folded(parts[2]).startswith(_DELEGATE_PREFIX):
+        return False
     return any(
         is_inside(abs_path, state / name, fold=False)
         for name in AGENT_WRITABLE_STATE

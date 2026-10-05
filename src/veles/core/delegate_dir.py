@@ -17,12 +17,14 @@ from pathlib import Path
 from veles.core.process import is_alive
 from veles.core.project import Project
 
-_PREFIX = "delegate-"
+# The agent's file tools refuse anything under `.veles/tmp/delegate-*`
+# (`core/layout/writable.py`): claude runs what its --mcp-config names.
+DIR_PREFIX = "delegate-"
 _registered: set[Path] = set()
 
 
 def delegate_dir(project: Project) -> Path:
-    path = project.tmp_dir / f"{_PREFIX}{os.getpid()}"
+    path = project.tmp_dir / f"{DIR_PREFIX}{os.getpid()}"
     if path not in _registered:
         _sweep(path.parent)
         path.mkdir(parents=True, exist_ok=True)
@@ -36,7 +38,7 @@ def delegate_budget_file(project: Project) -> Path:
 
 
 def _sweep(parent: Path) -> None:
-    for stale in parent.glob(f"{_PREFIX}*"):
-        pid = stale.name[len(_PREFIX) :]
+    for stale in parent.glob(f"{DIR_PREFIX}*"):
+        pid = stale.name[len(DIR_PREFIX) :]
         if pid.isdigit() and not is_alive(int(pid)):
             shutil.rmtree(stale, ignore_errors=True)
