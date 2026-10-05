@@ -392,6 +392,29 @@ def channel_leaf_label(channel: str) -> str:
     return f"chan: {channel}"
 
 
+def channel_blocker(node: DaemonNode) -> str | None:
+    """Why the daemon behind `node` would refuse to start (no channel ready), or
+    None. Checked before a restart stops the running one."""
+    from veles.core.channel_setup import channel_readiness, no_channel_message
+    from veles.core.module_loading import load_project_modules
+    from veles.core.modules import reset_module_registry, set_module_registry
+    from veles.core.project import ProjectNotFound, load_project
+
+    try:
+        project = load_project(Path(node.project_path))
+    except ProjectNotFound:
+        return f"{node.project_path} is no longer a Veles project"
+    session = node.name if node.kind == "named" else None
+    token = set_module_registry(load_project_modules(project))
+    try:
+        statuses = channel_readiness(project, session)
+    finally:
+        reset_module_registry(token)
+    if any(s.state == "ok" for s in statuses):
+        return None
+    return no_channel_message(statuses, session)
+
+
 def spawn_daemon_node(node: DaemonNode) -> bool:
     """Spawn the daemon backing `node`, detached. Registry/unnamed → host/port
     in its own project root; named → adds `--name` so the child re-attaches its

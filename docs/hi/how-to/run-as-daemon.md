@@ -6,6 +6,14 @@ daemon एक वैकल्पिक, दीर्घजीवी HTTP+WS serv
 करता है — यह [channels](connect-telegram.md) (Telegram, …), scheduled
 [jobs](long-running-tasks.md), और remote/headless उपयोग की नींव है।
 
+daemon channels को host करता है, इसलिए यह तभी शुरू होता है जब कम से कम एक channel तैयार हो —
+उसका module installed और उसके secrets अपनी जगह पर। किसी के न होने पर terminal में
+`veles daemon start` एक जोड़ने की पेशकश करता है; terminal के बिना यह मना कर देता है और चलाने का command
+print करता है (`veles channel add --channel <platform>`, या registry install)। `[channels.<platform>]` में
+declare किया गया channel शुरू होने पर आपके जुड़े हुए registries से अपना module install करता है।
+Channel platforms modules हैं — देखें [Telegram channel जोड़ें](connect-telegram.md) और
+[modules से Veles को extend करें](../../en/how-to/extend-veles-with-modules.md)।
+
 ## शुरू और बंद करना
 
 ```bash

@@ -346,13 +346,14 @@ HTTP+WS daemon चलाएँ/नियंत्रित करें। स�
 `--provider` प्रोजेक्ट config पर default होते हैं और daemon के जीवनकाल भर के लिए fixed रहते हैं।
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-बाहरी chat gateways (Telegram, …) जो किसी daemon से बात करते हैं। देखें
+बाहरी chat gateways (Telegram, …) जो किसी daemon से बात करते हैं। एक platform extension registry का
+module है; `run` और `add` उसके न होने पर उसे install करते हैं। देखें
 [Telegram जोड़ें](../how-to/connect-telegram.md)।
 
 | Subcommand | उद्देश्य |
 |---|---|
-| `list` | पंजीकृत channel platforms + session counts सूचीबद्ध करें |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | foreground में एक gateway शुरू करें |
+| `list` | installed channel platforms + session counts सूचीबद्ध करें, और वे declared channels जिनका module मौजूद नहीं |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | foreground में एक gateway शुरू करें; `--secret` platform का primary secret है (अन्यथा keychain या उसका env var) |
 | `list-sessions [--channel C]` | `chat_id → session_id` mappings दिखाएँ |
 | `reset-session <chat_id> [--channel C]` | एक mapping भूलें (अगला message नए सिरे से शुरू होगा) |
 | `add [--channel C] [--session S]` | किसी daemon से एक channel जोड़ें (wizard; creds → keychain) |

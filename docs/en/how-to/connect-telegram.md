@@ -6,9 +6,15 @@ Talk to a Veles project from Telegram. A channel is a gateway that forwards
 messages to a [daemon](run-as-daemon.md) and streams replies back. Each chat gets
 its own conversation session.
 
+Telegram is a module from the official extension registry (`official/telegram`),
+not part of the Veles core. You don't install it by hand: `veles channel add`
+offers it, and a `[channels.telegram]` block in your config installs it on the
+next `veles daemon start` — you declared the channel, so that is the go-ahead.
+It installs from your connected registries only.
+
 ## Prerequisites
 
-- A running daemon (see [run as a daemon](run-as-daemon.md)).
+- A Veles project (a daemon starts only with a working channel — this is one).
 - A Telegram bot token from [@BotFather](https://t.me/BotFather).
 
 ## Option A — attach via the wizard (recommended)
@@ -41,22 +47,32 @@ The **whitelist** restricts who the bot answers (Telegram `@username` or numeric
 user id). Leave it empty to answer everyone — not recommended, since every
 message spends model tokens.
 
-Restart the daemon to apply:
+Start (or restart) the daemon to apply:
 
 ```bash
-veles daemon restart
+veles daemon start      # or: veles daemon restart
 ```
+
+Writing the block by hand works the same way. Put the token in the keychain with
+`veles channel add`, or in the block as `bot_token = "…"`; if the token is
+missing, the daemon refuses to start and names the command that fixes it.
 
 ## Option B — run a standalone gateway
 
 If you prefer a separate process (instead of the in-daemon channel), run:
 
 ```bash
-export TELEGRAM_BOT_TOKEN=123456:ABC...
+export TELEGRAM_BOT_TOKEN=123456:ABC...   # or pass --secret
 veles channel run --channel telegram \
   --daemon-url http://127.0.0.1:8765 \
   --daemon-token "$(veles daemon token add tg)"
 ```
+
+`veles channel run --channel telegram` installs the module first if it isn't there.
+
+The daemon it talks to starts only with a channel of its own ready, so this fits a
+daemon that already hosts a different channel. Don't run the same bot in both
+places: Telegram hands a bot's updates to one poller only, so the second one fails.
 
 ## Manage chat sessions
 
@@ -85,6 +101,11 @@ continues one that stopped.
 When the agent needs a detail only you can give, it asks in the chat. Tap one
 of the suggested answers or type your own. If you don't answer within five
 minutes, it goes ahead on its best assumption and says what it assumed.
+
+`/settings` shows the model (fixed by the daemon's config), the chat's session,
+its token usage and the mode buttons in one message. `/tokens` shows the
+session's token usage since the daemon started; `/context` shows how full the
+model's context window is.
 
 ## Multimodal limitation
 

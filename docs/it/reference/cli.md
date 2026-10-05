@@ -354,13 +354,14 @@ Avvia/controlla il daemon HTTP+WS. `veles daemon` da solo apre la TUI del
 per tutta la durata del daemon.
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-Gateway di chat esterni (Telegram, …) che dialogano con un daemon. Vedi
+Gateway di chat esterni (Telegram, …) che dialogano con un daemon. Una piattaforma è un modulo
+del registry delle estensioni; `run` e `add` lo installano se manca. Vedi
 [connettere Telegram](../how-to/connect-telegram.md).
 
 | Sottocomando | Scopo |
 |---|---|
-| `list` | Elenca le piattaforme di canale registrate + il conteggio delle sessioni |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | Avvia un gateway in primo piano |
+| `list` | Elenca le piattaforme di canale installate + il conteggio delle sessioni, e i canali dichiarati il cui modulo manca |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | Avvia un gateway in primo piano; `--secret` è il segreto principale della piattaforma (altrimenti il keychain o la sua variabile d'ambiente) |
 | `list-sessions [--channel C]` | Mostra le mappature `chat_id → session_id` |
 | `reset-session <chat_id> [--channel C]` | Dimentica una mappatura (il prossimo messaggio parte da zero) |
 | `add [--channel C] [--session S]` | Collega un canale a un daemon (procedura guidata; credenziali → keychain) |

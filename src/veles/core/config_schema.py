@@ -29,9 +29,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from veles.core.project_config import get_section
+
+if TYPE_CHECKING:
+    from veles.core.platforms import PlatformSpec
 
 # Keys valid under `[daemon]` (flat legacy scalars) and `[daemon.<name>]`.
 _DAEMON_KNOWN = frozenset(
@@ -41,9 +44,9 @@ _DAEMON_KNOWN = frozenset(
 _MCP_SERVER_KNOWN = frozenset(
     {"transport", "command", "args", "env", "url", "timeout_s", "connect_timeout_s", "enabled"}
 )
-# Channel keys common to every platform; per-platform cred fields are added on
-# top (from the platform registry), so new platforms need no change here.
-_CHANNEL_BASE_KEYS = frozenset({"enabled", "chat_id"})
+# Channel keys common to every platform; each platform's cred fields and declared
+# config keys are added on top (from its `platform` contribution).
+_CHANNEL_BASE_KEYS = frozenset({"enabled"})
 # Keys valid under `[engine]` (M255). Verified against every consumer:
 # `model_resolver.resolve_effective_provider/model`, `routing/ensemble.py`, and
 # `tui_state.persist_model_choice` read `provider`/`model` and nothing else;
@@ -74,21 +77,22 @@ class ConfigFinding:
     known: tuple[str, ...]
 
 
-def _channel_known_keys(platform: str) -> frozenset[str]:
-    from veles.channels.platform_registry import ensure_builtins_registered, get_platform
+def _channel_known_keys(platform: str) -> frozenset[str] | None:
+    """Keys a channel block may have, or None when no loaded module provides the
+    platform — then there is nothing to check its keys against (not a typo)."""
+    from veles.core.platforms import get_platform
 
     try:
-        # `daemon start` validates the config before anything imports a channel
-        # module — bootstrap the builtin registry here, or `get_platform` raises
-        # on an empty registry and the validator degrades to base keys, falsely
-        # flagging legitimate per-platform keys like `whitelist` (live 2026-07-09).
-        ensure_builtins_registered()
-        entry = get_platform(platform)
-    except Exception:
-        # Unknown platform (possibly itself a typo) — validate only base keys
-        # rather than crash; the missing gateway surfaces elsewhere.
-        return _CHANNEL_BASE_KEYS
-    return _CHANNEL_BASE_KEYS | {f.key for f in entry.cred_fields}
+        spec = get_platform(platform)
+    except KeyError:
+        return None
+    return platform_keys(spec)
+
+
+def platform_keys(spec: PlatformSpec) -> frozenset[str]:
+    """The keys a block of this platform may hold: the base ones, its cred
+    fields, its declared `config_keys` (`veles.sdk.channel_checks` checks the same)."""
+    return _CHANNEL_BASE_KEYS | {f.key for f in spec.cred_fields} | spec.config_keys
 
 
 def _check(section: str, cfg: dict[str, Any], known: frozenset[str]) -> list[ConfigFinding]:
@@ -102,8 +106,9 @@ def _check(section: str, cfg: dict[str, Any], known: frozenset[str]) -> list[Con
 def _check_channels(prefix: str, channels: dict[str, Any]) -> list[ConfigFinding]:
     out: list[ConfigFinding] = []
     for platform, pcfg in channels.items():
-        if isinstance(pcfg, dict):
-            out += _check(f"{prefix}{platform}", pcfg, _channel_known_keys(platform))
+        known = _channel_known_keys(platform)
+        if isinstance(pcfg, dict) and known is not None:
+            out += _check(f"{prefix}{platform}", pcfg, known)
     return out
 
 

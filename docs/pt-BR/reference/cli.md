@@ -351,13 +351,14 @@ Executa/controla o daemon HTTP+WS. `veles daemon` sem argumentos abre a TUI do
 todo o ciclo de vida do daemon.
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-Gateways de chat externos (Telegram, …) que conversam com um daemon. Veja
+Gateways de chat externos (Telegram, …) que conversam com um daemon. Uma plataforma é um módulo
+do registro de extensões; `run` e `add` o instalam quando ele está ausente. Veja
 [conectar o Telegram](../how-to/connect-telegram.md).
 
 | Subcomando | Finalidade |
 |---|---|
-| `list` | Lista as plataformas de canal registradas + contagem de sessões |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | Inicia um gateway em primeiro plano |
+| `list` | Lista as plataformas de canal instaladas + contagem de sessões, e os canais declarados cujo módulo está ausente |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | Inicia um gateway em primeiro plano; `--secret` é o segredo principal da plataforma (senão o keychain ou sua variável de ambiente) |
 | `list-sessions [--channel C]` | Mostra os mapeamentos `chat_id → session_id` |
 | `reset-session <chat_id> [--channel C]` | Esquece um mapeamento (a próxima mensagem começa do zero) |
 | `add [--channel C] [--session S]` | Vincula um canal a um daemon (assistente; credenciais → chaveiro) |

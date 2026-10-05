@@ -1,7 +1,6 @@
 """Daemon-side `start_channel_runners` reads `.veles/config.toml` and
-spawns in-process channel gateways. We mock the TelegramGateway's
-network surface (`_telegram_send` + getUpdates returning []) so the
-test loop exits cleanly.
+spawns in-process channel gateways — here the test platform `fake`, whose
+gateway only records that it started.
 """
 
 from __future__ import annotations
@@ -41,98 +40,59 @@ def _write_config(project, body: str) -> None:
     cfg.write_text(body, encoding="utf-8")
 
 
+def test_daemon_builds_a_module_platform_from_context(state: DaemonState, fake_platform) -> None:
+    """`[channels.fake]` + a keychain token → the gateway is built through
+    `spec.build(ctx)`: config and secrets arrive in the context, no platform branch."""
+    from veles.daemon.channels import _build_channel_gateway
+
+    set_provider_key("fake", "tok", project=state.project.name)
+    gw = _build_channel_gateway(
+        "fake", {"enabled": True, "room": "r1"}, backend=object(), state=state
+    )
+    assert gw is not None
+    assert gw.ctx.config["room"] == "r1" and gw.ctx.secrets == {"token": "tok"}
+    assert gw.ctx.project is state.project and gw.ctx.name == "fake"
+
+
 def test_no_config_means_no_channel_runners(state: DaemonState) -> None:
     start_channel_runners(state)
     assert state.channel_runners == []
     assert state.channel_tasks == []
 
 
-def test_disabled_telegram_skipped(state: DaemonState) -> None:
-    _write_config(
-        state.project,
-        "[channels.telegram]\nenabled = false\nwhitelist = []\n",
-    )
+def test_disabled_channel_skipped(state: DaemonState, fake_platform) -> None:
+    _write_config(state.project, "[channels.fake]\nenabled = false\n")
     start_channel_runners(state)
     assert state.channel_runners == []
 
 
-def test_enabled_but_no_token_skipped(state: DaemonState, caplog) -> None:
+def test_enabled_but_no_token_skipped(state: DaemonState, caplog, fake_platform) -> None:
     import logging
 
-    _write_config(
-        state.project,
-        '[channels.telegram]\nenabled = true\nwhitelist = ["@foo"]\n',
-    )
+    _write_config(state.project, '[channels.fake]\nenabled = true\nrooms = ["@foo"]\n')
     with caplog.at_level(logging.WARNING, logger="veles.daemon.server"):
         start_channel_runners(state)
     assert state.channel_runners == []
     # M110: warning now lands in the logger (and the daemon log file),
     # not on stderr — that's how the picker's log view will surface it.
-    assert any("no bot token" in rec.message for rec in caplog.records)
+    assert any("missing token" in rec.message for rec in caplog.records)
+    assert any("veles channel add --channel fake" in rec.getMessage() for rec in caplog.records)
 
 
-async def test_enabled_with_keychain_token_starts_gateway(state: DaemonState, monkeypatch) -> None:
-    set_provider_key("telegram", "tok-test", project=state.project.name)
-    _write_config(
-        state.project,
-        '[channels.telegram]\nenabled = true\nwhitelist = ["@foo", "12345"]\n',
-    )
-    # Stub TelegramGateway.start so we don't enter the real poll loop.
-    started: list[bool] = []
-    stopped: list[bool] = []
+async def test_enabled_with_keychain_token_starts_gateway(
+    state: DaemonState, fake_platform
+) -> None:
+    import asyncio
 
-    async def fake_start(self):
-        started.append(True)
-
-    async def fake_stop(self):
-        stopped.append(True)
-
-    from veles.channels import telegram as tg_mod
-
-    monkeypatch.setattr(tg_mod.TelegramGateway, "start", fake_start)
-    monkeypatch.setattr(tg_mod.TelegramGateway, "stop", fake_stop)
+    set_provider_key("fake", "tok-test", project=state.project.name)
+    _write_config(state.project, '[channels.fake]\nenabled = true\nrooms = ["@foo", "12345"]\n')
 
     start_channel_runners(state)
     assert len(state.channel_runners) == 1
     gateway = state.channel_runners[0]
-    assert gateway.bot_token == "tok-test"
-    assert gateway.whitelist == ("@foo", "12345")
-
-    # Let the asyncio task run.
-    import asyncio
+    assert gateway.ctx.secrets == {"token": "tok-test"}
+    assert gateway.ctx.config["rooms"] == ["@foo", "12345"]
 
     for task in list(state.channel_tasks):
         await asyncio.wait_for(task, timeout=2.0)
-    assert started == [True]
-
-    # Clean up keychain entry to avoid polluting other tests.
-    from veles.core.secrets import delete_provider_key
-
-    delete_provider_key("telegram", project=state.project.name)
-
-
-async def test_legacy_chat_id_promoted_to_whitelist(state: DaemonState, monkeypatch) -> None:
-    set_provider_key("telegram", "tok-test", project=state.project.name)
-    _write_config(
-        state.project,
-        '[channels.telegram]\nenabled = true\nchat_id = "555"\n',
-    )
-
-    async def fake_start(self):
-        pass
-
-    from veles.channels import telegram as tg_mod
-
-    monkeypatch.setattr(tg_mod.TelegramGateway, "start", fake_start)
-
-    start_channel_runners(state)
-    assert state.channel_runners[0].whitelist == ("555",)
-
-    import asyncio
-
-    for task in list(state.channel_tasks):
-        await asyncio.wait_for(task, timeout=2.0)
-
-    from veles.core.secrets import delete_provider_key
-
-    delete_provider_key("telegram", project=state.project.name)
+    assert gateway.started

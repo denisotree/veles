@@ -6,6 +6,15 @@ El daemon es un servidor HTTP+WS opcional de larga duración que expone el agent
 una API — la base para los [canales](connect-telegram.md) (Telegram, …), los
 [trabajos](long-running-tasks.md) programados y el uso remoto/sin interfaz.
 
+Un daemon aloja canales, así que solo arranca cuando al menos un canal está listo:
+su módulo instalado y sus secretos en su sitio. Sin ninguno, `veles daemon start`
+en un terminal ofrece conectar uno; sin terminal se niega e imprime el comando a
+ejecutar (`veles channel add --channel <platform>`, o la instalación desde el
+registro). Un canal declarado en `[channels.<platform>]` instala su módulo desde
+tus registros conectados al arrancar. Las plataformas de canal son módulos — consulta
+[conectar un canal de Telegram](connect-telegram.md) y
+[extender Veles con módulos](../../en/how-to/extend-veles-with-modules.md).
+
 ## Iniciar y detener
 
 ```bash

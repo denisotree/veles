@@ -7,7 +7,8 @@ validate:
   script:
     - git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
     - >
-      uvx --from 'veles-ai==@@VELES_VERSION@@' --with pytest veles registry validate .
+      uvx --from 'veles-ai==@@VELES_VERSION@@' --with pytest --with pytest-asyncio
+      veles registry validate .
       --run-code --install-requires --base "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" --report review.md
   artifacts:
     when: always

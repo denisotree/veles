@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from veles.channels.session_map import SessionMap, channel_session_path
+from veles.core.chat_sessions import SessionMap, channel_session_path
 
 
 @pytest.fixture()

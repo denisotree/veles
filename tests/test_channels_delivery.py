@@ -4,19 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from veles.channels import platform_registry as pr
 from veles.channels.delivery import DeliveryError, DeliveryRouter
 from veles.core.delivery_target import DeliveryTarget
-
-
-@pytest.fixture(autouse=True)
-def _isolated_registry():
-    snapshot = dict(pr._REGISTRY)
-    pr._reset_registry_for_tests()
-    yield
-    pr._reset_registry_for_tests()
-    pr._REGISTRY.update(snapshot)
-
 
 # ---- DeliveryTarget.parse ----
 
@@ -93,7 +82,6 @@ async def test_unresolved_origin_raises():
 
 
 async def test_platform_deliverer_dispatch():
-    pr.register_platform("fake", lambda **_: None)
     seen: list[tuple[str, str, str | None]] = []
 
     async def deliverer(chat_id: str, text: str, thread_id: str | None) -> None:
@@ -113,9 +101,9 @@ async def test_platform_unregistered_raises():
     assert "nope" in str(excinfo.value)
 
 
-async def test_platform_registered_but_no_deliverer_raises():
-    pr.register_platform("fake", lambda **_: None)
+async def test_a_platform_with_no_running_channel_raises(fake_platform):
+    """Installed (contributed) is not enough: only a running channel delivers."""
     router = DeliveryRouter()
     with pytest.raises(DeliveryError) as excinfo:
         await router.deliver("fake:42", "hi")
-    assert "no deliverer" in str(excinfo.value)
+    assert "no 'fake' channel is running" in str(excinfo.value)

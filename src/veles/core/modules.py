@@ -219,6 +219,12 @@ def discover_modules(project: Project) -> list[ModuleHandle]:
     return discover_modules_in(project.modules_dir)
 
 
+def module_package(name: str) -> str:
+    """The import name a loaded module's files live under — also the root of its
+    loggers (`logging.getLogger(__name__)` in its files)."""
+    return f"_veles_module_{name}"
+
+
 def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
     """Import the entrypoint file and call `register(api)` to populate hooks."""
     try:
@@ -230,7 +236,7 @@ def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
     # The entrypoint is a package rooted at the module dir, so a multi-file module
     # imports its own files relatively (`from .helpers import x`).
     spec = importlib.util.spec_from_file_location(
-        f"_veles_module_{handle.name}", file_path, submodule_search_locations=[str(handle.dir)]
+        module_package(handle.name), file_path, submodule_search_locations=[str(handle.dir)]
     )
     if spec is None or spec.loader is None:
         raise ModuleLoadError(f"could not build import spec for {file_path}")

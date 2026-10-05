@@ -40,6 +40,9 @@ without breaking modules. A registry module **must** import Veles only from it �
 | `veles.sdk.memory` | `RecallHit`, memory-provider protocols, `append_memory_log`, `write_proposal`, `escape_query` |
 | `veles.sdk.layout` | `find_layout`, `LayoutManifest`, `load_context_file`, subprojects |
 | `veles.sdk.jobs` | `submit_oneshot_job`, `spawn` (worker agents), the delegation-depth guard |
+| `veles.sdk.channels` | the channel contract: `PlatformSpec`, `ChannelContext`, `ChannelCaps`, `ChannelGateway`, `CredField`, `RunBackend`, `RunBackendError`, `SessionMap` |
+| `veles.sdk.channel_checks` | checks a channel module's tests run on its spec: `check_builds_from_config`, `check_config_keys`, `check_delivers` |
+| `veles.sdk.media` | the speech-to-text and vision adapters a channel uses for voice and images |
 
 The entrypoint loads as a package rooted at the module directory, so the module's own
 files import relatively (`from .wiki import Wiki`).
@@ -56,9 +59,11 @@ one piece:
   belong to the module's approved tree, so editing one keeps the whole module unloaded
   until it is approved again;
 - **content engines, CLI verbs, `/` commands, recall, prompt and dream steps, hooks,
-  memory providers** — the contribution points below.
-
-Channels (Telegram and others) become module contributions in a later release.
+  memory providers, channel platforms** — the contribution points below;
+- **strings** — `locales/<lang>.toml` in the module directory, flat keys without a
+  table header. Veles merges them under the module's name, so `hello = "Hi"` in the
+  `telegram` module is `t("telegram.hello")`. A key Veles itself defines wins over
+  the module's.
 
 ```text
 my-suite/
@@ -109,11 +114,49 @@ requires_extensions = ["public:official/helper"]
 | `scaffold` | `fn(root, manifest)` | runs when a layout pack is applied to a project |
 | `background_op` | `BackgroundOp(kind, toolset, run)` | a daemon job kind; `run(job, *, spawn_agent, project)` |
 | `memory` | factory (via `api.add_memory_provider`) | an external memory provider |
+| `platform` | `PlatformSpec(build, caps, cred_fields, config_keys)` | a messaging platform the daemon hosts as a channel (see below) |
 
 Objects that take an `engine` gate themselves on it; the others check
 `veles.sdk.contributions.engine_enabled(project, "<name>")` themselves when they
 should only apply with their engine on. Builtin verbs and slash commands keep their
 names — a module can't take `veles run` or `/help`.
+
+## A channel platform
+
+A channel module contributes a `PlatformSpec` under the platform's name; the daemon
+builds one gateway per `[channels.<name>]` block through `build(ctx)`:
+
+```python
+from veles.sdk.channels import ChannelCaps, ChannelContext, CredField, PlatformSpec
+
+
+def _build(ctx: ChannelContext):
+    # ctx.config: the channel block; ctx.secrets: the resolved secret fields;
+    # ctx.backend: submit runs, stream events, answer prompts;
+    # ctx.session_map: chat id → session; ctx.project
+    return MyGateway(token=ctx.secrets["token"], backend=ctx.backend, sessions=ctx.session_map)
+
+
+SPEC = PlatformSpec(
+    build=_build,
+    caps=ChannelCaps(asks_questions=True),  # the agent may ask the chat and wait
+    cred_fields=(CredField("token", "Bot token", secret=True, required=True, env="MY_TOKEN"),),
+    config_keys=frozenset({"room"}),  # other keys its block may hold
+)
+
+
+def register(api) -> None:
+    api.contribute("platform", "mychat", SPEC)
+```
+
+The gateway has `start()`, `stop()` and `deliver(chat_id, text, thread_id=None)` — the
+last one is how scheduled jobs reach a chat (`deliver_to = "mychat:<chat_id>"`).
+Secret fields live in the OS keychain: the first one under the slot `<platform>`, any
+other under `<platform>.<key>`; `veles channel add` asks for them. A key in the block
+that is neither a cred field nor in `config_keys` is reported as a typo. A gateway's
+loggers write to the daemon log. The module's own tests check the spec with
+`veles.sdk.channel_checks`, and list it in `extension.toml` as `provides =
+["platform:mychat"]`.
 
 ## Declare what a registry module provides
 

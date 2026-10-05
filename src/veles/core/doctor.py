@@ -12,11 +12,12 @@ run means the agent is observable, gated, and reproducible.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -706,6 +707,34 @@ def _check_events_health(project: Project | None) -> CheckResult:
     return CheckResult(name="events_health", status="ok", message=f"events.jsonl: {size} bytes")
 
 
+def _check_channel_platforms(project: Project | None) -> CheckResult:
+    """A channel declared in config whose platform module isn't installed. doctor
+    never installs — the next daemon start does (the config is the decision)."""
+    if project is None:
+        return CheckResult(name="channel_platforms", status="info", message="no active project")
+    from veles.core.registry.ensure import channel_needs, ref_for
+
+    try:
+        needs = channel_needs(project, None)
+    except Exception as exc:
+        return CheckResult(
+            name="channel_platforms", status="warn", message=f"could not check channels: {exc}"
+        )
+    if not needs:
+        return CheckResult(
+            name="channel_platforms", status="ok", message="declared channels have their modules"
+        )
+    names = ", ".join(n.name for n in needs)
+    refs = " ".join(ref_for(n) or n.name for n in needs)
+    return CheckResult(
+        name="channel_platforms",
+        status="warn",
+        message=f"channel declared but its module isn't installed: {names}",
+        fix_hint=f"it installs on the next `veles daemon start`, or now: "
+        f"`veles registry install {refs}`",
+    )
+
+
 def _check_extensions(project: Project | None) -> CheckResult:
     from veles.core.registry.maintenance import verify
     from veles.core.registry.repo import RegistryRepoError
@@ -808,7 +837,36 @@ def run_all(project: Project | None) -> DoctorReport:
         _check_events_health,
         _check_approval_audit,
         _check_extensions,
+        _check_channel_platforms,
     ]
     results: list[CheckResult] = [c() for c in no_arg]
-    results.extend(c(project) for c in project_aware)
+    with _project_modules(project):
+        results.extend(c(project) for c in project_aware)
     return DoctorReport(results=results)
+
+
+@contextlib.contextmanager
+def _project_modules(project: Project | None) -> Iterator[None]:
+    """The project's modules while the project checks run, when the caller
+    loaded none (the `veles doctor` verb): a channel platform is a module, so
+    without it its config keys go unchecked (M201) and it reads as missing."""
+    from veles.core.module_loading import load_project_modules
+    from veles.core.modules import (
+        current_module_registry,
+        reset_module_registry,
+        set_module_registry,
+    )
+
+    if project is None or current_module_registry() is not None:
+        yield
+        return
+    try:
+        registry = load_project_modules(project)
+    except Exception:  # a broken module is the extensions check's finding, not a crash
+        yield
+        return
+    token = set_module_registry(registry)
+    try:
+        yield
+    finally:
+        reset_module_registry(token)

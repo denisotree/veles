@@ -17,7 +17,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: >
           uvx --python 3.13 --from 'veles-ai==@@VELES_VERSION@@' --with pytest
-          veles registry validate . --run-code --install-requires
+          --with pytest-asyncio veles registry validate . --run-code --install-requires
           --base "origin/$BASE_REF" --report review.md
       - name: Reviewer report
         if: always()

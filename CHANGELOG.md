@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.5] — 2026-10-05
+
+Channels are modules. Telegram leaves the core and ships from the extension registry
+(`official/telegram`); any module can contribute a messaging platform. A daemon starts
+only with a working channel.
+
+### Upgrading from 1.2.4
+
+- **Telegram installs itself.** A `[channels.telegram]` block in your config installs the
+  module from the official registry on the next `veles daemon start` — no prompt, since
+  you declared the channel; a registry cache that predates the module is refreshed first.
+  Your bot token stays where it is (the keychain slot `telegram`).
+- **A daemon needs a working channel.** With no channel ready (module installed, secrets
+  in place), `veles daemon start` offers to connect one at a terminal and otherwise
+  refuses, naming the command to run. That includes a daemon used only for its HTTP API.
+- `veles channel run`: `--bot-token` is now `--secret` (the platform's primary secret);
+  `--channel` has no default — with one platform installed it is picked, otherwise name it.
+
+### Added
+
+- Contribution point `platform`: a module contributes `PlatformSpec(build, caps,
+  cred_fields, config_keys)` and the daemon builds the channel's gateway through
+  `build(ChannelContext)`. `veles.sdk.channels` is the contract, `veles.sdk.media` the
+  speech-to-text and vision adapters, `veles.sdk.channel_checks` the checks a channel
+  module's own tests run on its spec.
+- A module ships its strings in `locales/<lang>.toml`; they are merged under the module's
+  name (`t("<module>.<key>")`), and a key Veles defines wins.
+- Each secret field of a platform gets its own keychain slot: the first `<platform>`, any
+  other `<platform>.<key>`.
+- The channel wizards (`veles channel add`, the new-project and daemon-start wizards, the
+  daemon picker) list the platforms in your registries next to the installed ones and
+  install the pick.
+- `veles doctor` names a declared channel whose module is missing; `veles channel list`
+  shows it too.
+- `GET /v1/sessions/{id}/usage` — a session's token usage since the daemon started and the
+  model's context window.
+- Telegram: `/settings` (model, session, usage and the mode buttons in one message),
+  `/tokens` and `/context` show real numbers.
+
+### Changed
+
+- Config validation checks a channel block against its platform's own keys; a block of a
+  platform that isn't installed is not checked. `veles doctor` loads the project's modules
+  for its checks, so an installed channel's keys are checked there too.
+- The daemon log also captures the loggers of loaded modules (a channel gateway's).
+- `veles daemon restart` (and restart in the daemon picker) checks that a channel is ready
+  before stopping the running daemon; with none, it leaves it running and says why.
+
+### Fixed
+
+- `veles registry validate --run-code` runs an extension's async tests instead of failing
+  them for want of an async plugin.
+- An unknown channel platform is reported without stray quotes.
+- `veles daemon start` with no model configured prints one line naming the fix instead of
+  a traceback.
+- `/tokens` counts goal, planning and manager runs too, not only plain turns.
+
 ## [1.2.4] — 2026-10-03
 
 A module can be a complete, reusable bundle: it ships its own skills and pulls the

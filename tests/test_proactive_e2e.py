@@ -8,7 +8,7 @@ from __future__ import annotations
 import datetime as _dt
 from pathlib import Path
 
-from veles.channels.session_map import SessionMap, channel_session_path
+from veles.core.chat_sessions import SessionMap, channel_session_path
 from veles.core.dreaming import DreamResult, _step_proactive_events
 from veles.core.proactive.delivery_log import DeliveryLog
 from veles.core.proactive.target_resolver import last_active_target

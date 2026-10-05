@@ -6,9 +6,16 @@ Discutez avec un projet Veles depuis Telegram. Un canal est une passerelle qui
 transmet les messages à un [daemon](run-as-daemon.md) et renvoie les réponses en flux
 continu. Chaque conversation dispose de sa propre session.
 
+Telegram est un module du registre officiel d'extensions (`official/telegram`),
+et non une partie du cœur de Veles. Vous ne l'installez pas à la main :
+`veles channel add` vous le propose, et un bloc `[channels.telegram]` dans votre
+configuration l'installe au prochain `veles daemon start` — vous avez déclaré le
+canal, c'est donc le feu vert. Il s'installe uniquement depuis vos registres
+connectés.
+
 ## Prérequis
 
-- Un daemon en cours d'exécution (voir [exécuter en tant que daemon](run-as-daemon.md)).
+- Un projet Veles (un daemon ne démarre qu'avec un canal opérationnel — celui-ci en est un).
 - Un token de bot Telegram fourni par [@BotFather](https://t.me/BotFather).
 
 ## Option A — attacher via l'assistant (recommandé)
@@ -41,22 +48,31 @@ La **whitelist** restreint les personnes auxquelles le bot répond (`@username`
 Telegram ou identifiant utilisateur numérique). Laissez-la vide pour répondre à tout le
 monde — déconseillé, car chaque message consomme des tokens du modèle.
 
-Redémarrez le daemon pour appliquer :
+Démarrez (ou redémarrez) le daemon pour appliquer :
 
 ```bash
-veles daemon restart
+veles daemon start      # or: veles daemon restart
 ```
+
+Écrire le bloc à la main fonctionne de la même façon. Mettez le token dans le
+trousseau avec `veles channel add`, ou dans le bloc sous la forme
+`bot_token = "…"` ; si le token manque, le daemon refuse de démarrer et nomme la
+commande qui règle le problème.
 
 ## Option B — exécuter une passerelle autonome
 
 Si vous préférez un processus séparé (au lieu du canal intégré au daemon), lancez :
 
 ```bash
-export TELEGRAM_BOT_TOKEN=123456:ABC...
+export TELEGRAM_BOT_TOKEN=123456:ABC...   # or pass --secret
 veles channel run --channel telegram \
   --daemon-url http://127.0.0.1:8765 \
   --daemon-token "$(veles daemon token add tg)"
 ```
+
+`veles channel run --channel telegram` installe d'abord le module s'il est absent.
+
+Le daemon auquel il se connecte ne démarre qu'avec un canal à lui prêt, donc cette option convient à un daemon qui héberge déjà un autre canal. N'exécutez pas le même bot aux deux endroits : Telegram ne remet les mises à jour d'un bot qu'à un seul poller, si bien que le second échoue.
 
 ## Gérer les sessions de conversation
 
@@ -87,6 +103,12 @@ Quand l'agent a besoin d'un détail que vous seul pouvez donner, il pose la
 question dans la conversation. Touchez une des réponses proposées ou écrivez la
 vôtre. Sans réponse sous cinq minutes, il continue sur sa meilleure hypothèse et
 indique laquelle.
+
+`/settings` affiche en un seul message le modèle (fixé par la configuration du
+daemon), la session de la conversation, sa consommation de tokens et les boutons
+de mode. `/tokens` affiche la consommation de tokens de la session depuis le
+démarrage du daemon ; `/context` indique à quel point la fenêtre de contexte du
+modèle est remplie.
 
 ## Limitation multimodale
 

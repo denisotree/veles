@@ -352,13 +352,14 @@ en TUI (projet → daemons → canaux). Voir [exécuter en daemon](../how-to/run
 pour toute la durée de vie du daemon.
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-Passerelles de chat externes (Telegram, …) qui dialoguent avec un daemon. Voir
+Passerelles de chat externes (Telegram, …) qui dialoguent avec un daemon. Une plateforme est un module
+du registre d'extensions ; `run` et `add` l'installent s'il manque. Voir
 [connecter Telegram](../how-to/connect-telegram.md).
 
 | Sous-commande | Rôle |
 |---|---|
-| `list` | Liste les plateformes de canaux enregistrées + le nombre de sessions |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | Démarre une passerelle au premier plan |
+| `list` | Liste les plateformes de canaux installées + le nombre de sessions, et les canaux déclarés dont le module manque |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | Démarre une passerelle au premier plan ; `--secret` est le secret principal de la plateforme (sinon le trousseau ou sa variable d'environnement) |
 | `list-sessions [--channel C]` | Affiche les correspondances `chat_id → session_id` |
 | `reset-session <chat_id> [--channel C]` | Oublie une correspondance (le prochain message repart de zéro) |
 | `add [--channel C] [--session S]` | Rattache un canal à un daemon (assistant ; identifiants → trousseau) |

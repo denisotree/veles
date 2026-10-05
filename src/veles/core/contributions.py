@@ -23,6 +23,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
+from veles.core.platforms import PlatformSpec
 from veles.core.text import shown
 
 if TYPE_CHECKING:
@@ -178,6 +179,8 @@ class Engine:
 # registry dry-run child must see all of them without importing their consumers.
 register_point(Point("memory"))
 register_point(Point("engine", kind=Engine))
+# A messaging platform the daemon hosts as a channel — consumer: core/platforms.py
+register_point(Point("platform", kind=PlatformSpec))
 # (project, query, *, limit) -> list[RecallHit] — consumer: core/memory/router.py
 register_point(Point("recall", reserved=frozenset({"insights", "turns", "about", "extra"})))
 

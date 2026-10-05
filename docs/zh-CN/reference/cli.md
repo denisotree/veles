@@ -315,12 +315,12 @@ veles [--no-wizard] <command> [subcommand] [options]
 `start` 同样接受共享 agent-loop 参数；对于 daemon，`--model` / `--provider` 默认取自项目配置，并在 daemon 的整个生命周期内固定不变。
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-与 daemon 通信的外部聊天网关（Telegram 等）。参见[连接 Telegram](../how-to/connect-telegram.md)。
+与 daemon 通信的外部聊天网关（Telegram 等）。平台是扩展注册表中的模块；`run` 和 `add` 在模块缺失时会安装它。参见[连接 Telegram](../how-to/connect-telegram.md)。
 
 | 子命令 | 用途 |
 |---|---|
-| `list` | 列出已注册的 channel 平台 + session 计数 |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | 在前台启动一个网关 |
+| `list` | 列出已安装的 channel 平台 + session 计数，以及已声明但模块缺失的 channel |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | 在前台启动一个网关；`--secret` 是平台的主密钥（否则取自钥匙串或其环境变量） |
 | `list-sessions [--channel C]` | 显示 `chat_id → session_id` 的映射 |
 | `reset-session <chat_id> [--channel C]` | 遗忘某个映射（下一条消息将全新开始） |
 | `add [--channel C] [--session S]` | 将某个 channel 绑定到 daemon（向导式；凭据 → 钥匙串） |

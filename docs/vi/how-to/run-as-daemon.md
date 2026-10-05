@@ -6,6 +6,14 @@ Daemon là một máy chủ HTTP+WS tùy chọn chạy lâu dài, phơi bày age
 API — nền tảng cho [channels](connect-telegram.md) (Telegram, …), các
 [job](long-running-tasks.md) được lên lịch, và việc dùng từ xa/headless.
 
+Daemon lưu trữ các kênh, nên nó chỉ khởi động khi có ít nhất một kênh sẵn sàng —
+module của kênh đã cài và các secret đã có sẵn. Nếu không có kênh nào, `veles daemon start`
+trong terminal sẽ đề nghị kết nối một kênh; không có terminal thì nó từ chối và in ra lệnh cần
+chạy (`veles channel add --channel <platform>`, hoặc cài từ registry). Một kênh khai báo trong
+`[channels.<platform>]` sẽ cài module của nó từ các registry bạn đã kết nối khi khởi động. Các
+nền tảng kênh là module — xem [kết nối kênh Telegram](connect-telegram.md) và
+[mở rộng Veles bằng module](../../en/how-to/extend-veles-with-modules.md).
+
 ## Khởi động và dừng
 
 ```bash

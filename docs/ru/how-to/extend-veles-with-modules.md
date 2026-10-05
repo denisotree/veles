@@ -40,6 +40,9 @@ Recall резервирует `insights`, `turns`, `about` и `extra`; `Backgrou
 | `veles.sdk.memory` | `RecallHit`, протоколы провайдеров памяти, `append_memory_log`, `write_proposal`, `escape_query` |
 | `veles.sdk.layout` | `find_layout`, `LayoutManifest`, `load_context_file`, подпроекты |
 | `veles.sdk.jobs` | `submit_oneshot_job`, `spawn` (агенты-исполнители), ограничение глубины делегирования |
+| `veles.sdk.channels` | контракт канала: `PlatformSpec`, `ChannelContext`, `ChannelCaps`, `ChannelGateway`, `CredField`, `RunBackend`, `RunBackendError`, `SessionMap` |
+| `veles.sdk.channel_checks` | проверки, которые тесты модуля канала гоняют на его spec: `check_builds_from_config`, `check_config_keys`, `check_delivers` |
+| `veles.sdk.media` | адаптеры распознавания речи и зрения, которые канал использует для голоса и изображений |
 
 Точка входа загружается как пакет с корнем в каталоге модуля, поэтому свои файлы модуль
 импортирует относительно (`from .wiki import Wiki`).
@@ -56,9 +59,11 @@ Recall резервирует `insights`, `turns`, `about` и `extra`; `Backgrou
   часть одобренного дерева модуля, поэтому правка любого из них выключает весь модуль,
   пока его не одобрят снова;
 - **движки контента, команды CLI, команды `/`, recall, блоки промпта и шаги dream, хуки,
-  провайдеры памяти** — точки вклада ниже.
-
-Каналы (Telegram и другие) станут вкладами модулей в одном из следующих релизов.
+  провайдеры памяти, платформы каналов** — точки вклада ниже;
+- **строки** — `locales/<lang>.toml` в каталоге модуля, плоские ключи без заголовка
+  таблицы. Veles подмешивает их под именем модуля: `hello = "Hi"` в модуле `telegram`
+  — это `t("telegram.hello")`. Ключ, который определяет сам Veles, побеждает ключ
+  модуля.
 
 ```text
 my-suite/
@@ -109,11 +114,49 @@ requires_extensions = ["public:official/helper"]
 | `scaffold` | `fn(root, manifest)` | выполняется при применении раскладки к проекту |
 | `background_op` | `BackgroundOp(kind, toolset, run)` | вид фоновой задачи daemon; `run(job, *, spawn_agent, project)` |
 | `memory` | фабрика (через `api.add_memory_provider`) | внешний провайдер памяти |
+| `platform` | `PlatformSpec(build, caps, cred_fields, config_keys)` | платформа обмена сообщениями, которую daemon держит как канал (см. ниже) |
 
 Объекты с полем `engine` сами проверяют свой движок; остальные, если должны работать
 только при включённом движке, проверяют `veles.sdk.contributions.engine_enabled(project, "<name>")`.
 Встроенные команды и slash-команды сохраняют свои имена — модуль не может занять
 `veles run` или `/help`.
+
+## Платформа канала
+
+Модуль канала вносит `PlatformSpec` под именем платформы; daemon собирает по одному
+шлюзу на каждый блок `[channels.<name>]` через `build(ctx)`:
+
+```python
+from veles.sdk.channels import ChannelCaps, ChannelContext, CredField, PlatformSpec
+
+
+def _build(ctx: ChannelContext):
+    # ctx.config: the channel block; ctx.secrets: the resolved secret fields;
+    # ctx.backend: submit runs, stream events, answer prompts;
+    # ctx.session_map: chat id → session; ctx.project
+    return MyGateway(token=ctx.secrets["token"], backend=ctx.backend, sessions=ctx.session_map)
+
+
+SPEC = PlatformSpec(
+    build=_build,
+    caps=ChannelCaps(asks_questions=True),  # the agent may ask the chat and wait
+    cred_fields=(CredField("token", "Bot token", secret=True, required=True, env="MY_TOKEN"),),
+    config_keys=frozenset({"room"}),  # other keys its block may hold
+)
+
+
+def register(api) -> None:
+    api.contribute("platform", "mychat", SPEC)
+```
+
+У шлюза есть `start()`, `stop()` и `deliver(chat_id, text, thread_id=None)` — последний
+нужен, чтобы запланированные задачи доходили до чата (`deliver_to = "mychat:<chat_id>"`).
+Секретные поля лежат в keychain ОС: первое — в слоте `<platform>`, остальные — в
+`<platform>.<key>`; их спрашивает `veles channel add`. Ключ в блоке, который не является
+ни полем учётных данных, ни частью `config_keys`, считается опечаткой. Логгеры шлюза
+пишут в лог daemon. Собственные тесты модуля проверяют spec через
+`veles.sdk.channel_checks`, а в `extension.toml` он указывается как `provides =
+["platform:mychat"]`.
 
 ## Объявить, что вносит модуль реестра
 

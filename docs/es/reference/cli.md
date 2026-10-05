@@ -348,13 +348,14 @@ de daemons** (proyecto → daemons → canales). Consulta [ejecutar como daemon]
 `--provider` toman por defecto la configuración del proyecto y quedan fijados durante toda la vida del daemon.
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-Pasarelas de chat externas (Telegram, …) que hablan con un daemon. Consulta
+Pasarelas de chat externas (Telegram, …) que hablan con un daemon. Una plataforma es
+un módulo del registro de extensiones; `run` y `add` lo instalan si falta. Consulta
 [conectar Telegram](../how-to/connect-telegram.md).
 
 | Subcomando | Propósito |
 |---|---|
-| `list` | Lista las plataformas de canal registradas + recuentos de sesiones |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | Inicia una pasarela en primer plano |
+| `list` | Lista las plataformas de canal instaladas + recuentos de sesiones, y los canales declarados cuyo módulo falta |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | Inicia una pasarela en primer plano; `--secret` es el secreto principal de la plataforma (si no, el llavero o su variable de entorno) |
 | `list-sessions [--channel C]` | Muestra los mapeos `chat_id → session_id` |
 | `reset-session <chat_id> [--channel C]` | Olvida un mapeo (el siguiente mensaje empieza de cero) |
 | `add [--channel C] [--session S]` | Adjunta un canal a un daemon (asistente; credenciales → llavero) |

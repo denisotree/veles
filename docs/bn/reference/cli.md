@@ -346,13 +346,14 @@ TUI খোলে (project → daemons → channels)। দেখুন [ডি�
 `--provider` প্রজেক্ট কনফিগে ডিফল্ট হয় এবং ডিমনের পুরো জীবনকালের জন্য নির্দিষ্ট থাকে।
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-এক্সটার্নাল চ্যাট গেটওয়ে (Telegram, …) যা একটি ডিমনের সাথে কথা বলে। দেখুন
+এক্সটার্নাল চ্যাট গেটওয়ে (Telegram, …) যা একটি ডিমনের সাথে কথা বলে। একটি platform হলো extension
+registry-র একটি module; না থাকলে `run` ও `add` সেটি install করে। দেখুন
 [Telegram সংযুক্ত করুন](../how-to/connect-telegram.md)।
 
 | সাবকমান্ড | উদ্দেশ্য |
 |---|---|
-| `list` | নিবন্ধিত চ্যানেল প্ল্যাটফর্ম + সেশন সংখ্যা তালিকাভুক্ত করে |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | ফোরগ্রাউন্ডে একটি গেটওয়ে চালু করে |
+| `list` | installed চ্যানেল প্ল্যাটফর্ম + সেশন সংখ্যা তালিকাভুক্ত করে, এবং declare করা চ্যানেল যার module নেই |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | ফোরগ্রাউন্ডে একটি গেটওয়ে চালু করে; `--secret` হলো platform-এর primary secret (না হলে keychain বা তার env var) |
 | `list-sessions [--channel C]` | `chat_id → session_id` ম্যাপিং দেখায় |
 | `reset-session <chat_id> [--channel C]` | একটি ম্যাপিং ভুলে যায় (পরের মেসেজ নতুনভাবে শুরু হয়) |
 | `add [--channel C] [--session S]` | একটি চ্যানেল একটি ডিমনের সাথে সংযুক্ত করে (উইজার্ড; creds → keychain) |

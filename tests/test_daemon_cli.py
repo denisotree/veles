@@ -18,6 +18,24 @@ def _ns(**fields):
     return type("A", (), fields)()
 
 
+def test_daemon_start_without_a_model_says_so_instead_of_a_traceback(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
+) -> None:
+    """No `[engine] model` and no user default: a one-line error naming the
+    fix, before any channel work — `veles run` already behaved so."""
+    import argparse
+
+    from veles.core.project import init_project
+
+    init_project(tmp_path, name="p")
+    monkeypatch.chdir(tmp_path)
+    args = argparse.Namespace(
+        command="daemon", foreground=True, host="127.0.0.1", port=8765, provider="openrouter"
+    )
+    assert daemon_cmd._cmd_daemon_start(args) == 2
+    assert "no model configured" in capsys.readouterr().err
+
+
 # ---------------- M129: `veles daemon start` bootstraps a missing project ----------------
 
 
@@ -592,7 +610,7 @@ def test_daemon_picker_non_tty_falls_back_to_list(
 
 
 def test_daemon_start_honours_config_port(
-    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake_channel
 ) -> None:
     """The unnamed daemon must honour `[daemon] host/port` from config (what
     the project wizard writes) instead of always binding the argparse default.
@@ -609,6 +627,7 @@ def test_daemon_start_honours_config_port(
     cfg.setdefault("daemon", {})
     cfg["daemon"]["host"] = "0.0.0.0"
     cfg["daemon"]["port"] = 8799
+    cfg["engine"] = {"model": "stub/model"}  # a daemon starts only with a model
     save_project_config(project, cfg)
 
     monkeypatch.setattr(cli_mod, "_resolve_active_project", lambda args: project)
@@ -639,7 +658,7 @@ def test_daemon_start_honours_config_port(
 
 
 def test_daemon_start_explicit_port_beats_config(
-    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake_channel
 ) -> None:
     """An explicit `--port` outranks the config block."""
     import argparse
@@ -652,6 +671,7 @@ def test_daemon_start_explicit_port_beats_config(
     project = init_project(tmp_path, name="p")
     cfg = load_project_config(project)
     cfg.setdefault("daemon", {})["port"] = 8799
+    cfg["engine"] = {"model": "stub/model"}  # a daemon starts only with a model
     save_project_config(project, cfg)
 
     monkeypatch.setattr(cli_mod, "_resolve_active_project", lambda args: project)
@@ -780,7 +800,7 @@ def test_start_wizard_falls_back_to_stdin_when_accepted(
 
 
 def test_start_wizard_skips_when_channel_exists(
-    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake_platform
 ) -> None:
     import veles.cli.channel_wizard as cw
     import veles.tui.wizard.daemon_runner as dr
@@ -788,9 +808,7 @@ def test_start_wizard_skips_when_channel_exists(
     from veles.core.project import init_project
 
     project = init_project(tmp_path, name="p")
-    apply_channel(
-        project, session=None, channel="telegram", secrets={"bot_token": "t"}, config_fields={}
-    )
+    apply_channel(project, session=None, channel="fake", secrets={"token": "t"}, config_fields={})
     _interactive(monkeypatch)
     calls: dict[str, object] = {}
     monkeypatch.setattr(cw, "add_channel", lambda *a, **k: calls.update(called=True))

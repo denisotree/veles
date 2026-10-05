@@ -54,8 +54,12 @@ def fake_install(monkeypatch):
         calls.append(f"resolve {spec}")
         return SimpleNamespace(ref=spec, ext=SimpleNamespace(kind="layout"))
 
-    def install(found, *, project, user_scope):
-        calls.append(f"install {found.ref}" + (" --user" if user_scope else ""))
+    def install(found, *, project, user_scope, preapproved=False):
+        calls.append(
+            f"install {found.ref}"
+            + (" --user" if user_scope else "")
+            + (" --preapproved" if preapproved else "")
+        )
 
     monkeypatch.setattr(ensure, "_resolve", resolve)
     monkeypatch.setattr(ensure, "_install", install)
@@ -135,7 +139,7 @@ def test_offline_or_declined_is_false_with_one_warning(home, monkeypatch, capsys
 def test_install_error_never_escapes(home, monkeypatch, capsys) -> None:
     monkeypatch.setattr(ensure, "_resolve", lambda spec: SimpleNamespace(ref=spec))
 
-    def boom(found, *, project, user_scope):
+    def boom(found, *, project, user_scope, preapproved=False):
         raise RuntimeError("anything at all")
 
     monkeypatch.setattr(ensure, "_install", boom)
@@ -191,6 +195,222 @@ def test_ambiguous_engine_providers_install_nothing(
     assert fake_install == []
     err = capsys.readouterr().err
     assert "a:x/g" in err and "b:y/g" in err
+
+
+def test_platform_need_installs_for_the_user_without_asking(home, fake_install, capsys) -> None:
+    """A channel declared in config is an intent: its platform module installs
+    itself — user scope, no confirmation, one line saying what and why."""
+    from veles.core.registry.ensure import PlatformNeed, ref_for
+
+    assert ref_for(PlatformNeed("telegram")) == "public:official/telegram"
+    why = "declared in [channels.telegram]"
+    assert ensure_extension(
+        PlatformNeed("telegram"), None, interactive=False, auto=True, reason=why
+    )
+    assert fake_install[-1] == "install public:official/telegram --user --preapproved"
+    assert f"({why})" in capsys.readouterr().err
+
+
+def test_an_official_platform_comes_only_from_the_official_registry_when_connected(
+    home, fake_install, monkeypatch
+) -> None:
+    """With `public` connected the official ref is the only candidate — even when
+    its cache is stale and another registry provides the platform, that third
+    party is never installed without asking. Only with `public` disconnected
+    does a single other provider count (a fork, a private mirror)."""
+    from veles.core.registry import catalog
+    from veles.core.registry import config as registry_config
+    from veles.core.registry.config import RegistrySource
+    from veles.core.registry.ensure import PlatformNeed
+
+    third_party = ["corp:official/telegram"]
+    monkeypatch.setattr(catalog, "providers_of", lambda t: third_party)
+    assert ensure_extension(PlatformNeed("telegram"), None, interactive=False, auto=True)
+    assert fake_install[-1] == "install public:official/telegram --user --preapproved"
+
+    monkeypatch.setattr(
+        registry_config, "list_sources", lambda: [RegistrySource("corp", "https://x")]
+    )
+    assert ensure_extension(PlatformNeed("telegram"), None, interactive=False, auto=True)
+    assert fake_install[-1] == "install corp:official/telegram --user --preapproved"
+
+
+def test_a_wizard_without_loaded_modules_sees_an_installed_platform(home, monkeypatch) -> None:
+    """The daemon picker and `veles init` load no modules: an installed platform
+    must not look like a registry offer that installs a second time."""
+    from tests.channels.fake_platform import install_as_user_module
+    from veles.core.modules import reset_module_registry, set_module_registry
+    from veles.core.registry.ensure import available_platforms, ensure_platform_interactive
+
+    install_as_user_module()
+    monkeypatch.setattr(
+        ensure, "ensure_extension", lambda *a, **k: pytest.fail("installed platform reinstalled")
+    )
+    token = set_module_registry(None)
+    try:
+        assert available_platforms()[0] == "fake"
+        assert ensure_platform_interactive("fake") is True
+    finally:
+        reset_module_registry(token)
+
+
+def test_a_wizard_runs_a_platform_modules_entrypoint_once(home, monkeypatch) -> None:
+    """Listing the platforms, then taking the pick, loads the user's modules
+    once — an entrypoint never runs twice in one process."""
+    from veles.core.modules import reset_module_registry, set_module_registry
+    from veles.core.registry.ensure import available_platforms, ensure_platform_interactive
+    from veles.core.registry.gate import approve_module
+    from veles.core.user_paths import user_modules_dir
+
+    calls = home / "register-calls.txt"
+    mod = user_modules_dir() / "oncech"
+    mod.mkdir(parents=True)
+    (mod / "module.toml").write_text(
+        '[module]\nname = "oncech"\ndescription = "d"\nentrypoint = "e.py:register"\n',
+        encoding="utf-8",
+    )
+    (mod / "e.py").write_text(
+        "from tests.channels.fake_platform import FAKE_SPEC\n\n"
+        "def register(api):\n"
+        f"    with open({str(calls)!r}, 'a') as fh:\n"
+        "        fh.write('x')\n"
+        "    api.contribute('platform', 'once', FAKE_SPEC)\n",
+        encoding="utf-8",
+    )
+    approve_module(mod, name="oncech", project_root=None)
+    token = set_module_registry(None)
+    try:
+        assert "once" in available_platforms()
+        assert ensure_platform_interactive("once") is True
+    finally:
+        reset_module_registry(token)
+    assert calls.read_text(encoding="utf-8") == "x"
+
+
+def test_a_stale_registry_cache_is_refreshed_once_before_giving_up(home, monkeypatch) -> None:
+    """Upgraders have a `public` cache from before the package existed: the
+    install refreshes that registry and looks again instead of refusing."""
+    from veles.core.registry import catalog, repo
+    from veles.core.registry.catalog import ResolveError
+
+    looked: list[str] = []
+    updated: list[str] = []
+
+    def resolve(spec):
+        looked.append(spec)
+        if not updated:
+            raise ResolveError(f"no extension named {spec!r}")
+        return SimpleNamespace(ref=spec)
+
+    monkeypatch.setattr(catalog, "resolve", resolve)
+    monkeypatch.setattr(repo, "update", lambda source: updated.append(source.name) or "abc")
+    assert ensure._resolve("public:official/telegram").ref == "public:official/telegram"
+    assert updated == ["public"] and len(looked) == 2
+
+
+def test_auto_install_refuses_ambiguous_and_unreachable(home, fake_install, monkeypatch, capsys):
+    from veles.core.registry import catalog
+    from veles.core.registry.ensure import PlatformNeed
+
+    monkeypatch.setattr(catalog, "providers_of", lambda token: ["a:x/s", "b:y/s"])
+    assert not ensure_extension(PlatformNeed("slackish"), None, interactive=False, auto=True)
+    assert fake_install == [] and "a:x/s" in capsys.readouterr().err
+
+    def unreachable(spec):
+        raise ResolveError("no registry named 'public'")
+
+    monkeypatch.setattr(catalog, "providers_of", lambda token: [])  # nothing cached
+    monkeypatch.setattr(ensure, "_resolve", unreachable)
+    ensure.reset_warnings()
+    assert not ensure_extension(PlatformNeed("telegram"), None, interactive=False, auto=True)
+    assert "public" in capsys.readouterr().err
+
+
+def test_channel_needs_lists_declared_platforms_without_a_module(home, fake_platform) -> None:
+    from veles.core.project_config import load_project_config, save_project_config
+    from veles.core.registry.ensure import PlatformNeed, channel_needs
+
+    project = init_project(home / "p", name="p", layout="bare")
+    cfg = load_project_config(project)
+    cfg["channels"] = {
+        "fake": {"enabled": True},
+        "ghost": {"enabled": True},
+        "off": {"enabled": False},
+    }
+    save_project_config(project, cfg)
+    assert channel_needs(project, None) == [PlatformNeed("ghost")]
+
+
+def test_doctor_names_a_declared_channel_without_its_module(home) -> None:
+    from veles.core.doctor import _check_channel_platforms
+    from veles.core.project_config import load_project_config, save_project_config
+
+    project = init_project(home / "p", name="p", layout="bare")
+    cfg = load_project_config(project)
+    cfg["channels"] = {"ghost": {"enabled": True}}
+    save_project_config(project, cfg)
+    result = _check_channel_platforms(project)
+    assert result.status == "warn" and "ghost" in result.message
+    assert "daemon start" in (result.fix_hint or "")
+
+
+def test_doctor_sees_an_installed_channel_module(home) -> None:
+    """doctor loads no modules up front; an installed platform is not "missing"."""
+    from tests.channels.fake_platform import install_as_user_module
+    from veles.core.doctor import run_all
+    from veles.core.modules import reset_module_registry, set_module_registry
+    from veles.core.project_config import load_project_config, save_project_config
+
+    install_as_user_module()
+    project = init_project(home / "p", name="p", layout="bare")
+    cfg = load_project_config(project)
+    cfg["channels"] = {"fake": {"enabled": True}}
+    save_project_config(project, cfg)
+    token = set_module_registry(None)
+    try:
+        report = run_all(project)
+    finally:
+        reset_module_registry(token)
+    assert next(r for r in report.results if r.name == "channel_platforms").status == "ok"
+
+
+def test_channel_run_installs_the_named_platform(home, monkeypatch) -> None:
+    """`veles channel run --channel X` names X explicitly — that is the decision."""
+    from veles.cli.commands import channel as channel_cmd
+
+    asked: list[tuple[str, bool, str | None]] = []
+
+    def fake_ensure(need, project, *, interactive, auto=False, reason=None):
+        asked.append((need.name, auto, reason))
+        return False
+
+    monkeypatch.setattr(ensure, "ensure_extension", fake_ensure)
+    args = SimpleNamespace(
+        channel_command="run",
+        channel="slackish",
+        secret=None,
+        daemon_url=None,
+        daemon_token="t",
+        project_root=None,
+    )
+    assert channel_cmd.cmd_channel(args) == 2  # not installed → unknown platform
+    assert asked == [("slackish", True, "named with --channel")]
+
+
+def test_auto_install_names_the_block_that_declared_it(
+    home, fake_install, monkeypatch, capsys
+) -> None:
+    from veles.core.project_config import load_project_config, save_project_config
+    from veles.core.registry import catalog
+    from veles.core.registry.ensure import ensure_channel_platforms
+
+    monkeypatch.setattr(catalog, "providers_of", lambda token: ["corp:x/ghost"])
+    project = init_project(home / "p", name="p", layout="bare")
+    cfg = load_project_config(project)
+    cfg["daemon"] = {"api": {"port": 8801, "channels": {"ghost": {"enabled": True}}}}
+    save_project_config(project, cfg)
+    ensure_channel_platforms(project, "api")
+    assert "(declared in [daemon.api.channels.ghost])" in capsys.readouterr().err
 
 
 def test_ensure_layout_true_for_an_installed_pack(home) -> None:

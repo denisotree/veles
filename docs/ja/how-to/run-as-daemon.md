@@ -4,6 +4,8 @@
 
 デーモンは、エージェントを API として公開するオプションの常駐型 HTTP+WS サーバーです。[チャンネル](connect-telegram.md)（Telegram など）、スケジュールされた[ジョブ](long-running-tasks.md)、リモート/ヘッドレス利用の基盤となります。
 
+デーモンはチャンネルをホストするため、少なくとも1つのチャンネルが準備できている（モジュールがインストール済みで、シークレットが揃っている）場合にのみ起動します。1つもない場合、ターミナルでの `veles daemon start` は接続を提案し、ターミナルがなければ起動を拒否して実行すべきコマンド（`veles channel add --channel <platform>`、またはレジストリからのインストール）を表示します。`[channels.<platform>]` で宣言されたチャンネルは、起動時に接続済みのレジストリからそのモジュールをインストールします。チャンネルプラットフォームはモジュールです — [Telegram チャネルを接続する方法](connect-telegram.md)と[モジュールで Veles を拡張する](../../en/how-to/extend-veles-with-modules.md)を参照してください。
+
 ## 起動と停止
 
 ```bash

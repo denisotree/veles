@@ -315,12 +315,12 @@ veles [--no-wizard] <command> [subcommand] [options]
 `start` 也接受共用代理迴圈旗標；對 daemon 而言，`--model` / `--provider` 預設取自專案設定，且在 daemon 的整個生命週期內固定不變。
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-與 daemon 通訊的外部聊天閘道（Telegram…）。參見[連接 Telegram](../how-to/connect-telegram.md)。
+與 daemon 通訊的外部聊天閘道（Telegram…）。平台是擴充功能 registry 中的模組；`run` 與 `add` 在模組缺少時會安裝它。參見[連接 Telegram](../how-to/connect-telegram.md)。
 
 | 子命令 | 用途 |
 |---|---|
-| `list` | 列出已註冊的 channel 平台＋工作階段數 |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | 在前景啟動一個閘道 |
+| `list` | 列出已安裝的 channel 平台＋工作階段數，以及已宣告但模組缺少的 channel |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | 在前景啟動一個閘道；`--secret` 是平台的主要密鑰（否則取自鑰匙圈或其環境變數） |
 | `list-sessions [--channel C]` | 顯示 `chat_id → session_id` 對應 |
 | `reset-session <chat_id> [--channel C]` | 遺忘某對應（下一則訊息將重新開始） |
 | `add [--channel C] [--session S]` | 將 channel 附掛到某 daemon（精靈；憑證 → 鑰匙圈） |

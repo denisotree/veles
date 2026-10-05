@@ -107,7 +107,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[daemon]` | 이름 없는/"기본" 데몬의 바인드 + 자동 시작 |
 | `[daemon.<name>]` | 이름 있는 데몬 세션(자체 model/provider/host/port/mode) |
 | `[goal]` | 새 목표의 예산 — `max_steps`(30), `max_cost_usd`(5.0), `max_wall_time_s`(3600). `veles goal start` 플래그가 우선 |
-| `[channels.<type>]` | 이름 없는 데몬이 서비스하는 채널(예: `telegram`) |
+| `[channels.<type>]` | 이름 없는 데몬이 서비스하는 채널(예: `telegram`). 키는 플랫폼 고유의 것(`enabled`와 해당 모듈이 선언한 키)이며, 선언하면 다음 `veles daemon start` 때 모듈이 설치됩니다 |
 | `[daemon.<name>.channels.<type>]` | 이름 있는 데몬 세션에 바인딩된 채널 |
 | `[mcp.servers.<name>]` | 외부 MCP 서버(도구 소스) |
 

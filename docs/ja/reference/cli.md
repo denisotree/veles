@@ -315,12 +315,12 @@ HTTP+WS デーモンの実行/制御を行います。引数なしの `veles dae
 `start` は共通エージェントループフラグも受け付けます。デーモンでは `--model` / `--provider` がプロジェクト設定をデフォルトとし、デーモンの稼働中は固定されます。
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-デーモンと通信する外部チャットゲートウェイ（Telegram など）です。[Telegram に接続する](../how-to/connect-telegram.md)を参照してください。
+デーモンと通信する外部チャットゲートウェイ（Telegram など）です。プラットフォームは拡張レジストリのモジュールで、`run` と `add` は不足していればインストールします。[Telegram に接続する](../how-to/connect-telegram.md)を参照してください。
 
 | サブコマンド | 目的 |
 |---|---|
-| `list` | 登録済みのチャンネルプラットフォームとセッション数を一覧表示する |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | ゲートウェイをフォアグラウンドで起動する |
+| `list` | インストール済みのチャンネルプラットフォームとセッション数、およびモジュールが不足している宣言済みチャンネルを一覧表示する |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | ゲートウェイをフォアグラウンドで起動する。`--secret` はプラットフォームの主要シークレット（なければキーチェーンまたはその環境変数） |
 | `list-sessions [--channel C]` | `chat_id → session_id` のマッピングを表示する |
 | `reset-session <chat_id> [--channel C]` | マッピングを破棄する（次のメッセージから新規開始） |
 | `add [--channel C] [--session S]` | チャンネルをデーモンに接続する（ウィザード、認証情報 → キーチェーン） |

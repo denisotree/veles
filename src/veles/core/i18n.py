@@ -8,8 +8,10 @@ are TOML files with namespaced tables:
     intro_no_project = "No Veles project found at {cwd}."
 
 Discovery order:
-    1. Built-in resources under `src/veles/locales/*.toml`.
-    2. User overrides under `~/.veles/locales/*.toml` (same shape).
+    1. Loaded modules' `locales/*.toml`, each under its module's name
+       (a module's `hello` is `<module>.hello`).
+    2. Built-in resources under `src/veles/locales/*.toml` (beat a module).
+    3. User overrides under `~/.veles/locales/*.toml` (same shape).
        Same-name file wins; missing keys still fall back to built-in EN.
 
 Active locale precedence:
@@ -36,7 +38,7 @@ _MISSING_MARKER = "<missing: {key}>"
 # is short-lived; the TUI runs one user).
 _active: str = _DEFAULT_LOCALE
 _active_set_by_caller: bool = False
-_cache: dict[str, dict[str, str]] = {}
+_cache: dict[tuple[str, tuple[tuple[str, Path], ...]], dict[str, str]] = {}
 
 
 # ---------------- public API ----------------
@@ -97,19 +99,32 @@ def reset_for_tests() -> None:
 # ---------------- internals ----------------
 
 
+def _module_dirs() -> tuple[tuple[str, Path], ...]:
+    """The loaded modules' dirs — each may ship `locales/<name>.toml`."""
+    from veles.core.modules import current_module_registry
+
+    reg = current_module_registry()
+    return tuple(sorted(reg.module_dirs.items())) if reg is not None else ()
+
+
 def _load(name: str) -> dict[str, str]:
     """Return the flat key→string map for `name`, caching results.
 
-    Files are merged in discovery order: built-in first, user override
-    second. User keys win on collision; missing keys remain (and `t`
-    falls back to EN at lookup time)."""
-    cached = _cache.get(name)
+    Merged in order, later wins: each loaded module's `locales/<name>.toml`
+    under the module's name (`telegram.start_greeting`), then the built-in
+    locales, then the user's overrides. So core's strings beat a module's and
+    the user's beat both; missing keys fall back to EN at lookup time. The cache
+    is keyed on the module set too — a module loaded mid-session is seen."""
+    modules = _module_dirs()
+    cached = _cache.get((name, modules))
     if cached is not None:
         return cached
     merged: dict[str, str] = {}
+    for module, directory in modules:
+        _flatten_into(merged, load_optional_toml(directory / "locales" / f"{name}.toml"), module)
     for root in _locale_dirs():
         _flatten_into(merged, load_optional_toml(root / f"{name}.toml"))
-    _cache[name] = merged
+    _cache[(name, modules)] = merged
     return merged
 
 

@@ -2,9 +2,9 @@
 
 Reuses the universal `Prompter` abstraction from `cli/wizard.py` (VISION §7): no
 new question machinery. A platform's `cred_fields` descriptor
-(`channels/platform_registry.py`) drives the prompts, so adding a new channel
-type needs zero wizard code — register the platform with its fields and the
-wizard handles it. Secrets go to the keychain (`core/secrets.set_provider_key`);
+(`core/platforms.py`, contributed by the platform's module) drives the prompts,
+so adding a new channel type needs zero wizard code. Secrets go to the keychain
+(`core/secrets.set_provider_key`);
 non-secret fields land in the channel's config block — global `[channels.<type>]`
 for the unnamed daemon, or `[daemon.<name>.channels.<type>]` for a named session.
 """
@@ -59,14 +59,10 @@ def add_channel(
     `session`/`channel` pre-fill the corresponding wizard steps when given;
     otherwise the user is asked. Creds are always collected via the prompter so
     secrets never land in argv/history."""
-    from veles.channels.platform_registry import (
-        ensure_builtins_registered,
-        get_platform,
-        list_platforms,
-    )
     from veles.cli.wizard import _ask_choice
+    from veles.core.platforms import get_platform
+    from veles.core.registry import ensure
 
-    ensure_builtins_registered()
     ask = _resolve_prompter(prompter)
     cfg = load_project_config(project)
 
@@ -82,17 +78,21 @@ def add_channel(
             )
             session = None if choice == _DEFAULT_LABEL else choice
 
-    # 2. channel type.
-    platforms = tuple(list_platforms())
+    # 2. channel type — installed platforms and those in the cached registries;
+    # a registry one is installed now (the normal confirmation).
+    platforms = tuple(ensure.available_platforms())
     if not platforms:
-        print("error: no channel platforms registered.")
+        print("error: no channel platform is installed or in your registries.")
         return 1
     if channel is None:
         channel = _ask_choice(ask, "Channel type", platforms, default=platforms[0])
+    if not ensure.ensure_platform_interactive(channel):
+        print(f"error: platform {channel!r} is not installed.")
+        return 2
     try:
         entry = get_platform(channel)
     except KeyError as exc:
-        print(f"error: {exc}")
+        print(f"error: {exc.args[0]}")
         return 2
 
     # 3. collect creds → secrets (keychain) + config fields (config block).
@@ -144,8 +144,9 @@ def apply_channel(
     secrets: dict[str, str],
     config_fields: dict[str, object],
 ) -> None:
-    """Persist a collected channel binding: secret values to the keychain
-    (`set_provider_key(channel, …)`), non-secret fields + `enabled=true` to the
+    """Persist a collected channel binding: each secret value to its keychain
+    slot (`secret_slot`: the first secret field `<platform>`, any other
+    `<platform>.<key>`), non-secret fields + `enabled=true` to the
     config block (global `[channels.<type>]` or per-session
     `[daemon.<name>.channels.<type>]`). Pure of any prompting — reusable from
     the CLI wizard and the TUI.
@@ -153,10 +154,14 @@ def apply_channel(
     Keychain writes happen FIRST: if a secret write fails (e.g. no keychain
     backend) we abort before persisting `enabled=true`, so we never leave a
     tokenless-but-enabled block the daemon would warn-and-skip on startup."""
+    from veles.core.channel_setup import secret_slot
+    from veles.core.platforms import get_platform
     from veles.core.secrets import set_provider_key
 
-    for value in secrets.values():
-        set_provider_key(channel, value, project=project.name)
+    spec = get_platform(channel) if secrets else None
+    for key, value in secrets.items():
+        assert spec is not None
+        set_provider_key(secret_slot(spec, channel, key), value, project=project.name)
     cfg = load_project_config(project)
     block = _channel_block(cfg, session, channel)
     for key, value in config_fields.items():

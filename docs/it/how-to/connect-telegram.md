@@ -6,9 +6,15 @@ Comunica con un progetto Veles da Telegram. Un canale è un gateway che inoltra
 i messaggi a un [daemon](run-as-daemon.md) e ne fa lo streaming delle risposte. Ogni chat ottiene
 la propria sessione di conversazione.
 
+Telegram è un modulo del registry ufficiale delle estensioni (`official/telegram`),
+non parte del core di Veles. Non lo installi a mano: `veles channel add` te lo
+propone, e un blocco `[channels.telegram]` nella tua configurazione lo installa al
+prossimo `veles daemon start` — hai dichiarato il canale, quindi quello è il via
+libera. Si installa solo dai registry che hai collegato.
+
 ## Prerequisiti
 
-- Un daemon in esecuzione (vedi [eseguire come daemon](run-as-daemon.md)).
+- Un progetto Veles (un daemon parte solo con un canale funzionante — questo lo è).
 - Un token del bot Telegram da [@BotFather](https://t.me/BotFather).
 
 ## Opzione A — collegare tramite la procedura guidata (consigliata)
@@ -41,22 +47,30 @@ La **whitelist** limita chi può ricevere risposte dal bot (`@username` Telegram
 numerico). Lasciala vuota per rispondere a tutti — sconsigliato, dato che ogni
 messaggio consuma token del modello.
 
-Riavvia il daemon per applicare:
+Avvia (o riavvia) il daemon per applicare:
 
 ```bash
-veles daemon restart
+veles daemon start      # or: veles daemon restart
 ```
+
+Scrivere il blocco a mano funziona allo stesso modo. Metti il token nel portachiavi
+con `veles channel add`, oppure nel blocco come `bot_token = "…"`; se il token manca,
+il daemon rifiuta di partire e indica il comando che risolve il problema.
 
 ## Opzione B — eseguire un gateway autonomo
 
 Se preferisci un processo separato (invece del canale interno al daemon), esegui:
 
 ```bash
-export TELEGRAM_BOT_TOKEN=123456:ABC...
+export TELEGRAM_BOT_TOKEN=123456:ABC...   # or pass --secret
 veles channel run --channel telegram \
   --daemon-url http://127.0.0.1:8765 \
   --daemon-token "$(veles daemon token add tg)"
 ```
+
+`veles channel run --channel telegram` installa prima il modulo se non c'è.
+
+Il daemon con cui comunica si avvia solo con un canale proprio pronto, quindi questa opzione va bene per un daemon che ospita già un canale diverso. Non eseguire lo stesso bot in entrambi i posti: Telegram consegna gli aggiornamenti di un bot a un solo poller, quindi il secondo fallisce.
 
 ## Gestire le sessioni di chat
 
@@ -86,6 +100,11 @@ riprende un obiettivo fermato.
 Quando l'agente ha bisogno di un dettaglio che solo tu puoi dare, lo chiede
 nella chat. Tocca una delle risposte suggerite o scrivi la tua. Se non rispondi
 entro cinque minuti, procede con la sua ipotesi migliore e dice quale.
+
+`/settings` mostra in un solo messaggio il modello (fissato dalla configurazione del
+daemon), la sessione della chat, il suo uso di token e i pulsanti di modalità.
+`/tokens` mostra l'uso di token della sessione da quando il daemon è partito;
+`/context` mostra quanto è piena la finestra di contesto del modello.
 
 ## Limitazione multimodale
 

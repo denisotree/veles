@@ -347,13 +347,14 @@ chọn daemon** (dự án → daemon → channels). Xem [chạy dưới dạng d
 `--provider` mặc định lấy từ config dự án và cố định trong suốt vòng đời của daemon.
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-Các gateway chat bên ngoài (Telegram, …) giao tiếp với một daemon. Xem
+Các gateway chat bên ngoài (Telegram, …) giao tiếp với một daemon. Một nền tảng là một module
+từ extension registry; `run` và `add` sẽ cài nó khi thiếu. Xem
 [kết nối Telegram](../how-to/connect-telegram.md).
 
 | Lệnh con | Mục đích |
 |---|---|
-| `list` | Liệt kê các nền tảng channel đã đăng ký + số lượng session |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | Khởi động một gateway ở foreground |
+| `list` | Liệt kê các nền tảng channel đã cài + số lượng session, và các channel đã khai báo nhưng thiếu module |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | Khởi động một gateway ở foreground; `--secret` là secret chính của nền tảng (nếu không thì lấy từ keychain hoặc biến môi trường của nó) |
 | `list-sessions [--channel C]` | Hiển thị các ánh xạ `chat_id → session_id` |
 | `reset-session <chat_id> [--channel C]` | Quên một ánh xạ (tin nhắn tiếp theo bắt đầu mới) |
 | `add [--channel C] [--session S]` | Gắn một channel vào một daemon (wizard; thông tin xác thực → keychain) |

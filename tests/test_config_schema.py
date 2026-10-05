@@ -10,19 +10,18 @@ surfaces them as errors.
 
 from __future__ import annotations
 
-import veles.channels.telegram  # noqa: F401 -- registers the telegram platform
 from veles.core.config_schema import validate_config
 
 
-def test_valid_channel_config_has_no_findings() -> None:
-    cfg = {"channels": {"telegram": {"enabled": True, "bot_token": "x", "whitelist": ["@a"]}}}
+def test_valid_channel_config_has_no_findings(fake_platform) -> None:
+    cfg = {"channels": {"fake": {"enabled": True, "token": "x", "rooms": ["@a"]}}}
     assert validate_config(cfg) == []
 
 
-def test_typo_whitelist_in_channel_is_flagged() -> None:
-    cfg = {"channels": {"telegram": {"enabled": True, "bot_token": "x", "whitlist": ["@a"]}}}
+def test_typo_in_a_channel_list_field_is_flagged(fake_platform) -> None:
+    cfg = {"channels": {"fake": {"enabled": True, "token": "x", "roms": ["@a"]}}}
     findings = validate_config(cfg)
-    assert any(f.key == "whitlist" and f.section == "channels.telegram" for f in findings)
+    assert any(f.key == "roms" and f.section == "channels.fake" for f in findings)
 
 
 def test_daemon_named_session_unknown_key_flagged() -> None:
@@ -36,10 +35,10 @@ def test_daemon_legacy_scalar_keys_are_valid() -> None:
     assert validate_config(cfg) == []
 
 
-def test_daemon_channels_subtable_is_validated() -> None:
-    cfg = {"daemon": {"work": {"channels": {"telegram": {"bot_token": "x", "whitlist": []}}}}}
+def test_daemon_channels_subtable_is_validated(fake_platform) -> None:
+    cfg = {"daemon": {"work": {"channels": {"fake": {"token": "x", "roms": []}}}}}
     findings = validate_config(cfg)
-    assert any(f.key == "whitlist" and "channels.telegram" in f.section for f in findings)
+    assert any(f.key == "roms" and "channels.fake" in f.section for f in findings)
 
 
 def test_mcp_server_unknown_key_flagged() -> None:
@@ -48,18 +47,14 @@ def test_mcp_server_unknown_key_flagged() -> None:
     assert any(f.key == "comand" and f.section == "mcp.servers.gh" for f in findings)
 
 
-def test_validator_self_registers_builtin_platforms() -> None:
-    """Live 2026-07-09: `veles daemon start` validates the config BEFORE
-    anything imports a channel module, so the platform registry was empty,
-    `get_platform` raised, and the validator degraded to base keys — flagging
-    the legitimate `whitelist` the channel wizard itself wrote ("unknown key
-    'whitelist' … a security control may be disabled"). The validator must
-    bootstrap the builtin registry itself."""
-    from veles.channels.platform_registry import _reset_registry_for_tests
-
-    _reset_registry_for_tests()  # simulate a fresh process, no channel imports
-    cfg = {"channels": {"telegram": {"enabled": True, "bot_token": "x", "whitelist": ["@a"]}}}
+def test_platform_declared_keys_are_known(fake_platform) -> None:
+    """A platform's cred fields and its declared `config_keys` are not typos —
+    live 2026-07-09 the validator flagged `whitelist` the wizard itself wrote, and
+    until 1.2.5 it flagged Telegram's `debounce_seconds` the daemon reads."""
+    cfg = {"channels": {"fake": {"enabled": True, "token": "x", "room": "r"}}}
     assert validate_config(cfg) == []
+    cfg = {"channels": {"fake": {"enabled": True, "rooom": "r"}}}
+    assert [f.key for f in validate_config(cfg)] == ["rooom"]
 
 
 def test_unknown_platform_does_not_crash() -> None:
@@ -69,17 +64,41 @@ def test_unknown_platform_does_not_crash() -> None:
     validate_config(cfg)  # no exception
 
 
-def test_doctor_reports_config_typo_as_error(tmp_path) -> None:
+def test_doctor_reports_config_typo_as_error(tmp_path, fake_platform) -> None:
     from veles.core.doctor import run_all
     from veles.core.project import init_project
     from veles.core.project_config import save_project_config
 
     project = init_project(tmp_path / "proj", name="t")
-    save_project_config(project, {"channels": {"telegram": {"enabled": True, "whitlist": ["@a"]}}})
+    save_project_config(project, {"channels": {"fake": {"enabled": True, "roms": ["@a"]}}})
     report = run_all(project)
     cfg_check = next(r for r in report.results if r.name == "config_schema")
     assert cfg_check.status == "error"
-    assert "whitlist" in cfg_check.message
+    assert "roms" in cfg_check.message
+
+
+def test_doctor_checks_the_keys_of_an_installed_module_channel(
+    tmp_path, isolated_user_home
+) -> None:
+    """`veles doctor` loads no modules up front. A channel platform is a module
+    now, so without loading them a `whitlist` typo in its block went unreported
+    — the M201 check silently stopped covering Telegram."""
+    from tests.channels.fake_platform import install_as_user_module
+    from veles.core.doctor import run_all
+    from veles.core.modules import reset_module_registry, set_module_registry
+    from veles.core.project import init_project
+    from veles.core.project_config import save_project_config
+
+    install_as_user_module()
+    project = init_project(tmp_path / "proj", name="t")
+    save_project_config(project, {"channels": {"fake": {"enabled": True, "roms": ["@a"]}}})
+    token = set_module_registry(None)
+    try:
+        report = run_all(project)
+    finally:
+        reset_module_registry(token)
+    cfg_check = next(r for r in report.results if r.name == "config_schema")
+    assert cfg_check.status == "error" and "roms" in cfg_check.message
 
 
 def test_engine_client_knobs_validate_clean() -> None:
