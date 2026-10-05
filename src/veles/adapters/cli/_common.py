@@ -123,6 +123,22 @@ class CLIProvider:
             raise RuntimeError(f"{self._binary} exited {proc.returncode}: {stderr}")
         return proc.stdout
 
+    def create_message(
+        self,
+        messages: list[Message],
+        tools: list[dict] | None = None,
+        *,
+        model: str,
+        max_tokens: int = 4096,
+    ) -> ProviderResponse:
+        del max_tokens  # agent CLIs expose no max_tokens knob
+        self._prepare(tools)
+        stdout = self._run(self._build_cmd(messages, model, stream=False))
+        state = self._new_state()
+        for event in iter_jsonl(stdout):
+            state.absorb(event)
+        return state.to_response(raw=stdout)
+
     def stream_message(
         self,
         messages: list[Message],

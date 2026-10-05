@@ -14,6 +14,7 @@ pinned by `tests/test_sdk_surface.py`; changing one goes into the CHANGELOG.
 - `veles.sdk.channels` — the platform contract for a channel module.
 - `veles.sdk.channel_checks` — checks a channel module's tests run on its spec.
 - `veles.sdk.media` — speech-to-text and image description adapters.
+- `veles.sdk.providers` — the LLM provider contract and a CLI delegate's base.
 
 `t()` renders a string of the active locale; a module's own strings live in its
 `locales/<lang>.toml` and are reached as `t("<module>.<key>")`.
@@ -39,6 +40,7 @@ from veles.sdk import (  # noqa: F401
     layout,
     media,
     memory,
+    providers,
     tools,
 )
 

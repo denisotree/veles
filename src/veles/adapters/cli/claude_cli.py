@@ -80,22 +80,6 @@ class ClaudeCLIProvider(CLIProvider):
         cmd += list(self._extra_args)
         return cmd
 
-    def create_message(
-        self,
-        messages: list[Message],
-        tools: list[dict] | None = None,
-        *,
-        model: str,
-        max_tokens: int = 4096,
-    ) -> ProviderResponse:
-        del max_tokens  # claude CLI does not expose a max_tokens knob
-        self._prepare(tools)
-        stdout = self._run(self._build_cmd(messages, model))
-        state = _ClaudeStreamState()
-        for event in iter_jsonl(stdout):
-            state.absorb(event)
-        return state.to_response(raw=stdout)
-
 
 @functools.cache
 def _isolation_flags(binary: str) -> tuple[str, ...]:
