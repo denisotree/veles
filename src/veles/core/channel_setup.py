@@ -12,6 +12,14 @@ if TYPE_CHECKING:
     from veles.core.project import Project
 
 
+def secret_slot(spec: PlatformSpec, platform: str, key: str) -> str:
+    """The keychain name a secret field is kept under. The platform's first
+    secret field keeps the bare `<platform>` slot (a running bot's token stays
+    where it always was); every other one gets `<platform>.<key>`."""
+    first = next((f.key for f in spec.cred_fields if f.secret), None)
+    return platform if key == first else f"{platform}.{key}"
+
+
 def resolve_secrets(
     spec: PlatformSpec,
     platform: str,
@@ -30,7 +38,11 @@ def resolve_secrets(
     for f in spec.cred_fields:
         if not f.secret:
             continue
-        value = get_provider_key(platform, project=project.name if project else None)
+        value = get_provider_key(
+            secret_slot(spec, platform, f.key),
+            project=project.name if project else None,
+            env_fallback=False,
+        )
         value = value or config.get(f.key)
         if not value and use_env and f.env:
             value = os.environ.get(f.env)
@@ -41,4 +53,4 @@ def resolve_secrets(
     return values, missing
 
 
-__all__ = ["resolve_secrets"]
+__all__ = ["resolve_secrets", "secret_slot"]

@@ -145,6 +145,34 @@ def test_apply_channel_writes_session_block_and_keychain(tmp_path: Path, fake_ke
     assert get_provider_key("telegram", project=project.name) == "tok"
 
 
+def test_apply_channel_writes_each_secret_to_its_slot(tmp_path: Path, fake_keyring):
+    """A second secret field must not overwrite the first (they used to share
+    the `<platform>` slot)."""
+    from tests.channels.fake_platform import FakeGateway, contributing
+    from veles.cli.channel_wizard import apply_channel
+    from veles.core.platforms import CredField, PlatformSpec
+    from veles.core.secrets import get_provider_key
+
+    spec = PlatformSpec(
+        build=FakeGateway,
+        cred_fields=(
+            CredField("bot", "b", secret=True, required=True),
+            CredField("app", "a", secret=True),
+        ),
+    )
+    project = init_project(tmp_path / "p", name="p")
+    with contributing({"twosecret": spec}):
+        apply_channel(
+            project,
+            session=None,
+            channel="twosecret",
+            secrets={"bot": "B", "app": "A"},
+            config_fields={},
+        )
+    assert get_provider_key("twosecret", project=project.name, env_fallback=False) == "B"
+    assert get_provider_key("twosecret.app", project=project.name, env_fallback=False) == "A"
+
+
 def test_delete_channel_block_returns_bool(tmp_path: Path, fake_keyring):
     from veles.cli.channel_wizard import apply_channel, delete_channel_block
 

@@ -148,10 +148,14 @@ def apply_channel(
     Keychain writes happen FIRST: if a secret write fails (e.g. no keychain
     backend) we abort before persisting `enabled=true`, so we never leave a
     tokenless-but-enabled block the daemon would warn-and-skip on startup."""
+    from veles.core.channel_setup import secret_slot
+    from veles.core.platforms import get_platform
     from veles.core.secrets import set_provider_key
 
-    for value in secrets.values():
-        set_provider_key(channel, value, project=project.name)
+    spec = get_platform(channel) if secrets else None
+    for key, value in secrets.items():
+        assert spec is not None
+        set_provider_key(secret_slot(spec, channel, key), value, project=project.name)
     cfg = load_project_config(project)
     block = _channel_block(cfg, session, channel)
     for key, value in config_fields.items():
