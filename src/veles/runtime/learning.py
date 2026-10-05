@@ -188,7 +188,7 @@ def _continuous_curator_eligible(args: argparse.Namespace) -> bool:
     - local providers (`ollama`/`llamacpp`/`openai-compat`), which authenticate
       via their own runtime — `has_api_key` returns True for them.
 
-    cli-delegate providers (`claude-cli`/`gemini-cli`) can't drive arbitrary
+    cli-delegate providers (`claude-cli`) can't drive arbitrary
     models for the sub-agents (`has_api_key` returns False), and `--resume`
     runs are user-driven refinement where extra LLM noise is unwelcome.
 

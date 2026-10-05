@@ -2,17 +2,12 @@
 
 from __future__ import annotations
 
-from veles.adapters.cli._tool_namespace import (
-    claude_mcp_prefix,
-    gemini_mcp_prefix,
-    mcp_prefix,
-    qualify_prompt,
-)
+from veles.adapters.cli._tool_namespace import claude_mcp_prefix, qualify_prompt
 
 
 def test_mcp_prefix_format() -> None:
-    assert mcp_prefix("wiki_write_page") == "mcp__veles__wiki_write_page"
-    assert mcp_prefix("read_file") == "mcp__veles__read_file"
+    assert claude_mcp_prefix("wiki_write_page") == "mcp__veles__wiki_write_page"
+    assert claude_mcp_prefix("read_file") == "mcp__veles__read_file"
 
 
 def test_qualify_prompt_rewrites_known_names() -> None:
@@ -52,19 +47,3 @@ def test_qualify_prompt_overlapping_names_longest_first() -> None:
     assert "mcp__veles__foo_bar" in out
     assert "mcp__veles__foo " in out  # standalone foo also rewritten
     assert "mcp__veles__mcp__veles__" not in out
-
-
-def test_gemini_mcp_prefix_format() -> None:
-    assert gemini_mcp_prefix("wiki_write_page") == "mcp_veles_wiki_write_page"
-    assert gemini_mcp_prefix("read_file") == "mcp_veles_read_file"
-
-
-def test_claude_mcp_prefix_alias_matches_legacy_mcp_prefix() -> None:
-    assert claude_mcp_prefix("read_file") == mcp_prefix("read_file")
-
-
-def test_qualify_prompt_with_gemini_prefix_fn() -> None:
-    prompt = "Call wiki_write_page(category, slug)."
-    out = qualify_prompt(prompt, ["wiki_write_page"], prefix_fn=gemini_mcp_prefix)
-    assert "mcp_veles_wiki_write_page(category, slug)" in out
-    assert "mcp__veles__wiki_write_page" not in out

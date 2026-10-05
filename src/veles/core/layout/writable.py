@@ -104,6 +104,7 @@ _CONFIRM_NAMES = frozenset(
         ".lefthook.yaml",
         ".claude",
         ".gemini",
+        ".agents",  # agy reads a workspace's MCP servers from .agents/mcp_config.json
         ".codex",
         ".vscode",
         ".devcontainer",

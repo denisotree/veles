@@ -28,6 +28,7 @@ _PROTECTED = (
     ".claude/settings.json",
     "sub/.Claude/commands/x.md",
     ".gemini/settings.json",
+    ".agents/mcp_config.json",
     ".codex/config.toml",
     ".devcontainer/devcontainer.json",
     ".husky/pre-push",

@@ -17,7 +17,7 @@ Three strategies, picked per provider:
   staleness. Live results are returned as-is (no merge with curated),
   because for local providers "what the server reports" is the ground
   truth.
-- **Curated-only** (`anthropic`, `claude-cli`, `gemini-cli`) — no
+- **Curated-only** (`anthropic`, `claude-cli`) — no
   network call. Anthropic's SDK does expose a listing endpoint, but
   the curated table is kept by an explicit project decision; cli
   delegates have no listing surface at all.

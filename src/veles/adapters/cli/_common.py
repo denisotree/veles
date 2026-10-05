@@ -54,7 +54,7 @@ class StreamState(Protocol):
 
 
 class CLIProvider:
-    """A provider that runs a local agent CLI (`claude`, `gemini`) as a subprocess.
+    """A provider that runs a local agent CLI (`claude`, `agy`) as a subprocess.
 
     Subclasses say how to build the command line (`_build_cmd`), where to run it
     (`_cwd`) and how to read its event stream (`_new_state`); running, error

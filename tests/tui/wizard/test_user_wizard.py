@@ -63,12 +63,11 @@ async def _drive_user_wizard(
 async def test_local_provider_skips_api_key_step():
     """When the user picks `ollama` we don't ask for an API key — the
     flow jumps straight from provider → theme → init-project."""
-    # Keys: language=en (Enter), provider=down*6→ollama (Enter),
+    # Keys: language=en (Enter), provider=down*5→ollama (Enter),
     # api-key skipped, theme=enter, init=enter (yes)
     keys = [
         "enter",  # language: en (default)
-        # provider: go down to "ollama" from "openrouter" (positions 0..6)
-        "down",
+        # provider: go down to "ollama" from "openrouter" (positions 0..5)
         "down",
         "down",
         "down",

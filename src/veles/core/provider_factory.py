@@ -8,10 +8,9 @@ project-scoped MCP-config wiring.
 
 Direct-API providers (`openrouter`, `anthropic`, `openai`, `gemini`)
 take their API key from environment variables listed in
-`PROVIDER_API_KEY_ENVS`. cli-delegate providers (`claude-cli`,
-`gemini-cli`) authenticate through their own binary's auth state and
-return False from `has_api_key` since they cannot drive arbitrary
-chat-only sub-agents.
+`PROVIDER_API_KEY_ENVS`. The cli-delegate provider (`claude-cli`)
+authenticates through its own binary's auth state and returns False from
+`has_api_key` since it cannot drive arbitrary chat-only sub-agents.
 
 Local-model providers (`ollama`, `llamacpp`, `openai-compat`) introduced
 in M78 don't need any credentials; `has_api_key` returns True for them
@@ -50,7 +49,7 @@ PROVIDER_API_KEY_ENVS: dict[str, tuple[str, ...]] = {
 }
 
 LOCAL_PROVIDERS: frozenset[str] = frozenset({"ollama", "llamacpp", "openai-compat"})
-CLI_PROVIDERS: frozenset[str] = frozenset({"claude-cli", "gemini-cli"})
+CLI_PROVIDERS: frozenset[str] = frozenset({"claude-cli"})
 
 
 def needs_api_key(provider: str) -> bool:
@@ -114,6 +113,10 @@ def make_provider(name: str, model: str | None = None) -> Provider:
     `model` (when given) lets local providers auto-detect tool-call support
     from the model's advertised capabilities — see `_apply_local_tool_policy`.
     """
+    from veles.core.providers import RETIRED
+
+    if name in RETIRED:
+        raise ValueError(RETIRED[name])
     if name == "openrouter":
         from veles.adapters.openrouter import OpenRouterProvider
 
@@ -141,10 +144,6 @@ def make_provider(name: str, model: str | None = None) -> Provider:
         # The project root, not wherever the process happens to run.
         project = current_project()
         return ClaudeCLIProvider(workdir=project.root if project else None)
-    if name == "gemini-cli":
-        from veles.adapters.cli.gemini_cli import GeminiCLIProvider
-
-        return GeminiCLIProvider()
     if name == "ollama":
         from veles.adapters.local.ollama import OllamaProvider
 
@@ -171,8 +170,8 @@ def has_api_key(provider_name: str, *, project: str | None = None) -> bool:
 
     M92: lookup is delegated to `core.secrets.get_provider_key` which
     consults keychain `veles:<provider>:<project>`, then `veles:<provider>:default`,
-    then ENV. cli-delegate providers (`claude-cli`, `gemini-cli`) return
-    False — they authenticate via their own binary and can't power
+    then ENV. A cli-delegate provider (`claude-cli`) returns
+    False — it authenticates via its own binary and can't power
     chat-only sub-agents. Local-model providers (`ollama`, `llamacpp`,
     `openai-compat`) return True unconditionally — they don't authenticate.
     """

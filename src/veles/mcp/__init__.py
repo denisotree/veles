@@ -6,7 +6,7 @@ through the standard tool `Registry`, so the Permission Engine / trust
 ladder sees them like any builtin tool.
 
 Not to be confused with `veles.adapters.cli.mcp_server`, which is the MCP
-*server* side (exposing Veles tools to claude-cli / gemini-cli).
+*server* side (exposing Veles tools to a delegated CLI such as claude-cli).
 
 Modules:
   config.py            — `[mcp.servers.*]` parsing + ${VAR} interpolation.

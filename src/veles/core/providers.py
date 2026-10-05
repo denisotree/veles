@@ -39,7 +39,6 @@ ALL_PROVIDERS: tuple[ProviderSpec, ...] = (
     ProviderSpec("openai", "OpenAI", "GPT direct"),
     ProviderSpec("gemini", "Google Gemini", ""),
     ProviderSpec("claude-cli", "Claude CLI", "subprocess"),
-    ProviderSpec("gemini-cli", "Gemini CLI", "subprocess"),
     ProviderSpec("ollama", "Ollama", "local, no key"),
     ProviderSpec("llamacpp", "llama.cpp", "local, no key"),
     ProviderSpec("openai-compat", "OpenAI-compatible", "custom endpoint"),
@@ -57,9 +56,20 @@ def tui_label(spec: ProviderSpec) -> str:
     return spec.label
 
 
+# Ids that once named a provider. Naming one gives this line, not "unknown".
+RETIRED: dict[str, str] = {
+    "gemini-cli": (
+        "the gemini-cli provider was removed in 1.2.6 — Google no longer serves the "
+        "Gemini CLI to personal accounts; use `gemini` with GEMINI_API_KEY, or "
+        "`antigravity-cli`"
+    ),
+}
+
+
 __all__ = [
     "ALL_PROVIDERS",
     "PROVIDER_VALUES",
+    "RETIRED",
     "ProviderSpec",
     "tui_label",
 ]

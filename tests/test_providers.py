@@ -25,7 +25,7 @@ def test_every_provider_classified_somewhere() -> None:
     keyed API providers, local providers, or CLI delegates. Otherwise
     we have a provider that no adapter knows how to instantiate."""
     keyed = frozenset(PROVIDER_API_KEY_ENVS.keys())
-    cli_delegates = frozenset({"claude-cli", "gemini-cli"})
+    cli_delegates = frozenset({"claude-cli"})
     for spec in ALL_PROVIDERS:
         assert (
             spec.value in keyed or spec.value in LOCAL_PROVIDERS or spec.value in cli_delegates

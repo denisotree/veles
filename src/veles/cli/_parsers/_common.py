@@ -27,7 +27,6 @@ PROVIDER_CHOICES = (
     "openai",
     "gemini",
     "claude-cli",
-    "gemini-cli",
     "ollama",
     "llamacpp",
     "openai-compat",
