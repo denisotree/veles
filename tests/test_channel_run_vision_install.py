@@ -33,7 +33,7 @@ def _clean(monkeypatch: pytest.MonkeyPatch):
 def _args() -> argparse.Namespace:
     return argparse.Namespace(
         channel="telegram",
-        bot_token="T",
+        secret="T",
         daemon_url="http://127.0.0.1:8765",
         daemon_token="D",
     )

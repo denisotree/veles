@@ -19,7 +19,7 @@ def test_channel_run_requires_bot_token(isolated_user_home: Path, capsys, monkey
     args = _ns(
         channel_command="run",
         channel="telegram",
-        bot_token=None,
+        secret=None,
         daemon_url=None,
         daemon_token="vd_x",
     )
@@ -34,7 +34,7 @@ def test_channel_run_requires_daemon_token(isolated_user_home: Path, capsys, mon
     args = _ns(
         channel_command="run",
         channel="telegram",
-        bot_token="bot-xyz",
+        secret="bot-xyz",
         daemon_url=None,
         daemon_token=None,
     )
@@ -58,7 +58,7 @@ def test_channel_run_reads_a_daemon_token_stored_with_veles_secret(
     args = _ns(
         channel_command="run",
         channel="no-such-channel",
-        bot_token="bot-xyz",
+        secret="bot-xyz",
         daemon_url=None,
         daemon_token=None,
     )
@@ -72,7 +72,7 @@ def test_channel_run_refuses_unknown_channel(isolated_user_home: Path, capsys, m
     args = _ns(
         channel_command="run",
         channel="slack",
-        bot_token="x",
+        secret="x",
         daemon_url=None,
         daemon_token="vd_x",
     )
@@ -119,6 +119,38 @@ def test_channel_reset_session_missing(isolated_user_home: Path, capsys) -> None
     rc = channel_cmd.cmd_channel(args)
     assert rc == 1
     assert "no session" in capsys.readouterr().err
+
+
+def test_channel_list_sees_a_user_module_platform(
+    isolated_user_home: Path, tmp_path: Path, monkeypatch, capsys
+) -> None:
+    """`veles channel` needs no project — it must still load the user's modules,
+    or a platform installed from the registry is invisible to it."""
+    from veles.cli import main
+    from veles.core.registry.gate import approve_module
+    from veles.core.user_paths import user_modules_dir
+
+    mod = user_modules_dir() / "fakech"
+    mod.mkdir(parents=True)
+    (mod / "module.toml").write_text(
+        '[module]\nname = "fakech"\ndescription = "d"\nentrypoint = "e.py:register"\n',
+        encoding="utf-8",
+    )
+    source = Path(__file__).parent / "channels" / "fake_platform.py"
+    (mod / "e.py").write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    approve_module(mod, name="fakech", project_root=None)
+    monkeypatch.chdir(tmp_path)
+    assert main(["channel", "list"]) == 0
+    assert "fake" in capsys.readouterr().out
+
+
+def test_channel_run_without_a_channel_names_the_choices(
+    isolated_user_home: Path, capsys, fake_platform
+) -> None:
+    args = _ns(channel_command="run", channel=None, secret=None, daemon_url=None, daemon_token="t")
+    assert channel_cmd.cmd_channel(args) == 2
+    err = capsys.readouterr().err
+    assert "fake" in err and "telegram" in err and "--channel" in err
 
 
 def test_channel_unknown_subcommand(isolated_user_home: Path, capsys) -> None:

@@ -29,6 +29,31 @@ if TYPE_CHECKING:
     from veles.core.project import Project
 
 
+def load_user_modules(into: ModuleRegistry | None = None) -> ModuleRegistry:
+    """The user-level modules only (`~/.veles/modules/`) — for commands that run
+    without a project (`veles channel`). With `into`, only those not loaded there
+    yet are added to it."""
+    from veles.core.user_paths import user_modules_dir
+
+    handles = _dedup_by_name(
+        _admitted(discover_modules_in(user_modules_dir()), project_root=None), scope="user"
+    )
+    return _load_handles(handles, into)
+
+
+def _load_handles(handles: list[ModuleHandle], into: ModuleRegistry | None) -> ModuleRegistry:
+    registry = into if into is not None else ModuleRegistry()
+    loaded = set(registry.modules)
+    for handle in handles:
+        if handle.name in loaded:
+            continue
+        try:
+            load_module(handle, registry)
+        except ModuleLoadError as exc:
+            _warn(f"skipping module {handle.name!r}: {shown(exc)}")
+    return registry
+
+
 def load_project_modules(project: Project, into: ModuleRegistry | None = None) -> ModuleRegistry:
     """The project's modules in a new registry — or, with `into` (after an install
     mid-session), only the modules not already loaded there, added to it: an
@@ -49,16 +74,7 @@ def load_project_modules(project: Project, into: ModuleRegistry | None = None) -
             continue
         handles.append(h)
     handles.extend(project_handles)
-    registry = into if into is not None else ModuleRegistry()
-    loaded = set(registry.modules)
-    for handle in handles:
-        if handle.name in loaded:
-            continue
-        try:
-            load_module(handle, registry)
-        except ModuleLoadError as exc:
-            _warn(f"skipping module {handle.name!r}: {shown(exc)}")
-    return registry
+    return _load_handles(handles, into)
 
 
 def _warn(message: str) -> None:
@@ -101,4 +117,4 @@ def _admitted(handles: list[ModuleHandle], *, project_root: Path | None) -> list
     return out
 
 
-__all__ = ["load_project_modules"]
+__all__ = ["load_project_modules", "load_user_modules"]

@@ -2,12 +2,16 @@
 
 Subcommands:
 
-    veles channel run --channel telegram
-        [--bot-token TOK | env TELEGRAM_BOT_TOKEN]
+    veles channel run [--channel NAME]
+        [--secret VALUE | the platform's env variable | keychain]
         [--daemon-url URL | env VELES_DAEMON_URL | http://127.0.0.1:8765]
         [--daemon-token TOK | env VELES_DAEMON_TOKEN]
-    veles channel list-sessions --channel telegram
-    veles channel reset-session --channel telegram <chat_id>
+    veles channel list-sessions [--channel NAME]
+    veles channel reset-session [--channel NAME] <chat_id>
+
+`--channel` may be omitted when exactly one platform is installed. Platforms come
+from modules (`veles registry install <platform>`), so the user's modules — and
+the project's, inside one — are loaded first.
 
 The runner is a foreground process: Ctrl-C terminates it cleanly. For
 production, run it under `systemd` / `tmux` / a process supervisor —
@@ -30,7 +34,50 @@ from veles.core.platforms import get_platform, list_platforms
 
 
 def cmd_channel(args: argparse.Namespace) -> int:
+    """`channel` runs without a project; a channel platform comes from a module,
+    so the modules load first — the project's when there is one, else the user's."""
+    from veles.cli._project import _resolve_active_project
+    from veles.core.module_loading import load_project_modules, load_user_modules
+    from veles.core.modules import (
+        current_module_registry,
+        reset_module_registry,
+        set_module_registry,
+    )
+
+    project = _resolve_active_project(args)
+    live = current_module_registry()  # a caller that already loaded modules keeps them
+    registry = (
+        load_project_modules(project, into=live)
+        if project is not None
+        else load_user_modules(into=live)
+    )
+    token = set_module_registry(registry)
+    try:
+        return _dispatch(args)
+    finally:
+        reset_module_registry(token)
+
+
+def _pick_channel(args: argparse.Namespace) -> str | None:
+    """The `--channel` given, else the only platform there is; None (after
+    printing the choices) when that is ambiguous."""
+    if getattr(args, "channel", None):
+        return str(args.channel)
+    platforms = list_platforms()
+    if len(platforms) == 1:
+        return platforms[0]
+    choices = ", ".join(platforms) or "(none installed — `veles registry search --kind module`)"
+    print(f"error: pass --channel <platform>; available: {choices}", file=sys.stderr)
+    return None
+
+
+def _dispatch(args: argparse.Namespace) -> int:
     sub = args.channel_command
+    if sub in ("run", "list-sessions", "reset-session"):
+        channel = _pick_channel(args)
+        if channel is None:
+            return 2
+        args.channel = channel
     if sub == "run":
         return _cmd_channel_run(args)
     if sub == "list-sessions":
@@ -73,18 +120,26 @@ def _cmd_channel_remove(args: argparse.Namespace) -> int:
     return remove_channel(project, args.channel, session=getattr(args, "session", None))
 
 
-def _cmd_channel_list(_args: argparse.Namespace) -> int:
-    """`veles channel list` — show registered platforms + their session counts."""
+def _cmd_channel_list(args: argparse.Namespace) -> int:
+    """`veles channel list` — installed platforms with their session counts, and
+    (inside a project) declared channels whose platform isn't installed yet."""
+    from veles.cli._project import _resolve_active_project
+    from veles.core.project_config import list_channel_configs, load_project_config
+
     platforms = list_platforms()
     if not platforms:
-        print("no channel platforms registered.")
-        return 0
+        print("no channel platforms installed.")
     for name in platforms:
         path = channel_session_path(name)
         count = 0
         if path.is_file():
             count = len(SessionMap.load(path).list())
         print(f"  {name}\tsessions: {count}\tmap: {path}")
+    project = _resolve_active_project(args)
+    if project is not None:
+        declared = {p for p, _ in list_channel_configs(load_project_config(project))}
+        for name in sorted(declared - set(platforms)):
+            print(f"  {name}\t(declared; module not installed — installs on daemon start)")
     return 0
 
 
@@ -143,11 +198,11 @@ def _cmd_channel_run(args: argparse.Namespace) -> int:
     config = _channel_config(project, channel)
     secrets, missing = resolve_secrets(spec, channel, config, project=project, use_env=True)
     first_secret = next((f for f in spec.cred_fields if f.secret), None)
-    if args.bot_token and first_secret is not None:
-        secrets[first_secret.key] = args.bot_token
+    if args.secret and first_secret is not None:
+        secrets[first_secret.key] = args.secret
         missing = [k for k in missing if k != first_secret.key]
     if missing:
-        hints = ["--bot-token" if first_secret and k == first_secret.key else k for k in missing]
+        hints = ["--secret" if first_secret and k == first_secret.key else k for k in missing]
         envs = [f.env for f in spec.cred_fields if f.key in missing and f.env]
         print(
             f"error: {channel} needs {', '.join(missing)} — pass {', '.join(hints)}"
