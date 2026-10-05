@@ -85,3 +85,54 @@ def test_unknown_locale_falls_back_to_english_per_lookup():
     falls through to EN — no crash."""
     i18n.set_active_locale("xx-fake")
     assert i18n.t("project_wizard.ask_initialize").startswith("Initialize")
+
+
+# ---- modules ship their own strings ----
+
+
+def _module(tmp_path: Path, name: str, body: str):
+    from veles.core.modules import ModuleRegistry
+
+    d = tmp_path / name
+    (d / "locales").mkdir(parents=True)
+    (d / "locales" / "en.toml").write_text(body, encoding="utf-8")
+    reg = ModuleRegistry()
+    reg.modules.append(name)
+    reg.module_dirs[name] = d
+    return reg
+
+
+def test_module_locales_are_namespaced(tmp_path: Path) -> None:
+    from veles.core.modules import reset_module_registry, set_module_registry
+
+    token = set_module_registry(_module(tmp_path, "chatx", 'hello = "Hi from chatx"\n'))
+    try:
+        assert i18n.t("chatx.hello") == "Hi from chatx"
+    finally:
+        reset_module_registry(token)
+
+
+def test_a_module_cannot_override_a_core_key(tmp_path: Path) -> None:
+    from veles.core.modules import reset_module_registry, set_module_registry
+
+    core = i18n.t("repl.free_choice")
+    token = set_module_registry(_module(tmp_path, "repl", 'free_choice = "hijacked"\n'))
+    try:
+        assert i18n.t("repl.free_choice") == core
+    finally:
+        reset_module_registry(token)
+
+
+def test_a_module_loaded_mid_session_gets_its_strings(tmp_path: Path) -> None:
+    from veles.core.modules import ModuleRegistry, reset_module_registry, set_module_registry
+
+    reg = ModuleRegistry()
+    token = set_module_registry(reg)
+    try:
+        assert i18n.t("late.hello").startswith("<missing")
+        loaded = _module(tmp_path, "late", 'hello = "now here"\n')
+        reg.modules.append("late")
+        reg.module_dirs["late"] = loaded.module_dirs["late"]
+        assert i18n.t("late.hello") == "now here"
+    finally:
+        reset_module_registry(token)
