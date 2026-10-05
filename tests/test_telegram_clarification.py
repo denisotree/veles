@@ -14,9 +14,9 @@ from typing import Any
 
 import pytest
 
-from veles.channels.session_map import SessionMap
 from veles.channels.telegram import TelegramGateway
 from veles.channels.telegram._prompts import _build_buttons, _format_prompt_body
+from veles.core.chat_sessions import SessionMap
 
 
 @pytest.fixture()

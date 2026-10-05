@@ -52,8 +52,6 @@ from typing import Any
 import aiohttp
 
 from veles.channels.daemon_client import DaemonClientError
-from veles.channels.protocols import RunBackend
-from veles.channels.session_map import SessionMap
 from veles.channels.telegram._api import TelegramApi
 from veles.channels.telegram._buffer import (
     _BUFFER_HARD_CAP,
@@ -86,7 +84,9 @@ from veles.channels.telegram._prompts import (
     _PendingTelegramPrompt,
 )
 from veles.channels.telegram_format import escape_html
+from veles.core.chat_sessions import SessionMap
 from veles.core.i18n import t
+from veles.core.platforms import RunBackend
 
 logger = logging.getLogger(__name__)
 

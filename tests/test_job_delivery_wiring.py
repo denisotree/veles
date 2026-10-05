@@ -19,8 +19,8 @@ from pathlib import Path
 from typing import Any
 
 from veles.channels.delivery import DeliveryRouter
-from veles.channels.session_map import SessionMap
 from veles.channels.telegram import TelegramGateway
+from veles.core.chat_sessions import SessionMap
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.core.secrets import delete_provider_key, set_provider_key

@@ -1,17 +1,19 @@
-"""Cross-channel runtime protocols.
+"""Channel platforms — the contract a channel module implements and what its
+gateway talks to.
 
-The Telegram gateway used to type its backend as `Any` — implicit duck
-typing against `DaemonClient` (HTTP loopback) and `InProcessRunBackend`
-(asyncio dispatch inside the daemon). M-R2.7 formalises the contract:
-both backends now declare themselves `RunBackend`, and the gateway's
-type hint reflects that. Strictly structural — no runtime import cost
-because `Protocol` is checked at type-time only.
+`RunBackend` is what a gateway needs from the daemon: `DaemonClient` (HTTP
+loopback) and `InProcessRunBackend` (asyncio dispatch inside the daemon) both
+implement it. It lives in core so `veles.sdk` can hand it to channel modules.
 """
 
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from typing import Any, Protocol, runtime_checkable
+
+
+class RunBackendError(RuntimeError):
+    """A run backend (the HTTP daemon client or the in-process one) failed a request."""
 
 
 @runtime_checkable
@@ -75,4 +77,4 @@ class RunBackend(Protocol):
         ...
 
 
-__all__ = ["RunBackend"]
+__all__ = ["RunBackend", "RunBackendError"]

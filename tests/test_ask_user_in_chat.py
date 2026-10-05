@@ -13,9 +13,9 @@ from dataclasses import dataclass
 
 import pytest
 
-from veles.channels.session_map import SessionMap
 from veles.channels.telegram import TelegramGateway
 from veles.core.agent import RunResult
+from veles.core.chat_sessions import SessionMap
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.daemon.auth import TokenStore

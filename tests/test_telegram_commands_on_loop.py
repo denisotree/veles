@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import pytest
 
-from veles.channels.session_map import SessionMap
 from veles.channels.telegram import TelegramGateway
 from veles.channels.telegram._commands import _HANDLERS, dispatch
+from veles.core.chat_sessions import SessionMap
 from veles.core.memory import SessionStore
 from veles.core.project import init_project
 from veles.daemon.auth import TokenStore

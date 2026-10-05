@@ -9,7 +9,7 @@ import pytest
 from aiohttp import web
 
 from tests.conftest import StubProvider
-from veles.channels.session_map import SessionMap, channel_session_path
+from veles.core.chat_sessions import SessionMap, channel_session_path
 from veles.core.memory import SessionStore
 from veles.core.project import Project, init_project
 from veles.core.provider import (

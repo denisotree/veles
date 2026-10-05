@@ -61,7 +61,7 @@ def test_list_channel_configs_sorted_and_empty():
 
 
 def test_channel_session_map_keying(monkeypatch, tmp_path):
-    import veles.channels.session_map as sm
+    import veles.core.chat_sessions as sm
 
     captured: list[str] = []
     real = sm.channel_session_path

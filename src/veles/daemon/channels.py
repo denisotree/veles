@@ -21,7 +21,7 @@ def channel_session_map(state: DaemonState, platform: str):
     """Per-(session, platform) chat→session map so two daemon sessions running
     the same platform keep independent conversation contexts. The unnamed
     daemon keeps the `<platform>-sessions.json` key."""
-    from veles.channels.session_map import SessionMap, channel_session_path
+    from veles.core.chat_sessions import SessionMap, channel_session_path
 
     key = f"{state.session_name}-{platform}" if state.session_name else platform
     return SessionMap.load(channel_session_path(key))
@@ -30,7 +30,7 @@ def channel_session_map(state: DaemonState, platform: str):
 def chat_session_slot(state: DaemonState, target: str):
     """`(session map, key)` of the chat a delivery target names, keyed the way
     its gateway keys it (`chat_key_for_target`); None for a non-chat target."""
-    from veles.channels.session_map import chat_key_for_target
+    from veles.core.chat_sessions import chat_key_for_target
 
     found = chat_key_for_target(target)
     if found is None:

@@ -92,7 +92,7 @@ def test_no_session_mapped_degrades_to_notify_only(tmp_path: Path) -> None:
 
 
 def test_mapped_session_resumes_and_delivers_final_text(tmp_path: Path) -> None:
-    from veles.channels.session_map import SessionMap, channel_session_path
+    from veles.core.chat_sessions import SessionMap, channel_session_path
     from veles.daemon.background_ops import make_on_op_finished
 
     project = _project(tmp_path)
@@ -149,7 +149,7 @@ def test_resume_into_a_stale_session_follows_the_session_the_factory_allocated(
     then allocates a fresh session; the resume turn must run, lock and be recorded
     under that session, and the chat must be re-pointed to it — otherwise the
     resumed answer lands in a session the chat never reads again."""
-    from veles.channels.session_map import SessionMap, channel_session_path
+    from veles.core.chat_sessions import SessionMap, channel_session_path
     from veles.daemon.background_ops import make_on_op_finished
 
     project = _project(tmp_path)
@@ -185,7 +185,7 @@ def test_resume_into_a_stale_session_follows_the_session_the_factory_allocated(
 
 
 def test_resume_depth_cap_degrades_to_notify_only(tmp_path: Path) -> None:
-    from veles.channels.session_map import SessionMap, channel_session_path
+    from veles.core.chat_sessions import SessionMap, channel_session_path
     from veles.daemon.background_ops import make_on_op_finished
 
     project = _project(tmp_path)

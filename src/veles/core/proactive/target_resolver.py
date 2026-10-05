@@ -55,7 +55,7 @@ def last_active_target(
     as `<channel>:<key>` — returning the bare key made every "last active chat"
     notice undeliverable. A named daemon keeps its maps as
     `<session_name>-<channel>` (`daemon/channels.py::channel_session_map`)."""
-    from veles.channels.session_map import SessionMap, channel_session_path
+    from veles.core.chat_sessions import SessionMap, channel_session_path
 
     best: str | None = None
     best_ts = float("-inf")

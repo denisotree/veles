@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from veles.channels.session_map import SessionMap, channel_session_path
 from veles.cli.commands import channel as channel_cmd
+from veles.core.chat_sessions import SessionMap, channel_session_path
 
 # `isolated_user_home` comes from tests/conftest.py.
 

@@ -137,7 +137,7 @@ async def _handle_list_channels(request: web.Request) -> web.Response:
        persisted chat count.
     """
     from veles.channels.platform_registry import ensure_builtins_registered, list_platforms
-    from veles.channels.session_map import (
+    from veles.core.chat_sessions import (
         SessionMap,
         channel_session_path,
         default_channels_dir,

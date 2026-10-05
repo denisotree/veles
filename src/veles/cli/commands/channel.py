@@ -28,7 +28,7 @@ from veles.channels.platform_registry import (
     get_platform,
     list_platforms,
 )
-from veles.channels.session_map import SessionMap, channel_session_path
+from veles.core.chat_sessions import SessionMap, channel_session_path
 from veles.core.defaults import DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT
 
 
