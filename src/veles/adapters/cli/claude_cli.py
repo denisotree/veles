@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from veles.adapters.cli._common import CLIProvider, format_messages_as_prompt, iter_jsonl
+from veles.adapters.cli._tool_namespace import claude_mcp_prefix
 from veles.core.provider import Message, ProviderResponse, TokenUsage
 
 
@@ -46,6 +47,9 @@ class ClaudeCLIProvider(CLIProvider):
         )
         self._mcp_config_path = mcp_config_path
         self._workdir = workdir
+
+    def mcp_tool_name(self, name: str) -> str:
+        return claude_mcp_prefix(name)
 
     def _new_state(self) -> _ClaudeStreamState:
         return _ClaudeStreamState()
@@ -75,22 +79,6 @@ class ClaudeCLIProvider(CLIProvider):
             cmd += ["--mcp-config", str(self._mcp_config_path), "--allowedTools", "mcp__veles"]
         cmd += list(self._extra_args)
         return cmd
-
-    def create_message(
-        self,
-        messages: list[Message],
-        tools: list[dict] | None = None,
-        *,
-        model: str,
-        max_tokens: int = 4096,
-    ) -> ProviderResponse:
-        del max_tokens  # claude CLI does not expose a max_tokens knob
-        self._prepare(tools)
-        stdout = self._run(self._build_cmd(messages, model))
-        state = _ClaudeStreamState()
-        for event in iter_jsonl(stdout):
-            state.absorb(event)
-        return state.to_response(raw=stdout)
 
 
 @functools.cache

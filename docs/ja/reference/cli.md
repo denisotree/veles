@@ -226,11 +226,11 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `refresh [--force]` | `AGENTS.md` から自然言語のルーティングヒントを再解析する |
 
 ### `veles models <provider>`
-プロバイダーのモデルを一覧表示します。クラウドプロバイダー（openrouter/openai/gemini）は 24 時間キャッシュされ、ローカルプロバイダーは常にライブです。
+プロバイダーのモデルを一覧表示します。クラウドプロバイダー（openrouter/openai/gemini）は 24 時間キャッシュされ、ローカルプロバイダーと `antigravity-cli` は常にライブです。未知のプロバイダーは、存在するものを列挙した 1 行のエラーになります（終了コード `2`）。
 
 | フラグ | デフォルト | 目的 |
 |---|---|---|
-| `provider`（位置引数） | — | [プロバイダー名](#provider-names)のいずれか |
+| `provider`（位置引数） | — | [カタログ](#provider-names)にあるプロバイダー id |
 | `--refresh` | オフ | ディスクキャッシュをバイパスする（クラウドのみ） |
 | `--json` | オフ | `{provider, source, models}` を JSON として出力する |
 
@@ -356,7 +356,9 @@ HTTP+WS デーモンの実行/制御を行います。引数なしの `veles dae
 
 ## プロバイダー名
 
-`openrouter`（デフォルト） · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` と `veles models` は、プロバイダーカタログにある任意の id を受け付けます — ビルトイン、`~/.veles/providers.toml` のもの、インストール済みモジュールのプロバイダーです:
 
-ローカルプロバイダー（`ollama`、`llamacpp`、`openai-compat`）は API キー不要です。[プロバイダーリファレンス](providers.md)と[プロバイダーの設定](../how-to/configure-providers.md)を参照してください。
+`openrouter`（デフォルト） · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`ollama` · `llamacpp` · `openai-compat`（ビルトイン）
+
+レジストリのモジュールだけが提供するプロバイダー（`antigravity-cli`）は、指定すると自動的にインストールされます。ローカルプロバイダー（`ollama`、`llamacpp`、`openai-compat`）は API キー不要です。[プロバイダーリファレンス](providers.md)と[プロバイダーの設定](../how-to/configure-providers.md)を参照してください。

@@ -68,9 +68,7 @@ def build_command_agent(  # noqa: PLR0913
         return None
 
     if tool_aware:
-        provider = run_registry.make_tool_aware_provider(
-            args.provider, project, skill_model=args.model
-        )
+        provider = run_registry.make_tool_aware_provider(args.provider, project, model=args.model)
     else:
         provider = provider_factory.make_provider(args.provider, args.model)
 

@@ -104,6 +104,24 @@ _SURFACE: dict[str, dict[str, str]] = {
         "spawn": "veles.core.orchestration.workers",
         "submit_oneshot_job": "veles.core.jobs_store",
     },
+    "veles.sdk.providers": {
+        "CLIProvider": "veles.adapters.cli._common",
+        "Message": "veles.core.provider",
+        "ProviderContext": "veles.core.providers",
+        "ProviderResponse": "veles.core.provider",
+        "ProviderSpec": "veles.core.providers",
+        "StreamEnd": "veles.core.provider",
+        "StreamEvent": "veles.core.provider",
+        "StreamState": "veles.adapters.cli._common",
+        "TextDelta": "veles.core.provider",
+        "TokenUsage": "veles.core.provider",
+        "ToolCall": "veles.core.provider",
+        "delegate_dir": "veles.core.delegate_dir",
+        "delegate_workspace": "veles.core.delegate_dir",
+        "format_messages_as_prompt": "veles.adapters.cli._common",
+        "iter_jsonl": "veles.adapters.cli._common",
+        "veles_mcp_server": "veles.adapters.cli.mcp_config",
+    },
 }
 
 

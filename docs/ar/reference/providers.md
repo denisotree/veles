@@ -2,8 +2,26 @@
 
 > 🌐 **اللغات:** [English](../../en/reference/providers.md) · [简体中文](../../zh-CN/reference/providers.md) · [繁體中文](../../zh-TW/reference/providers.md) · [日本語](../../ja/reference/providers.md) · [한국어](../../ko/reference/providers.md) · [Español](../../es/reference/providers.md) · [Français](../../fr/reference/providers.md) · [Italiano](../../it/reference/providers.md) · [Português (BR)](../../pt-BR/reference/providers.md) · [Português (PT)](../../pt-PT/reference/providers.md) · [Русский](../../ru/reference/providers.md) · **العربية** · [हिन्दी](../../hi/reference/providers.md) · [বাংলা](../../bn/reference/providers.md) · [Tiếng Việt](../../vi/reference/providers.md)
 
-Veles مستقل عن المزوّد. مرّر `--provider <name>` إلى أي أمر وكيل، أو اضبط
+Veles مستقل عن المزوّد. مرّر `--provider <id>` إلى أي أمر وكيل، أو اضبط
 مزوّدًا افتراضيًا في الإعداد. تستخدم معرّفات النماذج تسمية المزوّد نفسه.
+
+## كتالوج المزوّدين
+
+كل مزوّد يعرفه Veles هو مُدخَل في كتالوج واحد، يُبنى من ثلاثة مصادر:
+
+1. **المضمَّنة** — الجدول أدناه، ويُشحَن مع Veles.
+2. **الخاصة بك** — `~/.veles/providers.toml`: واجهة API مستضافة متوافقة مع OpenAI
+   أو خادم تشغّله بنفسك، بإضافة مُدخَل (راجع
+   [إضافة مزوّد خاص بك](../how-to/configure-providers.md#إضافة-مزوّد-خاص-بك)).
+   يتجاوز المُدخَل ذو المعرّف المضمَّن إعدادات ذلك المزوّد (مثل `base_url`).
+3. **الوحدات** — تُسهم وحدة من السجلّ بمزوّد (`antigravity-cli`). تسميته في
+   `[engine] provider` أو في مسار أو عبر `--provider` تثبّته من سجلّاتك المتصلة
+   عند التشغيل التالي، كما تُثبَّت قناة مُعلَنة.
+
+يقرأ كلٌّ من `--provider` و`veles models` ومعالجات الإعداد والتوجيه و`veles doctor`
+الكتالوج، فيعمل مزوّد من أي مصدر في كل موضع يعمل فيه المزوّد المضمَّن. المعرّف
+المجهول خطأ من سطر واحد يسرد ما هو موجود؛ كما يفحص `veles doctor` الملف
+`~/.veles/providers.toml` وكل مزوّد تسمّيه مساراتك.
 
 | المزوّد | النوع | مفتاح API | ملاحظات |
 |---|---|---|---|
@@ -11,11 +29,13 @@ Veles مستقل عن المزوّد. مرّر `--provider <name>` إلى أي �
 | `anthropic` | سحابي مباشر | `ANTHROPIC_API_KEY` | واجهة Claude Messages API، التخزين المؤقت للموجِّهات |
 | `openai` | سحابي مباشر | `OPENAI_API_KEY` | إكمالات دردشة GPT |
 | `gemini` | سحابي مباشر | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
-| `claude-cli` | عملية فرعية | — (جلسة CLI) | يفوّض إلى `claude` CLI محلي في وضع بثّ JSON |
-| `gemini-cli` | عملية فرعية | — (جلسة CLI) | يفوّض إلى `gemini` CLI محلي |
+| `claude-cli` | مفوَّض CLI | — (جلسة CLI) | يفوّض إلى `claude` CLI محلي في وضع بثّ JSON |
 | `ollama` | محلي | لا شيء | `OLLAMA_BASE_URL` (الافتراضي `http://localhost:11434/v1`) |
 | `llamacpp` | محلي | لا شيء | `LLAMACPP_BASE_URL` (الافتراضي `http://localhost:8080/v1`) |
-| `openai-compat` | محلي/مخصّص | لا شيء | `OPENAI_COMPAT_BASE_URL` (مطلوب، دون افتراضي) |
+| `openai-compat` | محلي/مخصّص | اختياري `OPENAI_COMPAT_API_KEY` | `OPENAI_COMPAT_BASE_URL` (مطلوب، دون افتراضي) |
+
+أُزيل `gemini-cli` في 1.2.6 — لم تعد Google تقدّم Gemini CLI للحسابات الشخصية.
+استخدم `gemini` مع مفتاح API، أو وحدة `antigravity-cli`.
 
 المزوّد الافتراضي: `openrouter`. **لا يوجد نموذج افتراضي مُضمَّن** — اضبط واحدًا
 عبر معالج الإعداد أو `[engine] model` أو `--model` (وإلا أبلغ الوكيل
@@ -27,22 +47,28 @@ Veles مستقل عن المزوّد. مرّر `--provider <name>` إلى أي �
 لا يحتاج `ollama` و`llamacpp` و`openai-compat` إلى مفتاح API. اسرد النماذج المُثبَّتة
 عبر `veles models <provider>` (دائمًا حيّة للمزوّدين المحليين).
 
-**استدعاء الأدوات معطّل افتراضيًا** على المزوّدين المحليين — إذ تُصدِر كثير من النماذج
-المحلية استدعاءات أدوات مشوَّهة. فعّله بعد اختيار نموذج قادر على استخدام الأدوات:
+**يُكتشَف استدعاء الأدوات** مما يعلنه الخادم: يُبلغ ollama بقدرات كل نموذج، ويُبلغ خادم
+llama.cpp بقدرات قالب الدردشة لديه. يفرض `VELES_LOCAL_TOOLS=1` تفعيل استدعاء الأدوات
+و`=0` تعطيله؛ وعند عدم الضبط يُكتشَف تلقائيًا.
 
 ```bash
-export VELES_LOCAL_TOOLS=1
 veles run --provider ollama --model qwen3:4b-instruct "..."
 ```
 
 تجاوز نقاط النهاية عبر متغيّرات البيئة `*_BASE_URL` (راجع
 [متغيّرات البيئة](environment-variables.md)).
 
-## تفويض CLI (`claude-cli`, `gemini-cli`)
+## تفويض CLI (`claude-cli`, `antigravity-cli`)
 
-إذا كان لديك اشتراك في Claude أو Gemini CLI، فيمكن لـ Veles تشغيل البرنامج
-التنفيذي في وضع بثّ JSON والعمل كمنسّق — مع إبقاء الحلقة محلية أولًا دون
-مفتاح API منفصل. لا تصل أدوات Veles إلى العملية الفرعية إلا عند تهيئة جسر MCP.
+إذا كان لديك اشتراك في Claude أو Google، فيمكن لـ Veles تشغيل الـ CLI الخاص به بلا
+واجهة والعمل كمنسّق — دون مفتاح API منفصل. `claude-cli` مضمَّن؛ أما `antigravity-cli`
+(الـ CLI المسمّى `agy`) فهو وحدة من السجلّ تثبّت نفسها عند تسميتها.
+
+المفوَّض هو النموذج فقط: تصل إليه أدوات Veles عبر جسر MCP، ويمرّ كل استدعاء عبر سلّم
+الثقة في Veles. يقع إعداد الجسر في مجلد خاص بالعملية الجارية،
+`.veles/tmp/delegate-<pid>/`، ويُحذف عند انتهائها. يعمل `agy` في مساحة عمل مؤقتة خارج
+مشروعك (تحت `~/.veles/tmp/`)، فلا يصل إليه إعداد `.agents/` الخاص بالمشروع نفسه، خلف
+بوّابة ترفض أدوات الصدفة والملفات الخاصة به.
 
 ## حالة الوسائط المتعددة (الرؤية / تحويل الكلام إلى نص)
 

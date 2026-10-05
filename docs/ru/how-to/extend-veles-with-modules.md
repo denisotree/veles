@@ -43,6 +43,7 @@ Recall резервирует `insights`, `turns`, `about` и `extra`; `Backgrou
 | `veles.sdk.channels` | контракт канала: `PlatformSpec`, `ChannelContext`, `ChannelCaps`, `ChannelGateway`, `CredField`, `RunBackend`, `RunBackendError`, `SessionMap` |
 | `veles.sdk.channel_checks` | проверки, которые тесты модуля канала гоняют на его spec: `check_builds_from_config`, `check_config_keys`, `check_delivers` |
 | `veles.sdk.media` | адаптеры распознавания речи и зрения, которые канал использует для голоса и изображений |
+| `veles.sdk.providers` | контракт LLM-провайдера: `ProviderSpec`, `ProviderContext`, типы ответа и база CLI-делегата (`CLIProvider`, `delegate_dir`, `veles_mcp_server`) |
 
 Точка входа загружается как пакет с корнем в каталоге модуля, поэтому свои файлы модуль
 импортирует относительно (`from .wiki import Wiki`).
@@ -115,6 +116,7 @@ requires_extensions = ["public:official/helper"]
 | `background_op` | `BackgroundOp(kind, toolset, run)` | вид фоновой задачи daemon; `run(job, *, spawn_agent, project)` |
 | `memory` | фабрика (через `api.add_memory_provider`) | внешний провайдер памяти |
 | `platform` | `PlatformSpec(build, caps, cred_fields, config_keys)` | платформа обмена сообщениями, которую daemon держит как канал (см. ниже) |
+| `provider` | `ProviderSpec(label, build, …)` | LLM-провайдер в каталоге: `--provider <name>`, `veles models`, маршруты и мастера (см. ниже); встроенные id зарезервированы |
 
 Объекты с полем `engine` сами проверяют свой движок; остальные, если должны работать
 только при включённом движке, проверяют `veles.sdk.contributions.engine_enabled(project, "<name>")`.
@@ -157,6 +159,50 @@ def register(api) -> None:
 пишут в лог daemon. Собственные тесты модуля проверяют spec через
 `veles.sdk.channel_checks`, а в `extension.toml` он указывается как `provides =
 ["platform:mychat"]`.
+
+## LLM-провайдер
+
+Модуль-провайдер вносит `ProviderSpec` под id провайдера. `build(ctx)` получает
+`ProviderContext` (`name`, `model`, `project`) и возвращает объект с
+`create_message(messages, tools=None, *, model, max_tokens)` — и `stream_message` с
+`list_models`, если умеет:
+
+```python
+from veles.sdk.providers import ProviderResponse, ProviderSpec, TokenUsage
+
+
+class EchoProvider:
+    name = "echo"
+    supports_tools = False
+    supports_streaming = False
+
+    def create_message(self, messages, tools=None, *, model, max_tokens=4096):
+        return ProviderResponse(text=messages[-1].content, tool_calls=[], usage=TokenUsage())
+
+
+SPEC = ProviderSpec(label="Echo", build=lambda ctx: EchoProvider(), model_list="live")
+
+
+def register(api) -> None:
+    api.contribute("provider", "echo", SPEC)
+```
+
+`model_list` задаёт, как его перечисляет `veles models`: `live` спрашивает
+`list_models()` каждый раз, `cached` хранит список 24 часа, `curated` берёт таблицу
+Veles. Провайдер, чей ключ лежит в keychain, называет свои переменные в `key_env` и
+получает ключ сам.
+
+**CLI-делегат** — агентный CLI в headless-режиме — наследует `CLIProvider` и описывает,
+как собрать команду (`_build_cmd`), где её запускать (`_cwd`) и как читать поток событий
+(`_new_state`); запуск, стриминг и ошибки общие. Его сборка `build_tool_aware` даёт CLI
+инструменты Veles по MCP: запишите конфиг вокруг `veles_mcp_server(project)` внутри
+`delegate_dir(project)` (каталог запущенного процесса, удаляется при выходе) и задайте
+`mcp_tool_name` — как CLI называет MCP-инструмент, чтобы промпты называли инструменты
+Veles именно так. CLI, который читает конфиг из рабочего каталога и каталогов выше,
+запускается в `delegate_workspace(project, name)` — вне проекта, чтобы собственные
+конфиги клонированного репозитория до него не доходили. Полный пример — `official/antigravity-cli` в публичном реестре. В
+`extension.toml` провайдер указывается как `provides = ["provider:<id>"]`: тогда id в
+конфиге, маршруте или `--provider` устанавливает модуль.
 
 ## Объявить, что вносит модуль реестра
 

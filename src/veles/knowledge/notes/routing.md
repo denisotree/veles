@@ -13,4 +13,8 @@ provider+model handles each task type in the ensemble (`[routing.tasks]` in
 to defaults; `veles route refresh` re-parses natural-language routing hints
 from `AGENTS.md` (explicit config entries always win).
 
+The `skills` task also decides where project skills run inside a CLI delegate's
+MCP server (claude-cli, antigravity-cli): a route to an API provider runs them
+there with that provider's key; a route to a CLI delegate turns them off there.
+
 Example: `veles route set compressor anthropic:claude-haiku-4.5`.

@@ -1,6 +1,6 @@
 """Iterator over a subprocess's line-delimited JSON stdout.
 
-Used by claude-cli and gemini-cli `stream_message` to consume
+Used by the CLI delegates' `stream_message` to consume
 `--output-format stream-json` lazily so TextDelta events can be emitted as
 soon as the underlying CLI flushes them.
 

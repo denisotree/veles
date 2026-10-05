@@ -80,19 +80,27 @@ solo dopo che ne hai approvato il file). Anche le altre grafie dello stesso file
 (maiuscole/minuscole, `..`, un symlink) vengono rifiutate.
 
 I file che vengono eseguiti senza un comando esplicito o che guidano una CLI di agente —
-tutto ciò che sta sotto `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`,
-`.vscode/`, `.devcontainer/`, `.husky/`, e `.envrc`, `.mcp.json`,
+tutto ciò che sta sotto `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.agents/`,
+`.codex/`, `.vscode/`, `.devcontainer/`, `.husky/`, e `.envrc`, `.mcp.json`,
 `.pre-commit-config.yaml`, `lefthook.yml`, a qualsiasi profondità, più la directory
 `core.hooksPath` del repository e la destinazione di un `.git` che è un symlink — gli
 strumenti per i file dell'agente li scrivono solo dopo che confermi quella scrittura. Le
 concessioni di fiducia e l'autopilot non la coprono; il daemon chiede nel canale, e
 un'esecuzione batch senza nessuno a cui chiedere rifiuta.
 
-I provider `claude-cli` e `gemini-cli` girano come un modello con i soli strumenti di
-Veles: i loro strumenti di shell, modifica file e web, le impostazioni e gli hook di
+I provider `claude-cli` e `antigravity-cli` girano come un modello con i soli strumenti
+di Veles: i loro strumenti di shell, modifica file e web, le impostazioni e gli hook di
 `.claude/` del progetto e gli altri server MCP non si applicano, e ogni strumento di
 Veles che chiamano passa per la scala di fiducia qui sopra (lì nessuno può rispondere a
-una richiesta, quindi tutto ciò che non è già concesso viene rifiutato).
+una richiesta, quindi tutto ciò che non è già concesso viene rifiutato). La loro config
+MCP si trova in `.veles/tmp/delegate-<pid>/`, una per ogni processo in esecuzione, che gli
+strumenti per i file dell'agente non possono scrivere. `agy` gira in un workspace
+temporaneo fuori dal progetto, sotto `~/.veles/tmp/`, quindi gli hook e i server MCP di
+`.agents/` del progetto non lo raggiungono mai. Gira con `--dangerously-skip-permissions`
+quando ha gli strumenti di Veles — altrimenti agy rifiuta le chiamate MCP in modalità
+headless — e un hook in quel workspace nega ogni suo strumento; anche un hook che fallisce
+nega. Gli strumenti per i file di Veles non possono scrivere fuori dal progetto, quindi
+agy non può riscrivere quell'hook tramite essi.
 
 Limiti noti:
 
@@ -102,14 +110,13 @@ Limiti noti:
   progetto (uno script indicato in `args`) — rivedi anche quelli.
 - Con un provider CLI, le esecuzioni che preautorizzano gli strumenti solo per sé stesse
   (job in background del daemon, `veles research`) non lo trasmettono alla CLI
-  delegata: i suoi strumenti di Veles richiedono una concessione permanente con
-  `veles trust set` o una finestra di autopilot. Nemmeno la modalità di pianificazione
-  dell'esecuzione genitore li raggiunge.
-- `gemini-cli` si fida della cartella del progetto per la sua esecuzione, quindi gemini
-  legge anche il `.env` del progetto — tieni fuori da lì le impostazioni di gemini che
-  non vuoi far pilotare all'agente.
-- Su una macchina con policy gemini gestite (di sistema), gemini ignora la policy che
-  Veles gli passa, quindi lì `gemini-cli` non è limitato agli strumenti di Veles.
+  delegata: la preautorizzazione vive nel processo di Veles, e il server MCP avviato
+  dalla CLI è un altro processo, quindi i suoi strumenti di Veles richiedono una
+  concessione permanente con `veles trust set` o una finestra di autopilot. Nemmeno la
+  modalità di pianificazione dell'esecuzione genitore li raggiunge.
+- `antigravity-cli` conta sul fatto che agy rispetti il `.agents/hooks.json` del suo
+  workspace; una release di agy che smettesse di leggere gli hook del workspace
+  lascerebbe aperti i suoi strumenti sotto `--dangerously-skip-permissions`.
 
 I percorsi con caratteri di controllo (sequenze di escape del terminale, override bidi)
 vengono rifiutati, e le conferme, la richiesta di fiducia e l'anteprima del diff

@@ -75,7 +75,7 @@ approve its file). Other spellings of the same file (case, `..`, a symlink) are 
 too.
 
 Files that run without an explicit command or steer an agent CLI — anything under
-`.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`, `.vscode/`, `.devcontainer/`,
+`.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.agents/`, `.codex/`, `.vscode/`, `.devcontainer/`,
 `.husky/`, and `.envrc`, `.mcp.json`, `.pre-commit-config.yaml`, `lefthook.yml`, at any
 depth, plus — when the git repo sits at the project root — the `core.hooksPath` set in its
 `.git/config` and wherever a symlinked `.git` points —
@@ -83,11 +83,17 @@ the agent's file tools write only after you confirm that write. Trust grants and
 autopilot don't cover it; the daemon asks in the channel, and a batch run with nobody to
 ask refuses.
 
-The `claude-cli` and `gemini-cli` providers run as a model with Veles' tools only: their
-own shell, file-edit and web tools, the project's `.claude/` settings and hooks, and
+The `claude-cli` and `antigravity-cli` providers run as a model with Veles' tools only:
+their own shell, file-edit and web tools, the project's `.claude/` settings and hooks, and
 other MCP servers don't apply, and every Veles tool they call goes through the trust
 ladder above (nobody can answer a prompt there, so anything not already granted is
-refused).
+refused). Their MCP config lives in `.veles/tmp/delegate-<pid>/`, one per running
+process, which the agent's file tools can't write. `agy` runs in a scratch workspace
+outside the project, under `~/.veles/tmp/`, so the project's own `.agents/` hooks and
+MCP servers never reach it. It runs with `--dangerously-skip-permissions` when it has
+Veles' tools — agy refuses MCP calls headless otherwise — and a hook in that workspace
+denies every tool of its own; a hook that fails denies too. Veles' file tools can't
+write outside the project, so agy can't rewrite that hook through them.
 
 Known limits:
 
@@ -96,13 +102,13 @@ Known limits:
 - An MCP approval pins the server's command line, not the files it runs from the project
   (a script named in `args`) — review those too.
 - With a CLI provider, runs that pre-authorise tools only for themselves (daemon
-  background jobs, `veles research`) don't pass that on to the delegated CLI: its Veles
-  tools need a standing `veles trust set` grant or an autopilot window. The parent run's
-  planning mode doesn't reach them either.
-- `gemini-cli` trusts the project folder for its run, so gemini also reads the project's
-  `.env` — keep gemini settings you don't want the agent to steer out of it.
-- On a machine with managed (system) gemini policies, gemini ignores the policy Veles
-  passes, so `gemini-cli` isn't limited to Veles' tools there.
+  background jobs, `veles research`) don't pass that on to the delegated CLI: the
+  pre-authorisation lives in the Veles process, and the MCP server the CLI starts is a
+  separate one, so its Veles tools need a standing `veles trust set` grant or an
+  autopilot window. The parent run's planning mode doesn't reach them either.
+- `antigravity-cli` relies on agy honouring its workspace's `.agents/hooks.json`; an agy
+  release that stopped reading workspace hooks would leave its own tools open under
+  `--dangerously-skip-permissions`.
 
 Paths with control characters (terminal escapes, bidi overrides) are refused, and
 confirmations, the trust prompt and the diff preview show such characters escaped —

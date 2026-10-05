@@ -31,7 +31,7 @@ from collections.abc import Callable
 from contextvars import ContextVar, Token
 from pathlib import Path
 
-from veles.cli.wizard import _ask_choice, _default_prompter
+from veles.cli.wizard import _ask_choice, _ask_provider, _default_prompter
 from veles.core.i18n import t
 from veles.core.project import LAYOUT_DEFAULT, Project, ProjectAlreadyExists, init_project
 from veles.core.project_config import (
@@ -40,7 +40,6 @@ from veles.core.project_config import (
 from veles.core.project_config import (
     save_project_config as _save_project_toml,
 )
-from veles.core.providers import PROVIDER_VALUES as _PROVIDER_CHOICES
 
 Prompter = Callable[[str, str | None], str]
 """(prompt_label, default_value) -> raw_answer."""
@@ -133,9 +132,7 @@ def _step_layout(prompter: Prompter) -> str:
 def _step_provider_override(project: Project, prompter: Prompter) -> None:
     if not _ask_yes_no(prompter, t("project_wizard.ask_provider_override"), default=False):
         return
-    provider = _ask_choice(
-        prompter, t("project_wizard.ask_provider_label"), _PROVIDER_CHOICES, default="openrouter"
-    )
+    provider = _ask_provider(prompter, t("project_wizard.ask_provider_label"))
     model = prompter(t("project_wizard.ask_model_label"), None).strip() or None
     cfg = _load_project_toml(project)
     cfg.setdefault("engine", {})

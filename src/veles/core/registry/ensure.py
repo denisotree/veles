@@ -1,7 +1,9 @@
 """One place for "the project needs an extension that isn't installed".
 
-Two kinds of need: the project's layout pack is missing (`LayoutNeed`), or its
-pack asks for a content engine no loaded module contributes (`EngineNeed`). With a
+The needs: the project's layout pack is missing (`LayoutNeed`), its pack asks
+for a content engine no loaded module contributes (`EngineNeed`), a declared
+channel's platform (`PlatformNeed`) or a named LLM provider (`ProviderNeed`) is
+not installed — the last two install without asking (the config decided). With a
 terminal the user is offered the install (the normal confirmation, dependencies
 included); without one — or when the registry is unreachable, the user declines,
 or nothing provides it — Veles warns once per need per process with the command
@@ -25,6 +27,7 @@ if TYPE_CHECKING:
 MIGRATED_LAYOUTS = frozenset({"llm-wiki", "notes"})
 _OFFICIAL_ENGINES = frozenset({"wiki"})
 _OFFICIAL_PLATFORMS = frozenset({"telegram"})
+_OFFICIAL_PROVIDERS = frozenset({"antigravity-cli"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,7 +47,14 @@ class PlatformNeed:
     name: str
 
 
-Need = LayoutNeed | EngineNeed | PlatformNeed
+@dataclass(frozen=True, slots=True)
+class ProviderNeed:
+    """An LLM provider named by config, a flag or a route that no catalogue entry provides."""
+
+    name: str
+
+
+Need = LayoutNeed | EngineNeed | PlatformNeed | ProviderNeed
 
 _warned: set[Need] = set()
 
@@ -70,6 +80,8 @@ def ref_for(need: Need) -> str | None:
     if isinstance(need, EngineNeed) and need.name in _OFFICIAL_ENGINES:
         return f"public:official/{need.name}"
     if isinstance(need, PlatformNeed) and need.name in _OFFICIAL_PLATFORMS:
+        return f"public:official/{need.name}"
+    if isinstance(need, ProviderNeed) and need.name in _OFFICIAL_PROVIDERS:
         return f"public:official/{need.name}"
     return None
 
@@ -106,11 +118,11 @@ def ensure_extension(
             )
         else:
             print(f"{_label(need)} is not installed; it is in the registry as {found.ref}.")
-        # An engine or a channel platform serves every project that asks for it.
+        # An engine, a channel platform or a provider serves every project that asks for it.
         _install(
             found,
             project=project,
-            user_scope=isinstance(need, (EngineNeed, PlatformNeed)),
+            user_scope=isinstance(need, (EngineNeed, PlatformNeed, ProviderNeed)),
             preapproved=auto,
         )
         return True
@@ -194,18 +206,31 @@ def available_platforms() -> list[str]:
     a loaded module) first, then the `platform:<name>` providers in the cached
     registries (no network) — picking one of those installs it."""
     from veles.core.platforms import list_platforms
-    from veles.core.registry.catalog import search
 
     # Into the live registry, not a scoped one: the pick then needs them loaded
     # (`ensure_platform_interactive`), and an entrypoint runs once per process.
-    _load_user_modules_into_live()
-    names = list_platforms()
-    with contextlib.suppress(Exception):  # no readable registry → installed platforms only
+    load_user_modules_into_live()
+    return list(dict.fromkeys([*list_platforms(), *_registry_offers("platform")]))
+
+
+def available_providers() -> list[str]:
+    """Providers to offer in a wizard: the catalogue first, then `provider:<id>`
+    offers in the cached registries — picking one of those installs it."""
+    from veles.core.providers import list_providers
+
+    load_user_modules_into_live()
+    return list(dict.fromkeys([*list_providers(), *_registry_offers("provider")]))
+
+
+def _registry_offers(point: str) -> list[str]:
+    """Names a cached registry's modules provide for `point` (no network)."""
+    from veles.core.registry.catalog import search
+
+    with contextlib.suppress(Exception):  # no readable registry → nothing offered
         found, _ = search(kind="module", sync_missing=False)
-        names += [
-            p.split(":", 1)[1] for f in found for p in f.ext.provides if p.startswith("platform:")
-        ]
-    return list(dict.fromkeys(names))
+        prefix = f"{point}:"
+        return [p[len(prefix) :] for f in found for p in f.ext.provides if p.startswith(prefix)]
+    return []
 
 
 def ensure_platform_interactive(name: str) -> bool:
@@ -213,16 +238,89 @@ def ensure_platform_interactive(name: str) -> bool:
     wizard pick) and its module loaded into the live registry."""
     from veles.core.platforms import list_platforms
 
-    _load_user_modules_into_live()
+    load_user_modules_into_live()
     if name in list_platforms():
         return True
     if not ensure_extension(PlatformNeed(name), None, interactive=True):
         return False
-    _load_user_modules_into_live()
+    load_user_modules_into_live()
     return name in list_platforms()
 
 
-def _load_user_modules_into_live() -> None:
+def ensure_provider(name: str, *, reason: str) -> bool:
+    """`name` is in the provider catalogue — already, or installed now from the
+    user's connected registries: naming a provider is the decision, as declaring a
+    channel is (release C §7). False for a retired or unknown name."""
+    from veles.core.providers import RETIRED, find_provider
+
+    if find_provider(name) is not None:
+        return True
+    load_user_modules_into_live()
+    if find_provider(name) is not None or name in RETIRED:
+        return find_provider(name) is not None
+    if not _offered(name):
+        return False  # a typo nobody offers: the caller says "unknown provider"
+    if ensure_extension(ProviderNeed(name), None, interactive=False, auto=True, reason=reason):
+        load_user_modules_into_live()
+    return find_provider(name) is not None
+
+
+def ensure_provider_interactive(name: str) -> bool:
+    """`name` is in the catalogue, or got installed now with the normal confirmation
+    (a wizard pick) and its module loaded into the live registry."""
+    from veles.core.providers import find_provider
+
+    load_user_modules_into_live()
+    if find_provider(name) is not None:
+        return True
+    if not ensure_extension(ProviderNeed(name), None, interactive=True):
+        return False
+    load_user_modules_into_live()
+    return find_provider(name) is not None
+
+
+def _offered(name: str) -> bool:
+    """A registry offers provider `name` — the official ref, or a cached-registry
+    extension whose `provides` lists it (no network)."""
+    from veles.core.registry import catalog
+
+    return bool(ref_for(ProviderNeed(name)) or catalog.providers_of(f"provider:{name}"))
+
+
+_ROUTE_SOURCES = {
+    "project-provider": "named in [engine] provider",
+    "user-provider": "named as your default provider",
+}
+
+
+def routed_provider_needs(project: Project) -> list[tuple[str, str]]:
+    """`(provider, why)` for each provider a routed task names that the catalogue
+    lacks but a registry offers. A name nobody offers (a typo) is doctor's to report."""
+    from veles.core.providers import find_provider
+    from veles.core.routing.ensemble import KNOWN_TASKS, effective_route
+
+    out: dict[str, str] = {}
+    for task in sorted(KNOWN_TASKS):
+        try:
+            provider, _model, source = effective_route(task, project)
+        except Exception:  # an unconfigured task routes nowhere — nothing to install
+            continue
+        if provider in out or find_provider(provider) is not None:
+            continue
+        if _offered(provider):
+            out[provider] = _ROUTE_SOURCES.get(source, f"named in [routing.tasks].{task}")
+    return list(out.items())
+
+
+def ensure_routed_providers(project: Project) -> bool:
+    """`ensure_provider` for every provider `routed_provider_needs` finds."""
+    installed = False
+    for provider, why in routed_provider_needs(project):
+        installed = ensure_provider(provider, reason=why) or installed
+    return installed
+
+
+def load_user_modules_into_live() -> None:
     """User-level modules (where a platform installs) into the live registry —
     a process that loaded no modules (the daemon picker, `veles init`) gets one;
     a module already loaded is not loaded twice."""
@@ -280,7 +378,8 @@ def _spec(need: Need) -> str | None:
     # counts only when that registry is not connected.
     if ref is not None and _connected(ref.partition(":")[0]):
         return ref
-    point = "platform" if isinstance(need, PlatformNeed) else "engine"
+    points: dict[type, str] = {PlatformNeed: "platform", ProviderNeed: "provider"}
+    point = points.get(type(need), "engine")
     refs = catalog.providers_of(f"{point}:{need.name}")
     if len(refs) == 1:
         return refs[0]
@@ -330,6 +429,8 @@ def _label(need: Need) -> str:
         return f"layout {need.name!r}"
     if isinstance(need, PlatformNeed):
         return f"channel platform {need.name!r}"
+    if isinstance(need, ProviderNeed):
+        return f"LLM provider {need.name!r}"
     return f"content engine {need.name!r}"
 
 
@@ -338,9 +439,9 @@ def _warn(need: Need, ref: str, *, reason: str = "") -> None:
         return
     _warned.add(need)
     why = f" ({reason})" if reason else ""
-    # A missing layout or engine degrades the run; a missing platform is the
-    # caller's to report (no channel to start, no gateway to run).
-    degrades = "" if isinstance(need, PlatformNeed) else " — working without it"
+    # A missing layout or engine degrades the run; a missing platform or provider
+    # is the caller's to report (no channel to start, no model to run on).
+    degrades = "" if isinstance(need, (PlatformNeed, ProviderNeed)) else " — working without it"
     print(
         f"warning: {_label(need)} is not installed{why}{degrades}. "
         f"Install: `veles registry update && veles registry install {ref}`",

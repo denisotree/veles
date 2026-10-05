@@ -1,7 +1,7 @@
 """M256: llama.cpp tool-call support is auto-detected from `GET /props`.
 
 Before this, only ollama could be probed (`/api/show` → `capabilities`), so
-`_apply_local_tool_policy` set `supports_tools = False` for `llamacpp` and
+`apply_local_tool_policy` set `supports_tools = False` for `llamacpp` and
 `openai-compat` unconditionally and `VELES_LOCAL_TOOLS=1` was the only way in.
 Since tools are how an agent reaches any data at all, a local run could not
 produce a grounded answer in principle.

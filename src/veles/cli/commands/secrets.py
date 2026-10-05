@@ -6,8 +6,8 @@ setup wizard writes. Before this, the command wrote `veles:OPENROUTER_API_KEY`,
 which M149 had deliberately stopped reading as a legacy form: `set` reported
 success for a key no provider would ever see, and `list` reported a working
 wizard-stored key as "(unset)". Every other secret keeps its flat
-`veles:<NAME>` entry. The routing table is `PROVIDER_API_KEY_ENVS`, via
-`secrets.provider_for_env_name`.
+`veles:<NAME>` entry. The routing table is the provider catalogue's `key_env`,
+via `secrets.provider_for_env_name`.
 """
 
 from __future__ import annotations
@@ -48,6 +48,11 @@ def _reject_project_for_plain_secret(args: argparse.Namespace) -> bool:
 
 
 def cmd_secret(args: argparse.Namespace) -> int:
+    from veles.core.registry.ensure import load_user_modules_into_live
+
+    # A module provider's key env names exist only once its module is loaded;
+    # without them `set ECHO_API_KEY` would store a flat entry nothing reads.
+    load_user_modules_into_live()
     verb = args.secret_command
     if verb == "set":
         return _set(args)
@@ -141,12 +146,12 @@ def _list(args: argparse.Namespace) -> int:
     # Channel credentials (a Telegram bot token, …) share the scoped layout —
     # `channel_wizard` stores them with `set_provider_key(<platform>, …)` — but
     # are not model providers, so they have no env name in the table above.
-    from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
+    from veles.core.providers import find_provider
 
     channels = sorted(
         (platform, stored_scopes(platform))
         for platform in list_providers_with_keys()
-        if platform not in PROVIDER_API_KEY_ENVS
+        if find_provider(platform) is None
     )
     width = max(len(r[0]) for r in rows)
     for name, source in rows:

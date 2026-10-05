@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.6] — 2026-10-06
+
+Providers are a catalogue. Every LLM provider — builtin, your own in
+`~/.veles/providers.toml`, or one a registry module contributes — is an entry that
+`--provider`, `veles models`, routing, the wizards and `veles doctor` read. The Antigravity
+CLI (`agy`) arrives as the `antigravity-cli` registry module; `gemini-cli` is gone.
+
+### Upgrading from 1.2.5
+
+- **`gemini-cli` is removed** — Google no longer serves the Gemini CLI to personal
+  accounts. Naming it is a one-line error: use `gemini` with `GEMINI_API_KEY`, or
+  `antigravity-cli` for a Google subscription.
+- **Skills inside a `claude-cli` MCP server run on your routing.** They used OpenRouter from
+  the environment with a fixed claude model; now they run on `[routing.tasks] skills` (or
+  the project's provider) with the keychain key. A route to a CLI delegate turns them off
+  there, said once in the log.
+- **`--provider` takes any catalogue id** — no fixed list in `--help` any more; an unknown
+  id is a one-line error listing what exists.
+- **`.veles/mcp.json` is no longer written.** A CLI delegate's MCP config now lives in
+  `.veles/tmp/delegate-<pid>/`; delete a leftover `.veles/mcp.json` by hand.
+
+### Added
+
+- `~/.veles/providers.toml`: add a hosted OpenAI-compatible API (`kind = "openai-api"`) or a
+  server you run (`kind = "local"`) with a `base_url` and `key_env`; an entry with a
+  builtin id overrides that provider's settings. `veles secret set <VAR>` stores the key
+  where that provider reads it, and `veles secret list` names every catalogue key.
+- Contribution point `provider` and `veles.sdk.providers`: a module contributes a
+  `ProviderSpec`; a CLI delegate builds on `CLIProvider`, `delegate_dir` and
+  `veles_mcp_server`.
+- A provider named in `[engine] provider`, a route or `--provider` that only a registry
+  module offers installs from your connected registries on that run, like a declared
+  channel. The wizards list registry providers after the installed ones and install the
+  pick.
+- `antigravity-cli` (registry module `official/antigravity-cli`): agy runs headless in a
+  scratch workspace outside the project (`~/.veles/tmp/agy/`), so a project's own
+  `.agents/` hooks and MCP servers never reach it, with Veles' tools over MCP behind a gate
+  that denies agy's own shell and file tools. `veles.sdk.providers.delegate_workspace` gives
+  a module delegate such a directory.
+- `veles doctor` checks `~/.veles/providers.toml` and every provider your routes name.
+
+### Changed
+
+- Vision and embeddings run on any OpenAI-wire provider in the catalogue, local ones
+  included; NL routing hints accept any catalogue provider except a CLI delegate.
+- `veles export` skips `.veles/tmp/`.
+
+### Fixed
+
+- Two processes delegating to `claude-cli` in one project no longer rewrite each other's
+  MCP config and budget file mid-run: each process has its own directory, written
+  atomically, removed at exit, swept when a crashed process left one.
+- An unknown provider in `veles run`, `veles models`, `veles dream` or `veles daemon start`
+  is a one-line error instead of an argparse dump or a traceback.
+- A missing-key error names the command that stores the key where the provider reads it
+  (`veles secret set OPENROUTER_API_KEY`); it suggested `veles secret set <provider>`, a
+  slot nothing reads, and `veles secret add`, which doesn't exist.
+
 ## [1.2.5] — 2026-10-05
 
 Channels are modules. Telegram leaves the core and ships from the extension registry

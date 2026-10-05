@@ -57,11 +57,7 @@ veles models ollama                     # confirm it's listed
 veles run --provider ollama --model qwen3:4b-instruct "Hello"
 ```
 
-로컬 프로바이더에서는 도구 호출이 **기본적으로 꺼져 있습니다**. 도구를 다룰 수 있는 모델을 선택한 뒤 활성화하세요.
-
-```bash
-export VELES_LOCAL_TOOLS=1
-```
+도구 호출은 서버가 알리는 내용으로 **감지됩니다**. `VELES_LOCAL_TOOLS=1`로 강제로 켜고(`=0`이면 끕니다).
 
 서버가 기본 포트에 있지 않다면 엔드포인트를 재정의하세요.
 
@@ -71,13 +67,72 @@ export LLAMACPP_BASE_URL=http://localhost:8080/v1
 export OPENAI_COMPAT_BASE_URL=http://my-host:8000/v1   # required for openai-compat
 ```
 
-## Claude / Gemini CLI 구독으로 위임
+## 나만의 프로바이더 추가
 
-`claude`나 `gemini` CLI가 인증되어 있다면, Veles가 그것을 구동할 수 있습니다.
+호스팅되는 OpenAI 호환 API나 직접 운영하는 서버는 `~/.veles/providers.toml`에 항목을 추가하기만 하면 프로바이더가 됩니다 — 코드는 필요 없습니다. id는 테이블 이름입니다.
+
+```toml
+[providers.groq]
+kind = "openai-api"                          # a hosted API; needs a key
+label = "Groq"                               # shown in the wizards (optional)
+base_url = "https://api.groq.com/openai/v1"
+key_env = ["GROQ_API_KEY"]
+
+[providers.lmstudio]
+kind = "local"                               # a server you run; a key is optional
+base_url = "http://localhost:1234/v1"
+```
+
+그런 다음 내장 프로바이더처럼 사용하세요.
+
+```bash
+veles secret set GROQ_API_KEY      # into the keychain, where the groq entry reads it
+veles models groq
+veles run --provider groq --model llama-3.3-70b-versatile "..."
+```
+
+| 키 | 의미 |
+|---|---|
+| `kind` | `openai-api`(호스팅되는 API) 또는 `local`(직접 운영하는 서버) |
+| `base_url` | `/v1`로 끝나는 OpenAI 호환 엔드포인트(또는 프로바이더의 동등한 경로) |
+| `base_url_env` | 설정되어 있으면 `base_url`을 재정의하는 환경 변수 |
+| `key_env` | 키를 읽어 올 환경 변수 이름. 키체인을 먼저 확인합니다 |
+| `label`, `tagline` | 마법사가 표시하는 방식 |
+| `tools` | `auto`(기본값), `on`, `off` — 모델에 도구 호출을 허용할지 여부 |
+
+내장 id를 가진 항목(`[providers.ollama]`)은 해당 프로바이더의 설정(예: `base_url`)은 바꾸지만 종류(kind)는 바꾸지 않습니다. 파일이 잘못된 경우 한 번만 보고하고 Veles는 내장 프로바이더로 계속 동작합니다. `veles doctor`가 무엇이 잘못되었는지 알려 줍니다.
+
+널리 쓰이는 API의 출발점입니다 — **Veles 팀이 검증하지 않았으므로**, 현재 엔드포인트는 프로바이더 문서에서 확인하세요.
+
+| id | `base_url` | `key_env` |
+|---|---|---|
+| `groq` | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` |
+| `deepseek` | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEY` |
+| `mistral` | `https://api.mistral.ai/v1` | `MISTRAL_API_KEY` |
+| `together` | `https://api.together.xyz/v1` | `TOGETHER_API_KEY` |
+| `xai` | `https://api.x.ai/v1` | `XAI_API_KEY` |
+| `fireworks` | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` |
+| `deepinfra` | `https://api.deepinfra.com/v1/openai` | `DEEPINFRA_API_KEY` |
+| `nebius` | `https://api.studio.nebius.com/v1` | `NEBIUS_API_KEY` |
+| `cerebras` | `https://api.cerebras.ai/v1` | `CEREBRAS_API_KEY` |
+| `zai` | `https://api.z.ai/api/paas/v4` | `ZAI_API_KEY` |
+| `moonshot` | `https://api.moonshot.ai/v1` | `MOONSHOT_API_KEY` |
+| `lmstudio` (`local`) | `http://localhost:1234/v1` | — |
+| `vllm` (`local`) | `http://localhost:8000/v1` | — |
+
+## Claude / Google 구독으로 위임
+
+`claude` CLI가 인증되어 있다면, Veles가 그것을 구동할 수 있습니다.
 
 ```bash
 veles run --provider claude-cli "..."
-veles run --provider gemini-cli "..."
+```
+
+Google 구독의 경우 Antigravity CLI(`agy`)를 설치하고 한 번 로그인한 뒤 해당 프로바이더 이름을 지정하세요. 그 실행에서 `antigravity-cli` 모듈이 연결된 레지스트리에서 스스로 설치됩니다.
+
+```bash
+veles run --provider antigravity-cli --model gemini-3.8-flash-high "..."
+veles models antigravity-cli
 ```
 
 API 키가 필요 없습니다 — CLI가 인증을 처리합니다.

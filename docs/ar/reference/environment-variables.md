@@ -8,7 +8,9 @@
 ## مفاتيح API للمزوّدين
 
 سلسلة البحث عن مفتاح API: سلسلة مفاتيح نظام التشغيل (نطاق المشروع) → سلسلة مفاتيح نظام التشغيل (النطاق الافتراضي)
-→ متغيّر البيئة.
+→ متغيّر البيئة. تأتي المتغيّرات التي يقرؤها المزوّد من `key_env` في مُدخَله في الكتالوج —
+وتسمّي مُدخَلاتك الخاصة في `~/.veles/providers.toml` متغيّراتها، ويخزّن
+`veles secret set <VARIABLE>` المفتاح حيث يقرؤه ذلك المزوّد.
 
 | المتغيّر | المزوّد | ملاحظات |
 |---|---|---|
@@ -17,8 +19,9 @@
 | `OPENAI_API_KEY` | openai | واجهة OpenAI API المباشرة |
 | `GEMINI_API_KEY` | gemini | المفتاح الأساسي لـ Google Gemini |
 | `GOOGLE_API_KEY` | gemini | البديل الاحتياطي لـ Google Gemini |
+| `OPENAI_COMPAT_API_KEY` | openai-compat | اختياري — لبوّابة تطلب مفتاحًا |
 
-يصادق `claude-cli` و`gemini-cli` عبر برامجهما التنفيذية الخاصة — دون متغيّر بيئة.
+يصادق `claude-cli` و`antigravity-cli` عبر برامجهما التنفيذية الخاصة — دون متغيّر بيئة.
 
 ## المزوّدون المحليون
 
@@ -28,7 +31,7 @@
 | `OLLAMA_HOST` | يتبع `OLLAMA_BASE_URL` | مضيف Ollama للتضمينات (embeddings) |
 | `LLAMACPP_BASE_URL` | `http://localhost:8080/v1` | نقطة نهاية خادم llama.cpp |
 | `OPENAI_COMPAT_BASE_URL` | — (مطلوب) | نقطة نهاية المزوّد `openai-compat` |
-| `VELES_LOCAL_TOOLS` | معطّل | تمكين استدعاء الأدوات على المزوّدين المحليين (`1`/`true`) |
+| `VELES_LOCAL_TOOLS` | اكتشاف | استدعاء الأدوات على المزوّدين المحليين: `1` يفرض التفعيل و`0` التعطيل؛ وعند عدم الضبط يُكتشَف من الخادم |
 | `VELES_OLLAMA_EMBED_MODEL` | افتراضي المزوّد | تجاوز نموذج تضمين Ollama |
 | `VELES_LOCAL_JSON_MODE` | مفعّل | إرسال `response_format: json_object` في الاستدعاءات المحلية التي يجب أن تُعيد كائن JSON (`0` للتعطيل) |
 

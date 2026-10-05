@@ -165,7 +165,7 @@ def test_curated_only_provider_skips_network() -> None:
 
 
 def test_cli_delegates_return_empty_curated() -> None:
-    for provider in ("claude-cli", "gemini-cli"):
+    for provider in ("claude-cli",):
         result = mf.fetch_models(provider)
         assert result.source == "curated"
         assert result.models == mf.known_models(provider)

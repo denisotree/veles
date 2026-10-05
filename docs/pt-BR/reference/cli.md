@@ -257,11 +257,12 @@ tarefa (`default`, `curator`, `compressor`, `insights`, `skills`, `advisor`,
 
 ### `veles models <provider>`
 Lista os modelos de um provedor. Provedores de nuvem (openrouter/openai/gemini)
-têm cache de 24h; provedores locais são sempre consultados ao vivo.
+têm cache de 24h; provedores locais e o `antigravity-cli` são sempre consultados ao
+vivo. Um provedor desconhecido é um erro de uma linha que lista o que existe (saída `2`).
 
 | Flag | Padrão | Finalidade |
 |---|---|---|
-| `provider` (posicional) | — | Um dos [nomes de provedores](#nomes-de-provedores) |
+| `provider` (posicional) | — | Um id de provedor do [catálogo](#nomes-de-provedores) |
 | `--refresh` | desligado | Ignora o cache em disco (somente nuvem) |
 | `--json` | desligado | Emite `{provider, source, models}` como JSON |
 
@@ -395,8 +396,12 @@ Aceitas por `run`, `add`, `tui`, `curate`, `research`, `job tick` e `daemon star
 
 ## Nomes de provedores
 
-`openrouter` (padrão) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` e `veles models` aceitam qualquer id do catálogo de provedores — os
+nativos, o seu `~/.veles/providers.toml` e os provedores de módulos instalados:
 
-Provedores locais (`ollama`, `llamacpp`, `openai-compat`) não precisam de chave de
-API. Veja a [referência de provedores](providers.md) e [configurar provedores](../how-to/configure-providers.md).
+`openrouter` (padrão) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`ollama` · `llamacpp` · `openai-compat` (nativos)
+
+Um provedor oferecido apenas por um módulo do registry (`antigravity-cli`) se instala
+sozinho quando você o nomeia. Provedores locais (`ollama`, `llamacpp`, `openai-compat`)
+não precisam de chave de API. Veja a [referência de provedores](providers.md) e [configurar provedores](../how-to/configure-providers.md).

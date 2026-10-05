@@ -226,11 +226,11 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `refresh [--force]` | 重新解析 `AGENTS.md` 中的自然语言路由提示 |
 
 ### `veles models <provider>`
-列出某个提供方的模型。云端提供方（openrouter/openai/gemini）缓存 24 小时；本地提供方始终实时获取。
+列出某个提供方的模型。云端提供方（openrouter/openai/gemini）缓存 24 小时；本地提供方和 `antigravity-cli` 始终实时获取。未知的提供方会得到一行错误，并列出现有的提供方（退出码 `2`）。
 
 | 参数 | 默认值 | 用途 |
 |---|---|---|
-| `provider`（位置参数） | — | [提供方名称](#provider-names)之一 |
+| `provider`（位置参数） | — | [目录](#provider-names)中的某个提供方 id |
 | `--refresh` | 关闭 | 绕过磁盘缓存（仅云端） |
 | `--json` | 关闭 | 以 JSON 形式输出 `{provider, source, models}` |
 
@@ -356,8 +356,10 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 ## 提供方名称
 
-`openrouter`（默认） · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` 和 `veles models` 接受提供方目录中的任何 id——内置的、你的 `~/.veles/providers.toml` 中的，以及已安装模块提供的：
 
-本地提供方（`ollama`、`llamacpp`、`openai-compat`）无需 API key。参见
+`openrouter`（默认） · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`ollama` · `llamacpp` · `openai-compat`（内置）
+
+只有注册表模块才提供的提供方（`antigravity-cli`）会在你指定它时自行安装。本地提供方（`ollama`、`llamacpp`、`openai-compat`）无需 API key。参见
 [提供方参考](providers.md)和[配置提供方](../how-to/configure-providers.md)。

@@ -8,7 +8,9 @@ keychain (`veles secret set …`); env vars are the fallback and the override.
 ## Provider API keys
 
 API-key lookup cascade: OS keychain (project scope) → OS keychain (default scope)
-→ environment variable.
+→ environment variable. Which variables a provider reads comes from its catalogue
+entry's `key_env` — your own entries in `~/.veles/providers.toml` name theirs, and
+`veles secret set <VARIABLE>` stores a key where that provider reads it.
 
 | Variable | Provider | Notes |
 |---|---|---|
@@ -17,8 +19,9 @@ API-key lookup cascade: OS keychain (project scope) → OS keychain (default sco
 | `OPENAI_API_KEY` | openai | Direct OpenAI API |
 | `GEMINI_API_KEY` | gemini | Primary key for Google Gemini |
 | `GOOGLE_API_KEY` | gemini | Fallback for Google Gemini |
+| `OPENAI_COMPAT_API_KEY` | openai-compat | Optional — for a gateway that wants a key |
 
-`claude-cli` and `gemini-cli` authenticate through their own binaries — no env var.
+`claude-cli` and `antigravity-cli` authenticate through their own binaries — no env var.
 
 ## Local providers
 
@@ -28,7 +31,7 @@ API-key lookup cascade: OS keychain (project scope) → OS keychain (default sco
 | `OLLAMA_HOST` | follows `OLLAMA_BASE_URL` | Ollama host for embeddings |
 | `LLAMACPP_BASE_URL` | `http://localhost:8080/v1` | llama.cpp server endpoint |
 | `OPENAI_COMPAT_BASE_URL` | — (required) | Endpoint for the `openai-compat` provider |
-| `VELES_LOCAL_TOOLS` | off | Enable tool calling on local providers (`1`/`true`) |
+| `VELES_LOCAL_TOOLS` | detect | Tool calling on local providers: `1` forces on, `0` off; unset detects from the server |
 | `VELES_OLLAMA_EMBED_MODEL` | provider default | Override the Ollama embedding model |
 | `VELES_LOCAL_JSON_MODE` | on | Send `response_format: json_object` on local calls that must return a JSON object (`0` to disable) |
 

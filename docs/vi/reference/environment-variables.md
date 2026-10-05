@@ -9,7 +9,10 @@ dự phòng và để ghi đè.
 ## API key của nhà cung cấp
 
 Chuỗi cascade tra cứu API key: keychain hệ điều hành (phạm vi dự án) → keychain
-hệ điều hành (phạm vi default) → biến môi trường.
+hệ điều hành (phạm vi default) → biến môi trường. Những biến mà một nhà cung cấp đọc
+lấy từ `key_env` trong mục danh mục của nó — các mục của riêng bạn trong
+`~/.veles/providers.toml` tự nêu tên biến, và `veles secret set <VARIABLE>` lưu key vào
+nơi nhà cung cấp đó đọc.
 
 | Biến | Nhà cung cấp | Ghi chú |
 |---|---|---|
@@ -18,8 +21,9 @@ hệ điều hành (phạm vi default) → biến môi trường.
 | `OPENAI_API_KEY` | openai | API OpenAI trực tiếp |
 | `GEMINI_API_KEY` | gemini | Key chính cho Google Gemini |
 | `GOOGLE_API_KEY` | gemini | Phương án dự phòng cho Google Gemini |
+| `OPENAI_COMPAT_API_KEY` | openai-compat | Tùy chọn — cho gateway yêu cầu key |
 
-`claude-cli` và `gemini-cli` xác thực qua binary của riêng chúng — không có biến môi trường.
+`claude-cli` và `antigravity-cli` xác thực qua binary của riêng chúng — không có biến môi trường.
 
 ## Nhà cung cấp cục bộ
 
@@ -29,7 +33,7 @@ hệ điều hành (phạm vi default) → biến môi trường.
 | `OLLAMA_HOST` | theo `OLLAMA_BASE_URL` | Host Ollama cho embedding |
 | `LLAMACPP_BASE_URL` | `http://localhost:8080/v1` | Endpoint máy chủ llama.cpp |
 | `OPENAI_COMPAT_BASE_URL` | — (bắt buộc) | Endpoint cho nhà cung cấp `openai-compat` |
-| `VELES_LOCAL_TOOLS` | tắt | Bật gọi tool trên các nhà cung cấp cục bộ (`1`/`true`) |
+| `VELES_LOCAL_TOOLS` | tự phát hiện | Gọi tool trên các nhà cung cấp cục bộ: `1` buộc bật, `0` buộc tắt; để trống thì phát hiện từ máy chủ |
 | `VELES_OLLAMA_EMBED_MODEL` | mặc định của nhà cung cấp | Ghi đè model embedding của Ollama |
 | `VELES_LOCAL_JSON_MODE` | bật | Gửi `response_format: json_object` cho các lệnh gọi cục bộ buộc phải trả về một object JSON (`0` để tắt) |
 

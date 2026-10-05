@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 from veles.core.platforms import PlatformSpec
+from veles.core.providers import ProviderSpec, builtin_ids
 from veles.core.text import shown
 
 if TYPE_CHECKING:
@@ -181,6 +182,8 @@ register_point(Point("memory"))
 register_point(Point("engine", kind=Engine))
 # A messaging platform the daemon hosts as a channel — consumer: core/platforms.py
 register_point(Point("platform", kind=PlatformSpec))
+# Release E: an LLM provider. A builtin id can't be taken (core/providers.toml).
+register_point(Point("provider", kind=ProviderSpec, reserved=builtin_ids()))
 # (project, query, *, limit) -> list[RecallHit] — consumer: core/memory/router.py
 register_point(Point("recall", reserved=frozenset({"insights", "turns", "about", "extra"})))
 

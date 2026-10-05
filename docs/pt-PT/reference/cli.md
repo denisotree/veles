@@ -255,11 +255,12 @@ Encaminhamento de ensemble por tarefa — que `provider:model` trata cada tipo d
 
 ### `veles models <provider>`
 Lista os modelos de um fornecedor. Os fornecedores na nuvem (openrouter/openai/gemini)
-ficam em cache 24h; os fornecedores locais são sempre ao vivo.
+ficam em cache 24h; os fornecedores locais e o `antigravity-cli` são sempre ao vivo. Um
+fornecedor desconhecido é um erro de uma linha que lista o que existe (saída `2`).
 
 | Opção | Predefinição | Finalidade |
 |---|---|---|
-| `provider` (posicional) | — | Um dos [nomes de fornecedores](#provider-names) |
+| `provider` (posicional) | — | Um id de fornecedor do [catálogo](#provider-names) |
 | `--refresh` | desligado | Ignora a cache em disco (apenas nuvem) |
 | `--json` | desligado | Emite `{provider, source, models}` como JSON |
 
@@ -392,8 +393,12 @@ Aceites por `run`, `add`, `tui`, `curate`, `research`, `job tick`, e `daemon sta
 
 ## Nomes de fornecedores
 
-`openrouter` (predefinição) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` e `veles models` aceitam qualquer id do catálogo de fornecedores — os
+incorporados, o seu `~/.veles/providers.toml` e os fornecedores de módulos instalados:
 
-Os fornecedores locais (`ollama`, `llamacpp`, `openai-compat`) não precisam de chave de
-API. Ver a [referência de fornecedores](providers.md) e [configurar fornecedores](../how-to/configure-providers.md).
+`openrouter` (predefinição) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`ollama` · `llamacpp` · `openai-compat` (incorporados)
+
+Um fornecedor oferecido apenas por um módulo do registo (`antigravity-cli`) instala-se
+sozinho quando o nomeia. Os fornecedores locais (`ollama`, `llamacpp`, `openai-compat`)
+não precisam de chave de API. Ver a [referência de fornecedores](providers.md) e [configurar fornecedores](../how-to/configure-providers.md).

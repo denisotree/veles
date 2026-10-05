@@ -168,26 +168,20 @@ def _build_embedding_provider(project: Project | None):
     """Construct an `EmbeddingProvider` from the routed `embedding` task.
 
     Resolution: `route("embedding", project)` → `(provider_name, model)`.
-    Currently only `openai` and `openrouter` produce a working adapter
-    (both are OpenAI-shape); other provider names raise so `auto` mode
-    can degrade.
+    Any OpenAI-wire provider in the catalogue produces a working adapter;
+    other provider names raise so `auto` mode can degrade.
     """
     if project is None:
         raise RuntimeError("embedding mode requires an active project for routing")
-    from veles.core.provider_factory import env_api_key
+    from veles.core.providers import openai_wire_endpoint
     from veles.core.routing import route
     from veles.core.skill_embedding import OpenAIEmbeddingAdapter
 
     provider_name, model = route("embedding", project)
-    found = env_api_key(provider_name)
-    api_key = found[1] if found else None
-    if not api_key and provider_name in ("openai", "openrouter"):
-        raise RuntimeError(f"no API key for routed embedding provider {provider_name!r}")
-    base_url = "https://openrouter.ai/api/v1" if provider_name == "openrouter" else None
-    if provider_name not in ("openai", "openrouter"):
-        raise RuntimeError(
-            f"embedding provider {provider_name!r} is not supported; route to openai or openrouter"
-        )
+    try:
+        base_url, api_key = openai_wire_endpoint(provider_name)
+    except (KeyError, ValueError, RuntimeError) as exc:
+        raise RuntimeError(f"embedding provider {provider_name!r}: {exc}") from exc
     return OpenAIEmbeddingAdapter(model=model, api_key=api_key, base_url=base_url)
 
 

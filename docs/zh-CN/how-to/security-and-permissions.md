@@ -71,23 +71,29 @@ Veles 自己的工具修改。文件工具还会拒绝项目中任何其他 `.ve
 同一文件的其他写法（大小写、`..`、符号链接）同样会被拒绝。
 
 无需显式命令就会运行、或会左右智能体 CLI 的文件——`.git/`、`.githooks/`、`.claude/`、
-`.gemini/`、`.codex/`、`.vscode/`、`.devcontainer/`、`.husky/` 下的任何内容，以及任意深度的
+`.gemini/`、`.agents/`、`.codex/`、`.vscode/`、`.devcontainer/`、`.husky/` 下的任何内容，以及任意深度的
 `.envrc`、`.mcp.json`、`.pre-commit-config.yaml`、`lefthook.yml`，外加仓库的
 `core.hooksPath` 目录以及符号链接的 `.git` 所指向的位置——智能体的文件工具只有在你确认该次写入后才会写入。
 信任授权和 autopilot 都不涵盖这一点；守护进程会在频道中询问，而无人可问的批处理运行则会拒绝。
 
-`claude-cli` 和 `gemini-cli` 提供方仅以只带 Veles 工具的模型身份运行：它们自带的
+`claude-cli` 和 `antigravity-cli` 提供方仅以只带 Veles 工具的模型身份运行：它们自带的
 shell、文件编辑和网络工具、项目的 `.claude/` 设置和钩子，以及其他 MCP 服务器都不适用，
 并且它们调用的每个 Veles 工具都要经过上述信任阶梯（那里没人能回答提示，因此任何尚未授予的操作都会被拒绝）。
+它们的 MCP 配置位于 `.veles/tmp/delegate-<pid>/` 中，每个运行中的进程一份，智能体的文件工具无法写入该目录。`agy` 在项目之外、
+`~/.veles/tmp/` 下的临时工作区里运行，因此项目自己的 `.agents/` 钩子和 MCP 服务器不会触及它。
+它在拥有 Veles 的工具时会带上 `--dangerously-skip-permissions`——否则 agy 在无界面模式下会拒绝 MCP 调用——
+并且该工作区中的一个钩子会拒绝它自带的每个工具；钩子本身失败时同样会拒绝。Veles 的文件工具无法在项目之外写入，
+因此 agy 无法通过它们改写该钩子。
 
 已知限制：
 
 - `run_shell` 就是一个 shell：一旦你授予它（或处于 autopilot 下），它就能在没有逐文件确认的情况下写入上述任何文件。
 - MCP 批准固定的是服务器的命令行，而不是它从项目中运行的文件（`args` 中指定的脚本）——也请审查这些文件。
 - 使用 CLI 提供方时，仅为自身预先授权工具的运行（守护进程后台作业、`veles research`）不会把授权传递给被委派的 CLI：
-  其 Veles 工具需要长期的 `veles trust set` 授权或 autopilot 窗口。父运行的规划模式同样不会传递给它们。
-- `gemini-cli` 会在其运行期间信任项目文件夹，因此 gemini 也会读取项目的 `.env`——请把你不希望智能体左右的 gemini 设置放在它之外。
-- 在带有受管（系统级）gemini 策略的机器上，gemini 会忽略 Veles 传入的策略，因此那里的 `gemini-cli` 不再仅限于 Veles 的工具。
+  预先授权存在于 Veles 进程中，而该 CLI 启动的 MCP 服务器是另一个独立进程，因此其 Veles 工具需要长期的
+  `veles trust set` 授权或 autopilot 窗口。父运行的规划模式同样不会传递给它们。
+- `antigravity-cli` 依赖 agy 遵守其工作区的 `.agents/hooks.json`；如果某个 agy 版本不再读取工作区钩子，
+  它自带的工具在 `--dangerously-skip-permissions` 下就会处于开放状态。
 
 包含控制字符（终端转义、双向覆盖）的路径会被拒绝，确认、信任提示和 diff 预览会以转义形式显示此类字符——
 工具调用无法伪造你所批准的文本。

@@ -9,7 +9,10 @@ d'ambiente sono il ripiego e l'override.
 ## Chiavi API dei provider
 
 Cascata di ricerca della chiave API: keychain del SO (scope di progetto) →
-keychain del SO (scope di default) → variabile d'ambiente.
+keychain del SO (scope di default) → variabile d'ambiente. Le variabili che un provider
+legge provengono dal `key_env` della sua voce nel catalogo — le tue voci in
+`~/.veles/providers.toml` indicano le proprie, e `veles secret set <VARIABLE>`
+conserva una chiave dove quel provider la legge.
 
 | Variabile | Provider | Note |
 |---|---|---|
@@ -18,8 +21,9 @@ keychain del SO (scope di default) → variabile d'ambiente.
 | `OPENAI_API_KEY` | openai | API OpenAI diretta |
 | `GEMINI_API_KEY` | gemini | Chiave primaria per Google Gemini |
 | `GOOGLE_API_KEY` | gemini | Ripiego per Google Gemini |
+| `OPENAI_COMPAT_API_KEY` | openai-compat | Opzionale — per un gateway che richiede una chiave |
 
-`claude-cli` e `gemini-cli` si autenticano tramite i propri binari — nessuna
+`claude-cli` e `antigravity-cli` si autenticano tramite i propri binari — nessuna
 variabile d'ambiente.
 
 ## Provider locali
@@ -30,7 +34,7 @@ variabile d'ambiente.
 | `OLLAMA_HOST` | segue `OLLAMA_BASE_URL` | Host Ollama per gli embedding |
 | `LLAMACPP_BASE_URL` | `http://localhost:8080/v1` | Endpoint del server llama.cpp |
 | `OPENAI_COMPAT_BASE_URL` | — (obbligatorio) | Endpoint per il provider `openai-compat` |
-| `VELES_LOCAL_TOOLS` | off | Abilita la chiamata-tool sui provider locali (`1`/`true`) |
+| `VELES_LOCAL_TOOLS` | rilevamento | Chiamata-tool sui provider locali: `1` la forza attiva, `0` la disattiva; se non impostata, la rileva dal server |
 | `VELES_OLLAMA_EMBED_MODEL` | default del provider | Sovrascrive il modello di embedding di Ollama |
 | `VELES_LOCAL_JSON_MODE` | attivo | Invia `response_format: json_object` sulle chiamate locali che devono restituire un oggetto JSON (`0` per disattivare) |
 

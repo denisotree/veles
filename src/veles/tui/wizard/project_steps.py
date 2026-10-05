@@ -38,7 +38,6 @@ from veles.core.project_config import (
 from veles.core.project_config import (
     save_project_config as _save_project_toml,
 )
-from veles.core.providers import ALL_PROVIDERS as _ALL_PROVIDERS
 from veles.tui.wizard.screens import (
     ChoiceScreen,
     ConfirmScreen,
@@ -55,9 +54,18 @@ from veles.tui.wizard.step import (
     outcome_from_dismiss,
 )
 
-# Project picker keeps labels compact — the user has seen the tagline
-# explanations in the first-run wizard already.
-_PROVIDER_CHOICES = [ChoiceItem(label=spec.label, value=spec.value) for spec in _ALL_PROVIDERS]
+
+def _provider_choices() -> list[ChoiceItem]:
+    # The project picker keeps labels compact — taglines were in the first-run wizard.
+    # Registry offers follow the catalogue and install on pick.
+    from veles.core.providers import find_provider
+    from veles.core.registry import ensure
+
+    items = []
+    for n in ensure.available_providers():
+        spec = find_provider(n)
+        items.append(ChoiceItem(label=spec.label if spec else f"{n} (registry)", value=n))
+    return items
 
 
 # ---------------- Step 1: Bootstrap ----------------
@@ -147,7 +155,7 @@ class ProviderOverrideStep:
         picked = await ctx.app.push_screen_wait(
             ChoiceScreen(
                 title=self.title,
-                items=_PROVIDER_CHOICES,
+                items=_provider_choices(),
                 subtitle=t("project_wizard.ask_provider_label"),
                 default=default_provider,
             )
@@ -155,6 +163,10 @@ class ProviderOverrideStep:
         nav = outcome_from_dismiss(picked)
         if nav is not None:
             return nav
+        from veles.tui.wizard.user_steps import install_picked_provider
+
+        if not await install_picked_provider(ctx, picked):
+            return WizardOutcome.BACK
 
         project: Project = ctx.answers["project"]
         # Configure the API key for this project scope first, so the
@@ -185,13 +197,13 @@ async def _pick_project_model(
 ) -> str | None:
     """Mirror of user-level ModelStep, scoped to the project."""
     from veles.cli.repl.model_fetcher import validate_and_fetch_models
-    from veles.core.provider_factory import LOCAL_PROVIDERS
+    from veles.core.provider_factory import needs_api_key
     from veles.core.secrets import get_provider_key
     from veles.tui.wizard.user_steps import model_choice_screen
 
     project: Project = ctx.answers["project"]
     slug = project.name
-    if provider in LOCAL_PROVIDERS:
+    if not needs_api_key(provider):
         api_key = "local"
     else:
         api_key = get_provider_key(provider, project=slug) or ""

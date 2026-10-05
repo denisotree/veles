@@ -1,7 +1,7 @@
 """REPL provider construction — native tool-call auto-detection (live 2026-07-08).
 
 `_build_runtime` used to call `_make_provider(args.provider)` WITHOUT the
-resolved model, so `provider_factory._apply_local_tool_policy` had nothing to
+resolved model, so `provider_factory.apply_local_tool_policy` had nothing to
 probe and forced `supports_tools=False` — the inline REPL (the flagship
 surface) pushed every local model through the fragile fenced-tools path even
 when ollama advertised native tool calling for it. `veles run` and the

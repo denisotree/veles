@@ -1,6 +1,6 @@
 """File-backed snapshot of `TokenBudget` for cross-process propagation.
 
-Used when a parent Veles command delegates to claude-cli/gemini-cli: the
+Used when a parent Veles command delegates to a CLI (claude-cli): the
 parent saves a snapshot before the delegate runs, the MCP child process
 loads it on startup and re-saves after each `tools/call`, and the parent
 reconciles the child's contribution back into its own budget on exit.

@@ -24,7 +24,7 @@ from veles.core.context import (
     reset_budget,
     set_budget,
 )
-from veles.core.project import init_project
+from veles.core.project import init_project, load_project
 from veles.core.tools.registry import Registry, ToolEntry
 
 
@@ -219,14 +219,9 @@ def test_core_tools_name_no_module_tool() -> None:
     assert not any(n.startswith("wiki_") for n in _CORE_TOOLS)
 
 
-def test_parse_args_accepts_skill_model() -> None:
-    args = _parse_args(["--project-root", "/tmp/x", "--skill-model", "openai/gpt-5-mini"])
-    assert args.skill_model == "openai/gpt-5-mini"
-
-
-def test_parse_args_skill_model_has_default() -> None:
-    args = _parse_args(["--project-root", "/tmp/x"])
-    assert "/" in args.skill_model  # provider/model format
+def test_parse_args_takes_no_skill_model() -> None:
+    with pytest.raises(SystemExit):
+        _parse_args(["--project-root", "/x", "--skill-model", "m"])
 
 
 def _write_skill(project_root: Path, name: str, body: str = "Echo input.") -> None:
@@ -238,22 +233,36 @@ def _write_skill(project_root: Path, name: str, body: str = "Echo input.") -> No
     )
 
 
-def test_register_project_skills_no_api_key(monkeypatch, tmp_path) -> None:
+def _skills_route(project_root: Path, spec: str) -> None:
+    from veles.core.project_config import save_project_config
+
+    save_project_config(load_project(project_root), {"routing": {"tasks": {"skills": spec}}})
+
+
+def test_child_skills_off_when_route_is_a_cli_delegate(tmp_path, capsys) -> None:
+    init_project(tmp_path, name="t")
+    _write_skill(tmp_path, "echo-skill")
+    _skills_route(tmp_path, "claude-cli:sonnet")
+    assert _register_project_skills(Registry(), load_project(tmp_path)) == []
+    assert "[routing.tasks] skills" in capsys.readouterr().err
+
+
+def test_child_skills_off_without_a_key(tmp_path, monkeypatch, capsys) -> None:
+    init_project(tmp_path, name="t")
+    _write_skill(tmp_path, "echo-skill")
+    _skills_route(tmp_path, "openrouter:x/y")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    project = init_project(tmp_path, name="t")
-    _write_skill(tmp_path, "echo-skill")
-    reg = Registry()
-    added = _register_project_skills(reg, project, "anthropic/claude-sonnet-4.6")
-    assert added == []
+    assert _register_project_skills(Registry(), load_project(tmp_path)) == []
+    assert "skill tools disabled" in capsys.readouterr().err
 
 
-def test_register_project_skills_registers_when_key_present(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("OPENROUTER_API_KEY", "fake-key")
-    project = init_project(tmp_path, name="t")
+def test_child_skills_on_the_routed_provider(tmp_path, monkeypatch) -> None:
+    init_project(tmp_path, name="t")
     _write_skill(tmp_path, "echo-skill")
+    _skills_route(tmp_path, "openrouter:x/y")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
     reg = Registry()
-    added = _register_project_skills(reg, project, "anthropic/claude-sonnet-4.6")
-    assert added == ["echo-skill"]
+    assert _register_project_skills(reg, load_project(tmp_path)) == ["echo-skill"]
     entry = reg.get("echo-skill")
     assert entry.description == "test skill"
     assert "input" in entry.parameter_schema["properties"]
@@ -263,7 +272,7 @@ def test_register_project_skills_empty_when_no_skills(monkeypatch, tmp_path) -> 
     monkeypatch.setenv("OPENROUTER_API_KEY", "fake-key")
     project = init_project(tmp_path, name="t")
     reg = Registry()
-    added = _register_project_skills(reg, project, "anthropic/claude-sonnet-4.6")
+    added = _register_project_skills(reg, project)
     assert added == []
 
 

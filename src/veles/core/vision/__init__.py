@@ -12,11 +12,10 @@ from veles.core.vision.adapter import (
     install_vision_adapter,
     load_vision_settings,
 )
-from veles.core.vision.backends import VISION_PROVIDERS, OCRUnavailable, describe, ocr_bytes
+from veles.core.vision.backends import OCRUnavailable, describe, ocr_bytes, vision_capable
 
 __all__ = [
     "DEFAULT_PROMPT",
-    "VISION_PROVIDERS",
     "OCRUnavailable",
     "RoutedVisionAdapter",
     "VisionSettings",
@@ -25,4 +24,5 @@ __all__ = [
     "install_vision_adapter",
     "load_vision_settings",
     "ocr_bytes",
+    "vision_capable",
 ]

@@ -259,11 +259,12 @@ Routing d'ensemble per task — quale `provider:model` gestisce ciascun tipo di 
 
 ### `veles models <provider>`
 Elenca i modelli di un provider. I provider cloud (openrouter/openai/gemini)
-vengono messi in cache per 24h; i provider locali sono sempre live.
+vengono messi in cache per 24h; i provider locali e `antigravity-cli` sono sempre live.
+Un provider sconosciuto è un errore di una riga che elenca ciò che esiste (exit `2`).
 
 | Flag | Default | Scopo |
 |---|---|---|
-| `provider` (posizionale) | — | Uno dei [nomi dei provider](#provider-names) |
+| `provider` (posizionale) | — | Un id di provider dal [catalogo](#provider-names) |
 | `--refresh` | off | Bypassa la cache su disco (solo cloud) |
 | `--json` | off | Emette `{provider, source, models}` come JSON |
 
@@ -399,9 +400,13 @@ start`:
 
 ## Nomi dei provider
 
-`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` e `veles models` accettano qualsiasi id del catalogo dei provider — quelli
+integrati, il tuo `~/.veles/providers.toml` e i provider dei moduli installati:
 
-I provider locali (`ollama`, `llamacpp`, `openai-compat`) non richiedono chiave
-API. Vedi il [riferimento dei provider](providers.md) e
+`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`ollama` · `llamacpp` · `openai-compat` (integrati)
+
+Un provider offerto solo da un modulo del registro (`antigravity-cli`) si installa da
+solo quando lo nomini. I provider locali (`ollama`, `llamacpp`, `openai-compat`) non
+richiedono chiave API. Vedi il [riferimento dei provider](providers.md) e
 [configurare i provider](../how-to/configure-providers.md).

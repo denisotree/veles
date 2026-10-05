@@ -10,7 +10,7 @@ Triggers from `cli/__init__.py::main` when ALL of:
 
 Asks three things and writes `~/.veles/config.toml`:
 1. Preferred language (`en` / `ru`) — recorded for future UI strings.
-2. Default LLM provider — bare-list choice from `_PROVIDER_CHOICES`.
+2. Default LLM provider — bare-list choice from the provider catalogue.
 3. (Soft hint only) which API-key env var to set; **NEVER persists keys**.
 
 Optional first-project name field exists in the schema but the wizard
@@ -30,8 +30,6 @@ from collections.abc import Callable
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 
-from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
-from veles.core.providers import PROVIDER_VALUES as _PROVIDER_CHOICES
 from veles.core.user_config import (
     UserConfig,
     save_user_config,
@@ -89,12 +87,7 @@ def run_wizard() -> WizardResult:
         file=sys.stderr,
     )
     language = _ask_choice(prompter, "Preferred language", _LANGUAGES, default="en")
-    provider = _ask_choice(
-        prompter,
-        "Default LLM provider",
-        _PROVIDER_CHOICES,
-        default="openrouter",
-    )
+    provider = _ask_provider(prompter, "Default LLM provider")
     _hint_about_api_key(provider)
     first_project = prompter("First project name (optional, blank to skip)", None).strip() or None
 
@@ -130,11 +123,27 @@ def _ask_choice(prompter: Prompter, prompt: str, choices: tuple[str, ...], *, de
         )
 
 
+def _ask_provider(prompter: Prompter, prompt: str) -> str:
+    """Pick a provider — the catalogue, then what the cached registries offer;
+    a registry pick is installed (with the normal confirmation) before it counts."""
+    from veles.core.registry import ensure
+
+    while True:
+        provider = _ask_choice(
+            prompter, prompt, tuple(ensure.available_providers()), default="openrouter"
+        )
+        if ensure.ensure_provider_interactive(provider):
+            return provider
+        print("  ! not installed; pick another", file=sys.stderr)
+
+
 def _hint_about_api_key(provider: str) -> None:
-    envs = PROVIDER_API_KEY_ENVS.get(provider)
-    if not envs:
-        # cli-delegate providers authenticate via their own binary.
-        return
+    from veles.core.providers import find_provider
+
+    spec = find_provider(provider)
+    if spec is None or not spec.needs_key:
+        return  # local servers and CLI delegates carry no key
+    envs = spec.key_env
     if any(os.environ.get(name) for name in envs):
         return
     label = " or ".join(envs)

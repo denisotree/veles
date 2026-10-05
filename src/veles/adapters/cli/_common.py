@@ -54,7 +54,7 @@ class StreamState(Protocol):
 
 
 class CLIProvider:
-    """A provider that runs a local agent CLI (`claude`, `gemini`) as a subprocess.
+    """A provider that runs a local agent CLI (`claude`, `agy`) as a subprocess.
 
     Subclasses say how to build the command line (`_build_cmd`), where to run it
     (`_cwd`) and how to read its event stream (`_new_state`); running, error
@@ -80,6 +80,16 @@ class CLIProvider:
     @property
     def supports_tools(self) -> bool:
         return self._tools_config is not None
+
+    def qualify_prompt(self, prompt: str, tool_names: tuple[str, ...]) -> str:
+        """Rewrite short tool names to what this delegate sees over MCP (a subclass
+        sets `mcp_tool_name`); unchanged without MCP or without a naming rule."""
+        namer = getattr(self, "mcp_tool_name", None)
+        if not self.supports_tools or namer is None:
+            return prompt
+        from veles.adapters.cli._tool_namespace import qualify_prompt
+
+        return qualify_prompt(prompt, tool_names, prefix_fn=namer)
 
     def _build_cmd(self, messages: list[Message], model: str, *, stream: bool) -> list[str]:
         raise NotImplementedError
@@ -112,6 +122,22 @@ class CLIProvider:
             stderr = proc.stderr.strip() or "<no stderr>"
             raise RuntimeError(f"{self._binary} exited {proc.returncode}: {stderr}")
         return proc.stdout
+
+    def create_message(
+        self,
+        messages: list[Message],
+        tools: list[dict] | None = None,
+        *,
+        model: str,
+        max_tokens: int = 4096,
+    ) -> ProviderResponse:
+        del max_tokens  # agent CLIs expose no max_tokens knob
+        self._prepare(tools)
+        stdout = self._run(self._build_cmd(messages, model, stream=False))
+        state = self._new_state()
+        for event in iter_jsonl(stdout):
+            state.absorb(event)
+        return state.to_response(raw=stdout)
 
     def stream_message(
         self,

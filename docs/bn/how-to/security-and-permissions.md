@@ -71,16 +71,22 @@ Tool-গুলো সক্রিয় প্রজেক্ট, `~/.veles/skil
 (বড়/ছোট হাতের অক্ষর, `..`, symlink) প্রত্যাখ্যাত হয়।
 
 যে ফাইলগুলো স্পষ্ট কমান্ড ছাড়াই চলে বা কোনো agent CLI-কে চালিত করে — `.git/`, `.githooks/`, `.claude/`,
-`.gemini/`, `.codex/`, `.vscode/`, `.devcontainer/`, `.husky/`-এর অধীনে সবকিছু, এবং `.envrc`, `.mcp.json`,
+`.gemini/`, `.agents/`, `.codex/`, `.vscode/`, `.devcontainer/`, `.husky/`-এর অধীনে সবকিছু, এবং `.envrc`, `.mcp.json`,
 `.pre-commit-config.yaml`, `lefthook.yml`, যেকোনো গভীরতায়, সেই সঙ্গে রিপোর `core.hooksPath` ডিরেক্টরি এবং
 symlink করা `.git` যেখানে নির্দেশ করে — agent-এর file tool সেখানে কেবল আপনি সেই লেখা নিশ্চিত করার পরেই লেখে।
 Trust grant ও autopilot এটি কভার করে না; daemon চ্যানেলে জিজ্ঞাসা করে, আর জিজ্ঞাসা করার কেউ না থাকলে
 batch run প্রত্যাখ্যান করে।
 
-`claude-cli` ও `gemini-cli` provider শুধু Veles-এর tool সহ একটি model হিসেবে চলে: তাদের নিজস্ব shell,
+`claude-cli` ও `antigravity-cli` provider শুধু Veles-এর tool সহ একটি model হিসেবে চলে: তাদের নিজস্ব shell,
 file-edit ও web tool, প্রজেক্টের `.claude/` settings ও hook, এবং অন্য MCP server প্রযোজ্য হয় না, আর
 তারা যে Veles tool-ই কল করে তা উপরের trust ladder-এর মধ্য দিয়ে যায় (সেখানে prompt-এর উত্তর দেওয়ার কেউ
-নেই, তাই আগে থেকে grant না করা সবকিছু প্রত্যাখ্যাত হয়)।
+নেই, তাই আগে থেকে grant না করা সবকিছু প্রত্যাখ্যাত হয়)। তাদের MCP config থাকে
+`.veles/tmp/delegate-<pid>/`-এ, প্রতিটি চলমান প্রসেসের জন্য একটি করে, যেখানে agent-এর file tool
+লিখতে পারে না। `agy` প্রজেক্টের বাইরে, `~/.veles/tmp/`-এর অধীনে, একটি scratch workspace-এ চলে,
+তাই প্রজেক্টের নিজস্ব `.agents/` hook ও MCP server কখনও তার কাছে পৌঁছায় না। Veles-এর tool পেলে
+সে `--dangerously-skip-permissions` সহ চলে — অন্যথায় agy headless অবস্থায় MCP কল প্রত্যাখ্যান করে —
+এবং সেই workspace-এর একটি hook তার নিজস্ব প্রতিটি tool বাতিল করে; যে hook ব্যর্থ হয় সেটিও বাতিল করে।
+Veles-এর file tool প্রজেক্টের বাইরে লিখতে পারে না, তাই agy সেগুলো দিয়ে ওই hook বদলাতে পারে না।
 
 জানা সীমাবদ্ধতা:
 
@@ -89,12 +95,11 @@ file-edit ও web tool, প্রজেক্টের `.claude/` settings ও h
 - MCP approval server-এর কমান্ড লাইন pin করে, প্রজেক্ট থেকে সে যে ফাইল চালায় সেগুলো নয়
   (`args`-এ উল্লিখিত script) — সেগুলোও পর্যালোচনা করুন।
 - CLI provider-এর ক্ষেত্রে, যে run কেবল নিজেদের জন্য tool আগে থেকে authorise করে (daemon-এর
-  background job, `veles research`) সেগুলো তা delegate করা CLI-কে দেয় না: তার Veles tool-গুলোর জন্য
+  background job, `veles research`) সেগুলো তা delegate করা CLI-কে দেয় না: আগে থেকে authorise করা
+  Veles প্রসেসের ভেতরেই থাকে, আর CLI যে MCP server চালু করে সেটি আলাদা একটি, তাই তার Veles tool-গুলোর জন্য
   স্থায়ী `veles trust set` grant বা autopilot উইন্ডো লাগে। parent run-এর planning mode-ও তাদের কাছে পৌঁছায় না।
-- `gemini-cli` তার run-এর জন্য প্রজেক্ট ফোল্ডারকে trust করে, তাই gemini প্রজেক্টের `.env`-ও পড়ে — agent যে
-  gemini settings চালনা করুক তা চান না, সেগুলো সেখান থেকে সরিয়ে রাখুন।
-- managed (system) gemini policy আছে এমন মেশিনে gemini Veles-এর দেওয়া policy উপেক্ষা করে, তাই সেখানে
-  `gemini-cli` কেবল Veles-এর tool-এ সীমাবদ্ধ নয়।
+- `antigravity-cli` ধরে নেয় agy তার workspace-এর `.agents/hooks.json` মানে; যে agy রিলিজ workspace hook
+  পড়া বন্ধ করবে, সেটি `--dangerously-skip-permissions`-এর অধীনে তার নিজস্ব tool খোলা রেখে দেবে।
 
 control character (terminal escape, bidi override) সহ path প্রত্যাখ্যাত হয়, এবং confirmation, trust prompt ও
 diff preview এমন অক্ষর escape করে দেখায় — কোনো tool call আপনার approve করা লেখা জাল করতে পারে না।
