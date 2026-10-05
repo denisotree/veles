@@ -4,6 +4,8 @@
 
 daemon 是一个可选的、长期运行的 HTTP+WS 服务器，它将 agent 暴露为 API——这是 [channels](connect-telegram.md)（Telegram 等）、定时[任务](long-running-tasks.md)以及远程/无头使用的基础。
 
+daemon 承载 channels，因此只有至少一个 channel 就绪（其模块已安装、密钥已就位）时才会启动。若一个也没有，在终端中运行 `veles daemon start` 会提示你连接一个；没有终端时则拒绝启动，并打印要运行的命令（`veles channel add --channel <platform>`，或注册表安装）。在 `[channels.<platform>]` 中声明的 channel 会在启动时从你已连接的注册表安装其模块。channel 平台就是模块——参见[连接 Telegram 频道](connect-telegram.md)和[用模块扩展 Veles](../../en/how-to/extend-veles-with-modules.md)。
+
 ## 启动与停止
 
 ```bash

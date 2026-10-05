@@ -6,9 +6,14 @@ Trò chuyện với một dự án Veles từ Telegram. Một kênh (channel) l�
 chuyển tiếp tin nhắn tới một [daemon](run-as-daemon.md) và stream các phản hồi trở
 lại. Mỗi cuộc trò chuyện có phiên hội thoại riêng của nó.
 
+Telegram là một module từ registry mở rộng chính thức (`official/telegram`), không thuộc
+lõi Veles. Bạn không cần cài thủ công: `veles channel add` sẽ đề nghị cài, và một khối
+`[channels.telegram]` trong cấu hình sẽ cài nó ở lần `veles daemon start` kế tiếp — bạn đã
+khai báo kênh, nên đó chính là sự đồng ý. Nó chỉ được cài từ các registry bạn đã kết nối.
+
 ## Điều kiện tiên quyết
 
-- Một daemon đang chạy (xem [chạy như một daemon](run-as-daemon.md)).
+- Một dự án Veles (daemon chỉ khởi động với một kênh hoạt động — đây là một kênh như vậy).
 - Một token bot Telegram từ [@BotFather](https://t.me/BotFather).
 
 ## Phương án A — gắn qua wizard (khuyến nghị)
@@ -41,22 +46,28 @@ whitelist = ["@alice", "123456789"]
 dạng số). Để trống nếu muốn trả lời tất cả mọi người — không khuyến nghị, vì mỗi tin
 nhắn đều tiêu tốn token của model.
 
-Khởi động lại daemon để áp dụng:
+Khởi động (hoặc khởi động lại) daemon để áp dụng:
 
 ```bash
-veles daemon restart
+veles daemon start      # or: veles daemon restart
 ```
+
+Viết khối bằng tay cũng hoạt động tương tự. Hãy đặt token vào keychain bằng
+`veles channel add`, hoặc vào khối dưới dạng `bot_token = "…"`; nếu thiếu token, daemon
+từ chối khởi động và nêu tên lệnh để khắc phục.
 
 ## Phương án B — chạy một gateway độc lập
 
 Nếu bạn thích một tiến trình riêng (thay vì kênh nằm trong daemon), hãy chạy:
 
 ```bash
-export TELEGRAM_BOT_TOKEN=123456:ABC...
+export TELEGRAM_BOT_TOKEN=123456:ABC...   # or pass --secret
 veles channel run --channel telegram \
   --daemon-url http://127.0.0.1:8765 \
   --daemon-token "$(veles daemon token add tg)"
 ```
+
+`veles channel run --channel telegram` sẽ cài module trước nếu nó chưa có.
 
 ## Quản lý các phiên trò chuyện
 
@@ -85,6 +96,10 @@ sau bước hiện tại, còn `/goal resume` tiếp tục một mục tiêu đ�
 Khi agent cần một chi tiết mà chỉ bạn biết, nó sẽ hỏi trong cuộc trò chuyện.
 Chạm vào một câu trả lời gợi ý hoặc tự nhập câu trả lời. Nếu bạn không trả lời
 trong năm phút, nó tiếp tục theo giả định hợp lý nhất và nói rõ đã giả định gì.
+
+`/settings` hiển thị trong một tin nhắn model (cố định theo cấu hình của daemon), phiên của
+cuộc trò chuyện, mức dùng token và các nút chế độ. `/tokens` hiển thị mức dùng token của phiên
+kể từ khi daemon khởi động; `/context` cho biết cửa sổ ngữ cảnh của model đã đầy đến đâu.
 
 ## Hạn chế đa phương thức (multimodal)
 

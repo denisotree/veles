@@ -110,7 +110,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[daemon]` | Привязка + автозапуск неименованного/«default» демона |
 | `[daemon.<name>]` | Именованная сессия демона (собственные model/provider/host/port/mode) |
 | `[goal]` | Бюджет новой цели — `max_steps` (30), `max_cost_usd` (5.0), `max_wall_time_s` (3600); флаги `veles goal start` его перекрывают |
-| `[channels.<type>]` | Канал, обслуживаемый неименованным демоном (например, `telegram`) |
+| `[channels.<type>]` | Канал, обслуживаемый неименованным демоном (например, `telegram`). Ключи в нём — собственные ключи платформы (`enabled` плюс то, что объявляет её модуль); объявление блока ставит модуль при следующем `veles daemon start` |
 | `[daemon.<name>.channels.<type>]` | Канал, привязанный к именованной сессии демона |
 | `[mcp.servers.<name>]` | Внешний MCP-сервер (источник инструментов) |
 

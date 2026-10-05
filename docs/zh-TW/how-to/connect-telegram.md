@@ -6,9 +6,11 @@
 訊息轉發到一個 [daemon](run-as-daemon.md)，並把回覆串流回來。每個聊天都會擁有
 它自己的對話 session。
 
+Telegram 是官方擴充功能 registry 中的一個模組（`official/telegram`），不屬於 Veles 核心。你不需要手動安裝：`veles channel add` 會提供安裝，設定中的 `[channels.telegram]` 區塊會在下一次 `veles daemon start` 時安裝它——你已宣告了該 channel，這就是同意。它只會從你已連接的 registry 安裝。
+
 ## 先決條件
 
-- 一個正在執行的 daemon（參閱[以 daemon 形式執行](run-as-daemon.md)）。
+- 一個 Veles 專案（daemon 只有在存在可用的 channel 時才會啟動——這就是一個）。
 - 來自 [@BotFather](https://t.me/BotFather) 的 Telegram bot token。
 
 ## 方案 A——透過精靈附掛（建議）
@@ -41,22 +43,26 @@ whitelist = ["@alice", "123456789"]
 使用者 id）。留空則會回應所有人——不建議，因為每一則
 訊息都會花費模型 tokens。
 
-重啟 daemon 以套用：
+啟動（或重啟）daemon 以套用：
 
 ```bash
-veles daemon restart
+veles daemon start      # or: veles daemon restart
 ```
+
+手動撰寫該區塊的效果相同。用 `veles channel add` 把 token 存入鑰匙圈，或在區塊中寫成 `bot_token = "…"`；若缺少 token，daemon 會拒絕啟動，並指出用來修復的指令。
 
 ## 方案 B——執行獨立的 gateway
 
 若你偏好一個獨立的行程（而非 daemon 內的 channel），請執行：
 
 ```bash
-export TELEGRAM_BOT_TOKEN=123456:ABC...
+export TELEGRAM_BOT_TOKEN=123456:ABC...   # or pass --secret
 veles channel run --channel telegram \
   --daemon-url http://127.0.0.1:8765 \
   --daemon-token "$(veles daemon token add tg)"
 ```
+
+`veles channel run --channel telegram` 在模組缺少時會先安裝它。
 
 ## 管理聊天 sessions
 
@@ -81,6 +87,8 @@ veles channel remove telegram            # drop the channel binding
 
 當智能體需要只有你能提供的資訊時，它會在聊天中提問。點選一個建議的回答，或輸入你
 自己的回答。如果五分鐘內沒有回覆，它會依最合理的假設繼續，並說明做了什麼假設。
+
+`/settings` 在一則訊息中顯示模型（由 daemon 的設定固定）、該聊天的 session、其 token 用量以及模式按鈕。`/tokens` 顯示自 daemon 啟動以來該 session 的 token 用量；`/context` 顯示模型 context window 的占用程度。
 
 ## 多模態限制
 

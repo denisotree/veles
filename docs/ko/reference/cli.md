@@ -315,12 +315,12 @@ HTTP+WS 데몬을 실행/제어합니다. 인자 없는 `veles daemon`은 **데�
 `start`는 공통 에이전트 루프 플래그도 받습니다. 데몬의 경우 `--model` / `--provider`는 프로젝트 설정을 기본값으로 사용하며, 데몬이 살아 있는 동안 고정됩니다.
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-데몬과 통신하는 외부 채팅 게이트웨이(Telegram, …). [Telegram 연결](../how-to/connect-telegram.md)을 참고하세요.
+데몬과 통신하는 외부 채팅 게이트웨이(Telegram, …). 플랫폼은 확장 레지스트리의 모듈이며, `run`과 `add`는 모듈이 없으면 설치합니다. [Telegram 연결](../how-to/connect-telegram.md)을 참고하세요.
 
 | 하위 명령 | 용도 |
 |---|---|
-| `list` | 등록된 채널 플랫폼 + 세션 수 나열 |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | 포그라운드로 게이트웨이 시작 |
+| `list` | 설치된 채널 플랫폼 + 세션 수, 모듈이 없는 선언된 채널 나열 |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | 포그라운드로 게이트웨이 시작; `--secret`은 플랫폼의 기본 시크릿(없으면 키체인 또는 환경 변수) |
 | `list-sessions [--channel C]` | `chat_id → session_id` 매핑 표시 |
 | `reset-session <chat_id> [--channel C]` | 매핑 삭제(다음 메시지부터 새로 시작) |
 | `add [--channel C] [--session S]` | 채널을 데몬에 연결(마법사; 자격 증명 → 키체인) |

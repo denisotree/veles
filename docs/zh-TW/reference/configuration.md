@@ -107,7 +107,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[daemon]` | 未具名／「預設」daemon 的綁定＋自動啟動 |
 | `[daemon.<name>]` | 一個具名 daemon 工作階段（自己的 model/provider/host/port/mode） |
 | `[goal]` | 新目標的預算 — `max_steps`（30）、`max_cost_usd`（5.0）、`max_wall_time_s`（3600）；`veles goal start` 的參數優先 |
-| `[channels.<type>]` | 由未具名 daemon 服務的 channel（例如 `telegram`） |
+| `[channels.<type>]` | 由未具名 daemon 服務的 channel（例如 `telegram`）。其鍵由平台自行定義（`enabled` 加上其模組宣告的鍵）；宣告它會在下一次 `veles daemon start` 時安裝該模組 |
 | `[daemon.<name>.channels.<type>]` | 綁定至某具名 daemon 工作階段的 channel |
 | `[mcp.servers.<name>]` | 一個外部 MCP 伺服器（工具來源） |
 

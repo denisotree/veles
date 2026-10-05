@@ -4,6 +4,14 @@
 
 데몬은 에이전트를 API로 노출하는 선택적이고 오래 실행되는 HTTP+WS 서버입니다 — [채널](connect-telegram.md)(Telegram, …), 예약 [작업](long-running-tasks.md), 원격/헤드리스 사용의 기반입니다.
 
+데몬은 채널을 호스팅하므로 준비된 채널(모듈이 설치되고 시크릿이 갖춰진 것)이 하나
+이상 있을 때만 시작됩니다. 채널이 없으면 터미널에서 `veles daemon start`가 채널
+연결을 제안하고, 터미널이 없으면 거부하며 실행할 명령(`veles channel add --channel <platform>`
+또는 레지스트리 설치)을 출력합니다. `[channels.<platform>]`에 선언된 채널은 시작 시
+연결한 레지스트리에서 모듈을 설치합니다. 채널 플랫폼은 모듈입니다 —
+[Telegram 채널 연결](connect-telegram.md)과
+[모듈로 Veles 확장](../../en/how-to/extend-veles-with-modules.md)을 참고하세요.
+
 ## 시작과 중지
 
 ```bash

@@ -6,9 +6,15 @@ Habla con un proyecto de Veles desde Telegram. Un canal es una pasarela que
 reenvía los mensajes a un [daemon](run-as-daemon.md) y devuelve las respuestas en
 streaming. Cada chat obtiene su propia sesión de conversación.
 
+Telegram es un módulo del registro oficial de extensiones (`official/telegram`),
+no parte del núcleo de Veles. No lo instalas a mano: `veles channel add` te lo
+ofrece, y un bloque `[channels.telegram]` en tu configuración lo instala en el
+siguiente `veles daemon start` — has declarado el canal, así que eso es el visto
+bueno. Se instala solo desde tus registros conectados.
+
 ## Requisitos previos
 
-- Un daemon en ejecución (ver [ejecutar como daemon](run-as-daemon.md)).
+- Un proyecto de Veles (un daemon solo arranca con un canal operativo — este lo es).
 - Un token de bot de Telegram de [@BotFather](https://t.me/BotFather).
 
 ## Opción A — adjuntar mediante el asistente (recomendado)
@@ -41,22 +47,28 @@ La **whitelist** restringe a quién responde el bot (el `@username` de Telegram 
 id numérico de usuario). Déjala vacía para responder a todo el mundo — no
 recomendado, ya que cada mensaje consume tokens del modelo.
 
-Reinicia el daemon para aplicar los cambios:
+Inicia (o reinicia) el daemon para aplicar los cambios:
 
 ```bash
-veles daemon restart
+veles daemon start      # or: veles daemon restart
 ```
+
+Escribir el bloque a mano funciona igual. Guarda el token en el llavero con
+`veles channel add`, o en el bloque como `bot_token = "…"`; si falta el token, el
+daemon se niega a arrancar y nombra el comando que lo arregla.
 
 ## Opción B — ejecutar una pasarela independiente
 
 Si prefieres un proceso separado (en lugar del canal dentro del daemon), ejecuta:
 
 ```bash
-export TELEGRAM_BOT_TOKEN=123456:ABC...
+export TELEGRAM_BOT_TOKEN=123456:ABC...   # or pass --secret
 veles channel run --channel telegram \
   --daemon-url http://127.0.0.1:8765 \
   --daemon-token "$(veles daemon token add tg)"
 ```
+
+`veles channel run --channel telegram` instala antes el módulo si no está.
 
 ## Gestionar las sesiones de chat
 
@@ -86,6 +98,11 @@ continúa uno detenido.
 Cuando el agente necesita un dato que solo tú puedes dar, pregunta en el chat.
 Toca una de las respuestas sugeridas o escribe la tuya. Si no respondes en cinco
 minutos, sigue con su mejor suposición y dice qué supuso.
+
+`/settings` muestra en un solo mensaje el modelo (fijado por la configuración del
+daemon), la sesión del chat, su uso de tokens y los botones de modo. `/tokens`
+muestra el uso de tokens de la sesión desde que arrancó el daemon; `/context`
+muestra cuán llena está la ventana de contexto del modelo.
 
 ## Limitación multimodal
 

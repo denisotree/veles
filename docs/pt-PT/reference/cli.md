@@ -348,13 +348,14 @@ daemons** (projecto → daemons → canais). Ver [executar como daemon](../how-t
 tempo de vida do daemon.
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-Gateways de chat externos (Telegram, …) que falam com um daemon. Ver
+Gateways de chat externos (Telegram, …) que falam com um daemon. Uma plataforma é um módulo
+do registo de extensões; `run` e `add` instalam-no quando está em falta. Ver
 [ligar o Telegram](../how-to/connect-telegram.md).
 
 | Subcomando | Finalidade |
 |---|---|
-| `list` | Lista as plataformas de canal registadas + contagens de sessões |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | Arranca um gateway em primeiro plano |
+| `list` | Lista as plataformas de canal instaladas + contagens de sessões, e os canais declarados cujo módulo está em falta |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | Arranca um gateway em primeiro plano; `--secret` é o segredo principal da plataforma (senão o keychain ou a sua variável de ambiente) |
 | `list-sessions [--channel C]` | Mostra os mapeamentos `chat_id → session_id` |
 | `reset-session <chat_id> [--channel C]` | Esquece um mapeamento (a próxima mensagem começa do zero) |
 | `add [--channel C] [--session S]` | Liga um canal a um daemon (assistente; credenciais → chaveiro) |

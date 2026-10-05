@@ -6,9 +6,15 @@ Converse com um projeto Veles a partir do Telegram. Um canal é um gateway que e
 mensagens para um [daemon](run-as-daemon.md) e transmite as respostas de volta. Cada chat ganha
 sua própria sessão de conversa.
 
+O Telegram é um módulo do registro oficial de extensões (`official/telegram`), e não
+parte do núcleo do Veles. Você não o instala manualmente: o `veles channel add` o
+oferece, e um bloco `[channels.telegram]` na sua configuração o instala no próximo
+`veles daemon start` — você declarou o canal, então esse é o sinal verde. Ele é
+instalado apenas a partir dos seus registros conectados.
+
 ## Pré-requisitos
 
-- Um daemon em execução (veja [executar como daemon](run-as-daemon.md)).
+- Um projeto Veles (um daemon só inicia com um canal funcionando — este é um).
 - Um token de bot do Telegram obtido com o [@BotFather](https://t.me/BotFather).
 
 ## Opção A — anexar pelo assistente (recomendado)
@@ -41,22 +47,28 @@ A **whitelist** restringe quem o bot responde (`@username` do Telegram ou id num
 de usuário). Deixe-a vazia para responder a todos — não recomendado, já que cada
 mensagem gasta tokens do modelo.
 
-Reinicie o daemon para aplicar:
+Inicie (ou reinicie) o daemon para aplicar:
 
 ```bash
-veles daemon restart
+veles daemon start      # or: veles daemon restart
 ```
+
+Escrever o bloco à mão funciona do mesmo jeito. Coloque o token no keychain com
+`veles channel add`, ou no bloco como `bot_token = "…"`; se o token estiver
+faltando, o daemon se recusa a iniciar e informa o comando que resolve.
 
 ## Opção B — executar um gateway independente
 
 Se você prefere um processo separado (em vez do canal interno do daemon), execute:
 
 ```bash
-export TELEGRAM_BOT_TOKEN=123456:ABC...
+export TELEGRAM_BOT_TOKEN=123456:ABC...   # or pass --secret
 veles channel run --channel telegram \
   --daemon-url http://127.0.0.1:8765 \
   --daemon-token "$(veles daemon token add tg)"
 ```
+
+O `veles channel run --channel telegram` instala o módulo primeiro, se ele não estiver presente.
 
 ## Gerenciar sessões de chat
 
@@ -86,6 +98,11 @@ parada.
 Quando o agente precisa de um detalhe que só você pode dar, ele pergunta no
 chat. Toque em uma das respostas sugeridas ou escreva a sua. Se você não
 responder em cinco minutos, ele segue com a melhor suposição e diz qual foi.
+
+`/settings` mostra, em uma única mensagem, o modelo (fixado pela configuração do daemon),
+a sessão do chat, o uso de tokens e os botões de modo. `/tokens` mostra o uso de tokens da
+sessão desde que o daemon iniciou; `/context` mostra o quanto a janela de contexto do
+modelo está preenchida.
 
 ## Limitação multimodal
 

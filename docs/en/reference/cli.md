@@ -393,13 +393,14 @@ TUI (project → daemons → channels). See [run as a daemon](../how-to/run-as-d
 `--provider` default to the project config and are fixed for the daemon's lifetime.
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-External chat gateways (Telegram, …) that talk to a daemon. See
+External chat gateways (Telegram, …) that talk to a daemon. A platform is a module
+from the extension registry; `run` and `add` install it when it is missing. See
 [connect Telegram](../how-to/connect-telegram.md).
 
 | Subcommand | Purpose |
 |---|---|
-| `list` | List registered channel platforms + session counts |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | Start a gateway in the foreground |
+| `list` | List installed channel platforms + session counts, and declared channels whose module is missing |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | Start a gateway in the foreground; `--secret` is the platform's primary secret (else the keychain or its env var) |
 | `list-sessions [--channel C]` | Show `chat_id → session_id` mappings |
 | `reset-session <chat_id> [--channel C]` | Forget a mapping (next message starts fresh) |
 | `add [--channel C] [--session S]` | Attach a channel to a daemon (wizard; creds → keychain) |

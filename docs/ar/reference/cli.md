@@ -346,13 +346,14 @@ veles [--no-wizard] <command> [subcommand] [options]
 `--provider` افتراضهما من إعداد المشروع ويُثبَّتان طوال عمر العفريت.
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-بوّابات دردشة خارجية (Telegram …) تتحدّث إلى عفريت. راجع
+بوّابات دردشة خارجية (Telegram …) تتحدّث إلى عفريت. المنصّة وحدة (module) من سجل الإضافات؛
+ويثبّتها `run` و`add` عند غيابها. راجع
 [ربط Telegram](../how-to/connect-telegram.md).
 
 | الأمر الفرعي | الغرض |
 |---|---|
-| `list` | سرد منصّات القنوات المُسجَّلة + أعداد الجلسات |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | بدء بوّابة في المقدّمة |
+| `list` | سرد منصّات القنوات المثبّتة + أعداد الجلسات، والقنوات المعلنة التي وحدتها غائبة |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | بدء بوّابة في المقدّمة؛ `--secret` هو السر الأساسي للمنصّة (وإلا فمن keychain أو متغيّر البيئة الخاص بها) |
 | `list-sessions [--channel C]` | عرض تعيينات `chat_id → session_id` |
 | `reset-session <chat_id> [--channel C]` | نسيان تعيين (تبدأ الرسالة التالية من جديد) |
 | `add [--channel C] [--session S]` | ربط قناة بعفريت (معالج؛ بيانات الاعتماد ← سلسلة المفاتيح) |

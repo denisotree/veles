@@ -123,7 +123,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[daemon]` | The unnamed/"default" daemon's bind + autostart |
 | `[daemon.<name>]` | A named daemon session (own model/provider/host/port/mode) |
 | `[goal]` | A new goal's budget — `max_steps` (30), `max_cost_usd` (5.0), `max_wall_time_s` (3600); `veles goal start` flags override it |
-| `[channels.<type>]` | A channel served by the unnamed daemon (e.g. `telegram`) |
+| `[channels.<type>]` | A channel served by the unnamed daemon (e.g. `telegram`). Its keys are the platform's own (`enabled` plus what its module declares); declaring it installs the module on the next `veles daemon start` |
 | `[daemon.<name>.channels.<type>]` | A channel bound to a named daemon session |
 | `[mcp.servers.<name>]` | An external MCP server (tool source) |
 

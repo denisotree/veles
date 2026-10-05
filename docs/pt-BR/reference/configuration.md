@@ -111,7 +111,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[daemon]` | Bind + autostart do daemon sem nome/"default" |
 | `[daemon.<name>]` | Uma sessão de daemon nomeada (modelo/provedor/host/porta/modo próprios) |
 | `[goal]` | O orçamento de uma meta nova — `max_steps` (30), `max_cost_usd` (5.0), `max_wall_time_s` (3600); as flags de `veles goal start` o substituem |
-| `[channels.<type>]` | Um canal servido pelo daemon sem nome (ex.: `telegram`) |
+| `[channels.<type>]` | Um canal servido pelo daemon sem nome (ex.: `telegram`). Suas chaves são as da própria plataforma (`enabled` mais o que seu módulo declara); declará-lo instala o módulo no próximo `veles daemon start` |
 | `[daemon.<name>.channels.<type>]` | Um canal vinculado a uma sessão de daemon nomeada |
 | `[mcp.servers.<name>]` | Um servidor MCP externo (fonte de tools) |
 
