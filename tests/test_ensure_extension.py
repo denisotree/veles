@@ -208,6 +208,28 @@ def test_platform_need_installs_for_the_user_without_asking(home, fake_install, 
     assert "declared in [channels.telegram]" in capsys.readouterr().err
 
 
+def test_an_official_platform_comes_from_the_one_registry_that_has_it(
+    home, fake_install, monkeypatch
+) -> None:
+    """`public` is preferred, but a connected registry that alone provides the
+    platform (a fork, a private mirror) is unambiguous too — not a dead end."""
+    from veles.core.registry import catalog
+    from veles.core.registry.ensure import PlatformNeed
+
+    monkeypatch.setattr(
+        catalog,
+        "providers_of",
+        lambda t: ["private:official/telegram"] if t == "platform:telegram" else [],
+    )
+    assert ensure_extension(PlatformNeed("telegram"), None, interactive=False, auto=True)
+    assert fake_install[-1] == "install private:official/telegram --user --preapproved"
+
+    both = ["private:official/telegram", "public:official/telegram"]
+    monkeypatch.setattr(catalog, "providers_of", lambda t: both)
+    assert ensure_extension(PlatformNeed("telegram"), None, interactive=False, auto=True)
+    assert fake_install[-1] == "install public:official/telegram --user --preapproved"
+
+
 def test_auto_install_refuses_ambiguous_and_unreachable(home, fake_install, monkeypatch, capsys):
     from veles.core.registry import catalog
     from veles.core.registry.ensure import PlatformNeed
@@ -219,6 +241,7 @@ def test_auto_install_refuses_ambiguous_and_unreachable(home, fake_install, monk
     def unreachable(spec):
         raise ResolveError("no registry named 'public'")
 
+    monkeypatch.setattr(catalog, "providers_of", lambda token: [])  # nothing cached
     monkeypatch.setattr(ensure, "_resolve", unreachable)
     ensure.reset_warnings()
     assert not ensure_extension(PlatformNeed("telegram"), None, interactive=False, auto=True)

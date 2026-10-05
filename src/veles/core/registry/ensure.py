@@ -249,14 +249,16 @@ def reset_warnings() -> None:
 
 def _spec(need: Need) -> str | None:
     ref = ref_for(need)
-    if ref is not None:
-        return ref
     if isinstance(need, LayoutNeed):
-        return need.name  # `resolve` reports a missing or ambiguous name
+        return ref or need.name  # `resolve` reports a missing or ambiguous name
     from veles.core.registry import catalog
 
     point = "platform" if isinstance(need, PlatformNeed) else "engine"
     refs = catalog.providers_of(f"{point}:{need.name}")
+    # The official ref wins when it is there — or when nothing is cached yet
+    # (`resolve` syncs it); a single other provider is unambiguous too.
+    if ref is not None and (ref in refs or not refs):
+        return ref
     if len(refs) == 1:
         return refs[0]
     if refs:
