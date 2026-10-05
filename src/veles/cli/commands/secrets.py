@@ -48,6 +48,11 @@ def _reject_project_for_plain_secret(args: argparse.Namespace) -> bool:
 
 
 def cmd_secret(args: argparse.Namespace) -> int:
+    from veles.core.registry.ensure import load_user_modules_into_live
+
+    # A module provider's key env names exist only once its module is loaded;
+    # without them `set ECHO_API_KEY` would store a flat entry nothing reads.
+    load_user_modules_into_live()
     verb = args.secret_command
     if verb == "set":
         return _set(args)

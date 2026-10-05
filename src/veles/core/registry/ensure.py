@@ -209,7 +209,7 @@ def available_platforms() -> list[str]:
 
     # Into the live registry, not a scoped one: the pick then needs them loaded
     # (`ensure_platform_interactive`), and an entrypoint runs once per process.
-    _load_user_modules_into_live()
+    load_user_modules_into_live()
     return list(dict.fromkeys([*list_platforms(), *_registry_offers("platform")]))
 
 
@@ -218,7 +218,7 @@ def available_providers() -> list[str]:
     offers in the cached registries — picking one of those installs it."""
     from veles.core.providers import list_providers
 
-    _load_user_modules_into_live()
+    load_user_modules_into_live()
     return list(dict.fromkeys([*list_providers(), *_registry_offers("provider")]))
 
 
@@ -238,12 +238,12 @@ def ensure_platform_interactive(name: str) -> bool:
     wizard pick) and its module loaded into the live registry."""
     from veles.core.platforms import list_platforms
 
-    _load_user_modules_into_live()
+    load_user_modules_into_live()
     if name in list_platforms():
         return True
     if not ensure_extension(PlatformNeed(name), None, interactive=True):
         return False
-    _load_user_modules_into_live()
+    load_user_modules_into_live()
     return name in list_platforms()
 
 
@@ -255,13 +255,13 @@ def ensure_provider(name: str, *, reason: str) -> bool:
 
     if find_provider(name) is not None:
         return True
-    _load_user_modules_into_live()
+    load_user_modules_into_live()
     if find_provider(name) is not None or name in RETIRED:
         return find_provider(name) is not None
     if not _offered(name):
         return False  # a typo nobody offers: the caller says "unknown provider"
     if ensure_extension(ProviderNeed(name), None, interactive=False, auto=True, reason=reason):
-        _load_user_modules_into_live()
+        load_user_modules_into_live()
     return find_provider(name) is not None
 
 
@@ -270,12 +270,12 @@ def ensure_provider_interactive(name: str) -> bool:
     (a wizard pick) and its module loaded into the live registry."""
     from veles.core.providers import find_provider
 
-    _load_user_modules_into_live()
+    load_user_modules_into_live()
     if find_provider(name) is not None:
         return True
     if not ensure_extension(ProviderNeed(name), None, interactive=True):
         return False
-    _load_user_modules_into_live()
+    load_user_modules_into_live()
     return find_provider(name) is not None
 
 
@@ -320,7 +320,7 @@ def ensure_routed_providers(project: Project) -> bool:
     return installed
 
 
-def _load_user_modules_into_live() -> None:
+def load_user_modules_into_live() -> None:
     """User-level modules (where a platform installs) into the live registry —
     a process that loaded no modules (the daemon picker, `veles init`) gets one;
     a module already loaded is not loaded twice."""

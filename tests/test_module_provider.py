@@ -35,15 +35,30 @@ def register(api):
 """
 
 
-def _install_echo() -> None:
+def _install_echo(source: str = _MODULE) -> None:
     mod = user_modules_dir() / "echo"
     mod.mkdir(parents=True)
     (mod / "module.toml").write_text(
         '[module]\nname = "echo"\ndescription = "d"\nentrypoint = "e.py:register"\n',
         encoding="utf-8",
     )
-    (mod / "e.py").write_text(_MODULE, encoding="utf-8")
+    (mod / "e.py").write_text(source, encoding="utf-8")
     approve_module(mod, name="echo", project_root=None)
+
+
+def test_a_module_providers_key_is_stored_where_it_is_read(
+    isolated_user_home: Path, fake_keyring
+) -> None:
+    """`veles secret set <ENV>` routes a module provider's key to its slot — the
+    secret verb loads the user's modules, or the key lands in a flat entry nothing reads."""
+    from veles.cli.commands.secrets import cmd_secret
+    from veles.core.secrets import get_provider_key
+
+    keyed = _MODULE.replace('model_list="live")', 'model_list="live", key_env=("ECHO_API_KEY",))')
+    _install_echo(keyed)
+    args = argparse.Namespace(secret_command="set", name="ECHO_API_KEY", value="k-1", project=None)
+    assert cmd_secret(args) == 0
+    assert get_provider_key("echo", env_fallback=False) == "k-1"
 
 
 def test_a_module_provider_through_the_cli(isolated_user_home: Path, capsys) -> None:
