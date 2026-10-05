@@ -78,6 +78,12 @@ async def start_turn(
         if session_id is None:
             session_id = state.store.create_session()
         state.set_chat_mode(session_id, mode)  # an unknown mode raises before any run
+
+    def finished(done: RunHandle) -> None:
+        state.record_usage(done.session_id, done.usage)  # M116b: per-session usage
+        if on_finished is not None:
+            on_finished(done)
+
     handle = new_run_handle(session_id=session_id)
     state.add_run(handle)
     chosen_mode = state.chat_mode(session_id).mode
@@ -91,7 +97,7 @@ async def start_turn(
                 handle,
                 worker_agent_factory=state.worker_agent_factory,
                 prompt=prompt,
-                on_finished=on_finished,
+                on_finished=finished,
                 verify_hook=state.verify_hook,
                 origin=origin,
                 store=state.store,
@@ -128,7 +134,7 @@ async def start_turn(
             agent=agent,
             turn=turn,
             prompt=prompt,
-            on_finished=on_finished,
+            on_finished=finished,
             post_turn_hook=state.post_turn_hook,
             verify_hook=state.verify_hook,
             origin=origin,

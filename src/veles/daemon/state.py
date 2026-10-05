@@ -29,7 +29,7 @@ from veles.daemon.runner import AgentFactory, RunHandle
 
 if TYPE_CHECKING:
     from veles.channels.delivery import DeliveryRouter
-    from veles.core.agent import Agent, RunResult
+    from veles.core.agent import Agent, RunResult, UsageSnapshot
     from veles.core.dream_runner import DreamRunner
     from veles.core.job_runner import JobRunner
     from veles.core.platforms import ChannelCaps
@@ -88,6 +88,17 @@ def load_chat_modes(path: Path) -> dict[str, ChatModeState]:
 
 
 @dataclass(slots=True)
+class SessionUsage:
+    """M116b: one session's tokens since this daemon started (kept in memory —
+    the API says so with `since_daemon_start`)."""
+
+    tokens_in: int = 0
+    tokens_out: int = 0
+    cache_read: int = 0
+    last_prompt_tokens: int = 0  # the latest request's prompt = resident context
+
+
+@dataclass(slots=True)
 class DaemonState:
     project: Project
     store: SessionStore
@@ -127,6 +138,8 @@ class DaemonState:
     # What each *running* channel's platform can do (asks_questions…). Read by
     # turns from any thread — the module registry is a ContextVar, this is not.
     channel_caps: dict[str, ChannelCaps] = field(default_factory=dict)
+    # M116b: tokens per session since this daemon started.
+    session_usage: dict[str, SessionUsage] = field(default_factory=dict)
     # Runs curator/insights/etc. after a turn.
     post_turn_hook: Callable[[RunResult], None] | None = None
     # M170b: opt-in verify→escalate run before the `completed` event.
@@ -152,6 +165,33 @@ class DaemonState:
 
     def session_lock(self, session_id: str) -> asyncio.Lock:
         return self.session_locks.setdefault(session_id, asyncio.Lock())
+
+    def record_usage(self, session_id: str | None, usage: UsageSnapshot | None) -> None:
+        """Add one finished run's tokens to its session."""
+        if not session_id or usage is None:
+            return
+        s = self.session_usage.setdefault(session_id, SessionUsage())
+        s.tokens_in += usage.prompt_tokens
+        s.tokens_out += usage.completion_tokens
+        s.cache_read += usage.cache_read_tokens
+        if usage.last_prompt_tokens:
+            s.last_prompt_tokens = usage.last_prompt_tokens
+
+    def usage_payload(self, session_id: str) -> dict[str, Any]:
+        """`GET /v1/sessions/{id}/usage` and `RunBackend.get_session_usage`."""
+        from veles.core.model_windows import context_window_for
+
+        u = self.session_usage.get(session_id) or SessionUsage()
+        return {
+            "session_id": session_id,
+            "tokens_in": u.tokens_in,
+            "tokens_out": u.tokens_out,
+            "cache_read": u.cache_read,
+            "last_prompt_tokens": u.last_prompt_tokens,
+            "context_window": context_window_for(self.default_model),
+            "model": self.default_model,
+            "since_daemon_start": True,
+        }
 
     def chat_mode(self, session_id: str | None) -> ChatModeState:
         """The session's mode state; a session never switched is on its default."""

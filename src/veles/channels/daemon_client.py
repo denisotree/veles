@@ -130,6 +130,15 @@ class DaemonClient:
         ) as resp:
             return await _read_json(resp)
 
+    async def get_session_usage(self, session_id: str) -> dict[str, Any]:
+        """GET /v1/sessions/{id}/usage — the session's tokens since the daemon
+        started and the model's context window (M116b)."""
+        async with self.session.get(
+            f"{self._base}/v1/sessions/{session_id}/usage",
+            headers=self._auth,
+        ) as resp:
+            return await _read_json(resp)
+
     async def update_session(self, session_id: str, *, mode: str) -> dict[str, Any]:
         """PATCH /v1/sessions/{id} — switch the session's agent mode
         (`"default"` switches it back). Model and provider are fixed at

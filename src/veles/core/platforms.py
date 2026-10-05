@@ -66,6 +66,11 @@ class RunBackend(Protocol):
         """The session's agent `mode` (`"default"` when never switched) and its `goal`."""
         ...
 
+    async def get_session_usage(self, session_id: str) -> dict[str, Any]:
+        """The session's `tokens_in`/`tokens_out`/`cache_read`/`last_prompt_tokens`
+        since the daemon started, its `model` and `context_window` (M116b)."""
+        ...
+
     async def update_session(self, session_id: str, *, mode: str) -> dict[str, Any]:
         """Switch the session's agent mode; `"default"` switches it back."""
         ...

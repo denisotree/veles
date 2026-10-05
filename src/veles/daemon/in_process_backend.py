@@ -65,6 +65,10 @@ class InProcessRunBackend:
             "goal": self._state.chat_goal(session_id),
         }
 
+    async def get_session_usage(self, session_id: str) -> dict[str, Any]:
+        """In-process equivalent of `DaemonClient.get_session_usage` (M116b)."""
+        return self._state.usage_payload(session_id)
+
     async def cancel_goal(self, session_id: str) -> dict[str, Any]:
         """In-process equivalent of `DaemonClient.cancel_goal`: cancel the
         chat's goal; `{"cancelled": null}` when it had none."""

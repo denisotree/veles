@@ -59,6 +59,7 @@ def make_app(state: DaemonState) -> web.Application:
     app.router.add_post("/v1/runs/{run_id}/prompts/{prompt_id}", _handle_resolve_prompt)
     app.router.add_get("/v1/sessions", _handle_list_sessions)
     app.router.add_get("/v1/sessions/{session_id}", _handle_get_session)
+    app.router.add_get("/v1/sessions/{session_id}/usage", _handle_session_usage)
     app.router.add_delete("/v1/sessions/{session_id}", _handle_delete_session)
     app.router.add_patch("/v1/sessions/{session_id}", _handle_patch_session)
     app.router.add_delete("/v1/sessions/{session_id}/goal", _handle_cancel_session_goal)
@@ -418,6 +419,13 @@ async def _handle_list_sessions(request: web.Request) -> web.Response:
             ]
         }
     )
+
+
+async def _handle_session_usage(request: web.Request) -> web.Response:
+    """M116b: the session's tokens since this daemon started and the model's
+    context window. A session with no finished run yet reports zeros."""
+    state: DaemonState = request.app["state"]
+    return web.json_response(state.usage_payload(request.match_info["session_id"]))
 
 
 async def _handle_get_session(request: web.Request) -> web.Response:
