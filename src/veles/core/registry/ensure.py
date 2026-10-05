@@ -206,18 +206,31 @@ def available_platforms() -> list[str]:
     a loaded module) first, then the `platform:<name>` providers in the cached
     registries (no network) — picking one of those installs it."""
     from veles.core.platforms import list_platforms
-    from veles.core.registry.catalog import search
 
     # Into the live registry, not a scoped one: the pick then needs them loaded
     # (`ensure_platform_interactive`), and an entrypoint runs once per process.
     _load_user_modules_into_live()
-    names = list_platforms()
-    with contextlib.suppress(Exception):  # no readable registry → installed platforms only
+    return list(dict.fromkeys([*list_platforms(), *_registry_offers("platform")]))
+
+
+def available_providers() -> list[str]:
+    """Providers to offer in a wizard: the catalogue first, then `provider:<id>`
+    offers in the cached registries — picking one of those installs it."""
+    from veles.core.providers import list_providers
+
+    _load_user_modules_into_live()
+    return list(dict.fromkeys([*list_providers(), *_registry_offers("provider")]))
+
+
+def _registry_offers(point: str) -> list[str]:
+    """Names a cached registry's modules provide for `point` (no network)."""
+    from veles.core.registry.catalog import search
+
+    with contextlib.suppress(Exception):  # no readable registry → nothing offered
         found, _ = search(kind="module", sync_missing=False)
-        names += [
-            p.split(":", 1)[1] for f in found for p in f.ext.provides if p.startswith("platform:")
-        ]
-    return list(dict.fromkeys(names))
+        prefix = f"{point}:"
+        return [p[len(prefix) :] for f in found for p in f.ext.provides if p.startswith(prefix)]
+    return []
 
 
 def ensure_platform_interactive(name: str) -> bool:
@@ -249,6 +262,20 @@ def ensure_provider(name: str, *, reason: str) -> bool:
         return False  # a typo nobody offers: the caller says "unknown provider"
     if ensure_extension(ProviderNeed(name), None, interactive=False, auto=True, reason=reason):
         _load_user_modules_into_live()
+    return find_provider(name) is not None
+
+
+def ensure_provider_interactive(name: str) -> bool:
+    """`name` is in the catalogue, or got installed now with the normal confirmation
+    (a wizard pick) and its module loaded into the live registry."""
+    from veles.core.providers import find_provider
+
+    _load_user_modules_into_live()
+    if find_provider(name) is not None:
+        return True
+    if not ensure_extension(ProviderNeed(name), None, interactive=True):
+        return False
+    _load_user_modules_into_live()
     return find_provider(name) is not None
 
 

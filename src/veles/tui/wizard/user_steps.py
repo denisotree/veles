@@ -35,9 +35,32 @@ _LANGUAGES = [
 
 
 def _provider_items() -> list[ChoiceItem]:
+    """The catalogue, then what the cached registries offer (installed on pick)."""
     from veles.core.providers import list_providers, tui_label
+    from veles.core.registry import ensure
 
-    return [ChoiceItem(label=tui_label(name), value=name) for name in list_providers()]
+    known = set(list_providers())
+    return [
+        ChoiceItem(label=tui_label(n) if n in known else f"{n} (registry)", value=n)
+        for n in ensure.available_providers()
+    ]
+
+
+async def install_picked_provider(ctx: WizardContext, name: str) -> bool:
+    """A registry pick is installed (the normal confirmation, on the terminal)
+    before it counts; a catalogue pick is already there. Shared with the project
+    wizard."""
+    from veles.core.providers import find_provider
+    from veles.core.registry import ensure
+    from veles.tui.wizard.install import install_with_terminal
+
+    if find_provider(name) is not None:
+        return True
+    return install_with_terminal(
+        ctx.app,
+        lambda: ensure.ensure_provider_interactive(name),
+        hint=f"run `veles registry install {name}`",
+    )
 
 
 # ---------------- Step 1: Language ----------------
@@ -84,6 +107,8 @@ class ProviderStep:
         nav = outcome_from_dismiss(result)
         if nav is not None:
             return nav
+        if not await install_picked_provider(ctx, result):
+            return WizardOutcome.BACK
         ctx.answers["default_provider"] = result
         return WizardOutcome.NEXT
 

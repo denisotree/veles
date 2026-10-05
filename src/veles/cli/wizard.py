@@ -30,7 +30,6 @@ from collections.abc import Callable
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 
-from veles.core.providers import list_providers
 from veles.core.user_config import (
     UserConfig,
     save_user_config,
@@ -88,12 +87,7 @@ def run_wizard() -> WizardResult:
         file=sys.stderr,
     )
     language = _ask_choice(prompter, "Preferred language", _LANGUAGES, default="en")
-    provider = _ask_choice(
-        prompter,
-        "Default LLM provider",
-        tuple(list_providers()),
-        default="openrouter",
-    )
+    provider = _ask_provider(prompter, "Default LLM provider")
     _hint_about_api_key(provider)
     first_project = prompter("First project name (optional, blank to skip)", None).strip() or None
 
@@ -127,6 +121,20 @@ def _ask_choice(prompter: Prompter, prompt: str, choices: tuple[str, ...], *, de
             f"  ! '{ans}' is not one of {choices}; try again.",
             file=sys.stderr,
         )
+
+
+def _ask_provider(prompter: Prompter, prompt: str) -> str:
+    """Pick a provider — the catalogue, then what the cached registries offer;
+    a registry pick is installed (with the normal confirmation) before it counts."""
+    from veles.core.registry import ensure
+
+    while True:
+        provider = _ask_choice(
+            prompter, prompt, tuple(ensure.available_providers()), default="openrouter"
+        )
+        if ensure.ensure_provider_interactive(provider):
+            return provider
+        print("  ! not installed; pick another", file=sys.stderr)
 
 
 def _hint_about_api_key(provider: str) -> None:

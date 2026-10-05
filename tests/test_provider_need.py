@@ -117,3 +117,27 @@ def test_doctor_names_a_provider_nothing_provides(isolated_user_home: Path, tmp_
     result = _check_provider_catalog(project)
     assert result.status == "warn" and "typo" in result.message
     assert "no base_url" in (result.details or {}).get("catalogue", [""])[0]
+
+
+def test_wizards_list_registry_providers_after_the_installed(
+    isolated_user_home: Path, monkeypatch
+) -> None:
+    from veles.core.registry import catalog
+
+    offer = SimpleNamespace(ext=SimpleNamespace(provides=("provider:antigravity-cli",)))
+    monkeypatch.setattr(catalog, "search", lambda **kw: ([offer], []))
+    names = ensure.available_providers()
+    assert names[0] == "openrouter" and names[-1] == "antigravity-cli"
+
+
+def test_a_wizard_pick_installs_with_confirmation(isolated_user_home: Path, monkeypatch) -> None:
+    asked: list[tuple[str, bool, bool]] = []
+    monkeypatch.setattr(
+        ensure,
+        "ensure_extension",
+        lambda need, project, *, interactive, auto=False, reason=None: (
+            asked.append((need.name, interactive, auto)) or False
+        ),
+    )
+    assert ensure.ensure_provider_interactive("antigravity-cli") is False
+    assert asked == [("antigravity-cli", True, False)]

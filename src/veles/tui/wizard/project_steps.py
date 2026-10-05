@@ -57,9 +57,15 @@ from veles.tui.wizard.step import (
 
 def _provider_choices() -> list[ChoiceItem]:
     # The project picker keeps labels compact — taglines were in the first-run wizard.
-    from veles.core.providers import get_provider, list_providers
+    # Registry offers follow the catalogue and install on pick.
+    from veles.core.providers import find_provider
+    from veles.core.registry import ensure
 
-    return [ChoiceItem(label=get_provider(n).label, value=n) for n in list_providers()]
+    items = []
+    for n in ensure.available_providers():
+        spec = find_provider(n)
+        items.append(ChoiceItem(label=spec.label if spec else f"{n} (registry)", value=n))
+    return items
 
 
 # ---------------- Step 1: Bootstrap ----------------
@@ -157,6 +163,10 @@ class ProviderOverrideStep:
         nav = outcome_from_dismiss(picked)
         if nav is not None:
             return nav
+        from veles.tui.wizard.user_steps import install_picked_provider
+
+        if not await install_picked_provider(ctx, picked):
+            return WizardOutcome.BACK
 
         project: Project = ctx.answers["project"]
         # Configure the API key for this project scope first, so the

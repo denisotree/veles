@@ -166,6 +166,26 @@ async def test_ctrl_q_cancels():
     assert answers == {}
 
 
+async def test_a_registry_provider_pick_installs_and_a_decline_goes_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A registry offer follows the eight builtins; picking it runs the install
+    (on the terminal); a declined install returns to the previous step."""
+    from veles.core.registry import ensure
+    from veles.tui.wizard import install
+
+    asked: list[str] = []
+    monkeypatch.setattr(
+        ensure, "_registry_offers", lambda point: ["antigravity-cli"] if point == "provider" else []
+    )
+    monkeypatch.setattr(ensure, "ensure_provider_interactive", lambda n: asked.append(n) or False)
+    monkeypatch.setattr(install, "install_with_terminal", lambda app, fn, *, hint: fn())
+    keys = ["enter", *["down"] * 8, "enter", "ctrl+q"]
+    answers = await _drive_user_wizard(keys)
+    assert asked == ["antigravity-cli"]
+    assert "default_provider" not in answers
+
+
 async def test_model_step_bad_key_continues_with_no(
     _isolate: _FakeKeyring, monkeypatch: pytest.MonkeyPatch
 ) -> None:

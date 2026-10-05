@@ -17,7 +17,6 @@ visible extension seam, not an optimisation to skip.
 
 from __future__ import annotations
 
-import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -86,19 +85,14 @@ async def collect_channel_via_modals(app: App, *, title: str) -> CollectResult |
 def _install_platform(app: App, name: str) -> bool:
     """Install a registry platform picked in the flow. Its confirmation is a
     terminal prompt, so the app hands the terminal back while it runs."""
-    from textual.app import SuspendNotSupported
-
     from veles.core.registry import ensure
+    from veles.tui.wizard.install import install_with_terminal
 
-    try:
-        with app.suspend():
-            return ensure.ensure_platform_interactive(name)
-    except SuspendNotSupported:
-        print(
-            f"can't install here — run `veles registry install {name}`, then add the channel",
-            file=sys.stderr,
-        )
-        return False
+    return install_with_terminal(
+        app,
+        lambda: ensure.ensure_platform_interactive(name),
+        hint=f"run `veles registry install {name}`, then add the channel",
+    )
 
 
 async def add_channel_via_modals(
