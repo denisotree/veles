@@ -706,6 +706,34 @@ def _check_events_health(project: Project | None) -> CheckResult:
     return CheckResult(name="events_health", status="ok", message=f"events.jsonl: {size} bytes")
 
 
+def _check_channel_platforms(project: Project | None) -> CheckResult:
+    """A channel declared in config whose platform module isn't installed. doctor
+    never installs — the next daemon start does (the config is the decision)."""
+    if project is None:
+        return CheckResult(name="channel_platforms", status="info", message="no active project")
+    from veles.core.registry.ensure import channel_needs, ref_for
+
+    try:
+        needs = channel_needs(project, None)
+    except Exception as exc:
+        return CheckResult(
+            name="channel_platforms", status="warn", message=f"could not check channels: {exc}"
+        )
+    if not needs:
+        return CheckResult(
+            name="channel_platforms", status="ok", message="declared channels have their modules"
+        )
+    names = ", ".join(n.name for n in needs)
+    refs = " ".join(ref_for(n) or n.name for n in needs)
+    return CheckResult(
+        name="channel_platforms",
+        status="warn",
+        message=f"channel declared but its module isn't installed: {names}",
+        fix_hint=f"it installs on the next `veles daemon start`, or now: "
+        f"`veles registry install {refs}`",
+    )
+
+
 def _check_extensions(project: Project | None) -> CheckResult:
     from veles.core.registry.maintenance import verify
     from veles.core.registry.repo import RegistryRepoError
@@ -808,6 +836,7 @@ def run_all(project: Project | None) -> DoctorReport:
         _check_events_health,
         _check_approval_audit,
         _check_extensions,
+        _check_channel_platforms,
     ]
     results: list[CheckResult] = [c() for c in no_arg]
     results.extend(c(project) for c in project_aware)

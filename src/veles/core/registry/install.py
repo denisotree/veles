@@ -80,10 +80,13 @@ def install(
     user_scope: bool = False,
     force: bool = False,
     confirmed: bool = False,
+    preapproved: bool = False,
 ) -> InstallRecord:
     """Install `found` plus whatever it `requires_extensions` that isn't installed
     yet — dependencies first, one confirmation for the whole set; a failure removes
-    everything this call installed. Returns `found`'s record."""
+    everything this call installed. Returns `found`'s record. `preapproved`: the
+    user already chose this (a channel declared in their config) — nothing is
+    asked, for the whole set."""
     plan = _plan(found, project, user_scope=user_scope)
     for item, scope in plan:
         _preflight(item, project, user_scope=scope, force=force)
@@ -93,7 +96,7 @@ def install(
     )
     # `confirmed`: the caller already showed `found` itself (e.g. `upgrade`) — a
     # dependency it never saw is still asked about.
-    to_confirm = plan[:-1] if confirmed else plan
+    to_confirm = [] if preapproved else (plan[:-1] if confirmed else plan)
     if to_confirm and not confirm_critical(op, "\n\n".join(describe(f) for f, _ in to_confirm)):
         raise InstallError("aborted")
     done: list[InstallRecord] = []

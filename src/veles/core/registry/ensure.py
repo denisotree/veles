@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
 MIGRATED_LAYOUTS = frozenset({"llm-wiki", "notes"})
 _OFFICIAL_ENGINES = frozenset({"wiki"})
+_OFFICIAL_PLATFORMS = frozenset({"telegram"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +37,14 @@ class EngineNeed:
     name: str
 
 
-Need = LayoutNeed | EngineNeed
+@dataclass(frozen=True, slots=True)
+class PlatformNeed:
+    """A channel declared in config whose platform no loaded module provides."""
+
+    name: str
+
+
+Need = LayoutNeed | EngineNeed | PlatformNeed
 
 _warned: set[Need] = set()
 
@@ -61,23 +69,44 @@ def ref_for(need: Need) -> str | None:
         return f"public:official/{need.name}"
     if isinstance(need, EngineNeed) and need.name in _OFFICIAL_ENGINES:
         return f"public:official/{need.name}"
+    if isinstance(need, PlatformNeed) and need.name in _OFFICIAL_PLATFORMS:
+        return f"public:official/{need.name}"
     return None
 
 
-def ensure_extension(need: Need, project: Project | None, *, interactive: bool) -> bool:
+def ensure_extension(
+    need: Need, project: Project | None, *, interactive: bool, auto: bool = False
+) -> bool:
     """True when `need` is met by installing it now; False (after one warning per
-    need per process) otherwise. Never raises."""
+    need per process) otherwise. Never raises.
+
+    `auto`: the user already decided (a channel declared in their config) — the
+    install runs without a terminal and without asking, and says what it installs
+    and why. Only from the user's connected registries and only an unambiguous
+    ref (`_spec`); anything else is a warning and nothing is installed."""
     try:
-        if not interactive:
+        if not interactive and not auto:
             _warn(need, ref_for(need) or need.name)
             return False
         spec = _spec(need)
         if spec is None:
             return False
         found = _resolve(spec)
-        print(f"{_label(need)} is not installed; it is in the registry as {found.ref}.")
-        # An engine module serves every project whose pack asks for it.
-        _install(found, project=project, user_scope=isinstance(need, EngineNeed))
+        if auto:
+            print(
+                f"installing {found.ref} {getattr(found.ext, 'version', '')}".rstrip()
+                + f" (declared in [channels.{need.name}])",
+                file=sys.stderr,
+            )
+        else:
+            print(f"{_label(need)} is not installed; it is in the registry as {found.ref}.")
+        # An engine or a channel platform serves every project that asks for it.
+        _install(
+            found,
+            project=project,
+            user_scope=isinstance(need, (EngineNeed, PlatformNeed)),
+            preapproved=auto,
+        )
         return True
     except Exception as exc:  # registry down, declined, bad manifest, anything at all
         _warn(need, ref_for(need) or need.name, reason=str(exc))
@@ -117,6 +146,37 @@ def layout_or_default(name: str, *, interactive: bool) -> str:
         return name
     print(f"Creating a {LAYOUT_DEFAULT!r} project instead of {name!r}.", file=sys.stderr)
     return LAYOUT_DEFAULT
+
+
+def channel_needs(project: Project, session: str | None = None) -> list[PlatformNeed]:
+    """Enabled channels declared for the daemon (`[channels.*]`, or a named
+    session's `[daemon.<s>.channels.*]`) whose platform no loaded module provides.
+    Kept apart from `needs_for`: that one runs at every REPL start, a channel
+    module is the daemon's business (and `veles channel`'s, and doctor's)."""
+    from veles.core.platforms import list_platforms
+    from veles.core.project_config import list_channel_configs, load_project_config
+
+    have = set(list_platforms())
+    declared = list_channel_configs(load_project_config(project), daemon_session=session)
+    return [PlatformNeed(name) for name, _ in declared if name not in have]
+
+
+def ensure_channel_platforms(project: Project, session: str | None = None) -> list[str]:
+    """Install (automatically — the config is the user's decision) the platform
+    module of every declared channel that lacks one, load what got installed into
+    the live module registry, and return the platforms still missing."""
+    from veles.core.module_loading import load_project_modules
+    from veles.core.modules import current_module_registry, set_module_registry
+
+    installed = False
+    for need in channel_needs(project, session):
+        installed = ensure_extension(need, None, interactive=False, auto=True) or installed
+    if installed:
+        live = current_module_registry()
+        registry = load_project_modules(project, into=live)
+        if live is None:
+            set_module_registry(registry)
+    return [n.name for n in channel_needs(project, session)]
 
 
 def install_hint(project: Project) -> str | None:
@@ -161,7 +221,8 @@ def _spec(need: Need) -> str | None:
         return need.name  # `resolve` reports a missing or ambiguous name
     from veles.core.registry import catalog
 
-    refs = catalog.providers_of(f"engine:{need.name}")
+    point = "platform" if isinstance(need, PlatformNeed) else "engine"
+    refs = catalog.providers_of(f"{point}:{need.name}")
     if len(refs) == 1:
         return refs[0]
     if refs:
@@ -177,15 +238,19 @@ def _resolve(spec: str) -> Any:
     return resolve(spec)
 
 
-def _install(found: Any, *, project: Project | None, user_scope: bool) -> None:
+def _install(
+    found: Any, *, project: Project | None, user_scope: bool, preapproved: bool = False
+) -> None:
     from veles.core.registry.install import install
 
-    install(found, project=project, user_scope=user_scope)
+    install(found, project=project, user_scope=user_scope, preapproved=preapproved)
 
 
 def _label(need: Need) -> str:
     if isinstance(need, LayoutNeed):
         return f"layout {need.name!r}"
+    if isinstance(need, PlatformNeed):
+        return f"channel platform {need.name!r}"
     return f"content engine {need.name!r}"
 
 
@@ -205,7 +270,10 @@ __all__ = [
     "MIGRATED_LAYOUTS",
     "EngineNeed",
     "LayoutNeed",
+    "PlatformNeed",
     "available_layouts",
+    "channel_needs",
+    "ensure_channel_platforms",
     "ensure_extension",
     "ensure_layout",
     "ensure_project_extensions",

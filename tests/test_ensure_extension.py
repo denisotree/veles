@@ -54,8 +54,12 @@ def fake_install(monkeypatch):
         calls.append(f"resolve {spec}")
         return SimpleNamespace(ref=spec, ext=SimpleNamespace(kind="layout"))
 
-    def install(found, *, project, user_scope):
-        calls.append(f"install {found.ref}" + (" --user" if user_scope else ""))
+    def install(found, *, project, user_scope, preapproved=False):
+        calls.append(
+            f"install {found.ref}"
+            + (" --user" if user_scope else "")
+            + (" --preapproved" if preapproved else "")
+        )
 
     monkeypatch.setattr(ensure, "_resolve", resolve)
     monkeypatch.setattr(ensure, "_install", install)
@@ -135,7 +139,7 @@ def test_offline_or_declined_is_false_with_one_warning(home, monkeypatch, capsys
 def test_install_error_never_escapes(home, monkeypatch, capsys) -> None:
     monkeypatch.setattr(ensure, "_resolve", lambda spec: SimpleNamespace(ref=spec))
 
-    def boom(found, *, project, user_scope):
+    def boom(found, *, project, user_scope, preapproved=False):
         raise RuntimeError("anything at all")
 
     monkeypatch.setattr(ensure, "_install", boom)
@@ -191,6 +195,85 @@ def test_ambiguous_engine_providers_install_nothing(
     assert fake_install == []
     err = capsys.readouterr().err
     assert "a:x/g" in err and "b:y/g" in err
+
+
+def test_platform_need_installs_for_the_user_without_asking(home, fake_install, capsys) -> None:
+    """A channel declared in config is an intent: its platform module installs
+    itself — user scope, no confirmation, one line saying what and why."""
+    from veles.core.registry.ensure import PlatformNeed, ref_for
+
+    assert ref_for(PlatformNeed("telegram")) == "public:official/telegram"
+    assert ensure_extension(PlatformNeed("telegram"), None, interactive=False, auto=True)
+    assert fake_install[-1] == "install public:official/telegram --user --preapproved"
+    assert "declared in [channels.telegram]" in capsys.readouterr().err
+
+
+def test_auto_install_refuses_ambiguous_and_unreachable(home, fake_install, monkeypatch, capsys):
+    from veles.core.registry import catalog
+    from veles.core.registry.ensure import PlatformNeed
+
+    monkeypatch.setattr(catalog, "providers_of", lambda token: ["a:x/s", "b:y/s"])
+    assert not ensure_extension(PlatformNeed("slackish"), None, interactive=False, auto=True)
+    assert fake_install == [] and "a:x/s" in capsys.readouterr().err
+
+    def unreachable(spec):
+        raise ResolveError("no registry named 'public'")
+
+    monkeypatch.setattr(ensure, "_resolve", unreachable)
+    ensure.reset_warnings()
+    assert not ensure_extension(PlatformNeed("telegram"), None, interactive=False, auto=True)
+    assert "public" in capsys.readouterr().err
+
+
+def test_channel_needs_lists_declared_platforms_without_a_module(home, fake_platform) -> None:
+    from veles.core.project_config import load_project_config, save_project_config
+    from veles.core.registry.ensure import PlatformNeed, channel_needs
+
+    project = init_project(home / "p", name="p", layout="bare")
+    cfg = load_project_config(project)
+    cfg["channels"] = {
+        "fake": {"enabled": True},
+        "ghost": {"enabled": True},
+        "off": {"enabled": False},
+    }
+    save_project_config(project, cfg)
+    assert channel_needs(project, None) == [PlatformNeed("ghost")]
+
+
+def test_doctor_names_a_declared_channel_without_its_module(home) -> None:
+    from veles.core.doctor import _check_channel_platforms
+    from veles.core.project_config import load_project_config, save_project_config
+
+    project = init_project(home / "p", name="p", layout="bare")
+    cfg = load_project_config(project)
+    cfg["channels"] = {"ghost": {"enabled": True}}
+    save_project_config(project, cfg)
+    result = _check_channel_platforms(project)
+    assert result.status == "warn" and "ghost" in result.message
+    assert "daemon start" in (result.fix_hint or "")
+
+
+def test_channel_run_installs_the_named_platform(home, monkeypatch) -> None:
+    """`veles channel run --channel X` names X explicitly — that is the decision."""
+    from veles.cli.commands import channel as channel_cmd
+
+    asked: list[tuple[str, bool]] = []
+
+    def fake_ensure(need, project, *, interactive, auto=False):
+        asked.append((need.name, auto))
+        return False
+
+    monkeypatch.setattr(ensure, "ensure_extension", fake_ensure)
+    args = SimpleNamespace(
+        channel_command="run",
+        channel="slackish",
+        secret=None,
+        daemon_url=None,
+        daemon_token="t",
+        project_root=None,
+    )
+    assert channel_cmd.cmd_channel(args) == 2  # not installed → unknown platform
+    assert asked == [("slackish", True)]
 
 
 def test_ensure_layout_true_for_an_installed_pack(home) -> None:

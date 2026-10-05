@@ -76,6 +76,20 @@ def test_dependency_installs_first_under_one_confirmation(remote, asked, tmp_pat
     assert "private:official/engine" in asked[0] and "private:official/pack" in asked[0]
 
 
+def test_preapproved_install_asks_nothing(remote, tmp_path) -> None:
+    """Auto-installing a config-declared channel: the whole chain, no prompt."""
+
+    def never(op: str, summary: str) -> bool:
+        raise AssertionError("a preapproved install must not ask")
+
+    token = set_critical_confirmer(never)
+    try:
+        install(resolve("pack"), project=init_project(tmp_path / "p", name="p"), preapproved=True)
+    finally:
+        reset_critical_confirmer(token)
+    assert _names() == {"pack", "engine"}
+
+
 def test_installed_dependency_is_not_reinstalled(remote, asked, tmp_path) -> None:
     project = init_project(tmp_path / "p", name="p", layout="bare")
     install(resolve("engine"), project=project, user_scope=True)

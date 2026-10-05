@@ -148,6 +148,14 @@ def _cmd_channel_list(args: argparse.Namespace) -> int:
 
 def _cmd_channel_run(args: argparse.Namespace) -> int:
     channel = args.channel
+    if channel not in list_platforms():
+        # Naming the channel explicitly is the decision: install its platform.
+        from veles.core.module_loading import load_user_modules
+        from veles.core.modules import current_module_registry
+        from veles.core.registry.ensure import PlatformNeed, ensure_extension
+
+        if ensure_extension(PlatformNeed(channel), None, interactive=False, auto=True):
+            load_user_modules(into=current_module_registry())
     try:
         spec = get_platform(channel)
     except KeyError as exc:
