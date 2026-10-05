@@ -209,6 +209,41 @@ def test_module_tests_run(tmp_path: Path) -> None:
     assert validate_registry(root).ok  # without --run-code the module never executes
 
 
+def test_validate_runs_async_extension_tests(tmp_path: Path) -> None:
+    """A failing `async def` test must turn validate red — not be skipped with a
+    warning for want of an asyncio plugin, the way a channel module's tests
+    (mostly async) would otherwise pass CI untested."""
+    root = write_registry(tmp_path / "r")
+    files = {**_MODULE_FILES, "tests/test_async.py": "async def test_x():\n    assert False\n"}
+    write_extension(
+        root,
+        "official",
+        "demo",
+        kind="module",
+        extra_ext='provides = ["hook:pre_turn"]',
+        files=files,
+    )
+    assert any("tests failed" in e for e in validate_registry(root, run_code=True).errors)
+
+
+def test_validate_runs_a_passing_async_extension_test(tmp_path: Path) -> None:
+    """…and a correct `async def` test passes: the tests are actually run
+    (asyncio mode on), not reported as unrunnable coroutines."""
+    root = write_registry(tmp_path / "r")
+    body = "import asyncio\n\nasync def test_x():\n    await asyncio.sleep(0)\n"
+    files = {**_MODULE_FILES, "tests/test_async.py": body}
+    write_extension(
+        root,
+        "official",
+        "demo",
+        kind="module",
+        extra_ext='provides = ["hook:pre_turn"]',
+        files=files,
+    )
+    report = validate_registry(root, run_code=True)
+    assert report.ok, report.errors
+
+
 def test_module_tests_pass(tmp_path: Path) -> None:
     root = write_registry(tmp_path / "r")
     files = {**_MODULE_FILES, "tests/test_ok.py": "def test_x():\n    assert True\n"}

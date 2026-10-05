@@ -444,6 +444,12 @@ def _run_module(
                 "-q",
                 "-p",
                 "no:cacheprovider",
+                # Async tests (a channel module's are mostly async) must run, not
+                # fail as unhandled coroutines; a missing plugin is an error.
+                "-p",
+                "asyncio",
+                "-o",
+                "asyncio_mode=auto",
                 "-c",
                 "/dev/null",
                 "--confcutdir",
