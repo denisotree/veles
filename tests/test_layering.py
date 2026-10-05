@@ -36,8 +36,6 @@ _KNOWN: frozenset[tuple[str, str]] = frozenset(
     {
         # Self-knowledge: describes the CLI surface by walking its parser.
         ("veles.core.knowledge.skeleton", "veles.cli._parsers"),
-        # Config validation knows which keys each registered channel accepts.
-        ("veles.core.config_schema", "veles.channels.platform_registry"),
     }
 )
 

@@ -136,14 +136,13 @@ async def _handle_list_channels(request: web.Request) -> web.Response:
        evidence that a channel has been used. Each platform reports its
        persisted chat count.
     """
-    from veles.channels.platform_registry import ensure_builtins_registered, list_platforms
     from veles.core.chat_sessions import (
         SessionMap,
         channel_session_path,
         default_channels_dir,
     )
+    from veles.core.platforms import list_platforms
 
-    ensure_builtins_registered()
     platforms = list_platforms()
     channels_dir = default_channels_dir()
     out: list[dict[str, Any]] = []

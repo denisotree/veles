@@ -41,6 +41,20 @@ def _write_config(project, body: str) -> None:
     cfg.write_text(body, encoding="utf-8")
 
 
+def test_daemon_builds_a_module_platform_from_context(state: DaemonState, fake_platform) -> None:
+    """`[channels.fake]` + a keychain token → the gateway is built through
+    `spec.build(ctx)`: config and secrets arrive in the context, no platform branch."""
+    from veles.daemon.channels import _build_channel_gateway
+
+    set_provider_key("fake", "tok", project=state.project.name)
+    gw = _build_channel_gateway(
+        "fake", {"enabled": True, "room": "r1"}, backend=object(), state=state
+    )
+    assert gw is not None
+    assert gw.ctx.config["room"] == "r1" and gw.ctx.secrets == {"token": "tok"}
+    assert gw.ctx.project is state.project and gw.ctx.name == "fake"
+
+
 def test_no_config_means_no_channel_runners(state: DaemonState) -> None:
     start_channel_runners(state)
     assert state.channel_runners == []
@@ -68,7 +82,7 @@ def test_enabled_but_no_token_skipped(state: DaemonState, caplog) -> None:
     assert state.channel_runners == []
     # M110: warning now lands in the logger (and the daemon log file),
     # not on stderr — that's how the picker's log view will surface it.
-    assert any("no bot token" in rec.message for rec in caplog.records)
+    assert any("missing bot_token" in rec.message for rec in caplog.records)
 
 
 async def test_enabled_with_keychain_token_starts_gateway(state: DaemonState, monkeypatch) -> None:

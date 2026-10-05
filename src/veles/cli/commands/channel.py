@@ -23,17 +23,13 @@ import sys
 import time
 
 from veles.channels.daemon_client import DaemonClient, DaemonClientError
-from veles.channels.platform_registry import (
-    ensure_builtins_registered,
-    get_platform,
-    list_platforms,
-)
+from veles.core.channel_setup import resolve_secrets
 from veles.core.chat_sessions import SessionMap, channel_session_path
 from veles.core.defaults import DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT
+from veles.core.platforms import get_platform, list_platforms
 
 
 def cmd_channel(args: argparse.Namespace) -> int:
-    ensure_builtins_registered()
     sub = args.channel_command
     if sub == "run":
         return _cmd_channel_run(args)
@@ -98,24 +94,10 @@ def _cmd_channel_list(_args: argparse.Namespace) -> int:
 def _cmd_channel_run(args: argparse.Namespace) -> int:
     channel = args.channel
     try:
-        entry = get_platform(channel)
+        spec = get_platform(channel)
     except KeyError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-
-    # Telegram is the only built-in M52 channel; honour its bot-token contract
-    # explicitly. Other platforms (registered via plugins) handle their own
-    # flag parsing inside their factories.
-    if channel == "telegram":
-        bot_token = args.bot_token or os.environ.get("TELEGRAM_BOT_TOKEN")
-        if not bot_token:
-            print(
-                "error: --bot-token or TELEGRAM_BOT_TOKEN env var is required",
-                file=sys.stderr,
-            )
-            return 2
-    else:
-        bot_token = args.bot_token or os.environ.get("TELEGRAM_BOT_TOKEN") or ""
 
     daemon_url = (
         args.daemon_url
@@ -158,12 +140,42 @@ def _cmd_channel_run(args: argparse.Namespace) -> int:
         set_active_project(project)
         install_vision_adapter(project)
 
-    return asyncio.run(_run_gateway(entry.factory, channel, bot_token, daemon_url, daemon_token))
+    config = _channel_config(project, channel)
+    secrets, missing = resolve_secrets(spec, channel, config, project=project, use_env=True)
+    first_secret = next((f for f in spec.cred_fields if f.secret), None)
+    if args.bot_token and first_secret is not None:
+        secrets[first_secret.key] = args.bot_token
+        missing = [k for k in missing if k != first_secret.key]
+    if missing:
+        hints = ["--bot-token" if first_secret and k == first_secret.key else k for k in missing]
+        envs = [f.env for f in spec.cred_fields if f.key in missing and f.env]
+        print(
+            f"error: {channel} needs {', '.join(missing)} — pass {', '.join(hints)}"
+            + (f", set {', '.join(envs)}" if envs else "")
+            + f", or store it with `veles channel add {channel}`",
+            file=sys.stderr,
+        )
+        return 2
+
+    return asyncio.run(
+        _run_gateway(spec, channel, secrets, config, daemon_url, daemon_token, project)
+    )
+
+
+def _channel_config(project, channel: str) -> dict:
+    """The channel's `[channels.<name>]` block, or {} outside a project."""
+    if project is None:
+        return {}
+    from veles.core.project_config import get_section, load_project_config
+
+    return dict(get_section(load_project_config(project), "channels", channel))
 
 
 async def _run_gateway(
-    factory, channel: str, bot_token: str, daemon_url: str, daemon_token: str
+    spec, channel: str, secrets, config, daemon_url: str, daemon_token: str, project
 ) -> int:
+    from veles.core.platforms import ChannelContext
+
     session_map = SessionMap.load(channel_session_path(channel))
     async with DaemonClient(daemon_url, daemon_token) as client:
         try:
@@ -171,15 +183,19 @@ async def _run_gateway(
         except DaemonClientError as exc:
             print(f"error: daemon health-check failed: {exc}", file=sys.stderr)
             return 1
-        project = health.get("project", "?")
         print(
-            f"channel: {channel} → daemon {daemon_url} (project: {project})",
+            f"channel: {channel} → daemon {daemon_url} (project: {health.get('project', '?')})",
             file=sys.stderr,
         )
-        gateway = factory(
-            bot_token=bot_token,
-            daemon_client=client,
-            session_map=session_map,
+        gateway = spec.build(
+            ChannelContext(
+                name=channel,
+                config=config,
+                secrets=secrets,
+                backend=client,
+                session_map=session_map,
+                project=project,
+            )
         )
         try:
             await gateway.start()

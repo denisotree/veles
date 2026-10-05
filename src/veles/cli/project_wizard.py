@@ -156,15 +156,10 @@ def _step_channel(project: Project, prompter: Prompter) -> None:
     by `veles channel add` and the TUI flows, so no telegram is hardcoded. The
     type prompt is always shown (even with one platform): it is the seam new
     channels register on."""
-    from veles.channels.platform_registry import (
-        ensure_builtins_registered,
-        get_platform,
-        list_platforms,
-    )
     from veles.cli.channel_wizard import apply_channel, collect_channel_fields
+    from veles.core.platforms import get_platform, list_platforms
     from veles.core.secrets import KeyringUnavailable
 
-    ensure_builtins_registered()
     platforms = tuple(list_platforms())
     if not platforms:
         return

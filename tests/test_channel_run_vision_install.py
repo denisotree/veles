@@ -22,9 +22,6 @@ from veles.modules.vision import get_vision_adapter, reset_vision_adapter
 
 @pytest.fixture(autouse=True)
 def _clean(monkeypatch: pytest.MonkeyPatch):
-    from veles.channels.platform_registry import ensure_builtins_registered
-
-    ensure_builtins_registered()
     reset_vision_adapter()
     token = set_active_project(None)
     monkeypatch.setattr(channel_cmd.asyncio, "run", lambda coro: coro.close() or 0)

@@ -85,8 +85,6 @@ _BASELINE = frozenset(
         # Validates curated knowledge notes' `related` refs — the check lives
         # in the knowledge freshness test.
         "skeleton_ref_index",
-        # Test cleanup for the platform registry, like the `reset_` hooks.
-        "unregister_platform",
     }
 )
 

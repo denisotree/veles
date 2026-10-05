@@ -106,8 +106,8 @@ def test_remove_absent_channel_errors(tmp_path: Path):
 
 
 def test_collect_channel_fields_splits_secret_and_config():
-    from veles.channels.platform_registry import get_platform
     from veles.cli.channel_wizard import collect_channel_fields
+    from veles.core.platforms import get_platform
 
     entry = get_platform("telegram")
     ask = _scripted_prompter({"bot token": "123:ABC", "chat ids": "1, 2"})
@@ -117,8 +117,8 @@ def test_collect_channel_fields_splits_secret_and_config():
 
 
 def test_collect_channel_fields_required_blank_returns_none():
-    from veles.channels.platform_registry import get_platform
     from veles.cli.channel_wizard import collect_channel_fields
+    from veles.core.platforms import get_platform
 
     entry = get_platform("telegram")
     assert collect_channel_fields(entry, _scripted_prompter({"bot token": ""})) is None

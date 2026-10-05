@@ -8,7 +8,7 @@ the synchronous `collect_channel_fields` in `cli/channel_wizard.py`: same
 platform registry, same `CredField` labels, same `(secrets, config_fields)`
 shape feeding `apply_channel`. So all four channel-setup flows (`channel add`,
 picker, stdin wizard, TUI wizard) stay in lockstep — adding a channel platform
-needs zero wizard code, only a `platform_registry` entry.
+needs zero wizard code, only a module contributing the `platform`.
 
 The channel-type `ChoiceScreen` is ALWAYS shown, even with a single registered
 platform: the "pick a type, then configure it" shape is the point — it is the
@@ -38,16 +38,11 @@ async def collect_channel_via_modals(app: App, *, title: str) -> CollectResult |
     `secret=True` creds) are kept apart from plain config fields so the caller
     can route them to the keychain vs the config block via `apply_channel`.
     """
-    from veles.channels.platform_registry import (
-        ensure_builtins_registered,
-        get_platform,
-        list_platforms,
-    )
+    from veles.core.platforms import get_platform, list_platforms
     from veles.tui.wizard.screens.choice import ChoiceItem, ChoiceScreen
     from veles.tui.wizard.screens.input import InputScreen
     from veles.tui.wizard.step import CANCEL_SENTINEL
 
-    ensure_builtins_registered()
     platforms = list_platforms()
     if not platforms:
         return None

@@ -10,7 +10,6 @@ surfaces them as errors.
 
 from __future__ import annotations
 
-import veles.channels.telegram  # noqa: F401 -- registers the telegram platform
 from veles.core.config_schema import validate_config
 
 
@@ -48,17 +47,18 @@ def test_mcp_server_unknown_key_flagged() -> None:
     assert any(f.key == "comand" and f.section == "mcp.servers.gh" for f in findings)
 
 
-def test_validator_self_registers_builtin_platforms() -> None:
-    """Live 2026-07-09: `veles daemon start` validates the config BEFORE
-    anything imports a channel module, so the platform registry was empty,
-    `get_platform` raised, and the validator degraded to base keys — flagging
-    the legitimate `whitelist` the channel wizard itself wrote ("unknown key
-    'whitelist' … a security control may be disabled"). The validator must
-    bootstrap the builtin registry itself."""
-    from veles.channels.platform_registry import _reset_registry_for_tests
+def test_platform_declared_keys_are_known(fake_platform) -> None:
+    """A platform's cred fields and its declared `config_keys` are not typos —
+    live 2026-07-09 the validator flagged `whitelist` the wizard itself wrote, and
+    until 1.2.5 it flagged Telegram's `debounce_seconds` the daemon reads."""
+    cfg = {"channels": {"fake": {"enabled": True, "token": "x", "room": "r"}}}
+    assert validate_config(cfg) == []
+    cfg = {"channels": {"fake": {"enabled": True, "rooom": "r"}}}
+    assert [f.key for f in validate_config(cfg)] == ["rooom"]
 
-    _reset_registry_for_tests()  # simulate a fresh process, no channel imports
-    cfg = {"channels": {"telegram": {"enabled": True, "bot_token": "x", "whitelist": ["@a"]}}}
+
+def test_telegram_debounce_keys_are_known() -> None:
+    cfg = {"channels": {"telegram": {"enabled": True, "whitelist": ["1"], "debounce_seconds": 2}}}
     assert validate_config(cfg) == []
 
 

@@ -8,8 +8,14 @@ implement it. It lives in core so `veles.sdk` can hand it to channel modules.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from typing import Any, Protocol, runtime_checkable
+from collections.abc import AsyncIterator, Callable, Mapping
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+
+from veles.core.chat_sessions import SessionMap
+
+if TYPE_CHECKING:
+    from veles.core.project import Project
 
 
 class RunBackendError(RuntimeError):
@@ -77,4 +83,88 @@ class RunBackend(Protocol):
         ...
 
 
-__all__ = ["RunBackend", "RunBackendError"]
+@dataclass(frozen=True, slots=True)
+class CredField:
+    """One credential or setting the add-channel wizard collects for a platform.
+
+    `secret=True` → kept in the keychain (`core/channel_setup.py` names the slot),
+    else written to the channel's config block. `list_value=True` → the
+    comma-separated answer is split into a list (e.g. a whitelist). `env` → the
+    environment variable `veles channel run` reads the value from."""
+
+    key: str
+    label: str
+    secret: bool = False
+    list_value: bool = False
+    required: bool = False
+    env: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ChannelCaps:
+    """What core needs to know about a platform. `asks_questions`: its gateway
+    renders trust/approval/`ask_user` prompts and returns the answer."""
+
+    asks_questions: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ChannelContext:
+    """Everything a platform's gateway is built from."""
+
+    name: str
+    config: Mapping[str, Any]  # [channels.<name>] or [daemon.<s>.channels.<name>]
+    secrets: Mapping[str, str]  # the platform's secret fields, resolved
+    backend: RunBackend
+    session_map: SessionMap
+    project: Project | None  # None for `veles channel run` outside a project
+
+
+class ChannelGateway(Protocol):
+    async def start(self) -> None: ...
+
+    async def stop(self) -> None: ...
+
+    async def deliver(self, chat_id: str, text: str, thread_id: str | None = None) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class PlatformSpec:
+    """A messaging platform, contributed by a module under the `platform` point."""
+
+    build: Callable[[ChannelContext], ChannelGateway]
+    caps: ChannelCaps = ChannelCaps()
+    cred_fields: tuple[CredField, ...] = ()
+    config_keys: frozenset[str] = frozenset()  # channel config keys besides cred_fields
+
+
+def _specs() -> dict[str, PlatformSpec]:
+    from veles.core.contributions import contributions
+
+    return {c.name: c.obj for c in contributions("platform") if isinstance(c.obj, PlatformSpec)}
+
+
+def get_platform(name: str) -> PlatformSpec:
+    """The spec a loaded module contributes for `name`; KeyError lists what there is."""
+    specs = _specs()
+    if name not in specs:
+        available = ", ".join(sorted(specs)) or "(none)"
+        raise KeyError(f"no channel platform {name!r}; available: {available}")
+    return specs[name]
+
+
+def list_platforms() -> list[str]:
+    return sorted(_specs())
+
+
+__all__ = [
+    "ChannelCaps",
+    "ChannelContext",
+    "ChannelGateway",
+    "CredField",
+    "PlatformSpec",
+    "RunBackend",
+    "RunBackendError",
+    "get_platform",
+    "list_platforms",
+]

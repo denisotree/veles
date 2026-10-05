@@ -374,3 +374,14 @@ def wiki_engine(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
     finally:
         reset_module_registry(token)
         clear_engine_cache()
+
+
+@pytest.fixture
+def fake_platform() -> Iterator[None]:
+    """A live module registry contributing the test platform `fake`
+    (`tests/channels/fake_platform.py`) — core's side of a channel without a
+    real messaging platform."""
+    from tests.channels.fake_platform import FAKE_SPEC, contributing
+
+    with contributing({"fake": FAKE_SPEC}):
+        yield

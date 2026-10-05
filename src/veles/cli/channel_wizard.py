@@ -2,9 +2,9 @@
 
 Reuses the universal `Prompter` abstraction from `cli/wizard.py` (VISION §7): no
 new question machinery. A platform's `cred_fields` descriptor
-(`channels/platform_registry.py`) drives the prompts, so adding a new channel
-type needs zero wizard code — register the platform with its fields and the
-wizard handles it. Secrets go to the keychain (`core/secrets.set_provider_key`);
+(`core/platforms.py`, contributed by the platform's module) drives the prompts,
+so adding a new channel type needs zero wizard code. Secrets go to the keychain
+(`core/secrets.set_provider_key`);
 non-secret fields land in the channel's config block — global `[channels.<type>]`
 for the unnamed daemon, or `[daemon.<name>.channels.<type>]` for a named session.
 """
@@ -59,14 +59,9 @@ def add_channel(
     `session`/`channel` pre-fill the corresponding wizard steps when given;
     otherwise the user is asked. Creds are always collected via the prompter so
     secrets never land in argv/history."""
-    from veles.channels.platform_registry import (
-        ensure_builtins_registered,
-        get_platform,
-        list_platforms,
-    )
     from veles.cli.wizard import _ask_choice
+    from veles.core.platforms import get_platform, list_platforms
 
-    ensure_builtins_registered()
     ask = _resolve_prompter(prompter)
     cfg = load_project_config(project)
 

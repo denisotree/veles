@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
-from veles.channels.platform_registry import get_platform
 from veles.core.delivery_target import DeliveryTarget
 
 
@@ -53,15 +52,8 @@ class DeliveryRouter:
         assert tgt.platform is not None and tgt.chat_id is not None
         deliverer = self._deliverers.get(tgt.platform)
         if deliverer is None:
-            # No explicit deliverer wired — look up via the platform registry.
-            try:
-                get_platform(tgt.platform)
-            except KeyError as exc:
-                raise DeliveryError(str(exc)) from exc
-            raise DeliveryError(
-                f"platform {tgt.platform!r} is registered but no deliverer is wired; "
-                "call DeliveryRouter.register_deliverer() before delivering"
-            )
+            # Only a running channel registers a deliverer (`start_channel_runners`).
+            raise DeliveryError(f"no {tgt.platform!r} channel is running in this daemon")
         await deliverer(tgt.chat_id, text, tgt.thread_id)
         return {"kind": "platform", "platform": tgt.platform, "delivered": True}
 
