@@ -121,7 +121,7 @@ class LocalOpenAIBase(OpenAICompatibleProvider):
         server holds many. A llama.cpp server holds exactly one, given at
         startup, and since b~10000 `--jinja` is on by default, so the answer is a
         property of the *server's* loaded template, not of any name the caller
-        passes. The parameter exists to satisfy the `_apply_local_tool_policy`
+        passes. The parameter exists to satisfy the `apply_local_tool_policy`
         probe signature.
 
         Both flags are required: `supports_tools` means the template can accept

@@ -124,13 +124,14 @@ def validate_engine(cfg: dict[str, Any]) -> list[ConfigFinding]:
     The second is invisible to the reader — "no `[engine.request]`" is also the
     normal state of every project without a pin — so it can only be caught here,
     one level up, as an unknown key under `[engine]`."""
-    from veles.core.providers import PROVIDER_VALUES
+    from veles.core.providers import list_providers
 
+    known = tuple(list_providers())
     findings = _check("engine", get_section(cfg, "engine"), _ENGINE_KNOWN)
     findings += [
-        ConfigFinding(section="engine.request", key=key, known=PROVIDER_VALUES)
+        ConfigFinding(section="engine.request", key=key, known=known)
         for key in sorted(get_section(cfg, "engine", "request"))
-        if key not in PROVIDER_VALUES
+        if key not in known
     ]
     return findings
 

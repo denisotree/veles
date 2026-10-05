@@ -10,7 +10,7 @@ Triggers from `cli/__init__.py::main` when ALL of:
 
 Asks three things and writes `~/.veles/config.toml`:
 1. Preferred language (`en` / `ru`) — recorded for future UI strings.
-2. Default LLM provider — bare-list choice from `_PROVIDER_CHOICES`.
+2. Default LLM provider — bare-list choice from the provider catalogue.
 3. (Soft hint only) which API-key env var to set; **NEVER persists keys**.
 
 Optional first-project name field exists in the schema but the wizard
@@ -31,7 +31,7 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass
 
 from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
-from veles.core.providers import PROVIDER_VALUES as _PROVIDER_CHOICES
+from veles.core.providers import list_providers
 from veles.core.user_config import (
     UserConfig,
     save_user_config,
@@ -92,7 +92,7 @@ def run_wizard() -> WizardResult:
     provider = _ask_choice(
         prompter,
         "Default LLM provider",
-        _PROVIDER_CHOICES,
+        tuple(list_providers()),
         default="openrouter",
     )
     _hint_about_api_key(provider)

@@ -15,8 +15,6 @@ from __future__ import annotations
 import contextlib
 from dataclasses import dataclass
 
-from veles.core.providers import ALL_PROVIDERS as _ALL_PROVIDERS
-from veles.core.providers import tui_label
 from veles.tui.wizard.screens import (
     ChoiceScreen,
     ConfirmScreen,
@@ -35,7 +33,11 @@ _LANGUAGES = [
     ChoiceItem(label="Русский", value="ru"),
 ]
 
-_PROVIDERS = [ChoiceItem(label=tui_label(spec), value=spec.value) for spec in _ALL_PROVIDERS]
+
+def _provider_items() -> list[ChoiceItem]:
+    from veles.core.providers import list_providers, tui_label
+
+    return [ChoiceItem(label=tui_label(name), value=name) for name in list_providers()]
 
 
 # ---------------- Step 1: Language ----------------
@@ -74,7 +76,7 @@ class ProviderStep:
         result = await ctx.app.push_screen_wait(
             ChoiceScreen(
                 title=self.title,
-                items=_PROVIDERS,
+                items=_provider_items(),
                 subtitle=("Veles can talk to any of these. You can override per-project later."),
                 default=ctx.answers.get("default_provider", "openrouter"),
             )

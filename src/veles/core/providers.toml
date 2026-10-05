@@ -1,0 +1,55 @@
+# The providers Veles ships, in the order wizards show them. `kind` picks the
+# adapter that builds an entry (core/provider_kinds.py); the other keys are its
+# settings. A user adds or overrides entries in ~/.veles/providers.toml — kinds
+# `openai-api` (a hosted OpenAI-compatible API) and `local` (a server you run).
+
+[providers.openrouter]
+label = "OpenRouter"
+tagline = "multi-model gateway"
+kind = "openrouter"
+base_url = "https://openrouter.ai/api/v1"
+key_env = ["OPENROUTER_API_KEY"]
+
+[providers.anthropic]
+label = "Anthropic"
+tagline = "Claude direct"
+kind = "anthropic"
+key_env = ["ANTHROPIC_API_KEY"]
+
+[providers.openai]
+label = "OpenAI"
+tagline = "GPT direct"
+kind = "openai"
+base_url = "https://api.openai.com/v1"
+key_env = ["OPENAI_API_KEY"]
+
+[providers.gemini]
+label = "Google Gemini"
+kind = "gemini"
+key_env = ["GEMINI_API_KEY", "GOOGLE_API_KEY"]
+
+[providers.claude-cli]
+label = "Claude CLI"
+tagline = "subprocess"
+kind = "claude-cli"
+
+[providers.ollama]
+label = "Ollama"
+tagline = "local, no key"
+kind = "ollama"
+base_url = "http://localhost:11434/v1"
+base_url_env = "OLLAMA_BASE_URL"
+
+[providers.llamacpp]
+label = "llama.cpp"
+tagline = "local, no key"
+kind = "llamacpp"
+base_url = "http://localhost:8080/v1"
+base_url_env = "LLAMACPP_BASE_URL"
+
+[providers.openai-compat]
+label = "OpenAI-compatible"
+tagline = "custom endpoint"
+kind = "local"
+base_url_env = "OPENAI_COMPAT_BASE_URL"
+key_env = ["OPENAI_COMPAT_API_KEY"]

@@ -38,7 +38,6 @@ from veles.core.project_config import (
 from veles.core.project_config import (
     save_project_config as _save_project_toml,
 )
-from veles.core.providers import ALL_PROVIDERS as _ALL_PROVIDERS
 from veles.tui.wizard.screens import (
     ChoiceScreen,
     ConfirmScreen,
@@ -55,9 +54,12 @@ from veles.tui.wizard.step import (
     outcome_from_dismiss,
 )
 
-# Project picker keeps labels compact — the user has seen the tagline
-# explanations in the first-run wizard already.
-_PROVIDER_CHOICES = [ChoiceItem(label=spec.label, value=spec.value) for spec in _ALL_PROVIDERS]
+
+def _provider_choices() -> list[ChoiceItem]:
+    # The project picker keeps labels compact — taglines were in the first-run wizard.
+    from veles.core.providers import get_provider, list_providers
+
+    return [ChoiceItem(label=get_provider(n).label, value=n) for n in list_providers()]
 
 
 # ---------------- Step 1: Bootstrap ----------------
@@ -147,7 +149,7 @@ class ProviderOverrideStep:
         picked = await ctx.app.push_screen_wait(
             ChoiceScreen(
                 title=self.title,
-                items=_PROVIDER_CHOICES,
+                items=_provider_choices(),
                 subtitle=t("project_wizard.ask_provider_label"),
                 default=default_provider,
             )
