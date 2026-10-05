@@ -152,6 +152,42 @@ def _check_user_config() -> CheckResult:
     return CheckResult(name="user_config", status="ok", message=f"{cfg} parses cleanly")
 
 
+def _check_provider_catalog(project: Project | None = None) -> CheckResult:
+    """The user catalogue reads cleanly and every provider the config routes to is
+    in the catalogue (a registry-offered one installs on the next run)."""
+    from veles.core.providers import RETIRED, catalog, find_provider, user_catalog_problems
+    from veles.core.routing.ensemble import KNOWN_TASKS, effective_route
+
+    problems = user_catalog_problems()
+    named: set[str] = set()
+    if project is not None:
+        for task in KNOWN_TASKS:
+            try:
+                named.add(effective_route(task, project)[0])
+            except Exception:
+                continue
+    retired = sorted(n for n in named if n in RETIRED)
+    missing = sorted(n for n in named if n not in RETIRED and find_provider(n) is None)
+    details: dict[str, object] = {"catalogue": problems, "missing": missing}
+    if retired:
+        return CheckResult(
+            name="provider_catalog", status="error", message=RETIRED[retired[0]], details=details
+        )
+    if missing or problems:
+        what = f"not in the catalogue: {', '.join(missing)}" if missing else problems[0]
+        return CheckResult(
+            name="provider_catalog",
+            status="warn",
+            message=what,
+            fix_hint="a registry module installs on the next run if one provides it; "
+            "otherwise fix the name or add it to ~/.veles/providers.toml",
+            details=details,
+        )
+    return CheckResult(
+        name="provider_catalog", status="ok", message=f"{len(catalog())} providers in the catalogue"
+    )
+
+
 def _check_provider_keys(project: Project | None = None) -> CheckResult:
     """Which providers have a key, checked where the runtime looks for one.
 
@@ -826,6 +862,7 @@ def run_all(project: Project | None) -> DoctorReport:
     project_aware: list[Callable[[Project | None], CheckResult]] = [
         # Project-aware because the runtime resolves a key per project scope.
         _check_provider_keys,
+        _check_provider_catalog,
         _check_active_project,
         _check_config_schema,
         _check_memory_fts,

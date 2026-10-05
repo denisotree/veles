@@ -190,6 +190,16 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     # silently ignored them and always bound the argparse default).
     _resolve_daemon_bind(args, project, name)
 
+    # Release C: a daemon hosts channels, and a channel's platform comes from a
+    # module. Load the modules and install the platform of every channel the
+    # config declares (the config is the user's decision) — first, so a provider
+    # a loaded module contributes is in the catalogue for the checks below.
+    _prepare_channels(project, name)
+    from veles.core.registry.ensure import ensure_routed_providers
+
+    # Release E: a provider the config routes to and a registry offers installs.
+    ensure_routed_providers(project)
+
     # M130: resolve via the unified cascade (project [engine] → user
     # [user] → DEFAULT) so the API-key check targets the provider the
     # daemon will actually boot on — not a bare `args.provider` that is
@@ -218,13 +228,9 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     # continuous curator on `args.provider`; a bare None silently disables it.
     args.provider = provider_name
 
-    # Release C: a daemon hosts channels, and a channel's platform comes from a
-    # module. Load the modules, install the platform of every channel the config
-    # declares (the config is the user's decision), then refuse to start with no
-    # channel ready. The parent checks before it detaches; the `--foreground`
-    # child checks again — it is the authority for paths without a terminal
-    # (picker, wizard autostart, systemd).
-    _prepare_channels(project, name)
+    # Refuse to start with no channel ready. The parent checks before it
+    # detaches; the `--foreground` child checks again — it is the authority for
+    # paths without a terminal (picker, wizard autostart, systemd).
     # After the modules: a channel block's keys are known only from its platform.
     _warn_on_security_config_typos(project)
 

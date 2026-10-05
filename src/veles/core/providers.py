@@ -225,6 +225,19 @@ def tui_label(name: str) -> str:
     return f"{spec.label} ({spec.tagline})" if spec.tagline else spec.label
 
 
+def user_catalog_problems() -> list[str]:
+    """What is wrong with ~/.veles/providers.toml: parse errors, a kind a user
+    entry can't use, an `openai-api` entry without `base_url`."""
+    problems = _entries()[1]
+    user, _ = _user_entries()
+    problems += [
+        f"{user_catalog_path()}: [providers.{n}] has no base_url"
+        for n, e in user.items()
+        if e.get("kind") == "openai-api" and not e.get("base_url")
+    ]
+    return problems
+
+
 def openai_wire_endpoint(name: str) -> tuple[str | None, str]:
     """`(base_url, api_key)` of an OpenAI-wire provider — vision and embeddings
     build their own SDK client from it. `base_url=None` means the SDK default."""
@@ -256,4 +269,5 @@ __all__ = [
     "openai_wire_endpoint",
     "tui_label",
     "user_catalog_path",
+    "user_catalog_problems",
 ]

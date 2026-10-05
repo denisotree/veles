@@ -126,6 +126,10 @@ def _run_in_project(args, command, modules=None) -> int:
     if ensure_project_extensions(project, interactive=interactive):
         # Only what was just installed loads — the live registry is already set.
         _load_project_modules(project, loaded)
+    from veles.core.registry.ensure import ensure_routed_providers
+
+    # A provider the config routes to and a registry offers installs itself.
+    ensure_routed_providers(project)
     try:
         return command(args, project)
     finally:

@@ -14,19 +14,40 @@ def confirm(prompt: str) -> bool:
     return answer in {"y", "yes"}
 
 
-def ensure_api_key(provider: str = "openrouter", *, project: str | None = None) -> bool:
-    """Check that a key is reachable for `provider`; print an error if not.
+def check_provider(provider: str) -> bool:
+    """The provider exists — in the catalogue, or installed now from the user's
+    registries because a flag or the config named it. Prints why not."""
+    from veles.core.providers import RETIRED, list_providers
+    from veles.core.registry.ensure import ensure_provider
 
-    Providers without an API key (local, CLI-delegating) always pass. The lookup
-    is `core.provider_factory.has_api_key`: keychain (project scope), keychain
-    (default scope), then env vars.
+    if ensure_provider(provider, reason="named in [engine] provider or with --provider"):
+        return True
+    if provider in RETIRED:
+        print(f"error: {RETIRED[provider]}", file=sys.stderr)
+        return False
+    print(
+        f"error: unknown provider {provider!r}; available: {', '.join(list_providers())} "
+        "— more from your registries: `veles registry search --kind module`",
+        file=sys.stderr,
+    )
+    return False
+
+
+def ensure_api_key(provider: str = "openrouter", *, project: str | None = None) -> bool:
+    """Check that `provider` exists and a key is reachable for it; print an error if not.
+
+    Providers without an API key (local, CLI-delegating) pass once they exist. The
+    lookup is `core.provider_factory.has_api_key`: keychain (project scope),
+    keychain (default scope), then env vars.
     """
     from veles.core.provider_factory import has_api_key
-    from veles.core.providers import find_provider
+    from veles.core.providers import get_provider
 
-    spec = find_provider(provider)
-    if spec is None or not spec.needs_key:
-        return True  # Task 4 turns the unknown case into a check
+    if not check_provider(provider):
+        return False
+    spec = get_provider(provider)
+    if not spec.needs_key:
+        return True
     if has_api_key(provider, project=project):
         return True
     envs = spec.key_env
