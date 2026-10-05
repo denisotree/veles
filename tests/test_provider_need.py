@@ -35,6 +35,8 @@ def test_run_with_an_unknown_provider_says_so(isolated_user_home: Path, capsys) 
     assert ensure_api_key("opnrouter") is False
     err = capsys.readouterr().err
     assert "unknown provider 'opnrouter'" in err and "openrouter" in err
+    # A typo nobody offers is one line — not an install hint for `opnrouter`.
+    assert "not installed" not in err and len(err.strip().splitlines()) == 1
 
 
 def test_a_retired_provider_names_its_replacement(isolated_user_home: Path, capsys) -> None:

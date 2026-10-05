@@ -245,9 +245,19 @@ def ensure_provider(name: str, *, reason: str) -> bool:
     _load_user_modules_into_live()
     if find_provider(name) is not None or name in RETIRED:
         return find_provider(name) is not None
+    if not _offered(name):
+        return False  # a typo nobody offers: the caller says "unknown provider"
     if ensure_extension(ProviderNeed(name), None, interactive=False, auto=True, reason=reason):
         _load_user_modules_into_live()
     return find_provider(name) is not None
+
+
+def _offered(name: str) -> bool:
+    """A registry offers provider `name` — the official ref, or a cached-registry
+    extension whose `provides` lists it (no network)."""
+    from veles.core.registry import catalog
+
+    return bool(ref_for(ProviderNeed(name)) or catalog.providers_of(f"provider:{name}"))
 
 
 _ROUTE_SOURCES = {
@@ -260,7 +270,6 @@ def routed_provider_needs(project: Project) -> list[tuple[str, str]]:
     """`(provider, why)` for each provider a routed task names that the catalogue
     lacks but a registry offers. A name nobody offers (a typo) is doctor's to report."""
     from veles.core.providers import find_provider
-    from veles.core.registry import catalog
     from veles.core.routing.ensemble import KNOWN_TASKS, effective_route
 
     out: dict[str, str] = {}
@@ -271,8 +280,7 @@ def routed_provider_needs(project: Project) -> list[tuple[str, str]]:
             continue
         if provider in out or find_provider(provider) is not None:
             continue
-        offered = ref_for(ProviderNeed(provider)) or catalog.providers_of(f"provider:{provider}")
-        if offered:
+        if _offered(provider):
             out[provider] = _ROUTE_SOURCES.get(source, f"named in [routing.tasks].{task}")
     return list(out.items())
 
