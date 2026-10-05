@@ -124,6 +124,9 @@ def _user_entries() -> tuple[dict[str, dict[str, Any]], list[str]]:
     except (OSError, tomllib.TOMLDecodeError) as exc:
         problems.append(f"{path}: {exc} — using the builtin providers only")
         raw = {}
+    if not isinstance(raw, dict):  # `[[providers]]`: an array, not a table of tables
+        problems.append(f"{path}: [providers] must be tables like [providers.<id>]; ignored")
+        raw = {}
     entries = {n: e for n, e in raw.items() if isinstance(e, dict)}
     problems += [f"{path}: [providers.{n}] is not a table" for n in raw if n not in entries]
     _user_cache.update(key=key, entries=entries, problems=problems)
@@ -159,6 +162,9 @@ def _spec_from_entry(name: str, entry: dict[str, Any]) -> ProviderSpec | None:
     key_env = entry.get("key_env", ())
     if isinstance(key_env, str):
         key_env = (key_env,)
+    if not isinstance(key_env, list | tuple) or not all(isinstance(e, str) for e in key_env):
+        _warn_once(f"provider {name!r}: key_env must be a name or a list of names; skipped")
+        return None
     return ProviderSpec(
         label=str(entry.get("label") or name),
         tagline=str(entry.get("tagline") or ""),

@@ -127,6 +127,30 @@ def test_broken_user_catalogue_keeps_the_builtins(
     assert "providers.toml" in caplog.text
 
 
+def test_an_array_of_providers_is_a_warning_not_a_crash(
+    isolated_user_home: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    from veles.core.providers import user_catalog_problems
+
+    _user_catalogue('[[providers]]\nname = "groq"\nkind = "openai-api"\n')
+    with caplog.at_level(logging.WARNING):
+        assert set(list_providers()) == builtin_ids()
+    assert "[providers]" in caplog.text
+    assert any("[providers]" in p for p in user_catalog_problems())
+
+
+def test_a_key_env_of_the_wrong_type_skips_the_entry(
+    isolated_user_home: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    _user_catalogue(
+        '[providers.groq]\nkind = "openai-api"\nbase_url = "https://x/v1"\nkey_env = 5\n'
+    )
+    with caplog.at_level(logging.WARNING):
+        assert find_provider("groq") is None
+        assert "openrouter" in list_providers()
+    assert "groq" in caplog.text and "key_env" in caplog.text
+
+
 def test_user_entry_cannot_use_a_builtin_only_kind(
     isolated_user_home: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
