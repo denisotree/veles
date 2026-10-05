@@ -81,6 +81,16 @@ class CLIProvider:
     def supports_tools(self) -> bool:
         return self._tools_config is not None
 
+    def qualify_prompt(self, prompt: str, tool_names: tuple[str, ...]) -> str:
+        """Rewrite short tool names to what this delegate sees over MCP (a subclass
+        sets `mcp_tool_name`); unchanged without MCP or without a naming rule."""
+        namer = getattr(self, "mcp_tool_name", None)
+        if not self.supports_tools or namer is None:
+            return prompt
+        from veles.adapters.cli._tool_namespace import qualify_prompt
+
+        return qualify_prompt(prompt, tool_names, prefix_fn=namer)
+
     def _build_cmd(self, messages: list[Message], model: str, *, stream: bool) -> list[str]:
         raise NotImplementedError
 

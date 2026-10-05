@@ -2,7 +2,8 @@
 
 `run_agent_streaming_aware` runs one prompt (streamed to stdout with
 `--stream`) inside `budget_scope`, which also carries the cumulative budget
-across claude/gemini CLI delegate hops via `<project>/.veles/budget.state.json`.
+across CLI delegate hops via the process's delegate budget file
+(`core/delegate_dir.py`).
 """
 
 from __future__ import annotations
@@ -136,9 +137,11 @@ def run_agent_streaming_aware(
 def budget_scope(args: argparse.Namespace, project: Project | None = None):
     """Install a `TokenBudget` of `args.max_tokens_total` for the duration.
 
-    For a CLI delegate the budget is also written to `budget.state.json`, so the
-    Veles MCP server the delegate spawns charges the same budget; what it spent
-    is added back on exit."""
+    For a CLI delegate the budget is also written to the process's delegate
+    budget file, so the Veles MCP server the delegate spawns charges the same
+    budget; what it spent is added back on exit."""
+    from veles.core.delegate_dir import delegate_budget_file
+
     budget = TokenBudget(limit=getattr(args, "max_tokens_total", 0))
     token = set_budget(budget)
     snapshot_path: Path | None = None
@@ -148,7 +151,7 @@ def budget_scope(args: argparse.Namespace, project: Project | None = None):
         and is_cli_provider(getattr(args, "provider", None) or "")
         and budget.limit > 0
     ):
-        snapshot_path = project.state_dir / "budget.state.json"
+        snapshot_path = delegate_budget_file(project)
         save_atomic(
             snapshot_path,
             BudgetSnapshot(limit=budget.limit, consumed=initial_consumed),

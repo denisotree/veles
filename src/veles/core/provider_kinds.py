@@ -71,6 +71,18 @@ def _claude_cli(entry: Entry, ctx: ProviderContext) -> Provider:
     return ClaudeCLIProvider(workdir=ctx.project.root if ctx.project else None)
 
 
+def _claude_cli_tool_aware(entry: Entry, ctx: ProviderContext) -> Provider:
+    """claude with Veles' tools over MCP — the config in the process's delegate dir."""
+    from veles.adapters.cli.claude_cli import ClaudeCLIProvider
+    from veles.adapters.cli.mcp_config import build_mcp_config
+
+    if ctx.project is None:
+        return _claude_cli(entry, ctx)
+    return ClaudeCLIProvider(
+        mcp_config_path=build_mcp_config(ctx.project), workdir=ctx.project.root
+    )
+
+
 def _ollama(entry: Entry, ctx: ProviderContext) -> Provider:
     from veles.adapters.local.ollama import OllamaProvider
     from veles.core.provider_factory import apply_local_tool_policy
@@ -136,7 +148,7 @@ KINDS: dict[str, Kind] = {
     "openai": Kind("openai-wire", "cached", _openai),
     "anthropic": Kind("anthropic-wire", "curated", _anthropic),
     "gemini": Kind("gemini-wire", "cached", _gemini),
-    "claude-cli": Kind("cli", "curated", _claude_cli),
+    "claude-cli": Kind("cli", "curated", _claude_cli, build_tool_aware=_claude_cli_tool_aware),
     "ollama": Kind("openai-wire", "live", _ollama, key_required=False),
     "llamacpp": Kind("openai-wire", "live", _llamacpp, key_required=False),
     "local": Kind("openai-wire", "live", _local, key_required=False),

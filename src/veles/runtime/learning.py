@@ -495,7 +495,7 @@ def _curate_one_session(
         "Session turns (chronological):\n"
         f"{serialized}"
     )
-    provider = make_tool_aware_provider(args.provider, project, skill_model=args.model)
+    provider = make_tool_aware_provider(args.provider, project, model=args.model)
     system_prompt = qualify_for_provider(system_prompt, provider, CURATE_TOOLS)
     agent = Agent(
         provider=provider,

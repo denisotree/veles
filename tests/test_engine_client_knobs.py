@@ -158,5 +158,5 @@ def test_skill_runtime_propagates_the_model(project_with, monkeypatch) -> None:
     project = project_with(None)
     from veles.runtime.registry import make_tool_aware_provider
 
-    provider = make_tool_aware_provider("openrouter", project, skill_model=SLOW)
+    provider = make_tool_aware_provider("openrouter", project, model=SLOW)
     assert provider._client.timeout == 450.0

@@ -130,10 +130,9 @@ class Project:
     @property
     def tmp_dir(self) -> Path:
         """Runtime artifacts the agent stores during a session — clipboard
-        pastes, web-fetch caches, Telegram-channel attachments. Sits
-        under `.veles/` so it gets the same backup/sync treatment as the
-        rest of project state, but `iter_project_files` excludes it
-        from `veles export` by default. Created lazily by the caller."""
+        pastes, web-fetch caches, Telegram-channel attachments, CLI-delegate
+        run directories. Sits under `.veles/`; `veles export` skips it
+        (`core/export.py::_is_excluded`). Created lazily by the caller."""
         return self.state_dir / "tmp"
 
 

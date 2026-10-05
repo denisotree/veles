@@ -24,9 +24,6 @@ _BASELINE: frozenset[tuple[str, str]] = frozenset(
         ("veles.core.knowledge.skeleton", "veles.cli._parsers.build_parser"),
         # Type-checking-only import of the local provider base class.
         ("veles.core.provider_factory", "veles.adapters.local._base.LocalOpenAIBase"),
-        # Tool-name qualification for the subscription CLIs' MCP bridge.
-        ("veles.runtime.registry", "veles.adapters.cli._tool_namespace.claude_mcp_prefix"),
-        ("veles.runtime.registry", "veles.adapters.cli._tool_namespace.qualify_prompt"),
     }
 )
 

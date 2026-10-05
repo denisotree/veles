@@ -1,10 +1,8 @@
-"""Generate the MCP config a CLI delegate reads to bridge Veles tools.
+"""The MCP config a CLI delegate reads to reach Veles' tools.
 
-`build_mcp_config(project)` → `<project>/.veles/mcp.json` (claude consumes it
-via `--mcp-config`). It describes an MCP server descriptor: a child Python
-process running `veles.adapters.cli.mcp_server`. The descriptor is regenerated
-on every tool-using command so `sys.executable` always reflects the active venv.
-"""
+Written atomically into the process's delegate directory
+(`core/delegate_dir.py`), never into the shared `.veles/`. A module delegate
+(antigravity) builds its own config file around `veles_mcp_server`."""
 
 from __future__ import annotations
 
@@ -13,15 +11,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from veles.core.delegate_dir import delegate_budget_file, delegate_dir
+from veles.core.io_utils import atomic_write_text
 from veles.core.project import Project
 
-_VELES_CONFIG_FILENAME = "mcp.json"
 
-
-DEFAULT_SKILL_MODEL = "anthropic/claude-sonnet-4.6"
-
-
-def _mcp_server_descriptor(project: Project, *, skill_model: str) -> dict[str, Any]:
+def veles_mcp_server(project: Project) -> dict[str, Any]:
+    """The stdio server entry: Veles' MCP server for `project`, charging the
+    process's delegate budget."""
     return {
         "command": sys.executable,
         "args": [
@@ -29,18 +26,15 @@ def _mcp_server_descriptor(project: Project, *, skill_model: str) -> dict[str, A
             "veles.adapters.cli.mcp_server",
             "--project-root",
             str(project.root),
-            "--skill-model",
-            skill_model,
             "--budget-file",
-            str(project.state_dir / "budget.state.json"),
+            str(delegate_budget_file(project)),
         ],
     }
 
 
-def build_mcp_config(project: Project, *, skill_model: str = DEFAULT_SKILL_MODEL) -> Path:
-    """Write `<project>/.veles/mcp.json` for claude `--mcp-config`."""
-    config = {"mcpServers": {"veles": _mcp_server_descriptor(project, skill_model=skill_model)}}
-    project.state_dir.mkdir(parents=True, exist_ok=True)
-    path = project.state_dir / _VELES_CONFIG_FILENAME
-    path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+def build_mcp_config(project: Project) -> Path:
+    """`<delegate dir>/mcp.json` for claude `--mcp-config`."""
+    path = delegate_dir(project) / "mcp.json"
+    config = {"mcpServers": {"veles": veles_mcp_server(project)}}
+    atomic_write_text(path, json.dumps(config, indent=2) + "\n")
     return path
