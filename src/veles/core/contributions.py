@@ -62,8 +62,6 @@ CONTRIBUTION_POINTS: dict[str, Point] = {}
 BUILTIN_MODULES: tuple[str, ...] = (
     "veles.modules.agentops",
     "veles.modules.organize",
-    # Telegram until it moves to the extension registry (release C).
-    "veles.channels.telegram",
 )
 
 

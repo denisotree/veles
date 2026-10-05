@@ -92,7 +92,7 @@ def add_channel(
     try:
         entry = get_platform(channel)
     except KeyError as exc:
-        print(f"error: {exc}")
+        print(f"error: {exc.args[0]}")
         return 2
 
     # 3. collect creds → secrets (keychain) + config fields (config block).

@@ -13,15 +13,15 @@ from __future__ import annotations
 from veles.core.config_schema import validate_config
 
 
-def test_valid_channel_config_has_no_findings() -> None:
-    cfg = {"channels": {"telegram": {"enabled": True, "bot_token": "x", "whitelist": ["@a"]}}}
+def test_valid_channel_config_has_no_findings(fake_platform) -> None:
+    cfg = {"channels": {"fake": {"enabled": True, "token": "x", "rooms": ["@a"]}}}
     assert validate_config(cfg) == []
 
 
-def test_typo_whitelist_in_channel_is_flagged() -> None:
-    cfg = {"channels": {"telegram": {"enabled": True, "bot_token": "x", "whitlist": ["@a"]}}}
+def test_typo_in_a_channel_list_field_is_flagged(fake_platform) -> None:
+    cfg = {"channels": {"fake": {"enabled": True, "token": "x", "roms": ["@a"]}}}
     findings = validate_config(cfg)
-    assert any(f.key == "whitlist" and f.section == "channels.telegram" for f in findings)
+    assert any(f.key == "roms" and f.section == "channels.fake" for f in findings)
 
 
 def test_daemon_named_session_unknown_key_flagged() -> None:
@@ -35,10 +35,10 @@ def test_daemon_legacy_scalar_keys_are_valid() -> None:
     assert validate_config(cfg) == []
 
 
-def test_daemon_channels_subtable_is_validated() -> None:
-    cfg = {"daemon": {"work": {"channels": {"telegram": {"bot_token": "x", "whitlist": []}}}}}
+def test_daemon_channels_subtable_is_validated(fake_platform) -> None:
+    cfg = {"daemon": {"work": {"channels": {"fake": {"token": "x", "roms": []}}}}}
     findings = validate_config(cfg)
-    assert any(f.key == "whitlist" and "channels.telegram" in f.section for f in findings)
+    assert any(f.key == "roms" and "channels.fake" in f.section for f in findings)
 
 
 def test_mcp_server_unknown_key_flagged() -> None:
@@ -57,11 +57,6 @@ def test_platform_declared_keys_are_known(fake_platform) -> None:
     assert [f.key for f in validate_config(cfg)] == ["rooom"]
 
 
-def test_telegram_debounce_keys_are_known() -> None:
-    cfg = {"channels": {"telegram": {"enabled": True, "whitelist": ["1"], "debounce_seconds": 2}}}
-    assert validate_config(cfg) == []
-
-
 def test_unknown_platform_does_not_crash() -> None:
     cfg = {"channels": {"myplatform": {"enabled": True, "weird_key": 1}}}
     # get_platform raises for an unknown platform; the validator must degrade,
@@ -69,17 +64,17 @@ def test_unknown_platform_does_not_crash() -> None:
     validate_config(cfg)  # no exception
 
 
-def test_doctor_reports_config_typo_as_error(tmp_path) -> None:
+def test_doctor_reports_config_typo_as_error(tmp_path, fake_platform) -> None:
     from veles.core.doctor import run_all
     from veles.core.project import init_project
     from veles.core.project_config import save_project_config
 
     project = init_project(tmp_path / "proj", name="t")
-    save_project_config(project, {"channels": {"telegram": {"enabled": True, "whitlist": ["@a"]}}})
+    save_project_config(project, {"channels": {"fake": {"enabled": True, "roms": ["@a"]}}})
     report = run_all(project)
     cfg_check = next(r for r in report.results if r.name == "config_schema")
     assert cfg_check.status == "error"
-    assert "whitlist" in cfg_check.message
+    assert "roms" in cfg_check.message
 
 
 def test_engine_client_knobs_validate_clean() -> None:

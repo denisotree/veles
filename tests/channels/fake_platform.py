@@ -34,6 +34,7 @@ def fake_spec(secret_key: str = "token") -> PlatformSpec:
         caps=ChannelCaps(asks_questions=True),
         cred_fields=(
             CredField(secret_key, "Fake token", secret=True, required=True, env="FAKE_TOKEN"),
+            CredField("rooms", "Allowed rooms, comma-separated", list_value=True),
         ),
         config_keys=frozenset({"room"}),
     )

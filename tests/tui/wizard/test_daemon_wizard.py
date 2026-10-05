@@ -63,25 +63,25 @@ async def test_bind_defaults_accepted_channel_declined(project) -> None:
     assert cfg["daemon"]["port"] == 8765
 
 
-async def test_channel_accepted_persists_via_registry(project) -> None:
+async def test_channel_accepted_persists_via_registry(project, fake_platform) -> None:
     steps = daemon_start_steps(project, session=None, host="127.0.0.1", port=8765)
     keys = [
         "enter",  # host default
         "enter",  # port default
         "y",  # connect a channel? yes
-        "enter",  # channel type picker → telegram (default)
+        "enter",  # channel type picker → fake (default)
         *list("token"),
-        "enter",  # bot_token cred
+        "enter",  # token cred
         *list("@foo"),
-        "enter",  # whitelist cred
+        "enter",  # rooms cred
     ]
     answers = await _drive(steps, keys)
-    assert answers["channel"]["channel"] == "telegram"
+    assert answers["channel"]["channel"] == "fake"
     assert answers["channel"]["status"] == "saved"
-    assert secrets.get_provider_key("telegram", project=project.name) == "token"
+    assert secrets.get_provider_key("fake", project=project.name) == "token"
     cfg = _cfg(project)
-    assert cfg["channels"]["telegram"]["enabled"] is True
-    assert cfg["channels"]["telegram"]["whitelist"] == ["@foo"]
+    assert cfg["channels"]["fake"]["enabled"] is True
+    assert cfg["channels"]["fake"]["rooms"] == ["@foo"]
 
 
 async def test_named_session_persists_to_its_own_block(project) -> None:

@@ -159,7 +159,7 @@ def _cmd_channel_run(args: argparse.Namespace) -> int:
     try:
         spec = get_platform(channel)
     except KeyError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        print(f"error: {exc.args[0]}", file=sys.stderr)
         return 2
 
     daemon_url = (

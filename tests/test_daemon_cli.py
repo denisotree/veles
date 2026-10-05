@@ -780,7 +780,7 @@ def test_start_wizard_falls_back_to_stdin_when_accepted(
 
 
 def test_start_wizard_skips_when_channel_exists(
-    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fake_platform
 ) -> None:
     import veles.cli.channel_wizard as cw
     import veles.tui.wizard.daemon_runner as dr
@@ -788,9 +788,7 @@ def test_start_wizard_skips_when_channel_exists(
     from veles.core.project import init_project
 
     project = init_project(tmp_path, name="p")
-    apply_channel(
-        project, session=None, channel="telegram", secrets={"bot_token": "t"}, config_fields={}
-    )
+    apply_channel(project, session=None, channel="fake", secrets={"token": "t"}, config_fields={})
     _interactive(monkeypatch)
     calls: dict[str, object] = {}
     monkeypatch.setattr(cw, "add_channel", lambda *a, **k: calls.update(called=True))

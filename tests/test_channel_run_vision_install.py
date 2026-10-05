@@ -21,7 +21,7 @@ from veles.modules.vision import get_vision_adapter, reset_vision_adapter
 
 
 @pytest.fixture(autouse=True)
-def _clean(monkeypatch: pytest.MonkeyPatch):
+def _clean(monkeypatch: pytest.MonkeyPatch, fake_platform):
     reset_vision_adapter()
     token = set_active_project(None)
     monkeypatch.setattr(channel_cmd.asyncio, "run", lambda coro: coro.close() or 0)
@@ -32,7 +32,7 @@ def _clean(monkeypatch: pytest.MonkeyPatch):
 
 def _args() -> argparse.Namespace:
     return argparse.Namespace(
-        channel="telegram",
+        channel="fake",
         secret="T",
         daemon_url="http://127.0.0.1:8765",
         daemon_token="D",

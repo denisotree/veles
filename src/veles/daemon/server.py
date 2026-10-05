@@ -175,10 +175,7 @@ async def _handle_list_channels(request: web.Request) -> web.Response:
 # M234. Mirrors the wording of `core/tools/builtin/task_tools.py::_resolve_target`,
 # which rejects a bad target at write time so the caller fixes it now rather than
 # discovering it at delivery time.
-_BAD_TARGET = (
-    "{field!r} is not a valid delivery target; use '<platform>:<chat_id>' "
-    "(e.g. 'telegram:42') or 'local'"
-)
+_BAD_TARGET = "{field!r} is not a valid delivery target; use '<platform>:<chat_id>' or 'local'"
 
 
 def _resolve_deliver_to(raw: Any, origin: str | None) -> tuple[str | None, str | None]:

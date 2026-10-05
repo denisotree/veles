@@ -72,6 +72,9 @@ _BASELINE = frozenset(
         "check_builds_from_config",
         "check_config_keys",
         "check_delivers",
+        # The STT adapter protocol (`veles.sdk.media`): its caller is the
+        # registry's Telegram channel, which transcribes voice messages.
+        "transcribe",
         # An observation hook that lets tests read state from outside instead
         # of reaching into `_active_state` (reviewed 2026-09-22).
         "current_state",

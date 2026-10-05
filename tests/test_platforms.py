@@ -27,8 +27,3 @@ def test_a_non_spec_platform_is_refused_at_load() -> None:
 
     with pytest.raises(ValueError):
         ModuleAPI(ModuleRegistry(), "m").contribute("platform", "x", object())
-
-
-def test_telegram_is_contributed_by_its_builtin_module() -> None:
-    # Until it moves to the registry (release C, Task 13).
-    assert "telegram" in list_platforms()
