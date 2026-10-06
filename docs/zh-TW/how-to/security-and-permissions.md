@@ -77,14 +77,17 @@ Veles 自己的工具修改。檔案工具也會拒絕專案中任何其他 `.ve
 `core.hooksPath` 目錄以及符號連結的 `.git` 所指向的位置 — agent 的檔案工具只有在你確認該次寫入後才會寫入。
 信任授權與 autopilot 都不涵蓋這一點；daemon 會在頻道中詢問，而無人可問的批次執行則會拒絕。
 
-`claude-cli` 與 `antigravity-cli` provider 僅以只帶 Veles 工具的模型身分執行：它們自帶的
+`claude-cli`、`codex` 與 `antigravity-cli` provider 僅以只帶 Veles 工具的模型身分執行：它們自帶的
 shell、檔案編輯與網路工具、專案的 `.claude/` 設定與 hooks，以及其他 MCP 伺服器都不適用，
 而且它們呼叫的每個 Veles 工具都要經過上述 trust ladder（那裡沒人能回答提示，因此任何尚未授予的操作都會被拒絕）。
 它們的 MCP 設定位於 `.veles/tmp/delegate-<pid>/` 中，每個執行中的行程一份，agent 的檔案工具無法寫入該目錄。`agy` 在專案之外、
 `~/.veles/tmp/` 下的暫存工作區裡執行，因此專案自己的 `.agents/` hooks 與 MCP 伺服器不會觸及它。
 它在擁有 Veles 的工具時會帶上 `--dangerously-skip-permissions`——否則 agy 在無介面模式下會拒絕 MCP 呼叫——
 而且該工作區中的一個 hook 會拒絕它自帶的每個工具；hook 本身失敗時同樣會拒絕。Veles 的檔案工具無法在專案之外寫入，
-因此 agy 無法透過它們改寫該 hook。
+因此 agy 無法透過它們改寫該 hook。`codex` 同樣在專案之外執行，忽略你的 codex 設定，使用唯讀沙箱，
+並以功能旗標關閉它自帶的工具；Veles 在每次首次執行前都會檢查這些旗標的名稱——重新命名了它所依賴旗標的
+codex 會被拒絕，而不是在開放狀態下執行。它的 MCP 伺服器放在其引數中（沒有設定檔），只核可該伺服器的工具，
+而該伺服器取得的環境變數是按名稱轉發的——絕不會包含 `VELES_TRUST_AUTO_ALLOW`。
 
 已知限制：
 

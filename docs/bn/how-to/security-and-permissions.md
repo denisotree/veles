@@ -77,7 +77,7 @@ symlink করা `.git` যেখানে নির্দেশ করে — 
 Trust grant ও autopilot এটি কভার করে না; daemon চ্যানেলে জিজ্ঞাসা করে, আর জিজ্ঞাসা করার কেউ না থাকলে
 batch run প্রত্যাখ্যান করে।
 
-`claude-cli` ও `antigravity-cli` provider শুধু Veles-এর tool সহ একটি model হিসেবে চলে: তাদের নিজস্ব shell,
+`claude-cli`, `codex` ও `antigravity-cli` provider শুধু Veles-এর tool সহ একটি model হিসেবে চলে: তাদের নিজস্ব shell,
 file-edit ও web tool, প্রজেক্টের `.claude/` settings ও hook, এবং অন্য MCP server প্রযোজ্য হয় না, আর
 তারা যে Veles tool-ই কল করে তা উপরের trust ladder-এর মধ্য দিয়ে যায় (সেখানে prompt-এর উত্তর দেওয়ার কেউ
 নেই, তাই আগে থেকে grant না করা সবকিছু প্রত্যাখ্যাত হয়)। তাদের MCP config থাকে
@@ -86,7 +86,12 @@ file-edit ও web tool, প্রজেক্টের `.claude/` settings ও h
 তাই প্রজেক্টের নিজস্ব `.agents/` hook ও MCP server কখনও তার কাছে পৌঁছায় না। Veles-এর tool পেলে
 সে `--dangerously-skip-permissions` সহ চলে — অন্যথায় agy headless অবস্থায় MCP কল প্রত্যাখ্যান করে —
 এবং সেই workspace-এর একটি hook তার নিজস্ব প্রতিটি tool বাতিল করে; যে hook ব্যর্থ হয় সেটিও বাতিল করে।
-Veles-এর file tool প্রজেক্টের বাইরে লিখতে পারে না, তাই agy সেগুলো দিয়ে ওই hook বদলাতে পারে না।
+Veles-এর file tool প্রজেক্টের বাইরে লিখতে পারে না, তাই agy সেগুলো দিয়ে ওই hook বদলাতে পারে না। `codex`-ও প্রজেক্টের বাইরে চলে; আপনার codex config উপেক্ষা
+করা হয়, sandbox হয় read-only, আর তার নিজস্ব tool বন্ধ থাকে feature flag দিয়ে, যেগুলোর নাম Veles প্রতিটি
+প্রথম run-এর আগে যাচাই করে — যে codex নিজের নির্ভরশীল কোনো flag-এর নাম বদলে ফেলেছে সেটি প্রত্যাখ্যাত হয়,
+খোলা অবস্থায় চালানো হয় না। এর MCP server যায় আর্গুমেন্টে (কোনো config file ছাড়া), শুধু ওই server-এর
+tool-ই approve করা হয়, আর ওই server যে environment পায় তা নাম ধরে forward করা হয় — `VELES_TRUST_AUTO_ALLOW`
+কখনও নয়।
 
 জানা সীমাবদ্ধতা:
 

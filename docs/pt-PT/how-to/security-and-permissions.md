@@ -90,7 +90,7 @@ symlink — as ferramentas de ficheiros do agente só escrevem depois de confirm
 essa escrita. Concessões de confiança e o autopilot não a cobrem; o daemon
 pergunta no canal, e uma execução em lote sem ninguém a quem perguntar recusa.
 
-Os fornecedores `claude-cli` e `antigravity-cli` funcionam como um modelo apenas com as
+Os fornecedores `claude-cli`, `codex` e `antigravity-cli` funcionam como um modelo apenas com as
 ferramentas do Veles: o seu próprio shell, edição de ficheiros e ferramentas web,
 as definições e hooks `.claude/` do projeto e outros servidores MCP não se
 aplicam, e cada ferramenta do Veles que chamam passa pela escada de confiança
@@ -103,7 +103,13 @@ nunca chegam até ele. Corre com `--dangerously-skip-permissions` quando tem as
 ferramentas do Veles — caso contrário o agy recusa chamadas MCP sem interface — e um
 hook nesse espaço de trabalho nega todas as suas ferramentas; um hook que falhe também
 nega. As ferramentas de ficheiros do Veles não escrevem fora do projeto, por isso o agy
-não consegue reescrever esse hook através delas.
+não consegue reescrever esse hook através delas. O `codex` também corre fora do projeto,
+com a sua configuração do codex ignorada, uma sandbox só de leitura e as suas próprias
+ferramentas desligadas por flags de funcionalidade cujos nomes o Veles verifica antes de
+cada primeira execução — um codex que tenha renomeado uma de que depende é recusado, não
+executado em aberto. O seu servidor MCP vai nos argumentos (sem ficheiro de configuração),
+apenas as ferramentas desse servidor são aprovadas, e o ambiente que esse servidor recebe
+é reencaminhado por nome — nunca `VELES_TRUST_AUTO_ALLOW`.
 
 Limites conhecidos:
 

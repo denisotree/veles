@@ -23,7 +23,7 @@ nơi nhà cung cấp đó đọc.
 | `GOOGLE_API_KEY` | gemini | Phương án dự phòng cho Google Gemini |
 | `OPENAI_COMPAT_API_KEY` | openai-compat | Tùy chọn — cho gateway yêu cầu key |
 
-`claude-cli` và `antigravity-cli` xác thực qua binary của riêng chúng — không có biến môi trường.
+`claude-cli`, `codex` và `antigravity-cli` xác thực qua binary của riêng chúng — không có biến môi trường.
 
 ## Nhà cung cấp cục bộ
 

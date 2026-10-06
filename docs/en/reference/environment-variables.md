@@ -21,7 +21,8 @@ entry's `key_env` — your own entries in `~/.veles/providers.toml` name theirs,
 | `GOOGLE_API_KEY` | gemini | Fallback for Google Gemini |
 | `OPENAI_COMPAT_API_KEY` | openai-compat | Optional — for a gateway that wants a key |
 
-`claude-cli` and `antigravity-cli` authenticate through their own binaries — no env var.
+`claude-cli`, `codex` and `antigravity-cli` authenticate through their own binaries — no
+env var.
 
 ## Local providers
 

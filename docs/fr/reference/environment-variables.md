@@ -23,7 +23,7 @@ stocke une clé là où ce fournisseur la lit.
 | `GOOGLE_API_KEY` | gemini | Solution de repli pour Google Gemini |
 | `OPENAI_COMPAT_API_KEY` | openai-compat | Facultative — pour une passerelle qui exige une clé |
 
-`claude-cli` et `antigravity-cli` s'authentifient via leurs propres binaires — aucune variable d'environnement.
+`claude-cli`, `codex` et `antigravity-cli` s'authentifient via leurs propres binaires — aucune variable d'environnement.
 
 ## Fournisseurs locaux
 

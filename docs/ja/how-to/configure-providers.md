@@ -120,12 +120,19 @@ veles run --provider groq --model llama-3.3-70b-versatile "..."
 | `lmstudio` (`local`) | `http://localhost:1234/v1` | — |
 | `vllm` (`local`) | `http://localhost:8000/v1` | — |
 
-## Claude / Google サブスクリプションに委譲する
+## Claude / ChatGPT / Google サブスクリプションに委譲する
 
 `claude` CLI が認証済みであれば、Veles はそれを駆動できます:
 
 ```bash
 veles run --provider claude-cli "..."
+```
+
+ChatGPT のサブスクリプションの場合は、Codex CLI をインストールして一度ログインします（`codex login`）:
+
+```bash
+veles run --provider codex --model gpt-6-luna "..."
+veles models codex      # the models your account has
 ```
 
 Google のサブスクリプションの場合は、Antigravity CLI（`agy`）を一度インストールしてログインし、そのプロバイダーを指定します — `antigravity-cli` モジュールは、その実行時に接続済みのレジストリから自動的にインストールされます:

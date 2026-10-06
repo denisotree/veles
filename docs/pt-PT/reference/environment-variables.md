@@ -23,7 +23,7 @@ chave onde esse fornecedor a lê.
 | `GOOGLE_API_KEY` | gemini | Reserva para o Google Gemini |
 | `OPENAI_COMPAT_API_KEY` | openai-compat | Opcional — para um gateway que exige uma chave |
 
-`claude-cli` e `antigravity-cli` autenticam-se através dos seus próprios binários — sem
+`claude-cli`, `codex` e `antigravity-cli` autenticam-se através dos seus próprios binários — sem
 variável de ambiente.
 
 ## Fornecedores locais

@@ -21,7 +21,7 @@
 | `GOOGLE_API_KEY` | gemini | البديل الاحتياطي لـ Google Gemini |
 | `OPENAI_COMPAT_API_KEY` | openai-compat | اختياري — لبوّابة تطلب مفتاحًا |
 
-يصادق `claude-cli` و`antigravity-cli` عبر برامجهما التنفيذية الخاصة — دون متغيّر بيئة.
+يصادق `claude-cli` و`codex` و`antigravity-cli` عبر برامجهما التنفيذية الخاصة — دون متغيّر بيئة.
 
 ## المزوّدون المحليون
 

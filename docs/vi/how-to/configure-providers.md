@@ -129,12 +129,19 @@ liệu của nhà cung cấp để biết endpoint hiện hành:
 | `lmstudio` (`local`) | `http://localhost:1234/v1` | — |
 | `vllm` (`local`) | `http://localhost:8000/v1` | — |
 
-## Ủy thác cho một gói đăng ký Claude / Google
+## Ủy thác cho một gói đăng ký Claude / ChatGPT / Google
 
 Nếu bạn đã xác thực CLI `claude`, Veles có thể điều khiển nó:
 
 ```bash
 veles run --provider claude-cli "..."
+```
+
+Với gói đăng ký ChatGPT, hãy cài Codex CLI và đăng nhập một lần (`codex login`):
+
+```bash
+veles run --provider codex --model gpt-6-luna "..."
+veles models codex      # the models your account has
 ```
 
 Với gói đăng ký Google, hãy cài và đăng nhập Antigravity CLI (`agy`) một lần, rồi gọi

@@ -34,6 +34,7 @@ provedor que as suas rotas nomeiam.
 | `openai` | Nuvem direta | `OPENAI_API_KEY` | Chat completions da GPT |
 | `gemini` | Nuvem direta | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
 | `claude-cli` | CLI delegada | — (sessão da CLI) | Delega a uma CLI `claude` local em modo de JSON-stream |
+| `codex` | CLI delegada | — (sessão da CLI) | Delega a uma CLI `codex` local (assinatura do ChatGPT) |
 | `ollama` | Local | nenhuma | `OLLAMA_BASE_URL` (padrão `http://localhost:11434/v1`) |
 | `llamacpp` | Local | nenhuma | `LLAMACPP_BASE_URL` (padrão `http://localhost:8080/v1`) |
 | `openai-compat` | Local/customizado | `OPENAI_COMPAT_API_KEY` opcional | `OPENAI_COMPAT_BASE_URL` (obrigatório, sem padrão) |
@@ -65,12 +66,12 @@ veles run --provider ollama --model qwen3:4b-instruct "..."
 Sobrescreva os endpoints com as variáveis de ambiente `*_BASE_URL` (veja
 [variáveis de ambiente](environment-variables.md)).
 
-## Delegação para CLI (`claude-cli`, `antigravity-cli`)
+## Delegação para CLI (`claude-cli`, `codex`, `antigravity-cli`)
 
-Se você tiver uma assinatura do Claude ou do Google, o Veles pode rodar a CLI dela em
-modo headless e atuar como coordenador — sem precisar de uma chave de API separada. O
-`claude-cli` é nativo; o `antigravity-cli` (a CLI `agy`) é um módulo do registry que se
-instala sozinho quando você o nomeia.
+Se você tiver uma assinatura do Claude, do ChatGPT ou do Google, o Veles pode rodar a
+CLI dela em modo headless e atuar como coordenador — sem precisar de uma chave de API
+separada. O `claude-cli` e o `codex` são nativos; o `antigravity-cli` (a CLI `agy`) é um
+módulo do registry que se instala sozinho quando você o nomeia.
 
 O delegado é apenas o modelo: as tools do Veles chegam até ele por uma ponte MCP, e
 toda chamada passa pela escada de confiança do Veles. A config da ponte fica em um
@@ -78,6 +79,15 @@ diretório do processo em execução, `.veles/tmp/delegate-<pid>/`, removido qua
 termina. O `agy` roda em um workspace temporário fora do seu projeto (em
 `~/.veles/tmp/`), então a config `.agents/` do próprio projeto nunca chega a ele, atrás
 de um gate que nega o shell e as tools de arquivo dele.
+
+O `codex` também roda fora do seu projeto (em `~/.veles/tmp/`), com a sua config do
+codex ignorada e as tools próprias dele — shell, edição de arquivos, imagens, subagentes,
+navegador, busca na web — desligadas; o Veles confere os nomes dessas flags uma vez por
+processo e se recusa a rodar um codex que renomeou alguma de que depende. O servidor MCP
+dele é passado em argumentos, não em um arquivo. No `veles run`, o codex segue o
+protocolo de tools do Veles com menos confiabilidade que o claude: ele pode responder que
+não consegue ler um arquivo sem chamar a tool — pergunte de novo ou nomeie a tool
+("use read_file em …").
 
 ## Status multimodal (visão / fala-para-texto)
 

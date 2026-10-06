@@ -129,12 +129,19 @@ a documentação do provedor para o endpoint atual:
 | `lmstudio` (`local`) | `http://localhost:1234/v1` | — |
 | `vllm` (`local`) | `http://localhost:8000/v1` | — |
 
-## Delegue para uma assinatura do Claude / Google
+## Delegue para uma assinatura do Claude / ChatGPT / Google
 
 Se você tiver a CLI `claude` autenticada, o Veles pode pilotá-la:
 
 ```bash
 veles run --provider claude-cli "..."
+```
+
+Para uma assinatura do ChatGPT, instale a Codex CLI e faça login uma vez (`codex login`):
+
+```bash
+veles run --provider codex --model gpt-6-luna "..."
+veles models codex      # the models your account has
 ```
 
 Para uma assinatura do Google, instale e faça login uma vez na Antigravity CLI (`agy`),

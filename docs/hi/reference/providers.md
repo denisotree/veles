@@ -30,6 +30,7 @@ Veles जो भी provider जानता है, वह एक ही catalo
 | `openai` | Cloud direct | `OPENAI_API_KEY` | GPT chat completions |
 | `gemini` | Cloud direct | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
 | `claude-cli` | CLI delegate | — (CLI session) | JSON-stream mode में एक local `claude` CLI को delegate करता है |
+| `codex` | CLI delegate | — (CLI session) | एक local `codex` CLI को delegate करता है (ChatGPT subscription) |
 | `ollama` | Local | none | `OLLAMA_BASE_URL` (default `http://localhost:11434/v1`) |
 | `llamacpp` | Local | none | `LLAMACPP_BASE_URL` (default `http://localhost:8080/v1`) |
 | `openai-compat` | Local/custom | optional `OPENAI_COMPAT_API_KEY` | `OPENAI_COMPAT_BASE_URL` (आवश्यक, कोई default नहीं) |
@@ -59,10 +60,10 @@ veles run --provider ollama --model qwen3:4b-instruct "..."
 `*_BASE_URL` env vars से endpoints override करें (देखें
 [environment variables](environment-variables.md))।
 
-## CLI delegation (`claude-cli`, `antigravity-cli`)
+## CLI delegation (`claude-cli`, `codex`, `antigravity-cli`)
 
-यदि आपके पास Claude या Google subscription है, तो Veles उसकी CLI को headless चला सकता है
-और coordinator की तरह काम कर सकता है — एक अलग API key के बिना। `claude-cli` builtin है;
+यदि आपके पास Claude, ChatGPT या Google subscription है, तो Veles उसकी CLI को headless चला सकता है
+और coordinator की तरह काम कर सकता है — एक अलग API key के बिना। `claude-cli` और `codex` builtin हैं;
 `antigravity-cli` (`agy` CLI) एक registry module है जो नाम देने पर खुद install हो जाता है।
 
 Delegate केवल model है: Veles के tools उस तक एक MCP bridge के ज़रिए पहुँचते हैं, और हर
@@ -71,6 +72,14 @@ call Veles की trust ladder से गुज़रती है। Bridge क
 project के बाहर (`~/.veles/tmp/` के अंतर्गत) एक scratch workspace में चलता है, इसलिए project का
 अपना `.agents/` config उस तक कभी नहीं पहुँचता, एक ऐसे gate के पीछे जो उसके अपने shell और
 file tools को deny करता है।
+
+`codex` भी आपके project के बाहर (`~/.veles/tmp/` के अंतर्गत) चलता है, आपका codex config अनदेखा
+करके और उसके अपने tools — shell, file edits, images, subagents, browser, web search — बंद
+करके; Veles उन flag नामों को प्रति process एक बार जाँचता है और ऐसा codex चलाने से मना कर देता है
+जिसने अपने इस्तेमाल का कोई flag rename कर दिया हो। उसका MCP server file के बजाय arguments में
+दिया जाता है। `veles run` में, codex Veles के tool protocol का पालन claude से कम भरोसेमंद ढंग से
+करता है: वह tool को call किए बिना ही जवाब दे सकता है कि वह file नहीं पढ़ सकता — दोबारा पूछें,
+या tool का नाम बताएँ ("use read_file on …")।
 
 ## Multimodal status (vision / speech-to-text)
 

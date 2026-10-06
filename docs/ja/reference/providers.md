@@ -21,6 +21,7 @@ Veles が知っているプロバイダーはすべて、3 つのソースから
 | `openai` | クラウド直接 | `OPENAI_API_KEY` | GPT chat completions |
 | `gemini` | クラウド直接 | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
 | `claude-cli` | CLI 委譲 | —（CLI セッション） | ローカルの `claude` CLI に JSON ストリームモードで委譲 |
+| `codex` | CLI 委譲 | —（CLI セッション） | ローカルの `codex` CLI に委譲（ChatGPT サブスクリプション） |
 | `ollama` | ローカル | なし | `OLLAMA_BASE_URL`（デフォルト `http://localhost:11434/v1`） |
 | `llamacpp` | ローカル | なし | `LLAMACPP_BASE_URL`（デフォルト `http://localhost:8080/v1`） |
 | `openai-compat` | ローカル/カスタム | 任意の `OPENAI_COMPAT_API_KEY` | `OPENAI_COMPAT_BASE_URL`（必須、デフォルトなし） |
@@ -41,11 +42,13 @@ veles run --provider ollama --model qwen3:4b-instruct "..."
 
 エンドポイントは `*_BASE_URL` 環境変数で上書きします（[環境変数](environment-variables.md)を参照）。
 
-## CLI 委譲（`claude-cli`、`antigravity-cli`）
+## CLI 委譲（`claude-cli`、`codex`、`antigravity-cli`）
 
-Claude または Google のサブスクリプションを持っている場合、Veles はその CLI をヘッドレスで実行し、コーディネーターとして振る舞うことができます。別途 API キーは不要です。`claude-cli` はビルトインです。`antigravity-cli`（`agy` CLI）はレジストリのモジュールで、指定すると自動的にインストールされます。
+Claude、ChatGPT または Google のサブスクリプションを持っている場合、Veles はその CLI をヘッドレスで実行し、コーディネーターとして振る舞うことができます。別途 API キーは不要です。`claude-cli` と `codex` はビルトインです。`antigravity-cli`（`agy` CLI）はレジストリのモジュールで、指定すると自動的にインストールされます。
 
 委譲先はモデルにすぎません。Veles のツールは MCP ブリッジ経由で届き、すべての呼び出しが Veles のトラストラダーを通ります。ブリッジの設定は実行中プロセスのディレクトリ `.veles/tmp/delegate-<pid>/` にあり、プロセスの終了時に削除されます。`agy` はプロジェクトの外（`~/.veles/tmp/` 配下）にある作業用の一時ワークスペースで実行されるため、プロジェクト自身の `.agents/` の設定は届きません。さらに、自身のシェルとファイルツールを拒否するゲートの内側に置かれます。
+
+`codex` もプロジェクトの外（`~/.veles/tmp/` 配下）で実行され、あなたの codex 設定は無視され、自身のツール（シェル、ファイル編集、画像、サブエージェント、ブラウザー、Web 検索）はオフにされます。Veles はこれらのフラグ名をプロセスごとに 1 回確認し、依存しているフラグの名前が変わった codex の実行を拒否します。MCP サーバーはファイルではなく引数で渡されます。`veles run` では、codex は claude ほど確実には Veles のツールプロトコルに従いません。ツールを呼ばずに「ファイルを読めない」と答えることがあります。その場合はもう一度尋ねるか、ツール名を指定してください（"use read_file on …"）。
 
 ## マルチモーダルの状況（ビジョン / 音声認識）
 

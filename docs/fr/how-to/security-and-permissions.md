@@ -90,7 +90,7 @@ confirmation de cette écriture. Les autorisations de confiance et l'autopilot n
 couvrent pas ; le daemon demande dans le canal, et une exécution par lots sans
 personne à qui demander refuse.
 
-Les fournisseurs `claude-cli` et `antigravity-cli` s'exécutent comme un modèle avec les
+Les fournisseurs `claude-cli`, `codex` et `antigravity-cli` s'exécutent comme un modèle avec les
 seuls outils de Veles : leurs propres outils shell, d'édition de fichiers et web, les
 réglages et hooks `.claude/` du projet, et les autres serveurs MCP ne s'appliquent
 pas, et chaque outil Veles qu'ils appellent passe par l'échelle de confiance
@@ -103,7 +103,13 @@ projet ne l'atteignent jamais. Il s'exécute avec `--dangerously-skip-permission
 dispose des outils de Veles — sinon agy refuse les appels MCP en headless — et un hook de
 cet espace de travail refuse tous ses propres outils ; un hook qui échoue refuse aussi.
 Les outils de fichiers de Veles ne peuvent pas écrire hors du projet, donc agy ne peut
-pas réécrire ce hook via eux.
+pas réécrire ce hook via eux. `codex` s'exécute aussi hors du projet, avec votre
+configuration codex ignorée, un bac à sable en lecture seule et ses propres outils
+désactivés par des indicateurs de fonctionnalité dont Veles vérifie les noms avant chaque
+première exécution — un codex qui en a renommé un dont il dépend est refusé, pas exécuté
+ouvert. Son serveur MCP passe dans ses arguments (pas de fichier de configuration), seuls
+les outils de ce serveur sont approuvés, et l'environnement que reçoit ce serveur est
+transmis par nom — jamais `VELES_TRUST_AUTO_ALLOW`.
 
 Limites connues :
 

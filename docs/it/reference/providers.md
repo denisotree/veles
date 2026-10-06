@@ -33,6 +33,7 @@ nominato dalle tue rotte.
 | `openai` | Cloud diretto | `OPENAI_API_KEY` | Chat completion GPT |
 | `gemini` | Cloud diretto | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
 | `claude-cli` | CLI delegata | — (sessione CLI) | Delega a una CLI `claude` locale in modalità JSON-stream |
+| `codex` | CLI delegata | — (sessione CLI) | Delega a una CLI `codex` locale (abbonamento ChatGPT) |
 | `ollama` | Locale | nessuna | `OLLAMA_BASE_URL` (default `http://localhost:11434/v1`) |
 | `llamacpp` | Locale | nessuna | `LLAMACPP_BASE_URL` (default `http://localhost:8080/v1`) |
 | `openai-compat` | Locale/personalizzato | `OPENAI_COMPAT_API_KEY` opzionale | `OPENAI_COMPAT_BASE_URL` (obbligatorio, nessun default) |
@@ -63,11 +64,11 @@ veles run --provider ollama --model qwen3:4b-instruct "..."
 Sovrascrivi gli endpoint con le variabili d'ambiente `*_BASE_URL` (vedi
 [variabili d'ambiente](environment-variables.md)).
 
-## Delega alla CLI (`claude-cli`, `antigravity-cli`)
+## Delega alla CLI (`claude-cli`, `codex`, `antigravity-cli`)
 
-Se possiedi un abbonamento Claude o Google, Veles può eseguirne la CLI in modalità
-headless e agire da coordinatore — senza una chiave API separata. `claude-cli` è
-integrato; `antigravity-cli` (la CLI `agy`) è un modulo del registro che si installa
+Se possiedi un abbonamento Claude, ChatGPT o Google, Veles può eseguirne la CLI in modalità
+headless e agire da coordinatore — senza una chiave API separata. `claude-cli` e `codex` sono
+integrati; `antigravity-cli` (la CLI `agy`) è un modulo del registro che si installa
 da solo quando lo nomini.
 
 Il delegato è solo il modello: i tool di Veles lo raggiungono tramite un bridge MCP, e
@@ -76,6 +77,8 @@ una directory del processo in esecuzione, `.veles/tmp/delegate-<pid>/`, rimossa 
 uscita. `agy` gira in un workspace temporaneo fuori dal tuo progetto (sotto
 `~/.veles/tmp/`), quindi la config `.agents/` del progetto non lo raggiunge mai, dietro
 un gate che nega i suoi shell e tool per i file.
+
+Anche `codex` gira fuori dal tuo progetto (sotto `~/.veles/tmp/`), con la tua config di codex ignorata e i suoi strumenti — shell, modifica file, immagini, subagent, browser, ricerca web — disattivati; Veles controlla quei nomi di flag una volta per processo e rifiuta di eseguire un codex che ne ha rinominato uno da cui dipende. Il suo server MCP viene passato negli argomenti, non in un file. In `veles run`, codex segue il protocollo dei tool di Veles in modo meno affidabile di claude: può rispondere di non poter leggere un file senza chiamare il tool — chiedi di nuovo, oppure nomina il tool ("use read_file on …").
 
 ## Stato multimodale (vision / speech-to-text)
 

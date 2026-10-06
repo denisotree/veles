@@ -87,7 +87,7 @@ arquivo do agente só os escrevem depois que você confirma essa escrita. Conces
 confiança e o autopilot não a cobrem; o daemon pergunta no canal, e uma execução em
 lote sem ninguém para perguntar recusa.
 
-Os provedores `claude-cli` e `antigravity-cli` rodam como um modelo apenas com as tools
+Os provedores `claude-cli`, `codex` e `antigravity-cli` rodam como um modelo apenas com as tools
 do Veles: as próprias tools de shell, edição de arquivos e web deles, as configurações e
 hooks de `.claude/` do projeto e outros servidores MCP não se aplicam, e toda tool do
 Veles que eles chamam passa pela escada de confiança acima (ninguém pode responder a
@@ -99,7 +99,12 @@ próprio projeto nunca chegam a ele. Ele roda com `--dangerously-skip-permission
 tem as tools do Veles — o agy recusa chamadas MCP em modo headless caso contrário — e um
 hook nesse workspace nega toda tool dele; um hook que falha também nega. As tools de
 arquivo do Veles não escrevem fora do projeto, então o agy não consegue reescrever esse
-hook por meio delas.
+hook por meio delas. O `codex` também roda fora do projeto, com a sua config do codex
+ignorada, um sandbox somente leitura e as tools próprias dele desligadas por flags de
+recurso cujos nomes o Veles confere antes de cada primeira execução — um codex que
+renomeou uma de que depende é recusado, não executado aberto. O servidor MCP dele vai
+nos argumentos (sem arquivo de config), só as tools desse servidor são aprovadas, e o
+ambiente que esse servidor recebe é repassado por nome — nunca `VELES_TRUST_AUTO_ALLOW`.
 
 Limites conhecidos:
 

@@ -21,7 +21,7 @@ API-key lookup cascade: OS keychain (project scope) → OS keychain (default sco
 | `GOOGLE_API_KEY` | gemini | Google Gemini के लिए fallback |
 | `OPENAI_COMPAT_API_KEY` | openai-compat | वैकल्पिक — ऐसे gateway के लिए जिसे key चाहिए |
 
-`claude-cli` और `antigravity-cli` अपने ही binaries के ज़रिए authenticate होते हैं — कोई env var नहीं।
+`claude-cli`, `codex` और `antigravity-cli` अपने ही binaries के ज़रिए authenticate होते हैं — कोई env var नहीं।
 
 ## Local providers
 

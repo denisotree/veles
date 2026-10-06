@@ -127,12 +127,19 @@ provider का documentation देखें:
 | `lmstudio` (`local`) | `http://localhost:1234/v1` | — |
 | `vllm` (`local`) | `http://localhost:8000/v1` | — |
 
-## एक Claude / Google subscription को delegate करें
+## एक Claude / ChatGPT / Google subscription को delegate करें
 
 यदि आपके पास `claude` CLI authenticated है, तो Veles उसे चला सकता है:
 
 ```bash
 veles run --provider claude-cli "..."
+```
+
+ChatGPT subscription के लिए, Codex CLI को install करें और एक बार log in करें (`codex login`):
+
+```bash
+veles run --provider codex --model gpt-6-luna "..."
+veles models codex      # the models your account has
 ```
 
 Google subscription के लिए, Antigravity CLI (`agy`) को install करें और एक बार log in करें,

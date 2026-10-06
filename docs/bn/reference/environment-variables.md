@@ -21,7 +21,7 @@ API-কী লুকআপ ক্যাসকেড: OS keychain (project scope)
 | `GOOGLE_API_KEY` | gemini | Google Gemini-এর ফলব্যাক |
 | `OPENAI_COMPAT_API_KEY` | openai-compat | ঐচ্ছিক — যে গেটওয়ে কী চায় তার জন্য |
 
-`claude-cli` এবং `antigravity-cli` তাদের নিজস্ব বাইনারির মাধ্যমে অথেনটিকেট করে — কোনো env var লাগে না।
+`claude-cli`, `codex` এবং `antigravity-cli` তাদের নিজস্ব বাইনারির মাধ্যমে অথেনটিকেট করে — কোনো env var লাগে না।
 
 ## লোকাল প্রোভাইডার
 

@@ -33,6 +33,7 @@ route của bạn nêu tên.
 | `openai` | Đám mây trực tiếp | `OPENAI_API_KEY` | GPT chat completions |
 | `gemini` | Đám mây trực tiếp | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
 | `claude-cli` | CLI ủy thác | — (session CLI) | Ủy thác cho CLI `claude` cục bộ ở chế độ JSON-stream |
+| `codex` | CLI ủy thác | — (session CLI) | Ủy thác cho CLI `codex` cục bộ (gói đăng ký ChatGPT) |
 | `ollama` | Cục bộ | không | `OLLAMA_BASE_URL` (mặc định `http://localhost:11434/v1`) |
 | `llamacpp` | Cục bộ | không | `LLAMACPP_BASE_URL` (mặc định `http://localhost:8080/v1`) |
 | `openai-compat` | Cục bộ/tùy chỉnh | tùy chọn `OPENAI_COMPAT_API_KEY` | `OPENAI_COMPAT_BASE_URL` (bắt buộc, không có mặc định) |
@@ -62,12 +63,12 @@ veles run --provider ollama --model qwen3:4b-instruct "..."
 Ghi đè endpoint bằng các biến môi trường `*_BASE_URL` (xem
 [biến môi trường](environment-variables.md)).
 
-## Ủy thác CLI (`claude-cli`, `antigravity-cli`)
+## Ủy thác CLI (`claude-cli`, `codex`, `antigravity-cli`)
 
-Nếu bạn có gói đăng ký Claude hoặc Google, Veles có thể chạy CLI của nó ở chế độ
-headless và đóng vai trò điều phối — không cần API key riêng. `claude-cli` là bản
-tích hợp sẵn; `antigravity-cli` (CLI `agy`) là một module registry, tự cài đặt khi bạn
-gọi tên nó.
+Nếu bạn có gói đăng ký Claude, ChatGPT hoặc Google, Veles có thể chạy CLI của nó ở chế
+độ headless và đóng vai trò điều phối — không cần API key riêng. `claude-cli` và `codex`
+là bản tích hợp sẵn; `antigravity-cli` (CLI `agy`) là một module registry, tự cài đặt
+khi bạn gọi tên nó.
 
 Bên được ủy thác chỉ đóng vai trò model: các tool của Veles tiếp cận nó qua một cầu
 nối MCP, và mọi lời gọi đều đi qua thang tin cậy của Veles. Config của cầu nối nằm
@@ -75,6 +76,14 @@ trong một thư mục của tiến trình đang chạy, `.veles/tmp/delegate-<p
 khi tiến trình thoát. `agy` chạy trong một workspace tạm bên ngoài dự án của bạn (dưới
 `~/.veles/tmp/`), nên config `.agents/` của chính dự án không bao giờ đến được nó, sau
 một cổng chặn shell và các tool tệp của chính nó.
+
+`codex` cũng chạy bên ngoài dự án của bạn (dưới `~/.veles/tmp/`), với config codex của
+bạn bị bỏ qua và các tool riêng của nó — shell, sửa tệp, hình ảnh, subagent, trình
+duyệt, tìm kiếm web — bị tắt; Veles kiểm tra tên các flag đó một lần cho mỗi tiến trình
+và từ chối chạy một codex đã đổi tên flag mà nó phụ thuộc. MCP server của nó được truyền
+qua tham số, không qua tệp. Trong `veles run`, codex tuân theo protocol tool của Veles
+kém tin cậy hơn claude: nó có thể trả lời rằng không đọc được tệp mà không gọi tool —
+hãy hỏi lại, hoặc gọi tên tool ("use read_file on …").
 
 ## Trạng thái đa phương thức (vision / chuyển giọng nói thành văn bản)
 

@@ -17,7 +17,7 @@ API 키 조회 순서: OS 키체인(프로젝트 범위) → OS 키체인(기본
 | `GOOGLE_API_KEY` | gemini | Google Gemini의 폴백 |
 | `OPENAI_COMPAT_API_KEY` | openai-compat | 선택 사항 — 키를 요구하는 게이트웨이용 |
 
-`claude-cli`와 `antigravity-cli`는 각자의 바이너리를 통해 인증하므로 환경 변수가 없습니다.
+`claude-cli`, `codex`, `antigravity-cli`는 각자의 바이너리를 통해 인증하므로 환경 변수가 없습니다.
 
 ## 로컬 프로바이더
 
