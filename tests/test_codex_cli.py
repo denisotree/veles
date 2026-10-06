@@ -129,6 +129,26 @@ def test_a_renamed_critical_feature_refuses(monkeypatch, tmp_path: Path) -> None
         _ask(CodexCLIProvider(workspace=tmp_path))
 
 
+def test_the_probe_skips_the_users_codex_config(monkeypatch, tmp_path: Path) -> None:
+    """`exec --ignore-user-config` runs past a broken ~/.codex/config.toml, but `features
+    list` has no such flag — it reads an empty CODEX_HOME, outside the project."""
+    _codex(monkeypatch, run_out=(_FIX / "answer.jsonl").read_text())
+    fake = subprocess.run
+    seen: list[dict] = []
+
+    def spy(cmd, **kw):
+        if cmd[1:3] == ["features", "list"]:
+            seen.append(kw)
+        return fake(cmd, **kw)
+
+    monkeypatch.setattr(subprocess, "run", spy)
+    monkeypatch.chdir(tmp_path)
+    _ask(CodexCLIProvider(workspace=tmp_path / "ws"))
+    home = Path(seen[0]["env"]["CODEX_HOME"])
+    assert home.is_dir() and not any(home.iterdir())
+    assert seen[0]["cwd"] == str(home) and tmp_path not in home.parents
+
+
 @pytest.mark.parametrize("row", ["removed  false", "deprecated  false", "stable  true"])
 def test_a_critical_feature_that_is_not_really_off_refuses(monkeypatch, tmp_path, row) -> None:
     """codex keeps a retired name as a `removed` row and accepts `--disable` for it — a
@@ -184,6 +204,28 @@ def test_not_logged_in_says_codex_login(monkeypatch, tmp_path: Path) -> None:
     assert "401" in reply.text and "codex login" in reply.text
 
 
+_CUT_SHORT = (
+    '{"type":"item.completed","item":{"type":"agent_message","text":"Step one done."}}\n'
+    '{"type":"turn.failed","error":{"message":"context window exceeded"}}\n'
+)
+
+
+def test_a_failure_after_a_partial_answer_says_so(monkeypatch, tmp_path: Path) -> None:
+    _codex(monkeypatch, run_out=_CUT_SHORT, rc=1)
+    reply = _ask(CodexCLIProvider(workspace=tmp_path))
+    assert reply.finish_reason == "error"
+    assert reply.text.startswith("Step one done.") and "context window exceeded" in reply.text
+
+
+def test_a_failure_after_a_partial_answer_shows_in_the_stream(tmp_path: Path) -> None:
+    from veles.adapters.cli.codex_cli import _CodexStreamState
+
+    state = _CodexStreamState()
+    chunks = [state.absorb(json.loads(line)) for line in _CUT_SHORT.splitlines()]
+    assert "context window exceeded" in chunks[-1]
+    assert state.to_response(raw=None).text == "".join(chunks)  # no duplicate
+
+
 def test_a_bad_model_is_an_error(monkeypatch, tmp_path: Path) -> None:
     _codex(monkeypatch, run_out=(_FIX / "bad_model.jsonl").read_text(), rc=1)
     reply = _ask(CodexCLIProvider(workspace=tmp_path))
@@ -209,7 +251,7 @@ def test_the_bridge_is_in_arguments_only(monkeypatch, tmp_path: Path) -> None:
     values = _mcp_values(calls[-1])
     assert values["command"] == "/py" and values["args"] == server["args"]
     assert values["default_tools_approval_mode"] == "approve"
-    assert values["tool_timeout_sec"] == 300
+    assert values["tool_timeout_sec"] == 150  # half the run's 300 s
     assert prov.qualify_prompt("use read_file", ("read_file",)) == "use mcp__veles__read_file"
 
 
@@ -228,9 +270,19 @@ def test_the_bridge_forwards_env_by_name_only(monkeypatch, tmp_path: Path) -> No
     names = _mcp_values(calls[-1])["env_vars"]
     assert isinstance(names, list)
     wanted = {"VELES_USER_HOME", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "TAVILY_API_KEY"}
+    # web_search's SearXNG backend, and fetch_url behind a corporate proxy / CA
+    wanted |= {"SEARXNG_URL", "HTTPS_PROXY", "https_proxy", "NO_PROXY", "SSL_CERT_FILE"}
     assert wanted <= set(names)
     assert "VELES_TRUST_AUTO_ALLOW" not in names and "VELES_DAEMON_TOKEN" not in names
     assert not any("sk-or-secret" in a for a in calls[-1])
+
+
+def test_a_slow_tool_leaves_codex_time_to_answer(monkeypatch, tmp_path: Path) -> None:
+    """A tool allowed the whole run would take the run down with it."""
+    calls = _codex(monkeypatch, run_out=(_FIX / "answer.jsonl").read_text())
+    server = {"command": "/py", "args": []}
+    _ask(CodexCLIProvider(workspace=tmp_path, mcp_server=server, timeout=300.0))
+    assert _mcp_values(calls[-1])["tool_timeout_sec"] == 150
 
 
 def test_a_catalogue_entry_cannot_forward_the_trust_switches(

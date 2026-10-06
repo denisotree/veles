@@ -17,12 +17,14 @@ delegate like `claude-cli`.
 - Provider `codex`: `codex exec --json` runs outside your project (under
   `~/.veles/tmp/`), with your codex config ignored, no session files, a read-only sandbox
   and its own tools — shell, file edits, images, subagents, browser, web search — switched
-  off. Veles checks those feature-flag names once per process and refuses a codex that
-  renamed one it relies on. With Veles' tools, the MCP server goes in codex's arguments
-  (no config file), only that server's tools are approved, and the environment it needs is
-  forwarded by name — never `VELES_TRUST_AUTO_ALLOW`. `veles models codex` lists your
-  account's models. In `veles run` codex follows Veles' tool protocol less reliably than
-  claude: it may answer without calling a tool.
+  off. Veles checks those feature flags once per process (ignoring your codex config, as
+  the run does) and refuses a codex that renamed or retired one it relies on. With Veles'
+  tools, the MCP server goes in codex's arguments (no config file), only that server's
+  tools are approved, a tool gets half the run's time, and the environment it needs
+  (SearXNG, proxy and CA settings included) is forwarded by name — never
+  `VELES_TRUST_AUTO_ALLOW`. An error after a partial answer is shown after it.
+  `veles models codex` lists your account's models. In `veles run` codex follows Veles'
+  tool protocol less reliably than claude: it may answer without calling a tool.
 - `veles.sdk.providers.popen_jsonl`; `delegate_workspace` works without a project.
 
 ### Fixed
@@ -33,9 +35,10 @@ delegate like `claude-cli`.
 - A `base_url` on `[providers.anthropic]` or `[providers.gemini]` in
   `~/.veles/providers.toml` now applies; a `kind` on a builtin override is a warning.
 - Vision on a provider that speaks the Anthropic or Gemini format uses that provider's key
-  and base URL instead of the builtin's.
+  and base URL instead of the builtin's, and never lets the SDK send its own env key there.
 - `veles run` and `veles daemon start` name an unknown provider before a missing model;
-  the auto-install line says where the name came from.
+  the auto-install line says where the name came from — `--provider`, `[engine]`,
+  `[daemon.<name>]` or your default provider.
 
 ## [1.2.6] — 2026-10-06
 

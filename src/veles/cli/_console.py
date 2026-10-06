@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import sys
 
 
@@ -13,13 +12,6 @@ def confirm(prompt: str) -> bool:
     except EOFError:
         return False
     return answer in {"y", "yes"}
-
-
-def provider_reason(args: argparse.Namespace) -> str:
-    """Why a provider is being installed, for the auto-install line."""
-    if getattr(args, "_provider_explicit", False):
-        return "named with --provider"
-    return "named in [engine] provider"
 
 
 def check_provider(

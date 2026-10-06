@@ -159,9 +159,25 @@ def test_an_unknown_provider_is_named_before_a_missing_model(
 def test_the_install_line_says_where_the_name_came_from(
     isolated_user_home: Path, fake_install: list[str], capsys
 ) -> None:
-    from veles.cli._console import check_provider, provider_reason
+    from veles.cli._console import check_provider
     from veles.cli._parsers import build_parser
+    from veles.core.model_resolver import provider_source
 
     args = build_parser().parse_args(["run", "--provider", "antigravity-cli", "hi"])
-    check_provider("antigravity-cli", reason=provider_reason(args))
+    check_provider("antigravity-cli", reason=provider_source(args, None)[1])
     assert "(named with --provider)" in capsys.readouterr().err
+
+
+def test_a_user_default_provider_is_named_as_such(
+    isolated_user_home: Path, tmp_path: Path, fake_install: list[str], capsys
+) -> None:
+    from veles.cli._parsers import build_parser
+    from veles.cli.commands.run import cmd_run
+    from veles.core.user_config import user_config_path
+
+    user_config_path().write_text(
+        '[user]\nlanguage = "en"\ndefault_provider = "antigravity-cli"\n', encoding="utf-8"
+    )
+    project = init_project(tmp_path / "p", name="p")
+    cmd_run(build_parser().parse_args(["run", "hi"]), project)
+    assert "(named as your default provider)" in capsys.readouterr().err

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import functools
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -75,6 +76,7 @@ _FORWARDED_ENV = (
     "BRAVE_SEARCH_API_KEY",
     "TAVILY_API_KEY",
     "VELES_WEB_SEARCH_BACKEND",
+    "SEARXNG_URL",
     "VELES_FETCH_ALLOW_PRIVATE",
     "VELES_SANDBOX_ROOTS",
     "VELES_LOCALE",
@@ -82,6 +84,15 @@ _FORWARDED_ENV = (
     "VELES_LOCAL_TOOLS",
     "VELES_LOCAL_JSON_MODE",
     "OLLAMA_HOST",
+    # HTTP clients behind a corporate proxy or CA (both spellings are read)
+    *(
+        v
+        for name in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY")
+        for v in (name, name.lower())
+    ),
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "REQUESTS_CA_BUNDLE",
 )
 
 
@@ -93,6 +104,11 @@ def lockdown_flags(binary: str, *, chat: bool) -> tuple[str, ...]:
     `chat` (no MCP bridge) also drops
     code mode: with it, codex reaches for its own exec instead of answering in Veles'
     fenced `veles-tool` blocks; the bridge needs it to call MCP tools."""
+    from veles.core.delegate_dir import delegate_workspace
+
+    # `features list` has no --ignore-user-config: an empty CODEX_HOME shows what exec
+    # sees, and a broken ~/.codex/config.toml can't fail the check.
+    home = delegate_workspace(None, "codex-probe")
     names: list[str] = [*_LOCKDOWN, "code_mode_host"] if chat else list(_LOCKDOWN)
     while True:
         disable = [arg for name in names for arg in ("--disable", name)]
@@ -104,6 +120,8 @@ def lockdown_flags(binary: str, *, chat: bool) -> tuple[str, ...]:
                 timeout=30,
                 check=False,
                 stdin=subprocess.DEVNULL,
+                cwd=str(home),
+                env={**os.environ, "CODEX_HOME": str(home)},
             )
         except (OSError, subprocess.SubprocessError) as exc:
             raise RuntimeError(f"codex features check failed: {exc}") from exc
@@ -197,7 +215,8 @@ class CodexCLIProvider(CLIProvider):
             # Only this server's tools; each call still goes through Veles' trust ladder.
             "default_tools_approval_mode": '"approve"',
             "env_vars": json.dumps(forwarded_env_names()),
-            "tool_timeout_sec": str(int(self._timeout)),
+            # Half the run: a slow tool fails as a tool error and codex still answers.
+            "tool_timeout_sec": str(int(self._timeout) // 2),
         }
         return [
             arg
@@ -223,6 +242,11 @@ class CodexCLIProvider(CLIProvider):
         return [m["slug"] for m in models if isinstance(m, dict) and m.get("visibility") == "list"]
 
 
+def _error_note(error: str) -> str:
+    login = "401" in error or "Unauthorized" in error
+    return f"<codex error: {error}{' — log in: `codex login`' if login else ''}>"
+
+
 @dataclass(slots=True)
 class _CodexStreamState:
     messages: list[str] = field(default_factory=list)
@@ -234,10 +258,7 @@ class _CodexStreamState:
         if etype == "item.completed":
             item = event.get("item") or {}
             if item.get("type") == "agent_message" and item.get("text"):
-                text = str(item["text"])
-                chunk = ("\n\n" if self.messages else "") + text
-                self.messages.append(text)
-                return chunk
+                return self._add(str(item["text"]))
         elif etype == "turn.completed":
             u = event.get("usage") or {}
             prompt = int(u.get("input_tokens") or 0)
@@ -252,15 +273,21 @@ class _CodexStreamState:
             )
         elif etype == "turn.failed":
             self.error = str((event.get("error") or {}).get("message") or "codex turn failed")
+            if self.messages:  # cut short after a partial answer: say so, in the stream too
+                return self._add(_error_note(self.error))
         # `{"type":"error"}` events and error items are retries/fallbacks, not the outcome.
         return ""
 
+    def _add(self, text: str) -> str:
+        chunk = ("\n\n" if self.messages else "") + text
+        self.messages.append(text)
+        return chunk
+
     def to_response(self, *, raw: Any) -> ProviderResponse:
-        text = "\n\n".join(self.messages)
-        if self.error and not text:
-            login = "401" in self.error or "Unauthorized" in self.error
-            hint = " — log in: `codex login`" if login else ""
-            text = f"<codex error: {self.error}{hint}>"
+        parts = list(self.messages)
+        if self.error and _error_note(self.error) not in parts:
+            parts.append(_error_note(self.error))
+        text = "\n\n".join(parts)
         return ProviderResponse(
             text=text or None,
             tool_calls=[],
