@@ -64,6 +64,7 @@ class AnthropicProvider:
         api_key: str | None = None,
         timeout: float = 120.0,
         client: Anthropic | None = None,
+        base_url: str | None = None,
     ) -> None:
         if client is not None:
             self._client = client
@@ -71,7 +72,8 @@ class AnthropicProvider:
         from veles.core.provider_factory import require_api_key
 
         key = require_api_key("anthropic", explicit=api_key)
-        self._client = Anthropic(api_key=key, timeout=timeout)
+        # `base_url=None` is the SDK default (a providers.toml override sets it).
+        self._client = Anthropic(api_key=key, timeout=timeout, base_url=base_url)
 
     def create_message(
         self,

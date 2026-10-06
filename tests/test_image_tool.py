@@ -370,3 +370,31 @@ def test_vision_in_known_routing() -> None:
     from veles.core.routing import KNOWN_TASKS
 
     assert "vision" in KNOWN_TASKS
+
+
+def test_describe_uses_the_routed_anthropic_wire_provider_not_the_builtin(
+    _project, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A module provider on the anthropic wire: its key and its base URL."""
+    from tests.test_provider_catalog import contributing
+    from veles.core.providers import ProviderSpec
+    from veles.core.routing import set_project_route
+
+    monkeypatch.setenv("CORP_KEY", "corp-secret")
+    spec = ProviderSpec(
+        label="Corp",
+        build=lambda ctx: None,
+        key_env=("CORP_KEY",),
+        wire="anthropic-wire",
+        base_url="https://corp.example",
+    )
+    fake_anthropic_mod = MagicMock()
+    client = fake_anthropic_mod.Anthropic.return_value
+    client.messages.create.return_value = MagicMock(content=[MagicMock(type="text", text="ok")])
+    monkeypatch.setitem(sys.modules, "anthropic", fake_anthropic_mod)
+    with contributing({"corp": spec}):
+        set_project_route(_project, "vision", "corp:claude-x")
+        out = image_describe(str(_make_image_file(_project.root, "x.png", body=b"P")))
+    assert out == "ok"
+    kwargs = fake_anthropic_mod.Anthropic.call_args.kwargs
+    assert kwargs["api_key"] == "corp-secret" and kwargs["base_url"] == "https://corp.example"

@@ -55,13 +55,13 @@ def _openai(entry: Entry, ctx: ProviderContext) -> Provider:
 def _anthropic(entry: Entry, ctx: ProviderContext) -> Provider:
     from veles.adapters.anthropic import AnthropicProvider
 
-    return AnthropicProvider()
+    return AnthropicProvider(base_url=entry_base_url(entry))
 
 
 def _gemini(entry: Entry, ctx: ProviderContext) -> Provider:
     from veles.adapters.gemini import GeminiProvider
 
-    return GeminiProvider()
+    return GeminiProvider(base_url=entry_base_url(entry))
 
 
 def _claude_cli(entry: Entry, ctx: ProviderContext) -> Provider:

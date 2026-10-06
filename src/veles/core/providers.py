@@ -141,6 +141,11 @@ def _entries() -> tuple[dict[str, dict[str, Any]], list[str]]:
     problems = list(problems)
     for name, entry in user.items():
         if name in merged:
+            if "kind" in entry:
+                problems.append(
+                    f"{user_catalog_path()}: [providers.{name}] — the kind of a builtin "
+                    "provider doesn't change; ignored"
+                )
             merged[name].update({k: v for k, v in entry.items() if k != "kind"})
         elif entry.get("kind") in USER_KINDS:
             merged[name] = dict(entry)
