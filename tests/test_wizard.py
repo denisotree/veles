@@ -91,6 +91,17 @@ def test_gate_skips_when_config_already_exists(monkeypatch: pytest.MonkeyPatch) 
 def test_gate_passes_when_all_conditions_met(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     assert should_run_wizard(_ns()) is True
+    assert should_run_wizard(_ns(command="run")) is True
+
+
+@pytest.mark.parametrize(
+    "command", ["module", "tool", "doctor", "skill", "mcp", "trust", "secret", "registry"]
+)
+def test_gate_skips_admin_commands(monkeypatch: pytest.MonkeyPatch, command: str) -> None:
+    """A fresh $HOME volume plus the TTY that `module approve` demands must reach the
+    approval, not a six-step onboarding (integrator report V-3, 2026-10-06)."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    assert should_run_wizard(_ns(command=command)) is False
 
 
 # ---------- run_wizard with stub prompter ----------

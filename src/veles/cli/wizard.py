@@ -5,10 +5,13 @@ Triggers from `cli/__init__.py::main` when ALL of:
 - stdin is a TTY.
 - `--no-wizard` was not passed.
 - `VELES_NO_WIZARD=1` is not set in the env.
-- The active command isn't a bootstrap one (`init`, `import`) — those
-  set up state themselves and the wizard would interleave awkwardly.
+- The command starts an agent (`_AGENT_COMMANDS`: the REPL, `run`, `daemon`, …).
+  Admin verbs (`module approve`, `tool`, `doctor`, …) never trigger it — on a fresh
+  `$HOME` the TTY that `module approve` requires must reach the approval.
 
-Asks three things and writes `~/.veles/config.toml`:
+With stdout a TTY too it is the TUI onboarding (`tui/wizard`: language, provider,
+key, model, theme, first project); otherwise three stdin questions, then writes
+`~/.veles/config.toml`:
 1. Preferred language (`en` / `ru`) — recorded for future UI strings.
 2. Default LLM provider — bare-list choice from the provider catalogue.
 3. (Soft hint only) which API-key env var to set; **NEVER persists keys**.
@@ -37,7 +40,10 @@ from veles.core.user_config import (
 )
 
 _LANGUAGES: tuple[str, ...] = ("en", "ru")
-_BOOTSTRAP_COMMANDS: frozenset[str] = frozenset({"init", "import"})
+# Verbs that start an agent and so need a provider; None is the bare-`veles` REPL.
+_AGENT_COMMANDS: frozenset[str | None] = frozenset(
+    {None, "run", "research", "organize", "curate", "goal", "dream", "daemon", "channel"}
+)
 
 
 Prompter = Callable[[str, str | None], str]
@@ -67,7 +73,7 @@ def should_run_wizard(args: argparse.Namespace) -> bool:
         return False
     if os.environ.get("VELES_NO_WIZARD") == "1":
         return False
-    if getattr(args, "command", None) in _BOOTSTRAP_COMMANDS:
+    if getattr(args, "command", None) not in _AGENT_COMMANDS:
         return False
     if not sys.stdin.isatty():
         return False
