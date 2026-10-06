@@ -103,7 +103,6 @@ def _admitted(handles: list[ModuleHandle], *, project_root: Path | None) -> list
     each refused one is named by its dir."""
     from veles.core.registry.gate import admit_module
 
-    flag = "--user " if project_root is None else ""
     out: list[ModuleHandle] = []
     for handle in handles:
         refusal = admit_module(handle.dir, project_root=project_root)
@@ -112,9 +111,33 @@ def _admitted(handles: list[ModuleHandle], *, project_root: Path | None) -> list
             continue
         _warn(
             f"skipping module {handle.name!r} at {shown(handle.dir)}: {shown(refusal)} — "
-            f"review it, then `veles module approve {flag}{handle.name}`"
+            f"review it, then `{_approve_command(handle.name, project_root)}`"
         )
     return out
 
 
-__all__ = ["load_project_modules", "load_user_modules"]
+def refused_modules(project: Project | None) -> list[tuple[str, str, str]]:
+    """`(name, why, approve command)` for each module on disk the load gate refuses, in
+    the user scope and the project's — `veles doctor` reports them; loading only warns."""
+    from veles.core.registry.gate import admit_module
+    from veles.core.user_paths import user_modules_dir
+
+    scopes: list[tuple[list[ModuleHandle], Path | None]] = [
+        (discover_modules_in(user_modules_dir()), None)
+    ]
+    if project is not None:
+        scopes.append((discover_modules(project), project.root))
+    out: list[tuple[str, str, str]] = []
+    for handles, root in scopes:
+        for handle in handles:
+            refusal = admit_module(handle.dir, project_root=root)
+            if refusal is not None:
+                out.append((handle.name, refusal, _approve_command(handle.name, root)))
+    return out
+
+
+def _approve_command(name: str, project_root: Path | None) -> str:
+    return f"veles module approve {'--user ' if project_root is None else ''}{name}"
+
+
+__all__ = ["load_project_modules", "load_user_modules", "refused_modules"]

@@ -818,6 +818,24 @@ def _check_extensions(project: Project | None) -> CheckResult:
     return CheckResult(name="extensions", status="ok", message="installed extensions verified")
 
 
+def _check_modules(project: Project | None) -> CheckResult:
+    """Every module on disk loads — a never-approved one has no install record, so
+    `_check_extensions` can't see it, yet the agent runs without it."""
+    from veles.core.module_loading import refused_modules
+    from veles.core.text import shown
+
+    refused = refused_modules(project)
+    if not refused:
+        return CheckResult(name="modules", status="ok", message="every module on disk loads")
+    return CheckResult(
+        name="modules",
+        status="error",
+        message="modules not loaded: "
+        + ", ".join(f"{name} ({shown(why)})" for name, why, _ in refused),
+        fix_hint="review each, then " + "; ".join(f"`{cmd}`" for _, _, cmd in refused),
+    )
+
+
 def _check_approval_audit(project: Project | None) -> CheckResult:
     if project is None:
         return CheckResult(name="approval_audit", status="info", message="no active project")
@@ -877,6 +895,7 @@ def run_all(project: Project | None) -> DoctorReport:
         _check_events_health,
         _check_approval_audit,
         _check_extensions,
+        _check_modules,
         _check_channel_platforms,
     ]
     results: list[CheckResult] = [c() for c in no_arg]
