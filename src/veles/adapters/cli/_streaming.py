@@ -49,6 +49,7 @@ def popen_jsonl(
     """
     proc = subprocess.Popen(
         cmd,
+        stdin=subprocess.DEVNULL,  # a CLI without a TTY may wait on stdin (codex does)
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,

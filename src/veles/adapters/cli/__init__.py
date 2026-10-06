@@ -7,5 +7,6 @@ from veles.adapters.cli._common import (
     format_messages_as_prompt,
     iter_jsonl,
 )
+from veles.adapters.cli._streaming import popen_jsonl
 
-__all__ = ["CLIProvider", "StreamState", "format_messages_as_prompt", "iter_jsonl"]
+__all__ = ["CLIProvider", "StreamState", "format_messages_as_prompt", "iter_jsonl", "popen_jsonl"]
