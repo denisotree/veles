@@ -74,15 +74,19 @@ def _b64(image_bytes: bytes) -> str:
     return base64.standard_b64encode(image_bytes).decode("ascii")
 
 
-def _endpoint(provider_name: str) -> tuple[str | None, str | None]:
+def _endpoint(provider_name: str) -> tuple[str | None, str]:
     """`(base_url or None, key)` of the routed catalogue provider for a direct-SDK
     call — not the builtin `anthropic`/`gemini`, which a module provider on the same
-    wire would otherwise borrow."""
-    from veles.core.provider_factory import resolve_api_key
+    wire would otherwise borrow. Never a None key: the SDK would read its own env
+    key and send it to this provider's URL."""
+    from veles.core.provider_factory import require_api_key, resolve_api_key
     from veles.core.providers import find_provider
 
     spec = find_provider(provider_name)
-    return (spec.effective_base_url() if spec else None), resolve_api_key(provider_name)
+    url = spec.effective_base_url() if spec else None
+    if spec is None or spec.needs_key:
+        return url, require_api_key(provider_name)
+    return url, resolve_api_key(provider_name) or "local"
 
 
 def _describe_anthropic(

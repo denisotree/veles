@@ -34,9 +34,18 @@ def _fresh_probe(monkeypatch: pytest.MonkeyPatch):
     codex_cli.lockdown_flags.cache_clear()
 
 
-def _codex(monkeypatch, *, run_out: str = "", rc: int = 0, unknown: tuple[str, ...] = ()):
-    """subprocess.run: `codex features list` rejects names in `unknown`; `exec` answers
-    `run_out`; records every command."""
+def _codex(
+    monkeypatch,
+    *,
+    run_out: str = "",
+    rc: int = 0,
+    unknown: tuple[str, ...] = (),
+    rows: dict[str, str] | None = None,
+):
+    """subprocess.run: `codex features list` rejects names in `unknown` and otherwise
+    prints the `name  stage  state` table codex 0.160.1 prints for the disabled names
+    (`unified_exec` stays on there; `rows` overrides a row); `exec` answers `run_out`;
+    records every command."""
     calls: list[list[str]] = []
 
     def fake_run(cmd, **kw):
@@ -45,7 +54,10 @@ def _codex(monkeypatch, *, run_out: str = "", rc: int = 0, unknown: tuple[str, .
             bad = [f for f in unknown if f in cmd]
             if bad:
                 return _Proc(1, "", f"Error: Unknown feature flag: {bad[0]}")
-            return _Proc(0, "shell_tool  stable  false\n", "")
+            names = [cmd[i + 1] for i, a in enumerate(cmd) if a == "--disable"]
+            table = {n: "stable  false" for n in names} | {"unified_exec": "stable  true"}
+            table |= rows or {}
+            return _Proc(0, "".join(f"{n}  {s}\n" for n, s in table.items()), "")
         return _Proc(rc, run_out, "")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
@@ -67,6 +79,9 @@ def test_the_command_is_headless_and_locked_down(monkeypatch, tmp_path: Path) ->
     disabled = {cmd[i + 1] for i, a in enumerate(cmd) if a == "--disable"}
     assert {"shell_tool", "unified_exec", "view_image", "multi_agent"} <= disabled
     assert 'web_search="disabled"' in cmd
+    # The model catalogue brings `collaboration.*` past `--disable multi_agent`;
+    # one thread per session makes spawn_agent fail (live, codex 0.160.1).
+    assert "features.multi_agent_v2.max_concurrent_threads_per_session=1" in cmd
     assert cmd[cmd.index("-m") + 1] == "gpt-6-luna"
     assert cmd[-2] == "--" and "--looks like a flag" in cmd[-1]  # prompt after `--`
     assert reply.text == "Hi there, friend." and reply.finish_reason == "stop"
@@ -112,6 +127,39 @@ def test_a_renamed_critical_feature_refuses(monkeypatch, tmp_path: Path) -> None
     _codex(monkeypatch, unknown=("shell_tool",))
     with pytest.raises(RuntimeError, match="shell_tool"):
         _ask(CodexCLIProvider(workspace=tmp_path))
+
+
+@pytest.mark.parametrize("row", ["removed  false", "deprecated  false", "stable  true"])
+def test_a_critical_feature_that_is_not_really_off_refuses(monkeypatch, tmp_path, row) -> None:
+    """codex keeps a retired name as a `removed` row and accepts `--disable` for it — a
+    renamed shell would then run. The table must show the feature live and off."""
+    _codex(monkeypatch, rows={"shell_tool": row})
+    with pytest.raises(RuntimeError, match="shell_tool"):
+        _ask(CodexCLIProvider(workspace=tmp_path))
+
+
+def test_a_critical_feature_missing_from_the_table_refuses(monkeypatch, tmp_path) -> None:
+    calls = _codex(monkeypatch)
+    real = subprocess.run
+
+    def without_view_image(cmd, **kw):
+        out = real(cmd, **kw)
+        if cmd[1:3] == ["features", "list"]:
+            out = _Proc(
+                0,
+                "".join(
+                    line + "\n"
+                    for line in out.stdout.splitlines()
+                    if not line.startswith("view_image")
+                ),
+                "",
+            )
+        return out
+
+    monkeypatch.setattr(subprocess, "run", without_view_image)
+    with pytest.raises(RuntimeError, match="view_image"):
+        _ask(CodexCLIProvider(workspace=tmp_path))
+    assert calls
 
 
 def test_a_renamed_minor_feature_is_dropped_with_a_warning(monkeypatch, tmp_path, capsys) -> None:
@@ -167,7 +215,7 @@ def test_the_bridge_is_in_arguments_only(monkeypatch, tmp_path: Path) -> None:
 
 def test_mcp_args_survive_spaces_and_quotes(monkeypatch, tmp_path: Path) -> None:
     calls = _codex(monkeypatch, run_out=(_FIX / "answer.jsonl").read_text())
-    odd = ["--project-root", '/p/my "proj" dir', "--budget-file", "/p/b\\x.json"]
+    odd = ["--project-root", '/p/my "proj" dir 🚀', "--budget-file", "/p/b\\x.json"]
     _ask(CodexCLIProvider(workspace=tmp_path, mcp_server={"command": "/py", "args": odd}))
     assert _mcp_values(calls[-1])["args"] == odd
 
@@ -183,6 +231,22 @@ def test_the_bridge_forwards_env_by_name_only(monkeypatch, tmp_path: Path) -> No
     assert wanted <= set(names)
     assert "VELES_TRUST_AUTO_ALLOW" not in names and "VELES_DAEMON_TOKEN" not in names
     assert not any("sk-or-secret" in a for a in calls[-1])
+
+
+def test_a_catalogue_entry_cannot_forward_the_trust_switches(
+    monkeypatch, tmp_path: Path, isolated_user_home
+) -> None:
+    path = isolated_user_home / "providers.toml"
+    path.write_text(
+        '[providers.evil]\nlabel = "Evil"\nkind = "openai-api"\nbase_url = "https://e/v1"\n'
+        'key_env = ["VELES_TRUST_AUTO_ALLOW", "EVIL_KEY"]\nbase_url_env = "VELES_DAEMON_TOKEN"\n',
+        encoding="utf-8",
+    )
+    calls = _codex(monkeypatch, run_out=(_FIX / "answer.jsonl").read_text())
+    _ask(CodexCLIProvider(workspace=tmp_path, mcp_server={"command": "/py", "args": []}))
+    names = _mcp_values(calls[-1])["env_vars"]
+    assert isinstance(names, list) and "EVIL_KEY" in names
+    assert "VELES_TRUST_AUTO_ALLOW" not in names and "VELES_DAEMON_TOKEN" not in names
 
 
 def test_no_bridge_without_a_server(monkeypatch, tmp_path: Path) -> None:

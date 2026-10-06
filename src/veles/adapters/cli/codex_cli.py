@@ -3,9 +3,10 @@
 codex is only the model. It runs in `delegate_workspace(project, "codex")`, outside
 the project, with the user's codex config ignored (`--ignore-user-config`), no session
 files (`--ephemeral`), a read-only sandbox and its own tools switched off by feature
-flags — shell, exec, images, subagents, browser, plugins, web search. The feature
-names are checked once per process (`lockdown_flags`): a renamed critical one stops
-the provider instead of leaving that tool on. Code mode stays only with the bridge:
+flags — shell, exec, images, browser, plugins, web search — plus `-c` settings: no web
+search, one thread per session (so it can't spawn subagents). The feature names are
+checked once per process (`lockdown_flags`): a renamed critical one stops the provider
+instead of leaving that tool on. Code mode stays only with the bridge:
 codex reaches MCP tools through it (its JavaScript has no file, network or process
 access); without the bridge it is off too, so codex answers in Veles' fenced blocks.
 
@@ -29,10 +30,13 @@ from veles.adapters.cli._tool_namespace import claude_mcp_prefix
 from veles.core.fenced_tools import FENCED_SENTINEL
 from veles.core.provider import Message, ProviderResponse, TokenUsage
 
-# Disabled on every run; the first three would let codex read or run outside Veles.
-_CRITICAL = ("shell_tool", "unified_exec", "view_image")
+# Disabled on every run. The critical two would let codex read or run outside Veles, so
+# `codex features list` must show them live and off. (`unified_exec` stays listed on in
+# 0.160.1 — with `shell_tool` off codex has no exec tool, live 2026-10-06.)
+_CRITICAL = ("shell_tool", "view_image")
 _LOCKDOWN = (
     *_CRITICAL,
+    "unified_exec",
     "multi_agent",
     "goals",
     "plugins",
@@ -46,6 +50,14 @@ _LOCKDOWN = (
     "sleep_tool",
     "skill_mcp_dependency_install",
 )
+_CONFIG = (
+    "-c",
+    'web_search="disabled"',
+    # The model catalogue adds `collaboration.*` past `--disable multi_agent`; with one
+    # thread per session spawn_agent fails ("agent thread limit reached", live 2026-10-06).
+    "-c",
+    "features.multi_agent_v2.max_concurrent_threads_per_session=1",
+)
 _UNKNOWN = "Unknown feature flag: "
 # Without it codex reaches for its own (disabled) exec instead of writing Veles'
 # fenced blocks — live: 0/3 without, 3/5 with (2026-10-06).
@@ -55,7 +67,9 @@ _FENCED_PREAMBLE = (
     "writing a ```veles-tool block in your reply and stop; the caller runs it and sends "
     "you the result in the next message.\n\n"
 )
-# Forwarded to Veles' MCP child by name (codex filters its env); never auto-allow.
+# Forwarded to Veles' MCP child by name (codex filters its env) — never the trust
+# switches, whatever a catalogue entry names.
+_NEVER_FORWARD = frozenset({"VELES_TRUST_AUTO_ALLOW", "VELES_DAEMON_TOKEN"})
 _FORWARDED_ENV = (
     "VELES_USER_HOME",
     "BRAVE_SEARCH_API_KEY",
@@ -74,8 +88,9 @@ _FORWARDED_ENV = (
 @functools.cache
 def lockdown_flags(binary: str, *, chat: bool) -> tuple[str, ...]:
     """`--disable` for every lockdown feature this codex knows, checked with `codex
-    features list` (no model call). A critical name it doesn't know raises — fail
-    closed; another is dropped with one warning. `chat` (no MCP bridge) also drops
+    features list` (no model call). A critical name it doesn't know, or doesn't list as
+    live and off, raises — fail closed; another unknown is dropped with one warning.
+    `chat` (no MCP bridge) also drops
     code mode: with it, codex reaches for its own exec instead of answering in Veles'
     fenced `veles-tool` blocks; the bridge needs it to call MCP tools."""
     names: list[str] = [*_LOCKDOWN, "code_mode_host"] if chat else list(_LOCKDOWN)
@@ -93,20 +108,30 @@ def lockdown_flags(binary: str, *, chat: bool) -> tuple[str, ...]:
         except (OSError, subprocess.SubprocessError) as exc:
             raise RuntimeError(f"codex features check failed: {exc}") from exc
         if proc.returncode == 0:
-            return (*disable, "-c", 'web_search="disabled"', "-s", "read-only")
+            # Rows are `name  stage  state`; a retired name stays as a `removed` row.
+            table = {row[0]: row[1:] for row in map(str.split, proc.stdout.splitlines()) if row}
+            for name in _CRITICAL:
+                row = table.get(name, [])
+                if row[-1:] != ["false"] or row[:1] in (["removed"], ["deprecated"]):
+                    raise _cannot_disable(name)
+            return (*disable, *_CONFIG, "-s", "read-only")
         unknown = proc.stderr.partition(_UNKNOWN)[2].split()[:1]
         if not unknown or unknown[0] not in names:
             raise RuntimeError(f"codex features check failed: {proc.stderr.strip()}")
         if unknown[0] in _CRITICAL:
-            raise RuntimeError(
-                f"this codex no longer has the feature flag {unknown[0]!r}, so Veles can't "
-                "switch that tool off — update Veles, or use another provider"
-            )
+            raise _cannot_disable(unknown[0])
         print(
             f"warning: codex has no feature flag {unknown[0]!r}; not disabling it",
             file=sys.stderr,
         )
         names.remove(unknown[0])
+
+
+def _cannot_disable(name: str) -> RuntimeError:
+    return RuntimeError(
+        f"this codex can't switch off its feature {name!r} (renamed or retired?), so Veles "
+        "won't run it — update Veles, or use another provider"
+    )
 
 
 def forwarded_env_names() -> list[str]:
@@ -119,7 +144,7 @@ def forwarded_env_names() -> list[str]:
         names.update(dict.fromkeys(spec.key_env))
         if spec.base_url_env:
             names[spec.base_url_env] = None
-    return list(names)
+    return [n for n in names if n not in _NEVER_FORWARD]
 
 
 class CodexCLIProvider(CLIProvider):
@@ -165,9 +190,10 @@ class CodexCLIProvider(CLIProvider):
         return [*cmd, "--", prompt]
 
     def _bridge_flags(self, server: dict[str, Any]) -> list[str]:
+        # ensure_ascii=False: JSON's surrogate-pair escapes are invalid TOML.
         values = {
-            "command": json.dumps(server["command"]),
-            "args": json.dumps(list(server["args"])),
+            "command": json.dumps(server["command"], ensure_ascii=False),
+            "args": json.dumps(list(server["args"]), ensure_ascii=False),
             # Only this server's tools; each call still goes through Veles' trust ladder.
             "default_tools_approval_mode": '"approve"',
             "env_vars": json.dumps(forwarded_env_names()),

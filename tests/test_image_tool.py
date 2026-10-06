@@ -398,3 +398,33 @@ def test_describe_uses_the_routed_anthropic_wire_provider_not_the_builtin(
     assert out == "ok"
     kwargs = fake_anthropic_mod.Anthropic.call_args.kwargs
     assert kwargs["api_key"] == "corp-secret" and kwargs["base_url"] == "https://corp.example"
+
+
+def test_a_routed_provider_without_its_key_never_borrows_the_sdk_default(
+    _project, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A keyless proxy: api_key=None would make the SDK read ANTHROPIC_API_KEY and
+    send it to the proxy's URL."""
+    from tests.test_provider_catalog import contributing
+    from veles.core.providers import ProviderSpec
+    from veles.core.routing import set_project_route
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-secret")
+    spec = ProviderSpec(
+        label="Proxy",
+        build=lambda ctx: None,
+        key_env=("PROXY_KEY",),
+        key_required=False,
+        wire="anthropic-wire",
+        base_url="http://proxy.local",
+    )
+    fake_anthropic_mod = MagicMock()
+    client = fake_anthropic_mod.Anthropic.return_value
+    client.messages.create.return_value = MagicMock(content=[MagicMock(type="text", text="ok")])
+    monkeypatch.setitem(sys.modules, "anthropic", fake_anthropic_mod)
+    with contributing({"proxy": spec}):
+        set_project_route(_project, "vision", "proxy:claude-x")
+        out = image_describe(str(_make_image_file(_project.root, "x.png", body=b"P")))
+    assert out == "ok"
+    key = fake_anthropic_mod.Anthropic.call_args.kwargs["api_key"]
+    assert key and key != "anthropic-secret"
