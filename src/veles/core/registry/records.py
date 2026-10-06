@@ -13,6 +13,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from veles.core.critical_ops import refuse_in_agent_shell
 from veles.core.file_lock import file_lock
 from veles.core.io_utils import atomic_write_json, load_optional_json
 from veles.core.user_paths import user_home
@@ -60,6 +61,7 @@ def load_records() -> list[InstallRecord]:
 
 
 def put_record(rec: InstallRecord) -> None:
+    refuse_in_agent_shell(f"recording {rec.kind} {rec.name}")  # a record is an approval
     with _locked():
         records = [r for r in load_records() if r.path != rec.path]
         records.append(rec)

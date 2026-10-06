@@ -261,6 +261,8 @@ def _hermetic_user_home(
     *config file* scope is isolated here."""
     home_root = tmp_path_factory.mktemp("veles-user-home")
     monkeypatch.setenv("VELES_USER_HOME", str(home_root))
+    # Run from an agent's `run_shell`, the suite inherits the mark that refuses approvals.
+    monkeypatch.delenv("VELES_AGENT_SHELL", raising=False)
 
 
 @pytest.fixture

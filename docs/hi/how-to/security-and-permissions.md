@@ -104,7 +104,10 @@ environment नाम से forward किया जाता है — `VELES
 ज्ञात सीमाएँ:
 
 - `run_shell` एक shell है: एक बार आप इसे grant कर दें (या autopilot में), यह ऊपर की किसी भी
-  file को per-file confirmation के बिना लिख सकता है।
+  file को per-file confirmation के बिना लिख सकता है — और `~/.veles/` के approval stores को भी।
+  `veles … approve` के लिए terminal या समीक्षा किया हुआ hash (`--sha256`) चाहिए
+  और यह agent के shell द्वारा शुरू किए गए command को अस्वीकार कर देता है, लेकिन grant किया हुआ
+  shell उस निशान को हटा सकता है या उन files को सीधे लिख सकता है।
 - MCP approval server की command line को pin करता है, उन files को नहीं जिन्हें वह project से
   चलाता है (`args` में नामित script) — उन्हें भी review करें।
 - CLI provider के साथ, जो runs tools को केवल अपने लिए pre-authorise करते हैं (daemon background

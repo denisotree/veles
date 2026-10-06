@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.8] — 2026-10-06
+
+Veles in a container, without a terminal: a deploy script approves modules and tools
+by the hash it reviewed, `veles doctor` names every module that doesn't load, and admin
+commands no longer open the first-run wizard.
+
+### Upgrading from 1.2.7
+
+- **`veles tool approve --yes` needs a terminal.** Without one it approved every tool
+  file on disk — including one the agent wrote and approved from its own `run_shell`.
+  A script now approves each file by the hash it reviewed:
+  `veles tool approve <name> --sha256 <hash>`; bare `veles tool approve` lists the
+  hashes. `--yes` at a terminal works as before.
+- **`veles doctor` reports a module that doesn't load as an error** — for example one
+  that was never approved. A start-up check that requires zero errors now fails until
+  the module is approved.
+- **Stdio MCP servers get `VELES_AGENT_SHELL=1`** in their environment, and `run_shell`
+  runs commands with stdin closed. A server or a command run that way can't approve
+  modules, tools or MCP servers, connect a registry, or confirm a critical operation.
+
+### Added
+
+- `veles module approve <name> --sha256 <hash>` and `veles tool approve <name> --sha256
+  <hash>` approve without a terminal and refuse if the files changed since that hash
+  was reviewed; rerunning one that is already approved succeeds. `veles module show`
+  prints the module's files hash; `veles module approve --all` asks for every module
+  in that scope waiting for approval.
+- Each tool call is a `tool_call` line in `.veles/events.jsonl` (and its outcome a
+  `tool_result` line); their keys are now part of the `veles run` contract test and
+  documented in "How to embed `veles run`". Tool calls a CLI delegate (`claude-cli`,
+  `codex`, `antigravity-cli`) makes through its MCP server are not written there.
+
+### Fixed
+
+- The first-run wizard fronts only commands that start an agent. On a fresh `$HOME`
+  with a terminal, `veles module approve` (which requires one) opened a six-step
+  onboarding instead of approving.
+- `veles doctor` said "0 error" while a never-approved module was skipped. Its hint
+  and the load warning suggest `veles module approve` only where approving helps.
+- Commands the agent runs with `run_shell` carry `VELES_AGENT_SHELL`, and every
+  approval store (modules, tools, MCP servers, connected registries) and the critical
+  confirmation refuse them — the agent's "fix" for a skipped module can't approve its
+  own code. A shell can still strip the variable or write the stores directly; an OS
+  sandbox around `run_shell` is what closes that.
+- `run_shell` no longer inherits your terminal as stdin, so a confirmation prompt it
+  starts can't read your keys.
+- `veles tool promote` approved the moved file even if it had never been approved; it
+  now only carries an existing approval. Interactive `tool approve` approves exactly
+  the bytes it showed.
+- A bundled MCP tool template that couldn't be approved when it was copied is approved
+  on the next start if it is still unchanged.
+
 ## [1.2.7] — 2026-10-06
 
 `codex` — the Codex CLI on a ChatGPT subscription — is the ninth builtin provider, a CLI

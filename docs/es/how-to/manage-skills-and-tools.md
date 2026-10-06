@@ -65,9 +65,10 @@ en cada ejecución solo mientras sus archivos sigan coincidiendo con lo que apro
 veles module list                              # both scopes, with a `scope` column
 veles module add https://github.com/org/module.git
 veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
-veles module show <name> [--user]
+veles module show <name> [--user]             # manifiesto + sha256 de los archivos
 veles module remove <name> [--user]
-veles module approve <name> [--user]
+veles module approve <name> [--user]          # escribe `yes` en una terminal
+veles module approve <name> --sha256 <hash>   # sin terminal: el hash que revisaste
 ```
 
 Los módulos viven en dos ámbitos, igual que las skills y las herramientas: locales al

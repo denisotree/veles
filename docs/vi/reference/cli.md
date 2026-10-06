@@ -12,6 +12,9 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 - `--no-wizard` — bỏ qua trình thiết lập lần đầu ngay cả khi thiếu
   `~/.veles/config.toml` (cũng phụ thuộc vào TTY và vào `VELES_NO_WIZARD=1`).
+  Trình thiết lập chỉ đứng trước các lệnh khởi chạy agent (`veles` không kèm đối số,
+  `run`, `daemon`, `channel`, …); các lệnh quản trị như `module`, `tool` và `doctor`
+  không bao giờ mở nó.
 - Khi không có đối số, `veles` khởi chạy [TUI](tui.md) tương tác.
 
 Hầu hết các lệnh agent đều chấp nhận [các cờ vòng lặp agent dùng chung](#shared-agent-loop-flags)
@@ -174,22 +177,32 @@ thăng cấp → lint wiki, tùy chọn củng cố bằng LLM).
 | `list` | Liệt kê các tool đã được lập danh mục trong `memory.db` của dự án này |
 | `show <name>` | In ra manifest + telemetry của một tool |
 | `promote <name> [-y]` | Chuyển một tool dự án sang `~/.veles/tools/` (dùng chung nhiều dự án) |
-| `approve [<name>] [--all] [-y]` | Xem lại + phê duyệt một file tool tự soạn để loader sẽ chạy nó |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | Xem lại + phê duyệt một file tool tự soạn để loader sẽ chạy nó |
 
 Các tool tự soạn (`.veles/tools/*.py`) chạy mã ở cấp module khi loader import
 chúng, nên một file mới hoặc vừa chỉnh sửa sẽ **không được nạp cho đến khi bạn
 phê duyệt nó** — `veles tool approve` hiển thị mã và ghi lại hash của nó. Chạy
-`veles tool approve` không kèm gì sẽ liệt kê những gì đang chờ. Đây là lý do một
-tool do agent viết cần một bước xem lại trước khi có thể gọi được.
+`veles tool approve` không kèm gì sẽ liệt kê những gì đang chờ, cùng sha256 của từng
+file. Đây là lý do một tool do agent viết cần một bước xem lại trước khi có thể gọi được.
 
-### `veles module {list,show,add,remove}`
+Khi không có terminal (một script triển khai), hãy phê duyệt một file theo hash bạn
+đã xem lại: `veles tool approve <name> --sha256 <hash>` — lệnh thất bại nếu file đã
+thay đổi kể từ đó. `-y` chỉ bỏ qua câu hỏi xác nhận khi có terminal.
+
+### `veles module {list,show,add,remove,approve}`
 
 | Lệnh con | Mục đích |
 |---|---|
 | `list` | Liệt kê các module đã cài đặt |
-| `show <name>` | In ra manifest của một module |
+| `show <name>` | In ra manifest của một module cùng sha256 của các file |
 | `add <source> [--name N] [-y]` | Cài đặt một module từ URL git hoặc đường dẫn cục bộ |
 | `remove <name> [-y]` | Xóa một module đã cài đặt |
+| `approve <name> [--user] [--sha256 H]` | Phê duyệt một module sau khi xem lại |
+| `approve --all [--user]` | Mọi module trong phạm vi đó đang chờ phê duyệt, mỗi module một lần xác nhận |
+
+Việc phê duyệt yêu cầu bạn gõ `yes` trong terminal; nếu không có terminal, hãy truyền
+hash của các file bạn đã xem lại (`show` sẽ in ra) qua `--sha256` — lệnh thất bại nếu
+các file đã thay đổi kể từ đó. `veles doctor` báo cáo mọi module trên đĩa không nạp được.
 
 ### `veles registry search [query] [--kind K]`
 Tìm kiếm trong các registry đã kết nối (module, skill, layout pack, công

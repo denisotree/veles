@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 import subprocess
 
+from veles.core.critical_ops import AGENT_SHELL_ENV
 from veles.core.path_guard import sandbox_cwd
 from veles.core.risk import RiskClass
 from veles.core.tools.registry import tool
@@ -30,6 +32,8 @@ def run_shell(command: str, timeout: int = 30) -> str:
             timeout=timeout,
             check=False,
             cwd=str(sandbox_cwd()),
+            stdin=subprocess.DEVNULL,  # never the user's terminal: no prompt reads their keys
+            env={**os.environ, AGENT_SHELL_ENV: "1"},  # `veles … approve` refuses it
         )
     except subprocess.TimeoutExpired:
         return f"<timeout after {timeout}s>"

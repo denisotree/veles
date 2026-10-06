@@ -256,6 +256,53 @@ def test_non_tty_trust_prompt_refuses_instead_of_blocking(
     assert choice is trust.TrustChoice.REFUSE
 
 
+def test_each_tool_call_is_a_line_in_events_jsonl(project: Project) -> None:
+    """Embedders count tool calls from `.veles/events.jsonl` — the stderr
+    `tool name(args)` line is a debug print, outside the contract (integrator report
+    V-5). These keys stay; new ones may be added."""
+    from tests.conftest import StubProvider
+    from veles.core.agent import Agent
+    from veles.core.context import reset_active_project, set_active_project
+    from veles.core.events import read_events
+    from veles.core.provider import ProviderResponse, TokenUsage, ToolCall
+    from veles.core.tools.registry import Registry, ToolEntry
+
+    usage = TokenUsage(prompt_tokens=1, completion_tokens=1, total_tokens=2)
+    provider = StubProvider(
+        responses=[
+            ProviderResponse(
+                text=None,
+                tool_calls=[ToolCall(id="c1", name="echo", arguments={"text": "x"})],
+                usage=usage,
+                finish_reason="tool_use",
+            ),
+            ProviderResponse(text="done", tool_calls=[], usage=usage, finish_reason="stop"),
+        ]
+    )
+    reg = Registry()
+    reg.register(
+        ToolEntry(
+            name="echo",
+            description="Echo",
+            parameter_schema={"type": "object"},
+            handler=lambda text="": f"echo:{text}",
+            is_async=False,
+        )
+    )
+    token = set_active_project(project)
+    try:
+        Agent(provider, reg, model="m").run("hi")
+    finally:
+        reset_active_project(token)
+    events = read_events(project.state_dir / "events.jsonl")
+    [call] = [e for e in events if e["type"] == "tool_call"]
+    [result] = [e for e in events if e["type"] == "tool_result"]
+    assert {"ts", "session_id", "tool_call_id", "name", "arguments"} <= set(call)
+    assert call["name"] == "echo" and call["arguments"] == {"text": "x"}
+    assert {"ts", "session_id", "tool_call_id", "name", "output", "error"} <= set(result)
+    assert result["tool_call_id"] == call["tool_call_id"] and result["error"] is None
+
+
 def test_non_tty_critical_confirm_refuses_instead_of_blocking(
     monkeypatch: pytest.MonkeyPatch, capsys
 ) -> None:

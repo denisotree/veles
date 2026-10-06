@@ -66,9 +66,10 @@ embeddings, vision, STT), не раздувая ядро. Установка п�
 veles module list                              # обе области, колонка `scope`
 veles module add https://github.com/org/module.git
 veles module add ./local-module --user          # установка в ~/.veles/modules/, для всех проектов
-veles module show <name> [--user]
+veles module show <name> [--user]             # манифест + sha256 файлов
 veles module remove <name> [--user]
-veles module approve <name> [--user]
+veles module approve <name> [--user]          # ввести `yes` в терминале
+veles module approve <name> --sha256 <hash>   # без терминала: проверенный хеш
 ```
 
 Модули, как навыки и инструменты, существуют в двух областях: проектной

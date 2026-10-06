@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import re
 import sys
+
+_SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
 def confirm(prompt: str) -> bool:
@@ -12,6 +15,20 @@ def confirm(prompt: str) -> bool:
     except EOFError:
         return False
     return answer in {"y", "yes"}
+
+
+def reviewed_sha256(value: str) -> str | None:
+    """`--sha256` normalised, or None (said why) unless it is a full SHA-256 — an unset
+    `$HASH` or a short one must not read as "the files changed"."""
+    digest = value.strip().lower()
+    if _SHA256.fullmatch(digest):
+        return digest
+    print(
+        "error: --sha256 takes the full 64-character hex hash (`veles module show` and "
+        "`veles tool approve` print it)",
+        file=sys.stderr,
+    )
+    return None
 
 
 def check_provider(

@@ -103,7 +103,10 @@ environment that server gets is forwarded by name — never `VELES_TRUST_AUTO_AL
 Known limits:
 
 - `run_shell` is a shell: once you grant it (or under autopilot) it can write any of
-  the files above without the per-file confirmation.
+  the files above without the per-file confirmation — and the approval stores in
+  `~/.veles/`. `veles … approve` needs a terminal or the reviewed hash (`--sha256`)
+  and refuses a command the agent's shell started, but a granted shell can strip
+  that mark or write those files directly.
 - An MCP approval pins the server's command line, not the files it runs from the project
   (a script named in `args`) — review those too.
 - With a CLI provider, runs that pre-authorise tools only for themselves (daemon

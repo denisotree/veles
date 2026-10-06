@@ -24,6 +24,7 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any, Literal
 
+from veles.core.critical_ops import refuse_in_agent_shell
 from veles.core.file_lock import file_lock
 from veles.core.io_utils import atomic_write_json, load_optional_json
 from veles.core.text import shown
@@ -156,6 +157,7 @@ def _locked() -> AbstractContextManager[None]:
 def approve(project_root: Path, name: str, raw: dict[str, Any]) -> str:
     """Record `raw` (and the project files it runs) as approved for `name`.
     Returns the hash."""
+    refuse_in_agent_shell(f"approving MCP server {name}")
     digest = approval_hash(project_root, raw)
     with _locked():
         data = _load()

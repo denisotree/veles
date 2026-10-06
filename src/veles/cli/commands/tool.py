@@ -30,6 +30,7 @@ Side-effects:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import shutil
 import sys
 from dataclasses import dataclass
@@ -137,10 +138,23 @@ def _cmd_approve(args: argparse.Namespace, project: Project) -> int:
     """Review and human-approve self-authored tool files so the loader will
     execute them (M199). Until approved, `.veles/tools/*.py` are skipped — their
     module-level code never runs. Approval records the file's current SHA-256 in
-    `~/.veles/tool-approvals.json` (outside the agent's write sandbox)."""
-    from veles.core.tools.approvals import approve, is_approved
+    `~/.veles/tool-approvals.json`. Headless (a deploy script) it takes `--sha256`,
+    the hash the human reviewed; `--yes` needs a terminal, since an agent's
+    `run_shell` has none and would otherwise approve its own files."""
+    from veles.core.tools.approvals import approve, file_sha256, is_approved
 
     candidates = _list_tool_py(project.state_dir / "tools") + _list_tool_py(user_home() / "tools")
+    if getattr(args, "sha256", None) is not None:
+        return _approve_by_hash(args, candidates)
+    yes = getattr(args, "yes", False)
+    if yes and not sys.stdin.isatty():
+        print(
+            "error: --yes needs a terminal. Without one, approve each file by the hash you "
+            "reviewed: `veles tool approve <name> --sha256 <hash>` (`veles tool approve` "
+            "lists them).",
+            file=sys.stderr,
+        )
+        return 1
     unapproved = [p for p in candidates if not is_approved(p)]
     if not unapproved:
         print("all self-authored tool files are already approved.")
@@ -156,22 +170,59 @@ def _cmd_approve(args: argparse.Namespace, project: Project) -> int:
     else:
         print("unapproved tool files (pass a name or --all to approve):")
         for p in unapproved:
-            print(f"  {p.stem}  ({p})")
+            print(f"  {p.stem}  ({p})  sha256: {file_sha256(p)}")
         return 0
 
-    for f in targets:
-        print(f"\n===== {f} =====")
-        print(f.read_text())
-        print("=" * (len(str(f)) + 12))
-        from veles.cli._console import confirm as _confirm
+    from veles.cli._console import confirm as _confirm
 
-        if not getattr(args, "yes", False) and not _confirm(
-            f"Approve '{f.name}' to execute its code at load? [y/N]"
-        ):
-            print(f"skipped {f.name}")
-            continue
-        sha = approve(f)
+    for f in targets:
+        try:
+            data = f.read_bytes()  # one read: the bytes shown are the bytes approved
+            print(f"\n===== {f} =====")
+            print(data.decode("utf-8", errors="replace"))
+            print("=" * (len(str(f)) + 12))
+            if not yes and not _confirm(f"Approve '{f.name}' to execute its code at load? [y/N]"):
+                print(f"skipped {f.name}")
+                continue
+            sha = approve(f, expected_sha256=hashlib.sha256(data).hexdigest())
+        except (OSError, ValueError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
         print(f"approved {f.name} ({sha[:12]}…)")
+    return 0
+
+
+def _approve_by_hash(args: argparse.Namespace, candidates: list[Path]) -> int:
+    """Headless: approve the named file whose bytes hash to the reviewed `--sha256` — a
+    same-named file in the other scope is left alone, and an approved one is success, so
+    a boot script can rerun it."""
+    from veles.cli._console import reviewed_sha256
+    from veles.core.tools.approvals import approve, file_sha256, is_approved
+
+    name = getattr(args, "name", None)
+    if getattr(args, "all", False) or not name:
+        print(
+            "error: --sha256 approves one named file: `veles tool approve <name> --sha256 <hash>`",
+            file=sys.stderr,
+        )
+        return 2
+    expected = reviewed_sha256(args.sha256)
+    if expected is None:
+        return 2
+    match = next((p for p in candidates if p.stem == name and file_sha256(p) == expected), None)
+    if match is None:
+        print(
+            f"error: no tool file {name!r} has that hash — changed since it was reviewed?",
+            file=sys.stderr,
+        )
+        return 1
+    if not is_approved(match):
+        try:
+            approve(match, expected_sha256=expected)
+        except (OSError, ValueError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+    print(f"approved {match.name} ({expected[:12]}…)")
     return 0
 
 
@@ -309,6 +360,7 @@ def _cmd_promote(args: argparse.Namespace, project: Project) -> int:
         return 1
 
     from veles.cli._console import confirm as _confirm
+    from veles.core.tools.approvals import approve, file_sha256, is_approved
 
     if not args.yes and not _confirm(
         f"Move {src} → {dst} (tool '{name}' becomes user-global)? [y/N]"
@@ -316,13 +368,15 @@ def _cmd_promote(args: argparse.Namespace, project: Project) -> int:
         print("aborted.")
         return 0
 
+    reviewed = file_sha256(src) if is_approved(src) else None
     shutil.move(str(src), str(dst))
-    # M199: promote is a human action on an already-reviewed tool — carry the
-    # approval to the new path so the user-level loader still runs it (the
-    # approval store is keyed by absolute path, which the move changed).
-    from veles.core.tools.approvals import approve
-
-    approve(dst)
+    # M199: carry an existing approval to the new path (the store is keyed by
+    # absolute path, which the move changed) — never create one for unreviewed code.
+    if reviewed:
+        try:
+            approve(dst, expected_sha256=reviewed)
+        except (OSError, ValueError) as exc:
+            print(f"warning: {dst.name} moved, but not approved there: {exc}", file=sys.stderr)
 
     # Update the catalogue. The next load_into_registry call will see
     # the file at the new path and refresh manifest_json; this

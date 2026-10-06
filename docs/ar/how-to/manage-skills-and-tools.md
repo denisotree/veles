@@ -62,9 +62,10 @@ veles tool promote <name>      # move to ~/.veles/tools/ (cross-project)
 veles module list                              # both scopes, with a `scope` column
 veles module add https://github.com/org/module.git
 veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
-veles module show <name> [--user]
+veles module show <name> [--user]             # البيان + sha256 للملفات
 veles module remove <name> [--user]
-veles module approve <name> [--user]
+veles module approve <name> [--user]          # اكتب `yes` في طرفية
+veles module approve <name> --sha256 <hash>   # بدون طرفية: البصمة التي راجعتها
 ```
 
 تعيش الوحدات في نطاقين، كالمهارات والأدوات: محلّي بالمشروع

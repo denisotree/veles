@@ -8,7 +8,7 @@
 veles [--no-wizard] <command> [subcommand] [options]
 ```
 
-- `--no-wizard`——即使 `~/.veles/config.toml` 不存在也跳過首次執行的設定精靈（同時也受 TTY 與 `VELES_NO_WIZARD=1` 控制）。
+- `--no-wizard`——即使 `~/.veles/config.toml` 不存在也跳過首次執行的設定精靈（同時也受 TTY 與 `VELES_NO_WIZARD=1` 控制）。精靈只會出現在會啟動代理的指令之前（不帶引數的 `veles`、`run`、`daemon`、`channel` 等）；`module`、`tool`、`doctor` 這類管理指令從不會開啟它。
 - 不帶任何引數時，`veles` 會啟動互動式 [TUI](tui.md)。
 
 多數代理命令都接受底部列出的[共用代理迴圈旗標](#shared-agent-loop-flags)與[供應商名稱](#provider-names)。
@@ -153,18 +153,24 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `list` | 列出本專案 `memory.db` 中編目的工具 |
 | `show <name>` | 印出某工具的清單檔＋遙測 |
 | `promote <name> [-y]` | 將專案工具移至 `~/.veles/tools/`（跨專案） |
-| `approve [<name>] [--all] [-y]` | 審閱並核准一個自撰工具檔，使載入器會執行它 |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | 審閱並核准一個自撰工具檔，使載入器會執行它 |
 
-自撰工具（`.veles/tools/*.py`）在載入器匯入時會執行其模組層級的程式碼，因此**新建或編輯過的檔案在你核准前不會被載入**——`veles tool approve` 會顯示程式碼並記錄其雜湊值。單獨執行 `veles tool approve` 會列出待核准的項目。這就是為什麼代理所撰寫的工具在能被呼叫之前需要一個審閱步驟。
+自撰工具（`.veles/tools/*.py`）在載入器匯入時會執行其模組層級的程式碼，因此**新建或編輯過的檔案在你核准前不會被載入**——`veles tool approve` 會顯示程式碼並記錄其雜湊值。單獨執行 `veles tool approve` 會列出待核准的項目，並附上每個檔案的 sha256。這就是為什麼代理所撰寫的工具在能被呼叫之前需要一個審閱步驟。
 
-### `veles module {list,show,add,remove}`
+沒有終端機時（部署腳本），可依已審閱的雜湊值核准單一檔案：`veles tool approve <name> --sha256 <hash>`——若檔案自那之後有變動則會失敗。`-y` 只在終端機中略過確認提示。
+
+### `veles module {list,show,add,remove,approve}`
 
 | 子命令 | 用途 |
 |---|---|
 | `list` | 列出已安裝的模組 |
-| `show <name>` | 印出某模組的清單檔 |
+| `show <name>` | 印出某模組的清單檔及其檔案的 sha256 |
 | `add <source> [--name N] [-y]` | 從 git URL 或本機路徑安裝模組 |
 | `remove <name> [-y]` | 刪除已安裝的模組 |
+| `approve <name> [--user] [--sha256 H]` | 審閱後核准一個模組 |
+| `approve --all [--user]` | 該範圍內所有待核准的模組，每個各確認一次 |
+
+核准時會要求在終端機中輸入 `yes`；沒有終端機時，請把你審閱過的檔案雜湊值（`show` 會印出）以 `--sha256` 傳入——若檔案自那之後有變動則會失敗。`veles doctor` 會回報磁碟上每個未載入的模組。
 
 ### `veles registry search [query] [--kind K]`
 在已連接的登錄庫中搜尋（模組、技能、layout 包、MCP 配方）。

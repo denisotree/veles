@@ -46,6 +46,23 @@ def test_provision_is_idempotent_and_preserves_edits(tmp_path: Path) -> None:
     assert dst.read_text(encoding="utf-8") == "# user edit\n"
 
 
+def test_a_template_left_unapproved_is_approved_on_the_next_call(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Provisioned from inside the agent's shell (a `veles run` the agent started), the
+    copy can't be approved; once the file exists it was skipped for good."""
+    from veles.core.tools.approvals import is_approved
+
+    project = _graphify_project(tmp_path)
+    dst = project.state_dir / "tools" / "graphify_rebuild.py"
+    monkeypatch.setenv("VELES_AGENT_SHELL", "1")
+    ensure_mcp_project_tools(project)
+    assert dst.is_file() and not is_approved(dst)
+    monkeypatch.delenv("VELES_AGENT_SHELL")
+    ensure_mcp_project_tools(project)
+    assert is_approved(dst)
+
+
 def test_no_provision_without_graphify_mcp(tmp_path: Path) -> None:
     project = init_project(tmp_path, name=None, force=False)
     assert ensure_mcp_project_tools(project) == []

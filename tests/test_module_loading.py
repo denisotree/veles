@@ -54,6 +54,29 @@ def test_mcp_child_loads_approved_user_modules(
     assert seen["modules"] == ["u1"]
 
 
+def test_doctor_reports_a_module_that_never_loads(tmp_path: Path) -> None:
+    """A never-approved module has no install record, so the extensions check missed it
+    and doctor said "0 error" while the module was skipped (integrator report V-2)."""
+    from veles.core.doctor import _check_modules
+
+    project = init_project(tmp_path / "p", name="p")
+    assert _check_modules(project).status == "ok"
+    approve_module(_user_module("u1"), name="u1", project_root=None)
+    _user_module("never")
+    own = project.modules_dir / "guard"
+    own.mkdir(parents=True)
+    (own / "module.toml").write_text(
+        '[module]\nname = "guard"\ndescription = "d"\nentrypoint = "m.py:register"\n',
+        encoding="utf-8",
+    )
+    (own / "m.py").write_text("def register(api):\n    pass\n", encoding="utf-8")
+    res = _check_modules(project)
+    assert res.status == "error"
+    assert "never" in res.message and "guard" in res.message and "u1" not in res.message
+    assert "veles module approve --user never" in (res.fix_hint or "")
+    assert "veles module approve guard" in (res.fix_hint or "")
+
+
 def test_builtin_modules_load_once_across_threads(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
     barrier = threading.Barrier(4)

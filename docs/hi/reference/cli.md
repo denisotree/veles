@@ -12,6 +12,8 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 - `--no-wizard` — पहली बार चलने वाले setup wizard को छोड़ दें, भले ही
   `~/.veles/config.toml` मौजूद न हो (यह TTY और `VELES_NO_WIZARD=1` पर भी निर्भर है)।
+  wizard केवल उन commands से पहले आता है जो agent शुरू करते हैं (सादा `veles`, `run`,
+  `daemon`, `channel`, …); `module`, `tool` और `doctor` जैसे admin verbs इसे कभी नहीं खोलते।
 - बिना किसी argument के, `veles` interactive [TUI](tui.md) शुरू करता है।
 
 अधिकांश agent commands [साझा agent-loop flags](#shared-agent-loop-flags) और नीचे
@@ -174,22 +176,33 @@ suggestions → wiki lint, वैकल्पिक रूप से LLM consoli
 | `list` | इस प्रोजेक्ट की `memory.db` में सूचीबद्ध tools दिखाएँ |
 | `show <name>` | किसी tool का manifest + telemetry प्रिंट करें |
 | `promote <name> [-y]` | एक project tool को `~/.veles/tools/` (cross-project) में ले जाएँ |
-| `approve [<name>] [--all] [-y]` | एक self-authored tool file की समीक्षा करें + approve करें ताकि loader उसे चलाए |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | एक self-authored tool file की समीक्षा करें + approve करें ताकि loader उसे चलाए |
 
 self-authored tools (`.veles/tools/*.py`) अपना module-level code तब चलाते हैं जब
 loader उन्हें import करता है, इसलिए एक नई या edited file **तब तक load नहीं होती जब
 तक आप उसे approve न करें** — `veles tool approve` code दिखाता है और उसका hash
-रिकॉर्ड करता है। सादा `veles tool approve` दिखाता है कि क्या लंबित है। यही कारण है
-कि agent द्वारा लिखे गए tool को callable बनने से पहले एक review step की ज़रूरत होती है।
+रिकॉर्ड करता है। सादा `veles tool approve` हर file के sha256 के साथ दिखाता है कि क्या
+लंबित है। यही कारण है कि agent द्वारा लिखे गए tool को callable बनने से पहले एक review step
+की ज़रूरत होती है।
 
-### `veles module {list,show,add,remove}`
+terminal के बिना (deploy script) किसी file को उस hash से approve करें जिसकी आपने समीक्षा की है:
+`veles tool approve <name> --sha256 <hash>` — इसके बाद file बदल गई हो तो यह विफल हो जाता है।
+`-y` prompt को केवल terminal में छोड़ता है।
+
+### `veles module {list,show,add,remove,approve}`
 
 | Subcommand | उद्देश्य |
 |---|---|
 | `list` | installed modules सूचीबद्ध करें |
-| `show <name>` | किसी module का manifest प्रिंट करें |
+| `show <name>` | किसी module का manifest और उसकी files का sha256 प्रिंट करें |
 | `add <source> [--name N] [-y]` | git URL या local path से एक module install करें |
 | `remove <name> [-y]` | एक installed module हटाएँ |
+| `approve <name> [--user] [--sha256 H]` | समीक्षा के बाद एक module approve करें |
+| `approve --all [--user]` | उस scope का हर module जो approval की प्रतीक्षा में है, हर एक के लिए एक confirmation |
+
+Approval में terminal पर `yes` टाइप करना पड़ता है; terminal के बिना, आपने जिन files की समीक्षा की उनका
+hash (`show` इसे प्रिंट करता है) `--sha256` के रूप में दें — files के बाद में बदल जाने पर यह विफल हो
+जाता है। `veles doctor` disk पर मौजूद हर उस module की रिपोर्ट करता है जो load नहीं होता।
 
 ### `veles registry search [query] [--kind K]`
 connected registries में search करें (module, skill, layout pack, MCP recipe)।
