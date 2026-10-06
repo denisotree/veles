@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import sys
 
 
@@ -14,13 +15,23 @@ def confirm(prompt: str) -> bool:
     return answer in {"y", "yes"}
 
 
-def check_provider(provider: str) -> bool:
+def provider_reason(args: argparse.Namespace) -> str:
+    """Why a provider is being installed, for the auto-install line."""
+    if getattr(args, "_provider_explicit", False):
+        return "named with --provider"
+    return "named in [engine] provider"
+
+
+def check_provider(
+    provider: str, *, reason: str = "named in [engine] provider or with --provider"
+) -> bool:
     """The provider exists — in the catalogue, or installed now from the user's
-    registries because a flag or the config named it. Prints why not."""
+    registries because a flag or the config named it (`reason` says which). Prints
+    why not."""
     from veles.core.providers import RETIRED, list_providers
     from veles.core.registry.ensure import ensure_provider
 
-    if ensure_provider(provider, reason="named in [engine] provider or with --provider"):
+    if ensure_provider(provider, reason=reason):
         return True
     if provider in RETIRED:
         print(f"error: {RETIRED[provider]}", file=sys.stderr)

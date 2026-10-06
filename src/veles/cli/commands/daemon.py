@@ -213,6 +213,11 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     )
 
     provider_name = resolve_effective_provider(args, project, daemon_session=name)
+    from veles.cli._console import check_provider, provider_reason
+
+    # The provider first: a typo there is the error to show, not the missing model.
+    if not check_provider(provider_name, reason=provider_reason(args)):
+        return 2
     # The model is fixed for the daemon's lifetime: an unset one is a one-line
     # error here, as for `veles run`, not a traceback from the agent factory.
     try:

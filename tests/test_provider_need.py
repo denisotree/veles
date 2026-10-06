@@ -141,3 +141,27 @@ def test_a_wizard_pick_installs_with_confirmation(isolated_user_home: Path, monk
     )
     assert ensure.ensure_provider_interactive("antigravity-cli") is False
     assert asked == [("antigravity-cli", True, False)]
+
+
+def test_an_unknown_provider_is_named_before_a_missing_model(
+    isolated_user_home: Path, tmp_path: Path, capsys
+) -> None:
+    from veles.cli._parsers import build_parser
+    from veles.cli.commands.run import cmd_run
+
+    project = init_project(tmp_path / "p", name="p")
+    args = build_parser().parse_args(["run", "--provider", "opnrouter", "hi"])
+    assert cmd_run(args, project) == 2
+    err = capsys.readouterr().err
+    assert "unknown provider 'opnrouter'" in err and "no model" not in err
+
+
+def test_the_install_line_says_where_the_name_came_from(
+    isolated_user_home: Path, fake_install: list[str], capsys
+) -> None:
+    from veles.cli._console import check_provider, provider_reason
+    from veles.cli._parsers import build_parser
+
+    args = build_parser().parse_args(["run", "--provider", "antigravity-cli", "hi"])
+    check_provider("antigravity-cli", reason=provider_reason(args))
+    assert "(named with --provider)" in capsys.readouterr().err

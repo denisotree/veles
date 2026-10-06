@@ -36,7 +36,8 @@ def cmd_dream(args: argparse.Namespace, project) -> int:
         from veles.core.provider_factory import make_provider as _make_provider
         from veles.core.routing.ensemble import route
 
-        if getattr(args, "provider", None) and not check_provider(args.provider):
+        named = getattr(args, "provider", None)
+        if named and not check_provider(named, reason="named with --provider"):
             return 2
         try:
             routed_provider, routed_model = route("insights", project)
