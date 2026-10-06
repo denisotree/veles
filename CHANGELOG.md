@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.8] — 2026-10-06
+
+Veles in a container, without a terminal: a deploy script approves modules and tools
+by the hash it reviewed, `veles doctor` names every module that doesn't load, and admin
+commands no longer open the first-run wizard.
+
+### Upgrading from 1.2.7
+
+- **`veles tool approve --yes` needs a terminal.** Without one it approved every tool
+  file on disk — including one the agent wrote and approved from its own `run_shell`.
+  A script now approves each file by the hash it reviewed:
+  `veles tool approve <name> --sha256 <hash>`; bare `veles tool approve` lists the
+  hashes. `--yes` at a terminal works as before.
+- **`veles doctor` reports a module that doesn't load as an error** — for example one
+  that was never approved. A start-up check that requires zero errors now fails until
+  the module is approved.
+
+### Added
+
+- `veles module approve <name> --sha256 <hash>` and `veles tool approve <name> --sha256
+  <hash>` approve without a terminal and refuse if the files changed since that hash
+  was reviewed. `veles module show` prints the module's files hash; `veles module
+  approve --all` asks for every module that doesn't load.
+- Each tool call is a `tool_call` line in `.veles/events.jsonl` (and its outcome a
+  `tool_result` line); their keys are now part of the `veles run` contract test and
+  documented in "How to embed `veles run`".
+
+### Fixed
+
+- The first-run wizard fronts only commands that start an agent. On a fresh `$HOME`
+  with a terminal, `veles module approve` (which requires one) opened a six-step
+  onboarding instead of approving.
+- `veles doctor` said "0 error" while a never-approved module was skipped.
+- Commands the agent runs with `run_shell` carry `VELES_AGENT_SHELL`, and approving a
+  module or tool refuses them, so the agent can't approve its own code with a hash.
+- `veles tool promote` approved the moved file even if it had never been approved; it
+  now only carries an existing approval. A tool file changed between being shown and
+  being approved is refused.
+
 ## [1.2.7] — 2026-10-06
 
 `codex` — the Codex CLI on a ChatGPT subscription — is the ninth builtin provider, a CLI
