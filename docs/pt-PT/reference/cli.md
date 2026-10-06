@@ -198,7 +198,7 @@ Sem um terminal (um script de implementação), aprova um ficheiro pelo hash rev
 | `add <source> [--name N] [-y]` | Instala um módulo a partir de um URL git ou caminho local |
 | `remove <name> [-y]` | Apaga um módulo instalado |
 | `approve <name> [--user] [--sha256 H]` | Aprova um módulo depois de o rever |
-| `approve --all [--user]` | Todos os módulos que não carregam, uma confirmação para cada |
+| `approve --all [--user]` | Todos os módulos desse âmbito à espera de aprovação, uma confirmação para cada |
 
 A aprovação pede-te que escrevas `yes` num terminal; sem um, passa o hash dos ficheiros
 revistos (o `show` imprime-o) como `--sha256` — falha se os ficheiros mudaram

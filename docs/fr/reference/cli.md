@@ -201,7 +201,7 @@ changé depuis. `-y` ne saute la question que dans un terminal.
 | `add <source> [--name N] [-y]` | Installe un module depuis une URL git ou un chemin local |
 | `remove <name> [-y]` | Supprime un module installé |
 | `approve <name> [--user] [--sha256 H]` | Approuve un module après l'avoir relu |
-| `approve --all [--user]` | Chaque module qui ne se charge pas, une confirmation chacun |
+| `approve --all [--user]` | Chaque module de ce périmètre en attente d'approbation, une confirmation chacun |
 
 L'approbation vous demande de saisir `yes` dans un terminal ; sans terminal, passez en
 `--sha256` le hash des fichiers que vous avez relus (`show` l'affiche) — la commande

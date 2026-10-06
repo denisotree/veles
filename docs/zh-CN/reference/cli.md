@@ -168,7 +168,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `add <source> [--name N] [-y]` | 从 git URL 或本地路径安装 module |
 | `remove <name> [-y]` | 删除已安装的 module |
 | `approve <name> [--user] [--sha256 H]` | 审阅后批准一个 module |
-| `approve --all [--user]` | 所有未加载的 module，每个单独确认一次 |
+| `approve --all [--user]` | 该范围内所有待批准的 module，每个单独确认一次 |
 
 批准时会要求在终端中输入 `yes`；没有终端时，请把你审阅过的文件哈希（`show` 会打印）作为 `--sha256` 传入——若文件自那以后发生了变化则会失败。`veles doctor` 会报告磁盘上每个未加载的 module。
 

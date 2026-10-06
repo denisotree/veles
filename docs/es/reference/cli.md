@@ -200,7 +200,7 @@ entonces. `-y` omite la pregunta solo en una terminal.
 | `add <source> [--name N] [-y]` | Instala un módulo desde una URL de git o una ruta local |
 | `remove <name> [-y]` | Elimina un módulo instalado |
 | `approve <name> [--user] [--sha256 H]` | Aprueba un módulo tras revisarlo |
-| `approve --all [--user]` | Cada módulo que no se carga, con una confirmación por cada uno |
+| `approve --all [--user]` | Cada módulo de ese ámbito pendiente de aprobación, con una confirmación por cada uno |
 
 La aprobación te pide escribir `yes` en una terminal; sin terminal, pasa el hash de los
 archivos que revisaste (`show` lo imprime) como `--sha256` — falla si los archivos

@@ -202,7 +202,7 @@ cambiato nel frattempo. `-y` salta la richiesta solo in un terminale.
 | `add <source> [--name N] [-y]` | Installa un modulo da un URL git o da un percorso locale |
 | `remove <name> [-y]` | Elimina un modulo installato |
 | `approve <name> [--user] [--sha256 H]` | Approva un modulo dopo averlo revisionato |
-| `approve --all [--user]` | Ogni modulo che non si carica, una conferma per ciascuno |
+| `approve --all [--user]` | Ogni modulo di quell'ambito in attesa di approvazione, una conferma per ciascuno |
 
 L'approvazione chiede di digitare `yes` in un terminale; senza terminale, passa come
 `--sha256` l'hash dei file che hai revisionato (lo stampa `show`) — fallisce se i file

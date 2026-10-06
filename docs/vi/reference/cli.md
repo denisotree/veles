@@ -198,7 +198,7 @@ thay đổi kể từ đó. `-y` chỉ bỏ qua câu hỏi xác nhận khi có t
 | `add <source> [--name N] [-y]` | Cài đặt một module từ URL git hoặc đường dẫn cục bộ |
 | `remove <name> [-y]` | Xóa một module đã cài đặt |
 | `approve <name> [--user] [--sha256 H]` | Phê duyệt một module sau khi xem lại |
-| `approve --all [--user]` | Mọi module không nạp được, mỗi module một lần xác nhận |
+| `approve --all [--user]` | Mọi module trong phạm vi đó đang chờ phê duyệt, mỗi module một lần xác nhận |
 
 Việc phê duyệt yêu cầu bạn gõ `yes` trong terminal; nếu không có terminal, hãy truyền
 hash của các file bạn đã xem lại (`show` sẽ in ra) qua `--sha256` — lệnh thất bại nếu

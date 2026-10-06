@@ -198,7 +198,7 @@ terminal के बिना (deploy script) किसी file को उस has
 | `add <source> [--name N] [-y]` | git URL या local path से एक module install करें |
 | `remove <name> [-y]` | एक installed module हटाएँ |
 | `approve <name> [--user] [--sha256 H]` | समीक्षा के बाद एक module approve करें |
-| `approve --all [--user]` | हर वह module जो load नहीं होता, हर एक के लिए एक confirmation |
+| `approve --all [--user]` | उस scope का हर module जो approval की प्रतीक्षा में है, हर एक के लिए एक confirmation |
 
 Approval में terminal पर `yes` टाइप करना पड़ता है; terminal के बिना, आपने जिन files की समीक्षा की उनका
 hash (`show` इसे प्रिंट करता है) `--sha256` के रूप में दें — files के बाद में बदल जाने पर यह विफल हो

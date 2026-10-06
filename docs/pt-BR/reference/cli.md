@@ -199,7 +199,7 @@ Sem um terminal (um script de deploy), aprove um arquivo pelo hash que você rev
 | `add <source> [--name N] [-y]` | Instala um módulo a partir de uma URL git ou caminho local |
 | `remove <name> [-y]` | Remove um módulo instalado |
 | `approve <name> [--user] [--sha256 H]` | Aprova um módulo depois de revisá-lo |
-| `approve --all [--user]` | Todo módulo que não carrega, uma confirmação para cada |
+| `approve --all [--user]` | Todo módulo desse escopo aguardando aprovação, uma confirmação para cada |
 
 A aprovação pede que você digite `yes` em um terminal; sem um, passe o hash dos
 arquivos que você revisou (o `show` o imprime) como `--sha256` — falha se os arquivos

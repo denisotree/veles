@@ -168,7 +168,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `add <source> [--name N] [-y]` | 從 git URL 或本機路徑安裝模組 |
 | `remove <name> [-y]` | 刪除已安裝的模組 |
 | `approve <name> [--user] [--sha256 H]` | 審閱後核准一個模組 |
-| `approve --all [--user]` | 所有未載入的模組，每個各確認一次 |
+| `approve --all [--user]` | 該範圍內所有待核准的模組，每個各確認一次 |
 
 核准時會要求在終端機中輸入 `yes`；沒有終端機時，請把你審閱過的檔案雜湊值（`show` 會印出）以 `--sha256` 傳入——若檔案自那之後有變動則會失敗。`veles doctor` 會回報磁碟上每個未載入的模組。
 

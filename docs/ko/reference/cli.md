@@ -168,7 +168,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `add <source> [--name N] [-y]` | git URL 또는 로컬 경로에서 모듈 설치 |
 | `remove <name> [-y]` | 설치된 모듈 삭제 |
 | `approve <name> [--user] [--sha256 H]` | 검토 후 모듈 승인 |
-| `approve --all [--user]` | 로드되지 않는 모든 모듈 — 모듈마다 한 번씩 확인 |
+| `approve --all [--user]` | 해당 범위에서 승인을 기다리는 모든 모듈 — 모듈마다 한 번씩 확인 |
 
 승인은 터미널에서 `yes` 입력을 요구합니다. 터미널이 없으면 검토한 파일 해시(`show`가 출력함)를 `--sha256`으로 전달하세요 — 그 이후 파일이 바뀌었다면 실패합니다. `veles doctor`는 디스크에 있으면서 로드되지 않는 모든 모듈을 보고합니다.
 
