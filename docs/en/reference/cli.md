@@ -238,7 +238,7 @@ Without a terminal (a deploy script), approve one file by the hash you reviewed:
 | `add <source> [--name N] [--user] [-y]` | Install a module from a git URL or local path |
 | `remove <name> [--user] [-y]` | Delete an installed module |
 | `approve <name> [--user] [--sha256 H]` | Approve a module after reviewing it |
-| `approve --all [--user]` | Every module that doesn't load, one confirmation each |
+| `approve --all [--user]` | Every module in that scope waiting for approval, one confirmation each |
 
 `--user` targets `~/.veles/modules/` instead of the project's, so the module
 loads in every project. A same-named project module overrides a user-level one.

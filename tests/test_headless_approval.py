@@ -110,6 +110,76 @@ def test_a_changed_tool_is_not_approved_by_an_old_hash(project: Project, capsys)
     assert not is_approved(f)
 
 
+def _other_tool(project: Project) -> Path:
+    f = project.state_dir / "tools" / "other.py"
+    f.write_text(_TOOL.replace("hello", "other"), encoding="utf-8")
+    return f
+
+
+def test_reapproving_a_tool_by_hash_is_idempotent(project: Project) -> None:
+    """A boot script reruns on every start; its exit status must not depend on another,
+    still-pending file."""
+    f = _tool(project)
+    _other_tool(project)
+    argv = ["tool", "approve", "hello", "--sha256", file_sha256(f)]
+    assert main(argv) == 0
+    assert main(argv) == 0
+
+
+def test_the_hash_picks_between_same_named_tool_files(project: Project) -> None:
+    from veles.core.user_paths import user_home
+
+    mine = _tool(project)
+    theirs = user_home() / "tools" / "hello.py"
+    theirs.parent.mkdir(parents=True, exist_ok=True)
+    theirs.write_text(_TOOL + "# user-level\n", encoding="utf-8")
+    assert main(["tool", "approve", "hello", "--sha256", file_sha256(theirs)]) == 0
+    assert is_approved(theirs) and not is_approved(mine)
+
+
+@pytest.mark.parametrize("bad", ["", "abc123", "sha256:" + "0" * 64, "z" * 64])
+def test_a_malformed_hash_is_a_usage_error(project: Project, capsys, bad: str) -> None:
+    """An unset `$HASH` must not fall back to the interactive path, nor a short hash
+    read as "changed"."""
+    f = _tool(project)
+    d = _module(project, "guard")
+    assert main(["tool", "approve", "hello", "--sha256", bad]) == 2
+    assert main(["module", "approve", "guard", "--sha256", bad]) == 2
+    assert not is_approved(f) and tree_sha256(d)
+    assert "64" in capsys.readouterr().err
+
+
+def test_yes_with_a_hash_works_headless(project: Project) -> None:
+    f = _tool(project)
+    assert main(["tool", "approve", "hello", "--yes", "--sha256", file_sha256(f)]) == 0
+    assert is_approved(f)
+
+
+def test_doctor_and_approve_all_only_offer_approval_where_it_helps(
+    project: Project, capsys
+) -> None:
+    """An approved module with a `.git` dir won't load — approving again can't help, so
+    the hint names the cause instead, and `--all` doesn't ask about it."""
+    from veles.core.critical_ops import reset_critical_confirmer, set_critical_confirmer
+    from veles.core.doctor import _check_modules
+    from veles.core.registry.gate import approve_module
+
+    cloned = _module(project, "cloned")
+    approve_module(cloned, name="cloned", project_root=project.root)
+    (cloned / ".git").mkdir()
+    approve_dir = _module(project, "plain")
+    res = _check_modules(project)
+    assert "veles module approve plain" in (res.fix_hint or "")
+    assert "veles module approve cloned" not in (res.fix_hint or "")
+    asked: list[str] = []
+    token = set_critical_confirmer(lambda op, summary: asked.append(op) or True)
+    try:
+        main(["module", "approve", "--all"])
+    finally:
+        reset_critical_confirmer(token)
+    assert asked == ["approve module plain"] and approve_dir.is_dir()
+
+
 def test_tool_approve_yes_needs_a_terminal(project: Project, capsys) -> None:
     """`--yes` without a TTY approved every file on disk — the agent's own included."""
     f = _tool(project)
@@ -145,6 +215,71 @@ def test_run_shell_marks_its_commands(project: Project) -> None:
     finally:
         reset_active_project(token)
     assert out.startswith("<1>")
+
+
+def test_run_shell_gives_the_agent_no_terminal(project: Project, monkeypatch) -> None:
+    """Inherited, fd 0 is the user's TTY in a REPL session: `isatty()` would pass and a
+    confirmation prompt would read the user's keys."""
+    import subprocess
+
+    from veles.core.tools.builtin import run_shell as mod
+
+    seen: dict = {}
+
+    def fake_run(cmd, **kw):
+        seen.update(kw)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+    monkeypatch.chdir(project.root)
+    monkeypatch.setenv("VELES_SANDBOX_ROOTS", str(project.root))
+    mod.run_shell("true")
+    assert seen["stdin"] is subprocess.DEVNULL
+
+
+def test_critical_confirm_refuses_in_the_agents_shell(monkeypatch) -> None:
+    """`veles mcp approve`, `registry install`, `skill add` gate on `confirm_critical`;
+    a command from the agent's shell is refused even if it reaches a terminal."""
+    from veles.core.critical_ops import confirm_critical
+
+    monkeypatch.setenv("VELES_AGENT_SHELL", "1")
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda *_a: pytest.fail("prompted"))
+    assert confirm_critical("approve MCP server x", "") is False
+
+
+def test_the_agents_shell_cannot_write_any_approval_store(project: Project, monkeypatch) -> None:
+    """Every approval writer refuses, not only `veles … approve`: `registry add` + a
+    `[channels.X]` auto-install would otherwise install and approve agent-chosen code."""
+    from veles.core.registry.config import add_source, list_sources
+    from veles.core.registry.records import InstallRecord, load_records, put_record
+    from veles.mcp.approvals import approval_state
+    from veles.mcp.approvals import approve as approve_mcp
+
+    before = list_sources()
+    monkeypatch.setenv("VELES_AGENT_SHELL", "1")
+    with pytest.raises(PermissionError):
+        approve_mcp(project.root, "srv", {"command": "x"})
+    with pytest.raises(PermissionError):
+        put_record(InstallRecord(name="m", kind="module", path="/x", tree_sha256="0" * 64))
+    with pytest.raises(PermissionError):
+        add_source("https://example.invalid/registry.git")
+    assert approval_state(project.root, "srv", {"command": "x"}) != "yes"
+    assert load_records() == [] and list_sources() == before
+
+
+def test_external_mcp_servers_are_marked_too(monkeypatch) -> None:
+    """A stdio MCP server that runs shell commands is the agent's hands as well; it keeps
+    the SDK's minimal environment unless its config adds variables."""
+    from veles.mcp.client import _server_env
+    from veles.mcp.config import McpServerConfig
+
+    bare = _server_env(McpServerConfig(name="s", transport="stdio", command="x"))
+    assert bare["VELES_AGENT_SHELL"] == "1" and "OPENROUTER_API_KEY" not in bare
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    assert "OPENROUTER_API_KEY" not in _server_env(
+        McpServerConfig(name="s", transport="stdio", command="x")
+    )
 
 
 def test_promote_does_not_approve_an_unapproved_tool(project: Project, monkeypatch) -> None:

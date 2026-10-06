@@ -5,7 +5,7 @@ Triggers from `cli/__init__.py::main` when ALL of:
 - stdin is a TTY.
 - `--no-wizard` was not passed.
 - `VELES_NO_WIZARD=1` is not set in the env.
-- The command starts an agent (`_AGENT_COMMANDS`: the REPL, `run`, `daemon`, …).
+- The command starts an agent (`_starts_agent`: the REPL, `run`, `daemon start`, …).
   Admin verbs (`module approve`, `tool`, `doctor`, …) never trigger it — on a fresh
   `$HOME` the TTY that `module approve` requires must reach the approval.
 
@@ -42,8 +42,29 @@ from veles.core.user_config import (
 _LANGUAGES: tuple[str, ...] = ("en", "ru")
 # Verbs that start an agent and so need a provider; None is the bare-`veles` REPL.
 _AGENT_COMMANDS: frozenset[str | None] = frozenset(
-    {None, "run", "research", "organize", "curate", "goal", "dream", "daemon", "channel"}
+    {None, "run", "research", "organize", "curate", "goal", "dream"}
 )
+# (verb, subcommand) pairs that start one; `veles daemon` alone opens the picker.
+_AGENT_SUBCOMMANDS: frozenset[tuple[str, str | None]] = frozenset(
+    {
+        ("daemon", "start"),
+        ("daemon", None),
+        ("channel", "run"),
+        ("route", "refresh"),
+        ("job", "tick"),
+    }
+)
+
+
+def _starts_agent(args: argparse.Namespace) -> bool:
+    from veles.cli import _COMMANDS
+
+    command = getattr(args, "command", None)
+    if command in _AGENT_COMMANDS:
+        return True
+    if command not in _COMMANDS:
+        return True  # a registry module's verb may start an agent (`run_agent`)
+    return (command, getattr(args, f"{command}_command", None)) in _AGENT_SUBCOMMANDS
 
 
 Prompter = Callable[[str, str | None], str]
@@ -73,7 +94,7 @@ def should_run_wizard(args: argparse.Namespace) -> bool:
         return False
     if os.environ.get("VELES_NO_WIZARD") == "1":
         return False
-    if getattr(args, "command", None) not in _AGENT_COMMANDS:
+    if not _starts_agent(args):
         return False
     if not sys.stdin.isatty():
         return False

@@ -32,6 +32,7 @@ def run_shell(command: str, timeout: int = 30) -> str:
             timeout=timeout,
             check=False,
             cwd=str(sandbox_cwd()),
+            stdin=subprocess.DEVNULL,  # never the user's terminal: no prompt reads their keys
             env={**os.environ, AGENT_SHELL_ENV: "1"},  # `veles … approve` refuses it
         )
     except subprocess.TimeoutExpired:

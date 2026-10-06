@@ -81,6 +81,11 @@ These keys are part of the contract (`tests/test_cli_run_contract.py`); new keys
 appear, so ignore ones you don't know. The `tool name(args)` line `--verbose` prints
 on stderr is a debug print, not part of the contract — don't parse it.
 
+This holds for API providers (`openrouter`, `openai`, `anthropic`, `gemini`, local
+ones). With a CLI delegate (`claude-cli`, `codex`, `antigravity-cli`) the delegated
+CLI calls Veles' tools through its own MCP server, and those calls are not written to
+`events.jsonl`.
+
 ## Exit codes
 
 | Code | Meaning | What the caller should do |

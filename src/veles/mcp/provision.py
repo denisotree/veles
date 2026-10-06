@@ -53,7 +53,10 @@ def ensure_mcp_project_tools(project: Project) -> list[str]:
             continue
         src = _TEMPLATES_DIR / template_name
         dst = tools_dir / template_name
-        if dst.exists() or not src.is_file():
+        if not src.is_file():
+            continue
+        if dst.exists():
+            _approve_if_untouched(dst, src)
             continue
         try:
             tools_dir.mkdir(parents=True, exist_ok=True)
@@ -70,6 +73,19 @@ def ensure_mcp_project_tools(project: Project) -> list[str]:
         except OSError as exc:
             logger.warning("failed to provision MCP tool %s: %s", template_name, exc)
     return provisioned
+
+
+def _approve_if_untouched(dst: Path, src: Path) -> None:
+    """A copy left unapproved (provisioned where approval was refused — from the agent's
+    shell) is approved once it is still byte-for-byte Veles' own template."""
+    from veles.core.tools.approvals import approve, file_sha256, is_approved
+
+    try:
+        template = file_sha256(src)
+        if template and not is_approved(dst) and file_sha256(dst) == template:
+            approve(dst, expected_sha256=template)
+    except (OSError, ValueError) as exc:
+        logger.warning("could not approve MCP tool %s: %s", dst.name, exc)
 
 
 __all__ = ["ensure_mcp_project_tools"]

@@ -153,7 +153,9 @@ def test_code_inside_git_dir_is_refused(tmp_path: Path, monkeypatch, capsys) -> 
     assert registry.modules == []
     assert list(registry.iter_hooks("post_turn")) == []
     err = capsys.readouterr().err
-    assert "remove the .git directory (.GIT)" in err and "veles module approve demo" in err
+    # Approving again can't help — the module is approved; removing `.GIT` loads it.
+    assert "remove the .git directory (.GIT)" in err and "approving won't load it" in err
+    assert "veles module approve demo" not in err
 
 
 def test_zip_inside_git_dir_never_runs(tmp_path: Path, monkeypatch) -> None:

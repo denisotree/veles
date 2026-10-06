@@ -11,8 +11,9 @@ sandbox: `path_guard` admits only `~/.veles/{skills,locales}` for the agent's
 `write_file`. So the same `write_file` that could drop `evil.py` cannot also drop
 an approval for it — only `veles tool approve` records a hash: at a terminal, or
 headless with `--sha256` (the hash a human reviewed). `--yes` needs a terminal,
-which an agent's `run_shell` has not. A granted `run_shell` is still a shell and
-could write this store directly; only an OS sandbox around `run_shell` closes that.
+which an agent's `run_shell` has not (stdin closed), and `approve` refuses its
+commands (`VELES_AGENT_SHELL`). A granted `run_shell` is still a shell: it could
+strip that or write this store directly; only an OS sandbox around it closes that.
 Co-locating the approval with the tool would let the agent self-approve; do not
 move it into a project.
 

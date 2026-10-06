@@ -95,6 +95,34 @@ def test_gate_passes_when_all_conditions_met(monkeypatch: pytest.MonkeyPatch) ->
 
 
 @pytest.mark.parametrize(
+    ("command", "sub", "expected"),
+    [
+        ("daemon", "start", True),
+        ("daemon", None, True),  # the picker can start one
+        ("daemon", "status", False),
+        ("daemon", "token", False),
+        ("channel", "run", True),
+        ("channel", "list-sessions", False),
+        ("route", "refresh", True),
+        ("route", "show", False),
+        ("job", "tick", True),
+        ("job", "list", False),
+    ],
+)
+def test_gate_follows_the_subcommand(monkeypatch, command, sub, expected) -> None:
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    args = _ns(command=command)
+    setattr(args, f"{command}_command", sub)
+    assert should_run_wizard(args) is expected
+
+
+def test_gate_passes_for_a_module_verb(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A registry module's verb may start an agent (`CommandHost.run_agent`)."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    assert should_run_wizard(_ns(command="wiki-lint")) is True
+
+
+@pytest.mark.parametrize(
     "command", ["module", "tool", "doctor", "skill", "mcp", "trust", "secret", "registry"]
 )
 def test_gate_skips_admin_commands(monkeypatch: pytest.MonkeyPatch, command: str) -> None:

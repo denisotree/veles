@@ -38,6 +38,8 @@ def module_approved(module_dir: Path) -> bool:
 
 
 _LINKED = "its directory is a symlink; a module dir must be a real directory"
+# The one refusal that `veles module approve` fixes.
+NOT_APPROVED = "not approved, or changed since approval"
 
 
 def is_linked(module_dir: Path) -> bool:
@@ -69,7 +71,7 @@ def admit_module(module_dir: Path, *, project_root: Path | None) -> str | None:
         where = "user scope" if rec.project is None else "another project"
         return f"it was approved for {where}, not for where it is loading"
     if not module_approved(module_dir):
-        return "not approved, or changed since approval"
+        return NOT_APPROVED
     try:
         found = git_dirs(module_dir)
         if found:

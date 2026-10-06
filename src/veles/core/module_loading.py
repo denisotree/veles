@@ -111,13 +111,13 @@ def _admitted(handles: list[ModuleHandle], *, project_root: Path | None) -> list
             continue
         _warn(
             f"skipping module {handle.name!r} at {shown(handle.dir)}: {shown(refusal)} — "
-            f"review it, then `{_approve_command(handle.name, project_root)}`"
+            f"{_fix(handle.name, refusal, project_root)}"
         )
     return out
 
 
 def refused_modules(project: Project | None) -> list[tuple[str, str, str]]:
-    """`(name, why, approve command)` for each module on disk the load gate refuses, in
+    """`(name, why, what fixes it)` for each module on disk the load gate refuses, in
     the user scope and the project's — `veles doctor` reports them; loading only warns."""
     from veles.core.registry.gate import admit_module
     from veles.core.user_paths import user_modules_dir
@@ -132,12 +132,19 @@ def refused_modules(project: Project | None) -> list[tuple[str, str, str]]:
         for handle in handles:
             refusal = admit_module(handle.dir, project_root=root)
             if refusal is not None:
-                out.append((handle.name, refusal, _approve_command(handle.name, root)))
+                out.append((handle.name, refusal, _fix(handle.name, refusal, root)))
     return out
 
 
-def _approve_command(name: str, project_root: Path | None) -> str:
-    return f"veles module approve {'--user ' if project_root is None else ''}{name}"
+def _fix(name: str, refusal: str, project_root: Path | None) -> str:
+    """Approving fixes only an unapproved or changed module — not a symlinked dir, a
+    `.git` inside, or an approval for another scope."""
+    from veles.core.registry.gate import NOT_APPROVED
+
+    if refusal != NOT_APPROVED:
+        return "fix that first; approving won't load it"
+    flag = "--user " if project_root is None else ""
+    return f"review it, then `veles module approve {flag}{name}`"
 
 
 __all__ = ["load_project_modules", "load_user_modules", "refused_modules"]

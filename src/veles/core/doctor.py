@@ -832,7 +832,7 @@ def _check_modules(project: Project | None) -> CheckResult:
         status="error",
         message="modules not loaded: "
         + ", ".join(f"{name} ({shown(why)})" for name, why, _ in refused),
-        fix_hint="review each, then " + "; ".join(f"`{cmd}`" for _, _, cmd in refused),
+        fix_hint="; ".join(f"{name}: {fix}" for name, _, fix in refused),
     )
 
 

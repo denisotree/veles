@@ -7,6 +7,7 @@ import shutil
 import sys
 from pathlib import Path
 
+from veles.cli._console import reviewed_sha256
 from veles.core.critical_ops import confirm_critical
 from veles.core.module_install import (
     ModuleInstallError,
@@ -186,19 +187,20 @@ def _approve(args: argparse.Namespace, project: Project) -> int:
             print("error: name a module, or pass --all", file=sys.stderr)
             return 2
         return _approve_one(args, project, args.name)
-    if args.name or getattr(args, "sha256", None):
+    if args.name or getattr(args, "sha256", None) is not None:
         print("error: --all takes no name and no --sha256", file=sys.stderr)
         return 2
-    from veles.core.registry.gate import admit_module
+    from veles.core.registry.gate import NOT_APPROVED, admit_module
 
     root = None if getattr(args, "user", False) else project.root
+    # Only modules an approval would load — not a symlinked dir or one with a `.git`.
     pending = [
         h.name
         for h in discover_modules_in(_modules_dir(args, project))
-        if admit_module(h.dir, project_root=root) is not None
+        if admit_module(h.dir, project_root=root) == NOT_APPROVED
     ]
     if not pending:
-        print("every module here loads.", file=sys.stderr)
+        print("no module here waits for approval.", file=sys.stderr)
     return max((_approve_one(args, project, name) for name in pending), default=0)
 
 
@@ -209,14 +211,16 @@ def _approve_one(args: argparse.Namespace, project: Project, name: str) -> int:
     from veles.core.registry.gate import approve_module
     from veles.core.registry.hashing import tree_sha256
 
+    sha = getattr(args, "sha256", None)
+    expected = reviewed_sha256(sha) if sha is not None else None
+    if sha is not None and expected is None:
+        return 2
     module_dir = _find(_modules_dir(args, project), name)
     if module_dir is None or not _in_own_scope(args, project, module_dir):
         return 1
     user = getattr(args, "user", False)
     flag = "--user " if user else ""
-    sha = getattr(args, "sha256", None)
     try:
-        expected = sha.strip().lower() if sha else None
         if expected is None:
             expected = tree_sha256(module_dir)
             summary = (

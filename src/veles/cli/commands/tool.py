@@ -30,6 +30,7 @@ Side-effects:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import shutil
 import sys
 from dataclasses import dataclass
@@ -142,14 +143,10 @@ def _cmd_approve(args: argparse.Namespace, project: Project) -> int:
     `run_shell` has none and would otherwise approve its own files."""
     from veles.core.tools.approvals import approve, file_sha256, is_approved
 
-    sha256 = getattr(args, "sha256", None)
+    candidates = _list_tool_py(project.state_dir / "tools") + _list_tool_py(user_home() / "tools")
+    if getattr(args, "sha256", None) is not None:
+        return _approve_by_hash(args, candidates)
     yes = getattr(args, "yes", False)
-    if sha256 and (getattr(args, "all", False) or not getattr(args, "name", None)):
-        print(
-            "error: --sha256 approves one named file: `veles tool approve <name> --sha256 <hash>`",
-            file=sys.stderr,
-        )
-        return 2
     if yes and not sys.stdin.isatty():
         print(
             "error: --yes needs a terminal. Without one, approve each file by the hash you "
@@ -158,7 +155,6 @@ def _cmd_approve(args: argparse.Namespace, project: Project) -> int:
             file=sys.stderr,
         )
         return 1
-    candidates = _list_tool_py(project.state_dir / "tools") + _list_tool_py(user_home() / "tools")
     unapproved = [p for p in candidates if not is_approved(p)]
     if not unapproved:
         print("all self-authored tool files are already approved.")
@@ -181,23 +177,52 @@ def _cmd_approve(args: argparse.Namespace, project: Project) -> int:
 
     for f in targets:
         try:
-            if sha256:
-                sha = approve(f, expected_sha256=sha256.strip().lower())
-            else:
-                shown_sha = file_sha256(f)
-                print(f"\n===== {f} =====")
-                print(f.read_text())
-                print("=" * (len(str(f)) + 12))
-                if not yes and not _confirm(
-                    f"Approve '{f.name}' to execute its code at load? [y/N]"
-                ):
-                    print(f"skipped {f.name}")
-                    continue
-                sha = approve(f, expected_sha256=shown_sha)  # not a file swapped meanwhile
+            data = f.read_bytes()  # one read: the bytes shown are the bytes approved
+            print(f"\n===== {f} =====")
+            print(data.decode("utf-8", errors="replace"))
+            print("=" * (len(str(f)) + 12))
+            if not yes and not _confirm(f"Approve '{f.name}' to execute its code at load? [y/N]"):
+                print(f"skipped {f.name}")
+                continue
+            sha = approve(f, expected_sha256=hashlib.sha256(data).hexdigest())
         except (OSError, ValueError) as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 1
         print(f"approved {f.name} ({sha[:12]}…)")
+    return 0
+
+
+def _approve_by_hash(args: argparse.Namespace, candidates: list[Path]) -> int:
+    """Headless: approve the named file whose bytes hash to the reviewed `--sha256` — a
+    same-named file in the other scope is left alone, and an approved one is success, so
+    a boot script can rerun it."""
+    from veles.cli._console import reviewed_sha256
+    from veles.core.tools.approvals import approve, file_sha256, is_approved
+
+    name = getattr(args, "name", None)
+    if getattr(args, "all", False) or not name:
+        print(
+            "error: --sha256 approves one named file: `veles tool approve <name> --sha256 <hash>`",
+            file=sys.stderr,
+        )
+        return 2
+    expected = reviewed_sha256(args.sha256)
+    if expected is None:
+        return 2
+    match = next((p for p in candidates if p.stem == name and file_sha256(p) == expected), None)
+    if match is None:
+        print(
+            f"error: no tool file {name!r} has that hash — changed since it was reviewed?",
+            file=sys.stderr,
+        )
+        return 1
+    if not is_approved(match):
+        try:
+            approve(match, expected_sha256=expected)
+        except (OSError, ValueError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+    print(f"approved {match.name} ({expected[:12]}…)")
     return 0
 
 

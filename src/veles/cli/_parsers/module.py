@@ -50,7 +50,10 @@ def register(sub: argparse._SubParsersAction) -> None:
     module_approve.add_argument("name", nargs="?", help="Module name (omit with --all).")
     module_approve.add_argument("--user", action="store_true", help=user_help)
     module_approve.add_argument(
-        "--all", action="store_true", help="Every module that doesn't load, one confirmation each."
+        "--all",
+        action="store_true",
+        help="Every module in this scope (the project's, or --user) waiting for approval, "
+        "one confirmation each.",
     )
     module_approve.add_argument(
         "--sha256",
