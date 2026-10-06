@@ -118,6 +118,45 @@ def test_tool_approve_yes_needs_a_terminal(project: Project, capsys) -> None:
     assert not is_approved(f)
 
 
+@pytest.mark.parametrize("kind", ["module", "tool"])
+def test_the_agents_shell_cannot_approve(project: Project, monkeypatch, capsys, kind) -> None:
+    """`--sha256` works without a TTY, so the agent's `run_shell` could read the hash and
+    approve its own code; its commands carry VELES_AGENT_SHELL and approval refuses."""
+    if kind == "module":
+        digest = tree_sha256(_module(project, "guard"))
+        argv = ["module", "approve", "guard"]
+    else:
+        digest = file_sha256(_tool(project))
+        argv = ["tool", "approve", "hello"]
+    monkeypatch.setenv("VELES_AGENT_SHELL", "1")
+    assert main([*argv, "--sha256", digest]) == 1
+    assert "agent" in capsys.readouterr().err
+    assert _load_project_modules(project).modules == []
+    assert not is_approved(project.state_dir / "tools" / "hello.py")
+
+
+def test_run_shell_marks_its_commands(project: Project) -> None:
+    from veles.core.context import reset_active_project, set_active_project
+    from veles.core.tools.builtin.run_shell import run_shell
+
+    token = set_active_project(project)
+    try:
+        out = run_shell('printf "<%s>" "$VELES_AGENT_SHELL"')
+    finally:
+        reset_active_project(token)
+    assert out.startswith("<1>")
+
+
+def test_promote_does_not_approve_an_unapproved_tool(project: Project, monkeypatch) -> None:
+    """Promote carries an approval to the new path; it must not create one."""
+    from veles.core.user_paths import user_home
+
+    _tool(project)
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    assert main(["tool", "promote", "hello", "--yes"]) == 0
+    assert not is_approved(user_home() / "tools" / "hello.py")
+
+
 def test_tool_approve_yes_still_works_at_a_terminal(project: Project, monkeypatch) -> None:
     f = _tool(project)
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)

@@ -335,6 +335,7 @@ def _cmd_promote(args: argparse.Namespace, project: Project) -> int:
         return 1
 
     from veles.cli._console import confirm as _confirm
+    from veles.core.tools.approvals import approve, file_sha256, is_approved
 
     if not args.yes and not _confirm(
         f"Move {src} → {dst} (tool '{name}' becomes user-global)? [y/N]"
@@ -342,13 +343,15 @@ def _cmd_promote(args: argparse.Namespace, project: Project) -> int:
         print("aborted.")
         return 0
 
+    reviewed = file_sha256(src) if is_approved(src) else None
     shutil.move(str(src), str(dst))
-    # M199: promote is a human action on an already-reviewed tool — carry the
-    # approval to the new path so the user-level loader still runs it (the
-    # approval store is keyed by absolute path, which the move changed).
-    from veles.core.tools.approvals import approve
-
-    approve(dst)
+    # M199: carry an existing approval to the new path (the store is keyed by
+    # absolute path, which the move changed) — never create one for unreviewed code.
+    if reviewed:
+        try:
+            approve(dst, expected_sha256=reviewed)
+        except (OSError, ValueError) as exc:
+            print(f"warning: {dst.name} moved, but not approved there: {exc}", file=sys.stderr)
 
     # Update the catalogue. The next load_into_registry call will see
     # the file at the new path and refresh manifest_json; this

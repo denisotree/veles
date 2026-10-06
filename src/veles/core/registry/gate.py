@@ -11,6 +11,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from veles.core.critical_ops import refuse_in_agent_shell
 from veles.core.module_manifest import ManifestError, entrypoint_file, parse_manifest
 from veles.core.registry.hashing import (
     bytecode_paths,
@@ -91,6 +92,7 @@ def approve_module(
     """Record `module_dir`'s current hash as approved. `expected_sha256` is the hash
     the user was shown: if the files changed since, nothing is approved. A module
     whose entrypoint is invalid or missing, or whose dir is a symlink, is refused."""
+    refuse_in_agent_shell(f"approving module {name}")
     if is_linked(module_dir):
         raise ValueError(f"{shown(module_dir)}: {_LINKED}")
     try:

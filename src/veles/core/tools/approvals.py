@@ -26,6 +26,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+from veles.core.critical_ops import refuse_in_agent_shell
 from veles.core.io_utils import atomic_write_json, load_optional_json
 from veles.core.user_paths import user_home
 
@@ -65,6 +66,7 @@ def approve(path: Path, *, expected_sha256: str | None = None) -> str:
     """Record `path`'s current SHA-256 as human-approved. Returns the hash.
     `expected_sha256` is the hash the human reviewed: a file changed since is
     refused (ValueError). Called by `veles tool approve` — never by the agent."""
+    refuse_in_agent_shell(f"approving {path.name}")
     sha = file_sha256(path)
     if not sha:
         raise FileNotFoundError(path)
