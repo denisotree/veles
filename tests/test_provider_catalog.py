@@ -64,17 +64,18 @@ def _user_catalogue(text: str) -> Path:
 
 
 def test_builtin_providers_in_wizard_order() -> None:
-    assert list_providers()[:8] == [
+    assert list_providers()[:9] == [
         "openrouter",
         "anthropic",
         "openai",
         "gemini",
         "claude-cli",
+        "codex",
         "ollama",
         "llamacpp",
         "openai-compat",
     ]
-    assert builtin_ids() == frozenset(list_providers()[:8])
+    assert builtin_ids() == frozenset(list_providers()[:9])
 
 
 def test_every_builtin_builds_offline(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -33,6 +33,11 @@ label = "Claude CLI"
 tagline = "subprocess"
 kind = "claude-cli"
 
+[providers.codex]
+label = "Codex CLI"
+tagline = "ChatGPT subscription"
+kind = "codex"
+
 [providers.ollama]
 label = "Ollama"
 tagline = "local, no key"

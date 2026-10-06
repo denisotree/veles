@@ -83,6 +83,28 @@ def _claude_cli_tool_aware(entry: Entry, ctx: ProviderContext) -> Provider:
     )
 
 
+def _codex(entry: Entry, ctx: ProviderContext) -> Provider:
+    from veles.adapters.cli.codex_cli import CodexCLIProvider
+    from veles.core.delegate_dir import delegate_workspace
+
+    # Outside the project: codex reads `.codex/` layers and AGENTS.md from its cwd up.
+    return CodexCLIProvider(workspace=delegate_workspace(ctx.project, "codex"))
+
+
+def _codex_tool_aware(entry: Entry, ctx: ProviderContext) -> Provider:
+    """codex with Veles' tools over MCP — the server passed in arguments, no file."""
+    from veles.adapters.cli.codex_cli import CodexCLIProvider
+    from veles.adapters.cli.mcp_config import veles_mcp_server
+    from veles.core.delegate_dir import delegate_workspace
+
+    if ctx.project is None:
+        return _codex(entry, ctx)
+    return CodexCLIProvider(
+        workspace=delegate_workspace(ctx.project, "codex"),
+        mcp_server=veles_mcp_server(ctx.project),
+    )
+
+
 def _ollama(entry: Entry, ctx: ProviderContext) -> Provider:
     from veles.adapters.local.ollama import OllamaProvider
     from veles.core.provider_factory import apply_local_tool_policy
@@ -149,6 +171,7 @@ KINDS: dict[str, Kind] = {
     "anthropic": Kind("anthropic-wire", "curated", _anthropic),
     "gemini": Kind("gemini-wire", "cached", _gemini),
     "claude-cli": Kind("cli", "curated", _claude_cli, build_tool_aware=_claude_cli_tool_aware),
+    "codex": Kind("cli", "live", _codex, key_required=False, build_tool_aware=_codex_tool_aware),
     "ollama": Kind("openai-wire", "live", _ollama, key_required=False),
     "llamacpp": Kind("openai-wire", "live", _llamacpp, key_required=False),
     "local": Kind("openai-wire", "live", _local, key_required=False),
