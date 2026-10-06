@@ -17,7 +17,9 @@ def register(sub: argparse._SubParsersAction) -> None:
     module_list = module_sub.add_parser("list", help="List installed modules.")
     module_list.add_argument("--user", action="store_true", help=user_help)
 
-    module_show = module_sub.add_parser("show", help="Print a module's manifest.")
+    module_show = module_sub.add_parser(
+        "show", help="Print a module's manifest and its files hash."
+    )
     module_show.add_argument("name", help="Module name.")
     module_show.add_argument("--user", action="store_true", help=user_help)
 
@@ -45,5 +47,14 @@ def register(sub: argparse._SubParsersAction) -> None:
     module_approve = module_sub.add_parser(
         "approve", help="Approve an installed module's current code so it loads."
     )
-    module_approve.add_argument("name", help="Module name.")
+    module_approve.add_argument("name", nargs="?", help="Module name (omit with --all).")
     module_approve.add_argument("--user", action="store_true", help=user_help)
+    module_approve.add_argument(
+        "--all", action="store_true", help="Every module that doesn't load, one confirmation each."
+    )
+    module_approve.add_argument(
+        "--sha256",
+        metavar="HASH",
+        help="Approve without a terminal: the files hash you reviewed (`veles module show`). "
+        "Refused if the files changed since.",
+    )

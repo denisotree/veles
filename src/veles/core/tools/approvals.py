@@ -8,10 +8,13 @@ injection-steered agent drops into `.veles/tools/` never runs unattended.
 **Security invariant — the store location is the whole property.** The store
 lives at `~/.veles/tool-approvals.json`, which sits OUTSIDE the agent-writable
 sandbox: `path_guard` admits only `~/.veles/{skills,locales}` for the agent's
-`write_file`/`run_shell`. So the same `write_file` that could drop `evil.py`
-cannot also drop an approval for it — only the human `veles tool approve`
-(which runs unsandboxed, as the user) records a hash. Co-locating the approval
-with the tool would let the agent self-approve; do not move it into a project.
+`write_file`. So the same `write_file` that could drop `evil.py` cannot also drop
+an approval for it — only `veles tool approve` records a hash: at a terminal, or
+headless with `--sha256` (the hash a human reviewed). `--yes` needs a terminal,
+which an agent's `run_shell` has not. A granted `run_shell` is still a shell and
+could write this store directly; only an OS sandbox around `run_shell` closes that.
+Co-locating the approval with the tool would let the agent self-approve; do not
+move it into a project.
 
 Known gaps (documented, not closed by M199): a sibling `_helper.py` imported by
 an approved tool is not itself hashed (loader skips `_`-prefixed files); and the
@@ -58,12 +61,15 @@ def is_approved(path: Path) -> bool:
     return _load().get(_key(path)) == sha
 
 
-def approve(path: Path) -> str:
+def approve(path: Path, *, expected_sha256: str | None = None) -> str:
     """Record `path`'s current SHA-256 as human-approved. Returns the hash.
-    Called only by `veles tool approve` (unsandboxed) — never by the agent."""
+    `expected_sha256` is the hash the human reviewed: a file changed since is
+    refused (ValueError). Called by `veles tool approve` — never by the agent."""
     sha = file_sha256(path)
     if not sha:
         raise FileNotFoundError(path)
+    if expected_sha256 is not None and sha != expected_sha256:
+        raise ValueError(f"{path.name} changed since the hash you reviewed (it is now {sha})")
     data = _load()
     data[_key(path)] = sha
     atomic_write_json(store_path(), data)

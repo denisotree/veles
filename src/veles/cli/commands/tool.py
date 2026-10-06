@@ -137,9 +137,27 @@ def _cmd_approve(args: argparse.Namespace, project: Project) -> int:
     """Review and human-approve self-authored tool files so the loader will
     execute them (M199). Until approved, `.veles/tools/*.py` are skipped — their
     module-level code never runs. Approval records the file's current SHA-256 in
-    `~/.veles/tool-approvals.json` (outside the agent's write sandbox)."""
-    from veles.core.tools.approvals import approve, is_approved
+    `~/.veles/tool-approvals.json`. Headless (a deploy script) it takes `--sha256`,
+    the hash the human reviewed; `--yes` needs a terminal, since an agent's
+    `run_shell` has none and would otherwise approve its own files."""
+    from veles.core.tools.approvals import approve, file_sha256, is_approved
 
+    sha256 = getattr(args, "sha256", None)
+    yes = getattr(args, "yes", False)
+    if sha256 and (getattr(args, "all", False) or not getattr(args, "name", None)):
+        print(
+            "error: --sha256 approves one named file: `veles tool approve <name> --sha256 <hash>`",
+            file=sys.stderr,
+        )
+        return 2
+    if yes and not sys.stdin.isatty():
+        print(
+            "error: --yes needs a terminal. Without one, approve each file by the hash you "
+            "reviewed: `veles tool approve <name> --sha256 <hash>` (`veles tool approve` "
+            "lists them).",
+            file=sys.stderr,
+        )
+        return 1
     candidates = _list_tool_py(project.state_dir / "tools") + _list_tool_py(user_home() / "tools")
     unapproved = [p for p in candidates if not is_approved(p)]
     if not unapproved:
@@ -156,21 +174,29 @@ def _cmd_approve(args: argparse.Namespace, project: Project) -> int:
     else:
         print("unapproved tool files (pass a name or --all to approve):")
         for p in unapproved:
-            print(f"  {p.stem}  ({p})")
+            print(f"  {p.stem}  ({p})  sha256: {file_sha256(p)}")
         return 0
 
-    for f in targets:
-        print(f"\n===== {f} =====")
-        print(f.read_text())
-        print("=" * (len(str(f)) + 12))
-        from veles.cli._console import confirm as _confirm
+    from veles.cli._console import confirm as _confirm
 
-        if not getattr(args, "yes", False) and not _confirm(
-            f"Approve '{f.name}' to execute its code at load? [y/N]"
-        ):
-            print(f"skipped {f.name}")
-            continue
-        sha = approve(f)
+    for f in targets:
+        try:
+            if sha256:
+                sha = approve(f, expected_sha256=sha256.strip().lower())
+            else:
+                shown_sha = file_sha256(f)
+                print(f"\n===== {f} =====")
+                print(f.read_text())
+                print("=" * (len(str(f)) + 12))
+                if not yes and not _confirm(
+                    f"Approve '{f.name}' to execute its code at load? [y/N]"
+                ):
+                    print(f"skipped {f.name}")
+                    continue
+                sha = approve(f, expected_sha256=shown_sha)  # not a file swapped meanwhile
+        except (OSError, ValueError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
         print(f"approved {f.name} ({sha[:12]}…)")
     return 0
 

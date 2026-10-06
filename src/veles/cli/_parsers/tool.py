@@ -54,5 +54,14 @@ def register(sub: argparse._SubParsersAction) -> None:
         "--all", action="store_true", help="Approve every unapproved tool file."
     )
     tool_approve.add_argument(
-        "--yes", "-y", action="store_true", help="Skip the per-file confirmation prompt."
+        "--yes",
+        "-y",
+        action="store_true",
+        help="Skip the per-file confirmation prompt (at a terminal only).",
+    )
+    tool_approve.add_argument(
+        "--sha256",
+        metavar="HASH",
+        help="Approve the named file without a terminal: the hash you reviewed (`veles tool "
+        "approve` lists them). Refused if the file changed since.",
     )
