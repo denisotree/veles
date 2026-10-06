@@ -301,7 +301,7 @@ Per-task ensemble routing — which `provider:model` handles each task type
 
 ### `veles models <provider>`
 List models for a provider. Cloud providers (openrouter/openai/gemini) are cached
-24h; local providers and `antigravity-cli` are always live. An unknown provider is a
+24h; local providers, `codex` and `antigravity-cli` are always live. An unknown provider is a
 one-line error listing what exists (exit `2`).
 
 | Flag | Default | Purpose |
@@ -444,7 +444,7 @@ start`:
 `--provider` and `veles models` take any id in the provider catalogue — the builtin
 ones, your `~/.veles/providers.toml`, and providers from installed modules:
 
-`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
 `ollama` · `llamacpp` · `openai-compat` (builtin)
 
 A provider only a registry module offers (`antigravity-cli`) installs itself when you

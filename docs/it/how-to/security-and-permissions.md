@@ -88,7 +88,7 @@ strumenti per i file dell'agente li scrivono solo dopo che confermi quella scrit
 concessioni di fiducia e l'autopilot non la coprono; il daemon chiede nel canale, e
 un'esecuzione batch senza nessuno a cui chiedere rifiuta.
 
-I provider `claude-cli` e `antigravity-cli` girano come un modello con i soli strumenti
+I provider `claude-cli`, `codex` e `antigravity-cli` girano come un modello con i soli strumenti
 di Veles: i loro strumenti di shell, modifica file e web, le impostazioni e gli hook di
 `.claude/` del progetto e gli altri server MCP non si applicano, e ogni strumento di
 Veles che chiamano passa per la scala di fiducia qui sopra (lì nessuno può rispondere a
@@ -100,7 +100,13 @@ temporaneo fuori dal progetto, sotto `~/.veles/tmp/`, quindi gli hook e i server
 quando ha gli strumenti di Veles — altrimenti agy rifiuta le chiamate MCP in modalità
 headless — e un hook in quel workspace nega ogni suo strumento; anche un hook che fallisce
 nega. Gli strumenti per i file di Veles non possono scrivere fuori dal progetto, quindi
-agy non può riscrivere quell'hook tramite essi.
+agy non può riscrivere quell'hook tramite essi. Anche `codex` gira fuori dal progetto,
+con la tua config di codex ignorata, una sandbox in sola lettura e i suoi strumenti
+disattivati da feature flag i cui nomi Veles controlla prima di ogni prima esecuzione —
+un codex che ne ha rinominato uno da cui dipende viene rifiutato, non eseguito aperto. Il
+suo server MCP va nei suoi argomenti (nessun file di config), vengono approvati solo gli
+strumenti di quel server, e l'ambiente che quel server riceve viene inoltrato per nome —
+mai `VELES_TRUST_AUTO_ALLOW`.
 
 Limiti noti:
 

@@ -113,15 +113,17 @@ class CLIProvider:
                 file=sys.stderr,
             )
 
-    def _run(self, cmd: list[str]) -> str:
-        """Run `cmd` to completion and return its stdout; a non-zero exit raises."""
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=self._timeout, check=False, cwd=self._cwd()
+    def _run(self, cmd: list[str]) -> subprocess.CompletedProcess[str]:
+        """Run `cmd` to completion with no stdin (a CLI without a TTY may wait on it)."""
+        return subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=self._timeout,
+            check=False,
+            cwd=self._cwd(),
+            stdin=subprocess.DEVNULL,
         )
-        if proc.returncode != 0:
-            stderr = proc.stderr.strip() or "<no stderr>"
-            raise RuntimeError(f"{self._binary} exited {proc.returncode}: {stderr}")
-        return proc.stdout
 
     def create_message(
         self,
@@ -133,11 +135,15 @@ class CLIProvider:
     ) -> ProviderResponse:
         del max_tokens  # agent CLIs expose no max_tokens knob
         self._prepare(tools)
-        stdout = self._run(self._build_cmd(messages, model, stream=False))
+        proc = self._run(self._build_cmd(messages, model, stream=False))
         state = self._new_state()
-        for event in iter_jsonl(stdout):
+        for event in iter_jsonl(proc.stdout):
             state.absorb(event)
-        return state.to_response(raw=stdout)
+        if proc.returncode != 0 and state.error is None:
+            # No error of its own in the stream: report the exit and its stderr.
+            stderr = proc.stderr.strip() or "<no stderr>"
+            raise RuntimeError(f"{self._binary} exited {proc.returncode}: {stderr}")
+        return state.to_response(raw=proc.stdout)
 
     def stream_message(
         self,
@@ -157,5 +163,6 @@ class CLIProvider:
                 if chunk:
                     yield TextDelta(text=chunk)
         except RuntimeError as exc:
-            state.error = str(exc)
+            # An error the CLI reported in its stream (and its hint) beats the bare exit.
+            state.error = state.error or str(exc)
         yield StreamEnd(response=state.to_response(raw=None))

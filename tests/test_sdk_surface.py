@@ -120,6 +120,7 @@ _SURFACE: dict[str, dict[str, str]] = {
         "delegate_workspace": "veles.core.delegate_dir",
         "format_messages_as_prompt": "veles.adapters.cli._common",
         "iter_jsonl": "veles.adapters.cli._common",
+        "popen_jsonl": "veles.adapters.cli._streaming",
         "veles_mcp_server": "veles.adapters.cli.mcp_config",
     },
 }

@@ -255,7 +255,7 @@ Encaminhamento de ensemble por tarefa — que `provider:model` trata cada tipo d
 
 ### `veles models <provider>`
 Lista os modelos de um fornecedor. Os fornecedores na nuvem (openrouter/openai/gemini)
-ficam em cache 24h; os fornecedores locais e o `antigravity-cli` são sempre ao vivo. Um
+ficam em cache 24h; os fornecedores locais, o `codex` e o `antigravity-cli` são sempre ao vivo. Um
 fornecedor desconhecido é um erro de uma linha que lista o que existe (saída `2`).
 
 | Opção | Predefinição | Finalidade |
@@ -396,7 +396,7 @@ Aceites por `run`, `add`, `tui`, `curate`, `research`, `job tick`, e `daemon sta
 `--provider` e `veles models` aceitam qualquer id do catálogo de fornecedores — os
 incorporados, o seu `~/.veles/providers.toml` e os fornecedores de módulos instalados:
 
-`openrouter` (predefinição) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`openrouter` (predefinição) · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
 `ollama` · `llamacpp` · `openai-compat` (incorporados)
 
 Um fornecedor oferecido apenas por um módulo do registo (`antigravity-cli`) instala-se

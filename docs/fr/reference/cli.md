@@ -258,7 +258,7 @@ Routage par ensemble selon la tâche — quel `provider:model` traite chaque typ
 
 ### `veles models <provider>`
 Liste les modèles d'un fournisseur. Les fournisseurs cloud (openrouter/openai/gemini)
-sont mis en cache 24 h ; les fournisseurs locaux et `antigravity-cli` sont toujours en
+sont mis en cache 24 h ; les fournisseurs locaux, `codex` et `antigravity-cli` sont toujours en
 direct. Un fournisseur inconnu donne une erreur d'une ligne qui liste ce qui existe
 (code de sortie `2`).
 
@@ -402,7 +402,7 @@ Acceptées par `run`, `add`, `tui`, `curate`, `research`, `job tick`, et `daemon
 fournisseurs — les intégrés, votre `~/.veles/providers.toml` et les fournisseurs des
 modules installés :
 
-`openrouter` (par défaut) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`openrouter` (par défaut) · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
 `ollama` · `llamacpp` · `openai-compat` (intégrés)
 
 Un fournisseur que seul un module du registre propose (`antigravity-cli`) s'installe

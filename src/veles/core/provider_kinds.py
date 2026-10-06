@@ -55,13 +55,13 @@ def _openai(entry: Entry, ctx: ProviderContext) -> Provider:
 def _anthropic(entry: Entry, ctx: ProviderContext) -> Provider:
     from veles.adapters.anthropic import AnthropicProvider
 
-    return AnthropicProvider()
+    return AnthropicProvider(base_url=entry_base_url(entry))
 
 
 def _gemini(entry: Entry, ctx: ProviderContext) -> Provider:
     from veles.adapters.gemini import GeminiProvider
 
-    return GeminiProvider()
+    return GeminiProvider(base_url=entry_base_url(entry))
 
 
 def _claude_cli(entry: Entry, ctx: ProviderContext) -> Provider:
@@ -80,6 +80,28 @@ def _claude_cli_tool_aware(entry: Entry, ctx: ProviderContext) -> Provider:
         return _claude_cli(entry, ctx)
     return ClaudeCLIProvider(
         mcp_config_path=build_mcp_config(ctx.project), workdir=ctx.project.root
+    )
+
+
+def _codex(entry: Entry, ctx: ProviderContext) -> Provider:
+    from veles.adapters.cli.codex_cli import CodexCLIProvider
+    from veles.core.delegate_dir import delegate_workspace
+
+    # Outside the project: codex reads `.codex/` layers and AGENTS.md from its cwd up.
+    return CodexCLIProvider(workspace=delegate_workspace(ctx.project, "codex"))
+
+
+def _codex_tool_aware(entry: Entry, ctx: ProviderContext) -> Provider:
+    """codex with Veles' tools over MCP — the server passed in arguments, no file."""
+    from veles.adapters.cli.codex_cli import CodexCLIProvider
+    from veles.adapters.cli.mcp_config import veles_mcp_server
+    from veles.core.delegate_dir import delegate_workspace
+
+    if ctx.project is None:
+        return _codex(entry, ctx)
+    return CodexCLIProvider(
+        workspace=delegate_workspace(ctx.project, "codex"),
+        mcp_server=veles_mcp_server(ctx.project),
     )
 
 
@@ -149,6 +171,7 @@ KINDS: dict[str, Kind] = {
     "anthropic": Kind("anthropic-wire", "curated", _anthropic),
     "gemini": Kind("gemini-wire", "cached", _gemini),
     "claude-cli": Kind("cli", "curated", _claude_cli, build_tool_aware=_claude_cli_tool_aware),
+    "codex": Kind("cli", "live", _codex, key_required=False, build_tool_aware=_codex_tool_aware),
     "ollama": Kind("openai-wire", "live", _ollama, key_required=False),
     "llamacpp": Kind("openai-wire", "live", _llamacpp, key_required=False),
     "local": Kind("openai-wire", "live", _local, key_required=False),

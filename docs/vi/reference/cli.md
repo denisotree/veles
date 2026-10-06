@@ -255,7 +255,7 @@ vụ (`default`, `curator`, `compressor`, `insights`, `skills`, `advisor`,
 
 ### `veles models <provider>`
 Liệt kê các model của một nhà cung cấp. Các nhà cung cấp đám mây
-(openrouter/openai/gemini) được cache 24h; các nhà cung cấp cục bộ và `antigravity-cli`
+(openrouter/openai/gemini) được cache 24h; các nhà cung cấp cục bộ, `codex` và `antigravity-cli`
 luôn trực tiếp. Một nhà cung cấp không xác định là lỗi một dòng liệt kê những gì hiện có
 (exit `2`).
 
@@ -398,7 +398,7 @@ Kiểm tra các máy chủ MCP bên ngoài được cấu hình dưới `[mcp.se
 nhà cung cấp tích hợp sẵn, `~/.veles/providers.toml` của bạn, và các nhà cung cấp từ
 module đã cài:
 
-`openrouter` (mặc định) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`openrouter` (mặc định) · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
 `ollama` · `llamacpp` · `openai-compat` (tích hợp sẵn)
 
 Một nhà cung cấp chỉ do một module registry cung cấp (`antigravity-cli`) tự cài đặt khi

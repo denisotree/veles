@@ -120,12 +120,19 @@ veles run --provider groq --model llama-3.3-70b-versatile "..."
 | `lmstudio` (`local`) | `http://localhost:1234/v1` | — |
 | `vllm` (`local`) | `http://localhost:8000/v1` | — |
 
-## Claude / Google 구독으로 위임
+## Claude / ChatGPT / Google 구독으로 위임
 
 `claude` CLI가 인증되어 있다면, Veles가 그것을 구동할 수 있습니다.
 
 ```bash
 veles run --provider claude-cli "..."
+```
+
+ChatGPT 구독의 경우 Codex CLI를 설치하고 한 번 로그인하세요(`codex login`).
+
+```bash
+veles run --provider codex --model gpt-6-luna "..."
+veles models codex      # the models your account has
 ```
 
 Google 구독의 경우 Antigravity CLI(`agy`)를 설치하고 한 번 로그인한 뒤 해당 프로바이더 이름을 지정하세요. 그 실행에서 `antigravity-cli` 모듈이 연결된 레지스트리에서 스스로 설치됩니다.

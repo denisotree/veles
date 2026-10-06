@@ -59,9 +59,9 @@ def describe(provider_name: str, model: str, image_bytes: bytes, mime: str, prom
     spec = find_provider(provider_name)
     wire = spec.wire if spec else None
     if wire == "anthropic-wire":
-        return _describe_anthropic(model, _b64(image_bytes), mime, prompt)
+        return _describe_anthropic(provider_name, model, _b64(image_bytes), mime, prompt)
     if wire == "gemini-wire":
-        return _describe_gemini(model, image_bytes, mime, prompt)
+        return _describe_gemini(provider_name, model, image_bytes, mime, prompt)
     if wire == "openai-wire":
         return _describe_openai(provider_name, model, _b64(image_bytes), mime, prompt)
     raise ValueError(
@@ -74,12 +74,28 @@ def _b64(image_bytes: bytes) -> str:
     return base64.standard_b64encode(image_bytes).decode("ascii")
 
 
-def _describe_anthropic(model: str, image_b64: str, mime: str, prompt: str) -> str:
+def _endpoint(provider_name: str) -> tuple[str | None, str]:
+    """`(base_url or None, key)` of the routed catalogue provider for a direct-SDK
+    call — not the builtin `anthropic`/`gemini`, which a module provider on the same
+    wire would otherwise borrow. Never a None key: the SDK would read its own env
+    key and send it to this provider's URL."""
+    from veles.core.provider_factory import require_api_key, resolve_api_key
+    from veles.core.providers import find_provider
+
+    spec = find_provider(provider_name)
+    url = spec.effective_base_url() if spec else None
+    if spec is None or spec.needs_key:
+        return url, require_api_key(provider_name)
+    return url, resolve_api_key(provider_name) or "local"
+
+
+def _describe_anthropic(
+    provider_name: str, model: str, image_b64: str, mime: str, prompt: str
+) -> str:
     from anthropic import Anthropic
 
-    from veles.core.provider_factory import resolve_api_key
-
-    client = Anthropic(api_key=resolve_api_key("anthropic"))
+    base_url, api_key = _endpoint(provider_name)
+    client = Anthropic(api_key=api_key, base_url=base_url)
     response = client.messages.create(
         model=model,
         max_tokens=_VISION_MAX_TOKENS,
@@ -137,13 +153,15 @@ def _describe_openai(provider_name: str, model: str, image_b64: str, mime: str, 
     return response.choices[0].message.content or ""
 
 
-def _describe_gemini(model: str, image_bytes: bytes, mime: str, prompt: str) -> str:
+def _describe_gemini(
+    provider_name: str, model: str, image_bytes: bytes, mime: str, prompt: str
+) -> str:
     from google import genai
 
-    from veles.core.provider_factory import resolve_api_key
-
-    api_key = resolve_api_key("gemini")  # key_env covers GOOGLE_API_KEY too
-    client = genai.Client(api_key=api_key)
+    base_url, api_key = _endpoint(provider_name)  # key_env covers GOOGLE_API_KEY too
+    client = genai.Client(
+        api_key=api_key, http_options={"base_url": base_url} if base_url else None
+    )
     response = client.models.generate_content(
         model=model,
         contents=[

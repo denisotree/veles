@@ -34,6 +34,7 @@ d'une ligne qui liste ce qui existe ; `veles doctor` vérifie aussi
 | `openai` | Cloud direct | `OPENAI_API_KEY` | Chat completions GPT |
 | `gemini` | Cloud direct | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
 | `claude-cli` | Délégué CLI | — (session CLI) | Délègue à un CLI `claude` local en mode JSON-stream |
+| `codex` | Délégué CLI | — (session CLI) | Délègue à un CLI `codex` local (abonnement ChatGPT) |
 | `ollama` | Local | aucune | `OLLAMA_BASE_URL` (défaut `http://localhost:11434/v1`) |
 | `llamacpp` | Local | aucune | `LLAMACPP_BASE_URL` (défaut `http://localhost:8080/v1`) |
 | `openai-compat` | Local/personnalisé | `OPENAI_COMPAT_API_KEY` facultative | `OPENAI_COMPAT_BASE_URL` (requis, sans valeur par défaut) |
@@ -65,11 +66,11 @@ veles run --provider ollama --model qwen3:4b-instruct "..."
 Surchargez les points de terminaison avec les variables d'environnement `*_BASE_URL`
 (voir [variables d'environnement](environment-variables.md)).
 
-## Délégation à un CLI (`claude-cli`, `antigravity-cli`)
+## Délégation à un CLI (`claude-cli`, `codex`, `antigravity-cli`)
 
-Si vous disposez d'un abonnement Claude ou Google, Veles peut exécuter son CLI en mode
-headless et jouer le rôle de coordinateur — sans clé d'API séparée. `claude-cli` est
-intégré ; `antigravity-cli` (le CLI `agy`) est un module du registre qui s'installe tout
+Si vous disposez d'un abonnement Claude, ChatGPT ou Google, Veles peut exécuter son CLI en mode
+headless et jouer le rôle de coordinateur — sans clé d'API séparée. `claude-cli` et `codex` sont
+intégrés ; `antigravity-cli` (le CLI `agy`) est un module du registre qui s'installe tout
 seul quand vous le nommez.
 
 Le délégué n'est que le modèle : les outils de Veles lui parviennent par un pont MCP, et
@@ -78,6 +79,8 @@ dans un répertoire du processus en cours, `.veles/tmp/delegate-<pid>/`, supprim
 sortie. `agy` s'exécute dans un espace de travail temporaire hors de votre projet (sous
 `~/.veles/tmp/`), si bien que la configuration `.agents/` du projet ne lui parvient
 jamais, derrière une barrière qui refuse ses propres outils shell et fichiers.
+
+`codex` s'exécute aussi hors de votre projet (sous `~/.veles/tmp/`), avec votre configuration codex ignorée et ses propres outils — shell, édition de fichiers, images, sous-agents, navigateur, recherche web — désactivés ; Veles vérifie ces noms d'indicateurs une fois par processus et refuse d'exécuter un codex qui en a renommé un dont il dépend. Son serveur MCP est passé dans les arguments, pas dans un fichier. Dans `veles run`, codex suit le protocole d'outils de Veles moins fidèlement que claude : il peut répondre qu'il ne peut pas lire un fichier sans appeler l'outil — redemandez, ou nommez l'outil ("use read_file on …").
 
 ## État du multimodal (vision / reconnaissance vocale)
 

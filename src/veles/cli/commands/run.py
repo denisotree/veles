@@ -197,13 +197,13 @@ def _maybe_run_via_manager(args: argparse.Namespace, project: Project) -> bool:
 def cmd_run(args: argparse.Namespace, project: Project) -> int:
     # Lazy imports so monkey-patches on the owning modules win at call time.
     from veles.cli._agent_builder import build_command_agent
-    from veles.cli._console import ensure_api_key
+    from veles.cli._console import check_provider, ensure_api_key
     from veles.cli._project import _touch_active_project
     from veles.core.model_resolver import (
         ConfigurationError,
         ensure_model_configured,
+        provider_source,
         resolve_effective_model,
-        resolve_effective_provider,
     )
     from veles.runtime.learning import (
         maybe_refresh_nl_routing,
@@ -222,7 +222,10 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
     # `[engine]` → user defaults) instead of letting the bare argparse
     # default through. An unconfigured model errors clearly rather than
     # silently booting on a cloud model.
-    args.provider = resolve_effective_provider(args, project)
+    args.provider, named = provider_source(args, project)
+    # The provider first: a typo there is the error to show, not the missing model.
+    if not check_provider(args.provider, reason=named):
+        return 2
     try:
         args.model = ensure_model_configured(resolve_effective_model(args, project))
     except ConfigurationError as exc:

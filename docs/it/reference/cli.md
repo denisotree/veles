@@ -259,7 +259,7 @@ Routing d'ensemble per task — quale `provider:model` gestisce ciascun tipo di 
 
 ### `veles models <provider>`
 Elenca i modelli di un provider. I provider cloud (openrouter/openai/gemini)
-vengono messi in cache per 24h; i provider locali e `antigravity-cli` sono sempre live.
+vengono messi in cache per 24h; i provider locali, `codex` e `antigravity-cli` sono sempre live.
 Un provider sconosciuto è un errore di una riga che elenca ciò che esiste (exit `2`).
 
 | Flag | Default | Scopo |
@@ -403,7 +403,7 @@ start`:
 `--provider` e `veles models` accettano qualsiasi id del catalogo dei provider — quelli
 integrati, il tuo `~/.veles/providers.toml` e i provider dei moduli installati:
 
-`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
 `ollama` · `llamacpp` · `openai-compat` (integrati)
 
 Un provider offerto solo da un modulo del registro (`antigravity-cli`) si installa da

@@ -257,7 +257,7 @@ tarefa (`default`, `curator`, `compressor`, `insights`, `skills`, `advisor`,
 
 ### `veles models <provider>`
 Lista os modelos de um provedor. Provedores de nuvem (openrouter/openai/gemini)
-têm cache de 24h; provedores locais e o `antigravity-cli` são sempre consultados ao
+têm cache de 24h; provedores locais, o `codex` e o `antigravity-cli` são sempre consultados ao
 vivo. Um provedor desconhecido é um erro de uma linha que lista o que existe (saída `2`).
 
 | Flag | Padrão | Finalidade |
@@ -399,7 +399,7 @@ Aceitas por `run`, `add`, `tui`, `curate`, `research`, `job tick` e `daemon star
 `--provider` e `veles models` aceitam qualquer id do catálogo de provedores — os
 nativos, o seu `~/.veles/providers.toml` e os provedores de módulos instalados:
 
-`openrouter` (padrão) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`openrouter` (padrão) · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
 `ollama` · `llamacpp` · `openai-compat` (nativos)
 
 Um provedor oferecido apenas por um módulo do registry (`antigravity-cli`) se instala

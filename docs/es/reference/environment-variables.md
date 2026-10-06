@@ -22,7 +22,7 @@ suyas, y `veles secret set <VARIABLE>` guarda una clave donde ese proveedor la l
 | `GOOGLE_API_KEY` | gemini | Respaldo para Google Gemini |
 | `OPENAI_COMPAT_API_KEY` | openai-compat | Opcional — para una pasarela que pide clave |
 
-`claude-cli` y `antigravity-cli` se autentican mediante sus propios binarios — sin variable de entorno.
+`claude-cli`, `codex` y `antigravity-cli` se autentican mediante sus propios binarios — sin variable de entorno.
 
 ## Proveedores locales
 

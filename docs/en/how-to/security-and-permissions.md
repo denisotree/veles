@@ -83,7 +83,7 @@ the agent's file tools write only after you confirm that write. Trust grants and
 autopilot don't cover it; the daemon asks in the channel, and a batch run with nobody to
 ask refuses.
 
-The `claude-cli` and `antigravity-cli` providers run as a model with Veles' tools only:
+The `claude-cli`, `codex` and `antigravity-cli` providers run as a model with Veles' tools only:
 their own shell, file-edit and web tools, the project's `.claude/` settings and hooks, and
 other MCP servers don't apply, and every Veles tool they call goes through the trust
 ladder above (nobody can answer a prompt there, so anything not already granted is
@@ -93,7 +93,12 @@ outside the project, under `~/.veles/tmp/`, so the project's own `.agents/` hook
 MCP servers never reach it. It runs with `--dangerously-skip-permissions` when it has
 Veles' tools — agy refuses MCP calls headless otherwise — and a hook in that workspace
 denies every tool of its own; a hook that fails denies too. Veles' file tools can't
-write outside the project, so agy can't rewrite that hook through them.
+write outside the project, so agy can't rewrite that hook through them. `codex` also
+runs outside the project, with your codex config ignored, a read-only sandbox and its
+own tools switched off by feature flags whose names Veles checks before every first
+run — a codex that renamed one it relies on is refused, not run open. Its MCP server
+goes in its arguments (no config file), only that server's tools are approved, and the
+environment that server gets is forwarded by name — never `VELES_TRUST_AUTO_ALLOW`.
 
 Known limits:
 

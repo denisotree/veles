@@ -128,12 +128,19 @@ Veles বিল্টইন প্রোভাইডার নিয়েই �
 | `lmstudio` (`local`) | `http://localhost:1234/v1` | — |
 | `vllm` (`local`) | `http://localhost:8000/v1` | — |
 
-## একটি Claude / Google সাবস্ক্রিপশনে ডেলিগেট করুন
+## একটি Claude / ChatGPT / Google সাবস্ক্রিপশনে ডেলিগেট করুন
 
 আপনার `claude` CLI অথেনটিকেট করা থাকলে, Veles এটি চালাতে পারে:
 
 ```bash
 veles run --provider claude-cli "..."
+```
+
+ChatGPT সাবস্ক্রিপশনের জন্য, Codex CLI ইনস্টল করে একবার লগ ইন করুন (`codex login`):
+
+```bash
+veles run --provider codex --model gpt-6-luna "..."
+veles models codex      # the models your account has
 ```
 
 Google সাবস্ক্রিপশনের জন্য, Antigravity CLI (`agy`) একবার ইনস্টল করে লগ ইন করুন,

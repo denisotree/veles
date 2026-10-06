@@ -16,7 +16,7 @@ def cmd_models(args: argparse.Namespace) -> int:
     from veles.cli._console import check_provider
     from veles.cli.repl.model_fetcher import fetch_models
 
-    if not check_provider(args.provider):
+    if not check_provider(args.provider, reason="named with veles models"):
         return 2
     result = fetch_models(args.provider, refresh=bool(args.refresh))
     if args.as_json:

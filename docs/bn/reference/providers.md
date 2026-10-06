@@ -30,6 +30,7 @@ Veles যত প্রোভাইডার চেনে, প্রতিটি 
 | `openai` | Cloud direct | `OPENAI_API_KEY` | GPT chat completions |
 | `gemini` | Cloud direct | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
 | `claude-cli` | CLI delegate | — (CLI session) | JSON-stream মোডে একটি লোকাল `claude` CLI-তে ডেলিগেট করে |
+| `codex` | CLI delegate | — (CLI session) | একটি লোকাল `codex` CLI-তে ডেলিগেট করে (ChatGPT সাবস্ক্রিপশন) |
 | `ollama` | Local | none | `OLLAMA_BASE_URL` (ডিফল্ট `http://localhost:11434/v1`) |
 | `llamacpp` | Local | none | `LLAMACPP_BASE_URL` (ডিফল্ট `http://localhost:8080/v1`) |
 | `openai-compat` | Local/custom | ঐচ্ছিক `OPENAI_COMPAT_API_KEY` | `OPENAI_COMPAT_BASE_URL` (প্রয়োজনীয়, কোনো ডিফল্ট নেই) |
@@ -59,10 +60,10 @@ veles run --provider ollama --model qwen3:4b-instruct "..."
 `*_BASE_URL` env var দিয়ে এন্ডপয়েন্ট ওভাররাইড করুন (দেখুন
 [এনভায়রনমেন্ট ভ্যারিয়েবল](environment-variables.md))।
 
-## CLI ডেলিগেশন (`claude-cli`, `antigravity-cli`)
+## CLI ডেলিগেশন (`claude-cli`, `codex`, `antigravity-cli`)
 
-আপনার যদি Claude বা Google সাবস্ক্রিপশন থাকে, Veles তার CLI হেডলেস চালাতে এবং
-কোঅর্ডিনেটর হিসেবে কাজ করতে পারে — আলাদা API কী লাগে না। `claude-cli` বিল্টইন;
+আপনার যদি Claude, ChatGPT বা Google সাবস্ক্রিপশন থাকে, Veles তার CLI হেডলেস চালাতে এবং
+কোঅর্ডিনেটর হিসেবে কাজ করতে পারে — আলাদা API কী লাগে না। `claude-cli` ও `codex` বিল্টইন;
 `antigravity-cli` (`agy` CLI) একটি রেজিস্ট্রি মডিউল, যার নাম দিলে নিজে থেকেই ইনস্টল হয়।
 
 ডেলিগেট কেবল মডেলের কাজ করে: Veles-এর tools তার কাছে একটি MCP ব্রিজের মাধ্যমে পৌঁছায়,
@@ -71,6 +72,13 @@ veles run --provider ollama --model qwen3:4b-instruct "..."
 যায়। `agy` আপনার প্রজেক্টের বাইরে (`~/.veles/tmp/`-এর অধীনে) একটি স্ক্র্যাচ ওয়ার্কস্পেসে চলে,
 তাই প্রজেক্টের নিজস্ব `.agents/` কনফিগ কখনও তার কাছে পৌঁছায় না, এমন একটি গেটের পেছনে যা তার
 নিজস্ব শেল ও ফাইল টুল বাতিল করে।
+
+`codex`-ও আপনার প্রজেক্টের বাইরে (`~/.veles/tmp/`-এর অধীনে) চলে; আপনার codex কনফিগ উপেক্ষা করা হয়
+এবং তার নিজস্ব টুল — শেল, ফাইল এডিট, ছবি, সাবএজেন্ট, ব্রাউজার, ওয়েব সার্চ — বন্ধ থাকে। Veles ওই
+ফ্ল্যাগের নামগুলো প্রতি প্রসেসে একবার যাচাই করে এবং যে codex নিজের নির্ভরশীল কোনো ফ্ল্যাগের নাম বদলে
+ফেলেছে তা চালাতে অস্বীকার করে। এর MCP সার্ভার ফাইলে নয়, আর্গুমেন্টে পাঠানো হয়। `veles run`-এ codex
+Veles-এর টুল প্রোটোকল claude-এর চেয়ে কম নির্ভরযোগ্যভাবে মেনে চলে: টুলটি কল না করেই সে উত্তর দিতে পারে যে
+সে ফাইল পড়তে পারছে না — আবার জিজ্ঞাসা করুন, অথবা টুলের নাম বলে দিন ("use read_file on …")।
 
 ## মাল্টিমোডাল স্ট্যাটাস (vision / speech-to-text)
 

@@ -254,7 +254,7 @@ Module-গুলো একইভাবে নিজস্ব verb যোগ ক�
 
 ### `veles models <provider>`
 একটি প্রোভাইডারের মডেল তালিকাভুক্ত করে। ক্লাউড প্রোভাইডার (openrouter/openai/gemini)
-24 ঘণ্টা ক্যাশ করা হয়; লোকাল প্রোভাইডার এবং `antigravity-cli` সর্বদা লাইভ। অজানা প্রোভাইডার
+24 ঘণ্টা ক্যাশ করা হয়; লোকাল প্রোভাইডার, `codex` এবং `antigravity-cli` সর্বদা লাইভ। অজানা প্রোভাইডার
 হলে কী কী আছে তার তালিকাসহ এক লাইনের ত্রুটি দেখায় (exit `2`)।
 
 | ফ্ল্যাগ | ডিফল্ট | উদ্দেশ্য |
@@ -395,7 +395,7 @@ start`-এ গৃহীত:
 `--provider` এবং `veles models` প্রোভাইডার ক্যাটালগের যেকোনো id নেয় — বিল্টইনগুলো,
 আপনার `~/.veles/providers.toml`, এবং ইনস্টল করা মডিউলের প্রোভাইডার:
 
-`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
 `ollama` · `llamacpp` · `openai-compat` (বিল্টইন)
 
 যে প্রোভাইডার শুধু একটি রেজিস্ট্রি মডিউল দেয় (`antigravity-cli`), তার নাম দিলে সেটি নিজে

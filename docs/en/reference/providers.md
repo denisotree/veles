@@ -30,6 +30,7 @@ id is a one-line error listing what exists; `veles doctor` also checks
 | `openai` | Cloud direct | `OPENAI_API_KEY` | GPT chat completions |
 | `gemini` | Cloud direct | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
 | `claude-cli` | CLI delegate | — (CLI session) | Delegates to a local `claude` CLI in JSON-stream mode |
+| `codex` | CLI delegate | — (CLI session) | Delegates to a local `codex` CLI (ChatGPT subscription) |
 | `ollama` | Local | none | `OLLAMA_BASE_URL` (default `http://localhost:11434/v1`) |
 | `llamacpp` | Local | none | `LLAMACPP_BASE_URL` (default `http://localhost:8080/v1`) |
 | `openai-compat` | Local/custom | optional `OPENAI_COMPAT_API_KEY` | `OPENAI_COMPAT_BASE_URL` (required, no default) |
@@ -58,11 +59,12 @@ veles run --provider ollama --model qwen3:4b-instruct "..."
 Override endpoints with the `*_BASE_URL` env vars (see
 [environment variables](environment-variables.md)).
 
-## CLI delegation (`claude-cli`, `antigravity-cli`)
+## CLI delegation (`claude-cli`, `codex`, `antigravity-cli`)
 
-If you hold a Claude or Google subscription, Veles can run its CLI headless and act
-as coordinator — no separate API key. `claude-cli` is builtin; `antigravity-cli`
-(the `agy` CLI) is a registry module that installs itself when you name it.
+If you hold a Claude, ChatGPT or Google subscription, Veles can run its CLI headless
+and act as coordinator — no separate API key. `claude-cli` and `codex` are builtin;
+`antigravity-cli` (the `agy` CLI) is a registry module that installs itself when you
+name it.
 
 The delegate is only the model: Veles' tools reach it over an MCP bridge, and every
 call goes through Veles' trust ladder. The bridge's config lives in a directory of
@@ -70,6 +72,14 @@ the running process, `.veles/tmp/delegate-<pid>/`, removed when it exits. `agy` 
 in a scratch workspace outside your project (under `~/.veles/tmp/`), so the project's
 own `.agents/` config never reaches it, behind a gate that denies its own shell and
 file tools.
+
+`codex` also runs outside your project (under `~/.veles/tmp/`), with your codex config
+ignored and its own tools — shell, file edits, images, subagents, browser, web search —
+switched off; Veles checks those flag names once per process and refuses to run a codex
+that renamed one it relies on. Its MCP server is passed in arguments, not a file. In
+`veles run`, codex follows Veles' tool protocol less reliably than claude: it may
+answer that it can't read a file without calling the tool — ask again, or name the
+tool ("use read_file on …").
 
 ## Multimodal status (vision / speech-to-text)
 

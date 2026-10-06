@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.7] — 2026-10-06
+
+`codex` — the Codex CLI on a ChatGPT subscription — is the ninth builtin provider, a CLI
+delegate like `claude-cli`.
+
+### Added
+
+- Provider `codex`: `codex exec --json` runs outside your project (under
+  `~/.veles/tmp/`), with your codex config ignored, no session files, a read-only sandbox
+  and its own tools — shell, file edits, images, subagents, browser, web search — switched
+  off. Veles checks those feature flags once per process (ignoring your codex config, as
+  the run does) and refuses a codex that renamed or retired one it relies on. With Veles'
+  tools, the MCP server goes in codex's arguments (no config file), only that server's
+  tools are approved, a tool gets half the run's time, and the environment it needs
+  (SearXNG, proxy and CA settings included) is forwarded by name — never
+  `VELES_TRUST_AUTO_ALLOW`. An error after a partial answer is shown after it.
+  `veles models codex` lists your account's models. In `veles run` codex follows Veles'
+  tool protocol less reliably than claude: it may answer without calling a tool.
+- `veles.sdk.providers.popen_jsonl`; `delegate_workspace` works without a project.
+
+### Fixed
+
+- A CLI delegate that reports its failure in its event stream and exits non-zero (agy's
+  missing login, codex's `turn.failed`) now shows that error and its hint instead of
+  "exited 1: <stderr>". CLI delegates run with no stdin.
+- A `base_url` on `[providers.anthropic]` or `[providers.gemini]` in
+  `~/.veles/providers.toml` now applies; a `kind` on a builtin override is a warning.
+- Vision on a provider that speaks the Anthropic or Gemini format uses that provider's key
+  and base URL instead of the builtin's, and never lets the SDK send its own env key there.
+- `veles run` and `veles daemon start` name an unknown provider before a missing model;
+  the auto-install line says where the name came from — `--provider`, `[engine]`,
+  `[daemon.<name>]` or your default provider.
+
 ## [1.2.6] — 2026-10-06
 
 Providers are a catalogue. Every LLM provider — builtin, your own in

@@ -64,17 +64,18 @@ def _user_catalogue(text: str) -> Path:
 
 
 def test_builtin_providers_in_wizard_order() -> None:
-    assert list_providers()[:8] == [
+    assert list_providers()[:9] == [
         "openrouter",
         "anthropic",
         "openai",
         "gemini",
         "claude-cli",
+        "codex",
         "ollama",
         "llamacpp",
         "openai-compat",
     ]
-    assert builtin_ids() == frozenset(list_providers()[:8])
+    assert builtin_ids() == frozenset(list_providers()[:9])
 
 
 def test_every_builtin_builds_offline(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -249,6 +250,37 @@ def test_a_missing_key_names_the_command_that_stores_it(
     assert "secret add" not in str(exc.value)
     assert ensure_api_key("groq") is False
     assert "veles secret set GROQ_API_KEY" in capsys.readouterr().err
+
+
+def test_a_builtin_anthropic_base_url_override_applies(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant")
+    _user_catalogue('[providers.anthropic]\nbase_url = "https://gw.example/anthropic"\n')
+    prov = make_provider("anthropic")
+    assert str(prov._client.base_url).startswith("https://gw.example/anthropic")
+
+
+def test_a_builtin_gemini_base_url_override_applies(
+    isolated_user_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from veles.adapters import gemini as gemini_mod
+
+    seen: dict = {}
+    monkeypatch.setenv("GEMINI_API_KEY", "g-key")
+    monkeypatch.setattr(gemini_mod.genai, "Client", lambda **kw: seen.update(kw) or object())
+    _user_catalogue('[providers.gemini]\nbase_url = "https://gw.example/gemini"\n')
+    make_provider("gemini")
+    assert seen["http_options"]["base_url"] == "https://gw.example/gemini"
+
+
+def test_a_kind_on_a_builtin_override_is_a_warning(
+    isolated_user_home: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    _user_catalogue('[providers.openai]\nkind = "local"\nbase_url = "http://x/v1"\n')
+    with caplog.at_level(logging.WARNING):
+        assert find_provider("openai") is not None
+    assert "openai" in caplog.text and "kind" in caplog.text
 
 
 def test_no_base_url_never_falls_back_to_the_sdk_default(

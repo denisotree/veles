@@ -17,7 +17,7 @@ API 金鑰的查詢串接順序：OS 鑰匙圈（專案範圍）→ OS 鑰匙圈
 | `GOOGLE_API_KEY` | gemini | Google Gemini 的退路金鑰 |
 | `OPENAI_COMPAT_API_KEY` | openai-compat | 選用——供需要金鑰的閘道使用 |
 
-`claude-cli` 與 `antigravity-cli` 透過各自的執行檔進行驗證——不需環境變數。
+`claude-cli`、`codex` 與 `antigravity-cli` 透過各自的執行檔進行驗證——不需環境變數。
 
 ## 本機供應商
 

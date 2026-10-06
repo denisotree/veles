@@ -254,7 +254,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 ### `veles models <provider>`
 سرد نماذج مزوّد. المزوّدون السحابيون (openrouter/openai/gemini) مُخزَّنون
-مؤقتًا لمدة 24 ساعة؛ والمزوّدون المحليون و`antigravity-cli` دائمًا حيّون. المزوّد
+مؤقتًا لمدة 24 ساعة؛ والمزوّدون المحليون و`codex` و`antigravity-cli` دائمًا حيّون. المزوّد
 المجهول خطأ من سطر واحد يسرد ما هو موجود (رمز الخروج `2`).
 
 | العَلَم | الافتراضي | الغرض |
@@ -395,7 +395,7 @@ start`:
 يقبل `--provider` و`veles models` أي معرّف في كتالوج المزوّدين — المضمَّنة،
 و`~/.veles/providers.toml` الخاص بك، ومزوّدو الوحدات المثبّتة:
 
-`openrouter` (الافتراضي) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
+`openrouter` (الافتراضي) · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
 `ollama` · `llamacpp` · `openai-compat` (مضمَّنة)
 
 المزوّد الذي توفّره وحدة من السجلّ فقط (`antigravity-cli`) يثبّت نفسه عند تسميته.

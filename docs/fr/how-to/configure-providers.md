@@ -130,12 +130,19 @@ consultez la documentation du fournisseur pour le point de terminaison actuel :
 | `lmstudio` (`local`) | `http://localhost:1234/v1` | — |
 | `vllm` (`local`) | `http://localhost:8000/v1` | — |
 
-## Déléguer à un abonnement Claude / Google
+## Déléguer à un abonnement Claude / ChatGPT / Google
 
 Si vous disposez du CLI `claude` authentifié, Veles peut le piloter :
 
 ```bash
 veles run --provider claude-cli "..."
+```
+
+Pour un abonnement ChatGPT, installez le CLI Codex et connectez-vous une fois (`codex login`) :
+
+```bash
+veles run --provider codex --model gpt-6-luna "..."
+veles models codex      # the models your account has
 ```
 
 Pour un abonnement Google, installez le CLI Antigravity (`agy`) et connectez-vous une

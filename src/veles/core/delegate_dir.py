@@ -34,14 +34,17 @@ def delegate_budget_file(project: Project) -> Path:
     return delegate_dir(project) / "budget.json"
 
 
-def delegate_workspace(project: Project, name: str) -> Path:
+def delegate_workspace(project: Project | None, name: str) -> Path:
     """A working directory for delegate `name`, outside every project:
-    `<user home>/tmp/<name>/<project key>-<pid>/`. A CLI that reads config from its
-    working directory and the folders above it (agy reads every `.agents/` up to the
-    repository root) then never picks up the project's own — a cloned repo's hooks
-    or MCP servers. Keyed by project, so one process serving several projects keeps
-    their configs apart."""
-    key = hashlib.sha256(str(project.root.resolve()).encode()).hexdigest()[:12]
+    `<user home>/tmp/<name>/<project key>-<pid>/` (key `none` without a project). A CLI
+    that reads config from its working directory and the folders above it (agy reads
+    every `.agents/` up to the repository root; codex its `.codex/` layers) then never
+    picks up the project's own — a cloned repo's hooks or MCP servers. Keyed by
+    project, so one process serving several projects keeps their configs apart."""
+    if project is None:
+        key = "none"
+    else:
+        key = hashlib.sha256(str(project.root.resolve()).encode()).hexdigest()[:12]
     return _claim(user_home() / "tmp" / name / f"{key}-{os.getpid()}", "*-*")
 
 

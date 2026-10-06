@@ -17,7 +17,7 @@ API キーの参照カスケード: OS キーチェーン（プロジェクト�
 | `GOOGLE_API_KEY` | gemini | Google Gemini のフォールバック |
 | `OPENAI_COMPAT_API_KEY` | openai-compat | 任意 — キーを求めるゲートウェイ向け |
 
-`claude-cli` と `antigravity-cli` は各自のバイナリを通じて認証します。環境変数は不要です。
+`claude-cli`、`codex`、`antigravity-cli` は各自のバイナリを通じて認証します。環境変数は不要です。
 
 ## ローカルプロバイダー
 

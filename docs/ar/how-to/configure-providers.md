@@ -127,12 +127,19 @@ veles run --provider groq --model llama-3.3-70b-versatile "..."
 | `lmstudio` (`local`) | `http://localhost:1234/v1` | — |
 | `vllm` (`local`) | `http://localhost:8000/v1` | — |
 
-## التفويض إلى اشتراك Claude / Google
+## التفويض إلى اشتراك Claude / ChatGPT / Google
 
 إذا كان لديك `claude` CLI مُصادَقًا عليه، فيمكن لـ Veles تشغيله:
 
 ```bash
 veles run --provider claude-cli "..."
+```
+
+لاشتراك ChatGPT، ثبّت Codex CLI وسجّل الدخول إليه مرة واحدة (`codex login`):
+
+```bash
+veles run --provider codex --model gpt-6-luna "..."
+veles models codex      # the models your account has
 ```
 
 لاشتراك Google، ثبّت Antigravity CLI (`agy`) وسجّل الدخول إليه مرة واحدة، ثم سمِّ

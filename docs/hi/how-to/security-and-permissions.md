@@ -84,7 +84,7 @@ file approve करें)। उसी file की अन्य spellings (case
 autopilot इसे cover नहीं करते; daemon channel में पूछता है, और जिस batch run में पूछने वाला कोई
 न हो वह अस्वीकार कर देता है।
 
-`claude-cli` और `antigravity-cli` providers केवल Veles के tools वाले model की तरह चलते हैं: उनके अपने
+`claude-cli`, `codex` और `antigravity-cli` providers केवल Veles के tools वाले model की तरह चलते हैं: उनके अपने
 shell, file-edit और web tools, project की `.claude/` settings और hooks, और अन्य MCP servers
 लागू नहीं होते, और उनके द्वारा बुलाया गया हर Veles tool ऊपर की trust ladder से गुज़रता है (वहाँ
 कोई prompt का जवाब नहीं दे सकता, इसलिए जो पहले से granted नहीं है वह अस्वीकार हो जाता है)।
@@ -94,7 +94,12 @@ workspace में चलता है, इसलिए project के अप�
 पहुँचते। जब उसके पास Veles के tools हों तब वह `--dangerously-skip-permissions` के साथ चलता है —
 वरना agy headless MCP calls अस्वीकार कर देता है — और उस workspace का एक hook उसके अपने हर tool को
 deny करता है; जो hook fail हो वह भी deny करता है। Veles के file tools project के बाहर नहीं लिखते,
-इसलिए agy उस hook को उनके ज़रिए दोबारा नहीं लिख सकता।
+इसलिए agy उस hook को उनके ज़रिए दोबारा नहीं लिख सकता। `codex` भी project के बाहर चलता है, आपका codex
+config अनदेखा करके, read-only sandbox के साथ और उसके अपने tools feature flags से बंद करके, जिनके
+नाम Veles हर पहले run से पहले जाँचता है — जिस codex ने अपने इस्तेमाल का कोई flag rename कर दिया हो
+उसे अस्वीकार कर दिया जाता है, खुला नहीं चलाया जाता। उसका MCP server उसके arguments में जाता है
+(कोई config file नहीं), केवल उसी server के tools approve होते हैं, और उस server को मिलने वाला
+environment नाम से forward किया जाता है — `VELES_TRUST_AUTO_ALLOW` कभी नहीं।
 
 ज्ञात सीमाएँ:
 

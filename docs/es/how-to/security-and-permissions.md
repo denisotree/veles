@@ -91,7 +91,7 @@ confirmes esa escritura. Las concesiones de confianza y el autopilot no la cubre
 daemon pregunta en el canal, y una ejecución por lotes sin nadie a quien preguntar la
 rechaza.
 
-Los proveedores `claude-cli` y `antigravity-cli` se ejecutan como un modelo con las
+Los proveedores `claude-cli`, `codex` y `antigravity-cli` se ejecutan como un modelo con las
 herramientas de Veles únicamente: sus propias herramientas de shell, edición de
 archivos y web, los ajustes y hooks de `.claude/` del proyecto y otros servidores MCP
 no se aplican, y toda herramienta de Veles que llamen pasa por la escalera de
@@ -105,7 +105,13 @@ temporal fuera del proyecto, bajo `~/.veles/tmp/`, así que los hooks y servidor
 contrario agy rechaza las llamadas MCP sin interfaz — y un hook en ese espacio de
 trabajo deniega todas sus herramientas propias; un hook que falla también deniega. Las
 herramientas de archivos de Veles no pueden escribir fuera del proyecto, así que agy no
-puede reescribir ese hook mediante ellas.
+puede reescribir ese hook mediante ellas. `codex` también se ejecuta fuera del proyecto,
+con tu configuración de codex ignorada, un sandbox de solo lectura y sus propias
+herramientas desactivadas mediante feature flags cuyos nombres Veles comprueba antes de
+cada primera ejecución — un codex que haya renombrado alguno de los que necesita se
+rechaza, no se ejecuta abierto. Su servidor MCP va en sus argumentos (sin archivo de
+configuración), solo se aprueban las herramientas de ese servidor, y el entorno que
+recibe ese servidor se reenvía por nombre — nunca `VELES_TRUST_AUTO_ALLOW`.
 
 Límites conocidos:
 

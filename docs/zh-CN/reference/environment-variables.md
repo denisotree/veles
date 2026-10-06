@@ -17,7 +17,7 @@ API key 的查找级联：操作系统钥匙串（项目作用域）→ 操作�
 | `GOOGLE_API_KEY` | gemini | Google Gemini 的回退 key |
 | `OPENAI_COMPAT_API_KEY` | openai-compat | 可选——用于需要 key 的网关 |
 
-`claude-cli` 和 `antigravity-cli` 通过各自的二进制程序进行认证——无需环境变量。
+`claude-cli`、`codex` 和 `antigravity-cli` 通过各自的二进制程序进行认证——无需环境变量。
 
 ## 本地提供方
 

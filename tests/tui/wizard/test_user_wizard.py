@@ -63,11 +63,12 @@ async def _drive_user_wizard(
 async def test_local_provider_skips_api_key_step():
     """When the user picks `ollama` we don't ask for an API key — the
     flow jumps straight from provider → theme → init-project."""
-    # Keys: language=en (Enter), provider=down*5→ollama (Enter),
+    # Keys: language=en (Enter), provider=down*6→ollama (Enter),
     # api-key skipped, theme=enter, init=enter (yes)
     keys = [
         "enter",  # language: en (default)
-        # provider: go down to "ollama" from "openrouter" (positions 0..5)
+        # provider: go down to "ollama" from "openrouter" (positions 0..6)
+        "down",
         "down",
         "down",
         "down",
@@ -169,7 +170,7 @@ async def test_ctrl_q_cancels():
 async def test_a_registry_provider_pick_installs_and_a_decline_goes_back(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A registry offer follows the eight builtins; picking it runs the install
+    """A registry offer follows the nine builtins; picking it runs the install
     (on the terminal); a declined install returns to the previous step."""
     from veles.core.registry import ensure
     from veles.tui.wizard import install
@@ -180,7 +181,7 @@ async def test_a_registry_provider_pick_installs_and_a_decline_goes_back(
     )
     monkeypatch.setattr(ensure, "ensure_provider_interactive", lambda n: asked.append(n) or False)
     monkeypatch.setattr(install, "install_with_terminal", lambda app, fn, *, hint: fn())
-    keys = ["enter", *["down"] * 8, "enter", "ctrl+q"]
+    keys = ["enter", *["down"] * 9, "enter", "ctrl+q"]
     answers = await _drive_user_wizard(keys)
     assert asked == ["antigravity-cli"]
     assert "default_provider" not in answers

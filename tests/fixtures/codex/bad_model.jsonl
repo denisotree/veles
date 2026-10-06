@@ -1,0 +1,3 @@
+{"type":"thread.started","thread_id":"t4"}
+{"type":"turn.started"}
+{"type":"turn.failed","error":{"message":"{\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'nope-model' model is not supported when using Codex with a ChatGPT account.\"}}"}}

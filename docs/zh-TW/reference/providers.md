@@ -21,6 +21,7 @@ Veles 所知的每個供應商都是同一份目錄中的一個項目，該目�
 | `openai` | 雲端直連 | `OPENAI_API_KEY` | GPT chat completions |
 | `gemini` | 雲端直連 | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
 | `claude-cli` | CLI 委派 | —（CLI 工作階段） | 委派給以 JSON-stream 模式執行的本機 `claude` CLI |
+| `codex` | CLI 委派 | —（CLI 工作階段） | 委派給本機 `codex` CLI（ChatGPT 訂閱） |
 | `ollama` | 本機 | 無 | `OLLAMA_BASE_URL`（預設 `http://localhost:11434/v1`） |
 | `llamacpp` | 本機 | 無 | `LLAMACPP_BASE_URL`（預設 `http://localhost:8080/v1`） |
 | `openai-compat` | 本機／自訂 | 選用的 `OPENAI_COMPAT_API_KEY` | `OPENAI_COMPAT_BASE_URL`（必填，無預設） |
@@ -41,11 +42,13 @@ veles run --provider ollama --model qwen3:4b-instruct "..."
 
 以 `*_BASE_URL` 環境變數覆寫端點（參見[環境變數](environment-variables.md)）。
 
-## CLI 委派（`claude-cli`、`antigravity-cli`）
+## CLI 委派（`claude-cli`、`codex`、`antigravity-cli`）
 
-如果你持有 Claude 或 Google 訂閱，Veles 可以以無介面方式執行其 CLI 並充當協調者——不需另一個 API 金鑰。`claude-cli` 是內建的；`antigravity-cli`（即 `agy` CLI）是一個登錄庫模組，在你指定它時會自行安裝。
+如果你持有 Claude、ChatGPT 或 Google 訂閱，Veles 可以以無介面方式執行其 CLI 並充當協調者——不需另一個 API 金鑰。`claude-cli` 與 `codex` 是內建的；`antigravity-cli`（即 `agy` CLI）是一個登錄庫模組，在你指定它時會自行安裝。
 
 委派方只充當模型：Veles 的工具透過 MCP 橋接觸及它，每一次呼叫都要經過 Veles 的信任階梯。橋接的設定位於執行中行程的目錄 `.veles/tmp/delegate-<pid>/` 內，行程結束時即被移除。`agy` 在你專案之外（`~/.veles/tmp/` 下）的暫存工作區中執行，因此專案自己的 `.agents/` 設定不會觸及它，並且有一道關卡會拒絕它自帶的 shell 與檔案工具。
+
+`codex` 同樣在你的專案之外執行（位於 `~/.veles/tmp/` 下），會忽略你的 codex 設定，並關閉它自帶的工具——shell、檔案編輯、圖片、子 agent、瀏覽器、網頁搜尋；Veles 每個行程只檢查一次這些旗標的名稱，並拒絕執行已將其所依賴旗標改名的 codex。它的 MCP 伺服器是以引數傳入，而不是檔案。在 `veles run` 中，codex 遵循 Veles 工具協定的可靠度不如 claude：它可能不呼叫工具就回答說無法讀取某個檔案——請再問一次，或指名該工具（"use read_file on …"）。
 
 ## 多模態狀態（視覺／語音轉文字）
 

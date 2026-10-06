@@ -83,7 +83,7 @@ nơi một `.git` dạng symlink trỏ tới — các công cụ tệp của age
 xác nhận lần ghi đó. Các quyền trust và autopilot không bao gồm việc này; daemon hỏi
 trong kênh, còn một lần chạy batch không có ai để hỏi thì từ chối.
 
-Các provider `claude-cli` và `antigravity-cli` chạy như một model chỉ với các công cụ
+Các provider `claude-cli`, `codex` và `antigravity-cli` chạy như một model chỉ với các công cụ
 của Veles: shell, công cụ sửa tệp và web riêng của chúng, cài đặt và hook `.claude/` của
 dự án, cùng các máy chủ MCP khác đều không áp dụng, và mọi công cụ Veles chúng gọi
 đều đi qua thang trust ở trên (ở đó không ai trả lời được prompt, nên bất cứ thứ gì
@@ -94,7 +94,13 @@ của agent không ghi vào được. `agy` chạy trong một workspace tạm b
 giờ đến được nó. Nó chạy kèm `--dangerously-skip-permissions` khi có các công cụ của
 Veles — nếu không agy từ chối các lệnh gọi MCP ở chế độ headless — và một hook trong
 workspace đó từ chối mọi công cụ của chính nó; một hook bị lỗi cũng từ chối. Các công
-cụ tệp của Veles không ghi ra ngoài dự án, nên agy không thể ghi đè hook đó qua chúng.
+cụ tệp của Veles không ghi ra ngoài dự án, nên agy không thể ghi đè hook đó qua chúng. `codex` cũng chạy bên ngoài dự án, với
+config codex của bạn bị bỏ qua, một sandbox chỉ đọc và các công cụ riêng của nó bị tắt
+bằng các feature flag mà Veles kiểm tra tên trước mỗi lần chạy đầu tiên — một codex đã
+đổi tên flag mà nó phụ thuộc sẽ bị từ chối, không được chạy ở trạng thái mở. MCP server
+của nó nằm trong tham số (không có tệp config), chỉ các công cụ của server đó được phê
+duyệt, và môi trường server đó nhận được được chuyển tiếp theo tên — không bao giờ là
+`VELES_TRUST_AUTO_ALLOW`.
 
 Các giới hạn đã biết:
 
