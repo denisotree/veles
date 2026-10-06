@@ -70,6 +70,15 @@ def test_a_delegate_workspace_sits_outside_every_project(
     assert delegate_workspace(two, "agy") != ws  # keyed by project: one MCP config each
 
 
+def test_a_delegate_workspace_without_a_project(isolated_user_home: Path) -> None:
+    from veles.core.delegate_dir import delegate_workspace
+    from veles.core.user_paths import user_home
+
+    ws = delegate_workspace(None, "codex")
+    assert ws.is_dir() and ws.is_relative_to(user_home())
+    assert ws.name == f"none-{os.getpid()}"
+
+
 def test_a_dead_processes_workspace_is_swept(tmp_path: Path, isolated_user_home: Path) -> None:
     from veles.core import delegate_dir as mod
 
