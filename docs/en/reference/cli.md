@@ -11,7 +11,9 @@ veles [--no-wizard] <command> [subcommand] [options]
 ```
 
 - `--no-wizard` — skip the first-run setup wizard even if `~/.veles/config.toml`
-  is missing (also gated on a TTY and on `VELES_NO_WIZARD=1`).
+  is missing (also gated on a TTY and on `VELES_NO_WIZARD=1`). The wizard fronts
+  only commands that start an agent (bare `veles`, `run`, `daemon`, `channel`, …);
+  admin verbs such as `module`, `tool` and `doctor` never open it.
 - With no arguments, `veles` launches the interactive [TUI](tui.md).
 
 Most agent commands accept the [shared agent-loop flags](#shared-agent-loop-flags)
@@ -215,26 +217,34 @@ suggestions → wiki lint, optionally LLM consolidation).
 | `list` | List tools catalogued in this project's `memory.db` |
 | `show <name>` | Print a tool's manifest + telemetry |
 | `promote <name> [-y]` | Move a project tool to `~/.veles/tools/` (cross-project) |
-| `approve [<name>] [--all] [-y]` | Review + approve a self-authored tool file so the loader will run it |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | Review + approve a self-authored tool file so the loader will run it |
 
 Self-authored tools (`.veles/tools/*.py`) run their module-level code when the
 loader imports them, so a new or edited file is **not loaded until you approve
 it** — `veles tool approve` shows the code and records its hash. Bare
-`veles tool approve` lists what's pending. This is why an agent-written tool
-needs a review step before it becomes callable.
+`veles tool approve` lists what's pending, with each file's sha256. This is why an
+agent-written tool needs a review step before it becomes callable.
+
+Without a terminal (a deploy script), approve one file by the hash you reviewed:
+`veles tool approve <name> --sha256 <hash>` — it fails if the file changed since.
+`-y` skips the prompt only at a terminal.
 
 ### `veles module {list,show,add,remove,approve}`
 
 | Subcommand | Purpose |
 |---|---|
 | `list [--user]` | List installed modules (both scopes, with a `scope` column, unless `--user`) |
-| `show <name> [--user]` | Print a module's manifest |
+| `show <name> [--user]` | Print a module's manifest and its files sha256 |
 | `add <source> [--name N] [--user] [-y]` | Install a module from a git URL or local path |
 | `remove <name> [--user] [-y]` | Delete an installed module |
-| `approve <name> [--user]` | Re-approve a module after reviewing an edit |
+| `approve <name> [--user] [--sha256 H]` | Approve a module after reviewing it |
+| `approve --all [--user]` | Every module that doesn't load, one confirmation each |
 
 `--user` targets `~/.veles/modules/` instead of the project's, so the module
 loads in every project. A same-named project module overrides a user-level one.
+Approval asks you to type `yes` at a terminal; without one, pass the files hash you
+reviewed (`show` prints it) as `--sha256` — it fails if the files changed since.
+`veles doctor` reports every module on disk that doesn't load.
 
 ### `veles registry search [query] [--kind K]`
 Search connected registries (modules, skills, layout packs, MCP recipes). See

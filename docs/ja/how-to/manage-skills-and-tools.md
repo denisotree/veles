@@ -63,9 +63,10 @@ veles tool promote <name>      # move to ~/.veles/tools/ (cross-project)
 veles module list                              # 両方のスコープを `scope` 列付きで表示
 veles module add https://github.com/org/module.git
 veles module add ./local-module --user          # ~/.veles/modules/ にインストール（全プロジェクト共通）
-veles module show <name> [--user]
+veles module show <name> [--user]             # マニフェスト + ファイルの sha256
 veles module remove <name> [--user]
-veles module approve <name> [--user]
+veles module approve <name> [--user]          # ターミナルで `yes` と入力
+veles module approve <name> --sha256 <hash>   # ターミナルなし: レビュー済みのハッシュ
 ```
 
 モジュールは、スキルやツールと同じく 2 つのスコープに置かれます。プロジェクトローカル

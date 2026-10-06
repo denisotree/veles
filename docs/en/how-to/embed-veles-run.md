@@ -66,6 +66,21 @@ Two flags fall **outside** this contract:
   before a tool call — not just the final answer. Do not use it if you parse stdout.
 - `--manager` returns before the session line and the exit-code mapping.
 
+### Tool calls in `events.jsonl`
+
+To count or audit tool calls, read `<project>/.veles/events.jsonl`, one JSON object
+per line. Each call is a `tool_call` line, and its outcome a `tool_result` line with
+the same `tool_call_id`:
+
+```json
+{"type": "tool_call", "ts": "…", "session_id": "…", "tool_call_id": "c1", "name": "btgate_query", "arguments": {"…": "…"}}
+{"type": "tool_result", "ts": "…", "session_id": "…", "tool_call_id": "c1", "name": "btgate_query", "output": "…", "error": null}
+```
+
+These keys are part of the contract (`tests/test_cli_run_contract.py`); new keys may
+appear, so ignore ones you don't know. The `tool name(args)` line `--verbose` prints
+on stderr is a debug print, not part of the contract — don't parse it.
+
 ## Exit codes
 
 | Code | Meaning | What the caller should do |
@@ -91,17 +106,37 @@ ladder only fires for tools declared `sensitive=True`. A plain `@tool()` has no
 risk class, resolves to `allow`, and is never gated — the grant is written and
 never read.
 
-**The real gate is `veles tool approve`**, and it is keyed on a hash of the file:
+**The real gate is `veles tool approve`**, and it is keyed on a hash of the file.
+A deploy script approves the exact content a human reviewed:
 
 ```bash
-veles tool approve my_tool --yes    # --yes skips the prompt; no TTY needed
+veles tool approve                            # lists unapproved files with their sha256
+veles tool approve my_tool --sha256 <hash>    # no TTY needed; fails if the file changed
 ```
+
+Pin the reviewed hash in your deployment. If the file changed since, the command
+fails instead of approving the new content. `--yes` skips the prompt only at a
+terminal (since 1.2.8): without one, an agent's `run_shell` could approve its own
+tools with it.
 
 **Every edit invalidates the approval.** An unapproved file is skipped — the model
 sees neither the tool nor a refusal, so the agent can answer confidently having
 never reached its data source. Since v0.30 the skip prints
 `warning: N self-authored tool file(s) not loaded (unapproved): …` to stderr;
 watch for it, and re-approve after every write.
+
+**Modules work the same way.** A module's code runs on every agent turn, so it loads
+only while its files match the approved hash:
+
+```bash
+veles module show my_guard                       # the manifest and the files sha256
+veles module approve my_guard --sha256 <hash>    # no TTY needed; fails if files changed
+```
+
+`veles doctor` reports every module on disk that doesn't load as an error — run it
+in your start-up check. Admin verbs (`module`, `tool`, `doctor`, …) never open the
+first-run wizard, even on a fresh `$HOME` with a TTY; it fronts only commands that
+start an agent, and `VELES_NO_WIZARD=1` skips it there.
 
 Two more sharp edges:
 

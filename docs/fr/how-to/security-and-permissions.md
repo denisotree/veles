@@ -114,7 +114,10 @@ transmis par nom — jamais `VELES_TRUST_AUTO_ALLOW`.
 Limites connues :
 
 - `run_shell` est un shell : une fois que vous l'accordez (ou sous autopilot), il peut
-  écrire n'importe lequel des fichiers ci-dessus sans la confirmation par fichier.
+  écrire n'importe lequel des fichiers ci-dessus sans la confirmation par fichier — ainsi
+  que les magasins d'approbation dans `~/.veles/`. `veles … approve` exige un terminal ou
+  le hash relu (`--sha256`) et refuse une commande lancée par le shell de l'agent, mais
+  un shell accordé peut retirer cette marque ou écrire ces fichiers directement.
 - Une approbation MCP fige la ligne de commande du serveur, pas les fichiers qu'il
   exécute depuis le projet (un script nommé dans `args`) — relisez-les aussi.
 - Avec un fournisseur CLI, les exécutions qui pré-autorisent des outils uniquement

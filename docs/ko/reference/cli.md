@@ -8,7 +8,7 @@ Veles의 모든 명령, 하위 명령, 플래그를 정리했습니다. 언제�
 veles [--no-wizard] <command> [subcommand] [options]
 ```
 
-- `--no-wizard` — `~/.veles/config.toml`이 없더라도 첫 실행 설정 마법사를 건너뜁니다(TTY 환경 및 `VELES_NO_WIZARD=1`에도 의존).
+- `--no-wizard` — `~/.veles/config.toml`이 없더라도 첫 실행 설정 마법사를 건너뜁니다(TTY 환경 및 `VELES_NO_WIZARD=1`에도 의존). 마법사는 에이전트를 시작하는 명령(인자 없는 `veles`, `run`, `daemon`, `channel` 등)에서만 열리며, `module`, `tool`, `doctor` 같은 관리용 명령은 마법사를 열지 않습니다.
 - 인자 없이 `veles`만 실행하면 대화형 [TUI](tui.md)가 시작됩니다.
 
 대부분의 에이전트 명령은 [공통 에이전트 루프 플래그](#shared-agent-loop-flags)와 하단에 정리된 [프로바이더 이름](#provider-names)을 받습니다.
@@ -153,18 +153,24 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `list` | 이 프로젝트의 `memory.db`에 등록된 도구 나열 |
 | `show <name>` | 도구의 매니페스트 + 텔레메트리 출력 |
 | `promote <name> [-y]` | 프로젝트 도구를 `~/.veles/tools/`로 이동(프로젝트 간 공유) |
-| `approve [<name>] [--all] [-y]` | 로더가 실행하도록 직접 작성한 도구 파일을 검토 + 승인 |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | 로더가 실행하도록 직접 작성한 도구 파일을 검토 + 승인 |
 
-직접 작성한 도구(`.veles/tools/*.py`)는 로더가 임포트할 때 모듈 수준 코드를 실행하므로, 새로 만들거나 수정한 파일은 **승인하기 전에는 로드되지 않습니다** — `veles tool approve`는 코드를 보여주고 그 해시를 기록합니다. 인자 없는 `veles tool approve`는 대기 중인 항목을 나열합니다. 에이전트가 작성한 도구가 호출 가능해지기 전에 검토 단계가 필요한 이유입니다.
+직접 작성한 도구(`.veles/tools/*.py`)는 로더가 임포트할 때 모듈 수준 코드를 실행하므로, 새로 만들거나 수정한 파일은 **승인하기 전에는 로드되지 않습니다** — `veles tool approve`는 코드를 보여주고 그 해시를 기록합니다. 인자 없는 `veles tool approve`는 대기 중인 항목을 각 파일의 sha256과 함께 나열합니다. 에이전트가 작성한 도구가 호출 가능해지기 전에 검토 단계가 필요한 이유입니다.
 
-### `veles module {list,show,add,remove}`
+터미널이 없을 때(배포 스크립트)는 검토한 해시로 파일 하나를 승인합니다. `veles tool approve <name> --sha256 <hash>` — 그 이후 파일이 바뀌었다면 실패합니다. `-y`는 터미널에서만 확인 프롬프트를 건너뜁니다.
+
+### `veles module {list,show,add,remove,approve}`
 
 | 하위 명령 | 용도 |
 |---|---|
 | `list` | 설치된 모듈 나열 |
-| `show <name>` | 모듈의 매니페스트 출력 |
+| `show <name>` | 모듈의 매니페스트와 파일 sha256 출력 |
 | `add <source> [--name N] [-y]` | git URL 또는 로컬 경로에서 모듈 설치 |
 | `remove <name> [-y]` | 설치된 모듈 삭제 |
+| `approve <name> [--user] [--sha256 H]` | 검토 후 모듈 승인 |
+| `approve --all [--user]` | 로드되지 않는 모든 모듈 — 모듈마다 한 번씩 확인 |
+
+승인은 터미널에서 `yes` 입력을 요구합니다. 터미널이 없으면 검토한 파일 해시(`show`가 출력함)를 `--sha256`으로 전달하세요 — 그 이후 파일이 바뀌었다면 실패합니다. `veles doctor`는 디스크에 있으면서 로드되지 않는 모든 모듈을 보고합니다.
 
 ### `veles registry search [query] [--kind K]`
 연결된 레지스트리를 검색합니다 (모듈, 스킬, 레이아웃 팩, MCP 레시피).

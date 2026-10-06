@@ -8,7 +8,7 @@ Veles 的所有命令、子命令和参数。运行 `veles <command> --help` 可
 veles [--no-wizard] <command> [subcommand] [options]
 ```
 
-- `--no-wizard` — 即使 `~/.veles/config.toml` 缺失也跳过首次运行的设置向导（同样受 TTY 以及 `VELES_NO_WIZARD=1` 的约束）。
+- `--no-wizard` — 即使 `~/.veles/config.toml` 缺失也跳过首次运行的设置向导（同样受 TTY 以及 `VELES_NO_WIZARD=1` 的约束）。向导只出现在会启动 agent 的命令之前（不带参数的 `veles`、`run`、`daemon`、`channel` 等）；`module`、`tool`、`doctor` 这类管理命令从不会打开它。
 - 不带任何参数时，`veles` 会启动交互式 [TUI](tui.md)。
 
 大多数 agent 命令都接受底部列出的[共享 agent-loop 参数](#shared-agent-loop-flags)和[提供方名称](#provider-names)。
@@ -153,18 +153,24 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `list` | 列出本项目 `memory.db` 中编目的 tools |
 | `show <name>` | 打印某个 tool 的清单 + 遥测数据 |
 | `promote <name> [-y]` | 将项目级 tool 移动到 `~/.veles/tools/`（跨项目） |
-| `approve [<name>] [--all] [-y]` | 审阅并批准一个自撰写的 tool 文件，使加载器会运行它 |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | 审阅并批准一个自撰写的 tool 文件，使加载器会运行它 |
 
-自撰写的 tools（`.veles/tools/*.py`）在加载器导入它们时会运行其模块级代码，因此新增或编辑过的文件在获得批准前**不会被加载**——`veles tool approve` 会显示代码并记录其哈希值。不带参数的 `veles tool approve` 会列出待批准的内容。
+自撰写的 tools（`.veles/tools/*.py`）在加载器导入它们时会运行其模块级代码，因此新增或编辑过的文件在获得批准前**不会被加载**——`veles tool approve` 会显示代码并记录其哈希值。不带参数的 `veles tool approve` 会列出待批准的内容，并附上每个文件的 sha256。
 
-### `veles module {list,show,add,remove}`
+没有终端时（部署脚本），可按已审阅的哈希批准单个文件：`veles tool approve <name> --sha256 <hash>`——若文件自那以后发生了变化则会失败。`-y` 仅在终端中跳过确认提示。
+
+### `veles module {list,show,add,remove,approve}`
 
 | 子命令 | 用途 |
 |---|---|
 | `list` | 列出已安装的 modules |
-| `show <name>` | 打印某个 module 的清单 |
+| `show <name>` | 打印某个 module 的清单及其文件的 sha256 |
 | `add <source> [--name N] [-y]` | 从 git URL 或本地路径安装 module |
 | `remove <name> [-y]` | 删除已安装的 module |
+| `approve <name> [--user] [--sha256 H]` | 审阅后批准一个 module |
+| `approve --all [--user]` | 所有未加载的 module，每个单独确认一次 |
+
+批准时会要求在终端中输入 `yes`；没有终端时，请把你审阅过的文件哈希（`show` 会打印）作为 `--sha256` 传入——若文件自那以后发生了变化则会失败。`veles doctor` 会报告磁盘上每个未加载的 module。
 
 ### `veles registry search [query] [--kind K]`
 在已连接的注册表中搜索（模块、技能、layout 包、MCP 配方）。

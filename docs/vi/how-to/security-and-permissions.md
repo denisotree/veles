@@ -105,7 +105,10 @@ duyệt, và môi trường server đó nhận được được chuyển tiếp
 Các giới hạn đã biết:
 
 - `run_shell` là một shell: một khi bạn cấp quyền cho nó (hoặc dưới autopilot), nó có
-  thể ghi bất kỳ tệp nào ở trên mà không cần xác nhận theo từng tệp.
+  thể ghi bất kỳ tệp nào ở trên mà không cần xác nhận theo từng tệp — và cả các kho
+  phê duyệt trong `~/.veles/`. `veles … approve` cần một terminal hoặc hash đã được xem
+  xét (`--sha256`) và từ chối lệnh do shell của agent khởi chạy, nhưng một shell đã
+  được cấp quyền vẫn có thể gỡ dấu đó hoặc ghi trực tiếp vào các tệp đó.
 - Một phê duyệt MCP ghim dòng lệnh của máy chủ, không ghim các tệp nó chạy từ dự án
   (một script nêu trong `args`) — hãy xem xét cả chúng.
 - Với một provider CLI, các lần chạy chỉ tiền cấp quyền công cụ cho riêng mình (tác vụ

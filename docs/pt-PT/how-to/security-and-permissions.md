@@ -114,7 +114,10 @@ apenas as ferramentas desse servidor são aprovadas, e o ambiente que esse servi
 Limites conhecidos:
 
 - `run_shell` é um shell: depois de o conceder (ou sob autopilot), pode escrever
-  qualquer um dos ficheiros acima sem a confirmação por ficheiro.
+  qualquer um dos ficheiros acima sem a confirmação por ficheiro — e os registos de
+  aprovação em `~/.veles/`. `veles … approve` exige um terminal ou o hash revisto (`--sha256`)
+  e recusa um comando iniciado pelo shell do agente, mas um shell concedido pode
+  remover essa marca ou escrever esses ficheiros diretamente.
 - Uma aprovação MCP fixa a linha de comando do servidor, não os ficheiros que ele
   executa a partir do projeto (um script indicado em `args`) — reveja-os também.
 - Com um fornecedor CLI, as execuções que pré-autorizam ferramentas apenas para si

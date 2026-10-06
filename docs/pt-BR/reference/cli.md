@@ -12,7 +12,9 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 - `--no-wizard` — pula o assistente de configuração de primeira execução mesmo que
   `~/.veles/config.toml` esteja ausente (também depende de um TTY e de
-  `VELES_NO_WIZARD=1`).
+  `VELES_NO_WIZARD=1`). O assistente só precede comandos que iniciam um agente
+  (`veles` sem argumentos, `run`, `daemon`, `channel`, …); verbos administrativos
+  como `module`, `tool` e `doctor` nunca o abrem.
 - Sem argumentos, `veles` abre a [TUI](tui.md) interativa.
 
 A maioria dos comandos do agente aceita as [flags compartilhadas do loop do agente](#flags-compartilhadas-do-loop-do-agente)
@@ -175,23 +177,33 @@ consolidação por LLM).
 | `list` | Lista as tools catalogadas no `memory.db` deste projeto |
 | `show <name>` | Imprime o manifesto + telemetria de uma tool |
 | `promote <name> [-y]` | Move uma tool de projeto para `~/.veles/tools/` (entre projetos) |
-| `approve [<name>] [--all] [-y]` | Revisa + aprova um arquivo de tool autoescrita para que o loader a execute |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | Revisa + aprova um arquivo de tool autoescrita para que o loader a execute |
 
 Tools autoescritas (`.veles/tools/*.py`) executam seu código de nível de módulo
 quando o loader as importa, então um arquivo novo ou editado **não é carregado
 até você aprová-lo** — `veles tool approve` mostra o código e registra seu hash.
-`veles tool approve` sem argumentos lista o que está pendente. É por isso que uma
-tool escrita pelo agente precisa de uma etapa de revisão antes de se tornar
-chamável.
+`veles tool approve` sem argumentos lista o que está pendente, com o sha256 de cada
+arquivo. É por isso que uma tool escrita pelo agente precisa de uma etapa de revisão
+antes de se tornar chamável.
 
-### `veles module {list,show,add,remove}`
+Sem um terminal (um script de deploy), aprove um arquivo pelo hash que você revisou:
+`veles tool approve <name> --sha256 <hash>` — falha se o arquivo mudou desde então.
+`-y` pula a confirmação apenas em um terminal.
+
+### `veles module {list,show,add,remove,approve}`
 
 | Subcomando | Finalidade |
 |---|---|
 | `list` | Lista os módulos instalados |
-| `show <name>` | Imprime o manifesto de um módulo |
+| `show <name>` | Imprime o manifesto de um módulo e o sha256 de seus arquivos |
 | `add <source> [--name N] [-y]` | Instala um módulo a partir de uma URL git ou caminho local |
 | `remove <name> [-y]` | Remove um módulo instalado |
+| `approve <name> [--user] [--sha256 H]` | Aprova um módulo depois de revisá-lo |
+| `approve --all [--user]` | Todo módulo que não carrega, uma confirmação para cada |
+
+A aprovação pede que você digite `yes` em um terminal; sem um, passe o hash dos
+arquivos que você revisou (o `show` o imprime) como `--sha256` — falha se os arquivos
+mudaram desde então. `veles doctor` informa todo módulo em disco que não carrega.
 
 ### `veles registry search [query] [--kind K]`
 Pesquisa nos registries conectados (módulos, skills, pacotes de layout,

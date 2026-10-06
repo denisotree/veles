@@ -55,9 +55,10 @@ veles tool promote <name>      # move to ~/.veles/tools/ (cross-project)
 veles module list                              # both scopes, with a `scope` column
 veles module add https://github.com/org/module.git
 veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
-veles module show <name> [--user]
+veles module show <name> [--user]             # ম্যানিফেস্ট + ফাইলগুলোর sha256
 veles module remove <name> [--user]
-veles module approve <name> [--user]
+veles module approve <name> [--user]          # টার্মিনালে `yes` টাইপ করুন
+veles module approve <name> --sha256 <hash>   # টার্মিনাল ছাড়া: আপনার রিভিউ করা হ্যাশ
 ```
 
 Skill ও tool-এর মতোই module-ও দুই scope-এ থাকে: প্রজেক্ট-লোকাল (`<project>/.veles/modules/`) এবং
