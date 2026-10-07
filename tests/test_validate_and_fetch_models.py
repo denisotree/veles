@@ -24,7 +24,7 @@ def test_cloud_provider_success_returns_live_models(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        model_fetcher, "_list_live", lambda p: ["openai/gpt-4o", "openai/gpt-4o-mini"]
+        model_fetcher, "_lister", lambda p: lambda: ["openai/gpt-4o", "openai/gpt-4o-mini"]
     )
     status, models, msg = model_fetcher.validate_and_fetch_models("openai", "sk-key")
     assert status == "ok"
@@ -35,7 +35,7 @@ def test_cloud_provider_success_returns_live_models(
 def test_cloud_provider_auth_failure_returns_false(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(model_fetcher, "_list_live", lambda p: None)
+    monkeypatch.setattr(model_fetcher, "_lister", lambda p: lambda: None)
     status, models, msg = model_fetcher.validate_and_fetch_models("openrouter", "bad")
     assert status == "rejected"
     assert models == []
@@ -44,14 +44,24 @@ def test_cloud_provider_auth_failure_returns_false(
 
 def test_a_provider_that_never_answers_is_unreachable_not_a_freeze(monkeypatch) -> None:
     """A closed network: the SDKs wait minutes with retries, and the wizard froze."""
+    import threading
     import time
 
+    release = threading.Event()  # set at the end, so no listing thread outlives the test
+
+    def hang() -> list[str]:
+        release.wait(5)
+        return ["x"]
+
     monkeypatch.setattr(model_fetcher, "FETCH_TIMEOUT_S", 0.2)
-    monkeypatch.setattr(model_fetcher, "_list_live", lambda p: time.sleep(5) or ["x"])
+    monkeypatch.setattr(model_fetcher, "_lister", lambda p: hang)
     started = time.monotonic()
-    status, models, msg = model_fetcher.validate_and_fetch_models("openrouter", "sk")
-    assert status == "unreachable" and models == [] and "0s" in msg
-    assert time.monotonic() - started < 2
+    try:
+        status, models, msg = model_fetcher.validate_and_fetch_models("openrouter", "sk")
+        assert status == "unreachable" and models == [] and "0s" in msg
+        assert time.monotonic() - started < 2
+    finally:
+        release.set()
 
 
 def test_a_network_error_is_unreachable_and_401_is_rejected(monkeypatch) -> None:
@@ -59,15 +69,43 @@ def test_a_network_error_is_unreachable_and_401_is_rejected(monkeypatch) -> None
         status_code = 401
 
     def boom(exc):
-        def _live(p):
+        def _live():
             raise exc
 
-        return _live
+        return lambda p: _live
 
-    monkeypatch.setattr(model_fetcher, "_list_live", boom(ConnectionError("no route")))
+    monkeypatch.setattr(model_fetcher, "_lister", boom(ConnectionError("no route")))
     assert model_fetcher.validate_and_fetch_models("openrouter", "sk")[0] == "unreachable"
-    monkeypatch.setattr(model_fetcher, "_list_live", boom(_Auth("bad key")))
+    monkeypatch.setattr(model_fetcher, "_lister", boom(_Auth("bad key")))
     assert model_fetcher.validate_and_fetch_models("openrouter", "sk")[0] == "rejected"
+
+
+def test_a_timed_out_listing_leaves_no_key_in_the_environment(monkeypatch) -> None:
+    """The key was planted inside the listing thread, which outlives the timeout: it
+    stayed in the environment, and its late restore clobbered values set since."""
+    import os
+    import threading
+
+    release = threading.Event()
+    built_with: list[str | None] = []
+
+    class _Hanging:
+        def __init__(self) -> None:
+            built_with.append(os.environ.get("OPENROUTER_API_KEY"))
+
+        def list_models(self) -> list[str]:
+            release.wait(5)
+            return ["x"]
+
+    monkeypatch.setattr(model_fetcher, "FETCH_TIMEOUT_S", 0.2)
+    monkeypatch.setattr("veles.core.provider_factory.make_provider", lambda p, **kw: _Hanging())
+    try:
+        status, _, _ = model_fetcher.validate_and_fetch_models("openrouter", "sk-new")
+        assert status == "unreachable"
+        assert built_with == ["sk-new"]
+        assert "OPENROUTER_API_KEY" not in os.environ
+    finally:
+        release.set()
 
 
 def test_the_bounded_listing_sees_the_callers_context() -> None:
@@ -100,7 +138,7 @@ def test_anthropic_no_list_endpoint_returns_curated(
 def test_local_provider_uses_live_endpoint(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(model_fetcher, "_list_live", lambda p: ["llama3", "mistral"])
+    monkeypatch.setattr(model_fetcher, "_lister", lambda p: lambda: ["llama3", "mistral"])
     status, models, _msg = model_fetcher.validate_and_fetch_models("ollama", "ignored")
     assert status == "ok"
     assert "llama3" in models
@@ -112,13 +150,13 @@ def test_env_var_is_restored_after_call(
     monkeypatch.setenv("OPENAI_API_KEY", "original-env-key")
     seen: dict[str, str] = {}
 
-    def fake_try_live(provider: str) -> list[str]:
+    def fake_lister(provider: str):
         import os
 
         seen["during"] = os.environ.get("OPENAI_API_KEY", "")
-        return ["model"]
+        return lambda: ["model"]
 
-    monkeypatch.setattr(model_fetcher, "_list_live", fake_try_live)
+    monkeypatch.setattr(model_fetcher, "_lister", fake_lister)
     model_fetcher.validate_and_fetch_models("openai", "wizard-key")
     import os
 
@@ -132,6 +170,6 @@ def test_env_var_cleared_when_was_unset(
     """When the env was unset before the call, it must remain unset after."""
     import os
 
-    monkeypatch.setattr(model_fetcher, "_list_live", lambda p: ["m"])
+    monkeypatch.setattr(model_fetcher, "_lister", lambda p: lambda: ["m"])
     model_fetcher.validate_and_fetch_models("openai", "wizard-key")
     assert "OPENAI_API_KEY" not in os.environ

@@ -103,9 +103,10 @@ def _merge_with_curated(live: list[str], provider: str) -> list[str]:
     return merged
 
 
-def _list_live(provider: str) -> list[str] | None:
-    """Build the adapter and call `list_models()`; `None` when there is no adapter or
-    no listing, the request's own error propagates."""
+def _lister(provider: str) -> Callable[[], list[str] | None] | None:
+    """Build the adapter now (it reads its key here) and return its listing call;
+    `None` when there is no adapter or no listing. The call returns `None` for a
+    malformed answer, and the request's own error propagates."""
     from veles.core.provider_factory import make_provider as _make_provider
 
     try:
@@ -113,14 +114,23 @@ def _list_live(provider: str) -> list[str] | None:
     except Exception as exc:
         _logger.debug("model fetcher: cannot build %s provider: %s", provider, exc)
         return None
-    lister = getattr(adapter, "list_models", None)
-    if not callable(lister):
+    list_models = getattr(adapter, "list_models", None)
+    if not callable(list_models):
         return None
-    result = lister()
-    if not isinstance(result, list) or not all(isinstance(m, str) for m in result):
-        _logger.debug("model fetcher: %s.list_models() returned non-list[str]", provider)
-        return None
-    return result
+
+    def call() -> list[str] | None:
+        result = list_models()
+        if not isinstance(result, list) or not all(isinstance(m, str) for m in result):
+            _logger.debug("model fetcher: %s.list_models() returned non-list[str]", provider)
+            return None
+        return result
+
+    return call
+
+
+def _list_live(provider: str) -> list[str] | None:
+    lister = _lister(provider)
+    return lister() if lister is not None else None
 
 
 def _bounded(fn: Callable[[], list[str] | None], timeout: float) -> list[str] | None:
@@ -165,9 +175,9 @@ def _rejected(exc: BaseException) -> bool:
 def validate_and_fetch_models(provider: str, api_key: str) -> tuple[FetchStatus, list[str], str]:
     """One-shot validation + model listing using `api_key`, within `FETCH_TIMEOUT_S`.
 
-    Temporarily plants the key in the canonical env var for `provider`
-    so the adapter (and its SDK) pick it up, calls `list_models()`, and
-    restores the env. Returns:
+    Temporarily plants the key in the canonical env var for `provider` while the
+    adapter is built (it reads the key then), restores the env, and calls
+    `list_models()`. Returns:
       - ("ok", models, "") on success — curated models for providers without a
         list-models endpoint (Anthropic, CLI shims): "accepted without validation".
       - ("rejected", [], message) when the provider refuses the key (401/403).
@@ -188,21 +198,23 @@ def validate_and_fetch_models(provider: str, api_key: str) -> tuple[FetchStatus,
     if not env_names and strategy != "live":
         return "ok", known_models(provider), ""
 
-    def with_key() -> list[str] | None:
-        saved: dict[str, str | None] = {n: os.environ.get(n) for n in env_names}
-        try:
-            for name in env_names:
-                os.environ[name] = api_key
-            return _list_live(provider)
-        finally:
-            for name, value in saved.items():
-                if value is None:
-                    os.environ.pop(name, None)
-                else:
-                    os.environ[name] = value
-
+    # The adapter reads its key when it is built: plant and restore around the build
+    # here, so the listing thread — which may outlive the timeout — never owns the env.
+    saved: dict[str, str | None] = {n: os.environ.get(n) for n in env_names}
     try:
-        models = _bounded(with_key, FETCH_TIMEOUT_S)
+        for name in env_names:
+            os.environ[name] = api_key
+        lister = _lister(provider)
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+    if lister is None:
+        return "rejected", [], "provider rejected the key or the request failed"
+    try:
+        models = _bounded(lister, FETCH_TIMEOUT_S)
     except TimeoutError:
         return "unreachable", [], f"{provider} didn't answer in {FETCH_TIMEOUT_S:.0f}s"
     except Exception as exc:
