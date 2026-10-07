@@ -8,8 +8,8 @@ connect कर सकता है और उनके tools को agent के
 
 ## एक server configure करें
 
-`<project>/.veles/config.toml` (या user-global `~/.veles/config.toml`) में एक
-`[mcp.servers.<name>]` block जोड़ें। `<name>` को
+`<project>/.veles/config.toml` में एक
+`[mcp.servers.<name>]` block जोड़ें — servers केवल project config से पढ़े जाते हैं। `<name>` को
 `[A-Za-z0-9][A-Za-z0-9_-]{0,31}` से मेल खाना चाहिए — यह हर tool के नाम का हिस्सा बन जाता है।
 तीन transports समर्थित हैं: `stdio` (default), `http`, `sse`।
 

@@ -14,22 +14,26 @@ Fixes from embedding Veles in a closed network and on channels that can't show b
 ### Fixed
 
 - **The wizard's model step can't freeze.** Listing a provider's models now gives up
-  after 10 s, and the wizard waits for it off the UI thread. A provider that can't be
-  reached is no longer reported as a rejected key: the wizard asks you to type a model
-  id (or leave it for later) instead of sending you back to the key. Only a 401/403
-  counts as a bad key. The REPL's model picker is bounded the same way.
+  after 10 s, and the wizard waits for it off the UI thread with a "Checking …" note.
+  A provider that can't be reached is no longer reported as a rejected key: both
+  wizards ask you to type a model id (or leave it for later) instead of sending you
+  back to the key, and going back to the step tries the provider again. Only a 401/403
+  counts as a bad key. The key you entered is never left in the environment by a
+  listing that timed out. The REPL's model picker is bounded the same way.
 - **A channel that can't ask refuses at once.** A channel whose platform can't render
   questions (`asks_questions = False`, e.g. email) used to wait out the 300 s prompt
-  timeout on every trust, approval or critical-op question. It now refuses
-  straight away and the reply says where to allow the tool (`veles trust set`, or
-  a chat that can ask).
+  timeout on every trust, approval or critical-op question; so did a turn resumed
+  after a background job on any channel. Both now refuse straight away, and the reply
+  says what would allow it: `veles trust set` for a trust prompt, a chat that can ask
+  or a terminal for an approval or a critical operation.
 - **A missing Python package is named.** Auto-installing a module (a channel declared
   in your config) prints the `uv tool install veles-ai --with …` line a manual
-  `veles registry install` prints. A declared channel whose module failed to load says
-  why — the import error, with a package hint for `No module named` — instead of
-  "its module isn't installed".
-- Docs: the user config example no longer shows `[mcp.servers]` (MCP servers are read
-  from the project config only); `VELES_FENCED_TOOLS` is described as the text
+  `veles registry install` prints. A declared channel whose module is installed but
+  failed to load says why — the import error, with a package hint for
+  `No module named` — and points at `veles doctor` instead of a reinstall.
+- Docs: the configuration reference and "Connect external MCP servers" no longer offer
+  `~/.veles/config.toml` for `[mcp.servers]` (they are read from the project config
+  only); the channel event contract lists `notice`; `VELES_FENCED_TOOLS` is described as the text
   tool-call protocol for models without native tool calls, on by default; `veles module`
   in the CLI reference is in sync across locales; "Embed `veles run` in another program"
   is translated into Russian.

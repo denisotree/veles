@@ -9,8 +9,8 @@ serviços, …).
 
 ## Configurar um servidor
 
-Adicione um bloco `[mcp.servers.<name>]` a `<project>/.veles/config.toml` (ou ao
-global do utilizador `~/.veles/config.toml`). O `<name>` tem de corresponder a
+Adicione um bloco `[mcp.servers.<name>]` a `<project>/.veles/config.toml` — os
+servidores são lidos apenas da configuração do projeto. O `<name>` tem de corresponder a
 `[A-Za-z0-9][A-Za-z0-9_-]{0,31}` — passa a fazer parte do nome de cada ferramenta.
 São suportados três transportes: `stdio` (predefinição), `http`, `sse`.
 

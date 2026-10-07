@@ -6,7 +6,7 @@ Veles একটি [MCP](https://modelcontextprotocol.io/) **client**: এটি
 
 ## একটি সার্ভার কনফিগার করা
 
-`<project>/.veles/config.toml`-এ (অথবা ব্যবহারকারী-গ্লোবাল `~/.veles/config.toml`-এ) একটি `[mcp.servers.<name>]` ব্লক যোগ করুন। `<name>`-কে অবশ্যই `[A-Za-z0-9][A-Za-z0-9_-]{0,31}`-এর সাথে মিলতে হবে — এটি প্রতিটি টুলের নামের অংশ হয়ে যায়। তিনটি transport সমর্থিত: `stdio` (ডিফল্ট), `http`, `sse`।
+`<project>/.veles/config.toml`-এ একটি `[mcp.servers.<name>]` ব্লক যোগ করুন — সার্ভার শুধু প্রজেক্টের কনফিগ থেকে পড়া হয়। `<name>`-কে অবশ্যই `[A-Za-z0-9][A-Za-z0-9_-]{0,31}`-এর সাথে মিলতে হবে — এটি প্রতিটি টুলের নামের অংশ হয়ে যায়। তিনটি transport সমর্থিত: `stdio` (ডিফল্ট), `http`, `sse`।
 
 | Key | Transport | Default | উদ্দেশ্য |
 |---|---|---|---|

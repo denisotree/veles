@@ -8,8 +8,8 @@ Veles هو **عميل** [MCP](https://modelcontextprotocol.io/): يمكنه ال
 
 ## تهيئة خادم
 
-أضف كتلة `[mcp.servers.<name>]` إلى `<project>/.veles/config.toml` (أو إلى
-الملف العام على مستوى المستخدم `~/.veles/config.toml`). يجب أن يطابق `<name>`
+أضف كتلة `[mcp.servers.<name>]` إلى `<project>/.veles/config.toml` — تُقرأ
+الخوادم من إعدادات المشروع فقط. يجب أن يطابق `<name>`
 النمط `[A-Za-z0-9][A-Za-z0-9_-]{0,31}` — فهو يصبح جزءًا من اسم كل أداة. هناك ثلاثة
 أنواع نقل مدعومة: `stdio` (الافتراضي)، و`http`، و`sse`.
 

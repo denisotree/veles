@@ -8,8 +8,8 @@ Veles は [MCP](https://modelcontextprotocol.io/) **クライアント** です:
 
 ## サーバーを設定する
 
-`<project>/.veles/config.toml`（または、ユーザーグローバルな `~/.veles/config.toml`）に
-`[mcp.servers.<name>]` ブロックを追加します。`<name>` は
+`<project>/.veles/config.toml` に
+`[mcp.servers.<name>]` ブロックを追加します — サーバーはプロジェクトの設定からのみ読み込まれます。`<name>` は
 `[A-Za-z0-9][A-Za-z0-9_-]{0,31}` に一致する必要があります — これは各ツール名の一部になります。
 サポートされるトランスポートは3種類です: `stdio`（デフォルト）、`http`、`sse`。
 

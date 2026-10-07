@@ -8,8 +8,8 @@ external MCP servers and expose their tools to the agent as if they were built i
 
 ## Configure a server
 
-Add a `[mcp.servers.<name>]` block to `<project>/.veles/config.toml` (or the
-user-global `~/.veles/config.toml`). The `<name>` must match
+Add a `[mcp.servers.<name>]` block to `<project>/.veles/config.toml` — servers
+are read from the project config only. The `<name>` must match
 `[A-Za-z0-9][A-Za-z0-9_-]{0,31}` — it becomes part of each tool's name. Three
 transports are supported: `stdio` (default), `http`, `sse`.
 
