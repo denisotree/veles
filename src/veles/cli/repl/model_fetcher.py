@@ -31,9 +31,11 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from veles.cli.repl.model_catalog import known_models
 from veles.core.io_utils import read_fresh_json, write_stamped_json
@@ -41,8 +43,10 @@ from veles.core.io_utils import read_fresh_json, write_stamped_json
 _logger = logging.getLogger(__name__)
 
 Source = Literal["live", "cache", "curated"]
+FetchStatus = Literal["ok", "rejected", "unreachable"]
 
 CACHE_TTL_SECONDS = 24 * 60 * 60
+FETCH_TIMEOUT_S = 10.0
 
 
 def _strategy(provider: str) -> str:
@@ -98,9 +102,9 @@ def _merge_with_curated(live: list[str], provider: str) -> list[str]:
     return merged
 
 
-def _try_live(provider: str) -> list[str] | None:
-    """Build adapter and call `list_models()`. Returns `None` on any
-    failure (missing key, no method, network/auth error)."""
+def _list_live(provider: str) -> list[str] | None:
+    """Build the adapter and call `list_models()`; `None` when there is no adapter or
+    no listing, the request's own error propagates."""
     from veles.core.provider_factory import make_provider as _make_provider
 
     try:
@@ -111,29 +115,61 @@ def _try_live(provider: str) -> list[str] | None:
     lister = getattr(adapter, "list_models", None)
     if not callable(lister):
         return None
-    try:
-        result = lister()
-    except Exception as exc:
-        _logger.debug("model fetcher: %s.list_models() failed: %s", provider, exc)
-        return None
+    result = lister()
     if not isinstance(result, list) or not all(isinstance(m, str) for m in result):
         _logger.debug("model fetcher: %s.list_models() returned non-list[str]", provider)
         return None
     return result
 
 
-def validate_and_fetch_models(provider: str, api_key: str) -> tuple[bool, list[str], str]:
-    """One-shot validation + model listing using `api_key`.
+def _bounded(fn: Callable[[], list[str] | None], timeout: float) -> list[str] | None:
+    """Run `fn` in a daemon thread for at most `timeout` s — the SDKs default to minutes
+    with retries, and a closed network froze the wizard. A daemon thread never blocks
+    process exit; raises TimeoutError, or `fn`'s own error."""
+    box: dict[str, Any] = {}
+
+    def run() -> None:
+        try:
+            box["value"] = fn()
+        except Exception as exc:  # carried to the caller
+            box["error"] = exc
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    worker.join(timeout)
+    if worker.is_alive():
+        raise TimeoutError
+    if "error" in box:
+        raise box["error"]
+    return box.get("value")
+
+
+def _try_live(provider: str) -> list[str] | None:
+    """`_list_live` within `FETCH_TIMEOUT_S`; `None` on any failure (the picker falls
+    back to the curated list)."""
+    try:
+        return _bounded(lambda: _list_live(provider), FETCH_TIMEOUT_S)
+    except Exception as exc:
+        _logger.debug("model fetcher: %s.list_models() failed: %s", provider, exc)
+        return None
+
+
+def _rejected(exc: BaseException) -> bool:
+    code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    return code in (401, 403)
+
+
+def validate_and_fetch_models(provider: str, api_key: str) -> tuple[FetchStatus, list[str], str]:
+    """One-shot validation + model listing using `api_key`, within `FETCH_TIMEOUT_S`.
 
     Temporarily plants the key in the canonical env var for `provider`
     so the adapter (and its SDK) pick it up, calls `list_models()`, and
     restores the env. Returns:
-      - (True, models, "") on success.
-      - (True, curated_models, "") for providers without a list-models
-        endpoint (Anthropic, CLI shims) — caller treats the key as
-        "accepted without validation".
-      - (False, [], message) when the adapter rejects the key or the
-        request fails for any reason.
+      - ("ok", models, "") on success — curated models for providers without a
+        list-models endpoint (Anthropic, CLI shims): "accepted without validation".
+      - ("rejected", [], message) when the provider refuses the key (401/403).
+      - ("unreachable", [], message) when it doesn't answer in time or the
+        request fails otherwise — the key may well be fine.
 
     Used by the TUI wizard to make API-key entry meaningful: the user
     finds out immediately if their key is wrong, and the model picker
@@ -141,29 +177,40 @@ def validate_and_fetch_models(provider: str, api_key: str) -> tuple[bool, list[s
     """
     strategy = _strategy(provider)
     if strategy == "curated":
-        return True, known_models(provider), ""
+        return "ok", known_models(provider), ""
     from veles.core.providers import find_provider
 
     spec = find_provider(provider)
     env_names = spec.key_env if spec else ()
     if not env_names and strategy != "live":
-        return True, known_models(provider), ""
-    saved: dict[str, str | None] = {n: os.environ.get(n) for n in env_names}
+        return "ok", known_models(provider), ""
+
+    def with_key() -> list[str] | None:
+        saved: dict[str, str | None] = {n: os.environ.get(n) for n in env_names}
+        try:
+            for name in env_names:
+                os.environ[name] = api_key
+            return _list_live(provider)
+        finally:
+            for name, value in saved.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+
     try:
-        for name in env_names:
-            os.environ[name] = api_key
-        models = _try_live(provider)
-    finally:
-        for name, value in saved.items():
-            if value is None:
-                os.environ.pop(name, None)
-            else:
-                os.environ[name] = value
+        models = _bounded(with_key, FETCH_TIMEOUT_S)
+    except TimeoutError:
+        return "unreachable", [], f"{provider} didn't answer in {FETCH_TIMEOUT_S:.0f}s"
+    except Exception as exc:
+        if _rejected(exc):
+            return "rejected", [], "the provider rejected the key"
+        return "unreachable", [], f"couldn't reach {provider}: {exc}"
     if models is None:
-        return False, [], "provider rejected the key or the request failed"
+        return "rejected", [], "provider rejected the key or the request failed"
     if strategy == "cached":
         models = _merge_with_curated(models, provider)
-    return True, models, ""
+    return "ok", models, ""
 
 
 def fetch_models(provider: str, *, refresh: bool = False) -> ModelList:

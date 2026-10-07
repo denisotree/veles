@@ -33,7 +33,7 @@ def _isolate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _FakeKeyring:
     monkeypatch.setattr(
         _model_fetcher,
         "validate_and_fetch_models",
-        lambda provider, api_key: (True, [f"{provider}/fake-a", f"{provider}/fake-b"], ""),
+        lambda provider, api_key: ("ok", [f"{provider}/fake-a", f"{provider}/fake-b"], ""),
     )
     return kr
 
@@ -197,7 +197,7 @@ async def test_model_step_bad_key_continues_with_no(
     monkeypatch.setattr(
         _model_fetcher,
         "validate_and_fetch_models",
-        lambda provider, api_key: (False, [], "401 Unauthorized"),
+        lambda provider, api_key: ("rejected", [], "401 Unauthorized"),
     )
     secrets.set_provider_key("openrouter", "bad-key")
     keys = [
@@ -212,4 +212,32 @@ async def test_model_step_bad_key_continues_with_no(
     answers = await _drive_user_wizard(keys, poll=80)
     assert answers["default_model"] is None
     # api_key_status downgraded to deferred so downstream doesn't trust it.
+    assert answers["api_key_status"] == "deferred"
+
+
+async def test_model_step_unreachable_provider_takes_a_typed_model(
+    _isolate: _FakeKeyring, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A closed network: not "the key is bad" — the user types a model id or skips."""
+    from veles.cli.repl import model_fetcher as _model_fetcher
+
+    monkeypatch.setattr(
+        _model_fetcher,
+        "validate_and_fetch_models",
+        lambda provider, api_key: ("unreachable", [], "openrouter didn't answer in 10s"),
+    )
+    secrets.set_provider_key("openrouter", "sk-key")
+    keys = [
+        "enter",  # language
+        "enter",  # provider openrouter
+        "enter",  # use existing keychain key
+        "a",
+        "b",
+        "c",
+        "enter",  # typed model id
+        "enter",  # theme default
+        "n",  # init? no
+    ]
+    answers = await _drive_user_wizard(keys, poll=80)
+    assert answers["default_model"] == "abc"
     assert answers["api_key_status"] == "deferred"

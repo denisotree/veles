@@ -12,6 +12,7 @@ which API key env var to consult, theme is independent (any moment),
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 from dataclasses import dataclass
 
@@ -257,8 +258,20 @@ class ModelStep:
                 ctx.answers["default_model"] = None
                 return WizardOutcome.SKIP
 
-        ok, models, error = validate_and_fetch_models(provider, api_key)
-        if not ok:
+        # A thread: the fetch is bounded but still seconds long — the UI keeps drawing.
+        status, models, error = await asyncio.to_thread(
+            validate_and_fetch_models, provider, api_key
+        )
+        if status == "unreachable":
+            entered = await ask_model_id(ctx, self.title, error)
+            nav = outcome_from_dismiss(entered)
+            if nav is not None:
+                return nav
+            typed = str(entered).strip()
+            ctx.answers["default_model"] = typed or None
+            ctx.answers["api_key_status"] = "deferred"
+            return WizardOutcome.NEXT if typed else WizardOutcome.SKIP
+        if status == "rejected":
             # Confirm + bounce: go BACK to ApiKeyStep so the user can
             # paste a correct key.
             retry = await ctx.app.push_screen_wait(
@@ -292,6 +305,18 @@ class ModelStep:
             return nav
         ctx.answers["default_model"] = result
         return WizardOutcome.NEXT
+
+
+async def ask_model_id(ctx: WizardContext, title: str, error: str) -> object:
+    """The provider didn't answer (a closed network): ask for a model id instead of
+    blaming the key. Returns the screen's dismiss value (`outcome_from_dismiss`)."""
+    return await ctx.app.push_screen_wait(
+        InputScreen(
+            title=title,
+            prompt=f"Couldn't list models ({error}). Type a model id, or leave empty to "
+            "choose later.",
+        )
+    )
 
 
 def model_choice_screen(
