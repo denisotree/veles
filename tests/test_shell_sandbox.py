@@ -107,6 +107,74 @@ def test_no_project_still_protects_user_paths() -> None:
     assert "<exit 0>" not in _shell(None, f"echo x > '{user_home()}/trust.json'")
 
 
+def _git(*args: str) -> None:
+    subprocess.run(["git", *args], check=True, capture_output=True)
+
+
+@needs_sandbox
+def test_a_worktree_project_works_and_its_real_config_is_protected(tmp_path: Path) -> None:
+    """`.git` is a file in a worktree: bwrap failed every command (ENOTDIR), and git's real
+    config in the main repo was writable on both platforms."""
+    main = tmp_path / "main"
+    _git("init", "-q", str(main))
+    _git("-C", str(main), "commit", "-q", "--allow-empty", "-m", "init")
+    _git("-C", str(main), "worktree", "add", "-q", str(tmp_path / "wt"), "-b", "side")
+    project = init_project(tmp_path / "wt", name="p")
+    assert _shell(project, "true").rstrip().endswith("<exit 0>")
+    assert "<exit 0>" not in _shell(project, "git config --local core.fsmonitor 'touch x'")
+    assert "<exit 0>" not in _shell(project, "echo 'gitdir: /elsewhere' > .git")
+
+
+@needs_sandbox
+def test_a_nested_repo_cannot_be_renamed_or_hooked(repo: Project) -> None:
+    _git("init", "-q", str(repo.root / "vendor" / "lib"))
+    assert "<exit 0>" not in _shell(repo, "mv vendor/lib/.git vendor/lib/g2")
+    assert "<exit 0>" not in _shell(repo, "echo x > vendor/lib/.git/hooks/pre-commit")
+
+
+@needs_sandbox
+def test_a_dir_holding_a_protected_name_cannot_be_moved_out(repo: Project, tmp_path: Path) -> None:
+    (repo.root / "sub" / ".claude").mkdir(parents=True)
+    assert "<exit 0>" not in _shell(repo, f"mv sub '{tmp_path}/moved'")
+    assert (repo.root / "sub" / ".claude").is_dir()
+
+
+@needs_sandbox
+def test_git_config_gets_the_hint(repo: Project) -> None:
+    assert "read-only for the agent's shell" in _shell(repo, "git config user.name x")
+
+
+@needs_sandbox
+def test_git_init_in_a_subdirectory_works(repo: Project) -> None:
+    out = _shell(repo, "mkdir -p sub && git -C sub init -q")
+    assert out.rstrip().endswith("<exit 0>")
+
+
+@needs_sandbox
+@pytest.mark.skipif(sys.platform != "darwin", reason="bwrap can't pin a symlink")
+def test_a_symlinked_ancestor_cannot_be_swapped(tmp_path: Path, monkeypatch) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(real, target_is_directory=True)
+    project = init_project(link / "p", name="p")
+    monkeypatch.setenv("PWD", str(link / "p"))
+    assert "<exit 0>" not in _shell(project, f"rm '{link}'")
+    assert link.is_symlink()
+
+
+@needs_sandbox
+def test_a_new_home_startup_file(repo: Project, tmp_path: Path, monkeypatch, capsys) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    out = _shell(repo, "echo x > ~/.bash_profile")
+    if sys.platform == "darwin":
+        assert "<exit 0>" not in out
+    else:  # can't be bound before it exists: reported
+        assert "created ~/.bash_profile" in out and ".bash_profile" in capsys.readouterr().err
+
+
 @pytest.mark.skipif(active, reason="the sandbox works here")
 def test_without_a_sandbox_run_shell_warns_and_runs(repo: Project, capsys) -> None:
     sandbox._warned.clear()

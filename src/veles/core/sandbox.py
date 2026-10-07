@@ -21,11 +21,14 @@ from pathlib import Path
 from veles.core.layout.writable import ShellGuard, shell_guard
 from veles.core.project import Project
 
-_DENIED = ("Operation not permitted", "Read-only file system")
-_HINT = "<sandbox: this path is read-only for the agent's shell — ask the user to change it>"
+# EBUSY: on Linux a rename onto a read-only bind mount (git writing `.git/config`).
+_DENIED = ("Operation not permitted", "Read-only file system", "Device or resource busy")
+_HINT = (
+    "<sandbox: if this was a write to a protected path, it is read-only for the agent's "
+    "shell — ask the user to change it>"
+)
+_WRAPPERS = ("sandbox-exec:", "bwrap:")
 _REGEX_META = frozenset(".^$*+?()[]{}|\\")
-_WALK_DEPTH = 4  # ponytail: bwrap binds only existing paths; deeper names aren't walked
-_WALK_SKIP = frozenset({".git", "node_modules"})
 _warned: set[str] = set()
 
 
@@ -84,43 +87,53 @@ def sandbox_status() -> SandboxStatus:
 def wrap(argv: list[str], project: Project | None) -> Wrapped:
     status = sandbox_status()
     if not status.active:
-        if not status.disabled and status.reason not in _warned:
-            _warned.add(status.reason)
-            print(f"warning: run_shell is not sandboxed: {status.reason}", file=sys.stderr)
+        if not status.disabled:
+            _warn_once(f"warning: run_shell is not sandboxed: {status.reason}")
         return Wrapped(list(argv), False)
     guard = shell_guard(project)
     if status.kind == "sandbox-exec":
-        return Wrapped(["sandbox-exec", "-p", sbpl_profile(guard), *argv], True)
+        profile = sbpl_profile(guard)
+        return Wrapped(["sandbox-exec", "-p", profile, *argv], True, _watch(guard, linux=False))
     # bwrap binds only existing paths: under a read-only `.veles/` a missing hole could
     # never be created, so Veles makes its own agent dirs first.
     for hole in guard.holes:
         with contextlib.suppress(OSError):
             hole.mkdir(parents=True, exist_ok=True)
-    return Wrapped(bwrap_argv(guard, argv), True, _absent_root_entries(guard))
+    return Wrapped(bwrap_argv(guard, argv), True, _watch(guard, linux=True))
 
 
 def notes(wrapped: Wrapped, *, returncode: int, output: str, project: Project | None) -> str:
-    """What to append to run_shell's output: a hint when a write was refused, and a
-    report of protected root entries the command created (Linux can't block a path that
-    didn't exist) — also told to the user on stderr and in the memory log."""
+    """What to append to run_shell's output: whether the sandbox itself failed to start
+    (the command didn't run — the user is told once), a hint when a write was refused,
+    and a report of protected paths the command created — ones that didn't exist, which
+    Linux can't block, and a new repo at the root — also told to the user on stderr and
+    in the memory log."""
     if not wrapped.active:
         return ""
+    if returncode != 0 and output.startswith(_WRAPPERS):
+        reason = output.splitlines()[0]
+        _warn_once(f"warning: run_shell's sandbox failed to start, nothing ran: {reason}")
+        return (
+            "<sandbox: the sandbox couldn't start, so the command didn't run — "
+            "the user has been told>"
+        )
     out: list[str] = []
     if returncode != 0 and any(marker in output for marker in _DENIED):
         out.append(_HINT)
     for path in wrapped.watch:
         if not os.path.lexists(path):
             continue
+        shown = _display(path, project)
         print(
-            f"warning: the agent's shell created {path.name} in the project — review it "
-            "(the sandbox can't block a path that didn't exist)",
+            f"warning: the agent's shell created {shown} — review it (the sandbox can't "
+            "block a path that didn't exist yet)",
             file=sys.stderr,
         )
         if project is not None:
             from veles.core.memory.artefacts import append_memory_log
 
-            append_memory_log(project, op="sandbox", summary=f"run_shell created {path.name}")
-        out.append(f"<sandbox: created {path.name} — the user has been told>")
+            append_memory_log(project, op="sandbox", summary=f"run_shell created {shown}")
+        out.append(f"<sandbox: created {shown} — the user has been told>")
     return "\n".join(out)
 
 
@@ -146,11 +159,14 @@ def sbpl_profile(guard: ShellGuard) -> str:
 def bwrap_argv(guard: ShellGuard, argv: list[str]) -> list[str]:
     out = ["bwrap", "--dev-bind", "/", "/"]
     for p in guard.pinned:  # a mount point can't be renamed (spike: the `mv .git` hole)
-        out += ["--bind-try", str(p), str(p)]
-    for p in (*guard.readonly, *_named_paths(guard)):
-        out += ["--ro-bind-try", str(p), str(p)]
+        flag = "--bind-try" if p.is_dir() and not p.is_symlink() else "--ro-bind-try"
+        out += [flag, str(p), str(p)]
+    for p in guard.readonly:
+        if _bindable(p):
+            out += ["--ro-bind-try", str(p), str(p)]
     for h in guard.holes:
-        out += ["--bind-try", str(h), str(h)]
+        if _bindable(h):
+            out += ["--bind-try", str(h), str(h)]
     if guard.relock_prefix is not None:
         prefix = guard.relock_prefix
         for d in sorted(prefix.parent.glob(prefix.name + "*")):
@@ -158,50 +174,54 @@ def bwrap_argv(guard: ShellGuard, argv: list[str]) -> list[str]:
     return [*out, "--die-with-parent", "--", *argv]
 
 
+def _bindable(p: Path) -> bool:
+    """`-try` binds skip a missing path but fail on one under a file (ENOTDIR) — e.g.
+    `.git/hooks` where `.git` is a worktree's file — and that broke every command."""
+    return not any(os.path.lexists(a) and not a.is_dir() for a in p.parents)
+
+
 def _no_rename(guard: ShellGuard) -> list[Path]:
-    """`literal` denies: the pinned dirs and every ancestor of every protected path —
-    renaming an ancestor would move the protected path out from under the profile."""
-    out: dict[Path, None] = dict.fromkeys(guard.pinned)
-    for p in (*guard.pinned, *guard.readonly):
+    """`literal` denies: the pinned dirs, the links, and every *existing* ancestor of a
+    protected path — renaming one would move the path out from under the profile. A
+    missing ancestor is left creatable (a literal deny would block `mkdir ~/.config`)."""
+    out: dict[Path, None] = dict.fromkeys((*guard.pinned, *guard.links))
+    for p in (*guard.pinned, *guard.readonly, *guard.links):
         for parent in p.parents:
-            if parent != Path(parent.anchor):
+            if parent != Path(parent.anchor) and os.path.lexists(parent):
                 out[parent] = None
     return list(out)
 
 
-def _named_paths(guard: ShellGuard) -> list[Path]:
-    """Existing paths matching `readonly_names` under the root (bwrap binds only what
-    exists), walking `_WALK_DEPTH` levels and skipping `.git` internals and node_modules."""
-    if guard.root is None:
-        return []
-    found: list[Path] = []
-    firsts = {n.split("/")[0].casefold() for n in guard.readonly_names}
-    for dirpath, dirnames, filenames in os.walk(guard.root):
-        here = Path(dirpath)
-        depth = len(here.relative_to(guard.root).parts)
-        for entry in (*dirnames, *filenames):
-            for name in guard.readonly_names:
-                first, _, rest = name.partition("/")
-                if first.casefold() != entry.casefold():
-                    continue
-                candidate = here / entry / rest if rest else here / entry
-                if os.path.lexists(candidate) and candidate not in guard.readonly:
-                    found.append(candidate)
-        dirnames[:] = [
-            d
-            for d in dirnames
-            if depth < _WALK_DEPTH and d not in _WALK_SKIP and d.casefold() not in firsts
+def _watch(guard: ShellGuard, *, linux: bool) -> tuple[Path, ...]:
+    """Protected paths that don't exist yet and that the command may create, to report:
+    a repo at the root (allowed — its hooks aren't protected until the next command);
+    on Linux, which binds only what exists, also the root-level names and home entries."""
+    home = Path(os.path.realpath(Path.home()))
+    candidates: list[Path] = []
+    if guard.root is not None:
+        candidates.append(guard.root / ".git")
+        if linux:
+            candidates += [guard.root / n for n in guard.readonly_names]
+    if linux:
+        candidates += [
+            p
+            for p in guard.readonly
+            if p.is_relative_to(home) and (guard.root is None or not p.is_relative_to(guard.root))
         ]
-    return found
+    return tuple(dict.fromkeys(p for p in candidates if not os.path.lexists(p)))
 
 
-def _absent_root_entries(guard: ShellGuard) -> tuple[Path, ...]:
-    if guard.root is None:
-        return ()
-    root = guard.root
-    return tuple(
-        root / n for n in guard.readonly_names if "/" not in n and not os.path.lexists(root / n)
-    )
+def _display(path: Path, project: Project | None) -> str:
+    if project is not None and path.is_relative_to(Path(os.path.realpath(project.root))):
+        return str(path.relative_to(Path(os.path.realpath(project.root))))
+    home = Path(os.path.realpath(Path.home()))
+    return f"~/{path.relative_to(home)}" if path.is_relative_to(home) else str(path)
+
+
+def _warn_once(message: str) -> None:
+    if message not in _warned:
+        _warned.add(message)
+        print(message, file=sys.stderr)
 
 
 def _quoted(text: Path | str) -> str:

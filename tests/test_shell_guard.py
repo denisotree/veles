@@ -17,12 +17,79 @@ def _real(p: Path) -> Path:
 
 
 def test_every_file_tool_name_is_closed_for_the_shell(tmp_path: Path) -> None:
-    """Lock: a name added to the file tools' confirm list is closed for run_shell too."""
+    """Lock: a name added to the file tools' confirm list is closed for run_shell too.
+    `.git` is not a name: existing repos are found and protected, new ones may be made."""
     guard = shell_guard(init_project(tmp_path / "p", name="p"))
     for name in _CONFIRM_NAMES - {".git"}:
         assert name in guard.readonly_names
     assert ".veles" in guard.readonly_names
-    assert {".git/hooks", ".git/config", ".git/config.worktree"} <= set(guard.readonly_names)
+    assert all("/" not in n and n != ".git" for n in guard.readonly_names)
+
+
+def _git(*args: str) -> None:
+    subprocess.run(["git", *args], check=True, capture_output=True)
+
+
+def test_a_worktree_protects_the_real_git_config(tmp_path: Path) -> None:
+    """`.git` is a file there: the hooks and config git really uses live in the main
+    repo, and the file itself must not be repointed."""
+    main = tmp_path / "main"
+    _git("init", "-q", str(main))
+    _git("-C", str(main), "commit", "-q", "--allow-empty", "-m", "init")
+    _git("-C", str(main), "worktree", "add", "-q", str(tmp_path / "wt"), "-b", "side")
+    project = init_project(tmp_path / "wt", name="p")
+    guard = shell_guard(project)
+    real = _real(main) / ".git"
+    assert {real / "config", real / "hooks"} <= set(guard.readonly)
+    assert _real(tmp_path / "wt") / ".git" in guard.pinned  # the .git file
+
+
+def test_included_and_global_git_configs_are_closed(tmp_path: Path) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    _git("init", "-q", str(project.root))
+    extra = tmp_path / "extra.gitconfig"
+    extra.write_text("[user]\n\tname = x\n")
+    _git("-C", str(project.root), "config", "include.path", str(extra))
+    assert _real(extra) in shell_guard(project).readonly
+
+
+def test_existing_nested_repos_are_protected_new_ones_are_not(tmp_path: Path) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    nested = project.root / "vendor" / "lib"
+    _git("init", "-q", str(nested))
+    guard = shell_guard(project)
+    git = _real(nested) / ".git"
+    assert git in guard.pinned and {git / "hooks", git / "config"} <= set(guard.readonly)
+    assert not any(p.name == ".git" for p in guard.pinned if p.parent == _real(project.root))
+
+
+def test_deep_existing_names_are_found(tmp_path: Path) -> None:
+    project = init_project(tmp_path / "p", name="p")
+    deep = project.root / "a" / "b" / "c" / ".claude"
+    deep.mkdir(parents=True)
+    assert _real(deep) in shell_guard(project).readonly
+
+
+def test_home_entries_follow_the_platform(tmp_path: Path) -> None:
+    import sys
+
+    readonly = {str(p) for p in shell_guard(None).readonly}
+    home = str(_real(Path.home()))
+    mac = f"{home}/Library/LaunchAgents" in readonly
+    linux = f"{home}/.config/autostart" in readonly
+    assert (mac, linux) == ((True, False) if sys.platform == "darwin" else (False, True))
+
+
+def test_symlinks_on_the_way_to_the_root_are_kept(tmp_path: Path, monkeypatch) -> None:
+    """The user entered by `~/code` → `/Volumes/…`: swapping that link for a directory
+    would hand them a planted copy of the repo. `$PWD` keeps the path they used."""
+    real = tmp_path / "real"
+    real.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(real, target_is_directory=True)
+    project = init_project(link / "p", name="p")
+    monkeypatch.setenv("PWD", str(link / "p"))
+    assert link in shell_guard(project).links
 
 
 def test_git_code_paths_not_the_whole_git_dir(tmp_path: Path) -> None:

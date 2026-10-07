@@ -21,6 +21,7 @@ def _guard(root: Path) -> ShellGuard:
         holes=(state / "tmp",),
         relock_prefix=state / "tmp" / "delegate-",
         pinned=(root, root / ".git"),
+        links=(),
     )
 
 
@@ -38,8 +39,8 @@ def test_profile_denies_then_reopens_holes_then_relocks() -> None:
     assert deny < allow < relock
     assert '(subpath "/w/proj/.git/hooks")' in prof
     assert '(subpath "/w/proj/.veles/tmp")' in prof
-    for literal in ("/w/proj", "/w/proj/.git", "/w", "/u/home", "/u"):
-        assert f'(literal "{literal}")' in prof  # pinned + every ancestor
+    for literal in ("/w/proj", "/w/proj/.git"):
+        assert f'(literal "{literal}")' in prof  # pinned (existing ancestors: own test)
     assert '(literal "/")' not in prof
 
 
@@ -83,7 +84,98 @@ def test_bwrap_order_pins_then_readonly_then_holes_then_relock(tmp_path: Path) -
         f"--bind-try {root}/.veles/tmp "
     )
     assert flat.index(f"--bind-try {root}/.veles/tmp ") < flat.index("delegate-1")
-    assert f"--ro-bind-try {root}/sub/.envrc {root}/sub/.envrc" in flat  # found by the walk
+
+
+def test_missing_ancestors_are_not_literal_denied(tmp_path: Path) -> None:
+    """A literal deny on a missing dir blocks creating it (`~/.config` absent broke gh);
+    only an existing ancestor can be renamed away."""
+    guard = ShellGuard(
+        root=None,
+        readonly=(tmp_path / "home" / ".config" / "fish",),
+        readonly_names=(),
+        holes=(),
+        relock_prefix=None,
+        pinned=(),
+        links=(),
+    )
+    (tmp_path / "home").mkdir()
+    prof = sandbox.sbpl_profile(guard)
+    assert f'(literal "{tmp_path / "home"}")' in prof
+    assert f'(literal "{tmp_path / "home" / ".config"}")' not in prof
+
+
+def test_bwrap_skips_paths_under_a_file_and_seals_a_git_file(tmp_path: Path) -> None:
+    """In a worktree `.git` is a file: `--ro-bind-try .git/hooks` failed with ENOTDIR and
+    every run_shell broke; the file itself must be read-only, not bound read-write."""
+    root = tmp_path / "wt"
+    root.mkdir()
+    (root / ".git").write_text("gitdir: /elsewhere\n")
+    guard = ShellGuard(
+        root=root,
+        readonly=(root / ".git" / "hooks",),
+        readonly_names=(),
+        holes=(),
+        relock_prefix=None,
+        pinned=(root, root / ".git"),
+        links=(),
+    )
+    flat = " ".join(sandbox.bwrap_argv(guard, ["true"]))
+    assert f"{root}/.git/hooks" not in flat
+    assert f"--ro-bind-try {root}/.git {root}/.git" in flat
+    assert f"--bind-try {root} {root}" in flat
+
+
+def test_links_are_literal_denied() -> None:
+    guard = ShellGuard(
+        root=None,
+        readonly=(),
+        readonly_names=(),
+        holes=(),
+        relock_prefix=None,
+        pinned=(),
+        links=(Path("/u/code"),),
+    )
+    assert '(literal "/u/code")' in sandbox.sbpl_profile(guard)
+
+
+def test_a_busy_mount_gets_the_hint() -> None:
+    """On Linux git's rename onto the read-only `.git/config` mount fails with EBUSY."""
+    w = sandbox.Wrapped(["x"], True)
+    out = "error: could not commit config file .git/config: Device or resource busy"
+    assert "read-only for the agent's shell" in sandbox.notes(
+        w, returncode=255, output=out, project=None
+    )
+
+
+def test_a_sandbox_that_fails_to_start_is_reported(capsys) -> None:
+    w = sandbox.Wrapped(["x"], True)
+    out = "bwrap: Can't find source path /p/.git/hooks: Not a directory\n"
+    note = sandbox.notes(w, returncode=1, output=out, project=None)
+    assert "didn't run" in note
+    assert "sandbox failed to start" in capsys.readouterr().err
+
+
+def test_watch_covers_a_new_repo_and_on_linux_new_home_entries(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "proj"
+    root.mkdir()
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    guard = ShellGuard(
+        root=root,
+        readonly=(home / ".bash_profile",),
+        readonly_names=(".envrc",),
+        holes=(),
+        relock_prefix=None,
+        pinned=(root,),
+        links=(),
+    )
+    assert set(sandbox._watch(guard, linux=False)) == {root / ".git"}
+    assert set(sandbox._watch(guard, linux=True)) == {
+        root / ".git",
+        root / ".envrc",
+        home / ".bash_profile",
+    }
 
 
 def test_bwrap_creates_missing_holes_first(tmp_path: Path, monkeypatch) -> None:

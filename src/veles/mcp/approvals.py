@@ -83,20 +83,24 @@ def project_files(project_root: Path, raw: dict[str, Any]) -> list[Path]:
 
 
 def _dash_m_files(root: Path, args: Any) -> list[Path]:
-    """`python -m pkg.mod` (or `-mpkg.mod`) naming a project module: its file, or every
-    `.py` of its package — editing them must revoke the approval too."""
+    """`python -m pkg.mod` (`-mpkg.mod`, `--module`) naming a project module — at the root
+    or under `src/`: its file, or every `.py` of its package (namespace packages too) —
+    editing them must revoke the approval too."""
     if not isinstance(args, list):
         return []
     tokens = [a for a in args if isinstance(a, str)]
-    modules = [nxt for flag, nxt in itertools.pairwise(tokens) if flag == "-m"]
+    modules = [nxt for flag, nxt in itertools.pairwise(tokens) if flag in ("-m", "--module")]
     modules += [t[2:] for t in tokens if t.startswith("-m") and len(t) > 2]
+    modules += [t.removeprefix("--module=") for t in tokens if t.startswith("--module=")]
     out: list[Path] = []
     for dotted in modules:
-        base = root.joinpath(*dotted.split("."))
-        if base.with_suffix(".py").is_file():
-            out.append(base.with_suffix(".py").resolve())
-        elif (base / "__init__.py").is_file():
-            out += sorted(p.resolve() for p in base.rglob("*.py") if p.is_file())
+        for base in (root.joinpath(*dotted.split(".")), root.joinpath("src", *dotted.split("."))):
+            if base.with_suffix(".py").is_file():
+                out.append(base.with_suffix(".py").resolve())
+                break
+            if base.is_dir():
+                out += sorted(p.resolve() for p in base.rglob("*.py") if p.is_file())
+                break
     return [p for p in out if p.is_relative_to(root)]
 
 

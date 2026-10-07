@@ -667,6 +667,7 @@ def test_sandbox_check_reports_each_state(tmp_path: Path, monkeypatch) -> None:
 
     project = init_project(tmp_path / "p", name="p")
     monkeypatch.setattr(sandbox, "sandbox_status", lambda: sandbox.SandboxStatus("bwrap", True))
+    monkeypatch.setattr(sandbox, "wrap", lambda argv, project: sandbox.Wrapped(["true"], True))
     assert _check_sandbox(project).status == "ok"
     monkeypatch.setattr(
         sandbox, "sandbox_status", lambda: sandbox.SandboxStatus("bwrap", False, "no userns")
@@ -678,6 +679,27 @@ def test_sandbox_check_reports_each_state(tmp_path: Path, monkeypatch) -> None:
         sandbox, "sandbox_status", lambda: sandbox.SandboxStatus(None, False, "off", disabled=True)
     )
     assert _check_sandbox(project).status == "info"
+
+
+def test_sandbox_check_runs_the_real_profile(tmp_path: Path, monkeypatch) -> None:
+    """The probe binds nothing; the project's own profile/binds can still fail (a worktree
+    broke every command while doctor said ok)."""
+    from veles.core import sandbox
+    from veles.core.doctor import _check_sandbox
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path / "p", name="p")
+    monkeypatch.setattr(sandbox, "sandbox_status", lambda: sandbox.SandboxStatus("bwrap", True))
+    monkeypatch.setattr(
+        sandbox,
+        "wrap",
+        lambda argv, project: sandbox.Wrapped(
+            ["sh", "-c", "echo 'bwrap: cannot find source path: Not a directory' >&2; exit 1"],
+            True,
+        ),
+    )
+    res = _check_sandbox(project)
+    assert res.status == "warn" and "Not a directory" in res.message
 
 
 def test_sandbox_switch_in_the_project_config_is_ignored(tmp_path: Path) -> None:
