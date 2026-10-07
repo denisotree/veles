@@ -43,6 +43,9 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 transport = "stdio"
 command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
+
+[sandbox]
+enabled = true                   # run_shell в песочнице ОС; false — выключить
 ```
 
 | Ключ | Тип | Назначение |
@@ -52,6 +55,7 @@ args = ["-m", "my_mcp_server"]
 | `[user] default_model` | string | Модель, используемая, когда она не задана явно |
 | `[user] tui_theme` | string | Цветовая тема TUI по умолчанию |
 | `[permissions] <tool>` | policy | Политика прав по инструментам (см. [trust и песочница](../explanation/trust-and-sandbox.md)) |
+| `[sandbox] enabled` | bool | `run_shell` в песочнице ОС (по умолчанию `true`); читается только здесь — `[sandbox]` проекта игнорируется (см. [безопасность](../how-to/security-and-permissions.md)) |
 
 ---
 

@@ -330,3 +330,34 @@ def test_concurrent_approvals_are_not_lost(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(mod, "_load", real_load)
     assert mod.approval_state(root, "a", {"command": "a"}) == "yes"
     assert mod.approval_state(root, "b", {"command": "b"}) == "yes"
+
+
+def test_a_module_run_with_dash_m_is_part_of_the_approval(tmp_path: Path) -> None:
+    from veles.mcp.approvals import project_files
+
+    root = tmp_path.resolve()
+    (root / "srv").mkdir()
+    (root / "srv" / "__init__.py").write_text("")
+    (root / "srv" / "main.py").write_text("print(1)")
+    (root / "tool.py").write_text("print(2)")
+    files = project_files(root, {"command": "python", "args": ["-m", "srv"]})
+    assert files == [root / "srv" / "__init__.py", root / "srv" / "main.py"]
+    assert project_files(root, {"command": "python", "args": ["-mtool"]}) == [root / "tool.py"]
+    assert project_files(root, {"command": "python", "args": ["-m", "json"]}) == []
+
+
+def test_dash_m_covers_src_layout_namespace_packages_and_long_flags(tmp_path: Path) -> None:
+    from veles.mcp.approvals import project_files
+
+    root = tmp_path.resolve()
+    (root / "src" / "app").mkdir(parents=True)
+    (root / "src" / "app" / "__init__.py").write_text("")
+    (root / "src" / "app" / "server.py").write_text("print(1)")
+    (root / "ns" / "inner").mkdir(parents=True)  # a namespace package: no __init__.py
+    (root / "ns" / "inner" / "srv.py").write_text("print(2)")
+    assert project_files(root, {"command": "uv", "args": ["run", "--module", "app.server"]}) == [
+        root / "src" / "app" / "server.py"
+    ]
+    assert project_files(root, {"command": "python", "args": ["-m", "ns"]}) == [
+        root / "ns" / "inner" / "srv.py"
+    ]

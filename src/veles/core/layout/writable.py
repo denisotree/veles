@@ -55,13 +55,17 @@ from __future__ import annotations
 
 import configparser
 import logging
+import os
 import subprocess
+import sys
 import unicodedata
+from dataclasses import dataclass
 from pathlib import Path
 
 from veles.core.delegate_dir import DIR_PREFIX as _DELEGATE_PREFIX
 from veles.core.path_guard import is_inside
 from veles.core.project import Project
+from veles.core.user_paths import user_home
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +267,177 @@ def _git_hooks_dir(root: Path) -> Path | None:
         return None
 
 
+# Files under $HOME that run without an explicit command, and the agent CLIs' config:
+# closed for run_shell (release F). `~/.veles` (approvals, trust, user modules) is added
+# from `user_home()`.
+_HOME_AUTORUN: tuple[str, ...] = (
+    ".bashrc",
+    ".bash_profile",
+    ".bash_login",
+    ".profile",
+    ".zshrc",
+    ".zprofile",
+    ".zshenv",
+    ".zlogin",
+    ".config/fish",
+    ".ssh",
+    ".gitconfig",
+    ".config/git",
+    ".claude",
+    ".claude.json",
+    ".codex",
+    ".gemini",
+)
+_HOME_AUTORUN_BY_OS: dict[str, tuple[str, ...]] = {
+    "darwin": ("Library/LaunchAgents",),
+    "linux": (".config/autostart", ".config/systemd/user"),
+}
+# Where git runs code from inside a `.git` dir (objects, refs and the index stay writable).
+_GIT_CODE: tuple[str, ...] = ("hooks", "config", "config.worktree")
+# ponytail: names and repos deeper than this aren't found; dependency/cache dirs are skipped
+_WALK_DEPTH = 6
+_WALK_SKIP = frozenset(
+    {"node_modules", ".venv", "venv", "__pycache__", ".tox", ".mypy_cache", ".pytest_cache"}
+    | {".ruff_cache"}
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ShellGuard:
+    """What the agent's `run_shell` may not write (`core/sandbox.py` enforces it): the
+    paths the file tools refuse or hard-confirm, plus the user's own auto-run files.
+    Canonical paths — a sandbox profile with a symlinked path protects nothing.
+
+    `readonly_names` are closed at any depth even before they exist (macOS);
+    `pinned` can't be renamed — the root and every existing `.git` (a `.git` file is
+    read-only too); `links` are symlinks on the way to the root and the home paths,
+    which must not be swapped for a directory the user would then open."""
+
+    root: Path | None
+    readonly: tuple[Path, ...]
+    readonly_names: tuple[str, ...]
+    holes: tuple[Path, ...]
+    relock_prefix: Path | None
+    pinned: tuple[Path, ...]
+    links: tuple[Path, ...]
+
+
+def shell_guard(project: Project | None) -> ShellGuard:
+    home = Path.home()
+    os_key = "darwin" if sys.platform == "darwin" else "linux"
+    rels = _HOME_AUTORUN + _HOME_AUTORUN_BY_OS[os_key]
+    written: list[Path] = [user_home(), *(home / rel for rel in rels)]
+    paths = [*written, *_git_files(None)]
+    if project is None:
+        return ShellGuard(None, _canonical(paths), (), (), None, (), _links(written))
+    root = Path(os.path.realpath(project.root))
+    names = tuple(sorted((_CONFIRM_NAMES - {".git"}) | _MANAGED_NAMES))
+    repos, named = _walk(root, names)
+    for git in repos:
+        if git.is_dir():
+            paths += [git / rel for rel in _GIT_CODE]
+            paths += [*sorted(git.glob("modules/*/hooks")), *sorted(git.glob("modules/*/config"))]
+    paths += _git_files(root)
+    paths += [root / name for name in names]
+    paths += named
+    paths += _protected_targets(project)
+    paths.append(project.state_dir)
+    state = Path(os.path.realpath(project.state_dir))
+    holes = [state / n for n in AGENT_WRITABLE_STATE if not (project.state_dir / n).is_symlink()]
+    # The root is stored resolved; `$PWD` keeps the path the user entered it by.
+    entered = [project.root]
+    pwd = os.environ.get("PWD")
+    if pwd and Path(os.path.realpath(pwd)).is_relative_to(root):
+        entered.append(Path(pwd))
+    return ShellGuard(
+        root=root,
+        readonly=_canonical(paths),
+        readonly_names=names,
+        holes=tuple(holes),
+        relock_prefix=state / "tmp" / _DELEGATE_PREFIX,
+        pinned=(root, *repos),
+        links=_links([*entered, *written]),
+    )
+
+
+def _walk(root: Path, names: tuple[str, ...]) -> tuple[list[Path], list[Path]]:
+    """Existing `.git` entries and existing entries named in `names` under `root` (its
+    own included). A new repo isn't one of them: `git init`/`clone` keep working."""
+    repos: list[Path] = []
+    named: list[Path] = []
+    folded = {n.casefold() for n in names}
+    for dirpath, dirnames, filenames in os.walk(root):
+        here = Path(dirpath)
+        depth = len(here.relative_to(root).parts)
+        for entry in (*dirnames, *filenames):
+            key = entry.casefold()
+            if key == ".git":
+                repos.append(here / entry)
+            elif key in folded:
+                named.append(here / entry)
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if depth < _WALK_DEPTH
+            and d not in _WALK_SKIP
+            and d.casefold() not in folded
+            and d.casefold() != ".git"
+        ]
+    return repos, named
+
+
+def _git_files(root: Path | None) -> list[Path]:
+    """Every config file git reads here — system, global, XDG, the repo's (a worktree's
+    common one) and their includes — plus the hooks dir and `config.worktree` it uses."""
+    cwd = root if root is not None else Path.home()
+    origins = _git(cwd, "config", "--list", "--show-origin", "--name-only", "-z").split("\0")
+    out = [cwd / o.removeprefix("file:") for o in origins[0::2] if o.startswith("file:")]
+    if root is not None:
+        paths = _git(root, "rev-parse", "--git-path", "hooks", "--git-path", "config")
+        paths += _git(root, "rev-parse", "--git-path", "config.worktree")
+        out += [root / line for line in paths.splitlines() if line]
+    return out
+
+
+def _git(cwd: Path, *args: str) -> str:
+    """git's stdout, or "" when git is missing, slow or fails (not a repo)."""
+    try:
+        run = subprocess.run(
+            ["git", "-C", str(cwd), *args],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+            stdin=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return ""
+    return run.stdout if run.returncode == 0 else ""
+
+
+def _links(paths: list[Path]) -> tuple[Path, ...]:
+    """Symlinks on the way to these paths, as written (`~/code` → `/Volumes/…`)."""
+    out: dict[Path, None] = {}
+    for p in paths:
+        absolute = p.absolute()
+        for part in (absolute, *absolute.parents):
+            if part.is_symlink():
+                out[part] = None
+    return tuple(out)
+
+
+def _canonical(paths: list[Path]) -> tuple[Path, ...]:
+    """`realpath` of each (a missing tail stays as written), plus the path as written
+    when it is a symlink — replacing the link must be refused too. Order kept, no dups."""
+    out: dict[Path, None] = {}
+    for p in paths:
+        absolute = p.absolute()  # not resolve(): the link itself must stay in the set
+        out[Path(os.path.realpath(absolute))] = None
+        if absolute.is_symlink():
+            out[absolute] = None
+    return tuple(out)
+
+
 def _state_verdict(project: Project, abs_path: Path) -> bool | None:
     """None outside Veles-managed paths; inside the project's `.veles/`, whether
     the agent may write there. Decided by file identity (`is_inside`), not
@@ -322,4 +497,11 @@ def _effective_writable_zones(project: Project) -> list[str]:
     return list(pack.manifest.writable_path_strings())
 
 
-__all__ = ["AGENT_WRITABLE_STATE", "is_veles_managed", "is_writable", "writable_zones"]
+__all__ = [
+    "AGENT_WRITABLE_STATE",
+    "ShellGuard",
+    "is_veles_managed",
+    "is_writable",
+    "shell_guard",
+    "writable_zones",
+]

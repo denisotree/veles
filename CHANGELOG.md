@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.9] — 2026-10-07
+
+`run_shell` runs in an OS sandbox. The commands the agent runs can no longer rewrite git
+hooks or config, `.envrc`-style auto-run files, agent-CLI configs, Veles' own state or your
+approval stores themselves. (A service they ask to act for them — a container started
+with `docker run -v`, `systemd-run`, `launchctl` — still writes as you.)
+
+### Upgrading from 1.2.8
+
+- **Where a sandbox works (`sandbox-exec` on macOS, `bwrap` on Linux), `run_shell`
+  can't write:** the hooks and config of every repo in the project (a worktree's or
+  submodule's main repo included), every config file git reads (includes, `~/.gitconfig`,
+  the system one) and the `core.hooksPath` directory; `.envrc`, `.claude/`, `.mcp.json`
+  and the other auto-run names at any depth; the project's `.veles/` outside
+  `skills/ tools/ tmp/ plans/ memory/ artifacts/`; `~/.veles/`; shell start-up files,
+  `~/.ssh/`, LaunchAgents/autostart; `~/.claude/`, `~/.codex/`, `~/.gemini/`.
+  `git push -u` and `git remote add` from the agent's shell hit `.git/config`; a new
+  repo (`git init`, `git clone`) works. Switch the sandbox off with
+  `[sandbox] enabled = false` in `~/.veles/config.toml` (a project's config can't).
+- **Linux needs unprivileged user namespaces for `bwrap`.** Ubuntu 24.04+ restricts
+  them; an AppArmor profile for `/usr/bin/bwrap` allows them (see "How to manage
+  security"). In unprivileged Docker the sandbox stays off unless the container runs
+  with `--security-opt seccomp=unconfined --security-opt apparmor=unconfined`; Veles
+  warns once and `veles doctor` says why.
+- **An MCP server run with `python -m <project module>`** now has that module's files in
+  its approval hash: approve it again with `veles mcp approve <name>`.
+
+### Added
+
+- `core/sandbox.py`: the protected set comes from the file tools' own rules
+  (`writable.shell_guard`) plus what git reports (`git config --show-origin`,
+  `--git-path`), so a path the file tools guard is guarded for `run_shell` too. Repos,
+  protected paths and their existing parent directories can't be renamed away — macOS
+  also refuses swapping a symlink on the way to the project. A refused write tells the
+  agent to ask you; a protected path the command created (a new repo at the root; on
+  Linux, which can only protect existing paths, also a new `.envrc` or home start-up
+  file) is reported to you and in the memory log; a sandbox that fails to start is
+  reported once.
+- `veles doctor` `sandbox` check: active (running the project's real profile),
+  unavailable with the fix, or off; a project-level `[sandbox]` is flagged as ignored.
+
+### Fixed
+
+- An MCP approval now covers the project module a server runs with `python -m` or
+  `--module`, at the root or under `src/`, namespace packages included.
+
 ## [1.2.8] — 2026-10-06
 
 Veles in a container, without a terminal: a deploy script approves modules and tools

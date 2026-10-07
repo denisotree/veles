@@ -106,16 +106,65 @@ renomeou uma de que depende é recusado, não executado aberto. O servidor MCP d
 nos argumentos (sem arquivo de config), só as tools desse servidor são aprovadas, e o
 ambiente que esse servidor recebe é repassado por nome — nunca `VELES_TRUST_AUTO_ALLOW`.
 
+### `run_shell` em um sandbox do SO
+
+Os comandos que o agente executa com `run_shell` rodam em um sandbox do SO —
+`sandbox-exec` no macOS, `bwrap` (bubblewrap) no Linux — que torna estes caminhos
+somente leitura para eles: os hooks e a config de cada repo do projeto (em um worktree
+ou submódulo, os do repo principal), todo arquivo de configuração que o git lê (seus
+includes, `~/.gitconfig`, o do sistema) e o diretório `core.hooksPath`;
+os nomes de execução automática acima (`.envrc`, `.claude/`, `.mcp.json`, …) em
+qualquer profundidade; o `.veles/` do projeto, exceto `skills/`, `tools/`, `tmp/`,
+`plans/`, `memory/` e `artifacts/`; `~/.veles/` (aprovações, confiança, seus módulos);
+arquivos de inicialização do shell (`~/.zshrc`, `~/.bashrc`, …), `~/.ssh/`,
+LaunchAgents e entradas de inicialização automática; e `~/.claude/`,
+`~/.codex/`, `~/.gemini/`. Esses caminhos, seus diretórios pais e os repos também não
+podem ser contornados renomeando-os. Todo o resto funciona como antes: o projeto,
+`git commit`, um novo repo (`git init`, `git clone`), caches de pacotes, diretórios
+temporários e a rede. Uma escrita recusada diz ao agente para perguntar a você.
+
+`veles doctor` mostra se o sandbox está ativo. Para desligá-lo, defina
+`[sandbox] enabled = false` em `~/.veles/config.toml` — a config do próprio projeto não
+consegue.
+
+No Linux, o `bwrap` precisa de user namespaces sem privilégios. O Ubuntu 24.04 e
+posteriores os restringem pelo AppArmor; libere-os só para o `bwrap` com um perfil:
+
+```
+# /etc/apparmor.d/bwrap — then: sudo apparmor_parser -r /etc/apparmor.d/bwrap
+abi <abi/4.0>,
+include <tunables/global>
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
+```
+
+No Docker, o sandbox precisa de `--security-opt seccomp=unconfined --security-opt
+apparmor=unconfined`. Onde ele não consegue iniciar, `run_shell` roda como antes e o
+Veles avisa uma vez.
+
 Limites conhecidos:
 
-- `run_shell` é um shell: depois que você o concede (ou sob autopilot), ele pode
-  escrever qualquer um dos arquivos acima sem a confirmação por arquivo — e os
-  armazenamentos de aprovação em `~/.veles/`. `veles … approve` exige um
-  terminal ou o hash revisado (`--sha256`) e recusa um comando iniciado pelo shell do
-  agente, mas um shell concedido pode remover essa marca ou escrever esses arquivos
-  diretamente.
-- Uma aprovação de MCP fixa a linha de comando do servidor, não os arquivos que ele
-  executa a partir do projeto (um script citado em `args`) — revise esses também.
+- Onde o sandbox não está ativo, `run_shell` é um shell: depois que você o concede (ou
+  sob autopilot), ele pode escrever qualquer um dos arquivos acima sem a confirmação
+  por arquivo — e os armazenamentos de aprovação em `~/.veles/`. `veles … approve`
+  exige um terminal ou o hash revisado (`--sha256`) e recusa um comando iniciado pelo
+  shell do agente, mas um shell concedido pode remover essa marca ou escrever esses
+  arquivos diretamente.
+- O sandbox protege escritas, não leituras nem a rede. Os diretórios no seu `PATH`
+  (`~/.local/bin`) continuam graváveis.
+- Ele detém os processos do próprio comando, não um serviço a quem o comando pede que
+  aja em seu nome: um contêiner iniciado com `docker run -v …`, `systemd-run`,
+  `launchctl` ou `osascript` escreve como você.
+- Um repo que o comando cria (`git init`) só fica protegido a partir do próximo comando;
+  o Veles avisa você sobre um novo repo na raiz do projeto.
+- No Linux, o sandbox só consegue proteger caminhos que existem e encontra nomes
+  protegidos até seis níveis de profundidade no projeto: um novo `.envrc` na raiz ou um
+  novo arquivo de inicialização na sua home (`~/.bash_profile`) pode ser criado — o
+  Veles avisa você e registra no log de memória — e um link simbólico no caminho até o
+  projeto (`~/code` → `/Volumes/…`) pode ser substituído. O macOS recusa os dois.
+- Uma aprovação de MCP cobre os scripts do projeto citados em `command`/`args` e os
+  módulos executados com `-m` (na raiz ou em `src/`), não os arquivos que eles importam.
 - Com um provedor CLI, execuções que pré-autorizam tools só para si mesmas (jobs em
   segundo plano do daemon, `veles research`) não repassam isso à CLI delegada: a
   pré-autorização vive no processo do Veles, e o servidor MCP que a CLI inicia é outro,

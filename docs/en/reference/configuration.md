@@ -43,6 +43,9 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 transport = "stdio"
 command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
+
+[sandbox]
+enabled = true                   # run_shell in an OS sandbox; false switches it off
 ```
 
 | Key | Type | Purpose |
@@ -52,6 +55,7 @@ args = ["-m", "my_mcp_server"]
 | `[user] default_model` | string | Model used when none is given |
 | `[user] tui_theme` | string | Default TUI color theme |
 | `[permissions] <tool>` | policy | Per-tool permission policy (see [trust & sandbox](../explanation/trust-and-sandbox.md)) |
+| `[sandbox] enabled` | bool | `run_shell` in an OS sandbox (default `true`); read only here — a project's `[sandbox]` is ignored (see [security](../how-to/security-and-permissions.md)) |
 
 ---
 

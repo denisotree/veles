@@ -143,6 +143,14 @@ in your start-up check. Admin verbs (`module`, `tool`, `doctor`, …) never open
 first-run wizard, even on a fresh `$HOME` with a TTY; it fronts only commands that
 start an agent, and `VELES_NO_WIZARD=1` skips it there.
 
+**In Docker the `run_shell` sandbox is off by default.** Since 1.2.9 the agent's shell
+commands run in an OS sandbox that keeps git hooks, Veles state and the approval stores
+read-only for them; in an unprivileged container `bwrap` can't create its namespaces, so
+`run_shell` runs unsandboxed and `veles doctor` warns. Either run the container with
+`--security-opt seccomp=unconfined --security-opt apparmor=unconfined` (this loosens the
+container's own profile), or mount `~/.veles/*approvals*.json` and
+`~/.veles/extensions.json` read-only so the approval stores stay out of the agent's reach.
+
 Two more sharp edges:
 
 - `@tool(timeout_s=…)` is advisory — nothing enforces it. Bound slow work inside

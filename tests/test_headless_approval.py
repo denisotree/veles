@@ -233,6 +233,10 @@ def test_run_shell_gives_the_agent_no_terminal(project: Project, monkeypatch) ->
     monkeypatch.setattr(mod.subprocess, "run", fake_run)
     monkeypatch.chdir(project.root)
     monkeypatch.setenv("VELES_SANDBOX_ROOTS", str(project.root))
+    from veles.core import sandbox
+
+    # The fake replaces the shared subprocess.run, which the cached sandbox probe calls.
+    monkeypatch.setattr(mod, "wrap", lambda argv, project: sandbox.Wrapped(list(argv), False))
     mod.run_shell("true")
     assert seen["stdin"] is subprocess.DEVNULL
 

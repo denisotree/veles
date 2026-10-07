@@ -15,17 +15,21 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import subprocess
 import sys
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from veles.core.approval import list_approvals
 from veles.core.project import Project
 from veles.core.timeutil import utc_iso
 from veles.core.trace import cache_fragmentation_alert, read_records, trace_path_for_project
+
+if TYPE_CHECKING:
+    from veles.core.sandbox import Wrapped
 
 CheckStatus = Literal["ok", "warn", "error", "info"]
 
@@ -836,6 +840,66 @@ def _check_modules(project: Project | None) -> CheckResult:
     )
 
 
+def _check_sandbox(project: Project | None) -> CheckResult:
+    """Whether `run_shell` runs in the OS sandbox (release F); a project-level
+    `[sandbox]` is ignored — only ~/.veles/config.toml can switch it off."""
+    from veles.core import sandbox
+    from veles.core.project_config import get_section, load_project_config
+
+    if project is not None and get_section(load_project_config(project), "sandbox"):
+        return CheckResult(
+            name="sandbox",
+            status="warn",
+            message="[sandbox] in the project's config.toml is ignored",
+            fix_hint="set it in ~/.veles/config.toml — a project can't switch the sandbox off",
+        )
+    status = sandbox.sandbox_status()
+    if status.disabled:
+        return CheckResult(name="sandbox", status="info", message="run_shell sandbox is off")
+    if status.active:
+        failure = _sandbox_start_failure(sandbox.wrap(["true"], project), project)
+        if failure:
+            return CheckResult(
+                name="sandbox",
+                status="warn",
+                message=f"run_shell's sandbox fails to start here: {failure}",
+                fix_hint="run_shell commands don't run in this project until this is fixed",
+            )
+        return CheckResult(name="sandbox", status="ok", message=f"run_shell runs in {status.kind}")
+    hint = (
+        "install bubblewrap; on Ubuntu 24.04+ allow its user namespaces with an AppArmor "
+        "profile for /usr/bin/bwrap (see the security docs); in Docker add "
+        "--security-opt seccomp=unconfined --security-opt apparmor=unconfined"
+        if status.kind == "bwrap"
+        else ""
+    )
+    return CheckResult(
+        name="sandbox",
+        status="warn",
+        message=f"run_shell is not sandboxed: {status.reason}",
+        fix_hint=hint,
+    )
+
+
+def _sandbox_start_failure(wrapped: Wrapped, project: Project | None) -> str:
+    """Run `true` under this project's real profile/binds: the probe binds nothing."""
+    try:
+        proc = subprocess.run(
+            wrapped.argv,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+            cwd=str(project.root) if project is not None else None,
+            stdin=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return str(exc)
+    if proc.returncode == 0:
+        return ""
+    return (proc.stderr.strip().splitlines() or [f"exit {proc.returncode}"])[0]
+
+
 def _check_approval_audit(project: Project | None) -> CheckResult:
     if project is None:
         return CheckResult(name="approval_audit", status="info", message="no active project")
@@ -896,6 +960,7 @@ def run_all(project: Project | None) -> DoctorReport:
         _check_approval_audit,
         _check_extensions,
         _check_modules,
+        _check_sandbox,
         _check_channel_platforms,
     ]
     results: list[CheckResult] = [c() for c in no_arg]

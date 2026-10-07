@@ -100,15 +100,61 @@ run — a codex that renamed one it relies on is refused, not run open. Its MCP 
 goes in its arguments (no config file), only that server's tools are approved, and the
 environment that server gets is forwarded by name — never `VELES_TRUST_AUTO_ALLOW`.
 
+### `run_shell` in an OS sandbox
+
+Commands the agent runs with `run_shell` run in an OS sandbox — `sandbox-exec` on macOS,
+`bwrap` (bubblewrap) on Linux — that makes these paths read-only for them: the hooks and
+config of every repo in the project (for a worktree or submodule, the main repo's), every
+config file git reads (its includes, `~/.gitconfig`, the system one) and the
+`core.hooksPath` directory; the auto-run names above (`.envrc`, `.claude/`, `.mcp.json`,
+…) at any depth; the project's `.veles/` except `skills/`, `tools/`, `tmp/`, `plans/`,
+`memory/` and `artifacts/`; `~/.veles/` (approvals, trust, your modules); shell start-up
+files (`~/.zshrc`, `~/.bashrc`, …), `~/.ssh/`, LaunchAgents and autostart entries; and
+`~/.claude/`, `~/.codex/`, `~/.gemini/`. Those paths, their parent directories and the
+repos can't be renamed away either. Everything else works as before: the project,
+`git commit`, a new repo (`git init`, `git clone`), package caches, temp dirs and the
+network. A refused write tells the agent to ask you.
+
+`veles doctor` shows whether the sandbox is active. To switch it off, set
+`[sandbox] enabled = false` in `~/.veles/config.toml` — a project's own config can't.
+
+On Linux, `bwrap` needs unprivileged user namespaces. Ubuntu 24.04 and later restrict
+them through AppArmor; allow them for `bwrap` alone with a profile:
+
+```
+# /etc/apparmor.d/bwrap — then: sudo apparmor_parser -r /etc/apparmor.d/bwrap
+abi <abi/4.0>,
+include <tunables/global>
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
+```
+
+In Docker the sandbox needs `--security-opt seccomp=unconfined --security-opt
+apparmor=unconfined`. Where it can't start, `run_shell` runs as before and Veles warns
+once.
+
 Known limits:
 
-- `run_shell` is a shell: once you grant it (or under autopilot) it can write any of
-  the files above without the per-file confirmation — and the approval stores in
-  `~/.veles/`. `veles … approve` needs a terminal or the reviewed hash (`--sha256`)
-  and refuses a command the agent's shell started, but a granted shell can strip
-  that mark or write those files directly.
-- An MCP approval pins the server's command line, not the files it runs from the project
-  (a script named in `args`) — review those too.
+- Where the sandbox isn't active, `run_shell` is a shell: once you grant it (or under
+  autopilot) it can write any of the files above without the per-file confirmation —
+  and the approval stores in `~/.veles/`. `veles … approve` needs a terminal or the
+  reviewed hash (`--sha256`) and refuses a command the agent's shell started, but a
+  granted shell can strip that mark or write those files directly.
+- The sandbox protects writes, not reads, and not the network. Directories on your
+  `PATH` (`~/.local/bin`) stay writable.
+- It stops the command's own processes, not a service the command asks to act for it:
+  a container it starts with `docker run -v …`, `systemd-run`, `launchctl` or
+  `osascript` writes as you.
+- A repo the command creates (`git init`) isn't protected until the next command; a new
+  repo at the project root is reported to you.
+- On Linux the sandbox can only protect paths that exist, and finds protected names six
+  levels deep in the project: a new `.envrc` at the root or a new start-up file in your
+  home (`~/.bash_profile`) can be created — Veles reports it to you and in the memory
+  log — and a symlink on the way to the project (`~/code` → `/Volumes/…`) can be
+  replaced. macOS refuses both.
+- An MCP approval covers the project scripts named in `command`/`args` and modules run
+  with `-m` (at the root or under `src/`), not the files those import.
 - With a CLI provider, runs that pre-authorise tools only for themselves (daemon
   background jobs, `veles research`) don't pass that on to the delegated CLI: the
   pre-authorisation lives in the Veles process, and the MCP server the CLI starts is a
