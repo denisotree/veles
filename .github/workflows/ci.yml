@@ -42,8 +42,14 @@ jobs:
         run: uv sync --locked
       - name: Install bubblewrap (Linux sandbox)
         if: runner.os == 'Linux'
+        # Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor; a profile
+        # for bwrap lifts it for bwrap alone (what a user does to enable the sandbox).
         run: |
           sudo apt-get install -y -qq bubblewrap
+          if ! bwrap --dev-bind / / -- true 2>/dev/null; then
+            printf 'abi <abi/4.0>,\ninclude <tunables/global>\nprofile bwrap /usr/bin/bwrap flags=(unconfined) {\n  userns,\n}\n' | sudo tee /etc/apparmor.d/bwrap >/dev/null
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap
+          fi
           if bwrap --dev-bind / / -- true; then echo "BWRAP_OK"; else echo "BWRAP_UNAVAILABLE"; fi
       - name: Run tests
         run: uv run pytest -q
