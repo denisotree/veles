@@ -658,3 +658,34 @@ def test_vector_recall_size_errors_only_past_the_deadline(tmp_path: Path) -> Non
     assert result.status == "error"
     assert "deadline" in result.message
     assert result.fix_hint and "remote backend" in result.fix_hint
+
+
+def test_sandbox_check_reports_each_state(tmp_path: Path, monkeypatch) -> None:
+    from veles.core import sandbox
+    from veles.core.doctor import _check_sandbox
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path / "p", name="p")
+    monkeypatch.setattr(sandbox, "sandbox_status", lambda: sandbox.SandboxStatus("bwrap", True))
+    assert _check_sandbox(project).status == "ok"
+    monkeypatch.setattr(
+        sandbox, "sandbox_status", lambda: sandbox.SandboxStatus("bwrap", False, "no userns")
+    )
+    res = _check_sandbox(project)
+    assert res.status == "warn" and "no userns" in res.message
+    assert "AppArmor" in res.fix_hint and "seccomp=unconfined" in res.fix_hint
+    monkeypatch.setattr(
+        sandbox, "sandbox_status", lambda: sandbox.SandboxStatus(None, False, "off", disabled=True)
+    )
+    assert _check_sandbox(project).status == "info"
+
+
+def test_sandbox_switch_in_the_project_config_is_ignored(tmp_path: Path) -> None:
+    from veles.core.doctor import _check_sandbox
+    from veles.core.project import init_project
+    from veles.core.project_config import save_project_config
+
+    project = init_project(tmp_path / "p", name="p")
+    save_project_config(project, {"sandbox": {"enabled": False}})
+    res = _check_sandbox(project)
+    assert res.status == "warn" and "~/.veles/config.toml" in res.fix_hint

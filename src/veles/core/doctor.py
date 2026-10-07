@@ -836,6 +836,39 @@ def _check_modules(project: Project | None) -> CheckResult:
     )
 
 
+def _check_sandbox(project: Project | None) -> CheckResult:
+    """Whether `run_shell` runs in the OS sandbox (release F); a project-level
+    `[sandbox]` is ignored — only ~/.veles/config.toml can switch it off."""
+    from veles.core import sandbox
+    from veles.core.project_config import get_section, load_project_config
+
+    if project is not None and get_section(load_project_config(project), "sandbox"):
+        return CheckResult(
+            name="sandbox",
+            status="warn",
+            message="[sandbox] in the project's config.toml is ignored",
+            fix_hint="set it in ~/.veles/config.toml — a project can't switch the sandbox off",
+        )
+    status = sandbox.sandbox_status()
+    if status.disabled:
+        return CheckResult(name="sandbox", status="info", message="run_shell sandbox is off")
+    if status.active:
+        return CheckResult(name="sandbox", status="ok", message=f"run_shell runs in {status.kind}")
+    hint = (
+        "install bubblewrap; on Ubuntu 24.04+ allow its user namespaces with an AppArmor "
+        "profile for /usr/bin/bwrap (see the security docs); in Docker add "
+        "--security-opt seccomp=unconfined --security-opt apparmor=unconfined"
+        if status.kind == "bwrap"
+        else ""
+    )
+    return CheckResult(
+        name="sandbox",
+        status="warn",
+        message=f"run_shell is not sandboxed: {status.reason}",
+        fix_hint=hint,
+    )
+
+
 def _check_approval_audit(project: Project | None) -> CheckResult:
     if project is None:
         return CheckResult(name="approval_audit", status="info", message="no active project")
@@ -896,6 +929,7 @@ def run_all(project: Project | None) -> DoctorReport:
         _check_approval_audit,
         _check_extensions,
         _check_modules,
+        _check_sandbox,
         _check_channel_platforms,
     ]
     results: list[CheckResult] = [c() for c in no_arg]
