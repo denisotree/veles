@@ -21,18 +21,6 @@ from veles.core.defaults import (
     DEFAULT_PROVIDER,
 )
 
-PROVIDER_CHOICES = (
-    "openrouter",
-    "anthropic",
-    "openai",
-    "gemini",
-    "claude-cli",
-    "gemini-cli",
-    "ollama",
-    "llamacpp",
-    "openai-compat",
-)
-
 
 class _ExplicitProviderAction(argparse.Action):
     """Record that `--provider` was passed on the command line.
@@ -135,12 +123,18 @@ def add_common_run_flags(p: argparse.ArgumentParser, *, defaults: bool = False) 
         default=_default(DEFAULT_MAX_ITERATIONS, defaults=defaults),
         help=f"Max tool-calling iterations (default: {DEFAULT_MAX_ITERATIONS}).",
     )
+    from veles.core.providers import builtin_ids
+
     p.add_argument(
         "--provider",
-        choices=PROVIDER_CHOICES,
         default=_default(DEFAULT_PROVIDER, defaults=defaults),
         action=_ExplicitProviderAction,
-        help=f"LLM provider (default: {DEFAULT_PROVIDER}).",
+        metavar="PROVIDER",
+        help=(
+            f"LLM provider id (default: {DEFAULT_PROVIDER}); builtin: "
+            f"{', '.join(sorted(builtin_ids()))}, or one from ~/.veles/providers.toml "
+            "or a module."
+        ),
     )
     p.add_argument(
         "--max-tokens-total",

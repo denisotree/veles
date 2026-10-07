@@ -3,7 +3,7 @@
 `load_skills` builds the per-run registry: a toolset's builtins, project and
 layout skills, external MCP servers and file-based project/user tools.
 `make_tool_aware_provider` builds a provider that can execute those tools
-(an MCP bridge for the claude/gemini CLI delegates), and `qualify_for_provider`
+(an MCP bridge for the claude CLI delegate), and `qualify_for_provider`
 rewrites tool names in a prompt to the shape such a delegate sees.
 """
 
@@ -124,47 +124,19 @@ def _load_file_tools(full: Registry, project: Project) -> list[str]:
 
 
 def qualify_for_provider(prompt: str, provider: Provider, tool_names: tuple[str, ...]) -> str:
-    """Rewrite short tool names to provider-specific MCP qualified names.
-
-    claude-cli sees Veles tools as `mcp__veles__<name>` (double underscore);
-    gemini-cli (with --allowed-mcp-server-names) as `mcp_veles_<name>`
-    (single underscore). No-op for every other provider and for CLI delegates
-    without MCP wired up.
-    """
-    if not provider.supports_tools:
-        return prompt
-    if provider.name == "claude-cli":
-        from veles.adapters.cli._tool_namespace import claude_mcp_prefix, qualify_prompt
-
-        return qualify_prompt(prompt, tool_names, prefix_fn=claude_mcp_prefix)
-    if provider.name == "gemini-cli":
-        from veles.adapters.cli._tool_namespace import gemini_mcp_prefix, qualify_prompt
-
-        return qualify_prompt(prompt, tool_names, prefix_fn=gemini_mcp_prefix)
-    return prompt
+    """Rewrite short tool names to the names a CLI delegate sees over MCP. No-op for
+    every provider that wires Veles tools directly."""
+    qualify = getattr(provider, "qualify_prompt", None)
+    return qualify(prompt, tool_names) if callable(qualify) else prompt
 
 
-def make_tool_aware_provider(
-    name: str, project: Project, *, skill_model: str | None = None
-) -> Provider:
-    """Build a provider that can execute Veles tools.
+def make_tool_aware_provider(name: str, project: Project, *, model: str | None = None) -> Provider:
+    """A provider that can execute Veles tools: a CLI delegate's tool-aware build
+    (an MCP bridge), else the plain one — it gets Veles tools through the
+    standard tool-call path; `model` lets local backends detect tool support."""
+    from veles.core.providers import ProviderContext, get_provider
 
-    For `claude-cli` and `gemini-cli` this writes an MCP descriptor so the
-    spawned CLI process can call our tools through the Veles MCP server;
-    `skill_model` tells that server which model runs project skills.
-    """
-    if name == "claude-cli":
-        from veles.adapters.cli.claude_cli import ClaudeCLIProvider
-        from veles.adapters.cli.mcp_config import DEFAULT_SKILL_MODEL, build_mcp_config
-
-        mcp_path = build_mcp_config(project, skill_model=skill_model or DEFAULT_SKILL_MODEL)
-        return ClaudeCLIProvider(mcp_config_path=mcp_path, workdir=project.root)
-    if name == "gemini-cli":
-        from veles.adapters.cli.gemini_cli import GeminiCLIProvider
-        from veles.adapters.cli.mcp_config import DEFAULT_SKILL_MODEL, build_gemini_mcp_settings
-
-        build_gemini_mcp_settings(project, skill_model=skill_model or DEFAULT_SKILL_MODEL)
-        return GeminiCLIProvider(mcp_settings_dir=project.root)
-    # Every other provider runs plain HTTP chat and gets Veles tools through the
-    # standard tool-call path; the model lets local backends detect tool support.
-    return make_provider(name, model=skill_model)
+    spec = get_provider(name)
+    if spec.build_tool_aware is None:
+        return make_provider(name, model=model)
+    return spec.build_tool_aware(ProviderContext(name=name, model=model, project=project))

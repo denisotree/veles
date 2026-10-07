@@ -26,8 +26,10 @@ from typing import Any
 
 import aiohttp
 
+from veles.core.platforms import RunBackendError
 
-class DaemonClientError(RuntimeError):
+
+class DaemonClientError(RunBackendError):
     def __init__(self, message: str, *, status: int | None = None, body: str | None = None):
         super().__init__(message)
         self.status = status
@@ -124,6 +126,15 @@ class DaemonClient:
         """GET /v1/sessions/{id} — the session row, history and agent `mode`."""
         async with self.session.get(
             f"{self._base}/v1/sessions/{session_id}",
+            headers=self._auth,
+        ) as resp:
+            return await _read_json(resp)
+
+    async def get_session_usage(self, session_id: str) -> dict[str, Any]:
+        """GET /v1/sessions/{id}/usage — the session's tokens since the daemon
+        started and the model's context window (M116b)."""
+        async with self.session.get(
+            f"{self._base}/v1/sessions/{session_id}/usage",
             headers=self._auth,
         ) as resp:
             return await _read_json(resp)

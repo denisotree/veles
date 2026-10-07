@@ -277,6 +277,21 @@ def test_name_clash_refused_without_confirmation(remote: Path, tmp_path: Path) -
     assert calls == []
 
 
+def test_same_name_in_both_scopes_needs_a_choice(remote: Path, tmp_path: Path) -> None:
+    from veles.core.user_paths import user_modules_dir
+
+    project = init_project(tmp_path / "p", name="p")
+    install(resolve("demo"), project=project)
+    install(resolve("demo"), project=project, user_scope=True)
+    with pytest.raises(InstallError, match="--user"):
+        uninstall("demo", project=project)
+    uninstall("demo", project=project, user_scope=True)
+    assert not (user_modules_dir() / "demo").exists()
+    assert (project.modules_dir / "demo").exists()
+    uninstall("demo", project=project, user_scope=False)
+    assert load_records() == []
+
+
 def test_mcp_name_clash_refused_without_confirmation(remote: Path, tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     install(resolve("graph"), project=project)

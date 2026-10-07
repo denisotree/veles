@@ -43,7 +43,7 @@ veles        # interactive REPL (just run `veles` with no subcommand)
 
 **Memoria che si accumula** — Ogni sessione viene distillata dal Curator nella memoria di progetto (insight, regole comportamentali, riepiloghi di sessione in `.veles/`). L'agente richiama automaticamente i fatti rilevanti e le decisioni passate — così smetti di rispiegare lo stesso contesto. La memoria funziona con *qualsiasi* layout di contenuti.
 
-**Layout di contenuti modulari** — `veles init` predispone come impostazione predefinita una wiki LLM in stile Karpathy; `--layout notes` crea una directory piatta di note; `--layout bare` non aggiunge alcuna struttura (ideale per i repository di codice). I pacchetti di layout personalizzati sono un singolo file TOML in `~/.veles/layouts/`.
+**Layout di contenuti modulari** — `veles init` non aggiunge alcuna struttura per impostazione predefinita (`bare`, ideale per i repository di codice); scegli `llm-wiki` per una wiki LLM in stile Karpathy o `notes` per una directory piatta di note, entrambi installati al momento dal registro delle estensioni. I pacchetti di layout personalizzati sono un singolo file TOML in `~/.veles/layouts/`.
 
 **Routing indipendente dal provider** — OpenRouter, Anthropic, OpenAI, Gemini, Ollama, llamacpp, oppure il tuo abbonamento alla CLI `claude`/`gemini`. Tipi di attività diversi (pianificazione, compressione, insight) possono essere instradati verso modelli diversi.
 
@@ -123,17 +123,17 @@ veles secret set OPENROUTER_API_KEY    # prompts for value, stores in keychain
 ### Scegli un layout di contenuti
 
 ```bash
-veles init                  # default: Karpathy-style LLM wiki (sources/ + wiki/)
-veles init --layout notes   # a single flat notes/ directory
-veles init --layout bare    # no content scaffold — code repos, free-form work
+veles init                      # default: bare — no content scaffold (at a terminal it asks)
+veles init --layout llm-wiki    # Karpathy-style LLM wiki (sources/ + wiki/), from the registry
+veles init --layout notes       # a single flat notes/ directory, from the registry
 ```
 
-La memoria propria dell'agente (insight, regole, riepiloghi di sessione in `.veles/`) funziona in modo identico con ogni layout. I pacchetti personalizzati sono un singolo `layout.toml` in `~/.veles/layouts/<name>/`.
+Un layout non installato viene proposto per l'installazione (con ciò di cui ha bisogno, con un'unica conferma). La memoria propria dell'agente (insight, regole, riepiloghi di sessione in `.veles/`) funziona in modo identico con ogni layout. I pacchetti personalizzati sono un singolo `layout.toml` in `~/.veles/layouts/<name>/`.
 
 ### Costruisci una base di conoscenza (layout llm-wiki)
 
 ```bash
-veles add paper.pdf                   # read a source → write a wiki page
+veles add paper.pdf                   # read a source → write a wiki page (the wiki module's verb)
 veles add https://example.com/post    # web pages, PDFs, plain text
 
 veles run "What do we know about the authentication design?"
@@ -325,7 +325,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | Crea un nuovo progetto |
 | `veles run "<prompt>"` | Esecuzione dell'agente a turno singolo |
 | `veles` | REPL interattiva (nessun sottocomando) |
-| `veles add <file\|url>` | Acquisisce una fonte → pagine wiki tematiche |
+| `veles add <file\|url>` | Acquisisce una fonte → pagine wiki tematiche (dal modulo `wiki`, layout llm-wiki) |
 | `veles organize` | Riorganizza i contenuti del progetto secondo il layout attivo (proponi e applica) |
 | `veles research "<question>"` | Ricerca approfondita multi-angolo |
 | `veles curate` | Consolida le sessioni nella wiki |

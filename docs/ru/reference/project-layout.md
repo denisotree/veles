@@ -7,15 +7,16 @@
 ## Что создаёт `veles init`
 
 Контентная половина зависит от выбранного layout-пакета (`--layout`,
-по умолчанию `llm-wiki`); половина состояния в `.veles/` везде одинакова.
+по умолчанию `bare` — только `AGENTS.md`); половина состояния в `.veles/` везде
+одинакова. Ниже — проект на раскладке `llm-wiki` из реестра:
 
 ```
-my-project/                  # veles init  (раскладка llm-wiki по умолчанию)
+my-project/                  # veles init --layout llm-wiki
 ├── AGENTS.md                # project context (injected into the agent)
 ├── CLAUDE.md → AGENTS.md    # symlink, so a `claude` CLI picks up the same context
 ├── GEMINI.md → AGENTS.md    # symlink, for a `gemini` CLI
-├── sources/                 # raw source material (readonly by convention, not enforced)
-├── wiki/                    # the LLM-writable knowledge zone
+├── sources/                 # (llm-wiki) raw source material, readonly by convention
+├── wiki/                    # (llm-wiki) the LLM-writable knowledge zone
 │   ├── concepts/ entities/ queries/ self-doc/ sessions/
 └── .veles/                  # project state (do not commit; machine-managed)
     ├── project.toml         # name, created_at, schema_version, layout
@@ -29,9 +30,9 @@ my-project/                  # veles init  (раскладка llm-wiki по у�
     └── skills/              # проектные навыки
 ```
 
-С `--layout notes` контентная половина — один каталог `notes/`; с
-`--layout bare` контент-скаффолда нет вовсе. `wiki/INDEX.md` (каталог по
-требованию) генерируется по мере роста вики; `config.toml`, `tools/` и `plans/`
+С `bare` по умолчанию контент-скаффолда нет вовсе; с `notes` (из реестра) это
+один каталог `notes/`. `INDEX.md` (каталог wiki по требованию) генерируется по
+мере роста вики; `config.toml`, `tools/` и `plans/`
 появляются под `.veles/`, как только вы что-то настроите, агент напишет
 инструмент или вы запустите цель.
 
@@ -67,8 +68,9 @@ my-project/                  # veles init  (раскладка llm-wiki по у�
 
 ## Layout-пакеты
 
-`veles init --layout {llm-wiki|notes|bare|<custom>}` выбирает раскладку
-контента; пакет владеет скаффолдом, шаблоном AGENTS.md, записываемыми зонами и
-тем, активен ли wiki-движок (wiki-инструменты, инъекция INDEX в промпт,
-wiki-recall). См.
+`veles init --layout {bare|llm-wiki|notes|<custom>}` выбирает раскладку
+контента (встроена только `bare`; остальные приходят из реестра и предлагаются к
+установке); пакет владеет скаффолдом, шаблоном AGENTS.md, записываемыми зонами и
+тем, какой контент-движок он просит (например, wiki: wiki-инструменты, инъекция
+INDEX в промпт, wiki-recall). См.
 [layout-пакеты и LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).

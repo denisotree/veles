@@ -57,7 +57,7 @@ def _list(args: argparse.Namespace, project: Project) -> int:
     from veles.mcp.config import load_raw_mcp_servers, parse_servers
 
     raw = load_raw_mcp_servers(project)
-    configs = parse_servers(raw)
+    configs = parse_servers(raw, cwd=project.root)
     if not configs:
         print(
             "no MCP servers configured.\n"
@@ -106,7 +106,7 @@ def _test(args: argparse.Namespace, project: Project) -> int:
     from veles.mcp.sanitize import normalize_tool_name, sanitize_text
 
     raw = load_raw_mcp_servers(project)
-    configs = parse_servers(raw)
+    configs = parse_servers(raw, cwd=project.root)
     cfg = configs.get(args.server)
     if cfg is None:
         known = ", ".join(sorted(configs)) or "(none)"
@@ -145,7 +145,7 @@ def _test(args: argparse.Namespace, project: Project) -> int:
 
 def _approve(args: argparse.Namespace, project: Project) -> int:
     from veles.core.critical_ops import confirm_critical
-    from veles.mcp.approvals import approve, describe_recipe, recipe_hash
+    from veles.mcp.approvals import approval_hash, approve, describe_recipe, recipe_hash
     from veles.mcp.config import load_raw_mcp_servers
 
     name = args.server
@@ -154,13 +154,20 @@ def _approve(args: argparse.Namespace, project: Project) -> int:
         print(f"error: no MCP server named {shown(name)} in config", file=sys.stderr)
         return 2
     digest = recipe_hash(recipe)
-    if not confirm_critical(f"approve MCP server {shown(name)}", describe_recipe(name, recipe)):
+    reviewed = approval_hash(project.root, recipe)  # includes the project files it runs
+    if not confirm_critical(
+        f"approve MCP server {shown(name)}", describe_recipe(name, recipe, project.root)
+    ):
         print("aborted — nothing approved.", file=sys.stderr)
         return 1
     # The config may have changed while the user was reading: approve only what
     # was shown.
     again = load_raw_mcp_servers(project).get(name)
-    if not isinstance(again, dict) or recipe_hash(again) != digest:
+    if (
+        not isinstance(again, dict)
+        or recipe_hash(again) != digest
+        or approval_hash(project.root, again) != reviewed
+    ):
         print(
             f"error: [mcp.servers.{shown(name)}] changed during review — nothing approved; "
             "run the command again.",

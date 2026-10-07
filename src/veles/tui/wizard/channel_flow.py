@@ -8,7 +8,7 @@ the synchronous `collect_channel_fields` in `cli/channel_wizard.py`: same
 platform registry, same `CredField` labels, same `(secrets, config_fields)`
 shape feeding `apply_channel`. So all four channel-setup flows (`channel add`,
 picker, stdin wizard, TUI wizard) stay in lockstep — adding a channel platform
-needs zero wizard code, only a `platform_registry` entry.
+needs zero wizard code, only a module contributing the `platform`.
 
 The channel-type `ChoiceScreen` is ALWAYS shown, even with a single registered
 platform: the "pick a type, then configure it" shape is the point — it is the
@@ -38,27 +38,26 @@ async def collect_channel_via_modals(app: App, *, title: str) -> CollectResult |
     `secret=True` creds) are kept apart from plain config fields so the caller
     can route them to the keychain vs the config block via `apply_channel`.
     """
-    from veles.channels.platform_registry import (
-        ensure_builtins_registered,
-        get_platform,
-        list_platforms,
-    )
+    from veles.core.platforms import get_platform, list_platforms
+    from veles.core.registry import ensure
     from veles.tui.wizard.screens.choice import ChoiceItem, ChoiceScreen
     from veles.tui.wizard.screens.input import InputScreen
     from veles.tui.wizard.step import CANCEL_SENTINEL
 
-    ensure_builtins_registered()
-    platforms = list_platforms()
+    installed = set(list_platforms())
+    platforms = ensure.available_platforms()
     if not platforms:
         return None
     channel = await app.push_screen_wait(
         ChoiceScreen(
             title,
-            [ChoiceItem(p, p) for p in platforms],
+            [ChoiceItem(p if p in installed else f"{p} (registry)", p) for p in platforms],
             default=platforms[0],
         )
     )
     if not channel or channel == CANCEL_SENTINEL:
+        return None
+    if channel not in installed and not _install_platform(app, channel):
         return None
     entry = get_platform(channel)
     secrets: dict[str, str] = {}
@@ -81,6 +80,19 @@ async def collect_channel_via_modals(app: App, *, title: str) -> CollectResult |
         else:
             config_fields[cred.key] = value
     return channel, secrets, config_fields
+
+
+def _install_platform(app: App, name: str) -> bool:
+    """Install a registry platform picked in the flow. Its confirmation is a
+    terminal prompt, so the app hands the terminal back while it runs."""
+    from veles.core.registry import ensure
+    from veles.tui.wizard.install import install_with_terminal
+
+    return install_with_terminal(
+        app,
+        lambda: ensure.ensure_platform_interactive(name),
+        hint=f"run `veles registry install {name}`, then add the channel",
+    )
 
 
 async def add_channel_via_modals(

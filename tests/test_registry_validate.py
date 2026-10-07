@@ -40,6 +40,41 @@ def test_memory_provider_provides_checked(tmp_path: Path) -> None:
     assert "memory:mp" in errors
 
 
+def test_module_may_import_veles_only_through_the_sdk(tmp_path: Path) -> None:
+    root = write_registry(tmp_path / "r")
+    files = {
+        **_MODULE_FILES,
+        "demo.py": (
+            "from veles.sdk import Project\n"
+            "import veles.sdk.tools\n"
+            "from veles.core.project import init_project\n"
+            "import veles.runtime.prompt\n" + _MODULE_FILES["demo.py"]
+        ),
+        # Tests run against a pinned Veles in CI; they may use internals for fixtures.
+        "tests/test_demo.py": "from veles.core.project import init_project\n",
+    }
+    write_extension(root, "official", "demo", kind="module", files=files)
+    errors = "\n".join(validate_registry(root).errors)
+    assert "demo.py:3 veles.core.project" in errors
+    assert "demo.py:4 veles.runtime.prompt" in errors
+    assert "veles.sdk" not in errors.replace("veles.sdk instead", "")
+    assert "test_demo.py" not in errors
+
+
+def test_sdk_rule_exempts_only_the_tests_directory(tmp_path: Path) -> None:
+    from veles.core.registry.scan import non_sdk_imports
+
+    payload = tmp_path / "m"
+    (payload / "tests").mkdir(parents=True)
+    (payload / "test_util.py").write_text("from veles.core import project\n", encoding="utf-8")
+    (payload / "conftest.py").write_text("import veles.runtime.prompt\n", encoding="utf-8")
+    (payload / "ok.py").write_text("from veles import sdk\n", encoding="utf-8")
+    (payload / "tests" / "test_x.py").write_text("import veles.core.project\n", encoding="utf-8")
+    hits = "\n".join(non_sdk_imports(payload))
+    assert "test_util.py:1" in hits and "conftest.py:1" in hits
+    assert "ok.py" not in hits and "tests/" not in hits
+
+
 def test_clean_registry_passes(tmp_path: Path) -> None:
     root = write_registry(tmp_path / "r")
     write_extension(root, "official", "alpha")
@@ -172,6 +207,41 @@ def test_module_tests_run(tmp_path: Path) -> None:
     )
     assert any("tests failed" in e for e in validate_registry(root, run_code=True).errors)
     assert validate_registry(root).ok  # without --run-code the module never executes
+
+
+def test_validate_runs_async_extension_tests(tmp_path: Path) -> None:
+    """A failing `async def` test must turn validate red — not be skipped with a
+    warning for want of an asyncio plugin, the way a channel module's tests
+    (mostly async) would otherwise pass CI untested."""
+    root = write_registry(tmp_path / "r")
+    files = {**_MODULE_FILES, "tests/test_async.py": "async def test_x():\n    assert False\n"}
+    write_extension(
+        root,
+        "official",
+        "demo",
+        kind="module",
+        extra_ext='provides = ["hook:pre_turn"]',
+        files=files,
+    )
+    assert any("tests failed" in e for e in validate_registry(root, run_code=True).errors)
+
+
+def test_validate_runs_a_passing_async_extension_test(tmp_path: Path) -> None:
+    """…and a correct `async def` test passes: the tests are actually run
+    (asyncio mode on), not reported as unrunnable coroutines."""
+    root = write_registry(tmp_path / "r")
+    body = "import asyncio\n\nasync def test_x():\n    await asyncio.sleep(0)\n"
+    files = {**_MODULE_FILES, "tests/test_async.py": body}
+    write_extension(
+        root,
+        "official",
+        "demo",
+        kind="module",
+        extra_ext='provides = ["hook:pre_turn"]',
+        files=files,
+    )
+    report = validate_registry(root, run_code=True)
+    assert report.ok, report.errors
 
 
 def test_module_tests_pass(tmp_path: Path) -> None:

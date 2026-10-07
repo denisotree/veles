@@ -11,7 +11,9 @@ veles [--no-wizard] <command> [subcommand] [options]
 ```
 
 - `--no-wizard` — skip the first-run setup wizard even if `~/.veles/config.toml`
-  is missing (also gated on a TTY and on `VELES_NO_WIZARD=1`).
+  is missing (also gated on a TTY and on `VELES_NO_WIZARD=1`). The wizard fronts
+  only commands that start an agent (bare `veles`, `run`, `daemon`, `channel`, …);
+  admin verbs such as `module`, `tool` and `doctor` never open it.
 - With no arguments, `veles` launches the interactive [TUI](tui.md).
 
 Most agent commands accept the [shared agent-loop flags](#shared-agent-loop-flags)
@@ -28,7 +30,7 @@ Create a new Veles project in the current directory (a `.veles/` state directory
 | Flag | Default | Purpose |
 |---|---|---|
 | `name` (positional) | cwd basename | Project name |
-| `--layout <name>` | `llm-wiki` | Layout pack for the content scaffold (`llm-wiki`, `notes`, `bare`, or a custom pack from `~/.veles/layouts/`) |
+| `--layout <name>` | `bare` (asked at a terminal) | Layout pack for the content scaffold (`bare`, a pack installed from a registry such as `llm-wiki` or `notes`, or a custom pack from `~/.veles/layouts/`). A pack that isn't installed is offered for install; refusing creates nothing |
 | `--force` | off | Recreate `.veles/` even if it already exists |
 
 ### `veles schema {validate,edit,fix}`
@@ -39,8 +41,10 @@ Validate or edit `AGENTS.md` (the project context file).
 - `fix` — interactively add missing sections via an LLM wizard.
 
 ### `veles self-doc [refresh|show]`
-Generate and display project self-documentation (`wiki/self-doc/overview.md`).
-Bare `veles self-doc` shows the current page; `refresh` regenerates it.
+Generate and display project self-documentation — in the layout's page store
+when it has one (the wiki: `wiki/self-doc/overview.md`), otherwise
+`.veles/memory/self-doc.md`. Bare `veles self-doc` shows the current page;
+`refresh` regenerates it.
 
 ### `veles doctor`
 Run health checks over user-global state and the active project. Works with or
@@ -130,8 +134,13 @@ There is no `veles tui` or `veles repl` subcommand — the inline REPL is invoke
 as bare `veles`.
 
 ### `veles add <source>`
+*(from the `wiki` module — `veles registry install llm-wiki` or `… install wiki`)*
 Read a source (a local file, a directory, or an `http(s)://` URL) and
-synthesise it into a wiki page.
+synthesise it into a wiki page. Without the module, `veles add` is an unknown
+command and the error names the install.
+
+Modules can add their own verbs the same way; they appear in `veles --help`
+inside a project that has the module.
 
 | Flag | Default | Purpose |
 |---|---|---|
@@ -152,7 +161,8 @@ plan first; nothing changes without `--apply`.
 Plus the shared agent-loop flags.
 
 ### `veles curate`
-Run one curator pass: compact unprocessed sessions into `wiki/sessions/` pages.
+Run one curator pass: compact unprocessed sessions into memory insights (and
+`wiki/sessions/` pages when the wiki engine is on).
 
 | Flag | Default | Purpose |
 |---|---|---|
@@ -207,26 +217,34 @@ suggestions → wiki lint, optionally LLM consolidation).
 | `list` | List tools catalogued in this project's `memory.db` |
 | `show <name>` | Print a tool's manifest + telemetry |
 | `promote <name> [-y]` | Move a project tool to `~/.veles/tools/` (cross-project) |
-| `approve [<name>] [--all] [-y]` | Review + approve a self-authored tool file so the loader will run it |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | Review + approve a self-authored tool file so the loader will run it |
 
 Self-authored tools (`.veles/tools/*.py`) run their module-level code when the
 loader imports them, so a new or edited file is **not loaded until you approve
 it** — `veles tool approve` shows the code and records its hash. Bare
-`veles tool approve` lists what's pending. This is why an agent-written tool
-needs a review step before it becomes callable.
+`veles tool approve` lists what's pending, with each file's sha256. This is why an
+agent-written tool needs a review step before it becomes callable.
+
+Without a terminal (a deploy script), approve one file by the hash you reviewed:
+`veles tool approve <name> --sha256 <hash>` — it fails if the file changed since.
+`-y` skips the prompt only at a terminal.
 
 ### `veles module {list,show,add,remove,approve}`
 
 | Subcommand | Purpose |
 |---|---|
 | `list [--user]` | List installed modules (both scopes, with a `scope` column, unless `--user`) |
-| `show <name> [--user]` | Print a module's manifest |
+| `show <name> [--user]` | Print a module's manifest and its files sha256 |
 | `add <source> [--name N] [--user] [-y]` | Install a module from a git URL or local path |
 | `remove <name> [--user] [-y]` | Delete an installed module |
-| `approve <name> [--user]` | Re-approve a module after reviewing an edit |
+| `approve <name> [--user] [--sha256 H]` | Approve a module after reviewing it |
+| `approve --all [--user]` | Every module in that scope waiting for approval, one confirmation each |
 
 `--user` targets `~/.veles/modules/` instead of the project's, so the module
 loads in every project. A same-named project module overrides a user-level one.
+Approval asks you to type `yes` at a terminal; without one, pass the files hash you
+reviewed (`show` prints it) as `--sha256` — it fails if the files changed since.
+`veles doctor` reports every module on disk that doesn't load.
 
 ### `veles registry search [query] [--kind K]`
 Search connected registries (modules, skills, layout packs, MCP recipes). See
@@ -293,11 +311,12 @@ Per-task ensemble routing — which `provider:model` handles each task type
 
 ### `veles models <provider>`
 List models for a provider. Cloud providers (openrouter/openai/gemini) are cached
-24h; local providers are always live.
+24h; local providers, `codex` and `antigravity-cli` are always live. An unknown provider is a
+one-line error listing what exists (exit `2`).
 
 | Flag | Default | Purpose |
 |---|---|---|
-| `provider` (positional) | — | One of the [provider names](#provider-names) |
+| `provider` (positional) | — | A provider id from the [catalogue](#provider-names) |
 | `--refresh` | off | Bypass the disk cache (cloud only) |
 | `--json` | off | Emit `{provider, source, models}` as JSON |
 
@@ -385,13 +404,14 @@ TUI (project → daemons → channels). See [run as a daemon](../how-to/run-as-d
 `--provider` default to the project config and are fixed for the daemon's lifetime.
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-External chat gateways (Telegram, …) that talk to a daemon. See
+External chat gateways (Telegram, …) that talk to a daemon. A platform is a module
+from the extension registry; `run` and `add` install it when it is missing. See
 [connect Telegram](../how-to/connect-telegram.md).
 
 | Subcommand | Purpose |
 |---|---|
-| `list` | List registered channel platforms + session counts |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | Start a gateway in the foreground |
+| `list` | List installed channel platforms + session counts, and declared channels whose module is missing |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | Start a gateway in the foreground; `--secret` is the platform's primary secret (else the keychain or its env var) |
 | `list-sessions [--channel C]` | Show `chat_id → session_id` mappings |
 | `reset-session <chat_id> [--channel C]` | Forget a mapping (next message starts fresh) |
 | `add [--channel C] [--session S]` | Attach a channel to a daemon (wizard; creds → keychain) |
@@ -431,8 +451,12 @@ start`:
 
 ## Provider names
 
-`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` and `veles models` take any id in the provider catalogue — the builtin
+ones, your `~/.veles/providers.toml`, and providers from installed modules:
 
-Local providers (`ollama`, `llamacpp`, `openai-compat`) need no API key. See the
+`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
+`ollama` · `llamacpp` · `openai-compat` (builtin)
+
+A provider only a registry module offers (`antigravity-cli`) installs itself when you
+name it. Local providers (`ollama`, `llamacpp`, `openai-compat`) need no API key. See the
 [providers reference](providers.md) and [configure providers](../how-to/configure-providers.md).

@@ -36,7 +36,8 @@ Design notes:
 
 - `parse_extractor_output(raw)` is JSON-tolerant: strips ```json fences,
   ignores unknown keys, validates task names against `KNOWN_TASKS`,
-  validates provider names against `PROVIDER_API_KEY_ENVS`. Garbage
+  validates provider names against the provider catalogue (CLI delegates
+  excluded). Garbage
   entries are dropped silently so a noisy LLM run doesn't poison the
   TOML.
 """
@@ -158,17 +159,12 @@ class _NLEntry:
     model: str
 
 
-_VALID_NL_PROVIDERS = frozenset(
-    {
-        "openrouter",
-        "anthropic",
-        "openai",
-        "gemini",
-        "ollama",
-        "llamacpp",
-        "openai-compat",
-    }
-)
+def _valid_nl_provider(name: str) -> bool:
+    """A catalogue provider a routed task can run on — not a CLI delegate."""
+    from veles.core.providers import find_provider
+
+    spec = find_provider(name)
+    return spec is not None and spec.wire != "cli"
 
 
 def _coerce_nl_entry(entry: Any, valid_tasks: set[str]) -> _NLEntry | None:
@@ -180,7 +176,7 @@ def _coerce_nl_entry(entry: Any, valid_tasks: set[str]) -> _NLEntry | None:
     model = entry.get("model")
     if not isinstance(task, str) or task not in valid_tasks:
         return None
-    if not isinstance(provider, str) or provider not in _VALID_NL_PROVIDERS:
+    if not isinstance(provider, str) or not _valid_nl_provider(provider):
         return None
     if not isinstance(model, str) or not model.strip():
         return None

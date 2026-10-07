@@ -2,9 +2,29 @@
 
 > 🌐 **Idiomas:** [English](../../en/reference/providers.md) · [简体中文](../../zh-CN/reference/providers.md) · [繁體中文](../../zh-TW/reference/providers.md) · [日本語](../../ja/reference/providers.md) · [한국어](../../ko/reference/providers.md) · **Español** · [Français](../../fr/reference/providers.md) · [Italiano](../../it/reference/providers.md) · [Português (BR)](../../pt-BR/reference/providers.md) · [Português (PT)](../../pt-PT/reference/providers.md) · [Русский](../../ru/reference/providers.md) · [العربية](../../ar/reference/providers.md) · [हिन्दी](../../hi/reference/providers.md) · [বাংলা](../../bn/reference/providers.md) · [Tiếng Việt](../../vi/reference/providers.md)
 
-Veles es agnóstico respecto al proveedor. Pasa `--provider <name>` a cualquier comando
+Veles es agnóstico respecto al proveedor. Pasa `--provider <id>` a cualquier comando
 del agente, o establece un valor por defecto en la configuración. Los IDs de modelo usan
 la propia nomenclatura del proveedor.
+
+## El catálogo de proveedores
+
+Todos los proveedores que Veles conoce son entradas de un único catálogo, construido a
+partir de tres fuentes:
+
+1. **Integrados** — la tabla de abajo, incluida con Veles.
+2. **Los tuyos** — `~/.veles/providers.toml`: una API alojada compatible con OpenAI o un
+   servidor que ejecutas tú, añadiendo una entrada (consulta
+   [añadir tu propio proveedor](../how-to/configure-providers.md#añadir-tu-propio-proveedor)).
+   Una entrada con un id integrado anula los ajustes de ese proveedor (su `base_url`, por ejemplo).
+3. **Módulos** — un módulo del registro aporta un proveedor (`antigravity-cli`). Nombrarlo
+   en `[engine] provider`, en una ruta o en `--provider` lo instala desde tus registros
+   conectados en la siguiente ejecución, igual que un canal declarado.
+
+`--provider`, `veles models`, los asistentes de configuración, el enrutamiento y
+`veles doctor` leen el catálogo, así que un proveedor de cualquier fuente funciona en todos
+los sitios donde funciona uno integrado. Un id desconocido es un error de una línea que
+lista lo que existe; `veles doctor` también revisa `~/.veles/providers.toml` y todos los
+proveedores que nombran tus rutas.
 
 | Proveedor | Tipo | Clave de API | Notas |
 |---|---|---|---|
@@ -12,11 +32,14 @@ la propia nomenclatura del proveedor.
 | `anthropic` | Nube directa | `ANTHROPIC_API_KEY` | API Messages de Claude, prompt caching |
 | `openai` | Nube directa | `OPENAI_API_KEY` | Chat completions de GPT |
 | `gemini` | Nube directa | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
-| `claude-cli` | Subproceso | — (sesión de CLI) | Delega en una CLI local de `claude` en modo JSON-stream |
-| `gemini-cli` | Subproceso | — (sesión de CLI) | Delega en una CLI local de `gemini` |
+| `claude-cli` | Delegado de CLI | — (sesión de CLI) | Delega en una CLI local de `claude` en modo JSON-stream |
+| `codex` | Delegado de CLI | — (sesión de CLI) | Delega en una CLI local de `codex` (suscripción de ChatGPT) |
 | `ollama` | Local | ninguna | `OLLAMA_BASE_URL` (por defecto `http://localhost:11434/v1`) |
 | `llamacpp` | Local | ninguna | `LLAMACPP_BASE_URL` (por defecto `http://localhost:8080/v1`) |
-| `openai-compat` | Local/personalizado | ninguna | `OPENAI_COMPAT_BASE_URL` (requerido, sin valor por defecto) |
+| `openai-compat` | Local/personalizado | `OPENAI_COMPAT_API_KEY` opcional | `OPENAI_COMPAT_BASE_URL` (requerido, sin valor por defecto) |
+
+`gemini-cli` se eliminó en la 1.2.6 — Google ya no ofrece la CLI de Gemini a cuentas
+personales. Usa `gemini` con una clave de API, o el módulo `antigravity-cli`.
 
 Proveedor por defecto: `openrouter`. **No hay un modelo por defecto codificado** —
 establece uno mediante el asistente de configuración, `[engine] model` o `--model`
@@ -29,24 +52,33 @@ establece uno mediante el asistente de configuración, `[engine] model` o `--mod
 `ollama`, `llamacpp` y `openai-compat` no necesitan clave de API. Lista los modelos
 instalados con `veles models <provider>` (siempre en vivo para los proveedores locales).
 
-**La llamada a herramientas está desactivada por defecto** en los proveedores locales —
-muchos modelos locales emiten llamadas a herramientas malformadas. Actívala una vez que
-hayas elegido un modelo capaz de usar herramientas:
+**La llamada a herramientas se detecta** a partir de lo que anuncia el backend: ollama
+informa de las capacidades de cada modelo, un servidor llama.cpp las de su plantilla de
+chat. `VELES_LOCAL_TOOLS=1` fuerza la llamada a herramientas, `=0` la desactiva; sin
+definir, se detecta.
 
 ```bash
-export VELES_LOCAL_TOOLS=1
 veles run --provider ollama --model qwen3:4b-instruct "..."
 ```
 
 Anula los endpoints con las variables de entorno `*_BASE_URL` (consulta
 [variables de entorno](environment-variables.md)).
 
-## Delegación a CLI (`claude-cli`, `gemini-cli`)
+## Delegación a CLI (`claude-cli`, `codex`, `antigravity-cli`)
 
-Si tienes una suscripción a la CLI de Claude o Gemini, Veles puede ejecutar el binario
-en modo JSON-streaming y actuar como coordinador — manteniendo el bucle local-first sin
-una clave de API aparte. Las herramientas de Veles llegan al subproceso solo cuando hay
-un puente MCP configurado.
+Si tienes una suscripción a Claude, ChatGPT o Google, Veles puede ejecutar su CLI sin interfaz y
+actuar como coordinador — sin una clave de API aparte. `claude-cli` y `codex` están integrados;
+`antigravity-cli` (la CLI `agy`) es un módulo del registro que se instala solo cuando lo
+nombras.
+
+El delegado es solo el modelo: las herramientas de Veles le llegan por un puente MCP, y
+cada llamada pasa por la escalera de confianza de Veles. La configuración del puente vive
+en un directorio del proceso en ejecución, `.veles/tmp/delegate-<pid>/`, que se elimina
+cuando termina. `agy` se ejecuta en un espacio de trabajo temporal fuera de tu proyecto
+(bajo `~/.veles/tmp/`), así que la configuración `.agents/` del propio proyecto nunca le
+llega, tras una barrera que deniega sus propias herramientas de shell y de archivos.
+
+`codex` también se ejecuta fuera de tu proyecto (bajo `~/.veles/tmp/`), con tu configuración de codex ignorada y sus propias herramientas — shell, edición de archivos, imágenes, subagentes, navegador, búsqueda web — desactivadas; Veles comprueba esos nombres de flags una vez por proceso y se niega a ejecutar un codex que haya renombrado alguno de los que necesita. Su servidor MCP se pasa en los argumentos, no en un archivo. En `veles run`, codex sigue el protocolo de herramientas de Veles con menos fiabilidad que claude: puede responder que no puede leer un archivo sin llamar a la herramienta — vuelve a preguntar, o nombra la herramienta ("use read_file on …").
 
 ## Estado multimodal (visión / voz a texto)
 

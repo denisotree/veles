@@ -29,7 +29,7 @@ _CURATED_MODELS_BY_PROVIDER: dict[str, list[str]] = {
     "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "o4-mini", "o3"],
     "gemini": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
     "claude-cli": [],
-    "gemini-cli": [],
+    "codex": [],  # live only (`codex debug models`); no curated list to go stale
 }
 
 

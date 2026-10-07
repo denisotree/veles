@@ -234,21 +234,27 @@ def test_recall_surfaces_insight_via_sql_path(tmp_path: Path) -> None:
     assert ref is not None
 
 
-def test_recall_returns_insight_alongside_wiki_pages(tmp_path: Path) -> None:
-    """M161: insights live only in SQL; wiki pages and insight rows are
-    distinct sources that both surface without any title de-dup pass."""
-    from veles.core.memory.router import MemoryRouter
-    from veles.modules.wiki.wiki import Wiki
+def test_recall_returns_insight_alongside_module_hits(tmp_path: Path) -> None:
+    """M161: insights live only in SQL; a module's recall hits (e.g. wiki pages)
+    and insight rows are distinct sources that both surface without any title
+    de-dup pass."""
+    from veles.core.memory.router import MemoryRouter, RecallHit
+    from veles.core.modules import (
+        ModuleAPI,
+        ModuleRegistry,
+        reset_module_registry,
+        set_module_registry,
+    )
 
     project = init_project(tmp_path / "p", name="p")
-    wiki = Wiki(project.wiki_root)
-    wiki.write_page(
-        category="concepts",
-        slug="cache-design",
-        title="cache design",
-        content="# cache design\n\nsession keys live in redis with a ttl\n",
+    scratch, reg = ModuleRegistry(), ModuleRegistry()
+    ModuleAPI(scratch, "pages").contribute(
+        "recall",
+        "pages",
+        lambda p, query, *, limit: [RecallHit("wiki/concepts/cache-design.md", "cache design", "")],
     )
-    wiki.reindex_if_stale()
+    reg.merge_from(scratch, "pages")
+    token = set_module_registry(reg)
     store = SessionStore(project.memory_db_path)
     try:
         _insert_insight(
@@ -257,6 +263,7 @@ def test_recall_returns_insight_alongside_wiki_pages(tmp_path: Path) -> None:
         hits = MemoryRouter(project, store=store).recall("redis ttl session", limit=5)
     finally:
         store.close()
+        reset_module_registry(token)
     titles = [h.title for h in hits]
     assert "cache ttl policy" in titles
     assert "cache design" in titles

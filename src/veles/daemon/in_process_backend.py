@@ -65,6 +65,10 @@ class InProcessRunBackend:
             "goal": self._state.chat_goal(session_id),
         }
 
+    async def get_session_usage(self, session_id: str) -> dict[str, Any]:
+        """In-process equivalent of `DaemonClient.get_session_usage` (M116b)."""
+        return self._state.usage_payload(session_id)
+
     async def cancel_goal(self, session_id: str) -> dict[str, Any]:
         """In-process equivalent of `DaemonClient.cancel_goal`: cancel the
         chat's goal; `{"cancelled": null}` when it had none."""
@@ -83,11 +87,12 @@ class InProcessRunBackend:
 
     async def health(self) -> dict[str, Any]:
         """In-process equivalent of `DaemonClient.health`. The gateway
-        calls this to learn the daemon's fixed provider for /model."""
+        calls this to learn the daemon's fixed provider and model."""
         return {
             "status": "ok",
             "project": self._state.project.name,
             "provider": self._state.provider,
+            "model": self._state.default_model,
         }
 
     async def run_dream(self) -> dict[str, Any]:

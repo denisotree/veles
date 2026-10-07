@@ -59,9 +59,10 @@ Module 是在 Veles 內部執行的 Python 程式碼（`module.toml` + 一個進
 veles module list                              # both scopes, with a `scope` column
 veles module add https://github.com/org/module.git
 veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
-veles module show <name> [--user]
+veles module show <name> [--user]             # 清單檔 + 檔案 sha256
 veles module remove <name> [--user]
-veles module approve <name> [--user]
+veles module approve <name> [--user]          # 在終端機中輸入 `yes`
+veles module approve <name> --sha256 <hash>   # 無終端機時：你審閱過的雜湊值
 ```
 
 Modules 與 skills、tools 一樣存在於兩個作用域：專案本地（`<project>/.veles/modules/`）與使用者全域（`~/.veles/modules/`，在每個專案中載入）。使用者層級的 module 與專案層級的 module 經過同樣的核可閘門，且閘門在比較名稱之前執行。如果專案 module 與使用者 module 同名，已核可的專案 module 會載入，Veles 會警告使用者層級的 module 被遮蔽；未核可的專案 module 會被跳過（警告中會指出其目錄），此時載入使用者 module。同一作用域內兩個已核可的 module 同名時 — 依目錄排序的第一個載入，其餘的發出警告並被跳過。`veles module {show,approve,remove}` 接受 manifest 名稱（`list` 顯示的名稱），並會拒絕該作用域內被多個目錄宣告的名稱，同時列出這些目錄；`veles module add` 會拒絕安裝名稱已被該作用域內另一個目錄宣告的 module。

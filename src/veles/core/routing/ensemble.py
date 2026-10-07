@@ -13,7 +13,7 @@ mid-tier. The typed config layer lives in the project's `config.toml`:
 
 Each entry is a `<provider>:<model>` string. `<provider>` matches
 Veles' CLI provider names (`openrouter`, `anthropic`, `openai`,
-`gemini`, `claude-cli`, `gemini-cli`); `<model>` is whatever the chosen
+`gemini`, `claude-cli`, …); `<model>` is whatever the chosen
 provider expects (slug for OpenRouter, bare name for direct adapters).
 
 **M125 — config unification + `[engine]` as routing base.** Before

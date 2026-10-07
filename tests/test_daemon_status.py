@@ -9,7 +9,7 @@ import pytest
 from aiohttp import web
 
 from tests.conftest import StubProvider
-from veles.channels.session_map import SessionMap, channel_session_path
+from veles.core.chat_sessions import SessionMap, channel_session_path
 from veles.core.memory import SessionStore
 from veles.core.project import Project, init_project
 from veles.core.provider import (
@@ -173,24 +173,24 @@ async def test_health_reports_active_channels(aiohttp_client, app) -> None:
 
 
 async def test_channels_lists_registered_platforms(
-    aiohttp_client, app, good_token: str, isolated_user_home: Path
+    aiohttp_client, app, good_token: str, isolated_user_home: Path, fake_platform
 ) -> None:
     client = await aiohttp_client(app)
     resp = await client.get("/v1/channels", headers={"Authorization": f"Bearer {good_token}"})
     assert resp.status == 200
     body = await resp.json()
     platforms = [c["platform"] for c in body["channels"]]
-    assert "telegram" in platforms
+    assert "fake" in platforms
 
 
 async def test_channels_counts_persisted_sessions(
-    aiohttp_client, app, good_token: str, isolated_user_home: Path
+    aiohttp_client, app, good_token: str, isolated_user_home: Path, fake_platform
 ) -> None:
-    sm = SessionMap.load(channel_session_path("telegram"))
+    sm = SessionMap.load(channel_session_path("fake"))
     sm.set("42", "ses-abc")
     sm.set("99", "ses-xyz")
     client = await aiohttp_client(app)
     resp = await client.get("/v1/channels", headers={"Authorization": f"Bearer {good_token}"})
     body = await resp.json()
-    tg = next(c for c in body["channels"] if c["platform"] == "telegram")
-    assert tg["sessions"] == 2
+    ch = next(c for c in body["channels"] if c["platform"] == "fake")
+    assert ch["sessions"] == 2

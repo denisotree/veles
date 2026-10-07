@@ -64,7 +64,18 @@ def resolve_effective_provider(
     *,
     daemon_session: str | None = None,
 ) -> str:
-    """Walk the cascade and return the provider Veles should boot with.
+    """Walk the cascade and return the provider Veles should boot with."""
+    return provider_source(args, project, daemon_session=daemon_session)[0]
+
+
+def provider_source(
+    args: argparse.Namespace,
+    project: Project | None,
+    *,
+    daemon_session: str | None = None,
+) -> tuple[str, str]:
+    """`(provider, where it was named)` — the cascade `resolve_effective_provider`
+    walks; the second part ends the auto-install line.
 
     M134: when `daemon_session` is given, a `[daemon.<name>] provider` in
     the project config takes priority over the project-wide `[engine]`
@@ -78,22 +89,22 @@ def resolve_effective_provider(
     # different provider could not CLI-override back to openrouter (2026-07-07).
     explicit = getattr(args, "provider", None)
     if explicit and getattr(args, "_provider_explicit", False):
-        return explicit
+        return explicit, "named with --provider"
     if project is not None:
         cfg = load_project_config(project)
         if daemon_session:
             ds_provider = get_section(cfg, "daemon", daemon_session).get("provider")
             if isinstance(ds_provider, str) and ds_provider:
-                return ds_provider
+                return ds_provider, f"named in [daemon.{daemon_session}] provider"
         project_provider = get_section(cfg, "engine").get("provider")
         if isinstance(project_provider, str) and project_provider:
-            return project_provider
+            return project_provider, "named in [engine] provider"
     from veles.core.user_config import load_user_config
 
     user_cfg = load_user_config()
     if user_cfg and user_cfg.default_provider:
-        return user_cfg.default_provider
-    return DEFAULT_PROVIDER
+        return user_cfg.default_provider, "named as your default provider"
+    return DEFAULT_PROVIDER, "Veles' default provider"
 
 
 def resolve_effective_model(

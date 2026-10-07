@@ -59,12 +59,8 @@ veles models ollama                     # confirm it's listed
 veles run --provider ollama --model qwen3:4b-instruct "Hello"
 ```
 
-A chamada de tools vem **desligada por padrão** em provedores locais. Habilite-a
-depois de escolher um modelo capaz de usar tools:
-
-```bash
-export VELES_LOCAL_TOOLS=1
-```
+A chamada de tools é **detectada** a partir do que o servidor anuncia. Force-a com
+`VELES_LOCAL_TOOLS=1` (ou desligue-a com `=0`).
 
 Sobrescreva os endpoints se o seu servidor não estiver na porta padrão:
 
@@ -74,13 +70,87 @@ export LLAMACPP_BASE_URL=http://localhost:8080/v1
 export OPENAI_COMPAT_BASE_URL=http://my-host:8000/v1   # required for openai-compat
 ```
 
-## Delegue para uma assinatura de CLI do Claude / Gemini
+## Adicione o seu próprio provedor
 
-Se você tiver a CLI `claude` ou `gemini` autenticada, o Veles pode pilotá-la:
+Qualquer API hospedada compatível com a OpenAI, ou um servidor que você mesmo roda,
+vira um provedor com uma entrada em `~/.veles/providers.toml` — sem código. O id é o
+nome da tabela:
+
+```toml
+[providers.groq]
+kind = "openai-api"                          # a hosted API; needs a key
+label = "Groq"                               # shown in the wizards (optional)
+base_url = "https://api.groq.com/openai/v1"
+key_env = ["GROQ_API_KEY"]
+
+[providers.lmstudio]
+kind = "local"                               # a server you run; a key is optional
+base_url = "http://localhost:1234/v1"
+```
+
+Depois use-o como qualquer provedor nativo:
+
+```bash
+veles secret set GROQ_API_KEY      # into the keychain, where the groq entry reads it
+veles models groq
+veles run --provider groq --model llama-3.3-70b-versatile "..."
+```
+
+| Chave | Significado |
+|---|---|
+| `kind` | `openai-api` (uma API hospedada) ou `local` (um servidor que você mesmo roda) |
+| `base_url` | o endpoint compatível com a OpenAI, terminando em `/v1` (ou o equivalente do provedor) |
+| `base_url_env` | uma variável de ambiente que, quando definida, sobrescreve `base_url` |
+| `key_env` | nomes das variáveis de ambiente de onde a chave é lida; o chaveiro é tentado primeiro |
+| `label`, `tagline` | como os assistentes o exibem |
+| `tools` | `auto` (padrão), `on` ou `off` — se o modelo recebe chamadas de tools |
+
+Uma entrada com um id nativo (`[providers.ollama]`) altera as configurações desse
+provedor — o seu `base_url`, por exemplo — mas não o seu tipo. Um arquivo quebrado é
+reportado uma única vez, e o Veles segue com os provedores nativos; o `veles doctor`
+lista o que há de errado nele.
+
+Pontos de partida para APIs comuns — **não verificados pela equipe do Veles**, consulte
+a documentação do provedor para o endpoint atual:
+
+| id | `base_url` | `key_env` |
+|---|---|---|
+| `groq` | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` |
+| `deepseek` | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEY` |
+| `mistral` | `https://api.mistral.ai/v1` | `MISTRAL_API_KEY` |
+| `together` | `https://api.together.xyz/v1` | `TOGETHER_API_KEY` |
+| `xai` | `https://api.x.ai/v1` | `XAI_API_KEY` |
+| `fireworks` | `https://api.fireworks.ai/inference/v1` | `FIREWORKS_API_KEY` |
+| `deepinfra` | `https://api.deepinfra.com/v1/openai` | `DEEPINFRA_API_KEY` |
+| `nebius` | `https://api.studio.nebius.com/v1` | `NEBIUS_API_KEY` |
+| `cerebras` | `https://api.cerebras.ai/v1` | `CEREBRAS_API_KEY` |
+| `zai` | `https://api.z.ai/api/paas/v4` | `ZAI_API_KEY` |
+| `moonshot` | `https://api.moonshot.ai/v1` | `MOONSHOT_API_KEY` |
+| `lmstudio` (`local`) | `http://localhost:1234/v1` | — |
+| `vllm` (`local`) | `http://localhost:8000/v1` | — |
+
+## Delegue para uma assinatura do Claude / ChatGPT / Google
+
+Se você tiver a CLI `claude` autenticada, o Veles pode pilotá-la:
 
 ```bash
 veles run --provider claude-cli "..."
-veles run --provider gemini-cli "..."
+```
+
+Para uma assinatura do ChatGPT, instale a Codex CLI e faça login uma vez (`codex login`):
+
+```bash
+veles run --provider codex --model gpt-6-luna "..."
+veles models codex      # the models your account has
+```
+
+Para uma assinatura do Google, instale e faça login uma vez na Antigravity CLI (`agy`),
+depois nomeie o provedor dela — o módulo `antigravity-cli` se instala sozinho a partir
+dos seus registries conectados nessa execução:
+
+```bash
+veles run --provider antigravity-cli --model gemini-3.8-flash-high "..."
+veles models antigravity-cli
 ```
 
 Nenhuma chave de API necessária — a CLI cuida da autenticação.

@@ -36,8 +36,13 @@ def register(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--force", action="store_true", help="Install even if yanked.")
     p = rs.add_parser("upgrade", help="Upgrade one or all installed extensions.")
     p.add_argument("name", nargs="?")
+    _add_scope_flags(p)
     p = rs.add_parser("uninstall", help="Remove an installed extension.")
     p.add_argument("name")
+    _add_scope_flags(p)
+    p.add_argument(
+        "--force", action="store_true", help="Remove it even if installed extensions need it."
+    )
     rs.add_parser("verify", help="Check installed extensions for drift, yanks and updates.")
 
     p = rs.add_parser("validate", help="Run a registry's CI checks locally.")
@@ -71,3 +76,9 @@ def register(sub: argparse._SubParsersAction) -> None:
     p.add_argument("spec")
     p.add_argument("--into", required=True)
     p.add_argument("--group", default="vendor")
+
+
+def _add_scope_flags(p: argparse.ArgumentParser) -> None:
+    scope = p.add_mutually_exclusive_group()
+    scope.add_argument("--user", action="store_true", help="The user-level install.")
+    scope.add_argument("--project", action="store_true", help="This project's install.")

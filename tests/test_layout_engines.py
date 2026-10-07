@@ -3,7 +3,8 @@
 With the wiki engine off (layout pack without `[layout.engines] wiki`):
 no wiki tools in the agent registry, no INDEX/context-file block in the
 system prompt, recall surfaces insights/turns only, dream skips
-lint/reindex, self-doc lands in `.veles/memory/`.
+lint/reindex, self-doc lands in `.veles/memory/`. (With it on — the wiki
+module from the registry — those are tested with the module.)
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from veles.core.layout import clear_engine_cache, wiki_enabled
+from veles.core.layout import clear_engine_cache, engine_enabled
 from veles.core.project import Project, init_project
 
 
@@ -41,8 +42,8 @@ def nowiki_project(tmp_path: Path, user_home: Path) -> Project:
 
 
 @pytest.fixture()
-def wiki_project(tmp_path: Path) -> Project:
-    return init_project(tmp_path / "w", name="w")  # default llm-wiki
+def wiki_project(tmp_path: Path, wiki_engine: str) -> Project:
+    return init_project(tmp_path / "w", name="w", layout=wiki_engine)
 
 
 # ---- toolset gating ----
@@ -63,25 +64,6 @@ def test_wiki_tools_dropped_when_engine_off(nowiki_project: Project) -> None:
     assert "memory_save_insight" in names
 
 
-def test_wiki_tools_present_when_engine_on(wiki_project: Project) -> None:
-    from veles.runtime.registry import RUN_TOOLS, load_skills
-
-    reg = load_skills(wiki_project, RUN_TOOLS, provider=_StubProvider(), model="m")
-    names = set(reg.list_names())
-    assert "wiki_search" in names
-    assert "wiki_write_page" in names
-
-
-def test_engine_wiki_toolset_declared() -> None:
-    """The wiki engine declares its tools through its `tool` contribution."""
-    from veles.core.contributions import ToolSet, contributions
-
-    sets = [c.obj for c in contributions("tool") if c.name == "wiki"]
-    assert len(sets) == 1 and isinstance(sets[0], ToolSet) and sets[0].engine == "wiki"
-    assert "wiki_search" in sets[0].tools
-    assert "wiki_write_page" in sets[0].tools
-
-
 # ---- system prompt ----
 
 
@@ -92,38 +74,6 @@ def test_prompt_has_no_wiki_blocks_when_engine_off(nowiki_project: Project) -> N
     assert prompt is not None
     assert "Knowledge base index" not in prompt
     assert "Wiki habits" not in prompt
-
-
-def test_prompt_injects_context_file_when_engine_on(wiki_project: Project) -> None:
-    from veles.runtime.prompt import build_run_system_prompt
-
-    (wiki_project.root / "INDEX.md").write_text(
-        "# INDEX\n\n- [page](wiki/concepts/page.md)\n", encoding="utf-8"
-    )
-    prompt = build_run_system_prompt(wiki_project, prompt="anything")
-    assert prompt is not None
-    assert "Knowledge base index" in prompt
-    assert "wiki/concepts/page.md" in prompt
-
-
-def test_workspace_block_lists_root_and_wiki_tree_when_engine_on(wiki_project: Project) -> None:
-    """The model must SEE the real folder names (the fix for guessing at
-    `-- Daily --/` and wrongly concluding nothing exists)."""
-    from veles.runtime.prompt import build_run_system_prompt
-
-    # A source folder at the root + a page in the canonical wiki tree.
-    (wiki_project.root / "-- Daily --").mkdir()
-    (wiki_project.root / "-- Daily --" / "daily-log.md").write_text("x", encoding="utf-8")
-    (wiki_project.root / "wiki" / "concepts").mkdir(parents=True, exist_ok=True)
-    (wiki_project.root / "wiki" / "concepts" / "mde.md").write_text("x", encoding="utf-8")
-
-    prompt = build_run_system_prompt(wiki_project, prompt="migrate diaries")
-    assert prompt is not None
-    assert "<workspace>" in prompt
-    assert "-- Daily --/" in prompt  # real root folder surfaced
-    assert "Current wiki structure" in prompt and "mde.md" in prompt  # wiki tree
-    # `.veles` state dir is never leaked into the map.
-    assert ".veles/" not in prompt
 
 
 def test_workspace_block_absent_when_engine_off(nowiki_project: Project) -> None:
@@ -188,30 +138,21 @@ def test_self_doc_lands_in_memory_when_engine_off(nowiki_project: Project) -> No
     assert not (nowiki_project.root / "wiki").exists()
 
 
-def test_self_doc_lands_in_wiki_when_engine_on(wiki_project: Project) -> None:
-    from veles.core.self_doc import refresh_self_doc
-
-    rel = refresh_self_doc(wiki_project)
-    assert rel == "wiki/self-doc/overview.md"
-    assert (wiki_project.root / rel).is_file()
-
-
 # ---- sanity ----
 
 
-def test_engine_needs_a_contributing_module(wiki_project: Project, monkeypatch) -> None:
+def test_engine_needs_a_contributing_module(wiki_project: Project) -> None:
     """The pack asking for `wiki` is not enough: some module must contribute it."""
-    from veles.core import contributions as contrib
+    from veles.core.modules import ModuleRegistry, reset_module_registry, set_module_registry
 
-    assert wiki_enabled(wiki_project)
-    monkeypatch.setattr(contrib, "BUILTIN_MODULES", ())
-    contrib.reset_builtin_contributions()
+    assert engine_enabled(wiki_project, "wiki")
+    token = set_module_registry(ModuleRegistry())  # the stub engine module gone
     try:
-        assert not wiki_enabled(wiki_project)
+        assert not engine_enabled(wiki_project, "wiki")
     finally:
-        contrib.reset_builtin_contributions()
+        reset_module_registry(token)
 
 
 def test_engine_flags(nowiki_project: Project, wiki_project: Project) -> None:
-    assert not wiki_enabled(nowiki_project)
-    assert wiki_enabled(wiki_project)
+    assert not engine_enabled(nowiki_project, "wiki")
+    assert engine_enabled(wiki_project, "wiki")

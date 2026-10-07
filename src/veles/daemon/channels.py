@@ -21,7 +21,7 @@ def channel_session_map(state: DaemonState, platform: str):
     """Per-(session, platform) chat→session map so two daemon sessions running
     the same platform keep independent conversation contexts. The unnamed
     daemon keeps the `<platform>-sessions.json` key."""
-    from veles.channels.session_map import SessionMap, channel_session_path
+    from veles.core.chat_sessions import SessionMap, channel_session_path
 
     key = f"{state.session_name}-{platform}" if state.session_name else platform
     return SessionMap.load(channel_session_path(key))
@@ -30,7 +30,7 @@ def channel_session_map(state: DaemonState, platform: str):
 def chat_session_slot(state: DaemonState, target: str):
     """`(session map, key)` of the chat a delivery target names, keyed the way
     its gateway keys it (`chat_key_for_target`); None for a non-chat target."""
-    from veles.channels.session_map import chat_key_for_target
+    from veles.core.chat_sessions import chat_key_for_target
 
     found = chat_key_for_target(target)
     if found is None:
@@ -39,65 +39,42 @@ def chat_session_slot(state: DaemonState, target: str):
     return channel_session_map(state, platform), key
 
 
-def _float_setting(cfg: dict, key: str) -> float | None:
-    """Read an optional numeric channel setting. A typo warns and falls
-    back to the code default rather than crashing daemon startup."""
-    raw = cfg.get(key)
-    if raw is None:
-        return None
-    try:
-        return float(raw)
-    except (TypeError, ValueError):
-        logger.warning("[channels.telegram] %s=%r is not a number — using the default", key, raw)
-        return None
-
-
 def _build_channel_gateway(platform: str, channel_cfg: dict, *, backend, state: DaemonState):
-    """Resolve creds + build one gateway via the platform registry. Returns
-    None (and warns) when the platform is unregistered or its token is
-    missing — a bad channel is skipped, never fatal to daemon startup."""
-    from veles.channels.platform_registry import get_platform
-    from veles.core.secrets import get_provider_key
+    """Resolve the platform and its secrets, then build one gateway through
+    `spec.build(ctx)`. None (and a warning) when no loaded module provides the
+    platform or a required secret is missing — a bad channel is skipped, never
+    fatal to daemon startup."""
+    from veles.core.channel_setup import resolve_secrets
+    from veles.core.platforms import ChannelContext, get_platform
 
     try:
-        entry = get_platform(platform)
+        spec = get_platform(platform)
     except KeyError:
-        logger.warning("channel %r is not a registered platform — skipping", platform)
-        return None
-    token = get_provider_key(platform, project=state.project.name) or channel_cfg.get("bot_token")
-    if not token:
         logger.warning(
-            "[channels.%s] enabled but no bot token in keychain (veles:%s:%s) or config — skipping",
+            "channel %r: no installed module provides this platform — skipping", platform
+        )
+        return None
+    secrets, missing = resolve_secrets(spec, platform, channel_cfg, project=state.project)
+    if missing:
+        logger.warning(
+            "[channels.%s] enabled but missing %s (keychain veles:%s:%s or config) — "
+            "skipping; set it with `veles channel add --channel %s`",
             platform,
+            ", ".join(missing),
             platform,
             state.project.name,
+            platform,
         )
         return None
-    session_map = channel_session_map(state, platform)
-    if platform == "telegram":
-        raw_whitelist = channel_cfg.get("whitelist") or []
-        if isinstance(raw_whitelist, str):
-            raw_whitelist = [raw_whitelist]
-        whitelist = tuple(str(x) for x in raw_whitelist if str(x).strip())
-        # Stdin-fallback wizard wrote chat_id as a single allowed peer; honor it.
-        legacy_chat_id = channel_cfg.get("chat_id")
-        if legacy_chat_id and not whitelist:
-            whitelist = (str(legacy_chat_id),)
-        gateway = entry.factory(
-            bot_token=str(token),
-            daemon_client=backend,
-            session_map=session_map,
-            whitelist=whitelist,
-            attachment_dir=state.project.tmp_dir,
-            project_root=state.project.root,
-            debounce_seconds=_float_setting(channel_cfg, "debounce_seconds"),
-            forward_debounce_seconds=_float_setting(channel_cfg, "forward_debounce_seconds"),
-        )
-        logger.info("telegram channel started (whitelist: %d entries)", len(whitelist))
-        return gateway
-    # Generic platforms use the minimal factory contract shared with
-    # `veles channel run` (bot_token / daemon_client / session_map).
-    gateway = entry.factory(bot_token=str(token), daemon_client=backend, session_map=session_map)
+    ctx = ChannelContext(
+        name=platform,
+        config=channel_cfg,
+        secrets=secrets,
+        backend=backend,
+        session_map=channel_session_map(state, platform),
+        project=state.project,
+    )
+    gateway = spec.build(ctx)
     logger.info("channel %r started", platform)
     return gateway
 
@@ -105,7 +82,7 @@ def _build_channel_gateway(platform: str, channel_cfg: dict, *, backend, state: 
 def start_channel_runners(state: DaemonState) -> None:
     """Read declared channels from config and start in-process gateways.
 
-    Generic over platforms (`channels/platform_registry`) and over several
+    Generic over platforms (`platform` contributions) and over several
     channels per daemon. For a named session (`state.session_name`) the source
     is `[daemon.<name>.channels.<type>]`; otherwise `[channels.<type>]`. Each
     enabled channel is resolved via the registry and given its own
@@ -113,11 +90,10 @@ def start_channel_runners(state: DaemonState) -> None:
     or token is needed. Channels with missing creds (or an unregistered
     platform) are skipped with a warning rather than failing daemon startup.
     """
-    from veles.channels.platform_registry import ensure_builtins_registered
+    from veles.core.platforms import get_platform
     from veles.core.project_config import list_channel_configs, load_project_config
     from veles.daemon.in_process_backend import InProcessRunBackend
 
-    ensure_builtins_registered()
     cfg = load_project_config(state.project)
     declared = list_channel_configs(cfg, daemon_session=state.session_name)
     if not declared:
@@ -129,13 +105,11 @@ def start_channel_runners(state: DaemonState) -> None:
             continue
         state.channel_runners.append(gateway)
         state.active_channels.append(platform)
-        # Expose this channel as an outbound delivery target for the scheduler:
-        # a gateway implementing `deliver(chat_id, text, thread_id)` becomes
-        # reachable via `deliver_to = "<platform>:<chat>"`.
+        state.channel_caps[platform] = get_platform(platform).caps
+        # Every gateway delivers (`ChannelGateway.deliver`): the channel becomes
+        # reachable as `deliver_to = "<platform>:<chat>"`.
         if state.delivery_router is not None:
-            deliver_fn = getattr(gateway, "deliver", None)
-            if callable(deliver_fn):
-                state.delivery_router.register_deliverer(platform, deliver_fn)
+            state.delivery_router.register_deliverer(platform, gateway.deliver)
         task = asyncio.create_task(_run_channel_gateway(gateway))
         state.channel_tasks.append(task)
 

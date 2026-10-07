@@ -58,6 +58,7 @@ class GeminiProvider:
         *,
         api_key: str | None = None,
         client: genai.Client | None = None,
+        base_url: str | None = None,
     ) -> None:
         if client is not None:
             self._client = client
@@ -65,7 +66,9 @@ class GeminiProvider:
         from veles.core.provider_factory import require_api_key
 
         key = require_api_key("gemini", explicit=api_key)
-        self._client = genai.Client(api_key=key)
+        # A providers.toml `base_url` override goes through the SDK's http options.
+        options = {"base_url": base_url} if base_url else None
+        self._client = genai.Client(api_key=key, http_options=options)
 
     def list_models(self) -> list[str]:
         """Return Gemini model ids via `genai.Client.models.list()`.

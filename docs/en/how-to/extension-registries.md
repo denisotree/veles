@@ -60,6 +60,24 @@ packs in `~/.veles/layouts/<name>/`, and an `mcp` recipe as a
 module is how you install a memory-provider module (Honcho, Mem0, Supermemory,
 …) — see [manage skills, tools & modules](manage-skills-and-tools.md#modules).
 
+An extension can need another one (`requires_extensions` in its
+`extension.toml`). `veles registry install llm-wiki` installs the `wiki` module
+it needs too: one confirmation lists every package, dependencies install first,
+and if any of them fails nothing from that call is left behind. A layout's
+dependencies install for the user, like the layout itself. `veles registry
+uninstall wiki` refuses while an installed extension needs it (`--force`
+overrides); `verify` and `doctor` report a missing dependency. A dependency
+can be a module, a layout or a skill — a module or a layout can bring the
+skills its workflow uses — but not an `mcp` recipe.
+
+When the same name is installed both for the user and in the project,
+`uninstall` and `upgrade` ask which one: pass `--user` or `--project`.
+
+A project whose layout or content engine isn't installed (for instance an
+`llm-wiki` project after upgrading to 1.2.3) offers the install when you start
+`veles` or `veles run` at a terminal; elsewhere Veles prints the install command
+once and carries on without it.
+
 The agent has the read-only half of this on its own: it can call
 `registry_search` to see what's available and propose `registry_install`, but
 the same confirmation gate applies — nothing installs without you approving
@@ -115,8 +133,14 @@ By default it's static: it checks the schema, slugs, semver, uniqueness of
 hash matches, that the payload matches its `kind` (a module's manifest and
 entry point parse, a skill's `SKILL.md` frontmatter is valid, a layout's
 `layout.toml` loads, an `mcp` recipe matches the `[mcp.servers]` schema), that
-`version` grew if the payload or source changed, and that `public = true`
-registries only accept permissive licenses. `--run-code` additionally imports
+`version` grew if the payload or source changed, that `public = true`
+registries only accept permissive licenses, that every `requires_extensions`
+ref names an existing module, layout or skill — in the same registry or in the
+connected registry it names (a registry not connected where `validate` runs is
+left to the reviewer, with a note) — and the refs form no cycle, and that a
+module imports Veles **only through `veles.sdk`** (its tests are exempt — they
+run against a pinned Veles; see [extend Veles with modules](extend-veles-with-modules.md)).
+`--run-code` additionally imports
 the module and runs its `tests/` — that flag is meant for CI only, since it
 executes the code under review; a local `validate` run by a reviewer stays
 static. `--install-requires` (implies `--run-code`) first installs each module's
@@ -125,8 +149,10 @@ so tests that drive a real SDK run instead of skipping; the generated CI passes
 it. Test-only dependencies (a mocking library such as `respx`) go into the CI
 command with `uvx --with`. `--report FILE` writes a non-blocking Markdown report for the
 reviewer: a static scan for `subprocess`/`os.system`, `eval`/`exec`, network
-access, writes outside the project, `os.environ` reads, dynamic imports, and
-the extension's declared `requires`.
+access, writes outside the project, `os.environ` reads, dynamic imports,
+native binaries (`.so`/`.pyd`/`.dylib`/`.dll` — code nobody can read), and the
+extension's declared `requires`. `search` and `install` warn when a registry
+clone hasn't been fetched for a week or more.
 
 From there: fork the registry, open a PR (for a `git`-sourced extension, only
 `extension.toml` changes), and let the registry's CI post the validate report

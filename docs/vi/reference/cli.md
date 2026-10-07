@@ -12,6 +12,9 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 - `--no-wizard` — bỏ qua trình thiết lập lần đầu ngay cả khi thiếu
   `~/.veles/config.toml` (cũng phụ thuộc vào TTY và vào `VELES_NO_WIZARD=1`).
+  Trình thiết lập chỉ đứng trước các lệnh khởi chạy agent (`veles` không kèm đối số,
+  `run`, `daemon`, `channel`, …); các lệnh quản trị như `module`, `tool` và `doctor`
+  không bao giờ mở nó.
 - Khi không có đối số, `veles` khởi chạy [TUI](tui.md) tương tác.
 
 Hầu hết các lệnh agent đều chấp nhận [các cờ vòng lặp agent dùng chung](#shared-agent-loop-flags)
@@ -28,7 +31,7 @@ Tạo một dự án Veles mới trong thư mục hiện tại (một thư mục
 | Cờ | Mặc định | Mục đích |
 |---|---|---|
 | `name` (vị trí) | tên cơ sở của cwd | Tên dự án |
-| `--layout <name>` | `llm-wiki` | Gói layout cho bộ khung nội dung (`llm-wiki`, `notes`, `bare`, hoặc một gói tùy chỉnh từ `~/.veles/layouts/`) |
+| `--layout <name>` | `bare` (hỏi tại terminal) | Gói layout cho bộ khung nội dung (`bare`, một gói cài từ registry như `llm-wiki` hoặc `notes`, hoặc một gói tùy chỉnh từ `~/.veles/layouts/`). Gói chưa cài sẽ được đề nghị cài; từ chối thì không tạo gì |
 | `--force` | tắt | Tạo lại `.veles/` ngay cả khi nó đã tồn tại |
 
 ### `veles schema {validate,edit,fix}`
@@ -39,7 +42,8 @@ Kiểm tra hoặc chỉnh sửa `AGENTS.md` (file ngữ cảnh dự án).
 - `fix` — bổ sung tương tác các mục còn thiếu qua một trình hướng dẫn LLM.
 
 ### `veles self-doc [refresh|show]`
-Tạo và hiển thị tài liệu tự sinh của dự án (`wiki/self-doc/overview.md`).
+Tạo và hiển thị tài liệu tự sinh của dự án — trong page store của layout nếu có
+(wiki: `wiki/self-doc/overview.md`), nếu không thì `.veles/memory/self-doc.md`.
 `veles self-doc` không kèm gì sẽ hiển thị trang hiện tại; `refresh` tạo lại nó.
 
 ### `veles doctor`
@@ -108,11 +112,17 @@ agent dùng chung, `--resume`, các cờ chèn/nén `--no-*` ở trên, và:
 | `--theme <name>` | từ config hoặc `everforest` | Chủ đề màu (everforest, dracula, gruvbox, tokyo-night, catppuccin) |
 
 ### `veles add <source>`
+*(từ module `wiki` — `veles registry install llm-wiki` hoặc `… install wiki`)*
 Đọc một nguồn (file cục bộ hoặc URL `http(s)://`) và tổng hợp nó thành một
-trang wiki. Chấp nhận các cờ vòng lặp agent dùng chung.
+trang wiki. Không có module thì `veles add` là một lệnh không xác định và thông
+báo lỗi nêu cách cài. Chấp nhận các cờ vòng lặp agent dùng chung.
+
+Module có thể thêm verb riêng theo cách tương tự; chúng xuất hiện trong `veles --help`
+bên trong dự án có module đó.
 
 ### `veles curate`
-Chạy một lượt curator: nén các session chưa xử lý thành các trang `wiki/sessions/`.
+Chạy một lượt curator: nén các session chưa xử lý thành các insight bộ nhớ (và thành
+các trang `wiki/sessions/` khi engine wiki được bật).
 
 | Cờ | Mặc định | Mục đích |
 |---|---|---|
@@ -167,22 +177,32 @@ thăng cấp → lint wiki, tùy chọn củng cố bằng LLM).
 | `list` | Liệt kê các tool đã được lập danh mục trong `memory.db` của dự án này |
 | `show <name>` | In ra manifest + telemetry của một tool |
 | `promote <name> [-y]` | Chuyển một tool dự án sang `~/.veles/tools/` (dùng chung nhiều dự án) |
-| `approve [<name>] [--all] [-y]` | Xem lại + phê duyệt một file tool tự soạn để loader sẽ chạy nó |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | Xem lại + phê duyệt một file tool tự soạn để loader sẽ chạy nó |
 
 Các tool tự soạn (`.veles/tools/*.py`) chạy mã ở cấp module khi loader import
 chúng, nên một file mới hoặc vừa chỉnh sửa sẽ **không được nạp cho đến khi bạn
 phê duyệt nó** — `veles tool approve` hiển thị mã và ghi lại hash của nó. Chạy
-`veles tool approve` không kèm gì sẽ liệt kê những gì đang chờ. Đây là lý do một
-tool do agent viết cần một bước xem lại trước khi có thể gọi được.
+`veles tool approve` không kèm gì sẽ liệt kê những gì đang chờ, cùng sha256 của từng
+file. Đây là lý do một tool do agent viết cần một bước xem lại trước khi có thể gọi được.
 
-### `veles module {list,show,add,remove}`
+Khi không có terminal (một script triển khai), hãy phê duyệt một file theo hash bạn
+đã xem lại: `veles tool approve <name> --sha256 <hash>` — lệnh thất bại nếu file đã
+thay đổi kể từ đó. `-y` chỉ bỏ qua câu hỏi xác nhận khi có terminal.
+
+### `veles module {list,show,add,remove,approve}`
 
 | Lệnh con | Mục đích |
 |---|---|
 | `list` | Liệt kê các module đã cài đặt |
-| `show <name>` | In ra manifest của một module |
+| `show <name>` | In ra manifest của một module cùng sha256 của các file |
 | `add <source> [--name N] [-y]` | Cài đặt một module từ URL git hoặc đường dẫn cục bộ |
 | `remove <name> [-y]` | Xóa một module đã cài đặt |
+| `approve <name> [--user] [--sha256 H]` | Phê duyệt một module sau khi xem lại |
+| `approve --all [--user]` | Mọi module trong phạm vi đó đang chờ phê duyệt, mỗi module một lần xác nhận |
+
+Việc phê duyệt yêu cầu bạn gõ `yes` trong terminal; nếu không có terminal, hãy truyền
+hash của các file bạn đã xem lại (`show` sẽ in ra) qua `--sha256` — lệnh thất bại nếu
+các file đã thay đổi kể từ đó. `veles doctor` báo cáo mọi module trên đĩa không nạp được.
 
 ### `veles registry search [query] [--kind K]`
 Tìm kiếm trong các registry đã kết nối (module, skill, layout pack, công
@@ -248,11 +268,13 @@ vụ (`default`, `curator`, `compressor`, `insights`, `skills`, `advisor`,
 
 ### `veles models <provider>`
 Liệt kê các model của một nhà cung cấp. Các nhà cung cấp đám mây
-(openrouter/openai/gemini) được cache 24h; các nhà cung cấp cục bộ luôn trực tiếp.
+(openrouter/openai/gemini) được cache 24h; các nhà cung cấp cục bộ, `codex` và `antigravity-cli`
+luôn trực tiếp. Một nhà cung cấp không xác định là lỗi một dòng liệt kê những gì hiện có
+(exit `2`).
 
 | Cờ | Mặc định | Mục đích |
 |---|---|---|
-| `provider` (vị trí) | — | Một trong [các tên nhà cung cấp](#provider-names) |
+| `provider` (vị trí) | — | Một id nhà cung cấp trong [danh mục](#provider-names) |
 | `--refresh` | tắt | Bỏ qua cache trên đĩa (chỉ đám mây) |
 | `--json` | tắt | Xuất `{provider, source, models}` dạng JSON |
 
@@ -340,13 +362,14 @@ chọn daemon** (dự án → daemon → channels). Xem [chạy dưới dạng d
 `--provider` mặc định lấy từ config dự án và cố định trong suốt vòng đời của daemon.
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-Các gateway chat bên ngoài (Telegram, …) giao tiếp với một daemon. Xem
+Các gateway chat bên ngoài (Telegram, …) giao tiếp với một daemon. Một nền tảng là một module
+từ extension registry; `run` và `add` sẽ cài nó khi thiếu. Xem
 [kết nối Telegram](../how-to/connect-telegram.md).
 
 | Lệnh con | Mục đích |
 |---|---|
-| `list` | Liệt kê các nền tảng channel đã đăng ký + số lượng session |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | Khởi động một gateway ở foreground |
+| `list` | Liệt kê các nền tảng channel đã cài + số lượng session, và các channel đã khai báo nhưng thiếu module |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | Khởi động một gateway ở foreground; `--secret` là secret chính của nền tảng (nếu không thì lấy từ keychain hoặc biến môi trường của nó) |
 | `list-sessions [--channel C]` | Hiển thị các ánh xạ `chat_id → session_id` |
 | `reset-session <chat_id> [--channel C]` | Quên một ánh xạ (tin nhắn tiếp theo bắt đầu mới) |
 | `add [--channel C] [--session S]` | Gắn một channel vào một daemon (wizard; thông tin xác thực → keychain) |
@@ -384,8 +407,13 @@ Kiểm tra các máy chủ MCP bên ngoài được cấu hình dưới `[mcp.se
 
 ## Tên nhà cung cấp
 
-`openrouter` (mặc định) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` và `veles models` nhận bất kỳ id nào trong danh mục nhà cung cấp — các
+nhà cung cấp tích hợp sẵn, `~/.veles/providers.toml` của bạn, và các nhà cung cấp từ
+module đã cài:
 
-Các nhà cung cấp cục bộ (`ollama`, `llamacpp`, `openai-compat`) không cần API
-key. Xem [tham khảo nhà cung cấp](providers.md) và [cấu hình nhà cung cấp](../how-to/configure-providers.md).
+`openrouter` (mặc định) · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
+`ollama` · `llamacpp` · `openai-compat` (tích hợp sẵn)
+
+Một nhà cung cấp chỉ do một module registry cung cấp (`antigravity-cli`) tự cài đặt khi
+bạn gọi tên nó. Các nhà cung cấp cục bộ (`ollama`, `llamacpp`, `openai-compat`) không
+cần API key. Xem [tham khảo nhà cung cấp](providers.md) và [cấu hình nhà cung cấp](../how-to/configure-providers.md).

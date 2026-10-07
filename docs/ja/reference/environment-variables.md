@@ -6,7 +6,7 @@ Veles は実行時にこれらを読み取ります。API キーとトークン�
 
 ## プロバイダーの API キー
 
-API キーの参照カスケード: OS キーチェーン（プロジェクトスコープ）→ OS キーチェーン（デフォルトスコープ）→ 環境変数。
+API キーの参照カスケード: OS キーチェーン（プロジェクトスコープ）→ OS キーチェーン（デフォルトスコープ）→ 環境変数。プロバイダーがどの変数を読むかは、カタログのエントリーの `key_env` で決まります。`~/.veles/providers.toml` の独自エントリーは自分の変数を指定し、`veles secret set <VARIABLE>` はそのプロバイダーが読む場所にキーを保存します。
 
 | 変数 | プロバイダー | 備考 |
 |---|---|---|
@@ -15,8 +15,9 @@ API キーの参照カスケード: OS キーチェーン（プロジェクト�
 | `OPENAI_API_KEY` | openai | OpenAI API への直接接続 |
 | `GEMINI_API_KEY` | gemini | Google Gemini の主キー |
 | `GOOGLE_API_KEY` | gemini | Google Gemini のフォールバック |
+| `OPENAI_COMPAT_API_KEY` | openai-compat | 任意 — キーを求めるゲートウェイ向け |
 
-`claude-cli` と `gemini-cli` は各自のバイナリを通じて認証します。環境変数は不要です。
+`claude-cli`、`codex`、`antigravity-cli` は各自のバイナリを通じて認証します。環境変数は不要です。
 
 ## ローカルプロバイダー
 
@@ -26,7 +27,7 @@ API キーの参照カスケード: OS キーチェーン（プロジェクト�
 | `OLLAMA_HOST` | `OLLAMA_BASE_URL` に従う | 埋め込み用の Ollama ホスト |
 | `LLAMACPP_BASE_URL` | `http://localhost:8080/v1` | llama.cpp サーバーのエンドポイント |
 | `OPENAI_COMPAT_BASE_URL` | — (required) | `openai-compat` プロバイダーのエンドポイント |
-| `VELES_LOCAL_TOOLS` | off | ローカルプロバイダーでツール呼び出しを有効にする（`1`/`true`） |
+| `VELES_LOCAL_TOOLS` | 検出 | ローカルプロバイダーでのツール呼び出し: `1` で強制的にオン、`0` でオフ。未設定ならサーバーから検出 |
 | `VELES_OLLAMA_EMBED_MODEL` | プロバイダーのデフォルト | Ollama の埋め込みモデルを上書きする |
 | `VELES_LOCAL_JSON_MODE` | on | JSON オブジェクトを返す必要があるローカル呼び出しに `response_format: json_object` を送る（`0` で無効化） |
 

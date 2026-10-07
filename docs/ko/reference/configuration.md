@@ -11,7 +11,7 @@ Veles는 두 개의 TOML 파일과 일련의 상태 디렉터리로 설정됩니
 | `~/.veles/` | 사용자 전역 | `config.toml`, 신뢰 권한, 프로젝트 간 스킬/도구, 모델 캐시, 로케일, 레지스트리 |
 | `<project>/.veles/` | 프로젝트 로컬 | `project.toml`, `config.toml`, `memory.db`, 프로젝트 스킬/도구, 계획, 런타임 임시 파일 |
 | `<project>/AGENTS.md` | 프로젝트 | 에이전트에 주입되는 컨텍스트 파일(`CLAUDE.md` / `GEMINI.md`로 심볼릭 링크됨) |
-| `<project>/wiki/`, `sources/` | 프로젝트 | 사용자 콘텐츠(기본 LLM-Wiki 레이아웃) |
+| `<project>/wiki/`, `sources/`, … | 프로젝트 | 레이아웃 팩이 배치하는 사용자 콘텐츠(예: LLM-Wiki) |
 
 `VELES_USER_HOME`은 `~`를 다른 위치로 바꿉니다(사용자 상태가 `<override>/.veles/`에 저장됨). 전체 트리는 [프로젝트 레이아웃](project-layout.md)을 참고하세요.
 
@@ -40,6 +40,9 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 transport = "stdio"
 command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
+
+[sandbox]
+enabled = true                   # OS 샌드박스 안의 run_shell; false면 끔
 ```
 
 | 키 | 타입 | 용도 |
@@ -49,6 +52,7 @@ args = ["-m", "my_mcp_server"]
 | `[user] default_model` | string | 모델이 지정되지 않았을 때 사용 |
 | `[user] tui_theme` | string | 기본 TUI 색상 테마 |
 | `[permissions] <tool>` | policy | 도구별 권한 정책([신뢰 & 샌드박스](../explanation/trust-and-sandbox.md) 참고) |
+| `[sandbox] enabled` | bool | OS 샌드박스 안의 `run_shell`(기본값 `true`); 여기서만 읽습니다 — 프로젝트의 `[sandbox]`는 무시됩니다([보안](../how-to/security-and-permissions.md) 참고) |
 
 ---
 
@@ -107,7 +111,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[daemon]` | 이름 없는/"기본" 데몬의 바인드 + 자동 시작 |
 | `[daemon.<name>]` | 이름 있는 데몬 세션(자체 model/provider/host/port/mode) |
 | `[goal]` | 새 목표의 예산 — `max_steps`(30), `max_cost_usd`(5.0), `max_wall_time_s`(3600). `veles goal start` 플래그가 우선 |
-| `[channels.<type>]` | 이름 없는 데몬이 서비스하는 채널(예: `telegram`) |
+| `[channels.<type>]` | 이름 없는 데몬이 서비스하는 채널(예: `telegram`). 키는 플랫폼 고유의 것(`enabled`와 해당 모듈이 선언한 키)이며, 선언하면 다음 `veles daemon start` 때 모듈이 설치됩니다 |
 | `[daemon.<name>.channels.<type>]` | 이름 있는 데몬 세션에 바인딩된 채널 |
 | `[mcp.servers.<name>]` | 외부 MCP 서버(도구 소스) |
 

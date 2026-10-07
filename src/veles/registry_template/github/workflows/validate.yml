@@ -12,10 +12,13 @@ jobs:
           fetch-depth: 0
       - uses: astral-sh/setup-uv@v6
       - name: Validate changed extensions
+        # The base ref goes through env, never straight into the shell line.
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: >
           uvx --python 3.13 --from 'veles-ai==@@VELES_VERSION@@' --with pytest
-          veles registry validate . --run-code --install-requires
-          --base origin/${{ github.base_ref }} --report review.md
+          --with pytest-asyncio veles registry validate . --run-code --install-requires
+          --base "origin/$BASE_REF" --report review.md
       - name: Reviewer report
         if: always()
         run: test -f review.md && cat review.md >> "$GITHUB_STEP_SUMMARY" || true

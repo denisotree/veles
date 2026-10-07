@@ -1,6 +1,6 @@
 """Shared agent-construction spine for agent-driven CLI verbs (M152).
 
-`cmd_run` and `_run_ingest_cli` (and any future agent verb) repeat the
+`cmd_run` and `CliHost.run_agent` (module verbs, e.g. `veles add`) repeat the
 same construction sequence: ensure the provider API key → make the
 provider → resolve the system prompt → optionally build a history
 compressor → load project skills into a tool registry → construct the
@@ -68,9 +68,7 @@ def build_command_agent(  # noqa: PLR0913
         return None
 
     if tool_aware:
-        provider = run_registry.make_tool_aware_provider(
-            args.provider, project, skill_model=args.model
-        )
+        provider = run_registry.make_tool_aware_provider(args.provider, project, model=args.model)
     else:
         provider = provider_factory.make_provider(args.provider, args.model)
 

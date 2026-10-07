@@ -38,7 +38,6 @@ _COMMANDS: dict[str | None, tuple[str, str, _ProjectNeed]] = {
     "trust": ("veles.cli.commands.trust", "cmd_trust", "optional"),
     "run": ("veles.cli.commands.run", "cmd_run", "required"),
     "research": ("veles.cli.commands.research", "cmd_research", "required"),
-    "add": ("veles.cli.commands.add", "cmd_add", "required"),
     "organize": ("veles.cli.commands.organize", "cmd_organize", "required"),
     "layout": ("veles.cli.commands.layout", "cmd_layout", "required"),
     "curate": ("veles.cli.commands.curate", "cmd_curate", "required"),
@@ -58,19 +57,27 @@ _COMMANDS: dict[str | None, tuple[str, str, _ProjectNeed]] = {
 
 
 def main(argv: list[str] | None = None) -> int:
+    from veles.cli import module_commands
     from veles.cli._parsers import build_parser
     from veles.cli._project import _resolve_active_project
     from veles.cli.wizard import maybe_run_first_run_wizard
     from veles.core.i18n import set_active_locale
     from veles.core.user_config import load_user_config
 
-    args = build_parser().parse_args(list(sys.argv[1:]) if argv is None else list(argv))
+    argv = list(sys.argv[1:]) if argv is None else list(argv)
+    parser = build_parser()
+    builtin = {verb for verb in _COMMANDS if verb is not None}
+    module_verbs = module_commands.prepare(parser, argv, builtin)
+    args = parser.parse_args(argv)
     # Resolve the i18n locale before any user-facing string fires.
     # `set_active_locale` honours `VELES_LOCALE` over the config.
     cfg = load_user_config()
     set_active_locale(cfg.language if cfg and cfg.language else "en")
     maybe_run_first_run_wizard(args)
 
+    if module_verbs is not None and args.command in module_verbs.commands:
+        command = module_commands.runner(module_verbs.commands[args.command])
+        return _run_in_project(args, command, modules=module_verbs.registry)
     entry = _COMMANDS.get(args.command)
     if entry is None:
         return 2
@@ -83,8 +90,9 @@ def main(argv: list[str] | None = None) -> int:
     return _run_in_project(args, command)
 
 
-def _run_in_project(args, command) -> int:
-    """Resolve (or bootstrap) the project, then run `command` inside its context."""
+def _run_in_project(args, command, modules=None) -> int:
+    """Resolve (or bootstrap) the project, then run `command` inside its context.
+    `modules`: the project's already-loaded module registry, if the caller has it."""
     from veles.cli._project import _load_project_modules, _resolve_active_project
     from veles.core.context import reset_active_project, set_active_project
     from veles.core.modules import reset_module_registry, set_module_registry
@@ -108,7 +116,20 @@ def _run_in_project(args, command) -> int:
         return 2
 
     token = set_active_project(project)
-    mod_token = set_module_registry(_load_project_modules(project))
+    loaded = modules or _load_project_modules(project)
+    mod_token = set_module_registry(loaded)
+    from veles.core.registry.ensure import ensure_project_extensions
+
+    # A missing layout or engine is offered for install when a session starts at a
+    # terminal (REPL, `veles run`); every other verb just warns once and goes on.
+    interactive = args.command in (None, "run") and sys.stdin.isatty()
+    if ensure_project_extensions(project, interactive=interactive):
+        # Only what was just installed loads — the live registry is already set.
+        _load_project_modules(project, loaded)
+    from veles.core.registry.ensure import ensure_routed_providers
+
+    # A provider the config routes to and a registry offers installs itself.
+    ensure_routed_providers(project)
     try:
         return command(args, project)
     finally:

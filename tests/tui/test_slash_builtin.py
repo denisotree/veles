@@ -3,15 +3,14 @@
 no Console / prompt_toolkit setup is needed.
 
 Most tests run on the `slash_ctx` fixture: a fresh project + session
-store under `./tmp/pytest/...`. Commands that need pre-populated wiki
-pages or recorded sessions seed them inline.
+store under `./tmp/pytest/...`. Commands that need recorded sessions seed
+them inline. `/wiki` and `/save` into the wiki are tested with the wiki module.
 """
 
 from __future__ import annotations
 
 from veles.cli.repl.slash import build_default_registry
 from veles.core.provider import Message
-from veles.modules.wiki.wiki import Wiki
 
 
 def _reg():
@@ -31,7 +30,6 @@ def test_help_lists_every_top_level_command(slash_ctx):
         "/session",
         "/save",
         "/history",
-        "/wiki",
         "/model",
         "/theme",
         "/mode",
@@ -118,16 +116,6 @@ def test_save_without_response_errors(slash_ctx):
     assert res is not None and res.is_error
 
 
-def test_save_writes_to_queries_and_logs(slash_ctx):
-    slash_ctx.state.last_assistant_text = "# Hello\n\nNote body."
-    res = _reg().dispatch("/save hello-note", slash_ctx)
-    assert res is not None and not res.is_error
-    assert "wiki/queries/hello-note.md" in res.text
-    wiki = Wiki(slash_ctx.project.wiki_root)
-    body = wiki.read_page("wiki/queries/hello-note.md")
-    assert "Note body." in body
-
-
 def test_save_without_slug_errors(slash_ctx):
     slash_ctx.state.last_assistant_text = "x"
     res = _reg().dispatch("/save", slash_ctx)
@@ -146,47 +134,6 @@ def test_history_lists_sessions(slash_ctx):
     res = _reg().dispatch("/history", slash_ctx)
     assert res is not None and not res.is_error
     assert sid in res.text
-
-
-# ---------------- wiki (M83) ----------------
-
-
-def test_wiki_bare_returns_usage(slash_ctx):
-    res = _reg().dispatch("/wiki", slash_ctx)
-    assert res is not None and res.is_error
-    assert "add" in res.text and "query" in res.text
-
-
-def test_wiki_add_queues_ingest_prompt(slash_ctx):
-    res = _reg().dispatch("/wiki add https://example.com/post", slash_ctx)
-    assert res is not None and not res.is_error
-    assert res.submit_prompt is not None
-    assert "https://example.com/post" in res.submit_prompt
-    assert "Ingest" in res.submit_prompt
-
-
-def test_wiki_add_without_source_errors(slash_ctx):
-    res = _reg().dispatch("/wiki add", slash_ctx)
-    assert res is not None and res.is_error
-
-
-def test_wiki_query_queues_search_prompt(slash_ctx):
-    res = _reg().dispatch("/wiki query what do we know about quokkas", slash_ctx)
-    assert res is not None and not res.is_error
-    assert res.submit_prompt is not None
-    assert "quokkas" in res.submit_prompt
-    assert "wiki_search" in res.submit_prompt
-
-
-def test_wiki_query_without_question_errors(slash_ctx):
-    res = _reg().dispatch("/wiki query", slash_ctx)
-    assert res is not None and res.is_error
-
-
-def test_wiki_unknown_subcommand_errors(slash_ctx):
-    res = _reg().dispatch("/wiki dance", slash_ctx)
-    assert res is not None and res.is_error
-    assert "add/query" in res.text or "add" in res.text
 
 
 # ---------------- /model ----------------

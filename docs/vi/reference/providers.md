@@ -2,9 +2,29 @@
 
 > 🌐 **Ngôn ngữ:** [English](../../en/reference/providers.md) · [简体中文](../../zh-CN/reference/providers.md) · [繁體中文](../../zh-TW/reference/providers.md) · [日本語](../../ja/reference/providers.md) · [한국어](../../ko/reference/providers.md) · [Español](../../es/reference/providers.md) · [Français](../../fr/reference/providers.md) · [Italiano](../../it/reference/providers.md) · [Português (BR)](../../pt-BR/reference/providers.md) · [Português (PT)](../../pt-PT/reference/providers.md) · [Русский](../../ru/reference/providers.md) · [العربية](../../ar/reference/providers.md) · [हिन्दी](../../hi/reference/providers.md) · [বাংলা](../../bn/reference/providers.md) · **Tiếng Việt**
 
-Veles không phụ thuộc vào nhà cung cấp nào. Truyền `--provider <name>` cho bất kỳ
+Veles không phụ thuộc vào nhà cung cấp nào. Truyền `--provider <id>` cho bất kỳ
 lệnh agent nào, hoặc đặt một giá trị mặc định trong config. ID model dùng quy ước
 đặt tên của chính nhà cung cấp.
+
+## Danh mục nhà cung cấp
+
+Mọi nhà cung cấp mà Veles biết đều là một mục trong một danh mục duy nhất, được xây
+dựng từ ba nguồn:
+
+1. **Tích hợp sẵn** — bảng bên dưới, đi kèm Veles.
+2. **Của bạn** — `~/.veles/providers.toml`: thêm một mục để dùng một API tương thích
+   OpenAI được lưu trữ sẵn hoặc một máy chủ do bạn chạy (xem
+   [thêm nhà cung cấp của riêng bạn](../how-to/configure-providers.md#thêm-nhà-cung-cấp-của-riêng-bạn)).
+   Một mục có id tích hợp sẵn sẽ ghi đè cài đặt của nhà cung cấp đó (ví dụ `base_url`).
+3. **Module** — một module registry đóng góp một nhà cung cấp (`antigravity-cli`). Gọi
+   tên nó trong `[engine] provider`, một route hoặc `--provider` sẽ cài nó từ các
+   registry đã kết nối của bạn ở lần chạy kế tiếp, giống như một channel đã khai báo.
+
+`--provider`, `veles models`, các trình thiết lập, định tuyến và `veles doctor` đều đọc
+danh mục, nên một nhà cung cấp từ bất kỳ nguồn nào cũng dùng được ở mọi nơi như một
+nhà cung cấp tích hợp sẵn. Một id không xác định là lỗi một dòng liệt kê những gì hiện
+có; `veles doctor` cũng kiểm tra `~/.veles/providers.toml` và mọi nhà cung cấp mà các
+route của bạn nêu tên.
 
 | Nhà cung cấp | Loại | API key | Ghi chú |
 |---|---|---|---|
@@ -12,11 +32,14 @@ lệnh agent nào, hoặc đặt một giá trị mặc định trong config. ID
 | `anthropic` | Đám mây trực tiếp | `ANTHROPIC_API_KEY` | Claude Messages API, prompt caching |
 | `openai` | Đám mây trực tiếp | `OPENAI_API_KEY` | GPT chat completions |
 | `gemini` | Đám mây trực tiếp | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
-| `claude-cli` | Tiến trình con | — (session CLI) | Ủy thác cho CLI `claude` cục bộ ở chế độ JSON-stream |
-| `gemini-cli` | Tiến trình con | — (session CLI) | Ủy thác cho CLI `gemini` cục bộ |
+| `claude-cli` | CLI ủy thác | — (session CLI) | Ủy thác cho CLI `claude` cục bộ ở chế độ JSON-stream |
+| `codex` | CLI ủy thác | — (session CLI) | Ủy thác cho CLI `codex` cục bộ (gói đăng ký ChatGPT) |
 | `ollama` | Cục bộ | không | `OLLAMA_BASE_URL` (mặc định `http://localhost:11434/v1`) |
 | `llamacpp` | Cục bộ | không | `LLAMACPP_BASE_URL` (mặc định `http://localhost:8080/v1`) |
-| `openai-compat` | Cục bộ/tùy chỉnh | không | `OPENAI_COMPAT_BASE_URL` (bắt buộc, không có mặc định) |
+| `openai-compat` | Cục bộ/tùy chỉnh | tùy chọn `OPENAI_COMPAT_API_KEY` | `OPENAI_COMPAT_BASE_URL` (bắt buộc, không có mặc định) |
+
+`gemini-cli` đã bị gỡ bỏ ở 1.2.6 — Google không còn cung cấp Gemini CLI cho tài khoản
+cá nhân. Hãy dùng `gemini` với một API key, hoặc module `antigravity-cli`.
 
 Nhà cung cấp mặc định: `openrouter`. **Không có model mặc định cứng** — hãy đặt
 một model qua trình thiết lập, qua `[engine] model`, hoặc qua `--model` (nếu
@@ -29,24 +52,38 @@ không agent sẽ báo "no model configured"). Các route theo tác vụ kế th
 `ollama`, `llamacpp`, và `openai-compat` không cần API key. Liệt kê các model đã
 cài bằng `veles models <provider>` (luôn trực tiếp với các nhà cung cấp cục bộ).
 
-**Gọi tool mặc định bị tắt** trên các nhà cung cấp cục bộ — nhiều model cục bộ
-phát ra các lời gọi tool sai định dạng. Bật nó khi bạn đã chọn một model hỗ trợ
-tool:
+**Gọi tool được phát hiện** từ những gì backend công bố: ollama báo khả năng của từng
+model, còn máy chủ llama.cpp báo khả năng của chat template. `VELES_LOCAL_TOOLS=1`
+buộc bật gọi tool, `=0` buộc tắt; để trống nghĩa là tự phát hiện.
 
 ```bash
-export VELES_LOCAL_TOOLS=1
 veles run --provider ollama --model qwen3:4b-instruct "..."
 ```
 
 Ghi đè endpoint bằng các biến môi trường `*_BASE_URL` (xem
 [biến môi trường](environment-variables.md)).
 
-## Ủy thác CLI (`claude-cli`, `gemini-cli`)
+## Ủy thác CLI (`claude-cli`, `codex`, `antigravity-cli`)
 
-Nếu bạn có gói đăng ký CLI Claude hoặc Gemini, Veles có thể chạy binary đó ở chế
-độ JSON-streaming và đóng vai trò điều phối — giữ vòng lặp ưu tiên cục bộ mà
-không cần API key riêng. Các tool của Veles chỉ tiếp cận được tiến trình con khi
-một cầu nối MCP được cấu hình.
+Nếu bạn có gói đăng ký Claude, ChatGPT hoặc Google, Veles có thể chạy CLI của nó ở chế
+độ headless và đóng vai trò điều phối — không cần API key riêng. `claude-cli` và `codex`
+là bản tích hợp sẵn; `antigravity-cli` (CLI `agy`) là một module registry, tự cài đặt
+khi bạn gọi tên nó.
+
+Bên được ủy thác chỉ đóng vai trò model: các tool của Veles tiếp cận nó qua một cầu
+nối MCP, và mọi lời gọi đều đi qua thang tin cậy của Veles. Config của cầu nối nằm
+trong một thư mục của tiến trình đang chạy, `.veles/tmp/delegate-<pid>/`, được xóa
+khi tiến trình thoát. `agy` chạy trong một workspace tạm bên ngoài dự án của bạn (dưới
+`~/.veles/tmp/`), nên config `.agents/` của chính dự án không bao giờ đến được nó, sau
+một cổng chặn shell và các tool tệp của chính nó.
+
+`codex` cũng chạy bên ngoài dự án của bạn (dưới `~/.veles/tmp/`), với config codex của
+bạn bị bỏ qua và các tool riêng của nó — shell, sửa tệp, hình ảnh, subagent, trình
+duyệt, tìm kiếm web — bị tắt; Veles kiểm tra tên các flag đó một lần cho mỗi tiến trình
+và từ chối chạy một codex đã đổi tên flag mà nó phụ thuộc. MCP server của nó được truyền
+qua tham số, không qua tệp. Trong `veles run`, codex tuân theo protocol tool của Veles
+kém tin cậy hơn claude: nó có thể trả lời rằng không đọc được tệp mà không gọi tool —
+hãy hỏi lại, hoặc gọi tên tool ("use read_file on …").
 
 ## Trạng thái đa phương thức (vision / chuyển giọng nói thành văn bản)
 

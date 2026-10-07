@@ -78,6 +78,12 @@ async def start_turn(
         if session_id is None:
             session_id = state.store.create_session()
         state.set_chat_mode(session_id, mode)  # an unknown mode raises before any run
+
+    def finished(done: RunHandle) -> None:
+        state.record_usage(done.session_id, done.usage)  # M116b: per-session usage
+        if on_finished is not None:
+            on_finished(done)
+
     handle = new_run_handle(session_id=session_id)
     state.add_run(handle)
     chosen_mode = state.chat_mode(session_id).mode
@@ -91,7 +97,7 @@ async def start_turn(
                 handle,
                 worker_agent_factory=state.worker_agent_factory,
                 prompt=prompt,
-                on_finished=on_finished,
+                on_finished=finished,
                 verify_hook=state.verify_hook,
                 origin=origin,
                 store=state.store,
@@ -128,7 +134,7 @@ async def start_turn(
             agent=agent,
             turn=turn,
             prompt=prompt,
-            on_finished=on_finished,
+            on_finished=finished,
             post_turn_hook=state.post_turn_hook,
             verify_hook=state.verify_hook,
             origin=origin,
@@ -137,22 +143,21 @@ async def start_turn(
             subagent_factory=getattr(state, "subagent_factory", None),
             turn_lock=(state.session_lock(effective_session_id) if effective_session_id else None),
             deliver_hook=deliver_hook,
-            ask_channel=asks_questions(origin),
+            ask_channel=asks_questions(state, origin),
         ),
     )
     return handle
 
 
-# Channels whose gateway renders a `clarification_prompt` and takes the reply.
-_QUESTION_CHANNELS = frozenset({"telegram"})
-
-
-def asks_questions(origin: str | None) -> bool:
+def asks_questions(state: DaemonState, origin: str | None) -> bool:
     """M284: may the agent's `ask_user` wait for an answer from this turn's
-    origin? Only a chat that renders the question can; an HTTP caller or a
-    scheduled job gets "no human available" at once, as before, instead of a
-    run stalled for the prompt timeout."""
-    return bool(origin) and origin.split(":", 1)[0] in _QUESTION_CHANNELS  # type: ignore[union-attr]
+    origin? Only a running channel whose platform renders questions can; an HTTP
+    caller or a scheduled job gets "no human available" at once instead of a run
+    stalled for the prompt timeout."""
+    if not origin:
+        return False
+    caps = state.channel_caps.get(origin.split(":", 1)[0])
+    return bool(caps and caps.asks_questions)
 
 
 def _session_for_mode_turn(state: DaemonState, session_id: str) -> str:

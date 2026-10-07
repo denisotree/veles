@@ -13,7 +13,7 @@
 | `~/.veles/` | عام للمستخدم | `config.toml`، منح الثقة، المهارات/الأدوات عبر المشاريع، ذاكرة النماذج المؤقتة، اللغات، السجلّ |
 | `<project>/.veles/` | محلي للمشروع | `project.toml`، `config.toml`، `memory.db`، مهارات/أدوات المشروع، الخطط، العناصر وقت التشغيل |
 | `<project>/AGENTS.md` | المشروع | ملف السياق المحقون في الوكيل (مرتبط رمزيًا بـ `CLAUDE.md` / `GEMINI.md`) |
-| `<project>/wiki/`، `sources/` | المشروع | محتوى المستخدم (تخطيط LLM-Wiki الافتراضي) |
+| `<project>/wiki/`، `sources/`، … | المشروع | محتوى المستخدم، كما تنظّمه حزمة التخطيط (مثل LLM-Wiki) |
 
 يُعيد `VELES_USER_HOME` توجيه `~` (بحيث تُخزَّن حالة المستخدم في `<override>/.veles/`).
 راجع [تخطيط المشروع](project-layout.md) للاطّلاع على الشجرة الكاملة.
@@ -43,6 +43,9 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 transport = "stdio"
 command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
+
+[sandbox]
+enabled = true                   # run_shell في صندوق رملي لنظام التشغيل؛ false يوقفه
 ```
 
 | المفتاح | النوع | الغرض |
@@ -52,6 +55,7 @@ args = ["-m", "my_mcp_server"]
 | `[user] default_model` | سلسلة | النموذج المستخدَم عند عدم تحديد أي نموذج |
 | `[user] tui_theme` | سلسلة | سمة ألوان TUI الافتراضية |
 | `[permissions] <tool>` | سياسة | سياسة الإذن لكل أداة (راجع [الثقة وصندوق الحماية](../explanation/trust-and-sandbox.md)) |
+| `[sandbox] enabled` | منطقي | `run_shell` في صندوق رملي لنظام التشغيل (الافتراضي `true`)؛ يُقرأ هنا فقط — يُتجاهل `[sandbox]` الخاص بالمشروع (راجع [الأمان](../how-to/security-and-permissions.md)) |
 
 ---
 
@@ -110,7 +114,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[daemon]` | ربط العفريت غير المُسمّى/"الافتراضي" + التشغيل التلقائي |
 | `[daemon.<name>]` | جلسة عفريت مُسمّاة (لها نموذجها/مزوّدها/مضيفها/منفذها/وضعها الخاص) |
 | `[goal]` | ميزانية الهدف الجديد — `max_steps` (30)، `max_cost_usd` (5.0)، `max_wall_time_s` (3600)؛ خيارات `veles goal start` تتقدّم عليها |
-| `[channels.<type>]` | قناة يقدّمها العفريت غير المُسمّى (مثل `telegram`) |
+| `[channels.<type>]` | قناة يقدّمها العفريت غير المُسمّى (مثل `telegram`). مفاتيحها هي مفاتيح المنصّة نفسها (`enabled` مع ما تعلنه وحدتها)؛ وإعلانها يثبّت الوحدة عند `veles daemon start` التالي |
 | `[daemon.<name>.channels.<type>]` | قناة مرتبطة بجلسة عفريت مُسمّاة |
 | `[mcp.servers.<name>]` | خادم MCP خارجي (مصدر أدوات) |
 

@@ -191,7 +191,6 @@ def measure(db_path: Path, *, rows: int, samples: int, budget_s: float) -> SizeR
     """Time each recall collector separately, plus the whole router pass."""
     from veles.core.memory.router import MemoryRouter
     from veles.core.project import load_project
-    from veles.modules.wiki.recall import wiki_recall
 
     # db_path is `<root>/.veles/memory.db`; the project root is two levels up.
     project_root = db_path.parent.parent
@@ -214,7 +213,7 @@ def measure(db_path: Path, *, rows: int, samples: int, budget_s: float) -> SizeR
         # costs, and a seeded pseudorandom one is as expensive as a real one.
         ("insights-KNN", lambda _q: store.knn_insights(query_vec, limit=5)),
         ("turns", lambda q: store.search_turns(q, limit=5, since=None)),
-        ("wiki", lambda q: wiki_recall(router._project, q, limit=5)),
+        # Module streams (e.g. the wiki's) are timed as part of the router pass.
         ("about", lambda q: router._collect_about_veles(q, limit=5)),
     ]
 

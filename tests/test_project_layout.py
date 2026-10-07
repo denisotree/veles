@@ -9,21 +9,21 @@ from veles.core.project import init_project, load_project
 
 def test_init_project_sets_default_layout(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
-    assert project.layout_name == "llm-wiki"
+    assert project.layout_name == "bare"
     # project.toml mentions the layout so subsequent loads see it.
     toml = project.project_toml_path.read_text(encoding="utf-8")
-    assert 'layout = "llm-wiki"' in toml
+    assert 'layout = "bare"' in toml
 
 
 def test_load_project_reads_layout_back(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     reloaded = load_project(project.root)
-    assert reloaded.layout_name == "llm-wiki"
+    assert reloaded.layout_name == "bare"
 
 
 def test_load_project_handles_missing_layout_field(tmp_path: Path) -> None:
     """Older project.tomls (pre-M117) don't have the `layout` key.
-    `load_project` must fall back to the default rather than crash."""
+    `load_project` reads them as the legacy `llm-wiki` rather than crash."""
     project = init_project(tmp_path / "p", name="p")
     toml_path = project.project_toml_path
     text = toml_path.read_text(encoding="utf-8")
@@ -40,7 +40,7 @@ def test_load_project_custom_layout_value(tmp_path: Path) -> None:
     project = init_project(tmp_path / "p", name="p")
     toml_path = project.project_toml_path
     text = toml_path.read_text(encoding="utf-8")
-    text = text.replace('layout = "llm-wiki"', 'layout = "obsidian-import"')
+    text = text.replace('layout = "bare"', 'layout = "obsidian-import"')
     toml_path.write_text(text, encoding="utf-8")
     reloaded = load_project(project.root)
     assert reloaded.layout_name == "obsidian-import"

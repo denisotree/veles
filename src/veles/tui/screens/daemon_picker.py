@@ -67,6 +67,7 @@ from veles.tui.screens._daemon_picker_data import (
     _live_channels,  # noqa: F401 — re-export for tests
     _runtime_channels,  # noqa: F401 — re-export for tests
     build_daemon_tree,
+    channel_blocker,
     channel_leaf_label,
     daemon_node_label,
     runtime_session_action,
@@ -333,6 +334,11 @@ class DaemonPickerScreen(Screen[None]):
         self.run_worker(self._restart_flow(node), exclusive=True)
 
     async def _restart_flow(self, node: DaemonNode) -> None:
+        # A daemon with no ready channel would refuse to start: keep the old one.
+        blocker = channel_blocker(node)
+        if blocker is not None:
+            self._set_action(f"{node.name}: not restarted — {blocker}", severity="error")
+            return
         # Order matters: confirm the old process is gone *before* spawning, or
         # the new daemon races it for the port and silently fails to bind.
         await self._kill_and_wait(node.pid)

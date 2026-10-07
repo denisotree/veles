@@ -6,7 +6,7 @@ Veles는 런타임에 다음 변수들을 읽습니다. API 키와 토큰은 OS 
 
 ## 프로바이더 API 키
 
-API 키 조회 순서: OS 키체인(프로젝트 범위) → OS 키체인(기본 범위) → 환경 변수.
+API 키 조회 순서: OS 키체인(프로젝트 범위) → OS 키체인(기본 범위) → 환경 변수. 프로바이더가 읽는 변수는 카탈로그 항목의 `key_env`에서 정해집니다. `~/.veles/providers.toml`의 사용자 정의 항목이 직접 이름을 지정하며, `veles secret set <VARIABLE>`은 해당 프로바이더가 읽는 위치에 키를 저장합니다.
 
 | 변수 | 프로바이더 | 비고 |
 |---|---|---|
@@ -15,8 +15,9 @@ API 키 조회 순서: OS 키체인(프로젝트 범위) → OS 키체인(기본
 | `OPENAI_API_KEY` | openai | OpenAI 직접 API |
 | `GEMINI_API_KEY` | gemini | Google Gemini의 기본 키 |
 | `GOOGLE_API_KEY` | gemini | Google Gemini의 폴백 |
+| `OPENAI_COMPAT_API_KEY` | openai-compat | 선택 사항 — 키를 요구하는 게이트웨이용 |
 
-`claude-cli`와 `gemini-cli`는 각자의 바이너리를 통해 인증하므로 환경 변수가 없습니다.
+`claude-cli`, `codex`, `antigravity-cli`는 각자의 바이너리를 통해 인증하므로 환경 변수가 없습니다.
 
 ## 로컬 프로바이더
 
@@ -26,7 +27,7 @@ API 키 조회 순서: OS 키체인(프로젝트 범위) → OS 키체인(기본
 | `OLLAMA_HOST` | `OLLAMA_BASE_URL`을 따름 | 임베딩용 Ollama 호스트 |
 | `LLAMACPP_BASE_URL` | `http://localhost:8080/v1` | llama.cpp 서버 엔드포인트 |
 | `OPENAI_COMPAT_BASE_URL` | — (필수) | `openai-compat` 프로바이더의 엔드포인트 |
-| `VELES_LOCAL_TOOLS` | off | 로컬 프로바이더에서 도구 호출 활성화(`1`/`true`) |
+| `VELES_LOCAL_TOOLS` | 감지 | 로컬 프로바이더의 도구 호출: `1`은 강제로 켜고 `0`은 끄며, 설정하지 않으면 서버에서 감지 |
 | `VELES_OLLAMA_EMBED_MODEL` | 프로바이더 기본값 | Ollama 임베딩 모델 재정의 |
 | `VELES_LOCAL_JSON_MODE` | 켜짐 | JSON 객체를 반환해야 하는 로컬 호출에 `response_format: json_object` 전송 (`0`이면 비활성화) |
 

@@ -8,7 +8,7 @@
 veles [--no-wizard] <command> [subcommand] [options]
 ```
 
-- `--no-wizard`——即使 `~/.veles/config.toml` 不存在也跳過首次執行的設定精靈（同時也受 TTY 與 `VELES_NO_WIZARD=1` 控制）。
+- `--no-wizard`——即使 `~/.veles/config.toml` 不存在也跳過首次執行的設定精靈（同時也受 TTY 與 `VELES_NO_WIZARD=1` 控制）。精靈只會出現在會啟動代理的指令之前（不帶引數的 `veles`、`run`、`daemon`、`channel` 等）；`module`、`tool`、`doctor` 這類管理指令從不會開啟它。
 - 不帶任何引數時，`veles` 會啟動互動式 [TUI](tui.md)。
 
 多數代理命令都接受底部列出的[共用代理迴圈旗標](#shared-agent-loop-flags)與[供應商名稱](#provider-names)。
@@ -23,7 +23,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | 旗標 | 預設 | 用途 |
 |---|---|---|
 | `name`（位置引數） | cwd 的 basename | 專案名稱 |
-| `--layout <name>` | `llm-wiki` | 內容骨架所用的版面套件（`llm-wiki`、`notes`、`bare`，或來自 `~/.veles/layouts/` 的自訂套件） |
+| `--layout <name>` | `bare`（在終端機中會詢問） | 內容骨架所用的版面套件（`bare`、從登錄表安裝的套件如 `llm-wiki` 或 `notes`，或來自 `~/.veles/layouts/` 的自訂套件）。未安裝的套件會提議安裝；拒絕則不會建立任何內容 |
 | `--force` | 關閉 | 即使 `.veles/` 已存在也重新建立 |
 
 ### `veles schema {validate,edit,fix}`
@@ -34,7 +34,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 - `fix`——透過 LLM 精靈互動式補上缺漏的章節。
 
 ### `veles self-doc [refresh|show]`
-產生並顯示專案的自我文件（`wiki/self-doc/overview.md`）。單獨執行 `veles self-doc` 會顯示目前的頁面；`refresh` 會重新產生。
+產生並顯示專案的自我文件——若版面有頁面儲存區則存入其中（wiki：`wiki/self-doc/overview.md`），否則存入 `.veles/memory/self-doc.md`。單獨執行 `veles self-doc` 會顯示目前的頁面；`refresh` 會重新產生。
 
 ### `veles doctor`
 對使用者全域狀態與作用中的專案執行健康檢查。無論是否有作用中的專案都可運作。
@@ -94,10 +94,13 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `--theme <name>` | 設定檔或 `everforest` | 色彩主題（everforest、dracula、gruvbox、tokyo-night、catppuccin） |
 
 ### `veles add <source>`
-讀取一個來源（本機檔案或 `http(s)://` URL），並將其綜整成一個 wiki 頁面。接受共用代理迴圈旗標。
+*（來自 `wiki` 模組——`veles registry install llm-wiki` 或 `… install wiki`）*
+讀取一個來源（本機檔案或 `http(s)://` URL），並將其綜整成一個 wiki 頁面。沒有該模組時，`veles add` 是未知指令，錯誤訊息會指出安裝方式。接受共用代理迴圈旗標。
+
+模組可以用同樣的方式新增自己的指令；它們會出現在裝有該模組的專案內的 `veles --help` 中。
 
 ### `veles curate`
-執行一次 curator 處理：將未處理的工作階段壓縮為 `wiki/sessions/` 頁面。
+執行一次 curator 處理：將未處理的工作階段壓縮為記憶 insights（wiki engine 開啟時還包括 `wiki/sessions/` 頁面）。
 
 | 旗標 | 預設 | 用途 |
 |---|---|---|
@@ -150,18 +153,24 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `list` | 列出本專案 `memory.db` 中編目的工具 |
 | `show <name>` | 印出某工具的清單檔＋遙測 |
 | `promote <name> [-y]` | 將專案工具移至 `~/.veles/tools/`（跨專案） |
-| `approve [<name>] [--all] [-y]` | 審閱並核准一個自撰工具檔，使載入器會執行它 |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | 審閱並核准一個自撰工具檔，使載入器會執行它 |
 
-自撰工具（`.veles/tools/*.py`）在載入器匯入時會執行其模組層級的程式碼，因此**新建或編輯過的檔案在你核准前不會被載入**——`veles tool approve` 會顯示程式碼並記錄其雜湊值。單獨執行 `veles tool approve` 會列出待核准的項目。這就是為什麼代理所撰寫的工具在能被呼叫之前需要一個審閱步驟。
+自撰工具（`.veles/tools/*.py`）在載入器匯入時會執行其模組層級的程式碼，因此**新建或編輯過的檔案在你核准前不會被載入**——`veles tool approve` 會顯示程式碼並記錄其雜湊值。單獨執行 `veles tool approve` 會列出待核准的項目，並附上每個檔案的 sha256。這就是為什麼代理所撰寫的工具在能被呼叫之前需要一個審閱步驟。
 
-### `veles module {list,show,add,remove}`
+沒有終端機時（部署腳本），可依已審閱的雜湊值核准單一檔案：`veles tool approve <name> --sha256 <hash>`——若檔案自那之後有變動則會失敗。`-y` 只在終端機中略過確認提示。
+
+### `veles module {list,show,add,remove,approve}`
 
 | 子命令 | 用途 |
 |---|---|
 | `list` | 列出已安裝的模組 |
-| `show <name>` | 印出某模組的清單檔 |
+| `show <name>` | 印出某模組的清單檔及其檔案的 sha256 |
 | `add <source> [--name N] [-y]` | 從 git URL 或本機路徑安裝模組 |
 | `remove <name> [-y]` | 刪除已安裝的模組 |
+| `approve <name> [--user] [--sha256 H]` | 審閱後核准一個模組 |
+| `approve --all [--user]` | 該範圍內所有待核准的模組，每個各確認一次 |
+
+核准時會要求在終端機中輸入 `yes`；沒有終端機時，請把你審閱過的檔案雜湊值（`show` 會印出）以 `--sha256` 傳入——若檔案自那之後有變動則會失敗。`veles doctor` 會回報磁碟上每個未載入的模組。
 
 ### `veles registry search [query] [--kind K]`
 在已連接的登錄庫中搜尋（模組、技能、layout 包、MCP 配方）。
@@ -223,11 +232,11 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `refresh [--force]` | 重新解析 `AGENTS.md` 中的自然語言路由提示 |
 
 ### `veles models <provider>`
-列出某供應商的模型。雲端供應商（openrouter／openai／gemini）會快取 24 小時；本機供應商一律即時取得。
+列出某供應商的模型。雲端供應商（openrouter／openai／gemini）會快取 24 小時；本機供應商、`codex` 與 `antigravity-cli` 一律即時取得。未知的供應商會得到一行錯誤，並列出現有的供應商（結束碼 `2`）。
 
 | 旗標 | 預設 | 用途 |
 |---|---|---|
-| `provider`（位置引數） | — | [供應商名稱](#provider-names)之一 |
+| `provider`（位置引數） | — | [目錄](#provider-names)中的某個供應商 id |
 | `--refresh` | 關閉 | 繞過磁碟快取（僅限雲端） |
 | `--json` | 關閉 | 以 JSON 輸出 `{provider, source, models}` |
 
@@ -312,12 +321,12 @@ veles [--no-wizard] <command> [subcommand] [options]
 `start` 也接受共用代理迴圈旗標；對 daemon 而言，`--model` / `--provider` 預設取自專案設定，且在 daemon 的整個生命週期內固定不變。
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-與 daemon 通訊的外部聊天閘道（Telegram…）。參見[連接 Telegram](../how-to/connect-telegram.md)。
+與 daemon 通訊的外部聊天閘道（Telegram…）。平台是擴充功能 registry 中的模組；`run` 與 `add` 在模組缺少時會安裝它。參見[連接 Telegram](../how-to/connect-telegram.md)。
 
 | 子命令 | 用途 |
 |---|---|
-| `list` | 列出已註冊的 channel 平台＋工作階段數 |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | 在前景啟動一個閘道 |
+| `list` | 列出已安裝的 channel 平台＋工作階段數，以及已宣告但模組缺少的 channel |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | 在前景啟動一個閘道；`--secret` 是平台的主要密鑰（否則取自鑰匙圈或其環境變數） |
 | `list-sessions [--channel C]` | 顯示 `chat_id → session_id` 對應 |
 | `reset-session <chat_id> [--channel C]` | 遺忘某對應（下一則訊息將重新開始） |
 | `add [--channel C] [--session S]` | 將 channel 附掛到某 daemon（精靈；憑證 → 鑰匙圈） |
@@ -353,6 +362,8 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 ## 供應商名稱
 
-`openrouter`（預設）· `anthropic` · `openai` · `gemini` · `claude-cli` · `gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` 與 `veles models` 接受供應商目錄中的任何 id——內建的、你的 `~/.veles/providers.toml` 中的，以及已安裝模組所提供的：
 
-本機供應商（`ollama`、`llamacpp`、`openai-compat`）不需 API 金鑰。參見[供應商參考](providers.md)與[設定供應商](../how-to/configure-providers.md)。
+`openrouter`（預設）· `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` · `ollama` · `llamacpp` · `openai-compat`（內建）
+
+只有登錄庫模組才提供的供應商（`antigravity-cli`）會在你指定它時自行安裝。本機供應商（`ollama`、`llamacpp`、`openai-compat`）不需 API 金鑰。參見[供應商參考](providers.md)與[設定供應商](../how-to/configure-providers.md)。

@@ -171,7 +171,7 @@ def test_repl_runtime_subagent_factory_scopes_tools(tmp_path, monkeypatch) -> No
 
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
     clear_engine_cache()
-    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
+    project = init_project(tmp_path / "proj", name="proj")
     token = set_active_project(project)
     try:
         args = argparse.Namespace(
@@ -190,11 +190,9 @@ def test_repl_runtime_subagent_factory_scopes_tools(tmp_path, monkeypatch) -> No
         assert runtime is not None
         _state, _factory, store, subagent_factory = runtime
         try:
-            worker = subagent_factory(
-                system_prompt="worker", tools=["read_file", "wiki_write_page"]
-            )
+            worker = subagent_factory(system_prompt="worker", tools=["read_file", "write_file"])
             names = set(worker._registry.list_names())
-            assert {"read_file", "wiki_write_page"} <= names  # scoped, wiki tool present
+            assert {"read_file", "write_file"} <= names  # scoped to what was requested
             assert "run_shell" not in names  # not requested → absent
         finally:
             store.close()

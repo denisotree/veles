@@ -77,32 +77,90 @@ project के `.veles/` के अंदर agent के file tools केव�
 file approve करें)। उसी file की अन्य spellings (case, `..`, symlink) भी अस्वीकार की जाती हैं।
 
 ऐसी files जो बिना explicit command के चलती हैं या किसी agent CLI को steer करती हैं — `.git/`,
-`.githooks/`, `.claude/`, `.gemini/`, `.codex/`, `.vscode/`, `.devcontainer/`, `.husky/` के
+`.githooks/`, `.claude/`, `.gemini/`, `.agents/`, `.codex/`, `.vscode/`, `.devcontainer/`, `.husky/` के
 अंतर्गत सब कुछ, और `.envrc`, `.mcp.json`, `.pre-commit-config.yaml`, `lefthook.yml`, किसी भी
 गहराई पर, साथ ही repo की `core.hooksPath` directory और वह जगह जहाँ symlinked `.git` इशारा करता
 है — agent के file tools इनमें तभी लिखते हैं जब आप उस write को confirm करें। Trust grants और
 autopilot इसे cover नहीं करते; daemon channel में पूछता है, और जिस batch run में पूछने वाला कोई
 न हो वह अस्वीकार कर देता है।
 
-`claude-cli` और `gemini-cli` providers केवल Veles के tools वाले model की तरह चलते हैं: उनके अपने
+`claude-cli`, `codex` और `antigravity-cli` providers केवल Veles के tools वाले model की तरह चलते हैं: उनके अपने
 shell, file-edit और web tools, project की `.claude/` settings और hooks, और अन्य MCP servers
 लागू नहीं होते, और उनके द्वारा बुलाया गया हर Veles tool ऊपर की trust ladder से गुज़रता है (वहाँ
 कोई prompt का जवाब नहीं दे सकता, इसलिए जो पहले से granted नहीं है वह अस्वीकार हो जाता है)।
+उनका MCP config `.veles/tmp/delegate-<pid>/` में रहता है, हर चल रहे process के लिए एक, जिसमें
+agent के file tools नहीं लिख सकते। `agy` project के बाहर, `~/.veles/tmp/` के अंतर्गत, एक scratch
+workspace में चलता है, इसलिए project के अपने `.agents/` hooks और MCP servers उस तक कभी नहीं
+पहुँचते। जब उसके पास Veles के tools हों तब वह `--dangerously-skip-permissions` के साथ चलता है —
+वरना agy headless MCP calls अस्वीकार कर देता है — और उस workspace का एक hook उसके अपने हर tool को
+deny करता है; जो hook fail हो वह भी deny करता है। Veles के file tools project के बाहर नहीं लिखते,
+इसलिए agy उस hook को उनके ज़रिए दोबारा नहीं लिख सकता। `codex` भी project के बाहर चलता है, आपका codex
+config अनदेखा करके, read-only sandbox के साथ और उसके अपने tools feature flags से बंद करके, जिनके
+नाम Veles हर पहले run से पहले जाँचता है — जिस codex ने अपने इस्तेमाल का कोई flag rename कर दिया हो
+उसे अस्वीकार कर दिया जाता है, खुला नहीं चलाया जाता। उसका MCP server उसके arguments में जाता है
+(कोई config file नहीं), केवल उसी server के tools approve होते हैं, और उस server को मिलने वाला
+environment नाम से forward किया जाता है — `VELES_TRUST_AUTO_ALLOW` कभी नहीं।
+
+### OS sandbox में `run_shell`
+
+agent जो commands `run_shell` से चलाता है वे OS sandbox में चलते हैं — macOS पर `sandbox-exec`,
+Linux पर `bwrap` (bubblewrap) — जो इन paths को उनके लिए read-only बना देता है: project के हर repo के
+hooks और config (worktree या submodule के लिए, मुख्य repo के), git जो हर config file पढ़ता है (उसके
+includes, `~/.gitconfig`, system वाली) और `core.hooksPath` directory; ऊपर बताए गए auto-run नाम (`.envrc`, `.claude/`,
+`.mcp.json`, …) किसी भी गहराई पर; project की `.veles/`, सिवाय `skills/`, `tools/`, `tmp/`,
+`plans/`, `memory/` और `artifacts/` के; `~/.veles/` (approvals, trust, आपके modules); shell
+start-up files (`~/.zshrc`, `~/.bashrc`, …), `~/.ssh/`, LaunchAgents और autostart
+entries; और `~/.claude/`, `~/.codex/`, `~/.gemini/`। इन paths, उनकी parent directories और repos का
+नाम बदलकर भी बचा नहीं जा सकता। बाकी सब पहले की तरह काम करता है: project,
+`git commit`, नया repo (`git init`, `git clone`), package caches, temp dirs और network। अस्वीकार की गई write agent को आपसे पूछने के
+लिए कहती है।
+
+`veles doctor` दिखाता है कि sandbox सक्रिय है या नहीं। इसे बंद करने के लिए `~/.veles/config.toml` में
+`[sandbox] enabled = false` सेट करें — project की अपनी config ऐसा नहीं कर सकती।
+
+Linux पर `bwrap` को unprivileged user namespaces चाहिए। Ubuntu 24.04 और उसके बाद के संस्करण इन्हें
+AppArmor के ज़रिए सीमित करते हैं; इन्हें केवल `bwrap` के लिए एक profile से अनुमति दें:
+
+```
+# /etc/apparmor.d/bwrap — then: sudo apparmor_parser -r /etc/apparmor.d/bwrap
+abi <abi/4.0>,
+include <tunables/global>
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
+```
+
+Docker में sandbox को `--security-opt seccomp=unconfined --security-opt apparmor=unconfined` चाहिए।
+जहाँ यह शुरू नहीं हो पाता, वहाँ `run_shell` पहले की तरह चलता है और Veles एक बार चेतावनी देता है।
 
 ज्ञात सीमाएँ:
 
-- `run_shell` एक shell है: एक बार आप इसे grant कर दें (या autopilot में), यह ऊपर की किसी भी
-  file को per-file confirmation के बिना लिख सकता है।
-- MCP approval server की command line को pin करता है, उन files को नहीं जिन्हें वह project से
-  चलाता है (`args` में नामित script) — उन्हें भी review करें।
+- जहाँ sandbox सक्रिय नहीं है, वहाँ `run_shell` एक shell है: एक बार आप इसे grant कर दें (या
+  autopilot में), यह ऊपर की किसी भी file को per-file confirmation के बिना लिख सकता है — और `~/.veles/` के approval stores को भी।
+  `veles … approve` के लिए terminal या समीक्षा किया हुआ hash (`--sha256`) चाहिए
+  और यह agent के shell द्वारा शुरू किए गए command को अस्वीकार कर देता है, लेकिन grant किया हुआ
+  shell उस निशान को हटा सकता है या उन files को सीधे लिख सकता है।
+- sandbox writes की रक्षा करता है, reads या network की नहीं। आपके `PATH` की directories
+  (`~/.local/bin`) writable रहती हैं।
+- यह command की अपनी processes को रोकता है, उस service को नहीं जिससे command अपनी ओर से काम करवाने को
+  कहता है: `docker run -v …`, `systemd-run`, `launchctl` या `osascript` से शुरू किया गया container आपके
+  नाम से लिखता है।
+- command जो repo बनाता है (`git init`) वह अगली command तक सुरक्षित नहीं होता; project root पर नया repo
+  बनने पर Veles आपको सूचित करता है।
+- Linux पर sandbox केवल मौजूदा paths की रक्षा कर सकता है, और project में छह स्तर गहराई तक सुरक्षित नाम खोज
+  लेता है: root पर नया `.envrc` या home में नई start-up file (`~/.bash_profile`) बनाई जा सकती है — Veles इसकी
+  सूचना आपको देता है तथा memory log में दर्ज करता है — और project तक जाने वाले रास्ते का कोई symlink
+  (`~/code` → `/Volumes/…`) बदला जा सकता है। macOS दोनों को अस्वीकार करता है।
+- MCP approval `command`/`args` में नामित project scripts और `-m` से चलाए गए modules (root पर या `src/` के
+  अंतर्गत) को कवर करता है, उन files को नहीं जिन्हें वे import करते हैं।
 - CLI provider के साथ, जो runs tools को केवल अपने लिए pre-authorise करते हैं (daemon background
-  jobs, `veles research`) वे इसे delegated CLI तक नहीं पहुँचाते: उसके Veles tools को standing
-  `veles trust set` grant या autopilot window चाहिए। parent run का planning mode भी उन तक नहीं
-  पहुँचता।
-- `gemini-cli` अपने run के लिए project folder पर भरोसा करता है, इसलिए gemini project की `.env`
-  भी पढ़ता है — gemini की वे settings उसमें न रखें जिन्हें आप agent से steer नहीं करवाना चाहते।
-- managed (system) gemini policies वाली machine पर, gemini उस policy को ignore करता है जो Veles
-  उसे देता है, इसलिए वहाँ `gemini-cli` केवल Veles के tools तक सीमित नहीं रहता।
+  jobs, `veles research`) वे इसे delegated CLI तक नहीं पहुँचाते: pre-authorisation Veles process में
+  रहता है, और CLI जो MCP server start करता है वह एक अलग process है, इसलिए उसके Veles tools को
+  standing `veles trust set` grant या autopilot window चाहिए। parent run का planning mode भी उन तक
+  नहीं पहुँचता।
+- `antigravity-cli` इस पर निर्भर है कि agy अपने workspace की `.agents/hooks.json` का सम्मान करे;
+  agy का कोई release जो workspace hooks पढ़ना बंद कर दे, `--dangerously-skip-permissions` के तहत
+  उसके अपने tools को खुला छोड़ देगा।
 
 control characters वाले paths (terminal escapes, bidi overrides) अस्वीकार किए जाते हैं, और
 confirmations, trust prompt और diff preview ऐसे characters को escaped दिखाते हैं — कोई tool call

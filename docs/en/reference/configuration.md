@@ -13,7 +13,7 @@ keychain or environment variables (see [environment variables](environment-varia
 | `~/.veles/` | User-global | `config.toml`, trust grants, cross-project skills/tools, model cache, locales, registry |
 | `<project>/.veles/` | Project-local | `project.toml`, `config.toml`, `memory.db`, project skills/tools, plans, runtime artefacts |
 | `<project>/AGENTS.md` | Project | The context file injected into the agent (symlinked to `CLAUDE.md` / `GEMINI.md`) |
-| `<project>/wiki/`, `sources/` | Project | User content (the default LLM-Wiki layout) |
+| `<project>/wiki/`, `sources/`, … | Project | User content, as the layout pack lays it out (e.g. the LLM-Wiki) |
 
 `VELES_USER_HOME` redirects `~` (so user state lands at `<override>/.veles/`).
 See [project layout](project-layout.md) for the full tree.
@@ -43,6 +43,9 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 transport = "stdio"
 command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
+
+[sandbox]
+enabled = true                   # run_shell in an OS sandbox; false switches it off
 ```
 
 | Key | Type | Purpose |
@@ -52,6 +55,7 @@ args = ["-m", "my_mcp_server"]
 | `[user] default_model` | string | Model used when none is given |
 | `[user] tui_theme` | string | Default TUI color theme |
 | `[permissions] <tool>` | policy | Per-tool permission policy (see [trust & sandbox](../explanation/trust-and-sandbox.md)) |
+| `[sandbox] enabled` | bool | `run_shell` in an OS sandbox (default `true`); read only here — a project's `[sandbox]` is ignored (see [security](../how-to/security-and-permissions.md)) |
 
 ---
 
@@ -123,7 +127,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[daemon]` | The unnamed/"default" daemon's bind + autostart |
 | `[daemon.<name>]` | A named daemon session (own model/provider/host/port/mode) |
 | `[goal]` | A new goal's budget — `max_steps` (30), `max_cost_usd` (5.0), `max_wall_time_s` (3600); `veles goal start` flags override it |
-| `[channels.<type>]` | A channel served by the unnamed daemon (e.g. `telegram`) |
+| `[channels.<type>]` | A channel served by the unnamed daemon (e.g. `telegram`). Its keys are the platform's own (`enabled` plus what its module declares); declaring it installs the module on the next `veles daemon start` |
 | `[daemon.<name>.channels.<type>]` | A channel bound to a named daemon session |
 | `[mcp.servers.<name>]` | An external MCP server (tool source) |
 

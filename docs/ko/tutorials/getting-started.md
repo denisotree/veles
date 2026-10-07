@@ -52,7 +52,7 @@ mkdir my-notes && cd my-notes
 veles init my-notes
 ```
 
-이 명령은 `AGENTS.md`(프로젝트 컨텍스트), `sources/`와 `wiki/`(기본 [LLM-Wiki 레이아웃](../explanation/layout-packs-and-llm-wiki.md)), 그리고 `.veles/`(머신 상태)를 만듭니다. [프로젝트 레이아웃](../reference/project-layout.md)을 참고하세요.
+이 명령은 `AGENTS.md`(프로젝트 컨텍스트)와 `.veles/`(머신 상태)를 만듭니다 — 기본 `bare` 레이아웃은 그 외에는 아무것도 추가하지 않습니다. 터미널에서 `veles init`은 어떤 [레이아웃](../explanation/layout-packs-and-llm-wiki.md)을 쓸지 묻습니다. `llm-wiki`(그 자리에서 레지스트리로부터 설치됨)를 고르면 `sources/`와 `wiki/`가 생깁니다. [프로젝트 레이아웃](../reference/project-layout.md)을 참고하세요.
 
 ## 4. 첫 프롬프트 실행
 

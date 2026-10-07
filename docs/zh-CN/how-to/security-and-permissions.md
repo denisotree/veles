@@ -71,23 +71,68 @@ Veles 自己的工具修改。文件工具还会拒绝项目中任何其他 `.ve
 同一文件的其他写法（大小写、`..`、符号链接）同样会被拒绝。
 
 无需显式命令就会运行、或会左右智能体 CLI 的文件——`.git/`、`.githooks/`、`.claude/`、
-`.gemini/`、`.codex/`、`.vscode/`、`.devcontainer/`、`.husky/` 下的任何内容，以及任意深度的
+`.gemini/`、`.agents/`、`.codex/`、`.vscode/`、`.devcontainer/`、`.husky/` 下的任何内容，以及任意深度的
 `.envrc`、`.mcp.json`、`.pre-commit-config.yaml`、`lefthook.yml`，外加仓库的
 `core.hooksPath` 目录以及符号链接的 `.git` 所指向的位置——智能体的文件工具只有在你确认该次写入后才会写入。
 信任授权和 autopilot 都不涵盖这一点；守护进程会在频道中询问，而无人可问的批处理运行则会拒绝。
 
-`claude-cli` 和 `gemini-cli` 提供方仅以只带 Veles 工具的模型身份运行：它们自带的
+`claude-cli`、`codex` 和 `antigravity-cli` 提供方仅以只带 Veles 工具的模型身份运行：它们自带的
 shell、文件编辑和网络工具、项目的 `.claude/` 设置和钩子，以及其他 MCP 服务器都不适用，
 并且它们调用的每个 Veles 工具都要经过上述信任阶梯（那里没人能回答提示，因此任何尚未授予的操作都会被拒绝）。
+它们的 MCP 配置位于 `.veles/tmp/delegate-<pid>/` 中，每个运行中的进程一份，智能体的文件工具无法写入该目录。`agy` 在项目之外、
+`~/.veles/tmp/` 下的临时工作区里运行，因此项目自己的 `.agents/` 钩子和 MCP 服务器不会触及它。
+它在拥有 Veles 的工具时会带上 `--dangerously-skip-permissions`——否则 agy 在无界面模式下会拒绝 MCP 调用——
+并且该工作区中的一个钩子会拒绝它自带的每个工具；钩子本身失败时同样会拒绝。Veles 的文件工具无法在项目之外写入，
+因此 agy 无法通过它们改写该钩子。`codex` 同样在项目之外运行，忽略你的 codex 配置，使用只读沙箱，
+并通过功能标志关闭它自带的工具；Veles 在每次首次运行前都会检查这些标志的名称——重命名了它所依赖标志的
+codex 会被拒绝，而不是在开放状态下运行。它的 MCP 服务器通过参数传入（没有配置文件），只批准该服务器的工具，
+并且该服务器获得的环境变量按名称转发——绝不会包含 `VELES_TRUST_AUTO_ALLOW`。
+
+### OS 沙箱中的 `run_shell`
+
+智能体通过 `run_shell` 运行的命令会在 OS 沙箱中执行——macOS 上是 `sandbox-exec`，Linux 上是
+`bwrap`（bubblewrap）——沙箱会让下列路径对它们只读：项目中每个仓库的钩子和配置（worktree 或子模块则为主仓库的）、git 读取的所有配置文件（其 include、`~/.gitconfig`、系统级的）以及 `core.hooksPath` 目录；
+上文列出的自动运行名称（`.envrc`、`.claude/`、`.mcp.json` 等）的任意深度；项目的 `.veles/`，但 `skills/`、
+`tools/`、`tmp/`、`plans/`、`memory/` 和 `artifacts/` 除外；`~/.veles/`（批准、信任、你的模块）；
+shell 启动文件（`~/.zshrc`、`~/.bashrc` 等）、`~/.ssh/`、LaunchAgents 和自启动项；
+以及 `~/.claude/`、`~/.codex/`、`~/.gemini/`。这些路径、它们的父目录和仓库也不能靠重命名绕过。
+其余一切照常工作：项目、`git commit`、新仓库（`git init`、`git clone`）、包缓存、临时目录和网络。
+写入被拒绝时，会提示智能体去询问你。
+
+`veles doctor` 会显示沙箱是否处于活动状态。要关闭它，请在 `~/.veles/config.toml` 中设置
+`[sandbox] enabled = false`——项目自己的配置做不到这一点。
+
+在 Linux 上，`bwrap` 需要非特权用户命名空间。Ubuntu 24.04 及更高版本通过 AppArmor 限制它们；
+可以用一个配置文件只为 `bwrap` 放行：
+
+```
+# /etc/apparmor.d/bwrap — then: sudo apparmor_parser -r /etc/apparmor.d/bwrap
+abi <abi/4.0>,
+include <tunables/global>
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
+```
+
+在 Docker 中，沙箱需要 `--security-opt seccomp=unconfined --security-opt apparmor=unconfined`。
+在它无法启动的地方，`run_shell` 照旧运行，Veles 会警告一次。
 
 已知限制：
 
-- `run_shell` 就是一个 shell：一旦你授予它（或处于 autopilot 下），它就能在没有逐文件确认的情况下写入上述任何文件。
-- MCP 批准固定的是服务器的命令行，而不是它从项目中运行的文件（`args` 中指定的脚本）——也请审查这些文件。
+- 在沙箱未生效的地方，`run_shell` 就是一个 shell：一旦你授予它（或处于 autopilot 下），它就能在没有逐文件确认的情况下写入上述任何文件——以及 `~/.veles/` 中的批准存储。`veles … approve` 需要终端或已审阅的哈希（`--sha256`），并会拒绝由 agent 的 shell 启动的命令，但获得授权的 shell 可以抹掉该标记或直接写入这些文件。
+- 沙箱保护的是写入，而不是读取，也不是网络。`PATH` 中的目录（`~/.local/bin`）仍然可写。
+- 它只拦得住命令自己的进程，拦不住命令请求代它行事的服务：命令用 `docker run -v …` 启动的容器、
+  `systemd-run`、`launchctl` 或 `osascript` 会以你的身份写入。
+- 命令创建的仓库（`git init`）要到下一条命令才受保护；项目根目录下的新仓库会向你报告。
+- 在 Linux 上，沙箱只能保护已存在的路径，并且在项目中最深查找六层的受保护名称：根目录下新的 `.envrc`
+  或主目录中新的启动文件（`~/.bash_profile`）可以被创建，Veles 会向你报告并记入记忆日志；通往项目的路径上的符号链接
+  （`~/code` → `/Volumes/…`）可以被替换。macOS 两者都会拒绝。
+- MCP 批准涵盖 `command`/`args` 中指定的项目脚本以及用 `-m` 运行的模块（位于根目录或 `src/` 下），但不涵盖它们所导入的文件。
 - 使用 CLI 提供方时，仅为自身预先授权工具的运行（守护进程后台作业、`veles research`）不会把授权传递给被委派的 CLI：
-  其 Veles 工具需要长期的 `veles trust set` 授权或 autopilot 窗口。父运行的规划模式同样不会传递给它们。
-- `gemini-cli` 会在其运行期间信任项目文件夹，因此 gemini 也会读取项目的 `.env`——请把你不希望智能体左右的 gemini 设置放在它之外。
-- 在带有受管（系统级）gemini 策略的机器上，gemini 会忽略 Veles 传入的策略，因此那里的 `gemini-cli` 不再仅限于 Veles 的工具。
+  预先授权存在于 Veles 进程中，而该 CLI 启动的 MCP 服务器是另一个独立进程，因此其 Veles 工具需要长期的
+  `veles trust set` 授权或 autopilot 窗口。父运行的规划模式同样不会传递给它们。
+- `antigravity-cli` 依赖 agy 遵守其工作区的 `.agents/hooks.json`；如果某个 agy 版本不再读取工作区钩子，
+  它自带的工具在 `--dangerously-skip-permissions` 下就会处于开放状态。
 
 包含控制字符（终端转义、双向覆盖）的路径会被拒绝，确认、信任提示和 diff 预览会以转义形式显示此类字符——
 工具调用无法伪造你所批准的文本。

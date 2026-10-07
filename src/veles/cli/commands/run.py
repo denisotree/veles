@@ -47,7 +47,7 @@ def _build_escalator(args, project, adv_provider, adv_model, store):
     advisor-tier model with the full run tool surface. None when the advisor
     agent can't be built (e.g. missing API key)."""
     from veles.cli._agent_builder import build_command_agent
-    from veles.core.provider_factory import CLI_PROVIDERS
+    from veles.core.providers import is_cli_provider
     from veles.runtime.prompt import system_prompt_from_args
     from veles.runtime.registry import RUN_TOOLS
     from veles.runtime.run import run_agent_streaming_aware
@@ -56,7 +56,7 @@ def _build_escalator(args, project, adv_provider, adv_model, store):
     esc_args.provider = adv_provider
     esc_args.model = adv_model
     esc_args.stream = False
-    tool_aware = adv_provider in CLI_PROVIDERS
+    tool_aware = is_cli_provider(adv_provider)
 
     def escalator(prompt: str):
         esc_agent = build_command_agent(
@@ -197,13 +197,13 @@ def _maybe_run_via_manager(args: argparse.Namespace, project: Project) -> bool:
 def cmd_run(args: argparse.Namespace, project: Project) -> int:
     # Lazy imports so monkey-patches on the owning modules win at call time.
     from veles.cli._agent_builder import build_command_agent
-    from veles.cli._console import ensure_api_key
+    from veles.cli._console import check_provider, ensure_api_key
     from veles.cli._project import _touch_active_project
     from veles.core.model_resolver import (
         ConfigurationError,
         ensure_model_configured,
+        provider_source,
         resolve_effective_model,
-        resolve_effective_provider,
     )
     from veles.runtime.learning import (
         maybe_refresh_nl_routing,
@@ -222,7 +222,10 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
     # `[engine]` → user defaults) instead of letting the bare argparse
     # default through. An unconfigured model errors clearly rather than
     # silently booting on a cloud model.
-    args.provider = resolve_effective_provider(args, project)
+    args.provider, named = provider_source(args, project)
+    # The provider first: a typo there is the error to show, not the missing model.
+    if not check_provider(args.provider, reason=named):
+        return 2
     try:
         args.model = ensure_model_configured(resolve_effective_model(args, project))
     except ConfigurationError as exc:

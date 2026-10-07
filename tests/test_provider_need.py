@@ -1,0 +1,183 @@
+"""Release E: a provider named by config, a flag or a route — known, retired,
+installed from a registry, or unknown."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from veles.core.project import init_project
+from veles.core.project_config import load_project_config, save_project_config
+from veles.core.registry import ensure
+
+
+@pytest.fixture()
+def fake_install(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    calls: list[str] = []
+    monkeypatch.setattr(
+        ensure, "_resolve", lambda spec: SimpleNamespace(ref=spec, ext=SimpleNamespace(version="1"))
+    )
+    monkeypatch.setattr(
+        ensure,
+        "_install",
+        lambda found, *, project, user_scope, preapproved=False: calls.append(found.ref),
+    )
+    ensure.reset_warnings()
+    return calls
+
+
+def test_run_with_an_unknown_provider_says_so(isolated_user_home: Path, capsys) -> None:
+    from veles.cli._console import ensure_api_key
+
+    assert ensure_api_key("opnrouter") is False
+    err = capsys.readouterr().err
+    assert "unknown provider 'opnrouter'" in err and "openrouter" in err
+    # A typo nobody offers is one line — not an install hint for `opnrouter`.
+    assert "not installed" not in err and len(err.strip().splitlines()) == 1
+
+
+def test_a_retired_provider_names_its_replacement(isolated_user_home: Path, capsys) -> None:
+    from veles.cli._console import check_provider
+
+    assert check_provider("gemini-cli") is False
+    assert "removed in 1.2.6" in capsys.readouterr().err
+
+
+def test_a_named_registry_provider_installs_itself(
+    isolated_user_home: Path, fake_install: list[str], capsys
+) -> None:
+    assert ensure.ensure_provider("antigravity-cli", reason="named with --provider") is False
+    assert fake_install == ["public:official/antigravity-cli"]
+    assert "(named with --provider)" in capsys.readouterr().err
+
+
+def test_a_routed_provider_a_registry_offers_installs(
+    isolated_user_home: Path, tmp_path: Path, fake_install: list[str], monkeypatch
+) -> None:
+    from veles.core.registry import catalog
+
+    project = init_project(tmp_path / "p", name="p")
+    cfg = load_project_config(project)
+    cfg["engine"] = {"provider": "openrouter", "model": "x/y"}
+    cfg["routing"] = {"tasks": {"curator": "groqmod:llama", "insights": "typo:m"}}
+    save_project_config(project, cfg)
+    monkeypatch.setattr(
+        catalog,
+        "providers_of",
+        lambda token: ["corp:x/groqmod"] if token == "provider:groqmod" else [],
+    )
+    # The typo nobody offers is doctor's to report, not an install.
+    assert ensure.routed_provider_needs(project) == [
+        ("groqmod", "named in [routing.tasks].curator")
+    ]
+    ensure.ensure_routed_providers(project)
+    assert fake_install == ["corp:x/groqmod"]
+
+
+def test_models_with_an_unknown_provider_says_so(isolated_user_home: Path, capsys) -> None:
+    from veles.cli.commands.models import cmd_models
+
+    rc = cmd_models(argparse.Namespace(provider="nope", refresh=False, as_json=False))
+    assert rc == 2 and "unknown provider 'nope'" in capsys.readouterr().err
+
+
+def test_provider_flag_takes_a_module_provider() -> None:
+    from veles.cli._parsers import build_parser
+
+    args = build_parser().parse_args(["run", "--provider", "some-module-provider", "hi"])
+    assert args.provider == "some-module-provider"
+
+
+def test_daemon_start_with_an_unknown_provider_refuses(
+    isolated_user_home: Path, tmp_path: Path, monkeypatch, capsys, fake_channel
+) -> None:
+    from veles.cli.commands import daemon as daemon_cmd
+
+    project = init_project(tmp_path, name="p")
+    save_project_config(project, {"engine": {"provider": "opnrouter", "model": "m"}})
+    monkeypatch.chdir(tmp_path)
+    args = argparse.Namespace(
+        command="daemon", foreground=True, host="127.0.0.1", port=8765, provider=None
+    )
+    assert daemon_cmd._cmd_daemon_start(args) == 2
+    assert "unknown provider 'opnrouter'" in capsys.readouterr().err
+
+
+def test_doctor_names_a_provider_nothing_provides(isolated_user_home: Path, tmp_path: Path) -> None:
+    from veles.core.doctor import _check_provider_catalog
+    from veles.core.providers import user_catalog_path
+
+    project = init_project(tmp_path / "p", name="p")
+    save_project_config(project, {"routing": {"tasks": {"curator": "typo:m"}}})
+    user_catalog_path().parent.mkdir(parents=True, exist_ok=True)
+    user_catalog_path().write_text('[providers.x]\nkind = "openai-api"\n', encoding="utf-8")
+    result = _check_provider_catalog(project)
+    assert result.status == "warn" and "typo" in result.message
+    assert "no base_url" in (result.details or {}).get("catalogue", [""])[0]
+
+
+def test_wizards_list_registry_providers_after_the_installed(
+    isolated_user_home: Path, monkeypatch
+) -> None:
+    from veles.core.registry import catalog
+
+    offer = SimpleNamespace(ext=SimpleNamespace(provides=("provider:antigravity-cli",)))
+    monkeypatch.setattr(catalog, "search", lambda **kw: ([offer], []))
+    names = ensure.available_providers()
+    assert names[0] == "openrouter" and names[-1] == "antigravity-cli"
+
+
+def test_a_wizard_pick_installs_with_confirmation(isolated_user_home: Path, monkeypatch) -> None:
+    asked: list[tuple[str, bool, bool]] = []
+    monkeypatch.setattr(
+        ensure,
+        "ensure_extension",
+        lambda need, project, *, interactive, auto=False, reason=None: (
+            asked.append((need.name, interactive, auto)) or False
+        ),
+    )
+    assert ensure.ensure_provider_interactive("antigravity-cli") is False
+    assert asked == [("antigravity-cli", True, False)]
+
+
+def test_an_unknown_provider_is_named_before_a_missing_model(
+    isolated_user_home: Path, tmp_path: Path, capsys
+) -> None:
+    from veles.cli._parsers import build_parser
+    from veles.cli.commands.run import cmd_run
+
+    project = init_project(tmp_path / "p", name="p")
+    args = build_parser().parse_args(["run", "--provider", "opnrouter", "hi"])
+    assert cmd_run(args, project) == 2
+    err = capsys.readouterr().err
+    assert "unknown provider 'opnrouter'" in err and "no model" not in err
+
+
+def test_the_install_line_says_where_the_name_came_from(
+    isolated_user_home: Path, fake_install: list[str], capsys
+) -> None:
+    from veles.cli._console import check_provider
+    from veles.cli._parsers import build_parser
+    from veles.core.model_resolver import provider_source
+
+    args = build_parser().parse_args(["run", "--provider", "antigravity-cli", "hi"])
+    check_provider("antigravity-cli", reason=provider_source(args, None)[1])
+    assert "(named with --provider)" in capsys.readouterr().err
+
+
+def test_a_user_default_provider_is_named_as_such(
+    isolated_user_home: Path, tmp_path: Path, fake_install: list[str], capsys
+) -> None:
+    from veles.cli._parsers import build_parser
+    from veles.cli.commands.run import cmd_run
+    from veles.core.user_config import user_config_path
+
+    user_config_path().write_text(
+        '[user]\nlanguage = "en"\ndefault_provider = "antigravity-cli"\n', encoding="utf-8"
+    )
+    project = init_project(tmp_path / "p", name="p")
+    cmd_run(build_parser().parse_args(["run", "hi"]), project)
+    assert "(named as your default provider)" in capsys.readouterr().err

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from veles.channels.session_map import SessionMap, channel_session_path
+from veles.core.chat_sessions import SessionMap, channel_session_path
 from veles.core.proactive.target_resolver import (
     last_active_target,
     resolve_last_active_target,

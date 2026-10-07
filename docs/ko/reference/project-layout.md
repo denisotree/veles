@@ -6,15 +6,15 @@
 
 ## `veles init`이 생성하는 것
 
-사용자 콘텐츠 부분은 선택한 레이아웃 팩(`--layout`, 기본값 `llm-wiki`)에 따라 달라지며, `.veles/` 상태 부분은 어디서나 동일합니다.
+사용자 콘텐츠 부분은 선택한 레이아웃 팩(`--layout`, 기본값 `bare` — `AGENTS.md` 외에는 아무것도 없음)에 따라 달라지며, `.veles/` 상태 부분은 어디서나 동일합니다. 아래는 레지스트리의 `llm-wiki` 레이아웃을 쓰는 프로젝트입니다.
 
 ```
-my-project/                  # veles init  (default llm-wiki layout)
+my-project/                  # veles init --layout llm-wiki
 ├── AGENTS.md                # project context (injected into the agent)
 ├── CLAUDE.md → AGENTS.md    # symlink, so a `claude` CLI picks up the same context
 ├── GEMINI.md → AGENTS.md    # symlink, for a `gemini` CLI
-├── sources/                 # raw, immutable source material (agent-readonly)
-├── wiki/                    # the LLM-writable knowledge zone
+├── sources/                 # (llm-wiki) raw source material, readonly by convention
+├── wiki/                    # (llm-wiki) the LLM-writable knowledge zone
 │   ├── concepts/ entities/ queries/ self-doc/ sessions/
 └── .veles/                  # project state (do not commit; machine-managed)
     ├── project.toml         # name, created_at, schema_version, layout
@@ -28,7 +28,7 @@ my-project/                  # veles init  (default llm-wiki layout)
     └── skills/              # project-local skills
 ```
 
-`--layout notes`를 사용하면 콘텐츠 부분이 단일 `notes/` 디렉터리가 되고, `--layout bare`를 사용하면 콘텐츠 스캐폴드가 전혀 생성되지 않습니다. `wiki/INDEX.md`(온디맨드 카탈로그)는 위키가 성장함에 따라 생성됩니다. `config.toml`, `tools/`, `plans/`는 무언가를 설정하거나, 에이전트가 도구를 작성하거나, 목표를 실행할 때 `.veles/` 아래에 나타납니다.
+기본값인 `bare`에서는 콘텐츠 스캐폴드가 전혀 생성되지 않고, `notes`(레지스트리 제공)에서는 단일 `notes/` 디렉터리가 됩니다. `INDEX.md`(위키의 온디맨드 카탈로그)는 위키가 성장함에 따라 생성됩니다. `config.toml`, `tools/`, `plans/`는 무언가를 설정하거나, 에이전트가 도구를 작성하거나, 목표를 실행할 때 `.veles/` 아래에 나타납니다.
 
 ## 상태 디렉터리
 
@@ -59,4 +59,4 @@ Veles의 프로젝트 메모리는 콘텐츠와 별개이며 레이아웃에 독
 
 ## 레이아웃 팩
 
-`veles init --layout {llm-wiki|notes|bare|<custom>}`은 콘텐츠 레이아웃을 선택합니다. 팩은 스캐폴드, AGENTS.md 템플릿, 쓰기 가능 영역, 그리고 위키 엔진(위키 도구, INDEX 프롬프트 주입, 위키 회상)의 활성화 여부를 소유합니다. [레이아웃 팩 및 LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)를 참조하세요.
+`veles init --layout {bare|llm-wiki|notes|<custom>}`은 콘텐츠 레이아웃을 선택합니다(내장은 `bare`뿐이며, 나머지는 레지스트리에서 제공되고 설치가 제안됩니다). 팩은 스캐폴드, AGENTS.md 템플릿, 쓰기 가능 영역, 그리고 요구하는 콘텐츠 엔진(예: 위키의 경우 위키 도구, INDEX 프롬프트 주입, 위키 회상)을 소유합니다. [레이아웃 팩 및 LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)를 참조하세요.

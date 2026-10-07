@@ -43,7 +43,7 @@ veles        # interactive REPL (bare `veles` with no subcommand)
 
 **복리처럼 쌓이는 메모리** — 모든 세션은 Curator가 정제하여 프로젝트별 메모리(`.veles/`에 저장되는 인사이트, 행동 규칙, 세션 다이제스트)로 만듭니다. 에이전트는 관련 사실과 과거 결정을 자동으로 떠올리므로, 같은 맥락을 다시 설명할 필요가 없어집니다. 메모리는 *어떤* 콘텐츠 레이아웃에서도 동작합니다.
 
-**플러그형 콘텐츠 레이아웃** — `veles init`은 기본적으로 Karpathy 스타일의 LLM 위키를 스캐폴딩합니다. `--layout notes`는 평면 노트 디렉터리를, `--layout bare`는 아무 구조도 추가하지 않습니다(코드 저장소에 이상적). 커스텀 레이아웃 팩은 `~/.veles/layouts/`에 들어가는 단일 TOML 파일입니다.
+**플러그형 콘텐츠 레이아웃** — `veles init`은 기본적으로 아무 구조도 추가하지 않습니다(`bare`, 코드 저장소에 이상적). Karpathy 스타일의 LLM 위키는 `llm-wiki`, 평면 노트 디렉터리는 `notes`를 고르면 되며, 둘 다 확장 레지스트리에서 즉시 설치됩니다. 커스텀 레이아웃 팩은 `~/.veles/layouts/`에 들어가는 단일 TOML 파일입니다.
 
 **프로바이더에 구애받지 않는 라우팅** — OpenRouter, Anthropic, OpenAI, Gemini, Ollama, llamacpp, 또는 `claude`/`gemini` CLI 구독. 작업 유형(계획 수립, 압축, 인사이트 추출)에 따라 서로 다른 모델로 라우팅할 수 있습니다.
 
@@ -123,17 +123,17 @@ veles secret set OPENROUTER_API_KEY    # prompts for value, stores in keychain
 ### 콘텐츠 레이아웃 선택
 
 ```bash
-veles init                  # default: Karpathy-style LLM wiki (sources/ + wiki/)
-veles init --layout notes   # a single flat notes/ directory
-veles init --layout bare    # no content scaffold — code repos, free-form work
+veles init                      # default: bare — no content scaffold (at a terminal it asks)
+veles init --layout llm-wiki    # Karpathy-style LLM wiki (sources/ + wiki/), from the registry
+veles init --layout notes       # a single flat notes/ directory, from the registry
 ```
 
-에이전트 자체의 메모리(`.veles/`에 저장되는 인사이트, 규칙, 세션 다이제스트)는 모든 레이아웃에서 동일하게 동작합니다. 커스텀 팩은 `~/.veles/layouts/<name>/`에 들어가는 하나의 `layout.toml`입니다.
+설치되지 않은 레이아웃은 필요한 것과 함께 설치를 제안합니다(확인은 한 번뿐). 에이전트 자체의 메모리(`.veles/`에 저장되는 인사이트, 규칙, 세션 다이제스트)는 모든 레이아웃에서 동일하게 동작합니다. 커스텀 팩은 `~/.veles/layouts/<name>/`에 들어가는 하나의 `layout.toml`입니다.
 
 ### 지식 베이스 구축 (llm-wiki 레이아웃)
 
 ```bash
-veles add paper.pdf                   # read a source → write a wiki page
+veles add paper.pdf                   # read a source → write a wiki page (the wiki module's verb)
 veles add https://example.com/post    # web pages, PDFs, plain text
 
 veles run "What do we know about the authentication design?"
@@ -324,7 +324,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | 새 프로젝트 생성 |
 | `veles run "<prompt>"` | 단일 턴 에이전트 실행 |
 | `veles` | 대화형 REPL |
-| `veles add <file\|url>` | 소스 수집 → 주제별 위키 페이지 |
+| `veles add <file\|url>` | 소스 수집 → 주제별 위키 페이지 (`wiki` 모듈, llm-wiki 레이아웃) |
 | `veles organize` | 활성 레이아웃에 따라 프로젝트 콘텐츠 재구성(제안 후 적용)|
 | `veles research "<question>"` | 다각도 심층 리서치 |
 | `veles curate` | 세션을 위키로 통합 |

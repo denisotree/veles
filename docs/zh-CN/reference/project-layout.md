@@ -7,15 +7,15 @@
 ## `veles init` 产出的内容
 
 用户内容那一半取决于所选的布局包（`--layout`，
-默认 `llm-wiki`）；而 `.veles/` 状态那一半在任何情况下都是一致的。
+默认 `bare` —— 除 `AGENTS.md` 外什么都没有）；而 `.veles/` 状态那一半在任何情况下都是一致的。下面是注册表中 `llm-wiki` 布局的项目：
 
 ```
-my-project/                  # veles init  (default llm-wiki layout)
+my-project/                  # veles init --layout llm-wiki
 ├── AGENTS.md                # project context (injected into the agent)
 ├── CLAUDE.md → AGENTS.md    # symlink, so a `claude` CLI picks up the same context
 ├── GEMINI.md → AGENTS.md    # symlink, for a `gemini` CLI
-├── sources/                 # raw, immutable source material (agent-readonly)
-├── wiki/                    # the LLM-writable knowledge zone
+├── sources/                 # (llm-wiki) raw source material, readonly by convention
+├── wiki/                    # (llm-wiki) the LLM-writable knowledge zone
 │   ├── concepts/ entities/ queries/ self-doc/ sessions/
 └── .veles/                  # project state (do not commit; machine-managed)
     ├── project.toml         # name, created_at, schema_version, layout
@@ -29,8 +29,8 @@ my-project/                  # veles init  (default llm-wiki layout)
     └── skills/              # project-local skills
 ```
 
-使用 `--layout notes` 时，内容那一半是单个 `notes/` 目录；使用
-`--layout bare` 时则完全没有内容脚手架。`wiki/INDEX.md`（按需
+使用默认的 `bare` 时完全没有内容脚手架；使用 `notes`（来自
+注册表）时则是单个 `notes/` 目录。`INDEX.md`（wiki 的按需
 目录）会随着 wiki 的增长而生成；`config.toml`、`tools/`
 和 `plans/` 会在你配置了某些内容、某个智能体
 写入了工具，或你运行了某个目标后，出现在 `.veles/` 下。
@@ -68,8 +68,9 @@ Veles 的项目记忆是一份**结构化产物**，与你的
 
 ## 布局包
 
-`veles init --layout {llm-wiki|notes|bare|<custom>}` 选择内容
-布局；布局包拥有脚手架、AGENTS.md 模板、可写区域，
-以及 wiki 引擎（wiki 工具、INDEX 提示注入、wiki
-召回）是否启用。参见
+`veles init --layout {bare|llm-wiki|notes|<custom>}` 选择内容
+布局（只有 `bare` 是内置的；其余来自注册表，并会提示安装）；
+布局包拥有脚手架、AGENTS.md 模板、可写区域，
+以及它所要求的内容引擎（例如 wiki：wiki 工具、INDEX
+提示注入、wiki 召回）。参见
 [布局包与 LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)。

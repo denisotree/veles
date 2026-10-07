@@ -9,7 +9,9 @@ respaldo y la anulación.
 ## Claves de API de proveedores
 
 Cascada de búsqueda de la clave de API: llavero del SO (ámbito de proyecto) → llavero del SO (ámbito por defecto)
-→ variable de entorno.
+→ variable de entorno. Qué variables lee un proveedor lo determina el `key_env` de su
+entrada del catálogo — tus propias entradas en `~/.veles/providers.toml` nombran las
+suyas, y `veles secret set <VARIABLE>` guarda una clave donde ese proveedor la lee.
 
 | Variable | Proveedor | Notas |
 |---|---|---|
@@ -18,8 +20,9 @@ Cascada de búsqueda de la clave de API: llavero del SO (ámbito de proyecto) �
 | `OPENAI_API_KEY` | openai | API directa de OpenAI |
 | `GEMINI_API_KEY` | gemini | Clave principal para Google Gemini |
 | `GOOGLE_API_KEY` | gemini | Respaldo para Google Gemini |
+| `OPENAI_COMPAT_API_KEY` | openai-compat | Opcional — para una pasarela que pide clave |
 
-`claude-cli` y `gemini-cli` se autentican mediante sus propios binarios — sin variable de entorno.
+`claude-cli`, `codex` y `antigravity-cli` se autentican mediante sus propios binarios — sin variable de entorno.
 
 ## Proveedores locales
 
@@ -29,7 +32,7 @@ Cascada de búsqueda de la clave de API: llavero del SO (ámbito de proyecto) �
 | `OLLAMA_HOST` | sigue a `OLLAMA_BASE_URL` | Host de Ollama para embeddings |
 | `LLAMACPP_BASE_URL` | `http://localhost:8080/v1` | Endpoint del servidor llama.cpp |
 | `OPENAI_COMPAT_BASE_URL` | — (requerido) | Endpoint del proveedor `openai-compat` |
-| `VELES_LOCAL_TOOLS` | desactivado | Habilita la llamada a herramientas en proveedores locales (`1`/`true`) |
+| `VELES_LOCAL_TOOLS` | detectar | Llamada a herramientas en proveedores locales: `1` la fuerza, `0` la desactiva; sin definir, se detecta a partir del servidor |
 | `VELES_OLLAMA_EMBED_MODEL` | valor por defecto del proveedor | Anula el modelo de embeddings de Ollama |
 | `VELES_LOCAL_JSON_MODE` | activado | Envía `response_format: json_object` en las llamadas locales que deben devolver un objeto JSON (`0` para desactivar) |
 

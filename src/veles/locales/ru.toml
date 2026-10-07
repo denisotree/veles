@@ -4,6 +4,7 @@
 [project_wizard]
 intro_no_project = "В {cwd} не найден проект Veles."
 ask_initialize = "Инициализировать данную директорию как проект Veles? Добавятся дополнительные файлы (.veles/ + AGENTS.md), а файлы проекта будут проиндексированы"
+ask_layout = "Раскладка"
 created_state = "  · создан {state_dir}, написан AGENTS.md skeleton."
 ready = "<проект '{name}' готов. Отредактируй AGENTS.md, чтобы добавить контекст.>"
 ask_provider_override = "Закрепить provider/модель за проектом? (по умолчанию: наследовать user-level)"
@@ -14,7 +15,6 @@ ask_channel = "Подключить чат-канал (например, Telegra
 ask_channel_type = "Тип канала"
 channel_field_required = "  ! обязательное поле канала {channel} пустое; настройка пропущена."
 channel_written = "  · записан канал {channel} → {path}"
-indexed_wiki = "  · проиндексировано {pages} страниц(ы) wiki в FTS-базу."
 
 [goal]
 confirm_line = "Давай проверим, верно ли я понял что нужно: {summary}"
@@ -43,14 +43,11 @@ theme_header = "тема · {count} — печатай для фильтра · 
 no_themes = "темы не найдены"
 theme_cancelled = "выбор темы отменён"
 
-[telegram]
-start_greeting = "Привет! Я Veles. Просто пиши сообщение — я отвечу. Подсказка: /help — список команд."
-history_cleared = "История очищена."
-history_empty = "История уже пуста."
-ack_working = "⏳ Принял в работу, думаю…"
-ack_searching = "🔍 Принял в работу: ищу в базе…"
-ack_writing_note = "✍️ Принял в работу: записываю в базу…"
-ack_building = "🛠 Принял в работу: готовлю инструмент…"
-ack_web = "🌐 Принял в работу: ищу в интернете…"
-ack_reading = "📄 Принял в работу: читаю источник…"
-ack_queued = "📥 Принял, поставил в очередь — вернусь к нему сразу после текущего."
+[prompt_options]
+once = "⏱ Один раз"
+always_project = "🔓 Всегда для этого проекта"
+refuse = "🚫 Отказать"
+yes = "✅ Разрешить"
+no = "❌ Запретить"
+critical_yes = "⚠️ Разрешить"
+critical_no = "🚫 Отменить"

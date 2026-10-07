@@ -126,6 +126,33 @@ def test_upgrade_restores_on_install_failure(setup, monkeypatch) -> None:
     assert not (project.skills_dir / ".alpha.upgrade-backup").exists()
 
 
+def test_upgrade_that_loses_a_race_keeps_the_winners_copy(setup, monkeypatch) -> None:
+    """Between `upgrade` removing the old copy and its install, another install of
+    the same extension finished. The upgrade fails; restoring its backup must not
+    delete or un-record the winner's copy."""
+    remote, project = setup
+    write_extension(remote, "official", "alpha", version="0.2.0")
+    commit_all(remote, "alpha 0.2.0")
+    update(get_source("private"))
+    old = installed_records(project)[0]
+    skill_dir = project.skills_dir / "alpha"
+
+    import veles.core.registry.maintenance as maintenance
+
+    def winner_then_collision(*a: object, **k: object) -> None:
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text("winner\n", encoding="utf-8")
+        put_record(dataclasses.replace(old, version="0.2.0"))
+        raise InstallError(f"{skill_dir} already exists")
+
+    monkeypatch.setattr(maintenance, "install", winner_then_collision)
+    with pytest.raises(InstallError, match="already exists"):
+        upgrade("alpha", project=project)
+    assert (skill_dir / "SKILL.md").read_text(encoding="utf-8") == "winner\n"
+    assert [r.version for r in installed_records(project)] == ["0.2.0"]
+    assert not (project.skills_dir / ".alpha.upgrade-backup").exists()
+
+
 def test_upgrade_restores_on_interrupt(setup, monkeypatch) -> None:
     remote, project = setup
     write_extension(remote, "official", "alpha", version="0.2.0")

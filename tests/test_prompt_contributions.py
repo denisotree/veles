@@ -1,8 +1,8 @@
 """`prompt` contributions: module blocks in the stable system prompt.
 
-The snapshots under `tests/fixtures/prompt/` were taken from 1.2.1's builder
+The snapshot under `tests/fixtures/prompt/` was taken from 1.2.1's builder
 before the wiki blocks moved into the wiki module — the cache prefix must not
-change by a byte.
+change by a byte. (The llm-wiki snapshot is checked with the wiki module.)
 """
 
 from __future__ import annotations
@@ -31,10 +31,9 @@ def build(tmp_path: Path, monkeypatch):
     return _build
 
 
-@pytest.mark.parametrize("layout", ["llm-wiki", "bare"])
-def test_prompt_is_byte_identical_to_1_2_1(build, layout: str) -> None:
-    project, out = build(layout)
-    expected = (_FIXTURES / f"{layout}.txt").read_text(encoding="utf-8")
+def test_prompt_is_byte_identical_to_1_2_1(build) -> None:
+    project, out = build("bare")
+    expected = (_FIXTURES / "bare.txt").read_text(encoding="utf-8")
     assert out is not None
     assert out.replace(str(project.root), "<ROOT>") == expected
 

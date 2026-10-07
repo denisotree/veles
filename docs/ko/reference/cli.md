@@ -8,7 +8,7 @@ Veles의 모든 명령, 하위 명령, 플래그를 정리했습니다. 언제�
 veles [--no-wizard] <command> [subcommand] [options]
 ```
 
-- `--no-wizard` — `~/.veles/config.toml`이 없더라도 첫 실행 설정 마법사를 건너뜁니다(TTY 환경 및 `VELES_NO_WIZARD=1`에도 의존).
+- `--no-wizard` — `~/.veles/config.toml`이 없더라도 첫 실행 설정 마법사를 건너뜁니다(TTY 환경 및 `VELES_NO_WIZARD=1`에도 의존). 마법사는 에이전트를 시작하는 명령(인자 없는 `veles`, `run`, `daemon`, `channel` 등)에서만 열리며, `module`, `tool`, `doctor` 같은 관리용 명령은 마법사를 열지 않습니다.
 - 인자 없이 `veles`만 실행하면 대화형 [TUI](tui.md)가 시작됩니다.
 
 대부분의 에이전트 명령은 [공통 에이전트 루프 플래그](#shared-agent-loop-flags)와 하단에 정리된 [프로바이더 이름](#provider-names)을 받습니다.
@@ -23,7 +23,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | 플래그 | 기본값 | 용도 |
 |---|---|---|
 | `name` (위치 인자) | cwd 베이스명 | 프로젝트 이름 |
-| `--layout <name>` | `llm-wiki` | 콘텐츠 스캐폴드용 레이아웃 팩(`llm-wiki`, `notes`, `bare`, 또는 `~/.veles/layouts/`의 커스텀 팩) |
+| `--layout <name>` | `bare` (터미널에서는 질문함) | 콘텐츠 스캐폴드용 레이아웃 팩(`bare`, `llm-wiki`나 `notes`처럼 레지스트리에서 설치한 팩, 또는 `~/.veles/layouts/`의 커스텀 팩). 설치되지 않은 팩은 설치를 제안하며, 거부하면 아무것도 생성되지 않음 |
 | `--force` | off | `.veles/`가 이미 있어도 다시 생성 |
 
 ### `veles schema {validate,edit,fix}`
@@ -34,7 +34,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 - `fix` — LLM 마법사로 누락된 섹션을 대화형으로 추가합니다.
 
 ### `veles self-doc [refresh|show]`
-프로젝트 자체 문서(`wiki/self-doc/overview.md`)를 생성하고 표시합니다. 인자 없는 `veles self-doc`은 현재 페이지를 보여주고, `refresh`는 다시 생성합니다.
+프로젝트 자체 문서를 생성하고 표시합니다 — 레이아웃에 페이지 저장소가 있으면 그곳에(위키: `wiki/self-doc/overview.md`), 없으면 `.veles/memory/self-doc.md`에 저장됩니다. 인자 없는 `veles self-doc`은 현재 페이지를 보여주고, `refresh`는 다시 생성합니다.
 
 ### `veles doctor`
 사용자 전역 상태와 활성 프로젝트에 대해 상태 점검을 실행합니다. 활성 프로젝트가 있든 없든 동작합니다.
@@ -94,10 +94,13 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `--theme <name>` | config 또는 `everforest` | 색상 테마(everforest, dracula, gruvbox, tokyo-night, catppuccin) |
 
 ### `veles add <source>`
-소스(로컬 파일 또는 `http(s)://` URL)를 읽어 위키 페이지로 종합합니다. 공통 에이전트 루프 플래그를 받습니다.
+*(`wiki` 모듈에서 제공 — `veles registry install llm-wiki` 또는 `… install wiki`)*
+소스(로컬 파일 또는 `http(s)://` URL)를 읽어 위키 페이지로 종합합니다. 모듈이 없으면 `veles add`는 알 수 없는 명령이며, 오류 메시지가 설치 방법을 알려줍니다.
+
+모듈도 같은 방식으로 자체 동사를 추가할 수 있으며, 해당 모듈이 있는 프로젝트 안의 `veles --help`에 표시됩니다. 공통 에이전트 루프 플래그를 받습니다.
 
 ### `veles curate`
-큐레이터를 한 번 실행합니다. 미처리 세션을 `wiki/sessions/` 페이지로 압축합니다.
+큐레이터를 한 번 실행합니다. 미처리 세션을 메모리 인사이트로 압축합니다(위키 엔진이 켜져 있으면 `wiki/sessions/` 페이지로도).
 
 | 플래그 | 기본값 | 용도 |
 |---|---|---|
@@ -150,18 +153,24 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `list` | 이 프로젝트의 `memory.db`에 등록된 도구 나열 |
 | `show <name>` | 도구의 매니페스트 + 텔레메트리 출력 |
 | `promote <name> [-y]` | 프로젝트 도구를 `~/.veles/tools/`로 이동(프로젝트 간 공유) |
-| `approve [<name>] [--all] [-y]` | 로더가 실행하도록 직접 작성한 도구 파일을 검토 + 승인 |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | 로더가 실행하도록 직접 작성한 도구 파일을 검토 + 승인 |
 
-직접 작성한 도구(`.veles/tools/*.py`)는 로더가 임포트할 때 모듈 수준 코드를 실행하므로, 새로 만들거나 수정한 파일은 **승인하기 전에는 로드되지 않습니다** — `veles tool approve`는 코드를 보여주고 그 해시를 기록합니다. 인자 없는 `veles tool approve`는 대기 중인 항목을 나열합니다. 에이전트가 작성한 도구가 호출 가능해지기 전에 검토 단계가 필요한 이유입니다.
+직접 작성한 도구(`.veles/tools/*.py`)는 로더가 임포트할 때 모듈 수준 코드를 실행하므로, 새로 만들거나 수정한 파일은 **승인하기 전에는 로드되지 않습니다** — `veles tool approve`는 코드를 보여주고 그 해시를 기록합니다. 인자 없는 `veles tool approve`는 대기 중인 항목을 각 파일의 sha256과 함께 나열합니다. 에이전트가 작성한 도구가 호출 가능해지기 전에 검토 단계가 필요한 이유입니다.
 
-### `veles module {list,show,add,remove}`
+터미널이 없을 때(배포 스크립트)는 검토한 해시로 파일 하나를 승인합니다. `veles tool approve <name> --sha256 <hash>` — 그 이후 파일이 바뀌었다면 실패합니다. `-y`는 터미널에서만 확인 프롬프트를 건너뜁니다.
+
+### `veles module {list,show,add,remove,approve}`
 
 | 하위 명령 | 용도 |
 |---|---|
 | `list` | 설치된 모듈 나열 |
-| `show <name>` | 모듈의 매니페스트 출력 |
+| `show <name>` | 모듈의 매니페스트와 파일 sha256 출력 |
 | `add <source> [--name N] [-y]` | git URL 또는 로컬 경로에서 모듈 설치 |
 | `remove <name> [-y]` | 설치된 모듈 삭제 |
+| `approve <name> [--user] [--sha256 H]` | 검토 후 모듈 승인 |
+| `approve --all [--user]` | 해당 범위에서 승인을 기다리는 모든 모듈 — 모듈마다 한 번씩 확인 |
+
+승인은 터미널에서 `yes` 입력을 요구합니다. 터미널이 없으면 검토한 파일 해시(`show`가 출력함)를 `--sha256`으로 전달하세요 — 그 이후 파일이 바뀌었다면 실패합니다. `veles doctor`는 디스크에 있으면서 로드되지 않는 모든 모듈을 보고합니다.
 
 ### `veles registry search [query] [--kind K]`
 연결된 레지스트리를 검색합니다 (모듈, 스킬, 레이아웃 팩, MCP 레시피).
@@ -223,11 +232,11 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `refresh [--force]` | `AGENTS.md`의 자연어 라우팅 힌트를 다시 파싱 |
 
 ### `veles models <provider>`
-프로바이더의 모델을 나열합니다. 클라우드 프로바이더(openrouter/openai/gemini)는 24시간 캐시되고, 로컬 프로바이더는 항상 실시간입니다.
+프로바이더의 모델을 나열합니다. 클라우드 프로바이더(openrouter/openai/gemini)는 24시간 캐시되고, 로컬 프로바이더, `codex`, `antigravity-cli`는 항상 실시간입니다. 알 수 없는 프로바이더는 존재하는 목록을 보여 주는 한 줄 오류입니다(종료 코드 `2`).
 
 | 플래그 | 기본값 | 용도 |
 |---|---|---|
-| `provider` (위치 인자) | — | [프로바이더 이름](#provider-names) 중 하나 |
+| `provider` (위치 인자) | — | [카탈로그](#provider-names)의 프로바이더 id |
 | `--refresh` | off | 디스크 캐시 우회(클라우드만 해당) |
 | `--json` | off | `{provider, source, models}`를 JSON으로 출력 |
 
@@ -312,12 +321,12 @@ HTTP+WS 데몬을 실행/제어합니다. 인자 없는 `veles daemon`은 **데�
 `start`는 공통 에이전트 루프 플래그도 받습니다. 데몬의 경우 `--model` / `--provider`는 프로젝트 설정을 기본값으로 사용하며, 데몬이 살아 있는 동안 고정됩니다.
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-데몬과 통신하는 외부 채팅 게이트웨이(Telegram, …). [Telegram 연결](../how-to/connect-telegram.md)을 참고하세요.
+데몬과 통신하는 외부 채팅 게이트웨이(Telegram, …). 플랫폼은 확장 레지스트리의 모듈이며, `run`과 `add`는 모듈이 없으면 설치합니다. [Telegram 연결](../how-to/connect-telegram.md)을 참고하세요.
 
 | 하위 명령 | 용도 |
 |---|---|
-| `list` | 등록된 채널 플랫폼 + 세션 수 나열 |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | 포그라운드로 게이트웨이 시작 |
+| `list` | 설치된 채널 플랫폼 + 세션 수, 모듈이 없는 선언된 채널 나열 |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | 포그라운드로 게이트웨이 시작; `--secret`은 플랫폼의 기본 시크릿(없으면 키체인 또는 환경 변수) |
 | `list-sessions [--channel C]` | `chat_id → session_id` 매핑 표시 |
 | `reset-session <chat_id> [--channel C]` | 매핑 삭제(다음 메시지부터 새로 시작) |
 | `add [--channel C] [--session S]` | 채널을 데몬에 연결(마법사; 자격 증명 → 키체인) |
@@ -353,6 +362,8 @@ HTTP+WS 데몬을 실행/제어합니다. 인자 없는 `veles daemon`은 **데�
 
 ## 프로바이더 이름
 
-`openrouter`(기본) · `anthropic` · `openai` · `gemini` · `claude-cli` · `gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider`와 `veles models`는 프로바이더 카탈로그의 모든 id를 받습니다 — 내장 프로바이더, 사용자의 `~/.veles/providers.toml`, 설치된 모듈이 제공하는 프로바이더입니다.
 
-로컬 프로바이더(`ollama`, `llamacpp`, `openai-compat`)는 API 키가 필요 없습니다. [프로바이더 레퍼런스](providers.md)와 [프로바이더 설정](../how-to/configure-providers.md)을 참고하세요.
+`openrouter`(기본) · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` · `ollama` · `llamacpp` · `openai-compat`(내장)
+
+레지스트리 모듈만 제공하는 프로바이더(`antigravity-cli`)는 이름을 지정하면 스스로 설치됩니다. 로컬 프로바이더(`ollama`, `llamacpp`, `openai-compat`)는 API 키가 필요 없습니다. [프로바이더 레퍼런스](providers.md)와 [프로바이더 설정](../how-to/configure-providers.md)을 참고하세요.

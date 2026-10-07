@@ -14,12 +14,12 @@ user can `daemon <id> delete` to clear it.
 from __future__ import annotations
 
 import json
-import os
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from veles.core.io_utils import atomic_write_text
+from veles.core.process import is_alive
 from veles.core.user_paths import user_home
 
 _REGISTRY_FILENAME = "daemons.json"
@@ -105,18 +105,6 @@ class DaemonRegistry:
 
 
 # ---------------- helpers ----------------
-
-
-def is_alive(pid: int) -> bool:
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
 
 
 def status_for(entry: DaemonEntry) -> str:

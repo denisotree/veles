@@ -43,7 +43,7 @@ veles        # interactive REPL (just run `veles` with no subcommand)
 
 **Une mémoire cumulative** — Chaque session est distillée par le Curateur dans la mémoire propre à chaque projet (enseignements, règles comportementales, résumés de sessions dans `.veles/`). L'agent se remémore automatiquement les faits pertinents et les décisions passées — vous cessez de ré-expliquer le même contexte. La mémoire fonctionne sous *n'importe quelle* organisation de contenu.
 
-**Des organisations de contenu modulables** — `veles init` échafaude par défaut un wiki LLM façon Karpathy ; `--layout notes` donne un répertoire de notes à plat ; `--layout bare` n'ajoute aucune structure (idéal pour les dépôts de code). Les packs d'organisation personnalisés tiennent dans un unique fichier TOML placé dans `~/.veles/layouts/`.
+**Des organisations de contenu modulables** — `veles init` n'ajoute aucune structure par défaut (`bare`, idéal pour les dépôts de code) ; choisissez `llm-wiki` pour un wiki LLM façon Karpathy ou `notes` pour un répertoire de notes à plat, tous deux installés à la volée depuis le registre d'extensions. Les packs d'organisation personnalisés tiennent dans un unique fichier TOML placé dans `~/.veles/layouts/`.
 
 **Un routage indépendant du fournisseur** — OpenRouter, Anthropic, OpenAI, Gemini, Ollama, llamacpp, ou votre abonnement CLI `claude`/`gemini`. Différents types de tâches (planification, compression, enseignements) peuvent être routés vers différents modèles.
 
@@ -123,17 +123,17 @@ veles secret set OPENROUTER_API_KEY    # prompts for value, stores in keychain
 ### Choisir une organisation de contenu
 
 ```bash
-veles init                  # default: Karpathy-style LLM wiki (sources/ + wiki/)
-veles init --layout notes   # a single flat notes/ directory
-veles init --layout bare    # no content scaffold — code repos, free-form work
+veles init                      # default: bare — no content scaffold (at a terminal it asks)
+veles init --layout llm-wiki    # Karpathy-style LLM wiki (sources/ + wiki/), from the registry
+veles init --layout notes       # a single flat notes/ directory, from the registry
 ```
 
-La mémoire propre de l'agent (enseignements, règles, résumés de sessions dans `.veles/`) fonctionne de façon identique sous chaque organisation. Les packs personnalisés tiennent dans un unique `layout.toml` placé dans `~/.veles/layouts/<name>/`.
+Une organisation non installée est proposée à l'installation (avec ce dont elle a besoin, en une seule confirmation). La mémoire propre de l'agent (enseignements, règles, résumés de sessions dans `.veles/`) fonctionne de façon identique sous chaque organisation. Les packs personnalisés tiennent dans un unique `layout.toml` placé dans `~/.veles/layouts/<name>/`.
 
 ### Constituer une base de connaissances (organisation llm-wiki)
 
 ```bash
-veles add paper.pdf                   # read a source → write a wiki page
+veles add paper.pdf                   # read a source → write a wiki page (the wiki module's verb)
 veles add https://example.com/post    # web pages, PDFs, plain text
 
 veles run "What do we know about the authentication design?"
@@ -325,7 +325,7 @@ veles import ./backup.tar.gz --into ./new-dir
 | `veles init [name]` | Créer un nouveau projet |
 | `veles run "<prompt>"` | Exécution d'agent en un seul tour |
 | `veles` | REPL interactif (sans sous-commande) |
-| `veles add <file\|url>` | Ingérer une source → pages de wiki thématiques |
+| `veles add <file\|url>` | Ingérer une source → pages de wiki thématiques (du module `wiki`, organisation llm-wiki) |
 | `veles organize` | Réorganiser le contenu du projet selon le layout actif (proposer puis appliquer) |
 | `veles research "<question>"` | Recherche approfondie multi-angles |
 | `veles curate` | Consolider les sessions dans le wiki |

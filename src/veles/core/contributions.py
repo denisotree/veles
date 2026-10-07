@@ -18,10 +18,13 @@ from __future__ import annotations
 import functools
 import importlib
 import sys
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
+from veles.core.platforms import PlatformSpec
+from veles.core.providers import ProviderSpec, builtin_ids
 from veles.core.text import shown
 
 if TYPE_CHECKING:
@@ -58,7 +61,6 @@ class Contribution:
 CONTRIBUTION_POINTS: dict[str, Point] = {}
 
 BUILTIN_MODULES: tuple[str, ...] = (
-    "veles.modules.wiki",
     "veles.modules.agentops",
     "veles.modules.organize",
 )
@@ -133,8 +135,17 @@ def _call[T](point: str, found: list[Contribution], fn: Callable[[Contribution],
     return out
 
 
-@functools.cache
+_builtin_lock = threading.RLock()
+
+
 def _builtin_registry() -> ModuleRegistry:
+    # Daemon worker threads can ask first at the same moment; the builtins load once.
+    with _builtin_lock:
+        return _load_builtins()
+
+
+@functools.cache
+def _load_builtins() -> ModuleRegistry:
     from veles.core.modules import ModuleAPI, ModuleRegistry
 
     registry = ModuleRegistry()
@@ -153,7 +164,7 @@ def _builtin_registry() -> ModuleRegistry:
 
 def reset_builtin_contributions() -> None:
     """Forget the loaded builtins (tests swap `BUILTIN_MODULES`)."""
-    _builtin_registry.cache_clear()
+    _load_builtins.cache_clear()
     _warned.clear()
 
 
@@ -169,6 +180,10 @@ class Engine:
 # registry dry-run child must see all of them without importing their consumers.
 register_point(Point("memory"))
 register_point(Point("engine", kind=Engine))
+# A messaging platform the daemon hosts as a channel — consumer: core/platforms.py
+register_point(Point("platform", kind=PlatformSpec))
+# Release E: an LLM provider. A builtin id can't be taken (core/providers.toml).
+register_point(Point("provider", kind=ProviderSpec, reserved=builtin_ids()))
 # (project, query, *, limit) -> list[RecallHit] — consumer: core/memory/router.py
 register_point(Point("recall", reserved=frozenset({"insights", "turns", "about", "extra"})))
 
@@ -237,9 +252,31 @@ class PageSource:
 
 
 register_point(Point("subproject_source", kind=PageSource))
-# (project, content) -> project-relative path, or None when it doesn't take it
-# — consumer: core/self_doc.py
-register_point(Point("self_doc"))
+
+
+@dataclass(frozen=True, slots=True)
+class PageStore:
+    """A module that keeps pages. `write(project, category, slug, title, content)`
+    returns the project-relative path (raises `ValueError` on a bad slug);
+    `read(project, category, slug)` returns the page text or None. Active when
+    `engine` (if any) is on for the project."""
+
+    write: Callable[..., str]
+    read: Callable[..., str | None]
+    engine: str | None = None
+
+
+# — consumers: core/self_doc.py (category "self-doc"), the REPL's /save and
+#   `veles self-doc show`
+register_point(Point("page_store", kind=PageStore))
+
+
+def page_store(project: Project | None) -> PageStore | None:
+    """The project's active page store — the first one, when several are."""
+    found = active(project, "page_store")
+    return found[0].obj if found else None  # type: ignore[return-value]
+
+
 # (root: Path, manifest: LayoutManifest) -> None, for every applied pack
 # — consumer: core/layout/scaffold.py
 register_point(Point("scaffold"))
@@ -259,6 +296,64 @@ class BackgroundOp:
 register_point(
     Point("background_op", kind=BackgroundOp, key=lambda op: op.kind)  # type: ignore[attr-defined]
 )
+
+
+@dataclass(frozen=True, slots=True)
+class SlashReply:
+    """What a module's slash command answers: `text` to show; `submit_prompt`, when
+    set, runs as the next agent turn; `error` marks the text as an error."""
+
+    text: str = ""
+    submit_prompt: str | None = None
+    error: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class SlashCommand:
+    """A REPL command `/<contribution name>`: `run(project, arg) -> SlashReply`.
+    Shown only where `engine` (if any) is on; builtin command names stay builtin."""
+
+    run: Callable[..., SlashReply]
+    summary: str = ""
+    usage: str = ""
+    engine: str | None = None
+
+
+# — consumer: cli/repl/slash/builtin.py (build_default_registry)
+register_point(Point("slash_command", kind=SlashCommand))
+
+
+class CommandHost(Protocol):
+    """What the CLI does for a module's command: `run_agent` builds an agent the
+    way `veles run` does (provider, key check, the project's run system prompt for
+    `prompt_hint`, the given `tools`), runs `message` as one turn — a callable is
+    called only once the provider is ready — and returns the exit code."""
+
+    def run_agent(
+        self,
+        message: str | Callable[[], str],
+        *,
+        tools: tuple[str, ...],
+        prompt_hint: str,
+        fallback_prompt: str = "",
+    ) -> int: ...
+
+
+@dataclass(frozen=True, slots=True)
+class CliCommand:
+    """A `veles <contribution name>` verb: `add_arguments(parser)` declares its
+    arguments; `run(args, project, host: CommandHost) -> int` runs it inside the
+    project. `run_flags` adds the shared agent flags (`--provider`, `--model`, …).
+    Builtin verb names stay builtin."""
+
+    help: str
+    add_arguments: Callable[..., None]
+    run: Callable[..., int]
+    run_flags: bool = False
+
+
+# — consumer: cli/__init__.py + cli/module_commands.py
+register_point(Point("cli_command", kind=CliCommand))
 
 
 def active(project: Project | None, point: str) -> list[Contribution]:
@@ -297,13 +392,18 @@ __all__ = [
     "BUILTIN_MODULES",
     "CONTRIBUTION_POINTS",
     "BackgroundOp",
+    "CliCommand",
+    "CommandHost",
     "Contribution",
     "CuratorTarget",
     "DreamStep",
     "Engine",
     "PageInfo",
     "PageSource",
+    "PageStore",
     "Point",
+    "SlashCommand",
+    "SlashReply",
     "ToolSet",
     "active",
     "call_active",
@@ -311,6 +411,7 @@ __all__ = [
     "check",
     "contributions",
     "load_tool_sets",
+    "page_store",
     "refuse_builtin_collisions",
     "register_point",
     "reset_builtin_contributions",

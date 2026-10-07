@@ -2,7 +2,17 @@
 
 > 🌐 **言語:** [English](../../en/reference/providers.md) · [简体中文](../../zh-CN/reference/providers.md) · [繁體中文](../../zh-TW/reference/providers.md) · **日本語** · [한국어](../../ko/reference/providers.md) · [Español](../../es/reference/providers.md) · [Français](../../fr/reference/providers.md) · [Italiano](../../it/reference/providers.md) · [Português (BR)](../../pt-BR/reference/providers.md) · [Português (PT)](../../pt-PT/reference/providers.md) · [Русский](../../ru/reference/providers.md) · [العربية](../../ar/reference/providers.md) · [हिन्दी](../../hi/reference/providers.md) · [বাংলা](../../bn/reference/providers.md) · [Tiếng Việt](../../vi/reference/providers.md)
 
-Veles はプロバイダー非依存です。任意のエージェントコマンドに `--provider <name>` を渡すか、設定でデフォルトを指定します。モデル ID は各プロバイダー独自の命名を使用します。
+Veles はプロバイダー非依存です。任意のエージェントコマンドに `--provider <id>` を渡すか、設定でデフォルトを指定します。モデル ID は各プロバイダー独自の命名を使用します。
+
+## プロバイダーカタログ
+
+Veles が知っているプロバイダーはすべて、3 つのソースから構築された 1 つのカタログのエントリーです。
+
+1. **ビルトイン** — 下の表。Veles に同梱されています。
+2. **自分のもの** — `~/.veles/providers.toml`: エントリーを追加すると、ホスト型の OpenAI 互換 API や自分で動かすサーバーを使えます（[独自のプロバイダーを追加する](../how-to/configure-providers.md#独自のプロバイダーを追加する)を参照）。ビルトインと同じ id のエントリーは、そのプロバイダーの設定（たとえば `base_url`）を上書きします。
+3. **モジュール** — レジストリのモジュールが提供するプロバイダー（`antigravity-cli`）。`[engine] provider`、ルート、または `--provider` で指定すると、宣言済みのチャンネルと同じように、次回の実行時に接続済みのレジストリからインストールされます。
+
+`--provider`、`veles models`、セットアップウィザード、ルーティング、`veles doctor` はすべてこのカタログを読むため、どのソースのプロバイダーもビルトインと同じ場所で使えます。未知の id は、存在するものを列挙した 1 行のエラーになります。`veles doctor` は `~/.veles/providers.toml` と、ルートが指定するすべてのプロバイダーも検査します。
 
 | プロバイダー | 種別 | API キー | 備考 |
 |---|---|---|---|
@@ -10,11 +20,13 @@ Veles はプロバイダー非依存です。任意のエージェントコマ�
 | `anthropic` | クラウド直接 | `ANTHROPIC_API_KEY` | Claude Messages API、プロンプトキャッシング |
 | `openai` | クラウド直接 | `OPENAI_API_KEY` | GPT chat completions |
 | `gemini` | クラウド直接 | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
-| `claude-cli` | サブプロセス | —（CLI セッション） | ローカルの `claude` CLI に JSON ストリームモードで委譲 |
-| `gemini-cli` | サブプロセス | —（CLI セッション） | ローカルの `gemini` CLI に委譲 |
+| `claude-cli` | CLI 委譲 | —（CLI セッション） | ローカルの `claude` CLI に JSON ストリームモードで委譲 |
+| `codex` | CLI 委譲 | —（CLI セッション） | ローカルの `codex` CLI に委譲（ChatGPT サブスクリプション） |
 | `ollama` | ローカル | なし | `OLLAMA_BASE_URL`（デフォルト `http://localhost:11434/v1`） |
 | `llamacpp` | ローカル | なし | `LLAMACPP_BASE_URL`（デフォルト `http://localhost:8080/v1`） |
-| `openai-compat` | ローカル/カスタム | なし | `OPENAI_COMPAT_BASE_URL`（必須、デフォルトなし） |
+| `openai-compat` | ローカル/カスタム | 任意の `OPENAI_COMPAT_API_KEY` | `OPENAI_COMPAT_BASE_URL`（必須、デフォルトなし） |
+
+`gemini-cli` は 1.2.6 で削除されました — Google は個人アカウント向けに Gemini CLI を提供しなくなったためです。API キーを使う `gemini`、または `antigravity-cli` モジュールを使ってください。
 
 デフォルトのプロバイダー: `openrouter`。**ハードコードされたデフォルトモデルはありません** — セットアップウィザード、`[engine] model`、または `--model` で指定してください（指定しないとエージェントは「no model configured」と報告します）。タスクごとのルートは、`[routing.tasks]` で上書きしない限り `[engine]` をベースとして継承します。[タスク別ルーティング](../how-to/per-task-routing.md)を参照してください。
 
@@ -22,18 +34,21 @@ Veles はプロバイダー非依存です。任意のエージェントコマ�
 
 `ollama`、`llamacpp`、`openai-compat` は API キーを必要としません。インストール済みモデルは `veles models <provider>` で一覧表示できます（ローカルプロバイダーでは常にライブ取得）。
 
-ローカルプロバイダーでは**ツール呼び出しはデフォルトで無効**です。多くのローカルモデルは不正なツール呼び出しを生成するためです。ツール対応のモデルを選んだら有効にしてください:
+**ツール呼び出しは検出されます**。バックエンドが通知する内容に基づきます。ollama はモデルごとの機能を報告し、llama.cpp サーバーはチャットテンプレートの機能を報告します。`VELES_LOCAL_TOOLS=1` でツール呼び出しを強制的に有効に、`=0` で無効にします。未設定なら検出に任せます。
 
 ```bash
-export VELES_LOCAL_TOOLS=1
 veles run --provider ollama --model qwen3:4b-instruct "..."
 ```
 
 エンドポイントは `*_BASE_URL` 環境変数で上書きします（[環境変数](environment-variables.md)を参照）。
 
-## CLI 委譲（`claude-cli`、`gemini-cli`）
+## CLI 委譲（`claude-cli`、`codex`、`antigravity-cli`）
 
-Claude または Gemini の CLI サブスクリプションを持っている場合、Veles はそのバイナリを JSON ストリーミングモードで実行し、コーディネーターとして振る舞うことができます。別途 API キーを用意せずにループをローカルファーストに保てます。Veles のツールがサブプロセスに到達するのは、MCP ブリッジが設定されている場合のみです。
+Claude、ChatGPT または Google のサブスクリプションを持っている場合、Veles はその CLI をヘッドレスで実行し、コーディネーターとして振る舞うことができます。別途 API キーは不要です。`claude-cli` と `codex` はビルトインです。`antigravity-cli`（`agy` CLI）はレジストリのモジュールで、指定すると自動的にインストールされます。
+
+委譲先はモデルにすぎません。Veles のツールは MCP ブリッジ経由で届き、すべての呼び出しが Veles のトラストラダーを通ります。ブリッジの設定は実行中プロセスのディレクトリ `.veles/tmp/delegate-<pid>/` にあり、プロセスの終了時に削除されます。`agy` はプロジェクトの外（`~/.veles/tmp/` 配下）にある作業用の一時ワークスペースで実行されるため、プロジェクト自身の `.agents/` の設定は届きません。さらに、自身のシェルとファイルツールを拒否するゲートの内側に置かれます。
+
+`codex` もプロジェクトの外（`~/.veles/tmp/` 配下）で実行され、あなたの codex 設定は無視され、自身のツール（シェル、ファイル編集、画像、サブエージェント、ブラウザー、Web 検索）はオフにされます。Veles はこれらのフラグ名をプロセスごとに 1 回確認し、依存しているフラグの名前が変わった codex の実行を拒否します。MCP サーバーはファイルではなく引数で渡されます。`veles run` では、codex は claude ほど確実には Veles のツールプロトコルに従いません。ツールを呼ばずに「ファイルを読めない」と答えることがあります。その場合はもう一度尋ねるか、ツール名を指定してください（"use read_file on …"）。
 
 ## マルチモーダルの状況（ビジョン / 音声認識）
 

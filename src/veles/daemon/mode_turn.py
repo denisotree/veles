@@ -25,7 +25,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from veles.core.agent import RunResult
+from veles.core.agent import RunResult, UsageSnapshot
 from veles.daemon.runner import TurnFn
 from veles.daemon.state import ChatModeState, DaemonState
 
@@ -108,9 +108,14 @@ def make_mode_turn(state: DaemonState, *, session_id: str, prompt: str) -> TurnF
             chat.mode = None if app.mode == "auto" else app.mode
         state.save_chat_modes()  # M282: a goal started or ended in this turn
 
+        usage = _turn_usage(done)  # every agent the turn ran, for /tokens (M116b)
         if outcome is not None:
             return RunResult(
-                text=outcome, iterations=0, stopped_reason="synthetic", session_id=session_id
+                text=outcome,
+                iterations=0,
+                stopped_reason="synthetic",
+                session_id=session_id,
+                usage=usage,
             )
         if not done:
             raise RuntimeError(f"agent mode {mode_name!r} ended the turn without a result")
@@ -121,10 +126,12 @@ def make_mode_turn(state: DaemonState, *, session_id: str, prompt: str) -> TurnF
                 iterations=0,
                 stopped_reason="synthetic",
                 session_id=session_id,
+                usage=usage,
             )
         if result.session_id is None:
             result.session_id = session_id
         result.text = _for_the_chat(result.text)
+        result.usage = usage
         return result
 
     return turn
@@ -175,6 +182,23 @@ def _drive_if_ready(
 
 
 _AUTONOMOUS = ("plan", "execute", "check")
+
+
+def _turn_usage(results: list[RunResult]) -> UsageSnapshot:
+    """The tokens of every agent a mode turn ran (a goal runs its plan, steps
+    and checks in one turn), summed; the context size is the latest one's."""
+    usages = [r.usage for r in results]
+    return UsageSnapshot(
+        prompt_tokens=sum(u.prompt_tokens for u in usages),
+        completion_tokens=sum(u.completion_tokens for u in usages),
+        total_tokens=sum(u.total_tokens for u in usages),
+        cache_read_tokens=sum(u.cache_read_tokens for u in usages),
+        cache_creation_tokens=sum(u.cache_creation_tokens for u in usages),
+        reasoning_tokens=sum(u.reasoning_tokens for u in usages),
+        last_prompt_tokens=next(
+            (u.last_prompt_tokens for u in reversed(usages) if u.last_prompt_tokens), 0
+        ),
+    )
 
 
 def _for_the_chat(text: str) -> str:

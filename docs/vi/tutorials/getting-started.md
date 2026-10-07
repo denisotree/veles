@@ -58,9 +58,11 @@ mkdir my-notes && cd my-notes
 veles init my-notes
 ```
 
-Lệnh này tạo `AGENTS.md` (ngữ cảnh dự án của bạn), `sources/` và `wiki/`
-([layout LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md) mặc định), và
-`.veles/` (trạng thái máy). Xem [layout dự án](../reference/project-layout.md).
+Lệnh này tạo `AGENTS.md` (ngữ cảnh dự án của bạn) và `.veles/` (trạng thái máy) —
+layout `bare` mặc định không thêm gì khác. Tại terminal, `veles init` hỏi dùng
+[layout](../explanation/layout-packs-and-llm-wiki.md) nào; chọn `llm-wiki` (được cài
+từ registry ngay tại chỗ) để có `sources/` và `wiki/`.
+Xem [layout dự án](../reference/project-layout.md).
 
 ## 4. Chạy prompt đầu tiên
 

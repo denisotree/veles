@@ -15,6 +15,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+from veles.core.critical_ops import refuse_in_agent_shell
 from veles.core.io_utils import atomic_write_text, dump_toml
 from veles.core.path_guard import has_control_char
 from veles.core.user_config import read_user_config_raw, user_config_path
@@ -59,6 +60,8 @@ def get_source(name: str) -> RegistrySource:
 
 
 def add_source(url: str, *, name: str | None = None, ref: str | None = None) -> RegistrySource:
+    # A connected registry is a code source auto-installs trust (`[channels.X]`).
+    refuse_in_agent_shell("connecting a registry")
     sources = list_sources()
     taken = {s.name for s in sources}
     if name is None:

@@ -67,6 +67,14 @@ _REGISTERING_DECORATORS = ("tool", "property", "hook", "setter", "command")
 # by design, with its reason.
 _BASELINE = frozenset(
     {
+        # The public test kit for channel modules (`veles.sdk.channel_checks`):
+        # a registry channel's own tests call it on its platform spec.
+        "check_builds_from_config",
+        "check_config_keys",
+        "check_delivers",
+        # The STT adapter protocol (`veles.sdk.media`): its caller is the
+        # registry's Telegram channel, which transcribes voice messages.
+        "transcribe",
         # An observation hook that lets tests read state from outside instead
         # of reaching into `_active_state` (reviewed 2026-09-22).
         "current_state",
@@ -85,8 +93,6 @@ _BASELINE = frozenset(
         # Validates curated knowledge notes' `related` refs — the check lives
         # in the knowledge freshness test.
         "skeleton_ref_index",
-        # Test cleanup for the platform registry, like the `reset_` hooks.
-        "unregister_platform",
     }
 )
 

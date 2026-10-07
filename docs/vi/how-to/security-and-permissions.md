@@ -76,33 +76,101 @@ cụ nó ghi vào `.veles/tools/` chỉ được nạp sau khi bạn duyệt t�
 viết khác của cùng một tệp (hoa/thường, `..`, symlink) cũng bị từ chối.
 
 Các tệp tự chạy mà không cần lệnh tường minh, hoặc điều khiển một agent CLI — mọi thứ
-dưới `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`, `.vscode/`,
+dưới `.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.agents/`, `.codex/`, `.vscode/`,
 `.devcontainer/`, `.husky/`, và `.envrc`, `.mcp.json`, `.pre-commit-config.yaml`,
 `lefthook.yml`, ở bất kỳ độ sâu nào, cộng với thư mục `core.hooksPath` của repo và
 nơi một `.git` dạng symlink trỏ tới — các công cụ tệp của agent chỉ ghi sau khi bạn
 xác nhận lần ghi đó. Các quyền trust và autopilot không bao gồm việc này; daemon hỏi
 trong kênh, còn một lần chạy batch không có ai để hỏi thì từ chối.
 
-Các provider `claude-cli` và `gemini-cli` chạy như một model chỉ với các công cụ của
-Veles: shell, công cụ sửa tệp và web riêng của chúng, cài đặt và hook `.claude/` của
+Các provider `claude-cli`, `codex` và `antigravity-cli` chạy như một model chỉ với các công cụ
+của Veles: shell, công cụ sửa tệp và web riêng của chúng, cài đặt và hook `.claude/` của
 dự án, cùng các máy chủ MCP khác đều không áp dụng, và mọi công cụ Veles chúng gọi
 đều đi qua thang trust ở trên (ở đó không ai trả lời được prompt, nên bất cứ thứ gì
-chưa được cấp đều bị từ chối).
+chưa được cấp đều bị từ chối). Config MCP của chúng nằm trong
+`.veles/tmp/delegate-<pid>/`, mỗi tiến trình đang chạy một thư mục, mà các công cụ tệp
+của agent không ghi vào được. `agy` chạy trong một workspace tạm bên ngoài dự án, dưới
+`~/.veles/tmp/`, nên các hook và máy chủ MCP trong `.agents/` của chính dự án không bao
+giờ đến được nó. Nó chạy kèm `--dangerously-skip-permissions` khi có các công cụ của
+Veles — nếu không agy từ chối các lệnh gọi MCP ở chế độ headless — và một hook trong
+workspace đó từ chối mọi công cụ của chính nó; một hook bị lỗi cũng từ chối. Các công
+cụ tệp của Veles không ghi ra ngoài dự án, nên agy không thể ghi đè hook đó qua chúng. `codex` cũng chạy bên ngoài dự án, với
+config codex của bạn bị bỏ qua, một sandbox chỉ đọc và các công cụ riêng của nó bị tắt
+bằng các feature flag mà Veles kiểm tra tên trước mỗi lần chạy đầu tiên — một codex đã
+đổi tên flag mà nó phụ thuộc sẽ bị từ chối, không được chạy ở trạng thái mở. MCP server
+của nó nằm trong tham số (không có tệp config), chỉ các công cụ của server đó được phê
+duyệt, và môi trường server đó nhận được được chuyển tiếp theo tên — không bao giờ là
+`VELES_TRUST_AUTO_ALLOW`.
+
+### `run_shell` trong sandbox của hệ điều hành
+
+Các lệnh agent chạy bằng `run_shell` chạy trong một sandbox của hệ điều hành —
+`sandbox-exec` trên macOS, `bwrap` (bubblewrap) trên Linux — khiến các đường dẫn sau
+chỉ đọc đối với chúng: hook và config của mọi repo trong dự án (với worktree hoặc
+submodule thì là của repo chính), mọi tệp cấu hình mà git đọc (các include của nó,
+`~/.gitconfig`, tệp của hệ thống) và thư mục `core.hooksPath`; các
+tên tự chạy ở trên (`.envrc`, `.claude/`, `.mcp.json`, …) ở bất kỳ độ sâu nào;
+`.veles/` của dự án, trừ `skills/`, `tools/`, `tmp/`, `plans/`, `memory/` và
+`artifacts/`; `~/.veles/` (các phê duyệt, trust, module của bạn); các tệp khởi động
+của shell (`~/.zshrc`, `~/.bashrc`, …), `~/.ssh/`, LaunchAgents và
+các mục tự khởi động; cùng `~/.claude/`, `~/.codex/`, `~/.gemini/`. Các đường dẫn đó,
+thư mục cha của chúng và các repo cũng không thể bị né bằng cách đổi tên. Mọi thứ còn
+lại vẫn hoạt động như trước: dự án, `git commit`, repo mới (`git init`, `git clone`),
+cache gói, thư mục tạm và mạng. Khi một
+lần ghi bị từ chối, agent được nhắc hỏi bạn.
+
+`veles doctor` cho biết sandbox có đang hoạt động hay không. Để tắt nó, đặt
+`[sandbox] enabled = false` trong `~/.veles/config.toml` — config của chính dự án thì
+không tắt được.
+
+Trên Linux, `bwrap` cần user namespace không đặc quyền. Ubuntu 24.04 trở lên hạn chế
+chúng qua AppArmor; hãy cho phép chúng riêng cho `bwrap` bằng một profile:
+
+```
+# /etc/apparmor.d/bwrap — then: sudo apparmor_parser -r /etc/apparmor.d/bwrap
+abi <abi/4.0>,
+include <tunables/global>
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
+```
+
+Trong Docker, sandbox cần `--security-opt seccomp=unconfined --security-opt
+apparmor=unconfined`. Ở nơi nó không khởi động được, `run_shell` chạy như trước và
+Veles cảnh báo một lần.
 
 Các giới hạn đã biết:
 
-- `run_shell` là một shell: một khi bạn cấp quyền cho nó (hoặc dưới autopilot), nó có
-  thể ghi bất kỳ tệp nào ở trên mà không cần xác nhận theo từng tệp.
-- Một phê duyệt MCP ghim dòng lệnh của máy chủ, không ghim các tệp nó chạy từ dự án
-  (một script nêu trong `args`) — hãy xem xét cả chúng.
+- Ở nơi sandbox không hoạt động, `run_shell` là một shell: một khi bạn cấp quyền cho
+  nó (hoặc dưới autopilot), nó có thể ghi bất kỳ tệp nào ở trên mà không cần xác nhận
+  theo từng tệp — và cả các kho phê duyệt trong `~/.veles/`. `veles … approve` cần một
+  terminal hoặc hash đã được xem xét (`--sha256`) và từ chối lệnh do shell của agent
+  khởi chạy, nhưng một shell đã được cấp quyền vẫn có thể gỡ dấu đó hoặc ghi trực tiếp
+  vào các tệp đó.
+- Sandbox bảo vệ việc ghi, không bảo vệ việc đọc, cũng không bảo vệ mạng. Các thư mục
+  trong `PATH` của bạn (`~/.local/bin`) vẫn ghi được.
+- Nó chặn các tiến trình của chính lệnh, không chặn một dịch vụ mà lệnh nhờ hành động
+  thay: một container nó khởi chạy bằng `docker run -v …`, `systemd-run`, `launchctl`
+  hay `osascript` ghi với tư cách của bạn.
+- Một repo do lệnh tạo ra (`git init`) chưa được bảo vệ cho đến lệnh kế tiếp; repo mới ở
+  thư mục gốc của dự án sẽ được báo cho bạn.
+- Trên Linux, sandbox chỉ bảo vệ được các đường dẫn đã tồn tại, và tìm các tên được bảo
+  vệ sâu tới sáu cấp trong dự án: một `.envrc` mới ở thư mục gốc hoặc một tệp khởi động
+  mới trong thư mục home của bạn (`~/.bash_profile`) vẫn có thể được tạo ra — Veles báo
+  cho bạn biết đồng thời ghi vào nhật ký bộ nhớ — và một symlink trên đường tới dự án
+  (`~/code` → `/Volumes/…`) có thể bị thay thế. macOS từ chối cả hai.
+- Một phê duyệt MCP bao gồm các script của dự án nêu trong `command`/`args` và các
+  module chạy bằng `-m` (ở thư mục gốc hoặc dưới `src/`), không bao gồm các tệp mà
+  chúng import.
 - Với một provider CLI, các lần chạy chỉ tiền cấp quyền công cụ cho riêng mình (tác vụ
-  nền của daemon, `veles research`) không truyền điều đó cho CLI được ủy quyền: các
-  công cụ Veles của nó cần một quyền cấp thường trực `veles trust set` hoặc một cửa
-  sổ autopilot. Chế độ lập kế hoạch của lần chạy cha cũng không tới được chúng.
-- `gemini-cli` tin cậy thư mục dự án trong lần chạy của nó, nên gemini cũng đọc `.env`
-  của dự án — đừng để trong đó các cài đặt gemini mà bạn không muốn agent điều khiển.
-- Trên máy có chính sách gemini được quản lý (cấp hệ thống), gemini bỏ qua chính sách
-  Veles truyền vào, nên ở đó `gemini-cli` không bị giới hạn trong các công cụ của Veles.
+  nền của daemon, `veles research`) không truyền điều đó cho CLI được ủy quyền: việc
+  tiền cấp quyền nằm trong tiến trình Veles, còn máy chủ MCP mà CLI khởi động là một
+  tiến trình riêng, nên các công cụ Veles của nó cần một quyền cấp thường trực
+  `veles trust set` hoặc một cửa sổ autopilot. Chế độ lập kế hoạch của lần chạy cha
+  cũng không tới được chúng.
+- `antigravity-cli` dựa vào việc agy tôn trọng `.agents/hooks.json` của workspace nó;
+  một bản phát hành agy ngừng đọc hook của workspace sẽ để các công cụ riêng của nó
+  mở dưới `--dangerously-skip-permissions`.
 
 Đường dẫn chứa ký tự điều khiển (chuỗi escape của terminal, ký tự đảo chiều bidi) bị
 từ chối, còn các xác nhận, lời nhắc trust và bản xem trước diff hiển thị các ký tự đó

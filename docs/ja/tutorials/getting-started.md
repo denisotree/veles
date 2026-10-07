@@ -52,7 +52,7 @@ mkdir my-notes && cd my-notes
 veles init my-notes
 ```
 
-これにより、`AGENTS.md`（プロジェクトコンテキスト）、`sources/` と `wiki/`（デフォルトの [LLM-Wiki レイアウト](../explanation/layout-packs-and-llm-wiki.md)）、そして `.veles/`（マシン状態）が作成されます。[プロジェクトレイアウト](../reference/project-layout.md)を参照してください。
+これにより、`AGENTS.md`（プロジェクトコンテキスト）と `.veles/`（マシン状態）が作成されます — デフォルトの `bare` レイアウトはそれ以外に何も追加しません。ターミナルでは、`veles init` がどの[レイアウト](../explanation/layout-packs-and-llm-wiki.md)を使うか尋ねます。`llm-wiki`（その場でレジストリからインストールされます）を選ぶと `sources/` と `wiki/` が得られます。[プロジェクトレイアウト](../reference/project-layout.md)を参照してください。
 
 ## 4. 最初のプロンプトを実行する
 

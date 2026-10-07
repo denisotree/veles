@@ -1,17 +1,16 @@
-"""Provider factory — build a chat-only `Provider` from a CLI provider name.
+"""Provider factory — build a chat-only `Provider` from a catalogue id.
 
 Extracted from `cli.py` in M44 so builtin tools (notably `advisor_review`)
 can spawn sub-agents on a routed `(provider, model)` pair without an
-import cycle through the CLI layer. Tool-aware providers (with MCP
-bridging for cli-delegates) still live in `cli.py` since they need
-project-scoped MCP-config wiring.
+import cycle through the CLI layer. The providers themselves are the
+catalogue (`core/providers.py`): builtin, the user's `providers.toml`, and
+module contributions; this module builds one and answers the key questions
+about it.
 
-Direct-API providers (`openrouter`, `anthropic`, `openai`, `gemini`)
-take their API key from environment variables listed in
-`PROVIDER_API_KEY_ENVS`. cli-delegate providers (`claude-cli`,
-`gemini-cli`) authenticate through their own binary's auth state and
-return False from `has_api_key` since they cannot drive arbitrary
-chat-only sub-agents.
+A provider with a key takes it from the keychain or the env vars its
+catalogue entry lists in `key_env`. A cli-delegate provider (`claude-cli`)
+authenticates through its own binary's auth state and returns False from
+`has_api_key` since it cannot drive arbitrary chat-only sub-agents.
 
 Local-model providers (`ollama`, `llamacpp`, `openai-compat`) introduced
 in M78 don't need any credentials; `has_api_key` returns True for them
@@ -42,25 +41,21 @@ from veles.core.provider import Provider
 if TYPE_CHECKING:
     from veles.adapters.local._base import LocalOpenAIBase
 
-PROVIDER_API_KEY_ENVS: dict[str, tuple[str, ...]] = {
-    "openrouter": ("OPENROUTER_API_KEY",),
-    "anthropic": ("ANTHROPIC_API_KEY",),
-    "openai": ("OPENAI_API_KEY",),
-    "gemini": ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
-}
-
-LOCAL_PROVIDERS: frozenset[str] = frozenset({"ollama", "llamacpp", "openai-compat"})
-CLI_PROVIDERS: frozenset[str] = frozenset({"claude-cli", "gemini-cli"})
-
 
 def needs_api_key(provider: str) -> bool:
-    """False for local servers and subscription CLIs, which carry no key."""
-    return provider not in LOCAL_PROVIDERS and provider not in CLI_PROVIDERS
+    """False for a provider that carries no key (local servers, subscription CLIs)."""
+    from veles.core.providers import find_provider
+
+    spec = find_provider(provider)
+    return True if spec is None else spec.needs_key
 
 
 def env_api_key(provider: str) -> tuple[str, str] | None:
     """`(env_name, value)` of the first set env var for `provider`, or None."""
-    for name in PROVIDER_API_KEY_ENVS.get(provider, ()):
+    from veles.core.providers import find_provider
+
+    spec = find_provider(provider)
+    for name in spec.key_env if spec else ():
         value = os.environ.get(name)
         if value:
             return name, value
@@ -79,10 +74,13 @@ def _local_tools_override() -> bool | None:
     return raw in {"1", "true", "yes", "on"}
 
 
-def _apply_local_tool_policy(provider: LocalOpenAIBase, model: str | None) -> None:
+def apply_local_tool_policy(
+    provider: LocalOpenAIBase, model: str | None, mode: str = "auto"
+) -> None:
     """Set `provider.supports_tools` for a freshly-built local provider.
 
-    An explicit `VELES_LOCAL_TOOLS` value wins (force on/off). Otherwise
+    A catalogue entry's `tools = "on"|"off"` forces it. Otherwise an explicit
+    `VELES_LOCAL_TOOLS` value wins (force on/off). Otherwise
     auto-detect through the provider's `model_supports_tools` probe — ollama's
     `/api/show` per model, llama.cpp's `/props` per server. When the capability
     can't be determined (no probe, or probe error) default to off: a tool-blind
@@ -94,6 +92,9 @@ def _apply_local_tool_policy(provider: LocalOpenAIBase, model: str | None) -> No
     startup and answers for itself, so refusing to ask left `llamacpp` tool-blind
     even against a server that advertises support. Probes that need the name and
     don't get one still return False on their own."""
+    if mode in ("on", "off"):
+        provider.supports_tools = mode == "on"
+        return
     override = _local_tools_override()
     if override is not None:
         provider.supports_tools = override
@@ -109,79 +110,37 @@ def _apply_local_tool_policy(provider: LocalOpenAIBase, model: str | None) -> No
 
 
 def make_provider(name: str, model: str | None = None) -> Provider:
-    """Build a chat-only provider (no MCP bridging) from its CLI name.
+    """Build a chat-only provider (no MCP bridging) from its catalogue id.
 
     `model` (when given) lets local providers auto-detect tool-call support
-    from the model's advertised capabilities — see `_apply_local_tool_policy`.
+    from the model's advertised capabilities — see `apply_local_tool_policy`.
     """
-    if name == "openrouter":
-        from veles.adapters.openrouter import OpenRouterProvider
+    from veles.core.context import current_project
+    from veles.core.providers import RETIRED, ProviderContext, find_provider
 
-        # M247: a reasoning model generates for minutes before emitting visible
-        # text, and the flat 120s default killed a long run mid-stream. M266
-        # moved the decision into the constructor, so every build site — this
-        # one, the CLI runtime, and the MCP server — gets it from one place.
-        return OpenRouterProvider(model=model)
-    if name == "anthropic":
-        from veles.adapters.anthropic import AnthropicProvider
-
-        return AnthropicProvider()
-    if name == "openai":
-        from veles.adapters.openai_direct import OpenAIProvider
-
-        return OpenAIProvider()
-    if name == "gemini":
-        from veles.adapters.gemini import GeminiProvider
-
-        return GeminiProvider()
-    if name == "claude-cli":
-        from veles.adapters.cli.claude_cli import ClaudeCLIProvider
-        from veles.core.context import current_project
-
-        # The project root, not wherever the process happens to run.
-        project = current_project()
-        return ClaudeCLIProvider(workdir=project.root if project else None)
-    if name == "gemini-cli":
-        from veles.adapters.cli.gemini_cli import GeminiCLIProvider
-
-        return GeminiCLIProvider()
-    if name == "ollama":
-        from veles.adapters.local.ollama import OllamaProvider
-
-        prov: LocalOpenAIBase = OllamaProvider()
-        _apply_local_tool_policy(prov, model)
-        return prov
-    if name == "llamacpp":
-        from veles.adapters.local.llamacpp import LlamaCppProvider
-
-        prov = LlamaCppProvider()
-        _apply_local_tool_policy(prov, model)
-        return prov
-    if name == "openai-compat":
-        from veles.adapters.local.openai_compatible import OpenAICompatibleProvider
-
-        prov = OpenAICompatibleProvider()
-        _apply_local_tool_policy(prov, model)
-        return prov
-    raise ValueError(f"unknown provider: {name!r}")
+    if name in RETIRED:
+        raise ValueError(RETIRED[name])
+    spec = find_provider(name)
+    if spec is None:
+        raise ValueError(f"unknown provider: {name!r}")
+    return spec.build(ProviderContext(name=name, model=model, project=current_project()))
 
 
 def has_api_key(provider_name: str, *, project: str | None = None) -> bool:
-    """Return True iff a key is available for a direct-API provider.
+    """True iff a sub-agent can run on `provider_name` with what is configured.
 
-    M92: lookup is delegated to `core.secrets.get_provider_key` which
-    consults keychain `veles:<provider>:<project>`, then `veles:<provider>:default`,
-    then ENV. cli-delegate providers (`claude-cli`, `gemini-cli`) return
-    False — they authenticate via their own binary and can't power
-    chat-only sub-agents. Local-model providers (`ollama`, `llamacpp`,
-    `openai-compat`) return True unconditionally — they don't authenticate.
-    """
-    if provider_name in LOCAL_PROVIDERS:
-        return True
-    if provider_name not in PROVIDER_API_KEY_ENVS:
-        return False
+    CLI delegates return False — they authenticate through their own binary and
+    can't power chat-only sub-agents. A provider with no key to carry (local
+    servers) returns True. Otherwise the key is looked up where the runtime reads
+    it (`core.secrets.get_provider_key`: project scope, default scope, env)."""
+    from veles.core.providers import find_provider
     from veles.core.secrets import get_provider_key
 
+    spec = find_provider(provider_name)
+    if spec is None or spec.wire == "cli":
+        return False
+    if not spec.needs_key:
+        return True
     return get_provider_key(provider_name, project=project) is not None
 
 
@@ -201,13 +160,16 @@ def require_api_key(
     key = resolve_api_key(provider_name, explicit=explicit)
     if key:
         return key
-    envs = PROVIDER_API_KEY_ENVS.get(provider_name, ())
+    from veles.core.providers import find_provider
+
+    spec = find_provider(provider_name)
+    envs = spec.key_env if spec else ()
     hint = env_hint or (envs[0] if envs else "")
     if hint:
         raise RuntimeError(
             f"no API key configured for provider {provider_name!r}. "
             f"Set ${hint}, configure it via bare `veles` (first-run wizard) or "
-            f"`veles secret add {provider_name}`."
+            f"`veles secret set {hint}`."
         )
     raise RuntimeError(f"no API key configured for provider {provider_name!r}.")
 

@@ -64,9 +64,10 @@ affidabili](../../en/how-to/extension-registries.md#keep-installs-honest)).
 veles module list                              # both scopes, with a `scope` column
 veles module add https://github.com/org/module.git
 veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
-veles module show <name> [--user]
+veles module show <name> [--user]             # manifest + sha256 dei file
 veles module remove <name> [--user]
-veles module approve <name> [--user]
+veles module approve <name> [--user]          # digita `yes` in un terminale
+veles module approve <name> --sha256 <hash>   # senza terminale: l'hash che hai revisionato
 ```
 
 I moduli vivono su due livelli, come skill e strumenti: locali al progetto

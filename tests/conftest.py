@@ -261,6 +261,8 @@ def _hermetic_user_home(
     *config file* scope is isolated here."""
     home_root = tmp_path_factory.mktemp("veles-user-home")
     monkeypatch.setenv("VELES_USER_HOME", str(home_root))
+    # Run from an agent's `run_shell`, the suite inherits the mark that refuses approvals.
+    monkeypatch.delenv("VELES_AGENT_SHELL", raising=False)
 
 
 @pytest.fixture
@@ -338,3 +340,81 @@ def isolated_user_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Itera
     veles_dir = home_root / ".veles"
     veles_dir.mkdir(exist_ok=True)
     yield veles_dir
+
+
+_FIXTURE_LAYOUTS = Path(__file__).parent / "fixtures" / "layouts"
+
+
+@pytest.fixture
+def wiki_engine(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
+    """Core's side of a content engine without the wiki itself (it ships from the
+    registry): the `wiki-test` layout (asks for the `wiki` engine, context file
+    INDEX.md) is discoverable whatever user home a test sets, and a stub module
+    contributes the engine. Yields the layout name."""
+    from veles.core.contributions import Engine
+    from veles.core.layout import clear_engine_cache, discovery
+    from veles.core.modules import (
+        ModuleAPI,
+        ModuleRegistry,
+        reset_module_registry,
+        set_module_registry,
+    )
+
+    real_roots = discovery._search_roots
+    monkeypatch.setattr(
+        discovery,
+        "_search_roots",
+        lambda project: [*real_roots(project), ("user", _FIXTURE_LAYOUTS)],
+    )
+    scratch, registry = ModuleRegistry(), ModuleRegistry()
+    ModuleAPI(scratch, "wiki-stub").contribute("engine", "wiki", Engine("wiki"))
+    registry.merge_from(scratch, "wiki-stub")
+    token = set_module_registry(registry)
+    clear_engine_cache()
+    try:
+        yield "wiki-test"
+    finally:
+        reset_module_registry(token)
+        clear_engine_cache()
+
+
+@pytest.fixture
+def fake_platform() -> Iterator[None]:
+    """A live module registry contributing the test platform `fake`
+    (`tests/channels/fake_platform.py`) — core's side of a channel without a
+    real messaging platform."""
+    from tests.channels.fake_platform import FAKE_SPEC, contributing
+
+    with contributing({"fake": FAKE_SPEC}):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def _module_registry_restored() -> Iterator[None]:
+    """CLI paths load modules into the process-wide registry, as a real run does
+    (`veles daemon start`/`restart`, a channel wizard). A test that drives one
+    gets its registry back afterwards, so the next test starts where it began."""
+    from veles.core.modules import (
+        current_module_registry,
+        reset_module_registry,
+        set_module_registry,
+    )
+
+    token = set_module_registry(current_module_registry())
+    try:
+        yield
+    finally:
+        reset_module_registry(token)
+
+
+@pytest.fixture
+def fake_channel(fake_platform, monkeypatch: pytest.MonkeyPatch) -> None:
+    """For daemon lifecycle tests: the daemon sees one ready channel (`fake`),
+    whatever project the test builds — a daemon without one does not start."""
+    from veles.core import channel_setup
+
+    monkeypatch.setattr(
+        channel_setup,
+        "channel_readiness",
+        lambda project, session=None: [channel_setup.ChannelStatus("fake", "ok")],
+    )

@@ -1,0 +1,7 @@
+{"type":"thread.started","thread_id":"t2"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"I’ll locate the Veles MCP read_file tool, then use it on `NOTES.txt`."}}
+{"type":"item.started","item":{"id":"item_1","type":"mcp_tool_call","server":"veles","tool":"read_file","arguments":{"path":"NOTES.txt"},"result":null,"error":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"mcp_tool_call","server":"veles","tool":"read_file","arguments":{"path":"NOTES.txt"},"result":{"content":[{"type":"text","text":"     1\tsecret-line\n"}],"structured_content":null},"error":null,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"`NOTES.txt` contains:\n\n```text\nsecret-line\n```"}}
+{"type":"turn.completed","usage":{"input_tokens":40132,"cached_input_tokens":35072,"cache_write_input_tokens":0,"output_tokens":130,"reasoning_output_tokens":0}}

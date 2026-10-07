@@ -50,10 +50,12 @@ from aiohttp import web
 
 from veles.cli.commands.daemon_lifecycle import (
     _bootstrap_daemon,
+    _channel_ready_or_say_why,
     _cleanup_daemon_exit,
     _detach_and_report,
     _graceful_stop,
     _mark_session_running,
+    _prepare_channels,
     _register_in_registry,
     _resolve_instance_paths,
     _restart_named_session,
@@ -154,8 +156,6 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
         )
         return 2
 
-    _warn_on_security_config_typos(project)
-
     # Named daemon session (M135): must already be declared (config block or
     # runtime_sessions row). Its `[daemon.<name>]` block is the declarative
     # source-of-truth for host/port — resolve them here so the whole
@@ -190,14 +190,41 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     # silently ignored them and always bound the argparse default).
     _resolve_daemon_bind(args, project, name)
 
+    # Release C: a daemon hosts channels, and a channel's platform comes from a
+    # module. Load the modules and install the platform of every channel the
+    # config declares (the config is the user's decision) — first, so a provider
+    # a loaded module contributes is in the catalogue for the checks below.
+    _prepare_channels(project, name)
+    from veles.core.registry.ensure import ensure_routed_providers
+
+    # Release E: a provider the config routes to and a registry offers installs.
+    ensure_routed_providers(project)
+
     # M130: resolve via the unified cascade (project [engine] → user
     # [user] → DEFAULT) so the API-key check targets the provider the
     # daemon will actually boot on — not a bare `args.provider` that is
     # `None` when no `--provider` was passed. M135: named sessions add a
     # `[daemon.<name>] provider` layer below an explicit `--provider`.
-    from veles.core.model_resolver import resolve_effective_provider
+    from veles.core.model_resolver import (
+        ConfigurationError,
+        ensure_model_configured,
+        provider_source,
+        resolve_effective_model,
+    )
 
-    provider_name = resolve_effective_provider(args, project, daemon_session=name)
+    provider_name, named = provider_source(args, project, daemon_session=name)
+    from veles.cli._console import check_provider
+
+    # The provider first: a typo there is the error to show, not the missing model.
+    if not check_provider(provider_name, reason=named):
+        return 2
+    # The model is fixed for the daemon's lifetime: an unset one is a one-line
+    # error here, as for `veles run`, not a traceback from the agent factory.
+    try:
+        ensure_model_configured(resolve_effective_model(args, project, daemon_session=name))
+    except ConfigurationError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     if not _ensure_api_key(provider_name, project=project.name):
         return 2
     # M184: reflect the resolved provider (incl. any `[daemon.<name>]` override)
@@ -206,14 +233,19 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     # continuous curator on `args.provider`; a bare None silently disables it.
     args.provider = provider_name
 
-    # M173/M208: in an already-initialised project with no channel configured,
-    # run the Textual start wizard (bind + channel) before we detach. The
-    # fresh-project path already offers a channel inside the project wizard;
-    # this closes the gap for `daemon start` on an existing project. Parent
-    # only — the detached child re-enters with `--foreground` and must not
-    # re-prompt.
+    # Refuse to start with no channel ready. The parent checks before it
+    # detaches; the `--foreground` child checks again — it is the authority for
+    # paths without a terminal (picker, wizard autostart, systemd).
+    # After the modules: a channel block's keys are known only from its platform.
+    _warn_on_security_config_typos(project)
+
+    # M173/M208: in an already-initialised project with no channel ready, run
+    # the Textual start wizard (bind + channel) before we detach. Parent only —
+    # the detached child re-enters with `--foreground` and must not re-prompt.
     if not getattr(args, "foreground", False):
         _maybe_run_start_wizard(args, project, session=name)
+    if not _channel_ready_or_say_why(project, name):
+        return 1
 
     # M113: detach by default. The child re-enters this function with
     # `--foreground` set and falls through to the real server loop.
@@ -438,21 +470,17 @@ def _maybe_run_start_wizard(args: argparse.Namespace, project, *, session: str |
     (live 2026-07-09). Host/port picked in the wizard apply to THIS launch.
 
     Skips silently when non-interactive, opted out (`--no-wizard` /
-    `VELES_NO_WIZARD=1`), or a channel already exists. Falls back to the
-    legacy stdin offer (M173, shared `add_channel` flow) when Textual is
-    unavailable or the TUI fails."""
+    `VELES_NO_WIZARD=1`), or a channel is ready. Falls back to the legacy stdin
+    offer (M173, shared `add_channel` flow) when Textual is unavailable or the
+    TUI fails."""
     if getattr(args, "no_wizard", False) or os.environ.get("VELES_NO_WIZARD") == "1":
         return
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         return
-    from veles.core.project_config import get_section, load_project_config
+    from veles.core.channel_setup import channel_readiness
 
-    cfg = load_project_config(project)
-    channels = (
-        get_section(cfg, "daemon", session, "channels") if session else get_section(cfg, "channels")
-    )
-    if any(isinstance(v, dict) for v in channels.values()):
-        return  # a channel is already configured for this daemon
+    if any(s.state == "ok" for s in channel_readiness(project, session)):
+        return  # a daemon needs one ready channel, and this one has it
 
     host = str(getattr(args, "host", None) or DEFAULT_DAEMON_HOST)
     try:
@@ -486,7 +514,7 @@ def _offer_channel_stdin(project, *, session: str | None) -> None:
 
     if not _ask_yes_no(
         _default_prompter,
-        "No channel is connected to this daemon. Connect one now (e.g. Telegram)?",
+        "No channel is ready for this daemon — a daemon needs one. Connect one now?",
         default=False,
     ):
         return
@@ -641,6 +669,21 @@ def _cmd_daemon_restart(args: argparse.Namespace) -> int:
     entry = registry.get(slug)
     if entry is None:
         print(f"error: no daemon named {slug!r} in registry.", file=sys.stderr)
+        return 1
+    # Checked before the stop: the new daemon would refuse, and the running one stays.
+    from veles.core.project import ProjectNotFound, load_project
+
+    try:
+        project = load_project(Path(entry.project_path))
+    except ProjectNotFound:
+        print(
+            f"error: daemon {slug!r} belongs to {entry.project_path}, which is no longer a "
+            f"Veles project; not restarting it (`veles daemon delete {slug}` forgets it).",
+            file=sys.stderr,
+        )
+        return 1
+    _prepare_channels(project, None)
+    if not _channel_ready_or_say_why(project, None):
         return 1
     if is_alive(entry.pid) and not _graceful_stop(entry.pid, timeout=5.0):
         print(f"error: daemon pid {entry.pid} did not stop.", file=sys.stderr)

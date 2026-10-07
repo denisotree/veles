@@ -33,6 +33,53 @@ def scan_python(root: Path) -> list[str]:
     return findings
 
 
+_NATIVE_SUFFIXES = (".so", ".pyd", ".dylib", ".dll")
+
+
+def native_binaries(root: Path) -> list[str]:
+    """Compiled libraries in a payload — code a reviewer cannot read."""
+    return [
+        f"{p.relative_to(root).as_posix()}: native binary (unreviewable code)"
+        for p in sorted(root.rglob("*"))
+        if p.is_file() and (p.suffix in _NATIVE_SUFFIXES or ".so." in p.name)
+    ]
+
+
+def non_sdk_imports(root: Path) -> list[str]:
+    """`<file>:<line> <module>` for every import of Veles outside `veles.sdk` in a
+    module's runtime code. The top-level `tests/` directory is exempt: tests run
+    in registry CI against a pinned Veles and may build fixtures from internals.
+    (A file elsewhere is runtime code whatever its name.)"""
+    found: list[str] = []
+    for path in sorted(root.rglob("*.py")):
+        rel = path.relative_to(root).as_posix()
+        if rel.startswith("tests/"):
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=rel)
+        except (SyntaxError, UnicodeDecodeError):
+            continue  # `scan_python` already reports it
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                # `from veles import sdk` names the module veles.sdk itself.
+                names = [
+                    f"{node.module}.{a.name}" if node.module == "veles" else node.module
+                    for a in node.names
+                ]
+            else:
+                continue
+            found += [f"{rel}:{node.lineno} {n}" for n in names if _outside_sdk(n)]
+    return found
+
+
+def _outside_sdk(name: str) -> bool:
+    if name != "veles" and not name.startswith("veles."):
+        return False
+    return not (name == "veles.sdk" or name.startswith("veles.sdk."))
+
+
 def _classify(node: ast.AST) -> str | None:
     if isinstance(node, ast.Import | ast.ImportFrom):
         names = (

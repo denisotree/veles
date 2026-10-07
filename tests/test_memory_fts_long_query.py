@@ -129,17 +129,6 @@ def test_shared_function_words_do_not_manufacture_matches(store: SessionStore) -
     assert store.search_turns("how does the curator decide which sessions to keep in memory")
 
 
-def test_wiki_search_shares_the_same_escaper(store: SessionStore) -> None:
-    """Wiki is one of the five recall streams — it must not stay on plain AND.
-
-    Otherwise a long prompt retrieves turns and insights but zero wiki pages.
-    """
-    from veles.core.fts import escape_query
-    from veles.modules.wiki.wiki import _fts_escape
-
-    assert _fts_escape is escape_query
-
-
 def test_insight_search_gets_the_same_treatment(store: SessionStore) -> None:
     store._conn.execute(
         "INSERT INTO insights(title, body, category, created_at, confidence) VALUES (?,?,?,?,?)",

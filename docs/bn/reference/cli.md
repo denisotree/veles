@@ -12,6 +12,8 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 - `--no-wizard` — `~/.veles/config.toml` অনুপস্থিত থাকলেও প্রথম-রানের সেটআপ
   উইজার্ড এড়িয়ে যায় (এটি একটি TTY এবং `VELES_NO_WIZARD=1`-এর উপরও নির্ভরশীল)।
+  উইজার্ড কেবল সেই কমান্ডগুলোর আগে আসে যা এজেন্ট চালু করে (খালি `veles`, `run`, `daemon`,
+  `channel`, …); `module`, `tool` ও `doctor`-এর মতো অ্যাডমিন কমান্ড কখনো এটি খোলে না।
 - কোনো আর্গুমেন্ট ছাড়া `veles` ইন্টারঅ্যাক্টিভ [TUI](tui.md) চালু করে।
 
 বেশিরভাগ এজেন্ট কমান্ড নিচে তালিকাভুক্ত [শেয়ার্ড এজেন্ট-লুপ ফ্ল্যাগ](#shared-agent-loop-flags)
@@ -28,7 +30,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | ফ্ল্যাগ | ডিফল্ট | উদ্দেশ্য |
 |---|---|---|
 | `name` (positional) | cwd basename | প্রজেক্টের নাম |
-| `--layout <name>` | `llm-wiki` | কন্টেন্ট স্ক্যাফোল্ডের জন্য লেআউট প্যাক (`llm-wiki`, `notes`, `bare`, অথবা `~/.veles/layouts/` থেকে একটি কাস্টম প্যাক) |
+| `--layout <name>` | `bare` (টার্মিনালে জিজ্ঞেস করা হয়) | কন্টেন্ট স্ক্যাফোল্ডের জন্য লেআউট প্যাক (`bare`, কোনো রেজিস্ট্রি থেকে ইনস্টল করা প্যাক যেমন `llm-wiki` বা `notes`, অথবা `~/.veles/layouts/` থেকে একটি কাস্টম প্যাক)। ইনস্টল না থাকা প্যাকের ইনস্টলের প্রস্তাব দেওয়া হয়; প্রত্যাখ্যান করলে কিছুই তৈরি হয় না |
 | `--force` | off | `.veles/` ইতিমধ্যে বিদ্যমান থাকলেও পুনরায় তৈরি করে |
 
 ### `veles schema {validate,edit,fix}`
@@ -39,7 +41,8 @@ veles [--no-wizard] <command> [subcommand] [options]
 - `fix` — একটি LLM উইজার্ডের মাধ্যমে অনুপস্থিত সেকশন ইন্টারঅ্যাক্টিভভাবে যোগ করে।
 
 ### `veles self-doc [refresh|show]`
-প্রজেক্টের সেলফ-ডকুমেন্টেশন (`wiki/self-doc/overview.md`) তৈরি ও প্রদর্শন করে।
+প্রজেক্টের সেলফ-ডকুমেন্টেশন তৈরি ও প্রদর্শন করে — লেআউটের page store-এ, যদি থাকে
+(wiki: `wiki/self-doc/overview.md`), নইলে `.veles/memory/self-doc.md`-এ।
 শুধু `veles self-doc` বর্তমান পৃষ্ঠা দেখায়; `refresh` এটি পুনরায় তৈরি করে।
 
 ### `veles doctor`
@@ -108,11 +111,17 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `--theme <name>` | config or `everforest` | কালার থিম (everforest, dracula, gruvbox, tokyo-night, catppuccin) |
 
 ### `veles add <source>`
+*(`wiki` module থেকে — `veles registry install llm-wiki` বা `… install wiki`)*
 একটি সোর্স (একটি লোকাল ফাইল বা `http(s)://` URL) পড়ে এবং একটি উইকি পৃষ্ঠায়
-সংশ্লেষ করে। শেয়ার্ড এজেন্ট-লুপ ফ্ল্যাগ গ্রহণ করে।
+সংশ্লেষ করে। module ছাড়া `veles add` একটি অজানা কমান্ড এবং এরর ইনস্টলের নাম বলে দেয়।
+শেয়ার্ড এজেন্ট-লুপ ফ্ল্যাগ গ্রহণ করে।
+
+Module-গুলো একইভাবে নিজস্ব verb যোগ করতে পারে; module আছে এমন প্রজেক্টের ভেতরে সেগুলো
+`veles --help`-এ দেখা যায়।
 
 ### `veles curate`
-একটি কিউরেটর পাস চালায়: অপ্রসেসড সেশনগুলোকে `wiki/sessions/` পৃষ্ঠায় সংকুচিত করে।
+একটি কিউরেটর পাস চালায়: অপ্রসেসড সেশনগুলোকে মেমরি insight-এ সংকুচিত করে (এবং wiki engine
+চালু থাকলে `wiki/sessions/` পৃষ্ঠায়)।
 
 | ফ্ল্যাগ | ডিফল্ট | উদ্দেশ্য |
 |---|---|---|
@@ -167,22 +176,32 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `list` | এই প্রজেক্টের `memory.db`-তে ক্যাটালগ করা tools তালিকাভুক্ত করে |
 | `show <name>` | একটি tool-এর ম্যানিফেস্ট + টেলিমেট্রি প্রিন্ট করে |
 | `promote <name> [-y]` | একটি প্রজেক্ট tool `~/.veles/tools/`-এ সরায় (ক্রস-প্রজেক্ট) |
-| `approve [<name>] [--all] [-y]` | একটি সেলফ-অথরড tool ফাইল রিভিউ + অনুমোদন করে যাতে লোডার এটি চালায় |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | একটি সেলফ-অথরড tool ফাইল রিভিউ + অনুমোদন করে যাতে লোডার এটি চালায় |
 
 সেলফ-অথরড tools (`.veles/tools/*.py`) লোডার ইমপোর্ট করার সময় তাদের মডিউল-লেভেল
 কোড চালায়, তাই একটি নতুন বা সম্পাদিত ফাইল **আপনি অনুমোদন না করা পর্যন্ত লোড হয়
 না** — `veles tool approve` কোডটি দেখায় এবং এর হ্যাশ রেকর্ড করে। শুধু
-`veles tool approve` কী কী পেন্ডিং আছে তা তালিকাভুক্ত করে। এই কারণেই একটি
-এজেন্ট-লিখিত tool কলযোগ্য হওয়ার আগে একটি রিভিউ ধাপ প্রয়োজন।
+`veles tool approve` প্রতিটি ফাইলের sha256-সহ কী কী পেন্ডিং আছে তা তালিকাভুক্ত করে।
+এই কারণেই একটি এজেন্ট-লিখিত tool কলযোগ্য হওয়ার আগে একটি রিভিউ ধাপ প্রয়োজন।
 
-### `veles module {list,show,add,remove}`
+টার্মিনাল ছাড়া (ডিপ্লয় স্ক্রিপ্ট) আপনার রিভিউ করা হ্যাশ দিয়ে একটি ফাইল অনুমোদন করুন:
+`veles tool approve <name> --sha256 <hash>` — ফাইলটি এর মধ্যে বদলে গেলে এটি ব্যর্থ হয়।
+`-y` শুধু টার্মিনালে প্রম্পট এড়িয়ে যায়।
+
+### `veles module {list,show,add,remove,approve}`
 
 | সাবকমান্ড | উদ্দেশ্য |
 |---|---|
 | `list` | ইনস্টল করা modules তালিকাভুক্ত করে |
-| `show <name>` | একটি module-এর ম্যানিফেস্ট প্রিন্ট করে |
+| `show <name>` | একটি module-এর ম্যানিফেস্ট ও এর ফাইলগুলোর sha256 প্রিন্ট করে |
 | `add <source> [--name N] [-y]` | একটি git URL বা লোকাল পাথ থেকে একটি module ইনস্টল করে |
 | `remove <name> [-y]` | একটি ইনস্টল করা module মুছে ফেলে |
+| `approve <name> [--user] [--sha256 H]` | রিভিউ করার পর একটি module অনুমোদন করে |
+| `approve --all [--user]` | সেই scope-এর অনুমোদনের অপেক্ষায় থাকা প্রতিটি module, প্রতিটির জন্য একটি করে নিশ্চিতকরণ |
+
+অনুমোদনে টার্মিনালে `yes` টাইপ করতে বলা হয়; টার্মিনাল ছাড়া আপনার রিভিউ করা ফাইলগুলোর হ্যাশ
+(`show` এটি প্রিন্ট করে) `--sha256` হিসেবে দিন — ফাইলগুলো এর মধ্যে বদলে গেলে এটি ব্যর্থ হয়।
+`veles doctor` ডিস্কে থাকা যে module লোড হয় না তার প্রতিটির কথা জানায়।
 
 ### `veles registry search [query] [--kind K]`
 সংযুক্ত রেজিস্ট্রিতে অনুসন্ধান করে (module, skill, layout pack, MCP recipe)।
@@ -247,11 +266,12 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 ### `veles models <provider>`
 একটি প্রোভাইডারের মডেল তালিকাভুক্ত করে। ক্লাউড প্রোভাইডার (openrouter/openai/gemini)
-24 ঘণ্টা ক্যাশ করা হয়; লোকাল প্রোভাইডার সর্বদা লাইভ।
+24 ঘণ্টা ক্যাশ করা হয়; লোকাল প্রোভাইডার, `codex` এবং `antigravity-cli` সর্বদা লাইভ। অজানা প্রোভাইডার
+হলে কী কী আছে তার তালিকাসহ এক লাইনের ত্রুটি দেখায় (exit `2`)।
 
 | ফ্ল্যাগ | ডিফল্ট | উদ্দেশ্য |
 |---|---|---|
-| `provider` (positional) | — | [প্রোভাইডার নাম](#provider-names)-এর একটি |
+| `provider` (positional) | — | [ক্যাটালগ](#provider-names)-এর একটি প্রোভাইডার id |
 | `--refresh` | off | ডিস্ক ক্যাশ বাইপাস করে (শুধু ক্লাউড) |
 | `--json` | off | `{provider, source, models}` JSON হিসেবে প্রদান করে |
 
@@ -339,13 +359,14 @@ TUI খোলে (project → daemons → channels)। দেখুন [ডি�
 `--provider` প্রজেক্ট কনফিগে ডিফল্ট হয় এবং ডিমনের পুরো জীবনকালের জন্য নির্দিষ্ট থাকে।
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-এক্সটার্নাল চ্যাট গেটওয়ে (Telegram, …) যা একটি ডিমনের সাথে কথা বলে। দেখুন
+এক্সটার্নাল চ্যাট গেটওয়ে (Telegram, …) যা একটি ডিমনের সাথে কথা বলে। একটি platform হলো extension
+registry-র একটি module; না থাকলে `run` ও `add` সেটি install করে। দেখুন
 [Telegram সংযুক্ত করুন](../how-to/connect-telegram.md)।
 
 | সাবকমান্ড | উদ্দেশ্য |
 |---|---|
-| `list` | নিবন্ধিত চ্যানেল প্ল্যাটফর্ম + সেশন সংখ্যা তালিকাভুক্ত করে |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | ফোরগ্রাউন্ডে একটি গেটওয়ে চালু করে |
+| `list` | installed চ্যানেল প্ল্যাটফর্ম + সেশন সংখ্যা তালিকাভুক্ত করে, এবং declare করা চ্যানেল যার module নেই |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | ফোরগ্রাউন্ডে একটি গেটওয়ে চালু করে; `--secret` হলো platform-এর primary secret (না হলে keychain বা তার env var) |
 | `list-sessions [--channel C]` | `chat_id → session_id` ম্যাপিং দেখায় |
 | `reset-session <chat_id> [--channel C]` | একটি ম্যাপিং ভুলে যায় (পরের মেসেজ নতুনভাবে শুরু হয়) |
 | `add [--channel C] [--session S]` | একটি চ্যানেল একটি ডিমনের সাথে সংযুক্ত করে (উইজার্ড; creds → keychain) |
@@ -383,8 +404,12 @@ start`-এ গৃহীত:
 
 ## প্রোভাইডার নাম
 
-`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` এবং `veles models` প্রোভাইডার ক্যাটালগের যেকোনো id নেয় — বিল্টইনগুলো,
+আপনার `~/.veles/providers.toml`, এবং ইনস্টল করা মডিউলের প্রোভাইডার:
 
-লোকাল প্রোভাইডারগুলোর (`ollama`, `llamacpp`, `openai-compat`) কোনো API কী লাগে না। দেখুন
+`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
+`ollama` · `llamacpp` · `openai-compat` (বিল্টইন)
+
+যে প্রোভাইডার শুধু একটি রেজিস্ট্রি মডিউল দেয় (`antigravity-cli`), তার নাম দিলে সেটি নিজে
+থেকেই ইনস্টল হয়। লোকাল প্রোভাইডারগুলোর (`ollama`, `llamacpp`, `openai-compat`) কোনো API কী লাগে না। দেখুন
 [প্রোভাইডার রেফারেন্স](providers.md) এবং [প্রোভাইডার কনফিগার করুন](../how-to/configure-providers.md)।

@@ -28,6 +28,7 @@ _PROTECTED = (
     ".claude/settings.json",
     "sub/.Claude/commands/x.md",
     ".gemini/settings.json",
+    ".agents/mcp_config.json",
     ".codex/config.toml",
     ".devcontainer/devcontainer.json",
     ".husky/pre-push",
@@ -145,6 +146,59 @@ def test_hooks_path_with_quotes_and_comment_is_protected(project, answers) -> No
         '[core]\n\tbare\n\thooksPath = "tools/hooks" ; set by setup.sh\n', encoding="utf-8"
     )
     assert "not confirmed" in write_file("tools/hooks/pre-commit", "x")
+
+
+def _git(*args: str, cwd: Path) -> None:
+    import subprocess
+
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+
+
+def test_hooks_path_of_an_enclosing_repo_is_protected(tmp_path, monkeypatch, answers) -> None:
+    """The project is a subdirectory of the git repo; the repo's config, not a
+    `.git/config` under the project, sets the hooks dir."""
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git("init", "-q", cwd=repo)
+    _git("config", "core.hooksPath", "proj/hooks", cwd=repo)
+    p = init_project(repo / "proj", name="proj")
+    token = set_active_project(p)
+    try:
+        assert "not confirmed" in write_file("hooks/pre-commit", "x")
+        assert write_file("notes.md", "x").startswith("wrote")
+    finally:
+        reset_active_project(token)
+
+
+def test_hooks_path_with_a_git_file_is_protected(tmp_path, monkeypatch, answers) -> None:
+    """`.git` is a `gitdir:` file (worktree / separate git dir)."""
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    proj = tmp_path / "proj"
+    _git("init", "-q", f"--separate-git-dir={tmp_path / 'gitdata'}", str(proj), cwd=tmp_path)
+    _git("config", "core.hooksPath", "tools/hooks", cwd=proj)
+    p = init_project(proj, name="proj")
+    token = set_active_project(p)
+    try:
+        assert "not confirmed" in write_file("tools/hooks/pre-commit", "x")
+    finally:
+        reset_active_project(token)
+
+
+def test_global_hooks_path_is_protected(tmp_path, monkeypatch, answers) -> None:
+    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    _git("init", "-q", cwd=proj)
+    global_cfg = tmp_path / "gitconfig"
+    global_cfg.write_text(f"[core]\n\thooksPath = {proj / 'gh'}\n", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(global_cfg))
+    p = init_project(proj, name="proj")
+    token = set_active_project(p)
+    try:
+        assert "not confirmed" in write_file("gh/pre-commit", "x")
+    finally:
+        reset_active_project(token)
 
 
 def test_unreadable_git_config_is_ignored(project, answers) -> None:

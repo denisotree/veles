@@ -63,9 +63,10 @@ installs honest](extension-registries.md#keep-installs-honest)).
 veles module list                              # both scopes, with a `scope` column
 veles module add https://github.com/org/module.git
 veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
-veles module show <name> [--user]
+veles module show <name> [--user]             # manifest + files sha256
 veles module remove <name> [--user]
-veles module approve <name> [--user]
+veles module approve <name> [--user]          # type `yes` at a terminal
+veles module approve <name> --sha256 <hash>   # headless: the hash you reviewed
 ```
 
 Modules live at two scopes, same as skills and tools: project-local

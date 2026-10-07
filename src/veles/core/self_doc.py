@@ -19,6 +19,11 @@ from veles.core.memory.eligibility import eligible_sql
 from veles.core.project import Project
 from veles.core.timeutil import utc_iso
 
+# Where the page lives in a page store (`page_store` contribution).
+SELF_DOC_CATEGORY = "self-doc"
+SELF_DOC_SLUG = "overview"
+SELF_DOC_TITLE = "Self-Documentation"
+
 
 @dataclass(frozen=True, slots=True)
 class SelfDocReport:
@@ -224,17 +229,17 @@ def refresh_self_doc(
 ) -> str:
     """Generate, render, persist. Returns the project-relative path.
 
-    A module `self_doc` writer takes it when it can (the wiki engine →
+    The project's page store keeps it when there is one (the wiki engine →
     `wiki/self-doc/overview.md`, FTS-indexed so recall surfaces it); otherwise
     `.veles/memory/self-doc.md` (M163)."""
-    from veles.core.contributions import call_each
+    from veles.core.contributions import page_store
     from veles.core.memory.artefacts import append_memory_log
 
     report = generate_self_doc(project, tools=tools)
     content = render_self_doc(report)
-    taken = [p for p in call_each("self_doc", lambda c: c.obj(project, content)) if p]  # type: ignore[operator]
-    if taken:
-        rel_path = taken[0]
+    store = page_store(project)
+    if store is not None:
+        rel_path = store.write(project, SELF_DOC_CATEGORY, SELF_DOC_SLUG, SELF_DOC_TITLE, content)
     else:
         out = project.memory_dir / "self-doc.md"
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -250,3 +255,14 @@ def refresh_self_doc(
         ),
     )
     return rel_path
+
+
+def read_self_doc(project: Project) -> str | None:
+    """The last refreshed self-doc, from wherever `refresh_self_doc` put it."""
+    from veles.core.contributions import page_store
+
+    store = page_store(project)
+    if store is not None:
+        return store.read(project, SELF_DOC_CATEGORY, SELF_DOC_SLUG)
+    path = project.memory_dir / "self-doc.md"
+    return path.read_text(encoding="utf-8") if path.is_file() else None

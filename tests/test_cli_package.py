@@ -29,8 +29,9 @@ def test_every_dispatch_entry_resolves(verb: str | None) -> None:
 
 # The public CLI surface. A verb leaving this set is a user-visible removal and
 # must be deliberate, not a side effect of a parser or dispatch refactor.
+# `add` is a module verb now (the wiki module's `cli_command`).
 _EXPECTED_VERBS = {
-    "add", "autopilot", "channel", "curate", "daemon", "doctor", "dream",
+    "autopilot", "channel", "curate", "daemon", "doctor", "dream",
     "export", "goal", "import", "init", "job", "layout", "mcp", "models", "module",
     "organize", "project", "registry", "research", "route", "run", "schema", "secret",
     "self-doc", "sessions", "skill", "subproject", "tool", "trust",

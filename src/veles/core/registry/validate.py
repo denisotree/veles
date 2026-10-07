@@ -18,6 +18,8 @@ from pathlib import Path
 from veles.core.frontmatter import parse_frontmatter
 from veles.core.layout.manifest import LayoutManifestError, read_manifest
 from veles.core.module_manifest import ManifestError, entrypoint_file, parse_manifest
+from veles.core.registry.catalog import ResolveError, resolve
+from veles.core.registry.config import list_sources
 from veles.core.registry.hashing import bytecode_paths, git_dirs, tree_sha256
 from veles.core.registry.model import (
     EXTENSION_FILE,
@@ -30,7 +32,7 @@ from veles.core.registry.model import (
     scan_registry,
 )
 from veles.core.registry.repo import RegistryRepoError, changed_paths, fetch_git_source, file_at
-from veles.core.registry.scan import scan_python
+from veles.core.registry.scan import native_binaries, non_sdk_imports, scan_python
 from veles.core.registry.versions import is_newer, satisfies
 
 PERMISSIVE_LICENSES = frozenset(
@@ -101,6 +103,7 @@ def validate_registry(
                 f"duplicate name {ext.name!r}: {ext.group}/ and {seen[ext.name].group}/"
             )
         seen.setdefault(ext.name, ext)
+    _check_dependencies(entries, meta.name, report)
     touched: frozenset[str] = frozenset()
     if base is None:
         targets = entries
@@ -135,6 +138,64 @@ def validate_registry(
     return report
 
 
+_DEPENDENCY_KINDS = frozenset({"module", "layout", "skill"})
+
+
+def _check_dependencies(entries: list[Extension], registry: str, report: ValidationReport) -> None:
+    """Every `requires_extensions` ref names a module, layout or skill that exists —
+    in this registry, or in the connected registry the ref names (a registry not
+    connected here gets a reviewer note: refs carry the local source name, which a
+    fresh CI home doesn't have) — and the refs form no cycle."""
+    by_ref = {f"{registry}:{e.group}/{e.name}": e for e in entries}
+    for ext in by_ref.values():
+        for dep in ext.requires_extensions:
+            where = f"{ext.group}/{ext.name}: requires_extensions"
+            prefix = dep.partition(":")[0]
+            if prefix != registry and not _connected(prefix):
+                report.review.append(
+                    f"{where}: {dep} can't be checked — {prefix!r} is not connected here"
+                )
+                continue
+            kind, problem = _dependency_kind(dep, by_ref, registry)
+            if problem is None and kind not in _DEPENDENCY_KINDS:
+                problem = (
+                    f"{dep} is a {kind} — only a module, a layout or a skill can be a dependency"
+                )
+            if problem is not None:
+                report.errors.append(f"{where}: {problem}")
+    done: set[str] = set()
+
+    def visit(ref: str, stack: list[str]) -> None:
+        if ref in stack:
+            report.errors.append(f"requires_extensions cycle: {' → '.join([*stack, ref])}")
+            return
+        if ref in done or ref not in by_ref:
+            return
+        for dep in by_ref[ref].requires_extensions:
+            visit(dep, [*stack, ref])
+        done.add(ref)
+
+    for ref in by_ref:
+        visit(ref, [])
+
+
+def _connected(name: str) -> bool:
+    return any(s.name == name for s in list_sources())
+
+
+def _dependency_kind(
+    dep: str, by_ref: dict[str, Extension], registry: str
+) -> tuple[str | None, str | None]:
+    """(kind, None) for a dependency that exists, (None, why) for one that doesn't."""
+    if dep.startswith(f"{registry}:"):
+        target = by_ref.get(dep)
+        return (target.kind, None) if target is not None else (None, f"no extension {dep}")
+    try:
+        return resolve(dep).ext.kind, None
+    except ResolveError as exc:
+        return None, f"{dep}: {exc}"
+
+
 def _check(
     ext: Extension, meta: RegistryMeta, report: ValidationReport, work: Path
 ) -> tuple[list[str], Path | None]:
@@ -167,6 +228,7 @@ def _check(
             errors.append(f".git is not allowed in an extension payload: {git}")
         errors += _check_kind(ext, payload)
         report.review += [f"{ext.group}/{ext.name}: {f}" for f in scan_python(payload)]
+        report.review += [f"{ext.group}/{ext.name}: {f}" for f in native_binaries(payload)]
         if ext.requires:
             report.review.append(
                 f"{ext.group}/{ext.name}: pip requirements {', '.join(ext.requires)}"
@@ -214,6 +276,7 @@ def _check_module(ext: Extension, payload: Path) -> list[str]:
     bad = [p for p in ext.provides if not p.startswith(prefixes)]
     if bad:
         errors.append(f"provides entries must start with {', '.join(prefixes)}: {bad}")
+    errors += [f"{hit} — import from veles.sdk instead" for hit in non_sdk_imports(payload)]
     try:
         manifest = parse_manifest((payload / "module.toml").read_text(encoding="utf-8"))
         entry, _ = entrypoint_file(payload, manifest.entrypoint)
@@ -381,6 +444,14 @@ def _run_module(
                 "-q",
                 "-p",
                 "no:cacheprovider",
+                # Async tests (a channel module's are mostly async) must run, not
+                # fail as unhandled coroutines. The plugin by its module name: a
+                # missing pytest-asyncio is then a loud error, where `-p asyncio`
+                # quietly loaded the stdlib module instead.
+                "-p",
+                "pytest_asyncio",
+                "-o",
+                "asyncio_mode=auto",
                 "-c",
                 "/dev/null",
                 "--confcutdir",

@@ -64,13 +64,36 @@ def test_setup_is_idempotent_no_duplicate_handlers(tmp_path: Path) -> None:
 
 
 def test_channels_logger_writes_to_same_file(tmp_path: Path) -> None:
-    """Daemon log captures channel events (Telegram, future channels) as
-    well — they share the file handler under `veles.channels`."""
+    """Daemon log captures core channel events as well — they share the file
+    handler under `veles.channels`."""
     log_path = _setup_daemon_logging("alpha")
-    logging.getLogger("veles.channels.telegram").info("telegram-event-XYZ")
+    logging.getLogger("veles.channels.delivery").info("channel-event-XYZ")
     for h in logging.getLogger("veles.channels").handlers:
         h.flush()
-    assert "telegram-event-XYZ" in log_path.read_text(encoding="utf-8")
+    assert "channel-event-XYZ" in log_path.read_text(encoding="utf-8")
+
+
+def test_loaded_modules_log_to_the_daemon_file(tmp_path: Path) -> None:
+    """A module's own loggers (`_veles_module_<name>.*` — a channel gateway's
+    inbound updates) land in the daemon log too, not on lastResort stderr."""
+    from veles.core.modules import (
+        ModuleRegistry,
+        module_package,
+        reset_module_registry,
+        set_module_registry,
+    )
+
+    registry = ModuleRegistry()
+    registry.module_dirs["chan"] = tmp_path
+    token = set_module_registry(registry)
+    try:
+        log_path = _setup_daemon_logging("alpha")
+    finally:
+        reset_module_registry(token)
+    logging.getLogger(f"{module_package('chan')}._gateway").info("module-event-XYZ")
+    for h in logging.getLogger(module_package("chan")).handlers:
+        h.flush()
+    assert "module-event-XYZ" in log_path.read_text(encoding="utf-8")
 
 
 def test_level_from_argument_enables_debug(tmp_path: Path) -> None:

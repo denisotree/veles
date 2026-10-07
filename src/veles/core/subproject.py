@@ -123,7 +123,7 @@ def init_subproject(
     resolved path is outside the parent (no `..` escape, no absolute
     path), equals the parent root, or already hosts an initialised
     project. Slug for the registry is the subproject's normalised name
-    (from `init_project`).
+    (from `init_project`). The subproject gets its parent's layout pack.
     """
     rel_str = subdir.strip()
     if not rel_str:
@@ -140,7 +140,7 @@ def init_subproject(
         raise ValueError(f"subdir {subroot} resolves outside parent {parent_resolved}") from exc
     if (subroot / ".veles" / "project.toml").is_file():
         raise ProjectAlreadyExists(f"project already initialised at {subroot}")
-    subproject = init_project(subroot, name=name)
+    subproject = init_project(subroot, name=name, layout=parent.layout_name)
     rel_path = "./" + rel.as_posix()
     register_subproject(
         parent,

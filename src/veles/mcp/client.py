@@ -208,7 +208,8 @@ class McpClientManager:
             params = StdioServerParameters(
                 command=cfg.command or "",
                 args=list(cfg.args),
-                env={**os.environ, **cfg.env} if cfg.env else None,
+                env=_server_env(cfg),
+                cwd=cfg.cwd,
             )
             read, write = await stack.enter_async_context(stdio_client(params))
             return read, write
@@ -307,6 +308,18 @@ class McpClientManager:
         if thread is not None:
             thread.join(timeout=_CLOSE_GRACE_S)
         self._servers.clear()
+
+
+def _server_env(cfg: McpServerConfig) -> dict[str, str]:
+    """A stdio server's environment: the SDK's minimal one, or the full one plus the
+    recipe's `env` — marked like `run_shell`'s commands, since a server that runs shell
+    commands is the agent's hands too and `veles … approve` must refuse it."""
+    from mcp.client.stdio import get_default_environment
+
+    from veles.core.critical_ops import AGENT_SHELL_ENV
+
+    base = {**os.environ, **cfg.env} if cfg.env else get_default_environment()
+    return {**base, AGENT_SHELL_ENV: "1"}
 
 
 __all__ = [

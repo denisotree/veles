@@ -8,7 +8,7 @@ Veles 的所有命令、子命令和参数。运行 `veles <command> --help` 可
 veles [--no-wizard] <command> [subcommand] [options]
 ```
 
-- `--no-wizard` — 即使 `~/.veles/config.toml` 缺失也跳过首次运行的设置向导（同样受 TTY 以及 `VELES_NO_WIZARD=1` 的约束）。
+- `--no-wizard` — 即使 `~/.veles/config.toml` 缺失也跳过首次运行的设置向导（同样受 TTY 以及 `VELES_NO_WIZARD=1` 的约束）。向导只出现在会启动 agent 的命令之前（不带参数的 `veles`、`run`、`daemon`、`channel` 等）；`module`、`tool`、`doctor` 这类管理命令从不会打开它。
 - 不带任何参数时，`veles` 会启动交互式 [TUI](tui.md)。
 
 大多数 agent 命令都接受底部列出的[共享 agent-loop 参数](#shared-agent-loop-flags)和[提供方名称](#provider-names)。
@@ -23,7 +23,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | 参数 | 默认值 | 用途 |
 |---|---|---|
 | `name`（位置参数） | 当前目录名 | 项目名称 |
-| `--layout <name>` | `llm-wiki` | 内容脚手架使用的 layout 包（`llm-wiki`、`notes`、`bare`，或来自 `~/.veles/layouts/` 的自定义包） |
+| `--layout <name>` | `bare`（在终端中会询问） | 内容脚手架使用的 layout 包（`bare`、从注册表安装的包如 `llm-wiki` 或 `notes`，或来自 `~/.veles/layouts/` 的自定义包）。未安装的包会提示安装；拒绝则不会创建任何内容 |
 | `--force` | 关闭 | 即使 `.veles/` 已存在也重新创建 |
 
 ### `veles schema {validate,edit,fix}`
@@ -34,7 +34,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 - `fix` — 通过 LLM 向导交互式地补全缺失的章节。
 
 ### `veles self-doc [refresh|show]`
-生成并显示项目自文档（`wiki/self-doc/overview.md`）。不带参数的 `veles self-doc` 显示当前页面；`refresh` 会重新生成它。
+生成并显示项目自文档 —— 若布局有页面存储则存入其中（wiki：`wiki/self-doc/overview.md`），否则存入 `.veles/memory/self-doc.md`。不带参数的 `veles self-doc` 显示当前页面；`refresh` 会重新生成它。
 
 ### `veles doctor`
 对用户全局状态和当前活动项目运行健康检查。无论是否有活动项目都可用。
@@ -94,10 +94,13 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `--theme <name>` | 来自配置或 `everforest` | 配色主题（everforest、dracula、gruvbox、tokyo-night、catppuccin） |
 
 ### `veles add <source>`
-读取一个来源（本地文件或 `http(s)://` URL）并将其综合成一个 wiki 页面。接受共享 agent-loop 参数。
+*（来自 `wiki` 模块 —— `veles registry install llm-wiki` 或 `… install wiki`）*
+读取一个来源（本地文件或 `http(s)://` URL）并将其综合成一个 wiki 页面。没有该模块时，`veles add` 是未知命令，错误信息会指明安装方式。接受共享 agent-loop 参数。
+
+模块可以用同样的方式添加自己的命令；它们会出现在装有该模块的项目内的 `veles --help` 中。
 
 ### `veles curate`
-运行一轮 curator：将未处理的 session 压缩为 `wiki/sessions/` 页面。
+运行一轮 curator：将未处理的 session 压缩为记忆洞察（wiki 引擎开启时还包括 `wiki/sessions/` 页面）。
 
 | 参数 | 默认值 | 用途 |
 |---|---|---|
@@ -150,18 +153,24 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `list` | 列出本项目 `memory.db` 中编目的 tools |
 | `show <name>` | 打印某个 tool 的清单 + 遥测数据 |
 | `promote <name> [-y]` | 将项目级 tool 移动到 `~/.veles/tools/`（跨项目） |
-| `approve [<name>] [--all] [-y]` | 审阅并批准一个自撰写的 tool 文件，使加载器会运行它 |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | 审阅并批准一个自撰写的 tool 文件，使加载器会运行它 |
 
-自撰写的 tools（`.veles/tools/*.py`）在加载器导入它们时会运行其模块级代码，因此新增或编辑过的文件在获得批准前**不会被加载**——`veles tool approve` 会显示代码并记录其哈希值。不带参数的 `veles tool approve` 会列出待批准的内容。
+自撰写的 tools（`.veles/tools/*.py`）在加载器导入它们时会运行其模块级代码，因此新增或编辑过的文件在获得批准前**不会被加载**——`veles tool approve` 会显示代码并记录其哈希值。不带参数的 `veles tool approve` 会列出待批准的内容，并附上每个文件的 sha256。
 
-### `veles module {list,show,add,remove}`
+没有终端时（部署脚本），可按已审阅的哈希批准单个文件：`veles tool approve <name> --sha256 <hash>`——若文件自那以后发生了变化则会失败。`-y` 仅在终端中跳过确认提示。
+
+### `veles module {list,show,add,remove,approve}`
 
 | 子命令 | 用途 |
 |---|---|
 | `list` | 列出已安装的 modules |
-| `show <name>` | 打印某个 module 的清单 |
+| `show <name>` | 打印某个 module 的清单及其文件的 sha256 |
 | `add <source> [--name N] [-y]` | 从 git URL 或本地路径安装 module |
 | `remove <name> [-y]` | 删除已安装的 module |
+| `approve <name> [--user] [--sha256 H]` | 审阅后批准一个 module |
+| `approve --all [--user]` | 该范围内所有待批准的 module，每个单独确认一次 |
+
+批准时会要求在终端中输入 `yes`；没有终端时，请把你审阅过的文件哈希（`show` 会打印）作为 `--sha256` 传入——若文件自那以后发生了变化则会失败。`veles doctor` 会报告磁盘上每个未加载的 module。
 
 ### `veles registry search [query] [--kind K]`
 在已连接的注册表中搜索（模块、技能、layout 包、MCP 配方）。
@@ -223,11 +232,11 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `refresh [--force]` | 重新解析 `AGENTS.md` 中的自然语言路由提示 |
 
 ### `veles models <provider>`
-列出某个提供方的模型。云端提供方（openrouter/openai/gemini）缓存 24 小时；本地提供方始终实时获取。
+列出某个提供方的模型。云端提供方（openrouter/openai/gemini）缓存 24 小时；本地提供方、`codex` 和 `antigravity-cli` 始终实时获取。未知的提供方会得到一行错误，并列出现有的提供方（退出码 `2`）。
 
 | 参数 | 默认值 | 用途 |
 |---|---|---|
-| `provider`（位置参数） | — | [提供方名称](#provider-names)之一 |
+| `provider`（位置参数） | — | [目录](#provider-names)中的某个提供方 id |
 | `--refresh` | 关闭 | 绕过磁盘缓存（仅云端） |
 | `--json` | 关闭 | 以 JSON 形式输出 `{provider, source, models}` |
 
@@ -312,12 +321,12 @@ veles [--no-wizard] <command> [subcommand] [options]
 `start` 同样接受共享 agent-loop 参数；对于 daemon，`--model` / `--provider` 默认取自项目配置，并在 daemon 的整个生命周期内固定不变。
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-与 daemon 通信的外部聊天网关（Telegram 等）。参见[连接 Telegram](../how-to/connect-telegram.md)。
+与 daemon 通信的外部聊天网关（Telegram 等）。平台是扩展注册表中的模块；`run` 和 `add` 在模块缺失时会安装它。参见[连接 Telegram](../how-to/connect-telegram.md)。
 
 | 子命令 | 用途 |
 |---|---|
-| `list` | 列出已注册的 channel 平台 + session 计数 |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | 在前台启动一个网关 |
+| `list` | 列出已安装的 channel 平台 + session 计数，以及已声明但模块缺失的 channel |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | 在前台启动一个网关；`--secret` 是平台的主密钥（否则取自钥匙串或其环境变量） |
 | `list-sessions [--channel C]` | 显示 `chat_id → session_id` 的映射 |
 | `reset-session <chat_id> [--channel C]` | 遗忘某个映射（下一条消息将全新开始） |
 | `add [--channel C] [--session S]` | 将某个 channel 绑定到 daemon（向导式；凭据 → 钥匙串） |
@@ -353,8 +362,10 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 ## 提供方名称
 
-`openrouter`（默认） · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` 和 `veles models` 接受提供方目录中的任何 id——内置的、你的 `~/.veles/providers.toml` 中的，以及已安装模块提供的：
 
-本地提供方（`ollama`、`llamacpp`、`openai-compat`）无需 API key。参见
+`openrouter`（默认） · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
+`ollama` · `llamacpp` · `openai-compat`（内置）
+
+只有注册表模块才提供的提供方（`antigravity-cli`）会在你指定它时自行安装。本地提供方（`ollama`、`llamacpp`、`openai-compat`）无需 API key。参见
 [提供方参考](providers.md)和[配置提供方](../how-to/configure-providers.md)。

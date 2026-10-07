@@ -8,7 +8,7 @@ import inspect
 
 import pytest
 
-from veles.channels.protocols import RunBackend
+from veles.core.platforms import RunBackend
 
 _METHODS = [
     name
@@ -28,6 +28,14 @@ def _backends():
 def test_backend_implements_every_protocol_method(backend) -> None:
     missing = [m for m in _METHODS if not callable(getattr(backend, m, None))]
     assert not missing, f"{backend.__name__} lacks {missing}"
+
+
+def test_daemon_client_error_is_a_run_backend_error() -> None:
+    """Channel code catches backend failures without importing the HTTP client."""
+    from veles.channels.daemon_client import DaemonClientError
+    from veles.core.platforms import RunBackendError
+
+    assert issubclass(DaemonClientError, RunBackendError)
 
 
 def test_the_protocol_covers_what_the_gateway_calls() -> None:

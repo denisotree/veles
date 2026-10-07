@@ -63,9 +63,10 @@ bản cài đặt trung thực](../../en/how-to/extension-registries.md#keep-ins
 veles module list                              # both scopes, with a `scope` column
 veles module add https://github.com/org/module.git
 veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
-veles module show <name> [--user]
+veles module show <name> [--user]             # manifest + sha256 của các tệp
 veles module remove <name> [--user]
-veles module approve <name> [--user]
+veles module approve <name> [--user]          # gõ `yes` trong terminal
+veles module approve <name> --sha256 <hash>   # không có terminal: hash bạn đã xem lại
 ```
 
 Modules nằm ở hai phạm vi, giống skills và tools: cục bộ theo dự án

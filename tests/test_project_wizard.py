@@ -122,17 +122,6 @@ def test_intro_uses_active_locale(
     assert "No Veles project found" in err
 
 
-def test_init_triggers_wiki_reindex(tmp_cwd: Path) -> None:
-    token = pw.set_project_wizard_prompter(_scripted(["y", "n", "n", "n"]))
-    try:
-        project = pw.run_project_wizard(tmp_cwd)
-    finally:
-        pw.reset_project_wizard_prompter(token)
-    assert project is not None
-    # The FTS sidecar lands at <wiki_root>/wiki_index.db after reindex.
-    assert (project.wiki_root / "wiki_index.db").is_file()
-
-
 def test_gate_blocks_when_no_tty(tmp_cwd: Path) -> None:
     # Pytest stdin is typically non-TTY; this should naturally return False.
     assert pw.should_run_project_wizard(_args(), tmp_cwd) is False
@@ -171,7 +160,7 @@ def test_provider_override_writes_config(tmp_cwd: Path) -> None:
                 "y",  # provider override
                 "openai",  # provider
                 "openai/gpt-4o",  # model
-                "n",  # telegram
+                "n",  # channel
             ]
         )
     )
@@ -205,18 +194,18 @@ def test_wizard_does_not_bulk_copy_into_sources(tmp_cwd: Path) -> None:
     assert not (project.wiki_root / "sources" / "seed").exists()
 
 
-def test_channel_writes_token_and_whitelist(tmp_cwd: Path) -> None:
+def test_channel_writes_token_and_list_field(tmp_cwd: Path, fake_platform) -> None:
     # M172: the channel step is registry-driven — pick a type, then fill the
-    # platform's cred fields (telegram: bot_token, then whitelist).
+    # platform's cred fields (fake: token, then rooms).
     token_p = pw.set_project_wizard_prompter(
         _scripted(
             [
                 "y",  # bootstrap
                 "n",  # provider override
                 "y",  # add a channel?
-                "telegram",  # channel type (only registered platform)
-                "bot-abc",  # bot_token cred
-                "42",  # whitelist (comma-separated → single-entry list)
+                "fake",  # channel type (only registered platform)
+                "bot-abc",  # token cred
+                "42",  # rooms (comma-separated → single-entry list)
             ]
         )
     )
@@ -232,12 +221,12 @@ def test_channel_writes_token_and_whitelist(tmp_cwd: Path) -> None:
     assert '"42"' in cfg
     from veles.core.secrets import delete_provider_key, get_provider_key
 
-    assert get_provider_key("telegram", project=project.name) == "bot-abc"
-    delete_provider_key("telegram", project=project.name)
+    assert get_provider_key("fake", project=project.name) == "bot-abc"
+    delete_provider_key("fake", project=project.name)
 
 
-def test_channel_skips_when_required_field_blank(tmp_cwd: Path) -> None:
-    # A blank value for a required cred (telegram bot_token) aborts the step
+def test_channel_skips_when_required_field_blank(tmp_cwd: Path, fake_platform) -> None:
+    # A blank value for a required cred (fake's token) aborts the step
     # and writes nothing — no half-configured channel block.
     token_p = pw.set_project_wizard_prompter(
         _scripted(
@@ -245,8 +234,8 @@ def test_channel_skips_when_required_field_blank(tmp_cwd: Path) -> None:
                 "y",  # bootstrap
                 "n",  # provider
                 "y",  # add a channel?
-                "telegram",  # channel type
-                "",  # bot_token blank (required) → abort
+                "fake",  # channel type
+                "",  # token blank (required) → abort
             ]
         )
     )
@@ -283,7 +272,11 @@ def test_run_project_wizard_tui_respects_autostart_flag(
             pass
 
         def run(self):
-            return {"project": proj, "daemon": {"host": "127.0.0.1", "port": 8765}}
+            return {
+                "project": proj,
+                "daemon": {"host": "127.0.0.1", "port": 8765},
+                "channel": {"channel": "fake", "config_fields": {}, "status": "saved"},
+            }
 
     monkeypatch.setattr(pr, "WizardApp", _FakeApp)
     calls: list[tuple] = []
@@ -298,6 +291,30 @@ def test_run_project_wizard_tui_respects_autostart_flag(
     out2 = pr.run_project_wizard_tui(tmp_path, autostart_daemon=True)
     assert out2 is proj
     assert len(calls) == 1
+
+
+def test_wizard_does_not_autostart_a_daemon_without_a_channel(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """A daemon needs a channel: the wizard doesn't spawn one that would refuse."""
+    from veles.core.project import Project
+    from veles.tui.wizard import project_runner as pr
+
+    proj = Project(root=tmp_path, name="x", created_at=0.0, schema_version=2, layout_name="bare")
+
+    class _FakeApp:
+        def __init__(self, *a, **k) -> None:
+            pass
+
+        def run(self):
+            return {"project": proj, "daemon": {"host": "127.0.0.1", "port": 8765}}
+
+    monkeypatch.setattr(pr, "WizardApp", _FakeApp)
+    calls: list[tuple] = []
+    monkeypatch.setattr(pr, "_autostart_daemon", lambda p, d: calls.append((p, d)))
+    assert pr.run_project_wizard_tui(tmp_path, autostart_daemon=True) is proj
+    assert calls == []
+    assert "veles channel add" in capsys.readouterr().err
 
 
 def test_maybe_wrapper_threads_suppress_flag_into_tui(
@@ -321,3 +338,42 @@ def test_maybe_wrapper_threads_suppress_flag_into_tui(
 
     pw.maybe_run_project_wizard(_args(_suppress_wizard_daemon_autostart=True), tmp_cwd)
     assert captured.get("autostart_daemon") is False
+
+
+# ---------------- layout ----------------
+
+
+def _user_pack(name: str) -> None:
+    from veles.core.user_paths import user_home
+
+    pack = user_home() / "layouts" / name
+    pack.mkdir(parents=True)
+    (pack / "layout.toml").write_text(
+        f'[layout]\nname = "{name}"\ndescription = "d"\n', encoding="utf-8"
+    )
+
+
+def test_wizard_asks_for_a_layout_when_there_is_a_choice(tmp_cwd: Path) -> None:
+    _user_pack("journal")
+    token = pw.set_project_wizard_prompter(_scripted(["y", "journal", "n", "n"]))
+    try:
+        project = pw.run_project_wizard(tmp_cwd)
+    finally:
+        pw.reset_project_wizard_prompter(token)
+    assert project is not None and project.layout_name == "journal"
+
+
+def test_wizard_falls_back_to_bare_when_the_layout_cannot_be_had(
+    tmp_cwd: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    from veles.core.registry import ensure
+
+    monkeypatch.setattr(ensure, "available_layouts", lambda: ["bare", "llm-wiki"])
+    monkeypatch.setattr(ensure, "ensure_layout", lambda name, *, interactive: False)
+    token = pw.set_project_wizard_prompter(_scripted(["y", "llm-wiki", "n", "n"]))
+    try:
+        project = pw.run_project_wizard(tmp_cwd)
+    finally:
+        pw.reset_project_wizard_prompter(token)
+    assert project is not None and project.layout_name == "bare"
+    assert "llm-wiki" in capsys.readouterr().err

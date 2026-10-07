@@ -2,8 +2,26 @@
 
 > 🌐 **Languages:** **English** · [简体中文](../../zh-CN/reference/providers.md) · [繁體中文](../../zh-TW/reference/providers.md) · [日本語](../../ja/reference/providers.md) · [한국어](../../ko/reference/providers.md) · [Español](../../es/reference/providers.md) · [Français](../../fr/reference/providers.md) · [Italiano](../../it/reference/providers.md) · [Português (BR)](../../pt-BR/reference/providers.md) · [Português (PT)](../../pt-PT/reference/providers.md) · [Русский](../../ru/reference/providers.md) · [العربية](../../ar/reference/providers.md) · [हिन्दी](../../hi/reference/providers.md) · [বাংলা](../../bn/reference/providers.md) · [Tiếng Việt](../../vi/reference/providers.md)
 
-Veles is provider-agnostic. Pass `--provider <name>` to any agent command, or set
+Veles is provider-agnostic. Pass `--provider <id>` to any agent command, or set
 a default in config. Model IDs use the provider's own naming.
+
+## The provider catalogue
+
+Every provider Veles knows is an entry in one catalogue, built from three sources:
+
+1. **Builtin** — the table below, shipped with Veles.
+2. **Yours** — `~/.veles/providers.toml`: a hosted OpenAI-compatible API or a server
+   you run, by adding an entry (see
+   [add your own provider](../how-to/configure-providers.md#add-your-own-provider)).
+   An entry with a builtin id overrides that provider's settings (its `base_url`, say).
+3. **Modules** — a registry module contributes a provider (`antigravity-cli`). Naming
+   one in `[engine] provider`, a route or `--provider` installs it from your connected
+   registries on the next run, like a declared channel.
+
+`--provider`, `veles models`, the setup wizards, routing and `veles doctor` all read the
+catalogue, so a provider from any source works everywhere a builtin does. An unknown
+id is a one-line error listing what exists; `veles doctor` also checks
+`~/.veles/providers.toml` and every provider your routes name.
 
 | Provider | Kind | API key | Notes |
 |---|---|---|---|
@@ -11,11 +29,14 @@ a default in config. Model IDs use the provider's own naming.
 | `anthropic` | Cloud direct | `ANTHROPIC_API_KEY` | Claude Messages API, prompt caching |
 | `openai` | Cloud direct | `OPENAI_API_KEY` | GPT chat completions |
 | `gemini` | Cloud direct | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Google Gemini |
-| `claude-cli` | Subprocess | — (CLI session) | Delegates to a local `claude` CLI in JSON-stream mode |
-| `gemini-cli` | Subprocess | — (CLI session) | Delegates to a local `gemini` CLI |
+| `claude-cli` | CLI delegate | — (CLI session) | Delegates to a local `claude` CLI in JSON-stream mode |
+| `codex` | CLI delegate | — (CLI session) | Delegates to a local `codex` CLI (ChatGPT subscription) |
 | `ollama` | Local | none | `OLLAMA_BASE_URL` (default `http://localhost:11434/v1`) |
 | `llamacpp` | Local | none | `LLAMACPP_BASE_URL` (default `http://localhost:8080/v1`) |
-| `openai-compat` | Local/custom | none | `OPENAI_COMPAT_BASE_URL` (required, no default) |
+| `openai-compat` | Local/custom | optional `OPENAI_COMPAT_API_KEY` | `OPENAI_COMPAT_BASE_URL` (required, no default) |
+
+`gemini-cli` was removed in 1.2.6 — Google no longer serves the Gemini CLI to personal
+accounts. Use `gemini` with an API key, or the `antigravity-cli` module.
 
 Default provider: `openrouter`. There is **no hardcoded default model** — set one
 via the setup wizard, `[engine] model`, or `--model` (otherwise the agent reports
@@ -27,23 +48,38 @@ overridden in `[routing.tasks]` — see [per-task routing](../how-to/per-task-ro
 `ollama`, `llamacpp`, and `openai-compat` need no API key. List installed models
 with `veles models <provider>` (always live for local providers).
 
-**Tool calling is off by default** on local providers — many local models emit
-malformed tool calls. Enable it once you've picked a tool-capable model:
+**Tool calling is detected** from what the backend advertises: ollama reports each
+model's capabilities, a llama.cpp server its chat template's. `VELES_LOCAL_TOOLS=1`
+forces tool calling on, `=0` off; unset means detect.
 
 ```bash
-export VELES_LOCAL_TOOLS=1
 veles run --provider ollama --model qwen3:4b-instruct "..."
 ```
 
 Override endpoints with the `*_BASE_URL` env vars (see
 [environment variables](environment-variables.md)).
 
-## CLI delegation (`claude-cli`, `gemini-cli`)
+## CLI delegation (`claude-cli`, `codex`, `antigravity-cli`)
 
-If you hold a Claude or Gemini CLI subscription, Veles can run the binary in
-JSON-streaming mode and act as coordinator — keeping the loop local-first without
-a separate API key. Veles tools reach the subprocess only when an MCP bridge is
-configured.
+If you hold a Claude, ChatGPT or Google subscription, Veles can run its CLI headless
+and act as coordinator — no separate API key. `claude-cli` and `codex` are builtin;
+`antigravity-cli` (the `agy` CLI) is a registry module that installs itself when you
+name it.
+
+The delegate is only the model: Veles' tools reach it over an MCP bridge, and every
+call goes through Veles' trust ladder. The bridge's config lives in a directory of
+the running process, `.veles/tmp/delegate-<pid>/`, removed when it exits. `agy` runs
+in a scratch workspace outside your project (under `~/.veles/tmp/`), so the project's
+own `.agents/` config never reaches it, behind a gate that denies its own shell and
+file tools.
+
+`codex` also runs outside your project (under `~/.veles/tmp/`), with your codex config
+ignored and its own tools — shell, file edits, images, subagents, browser, web search —
+switched off; Veles checks those flag names once per process and refuses to run a codex
+that renamed one it relies on. Its MCP server is passed in arguments, not a file. In
+`veles run`, codex follows Veles' tool protocol less reliably than claude: it may
+answer that it can't read a file without calling the tool — ask again, or name the
+tool ("use read_file on …").
 
 ## Multimodal status (vision / speech-to-text)
 

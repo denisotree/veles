@@ -1,48 +1,17 @@
-"""M-R1.1: single source of truth for the provider catalogue.
-
-`core/providers.py::ALL_PROVIDERS` is the canonical list every wizard
-derives from. These tests pin that contract — invariants here catch silent
-drift if someone adds a new provider directly to one wizard.
-"""
+"""The wizard-facing helpers of the provider catalogue."""
 
 from __future__ import annotations
 
-from veles.core.provider_factory import LOCAL_PROVIDERS, PROVIDER_API_KEY_ENVS
-from veles.core.providers import (
-    ALL_PROVIDERS,
-    ProviderSpec,
-    tui_label,
-)
-
-
-def test_all_providers_unique_values() -> None:
-    values = [p.value for p in ALL_PROVIDERS]
-    assert len(values) == len(set(values))
-
-
-def test_every_provider_classified_somewhere() -> None:
-    """Each catalogued provider must be in one of the three buckets:
-    keyed API providers, local providers, or CLI delegates. Otherwise
-    we have a provider that no adapter knows how to instantiate."""
-    keyed = frozenset(PROVIDER_API_KEY_ENVS.keys())
-    cli_delegates = frozenset({"claude-cli", "gemini-cli"})
-    for spec in ALL_PROVIDERS:
-        assert (
-            spec.value in keyed or spec.value in LOCAL_PROVIDERS or spec.value in cli_delegates
-        ), f"provider {spec.value!r} has no adapter category"
+from veles.core.providers import list_providers, tui_label
 
 
 def test_tui_label_includes_tagline_when_present() -> None:
-    spec = ProviderSpec(value="x", label="X", tagline="cool")
-    assert tui_label(spec) == "X (cool)"
+    assert tui_label("ollama") == "Ollama (local, no key)"
 
 
 def test_tui_label_omits_empty_tagline() -> None:
-    spec = ProviderSpec(value="x", label="X", tagline="")
-    assert tui_label(spec) == "X"
+    assert tui_label("gemini") == "Google Gemini"
 
 
 def test_default_order_openrouter_first() -> None:
-    """OpenRouter is the most common pick (multi-model gateway) — the
-    picker presents it first so the typical user lands on it."""
-    assert ALL_PROVIDERS[0].value == "openrouter"
+    assert list_providers()[0] == "openrouter"

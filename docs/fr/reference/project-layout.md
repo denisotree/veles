@@ -7,15 +7,16 @@ Ce que crée `veles init`, où Veles conserve son état, et le schéma de la mé
 ## Ce que produit `veles init`
 
 La moitié « contenu utilisateur » dépend du pack de mise en page choisi (`--layout`,
-par défaut `llm-wiki`) ; la moitié « état » dans `.veles/` est identique partout.
+par défaut `bare` — rien d'autre que `AGENTS.md`) ; la moitié « état » dans `.veles/`
+est identique partout. Ci-dessous, un projet avec la mise en page `llm-wiki` du registre :
 
 ```
-my-project/                  # veles init  (mise en page llm-wiki par défaut)
+my-project/                  # veles init --layout llm-wiki
 ├── AGENTS.md                # contexte du projet (injecté dans l'agent)
 ├── CLAUDE.md → AGENTS.md    # lien symbolique, pour qu'un CLI `claude` reprenne le même contexte
 ├── GEMINI.md → AGENTS.md    # lien symbolique, pour un CLI `gemini`
-├── sources/                 # matière source brute et immuable (lecture seule pour l'agent)
-├── wiki/                    # la zone de connaissances inscriptible par le LLM
+├── sources/                 # (llm-wiki) matière source brute, lecture seule par convention
+├── wiki/                    # (llm-wiki) la zone de connaissances inscriptible par le LLM
 │   ├── concepts/ entities/ queries/ self-doc/ sessions/
 └── .veles/                  # état du projet (ne pas committer ; géré par la machine)
     ├── project.toml         # name, created_at, schema_version, layout
@@ -29,9 +30,9 @@ my-project/                  # veles init  (mise en page llm-wiki par défaut)
     └── skills/              # skills locaux au projet
 ```
 
-Avec `--layout notes`, la moitié contenu se réduit à un unique répertoire `notes/` ;
-avec `--layout bare`, il n'y a aucun échafaudage de contenu. `wiki/INDEX.md` (le
-catalogue à la demande) est généré à mesure que le wiki grandit ; `config.toml`,
+Avec le `bare` par défaut, il n'y a aucun échafaudage de contenu ; avec `notes` (du
+registre), la moitié contenu se réduit à un unique répertoire `notes/`. `INDEX.md` (le
+catalogue à la demande du wiki) est généré à mesure que le wiki grandit ; `config.toml`,
 `tools/` et `plans/` apparaissent sous `.veles/` une fois que vous configurez
 quelque chose, qu'un agent écrit un outil, ou que vous lancez un objectif.
 
@@ -67,8 +68,9 @@ pour comprendre comment elles sont écrites et rappelées.
 
 ## Packs de mise en page
 
-`veles init --layout {llm-wiki|notes|bare|<custom>}` choisit la mise en page du
-contenu ; le pack possède l'échafaudage, le modèle d'AGENTS.md, les zones
-inscriptibles, ainsi que l'activation ou non du moteur wiki (outils wiki, injection
-de l'INDEX dans le prompt, rappel wiki). Voir
+`veles init --layout {bare|llm-wiki|notes|<custom>}` choisit la mise en page du
+contenu (seul `bare` est intégré ; les autres viennent d'un registre et sont proposés
+à l'installation) ; le pack possède l'échafaudage, le modèle d'AGENTS.md, les zones
+inscriptibles, ainsi que le moteur de contenu qu'il demande (p. ex. le wiki : outils
+wiki, injection de l'INDEX dans le prompt, rappel wiki). Voir
 [packs de mise en page & le LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).

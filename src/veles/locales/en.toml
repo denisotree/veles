@@ -4,6 +4,7 @@
 [project_wizard]
 intro_no_project = "No Veles project found at {cwd}."
 ask_initialize = "Initialize this directory as a Veles project? It will add `.veles/` and an `AGENTS.md` template, and index existing project files."
+ask_layout = "Layout"
 created_state = "  · created {state_dir} and AGENTS.md skeleton."
 ready = "<project '{name}' ready. edit AGENTS.md to add context.>"
 ask_provider_override = "Pin a project-specific provider/model? (default: inherit user-level)"
@@ -14,7 +15,6 @@ ask_channel = "Connect a chat channel (e.g. Telegram) to this project?"
 ask_channel_type = "Channel type"
 channel_field_required = "  ! a required {channel} field was left blank; skipping channel setup."
 channel_written = "  · wrote {channel} channel → {path}"
-indexed_wiki = "  · indexed {pages} wiki page(s) into the FTS database."
 
 [rules_digest]
 header = "House rules (learned from this project)"
@@ -50,14 +50,12 @@ theme_header = "theme · {count} — type to filter · ↑↓ · Enter · Esc"
 no_themes = "no themes found"
 theme_cancelled = "theme selection cancelled"
 
-[telegram]
-start_greeting = "Hi! I'm Veles. Just send a message and I'll reply. Tip: /help lists the commands."
-history_cleared = "History cleared."
-history_empty = "History is already empty."
-ack_working = "⏳ On it — working on your request…"
-ack_searching = "🔍 On it — searching the knowledge base…"
-ack_writing_note = "✍️ On it — writing to the knowledge base…"
-ack_building = "🛠 On it — preparing a tool/skill…"
-ack_web = "🌐 On it — searching the web…"
-ack_reading = "📄 On it — reading the source…"
-ack_queued = "📥 Got it — queued, will get to it right after the current one."
+[prompt_options]
+# Answers a channel offers for a trust / approval / critical-op question.
+once = "⏱ Once"
+always_project = "🔓 Always for this project"
+refuse = "🚫 Refuse"
+yes = "✅ Allow"
+no = "❌ Deny"
+critical_yes = "⚠️ Allow"
+critical_no = "🚫 Cancel"

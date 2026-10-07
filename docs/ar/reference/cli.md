@@ -11,7 +11,9 @@ veles [--no-wizard] <command> [subcommand] [options]
 ```
 
 - `--no-wizard` — تخطّي معالج الإعداد لأول مرة حتى لو كان `~/.veles/config.toml`
-  غير موجود (مشروط أيضًا بوجود TTY وبالمتغير `VELES_NO_WIZARD=1`).
+  غير موجود (مشروط أيضًا بوجود TTY وبالمتغير `VELES_NO_WIZARD=1`). لا يسبق المعالج
+  إلا الأوامر التي تُطلق وكيلًا (`veles` المجرّد، و`run`، و`daemon`، و`channel`، …)؛
+  أما الأوامر الإدارية مثل `module` و`tool` و`doctor` فلا تفتحه أبدًا.
 - بدون أي وسائط، يُطلق `veles` واجهة [TUI](tui.md) التفاعلية.
 
 تقبل معظم أوامر الوكيل [أعلام حلقة الوكيل المشتركة](#shared-agent-loop-flags)
@@ -28,7 +30,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | العَلَم | الافتراضي | الغرض |
 |---|---|---|
 | `name` (موضعي) | اسم قاعدة الدليل الحالي | اسم المشروع |
-| `--layout <name>` | `llm-wiki` | حزمة التخطيط لسقالة المحتوى (`llm-wiki` أو `notes` أو `bare` أو حزمة مخصصة من `~/.veles/layouts/`) |
+| `--layout <name>` | `bare` (يُسأل عنه في الطرفية) | حزمة التخطيط لسقالة المحتوى (`bare`، أو حزمة مثبّتة من سجلّ مثل `llm-wiki` أو `notes`، أو حزمة مخصصة من `~/.veles/layouts/`). الحزمة غير المثبّتة يُعرض تثبيتها؛ والرفض لا ينشئ شيئًا |
 | `--force` | معطّل | إعادة إنشاء `.veles/` حتى لو كان موجودًا بالفعل |
 
 ### `veles schema {validate,edit,fix}`
@@ -39,7 +41,8 @@ veles [--no-wizard] <command> [subcommand] [options]
 - `fix` — أضِف الأقسام المفقودة تفاعليًا عبر معالج LLM.
 
 ### `veles self-doc [refresh|show]`
-وَلِّد التوثيق الذاتي للمشروع واعرضه (`wiki/self-doc/overview.md`).
+وَلِّد التوثيق الذاتي للمشروع واعرضه — في مخزن صفحات التخطيط إن كان له مخزن
+(الويكي: `wiki/self-doc/overview.md`)، وإلا في `.veles/memory/self-doc.md`.
 يعرض `veles self-doc` المجرّد الصفحة الحالية؛ بينما يعيد `refresh` توليدها.
 
 ### `veles doctor`
@@ -108,11 +111,17 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `--theme <name>` | حسب الإعداد أو `everforest` | سمة الألوان (everforest، dracula، gruvbox، tokyo-night، catppuccin) |
 
 ### `veles add <source>`
-اقرأ مصدرًا (ملفًا محليًا أو رابط `http(s)://`) واصهره في صفحة ويكي.
+*(من وحدة `wiki` — `veles registry install llm-wiki` أو `… install wiki`)*
+اقرأ مصدرًا (ملفًا محليًا أو رابط `http(s)://`) واصهره في صفحة ويكي. بدون
+الوحدة يكون `veles add` أمرًا غير معروف، ويذكر الخطأ كيفية التثبيت.
 يقبل أعلام حلقة الوكيل المشتركة.
 
+يمكن للوحدات إضافة أوامرها الخاصة بالطريقة نفسها؛ وتظهر في `veles --help`
+داخل مشروع فيه الوحدة.
+
 ### `veles curate`
-شغّل تمريرة منسّق واحدة: اضغط الجلسات غير المعالجة في صفحات `wiki/sessions/`.
+شغّل تمريرة منسّق واحدة: اضغط الجلسات غير المعالجة في رؤى الذاكرة (وفي صفحات
+`wiki/sessions/` عندما يكون محرّك الويكي مفعّلًا).
 
 | العَلَم | الافتراضي | الغرض |
 |---|---|---|
@@ -167,22 +176,32 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `list` | سرد الأدوات المفهرسة في `memory.db` لهذا المشروع |
 | `show <name>` | طباعة بيان أداة + القياسات عن بُعد |
 | `promote <name> [-y]` | نقل أداة مشروع إلى `~/.veles/tools/` (عبر المشاريع) |
-| `approve [<name>] [--all] [-y]` | مراجعة ملف أداة من تأليف ذاتي والموافقة عليه كي يُشغّله المُحمِّل |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | مراجعة ملف أداة من تأليف ذاتي والموافقة عليه كي يُشغّله المُحمِّل |
 
 تُشغِّل الأدوات ذاتية التأليف (`.veles/tools/*.py`) شيفرتها على مستوى الوحدة عندما
 يستوردها المُحمِّل، لذا **لا يُحمَّل** ملف جديد أو مُحرَّر **حتى توافق عليه** — يعرض
 `veles tool approve` الشيفرة ويسجّل بصمتها (hash). ويسرد `veles tool approve`
-المجرّد ما هو قيد الانتظار. لهذا تحتاج أداة كتبها وكيل إلى خطوة مراجعة قبل أن
-تصبح قابلة للاستدعاء.
+المجرّد ما هو قيد الانتظار مع sha256 لكل ملف. لهذا تحتاج أداة كتبها وكيل إلى خطوة
+مراجعة قبل أن تصبح قابلة للاستدعاء.
 
-### `veles module {list,show,add,remove}`
+بدون طرفية (سكربت نشر)، وافق على ملف واحد بالبصمة التي راجعتها:
+`veles tool approve <name> --sha256 <hash>` — يفشل الأمر إذا تغيّر الملف منذ ذلك
+الحين. ولا يتجاوز `-y` السؤال إلا في طرفية.
+
+### `veles module {list,show,add,remove,approve}`
 
 | الأمر الفرعي | الغرض |
 |---|---|
 | `list` | سرد الوحدات المُثبَّتة |
-| `show <name>` | طباعة بيان وحدة |
+| `show <name>` | طباعة بيان وحدة وقيمة sha256 لملفاتها |
 | `add <source> [--name N] [-y]` | تثبيت وحدة من رابط git أو مسار محلي |
 | `remove <name> [-y]` | حذف وحدة مُثبَّتة |
+| `approve <name> [--user] [--sha256 H]` | الموافقة على وحدة بعد مراجعتها |
+| `approve --all [--user]` | كل وحدة في هذا النطاق تنتظر الموافقة، بتأكيد واحد لكل منها |
+
+تطلب الموافقة أن تكتب `yes` في طرفية؛ وبدون طرفية مرّر بصمة الملفات التي راجعتها
+(يطبعها `show`) عبر `--sha256` — يفشل الأمر إذا تغيّرت الملفات منذ ذلك الحين.
+ويُبلغ `veles doctor` عن كل وحدة على القرص لا تُحمَّل.
 
 ### `veles registry search [query] [--kind K]`
 ابحث في السجلّات المتصلة (وحدات، مهارات، حزم تخطيط، وصفات MCP).
@@ -247,11 +266,12 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 ### `veles models <provider>`
 سرد نماذج مزوّد. المزوّدون السحابيون (openrouter/openai/gemini) مُخزَّنون
-مؤقتًا لمدة 24 ساعة؛ والمزوّدون المحليون دائمًا حيّون.
+مؤقتًا لمدة 24 ساعة؛ والمزوّدون المحليون و`codex` و`antigravity-cli` دائمًا حيّون. المزوّد
+المجهول خطأ من سطر واحد يسرد ما هو موجود (رمز الخروج `2`).
 
 | العَلَم | الافتراضي | الغرض |
 |---|---|---|
-| `provider` (موضعي) | — | أحد [أسماء المزوّدين](#provider-names) |
+| `provider` (موضعي) | — | معرّف مزوّد من [الكتالوج](#provider-names) |
 | `--refresh` | معطّل | تجاوز التخزين المؤقت على القرص (السحابي فقط) |
 | `--json` | معطّل | إصدار `{provider, source, models}` بصيغة JSON |
 
@@ -339,13 +359,14 @@ veles [--no-wizard] <command> [subcommand] [options]
 `--provider` افتراضهما من إعداد المشروع ويُثبَّتان طوال عمر العفريت.
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-بوّابات دردشة خارجية (Telegram …) تتحدّث إلى عفريت. راجع
+بوّابات دردشة خارجية (Telegram …) تتحدّث إلى عفريت. المنصّة وحدة (module) من سجل الإضافات؛
+ويثبّتها `run` و`add` عند غيابها. راجع
 [ربط Telegram](../how-to/connect-telegram.md).
 
 | الأمر الفرعي | الغرض |
 |---|---|
-| `list` | سرد منصّات القنوات المُسجَّلة + أعداد الجلسات |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | بدء بوّابة في المقدّمة |
+| `list` | سرد منصّات القنوات المثبّتة + أعداد الجلسات، والقنوات المعلنة التي وحدتها غائبة |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | بدء بوّابة في المقدّمة؛ `--secret` هو السر الأساسي للمنصّة (وإلا فمن keychain أو متغيّر البيئة الخاص بها) |
 | `list-sessions [--channel C]` | عرض تعيينات `chat_id → session_id` |
 | `reset-session <chat_id> [--channel C]` | نسيان تعيين (تبدأ الرسالة التالية من جديد) |
 | `add [--channel C] [--session S]` | ربط قناة بعفريت (معالج؛ بيانات الاعتماد ← سلسلة المفاتيح) |
@@ -383,8 +404,12 @@ start`:
 
 ## أسماء المزوّدين
 
-`openrouter` (الافتراضي) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+يقبل `--provider` و`veles models` أي معرّف في كتالوج المزوّدين — المضمَّنة،
+و`~/.veles/providers.toml` الخاص بك، ومزوّدو الوحدات المثبّتة:
 
+`openrouter` (الافتراضي) · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
+`ollama` · `llamacpp` · `openai-compat` (مضمَّنة)
+
+المزوّد الذي توفّره وحدة من السجلّ فقط (`antigravity-cli`) يثبّت نفسه عند تسميته.
 لا يحتاج المزوّدون المحليون (`ollama` و`llamacpp` و`openai-compat`) إلى مفتاح API. راجع
 [مرجع المزوّدين](providers.md) و[تهيئة المزوّدين](../how-to/configure-providers.md).

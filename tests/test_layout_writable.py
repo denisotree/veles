@@ -12,11 +12,20 @@ from veles.core.project import init_project, load_project
 
 @pytest.fixture()
 def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
-    return tmp_path / "home"
+    """A user home with `notes`, a pack whose only writable zone is `notes/`."""
+    home = tmp_path / "home"
+    monkeypatch.setenv("VELES_USER_HOME", str(home))
+    pack = home / ".veles" / "layouts" / "notes"
+    pack.mkdir(parents=True)
+    (pack / "layout.toml").write_text(
+        '[layout]\nname = "notes"\n[layout.scaffold]\ndirs = ["notes/"]\n'
+        '[[layout.writable_zones]]\npath = "notes/"\n',
+        encoding="utf-8",
+    )
+    return home
 
 
-# ---- llm-wiki defaults (M189: permissive — declares no writable_zones) ----
+# ---- default (bare) and other zone-less packs are permissive (M189) ----
 
 
 def test_wiki_path_writable_under_llm_wiki(isolated_home: Path, tmp_path: Path) -> None:
@@ -89,26 +98,41 @@ def test_agents_md_exact_match_not_prefix(isolated_home: Path, tmp_path: Path) -
     assert not is_writable(project, "wiki-AGENTS.md")
 
 
-# ---- permissive fallback ----
+# ---- a pack that isn't installed ----
 
 
-def test_unknown_layout_permissive(isolated_home: Path, tmp_path: Path) -> None:
-    """When the layout-pack doesn't resolve, fall back to permissive
-    (anything inside the project root is writable). Preserves the
-    pre-M117 contract."""
-    project = init_project(tmp_path / "proj", name="proj")
+def _with_layout(project, name: str):
     toml_path = project.project_toml_path
     text = toml_path.read_text(encoding="utf-8")
-    toml_path.write_text(
-        text.replace('layout = "llm-wiki"', 'layout = "ghost-pack"'),
-        encoding="utf-8",
-    )
-    reloaded = load_project(project.root)
-    assert is_writable(reloaded, "README.md")
-    assert is_writable(reloaded, "src/main.py")
-    # the agent's .veles/ subdirs still writable in permissive mode, state files not
+    toml_path.write_text(text.replace('layout = "bare"', f'layout = "{name}"'), encoding="utf-8")
+    return load_project(project.root)
+
+
+def test_unknown_layout_fails_closed(isolated_home: Path, tmp_path: Path) -> None:
+    """A pack that doesn't resolve may have declared zones we can't see: only the
+    always-writable paths stay open until it's installed."""
+    reloaded = _with_layout(init_project(tmp_path / "proj", name="proj"), "ghost-pack")
+    assert not is_writable(reloaded, "README.md")
+    assert not is_writable(reloaded, "src/main.py")
+    assert is_writable(reloaded, "AGENTS.md")
     assert is_writable(reloaded, ".veles/tmp/x")
     assert not is_writable(reloaded, ".veles/memory.db")
+
+
+def test_missing_notes_keeps_its_zone(isolated_home: Path, tmp_path: Path) -> None:
+    """`notes` moved to the registry; until it's reinstalled its known zone holds."""
+    (isolated_home / ".veles" / "layouts" / "notes" / "layout.toml").unlink()
+    reloaded = _with_layout(init_project(tmp_path / "proj", name="proj"), "notes")
+    assert is_writable(reloaded, "notes/a.md")
+    assert not is_writable(reloaded, "src/main.py")
+
+
+def test_missing_llm_wiki_stays_permissive(isolated_home: Path, tmp_path: Path) -> None:
+    """`llm-wiki` declares no zones, so a project waiting for it to be
+    installed keeps working as before."""
+    reloaded = _with_layout(init_project(tmp_path / "proj", name="proj"), "llm-wiki")
+    assert is_writable(reloaded, "wiki/concepts/a.md")
+    assert is_writable(reloaded, "src/main.py")
 
 
 # ---- outside the project tree ----
@@ -139,15 +163,14 @@ def test_writable_zones_llm_wiki_is_just_defaults(isolated_home: Path, tmp_path:
     assert not any(z.rstrip("/") == "sources" for z in zones)
 
 
-def test_writable_zones_permissive_when_no_pack(isolated_home: Path, tmp_path: Path) -> None:
-    """No pack resolves → writable_zones returns just the always-on
-    defaults (callers know to treat empty pack list as permissive)."""
+def test_writable_zones_without_a_pack_are_the_defaults(
+    isolated_home: Path, tmp_path: Path
+) -> None:
+    """No pack resolves → writable_zones lists just the always-on defaults."""
     project = init_project(tmp_path / "proj", name="proj")
     toml_path = project.project_toml_path
     toml_path.write_text(
-        toml_path.read_text(encoding="utf-8").replace(
-            'layout = "llm-wiki"', 'layout = "ghost-pack"'
-        ),
+        toml_path.read_text(encoding="utf-8").replace('layout = "bare"', 'layout = "ghost-pack"'),
         encoding="utf-8",
     )
     reloaded = load_project(project.root)

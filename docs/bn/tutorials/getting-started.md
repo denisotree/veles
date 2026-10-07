@@ -57,9 +57,11 @@ mkdir my-notes && cd my-notes
 veles init my-notes
 ```
 
-এটি তৈরি করে `AGENTS.md` (আপনার প্রজেক্ট কনটেক্সট), `sources/` ও `wiki/` (ডিফল্ট
-[LLM-Wiki লেআউট](../explanation/layout-packs-and-llm-wiki.md)), এবং
-`.veles/` (মেশিন স্টেট)। দেখুন [প্রজেক্ট লেআউট](../reference/project-layout.md)।
+এটি তৈরি করে `AGENTS.md` (আপনার প্রজেক্ট কনটেক্সট) এবং `.veles/` (মেশিন স্টেট) —
+ডিফল্ট `bare` লেআউট আর কিছু যোগ করে না। টার্মিনালে `veles init` জিজ্ঞেস করে কোন
+[লেআউট](../explanation/layout-packs-and-llm-wiki.md) ব্যবহার করবেন; `sources/` ও
+`wiki/` পেতে `llm-wiki` বেছে নিন (রেজিস্ট্রি থেকে তৎক্ষণাৎ ইনস্টল হয়)।
+দেখুন [প্রজেক্ট লেআউট](../reference/project-layout.md)।
 
 ## ৪. আপনার প্রথম প্রম্পট চালান
 

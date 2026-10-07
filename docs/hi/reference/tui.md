@@ -34,7 +34,7 @@ Composer में `/` टाइप करें; `Tab` complete करता �
 | `/model` | Open the model picker |
 | `/mode` | Switch run mode (auto/planning/writing/goal) |
 | `/session` | Open the session picker (resume) |
-| `/save` | Save / name the current session |
+| `/save <slug>` | आख़िरी उत्तर सहेजें — layout के page store में एक page (wiki: `wiki/queries/<slug>.md`) यदि हो, अन्यथा project-memory insight |
 | `/history` | Show session history |
 | `/tokens` | Token usage (in / out / per-turn / per-session) |
 | `/context` | Current context size vs the limit |
@@ -42,7 +42,7 @@ Composer में `/` टाइप करें; `Tab` complete करता �
 | `/insights` | Show learned insights for the project |
 | `/rules` | Show the project's rules digest |
 | `/schema` | Validate / fix `AGENTS.md` |
-| `/wiki` | Wiki operations for the active layout |
+| `/wiki add <path\|url>` / `/wiki query <question>` | `wiki` module के wiki ops — केवल वहीं जहाँ active layout wiki engine चालू करता है (जैसे `llm-wiki`)। modules इसी तरह अपने `/commands` जोड़ सकते हैं |
 | `/daemon` | Open the daemon control panel (project → daemons → channels) |
 
 > Slash set वही रहता है चाहे आप TUI को सीधे launch करें या किसी और screen से उसे push करें।

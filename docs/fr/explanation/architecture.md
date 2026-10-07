@@ -62,7 +62,8 @@ pertinents) sont rappelées **à la demande** plutôt que déversées d'emblée.
 
 - `<project>/.veles/` — la mémoire, la configuration et les skills/outils locaux de ce projet.
 - `~/.veles/` — la configuration globale utilisateur, les skills/outils inter-projets, les caches, la confiance.
-- `<project>/AGENTS.md`, `wiki/`, `sources/` — votre contenu (la mise en page LLM-Wiki).
+- `<project>/AGENTS.md` et ce qu'ajoute votre mise en page (p. ex. `wiki/`, `sources/`
+  pour la mise en page LLM-Wiki) — votre contenu.
 
 Voir [mise en page du projet](../reference/project-layout.md).
 
@@ -75,7 +76,8 @@ afin qu'un CLI externe lancé là-bas voie le même contexte. Voir
 
 ## Les surfaces
 
-- **CLI** (`veles run`, `veles add`, …) — usage ponctuel et scripté.
+- **CLI** (`veles run`, `veles organize`, …, plus les verbes qu'ajoutent les modules,
+  comme le `veles add` du wiki) — usage ponctuel et scripté.
 - **TUI** (`veles tui`) — REPL interactif avec des [modes d'exécution](modes.md).
 - **Daemon + canaux** — API headless, Telegram, jobs planifiés.
 

@@ -1,6 +1,6 @@
 """Iterator over a subprocess's line-delimited JSON stdout.
 
-Used by claude-cli and gemini-cli `stream_message` to consume
+Used by the CLI delegates' `stream_message` to consume
 `--output-format stream-json` lazily so TextDelta events can be emitted as
 soon as the underlying CLI flushes them.
 
@@ -49,6 +49,7 @@ def popen_jsonl(
     """
     proc = subprocess.Popen(
         cmd,
+        stdin=subprocess.DEVNULL,  # a CLI without a TTY may wait on stdin (codex does)
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,

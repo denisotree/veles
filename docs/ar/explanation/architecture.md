@@ -59,7 +59,8 @@ response  ──►  saved to memory  ──►  learning triggers (insights, cu
 
 - `<project>/.veles/` — ذاكرة هذا المشروع، وإعداداته، ومهاراته/أدواته المحلية.
 - `~/.veles/` — الإعداد العام للمستخدم، والمهارات/الأدوات العابرة للمشاريع، والذاكرات المؤقتة، والثقة.
-- `<project>/AGENTS.md`, `wiki/`, `sources/` — محتواك (تخطيط LLM-Wiki).
+- `<project>/AGENTS.md` وكل ما يضيفه تخطيطك (مثل `wiki/` و`sources/`
+  في تخطيط LLM-Wiki) — محتواك.
 
 راجع [تخطيط المشروع](../reference/project-layout.md).
 
@@ -72,7 +73,8 @@ response  ──►  saved to memory  ──►  learning triggers (insights, cu
 
 ## الواجهات
 
-- **CLI** (`veles run`, `veles add`, …) — الاستخدام لمرة واحدة والمؤتمت بالبرمجة.
+- **CLI** (`veles run`, `veles organize`, …، بالإضافة إلى أوامر تضيفها الوحدات مثل
+  `veles add` الخاص بالويكي) — الاستخدام لمرة واحدة والمؤتمت بالبرمجة.
 - **TUI** (`veles tui`) — حلقة REPL تفاعلية مع [أوضاع التشغيل](modes.md).
 - **الخادم الخفي + القنوات** — واجهة برمجية بلا رأس، وTelegram، ومهام مجدولة.
 

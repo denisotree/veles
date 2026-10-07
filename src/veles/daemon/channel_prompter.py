@@ -1,10 +1,10 @@
 """Daemon-side prompters that route trust / approval / critical-op questions and
-the agent's `ask_user` to a channel client (e.g. Telegram) via the run's event
+the agent's `ask_user` to a channel client via the run's event
 stream.
 
 The agent's permission engine calls whatever ContextVar prompter is installed.
 Inside `veles daemon`, without these, the defaults check `sys.stdin.isatty()`
-and auto-refuse — so a Telegram-originated run could never invoke a sensitive
+and auto-refuse — so a chat-originated run could never invoke a sensitive
 tool or ask the user anything.
 
 Every prompter here goes through `_ask`, which (on the agent's worker thread):
@@ -30,6 +30,7 @@ from concurrent.futures import TimeoutError as _FuturesTimeout
 from typing import Any
 
 from veles.core.critical_ops import Confirmer
+from veles.core.i18n import t
 from veles.core.permission.prompt import (
     PromptAnswer,
     PromptRequest,
@@ -45,23 +46,25 @@ DEFAULT_PROMPT_TIMEOUT_SECONDS = 300.0
 """Five minutes — matches the user-chosen UX in the plan. Configurable
 per call if a channel needs a different SLA."""
 
-# Telegram shows these as inline-keyboard buttons. Trust omits "always global":
-# a daemon is bound to one project.
-_TRUST_OPTIONS_TELEGRAM: tuple[dict[str, str], ...] = (
-    {"key": "once", "label": "⏱ Once"},
-    {"key": "always_project", "label": "🔓 Always for this project"},
-    {"key": "refuse", "label": "🚫 Refuse"},
-)
 
-_APPROVAL_OPTIONS_TELEGRAM: tuple[dict[str, str], ...] = (
-    {"key": "yes", "label": "✅ Allow"},
-    {"key": "no", "label": "❌ Deny"},
-)
+def _option(key: str, label_key: str | None = None) -> dict[str, str]:
+    """One answer a channel offers: a machine-readable `key` and a label in the
+    daemon's language — the channel draws it (a button, a numbered line…)."""
+    return {"key": key, "label": t(f"prompt_options.{label_key or key}")}
 
-_CRITICAL_OPTIONS_TELEGRAM: tuple[dict[str, str], ...] = (
-    {"key": "yes", "label": "⚠️ Allow"},
-    {"key": "no", "label": "🚫 Cancel"},
-)
+
+def _trust_options() -> tuple[dict[str, str], ...]:
+    # No "always global": a daemon is bound to one project.
+    return (_option("once"), _option("always_project"), _option("refuse"))
+
+
+def _approval_options() -> tuple[dict[str, str], ...]:
+    return (_option("yes"), _option("no"))
+
+
+def _critical_options() -> tuple[dict[str, str], ...]:
+    return (_option("yes", "critical_yes"), _option("no", "critical_no"))
+
 
 _TRUST_DECISION_BY_KEY: dict[str, str] = {
     "once": "allow_once",
@@ -129,7 +132,7 @@ def make_unified_prompter(
                 kind="trust",
                 subject=req.tool_name,
                 payload=payload,
-                options=_TRUST_OPTIONS_TELEGRAM,
+                options=_trust_options(),
                 timeout=timeout,
                 timeout_choice="refuse",
             )
@@ -141,7 +144,7 @@ def make_unified_prompter(
                 kind="approval",
                 subject=req.tool_name,
                 payload=payload,
-                options=_APPROVAL_OPTIONS_TELEGRAM,
+                options=_approval_options(),
                 timeout=timeout,
             )
             return PromptAnswer("allow_once" if key == "yes" else "deny")
@@ -169,7 +172,7 @@ def make_critical_confirmer(
             kind="critical",
             subject=op,
             payload={"op": op, "summary": summary},
-            options=_CRITICAL_OPTIONS_TELEGRAM,
+            options=_critical_options(),
             timeout=timeout,
         )
         return answer == "yes"

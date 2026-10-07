@@ -13,7 +13,7 @@ keychain বা এনভায়রনমেন্ট ভ্যারিয়
 | `~/.veles/` | User-global | `config.toml`, trust গ্রান্ট, ক্রস-প্রজেক্ট skills/tools, মডেল ক্যাশ, locales, registry |
 | `<project>/.veles/` | Project-local | `project.toml`, `config.toml`, `memory.db`, প্রজেক্ট skills/tools, plans, রানটাইম আর্টিফ্যাক্ট |
 | `<project>/AGENTS.md` | Project | এজেন্টে ইনজেক্ট করা কনটেক্সট ফাইল (`CLAUDE.md` / `GEMINI.md`-এ symlink করা) |
-| `<project>/wiki/`, `sources/` | Project | ইউজার কন্টেন্ট (ডিফল্ট LLM-Wiki লেআউট) |
+| `<project>/wiki/`, `sources/`, … | Project | ইউজার কন্টেন্ট, লেআউট প্যাক যেভাবে সাজায় (যেমন LLM-Wiki) |
 
 `VELES_USER_HOME` `~` রিডাইরেক্ট করে (ফলে ইউজার স্টেট `<override>/.veles/`-এ যায়)।
 সম্পূর্ণ ট্রির জন্য দেখুন [প্রজেক্ট লেআউট](project-layout.md)।
@@ -43,6 +43,9 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 transport = "stdio"
 command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
+
+[sandbox]
+enabled = true                   # OS sandbox-এ run_shell; false দিলে বন্ধ হয়
 ```
 
 | কী | টাইপ | উদ্দেশ্য |
@@ -52,6 +55,7 @@ args = ["-m", "my_mcp_server"]
 | `[user] default_model` | string | কোনোটি না দিলে যে মডেল ব্যবহৃত হয় |
 | `[user] tui_theme` | string | ডিফল্ট TUI কালার থিম |
 | `[permissions] <tool>` | policy | পার-টুল পারমিশন পলিসি (দেখুন [trust ও sandbox](../explanation/trust-and-sandbox.md)) |
+| `[sandbox] enabled` | bool | OS sandbox-এ `run_shell` (ডিফল্ট `true`); শুধু এখানেই পড়া হয় — প্রজেক্টের `[sandbox]` উপেক্ষা করা হয় (দেখুন [নিরাপত্তা](../how-to/security-and-permissions.md)) |
 
 ---
 
@@ -110,7 +114,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[daemon]` | unnamed/"default" ডিমনের bind + autostart |
 | `[daemon.<name>]` | একটি নামকৃত ডিমন সেশন (নিজস্ব model/provider/host/port/mode) |
 | `[goal]` | নতুন লক্ষ্যের বাজেট — `max_steps` (30), `max_cost_usd` (5.0), `max_wall_time_s` (3600); `veles goal start`-এর ফ্ল্যাগ এটিকে ছাপিয়ে যায় |
-| `[channels.<type>]` | unnamed ডিমন দ্বারা পরিবেশিত একটি চ্যানেল (যেমন `telegram`) |
+| `[channels.<type>]` | unnamed ডিমন দ্বারা পরিবেশিত একটি চ্যানেল (যেমন `telegram`)। এর key-গুলো platform-এর নিজস্ব (`enabled` এবং তার module যা declare করে); এটি declare করলে পরের `veles daemon start`-এ module install হয় |
 | `[daemon.<name>.channels.<type>]` | একটি নামকৃত ডিমন সেশনে বাইন্ড করা একটি চ্যানেল |
 | `[mcp.servers.<name>]` | একটি এক্সটার্নাল MCP সার্ভার (টুল সোর্স) |
 

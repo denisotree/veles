@@ -7,8 +7,10 @@ import io
 import json
 from pathlib import Path
 
+import pytest
+
 from veles.adapters.cli.mcp_server import (
-    _MCP_TOOLS,
+    _CORE_TOOLS,
     MCPServer,
     _parse_args,
     _register_project_skills,
@@ -22,7 +24,7 @@ from veles.core.context import (
     reset_budget,
     set_budget,
 )
-from veles.core.project import init_project
+from veles.core.project import init_project, load_project
 from veles.core.tools.registry import Registry, ToolEntry
 
 
@@ -212,20 +214,14 @@ def test_serve_handles_empty_lines() -> None:
     assert len(lines) == 1
 
 
-def test_mcp_tools_constant_is_non_empty() -> None:
-    assert len(_MCP_TOOLS) >= 5
-    assert "read_file" in _MCP_TOOLS
-    assert "wiki_write_page" in _MCP_TOOLS
+def test_core_tools_name_no_module_tool() -> None:
+    assert "read_file" in _CORE_TOOLS
+    assert not any(n.startswith("wiki_") for n in _CORE_TOOLS)
 
 
-def test_parse_args_accepts_skill_model() -> None:
-    args = _parse_args(["--project-root", "/tmp/x", "--skill-model", "openai/gpt-5-mini"])
-    assert args.skill_model == "openai/gpt-5-mini"
-
-
-def test_parse_args_skill_model_has_default() -> None:
-    args = _parse_args(["--project-root", "/tmp/x"])
-    assert "/" in args.skill_model  # provider/model format
+def test_parse_args_takes_no_skill_model() -> None:
+    with pytest.raises(SystemExit):
+        _parse_args(["--project-root", "/x", "--skill-model", "m"])
 
 
 def _write_skill(project_root: Path, name: str, body: str = "Echo input.") -> None:
@@ -237,22 +233,36 @@ def _write_skill(project_root: Path, name: str, body: str = "Echo input.") -> No
     )
 
 
-def test_register_project_skills_no_api_key(monkeypatch, tmp_path) -> None:
+def _skills_route(project_root: Path, spec: str) -> None:
+    from veles.core.project_config import save_project_config
+
+    save_project_config(load_project(project_root), {"routing": {"tasks": {"skills": spec}}})
+
+
+def test_child_skills_off_when_route_is_a_cli_delegate(tmp_path, capsys) -> None:
+    init_project(tmp_path, name="t")
+    _write_skill(tmp_path, "echo-skill")
+    _skills_route(tmp_path, "claude-cli:sonnet")
+    assert _register_project_skills(Registry(), load_project(tmp_path)) == []
+    assert "[routing.tasks] skills" in capsys.readouterr().err
+
+
+def test_child_skills_off_without_a_key(tmp_path, monkeypatch, capsys) -> None:
+    init_project(tmp_path, name="t")
+    _write_skill(tmp_path, "echo-skill")
+    _skills_route(tmp_path, "openrouter:x/y")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    project = init_project(tmp_path, name="t")
-    _write_skill(tmp_path, "echo-skill")
-    reg = Registry()
-    added = _register_project_skills(reg, project, "anthropic/claude-sonnet-4.6")
-    assert added == []
+    assert _register_project_skills(Registry(), load_project(tmp_path)) == []
+    assert "skill tools disabled" in capsys.readouterr().err
 
 
-def test_register_project_skills_registers_when_key_present(monkeypatch, tmp_path) -> None:
-    monkeypatch.setenv("OPENROUTER_API_KEY", "fake-key")
-    project = init_project(tmp_path, name="t")
+def test_child_skills_on_the_routed_provider(tmp_path, monkeypatch) -> None:
+    init_project(tmp_path, name="t")
     _write_skill(tmp_path, "echo-skill")
+    _skills_route(tmp_path, "openrouter:x/y")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
     reg = Registry()
-    added = _register_project_skills(reg, project, "anthropic/claude-sonnet-4.6")
-    assert added == ["echo-skill"]
+    assert _register_project_skills(reg, load_project(tmp_path)) == ["echo-skill"]
     entry = reg.get("echo-skill")
     assert entry.description == "test skill"
     assert "input" in entry.parameter_schema["properties"]
@@ -262,7 +272,7 @@ def test_register_project_skills_empty_when_no_skills(monkeypatch, tmp_path) -> 
     monkeypatch.setenv("OPENROUTER_API_KEY", "fake-key")
     project = init_project(tmp_path, name="t")
     reg = Registry()
-    added = _register_project_skills(reg, project, "anthropic/claude-sonnet-4.6")
+    added = _register_project_skills(reg, project)
     assert added == []
 
 
@@ -294,13 +304,15 @@ def test_main_loads_budget_snapshot_into_context(monkeypatch, tmp_path) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     sentinel_token = set_budget(None)
     try:
-        rc = main(
+        # main() sets the module registry for its process; isolate it from later tests.
+        rc = contextvars.copy_context().run(
+            main,
             [
                 "--project-root",
                 str(tmp_path),
                 "--budget-file",
                 str(snap_path),
-            ]
+            ],
         )
         assert rc == 0
         budget = captured["budget"]
@@ -402,9 +414,11 @@ def test_project_trust_grant_lets_the_call_through(monkeypatch, tmp_path) -> Non
         reset_active_project(token)
 
 
-def test_main_exposes_wiki_tools_for_a_wiki_project(monkeypatch, tmp_path) -> None:
+def test_main_lists_no_wiki_tools_without_the_wiki_module(monkeypatch, tmp_path) -> None:
+    """Wiki tools are listed only when they exist — the wiki module (from the
+    registry) registers them."""
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
-    project = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
+    project = init_project(tmp_path / "proj", name="proj")
     request = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}) + "\n"
     monkeypatch.setattr("sys.stdin", io.StringIO(request))
     out = io.StringIO()
@@ -412,4 +426,46 @@ def test_main_exposes_wiki_tools_for_a_wiki_project(monkeypatch, tmp_path) -> No
     # main() sets the active project for its process; isolate it from later tests.
     contextvars.copy_context().run(main, ["--project-root", str(project.root)])
     names = {t["name"] for t in json.loads(out.getvalue().splitlines()[0])["result"]["tools"]}
-    assert {"wiki_read_page", "wiki_write_page"} <= names
+    assert "read_file" in names
+    assert not any(n.startswith("wiki_") for n in names)
+
+
+@pytest.mark.parametrize(("engine", "listed"), [("None", True), ("'ghost'", False)])
+def test_main_lists_the_tools_of_a_loaded_module(monkeypatch, tmp_path, engine, listed) -> None:
+    """A module's tool set reaches the delegated CLI — core keeps no list of them —
+    unless the project's layout doesn't enable the engine the set is gated on."""
+    from veles.core.registry.gate import approve_module
+    from veles.core.tools.registry import registry as tool_registry
+    from veles.core.user_paths import user_modules_dir
+
+    # `@tool` registers into the process-wide registry and refuses a second
+    # registration — give this test its own copy.
+    monkeypatch.setattr(tool_registry, "_tools", dict(tool_registry._tools))
+    project = init_project(tmp_path / "proj", name="proj")
+    mod = user_modules_dir() / "echo"
+    mod.mkdir(parents=True)
+    (mod / "module.toml").write_text(
+        '[module]\nname = "echo"\ndescription = "d"\nentrypoint = "e.py:register"\n',
+        encoding="utf-8",
+    )
+    (mod / "e.py").write_text(
+        "from veles.sdk.contributions import ToolSet\n"
+        "def _load():\n"
+        "    from veles.sdk.tools import tool\n"
+        "    @tool(name='echo_back', description='echo')\n"
+        "    def echo_back(text: str) -> str:\n"
+        "        return text\n"
+        "def register(api):\n"
+        f"    ts = ToolSet(load=_load, tools=('echo_back',), engine={engine})\n"
+        "    api.contribute('tool', 'echo', ts)\n",
+        encoding="utf-8",
+    )
+    approve_module(mod, name="echo", project_root=None)
+    request = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}) + "\n"
+    monkeypatch.setattr("sys.stdin", io.StringIO(request))
+    out = io.StringIO()
+    monkeypatch.setattr("sys.stdout", out)
+    contextvars.copy_context().run(main, ["--project-root", str(project.root)])
+    names = {t["name"] for t in json.loads(out.getvalue().splitlines()[0])["result"]["tools"]}
+    assert ("echo_back" in names) is listed
+    assert "read_file" in names

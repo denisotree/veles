@@ -1,11 +1,10 @@
-"""M164 — end-to-end proof of layout modularity: the `bare` and `notes`
-builtin packs run the full memory/learning surface with zero (or
-minimal) user-content structure.
+"""M164 — end-to-end proof of layout modularity: the builtin `bare` pack
+runs the full memory/learning surface with zero user-content structure.
 
 Covers per the M160–M163 contract: init scaffolds only what the pack
 declares; insight extraction → SQL + `.veles/memory/insights/`; recall
 works without wiki; jobs → `.veles/jobs/`; dreaming runs; proposals →
-`.veles/memory/proposals/`; `veles add` errors cleanly.
+`.veles/memory/proposals/`; `veles add` (a wiki-module verb) is unknown.
 """
 
 from __future__ import annotations
@@ -15,9 +14,13 @@ from pathlib import Path
 
 import pytest
 
-from veles.core.layout import clear_engine_cache, find_layout, wiki_enabled
+from veles.core.layout import clear_engine_cache, engine_enabled, find_layout
 from veles.core.project import Project, init_project
 from veles.core.provider import Message, ProviderResponse, TokenUsage
+
+
+def wiki_enabled(project: Project) -> bool:
+    return engine_enabled(project, "wiki")
 
 
 @pytest.fixture(autouse=True)
@@ -52,16 +55,6 @@ def test_bare_pack_is_builtin(bare_project: Project) -> None:
     assert pack.scope == "builtin"
     assert pack.manifest.writable_zones == ()
     assert pack.manifest.engines == ()
-
-
-def test_notes_init_scaffolds_notes_dir(tmp_path: Path) -> None:
-    project = init_project(tmp_path / "n", name="n", layout="notes")
-    assert (project.root / "notes").is_dir()
-    assert not (project.root / "wiki").exists()
-    agents = (project.root / "AGENTS.md").read_text(encoding="utf-8")
-    assert agents.startswith("# n\n")
-    assert "notes/" in agents
-    assert not wiki_enabled(project)
 
 
 def test_bare_layout_writes_are_permissive(bare_project: Project) -> None:
@@ -159,17 +152,13 @@ def test_bare_job_output_root(bare_project: Project) -> None:
 # ---- veles add ----
 
 
-def test_bare_veles_add_errors_cleanly(bare_project: Project, capsys) -> None:
-    import argparse
+def test_veles_add_is_unknown_without_the_wiki_module(bare_project: Project, capsys) -> None:
+    from veles.cli import main
 
-    from veles.cli.commands.ingest import _run_ingest_cli
-
-    args = argparse.Namespace(provider="openrouter")
-    rc = _run_ingest_cli(args, bare_project, source="https://example.com")
-    assert rc == 2
-    err = capsys.readouterr().err
-    assert "wiki content engine" in err
-    assert "bare" in err
+    with pytest.raises(SystemExit) as exc:
+        main(["add", "https://example.com", "--project-root", str(bare_project.root)])
+    assert exc.value.code == 2
+    assert "add" in capsys.readouterr().err
 
 
 # ---- system prompt ----
@@ -187,14 +176,14 @@ def test_bare_system_prompt_has_no_wiki_blocks(bare_project: Project) -> None:
 # ---- M174: wiki-as-one-layout consistency (gated leak sites) ----
 
 
-def test_bare_doctor_wiki_check_is_info_not_warn(bare_project: Project) -> None:
-    """`veles doctor` must not nag about missing INDEX.md/LOG.md on a
-    layout whose wiki engine is off."""
-    from veles.core.doctor import _check_wiki_files
+def test_bare_doctor_context_check_is_info_not_warn(bare_project: Project) -> None:
+    """`veles doctor` must not nag about a missing INDEX.md on a layout that
+    declares no context file."""
+    from veles.core.doctor import _check_context_file
 
-    result = _check_wiki_files(bare_project)
+    result = _check_context_file(bare_project)
     assert result.status == "info"
-    assert "no wiki engine" in result.message
+    assert "no context file" in result.message
 
 
 def test_bare_subproject_proposer_is_noop(bare_project: Project) -> None:
@@ -223,10 +212,6 @@ def test_wiki_slash_not_registered_on_bare(bare_project: Project, tmp_path: Path
     bare_reg = build_default_registry(project=bare_project)
     assert "/wiki" not in bare_reg.names()
     assert "/save" in bare_reg.names()  # still present (memory fallback)
-
-    wiki_project = init_project(tmp_path / "w", name="w", layout="llm-wiki")
-    wiki_reg = build_default_registry(project=wiki_project)
-    assert "/wiki" in wiki_reg.names()
 
 
 def test_bare_help_omits_wiki(bare_project: Project) -> None:

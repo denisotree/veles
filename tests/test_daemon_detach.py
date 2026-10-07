@@ -109,7 +109,7 @@ def test_spawn_daemon_detaches_stdin(monkeypatch, tmp_path: Path) -> None:
 
 
 def test_detach_path_default_calls_spawn(
-    project, isolated_user_home: Path, monkeypatch, capsys
+    project, fake_channel, isolated_user_home: Path, monkeypatch, capsys
 ) -> None:
     """No `--foreground` → `_cmd_daemon_start` delegates to
     `_detach_and_report`, which spawns + polls (pid file AND the child
@@ -171,7 +171,7 @@ def test_detach_path_default_calls_spawn(
 
 
 def test_detach_path_spawn_returns_none_reports_failure(
-    project, isolated_user_home: Path, monkeypatch, capsys
+    project, fake_channel, isolated_user_home: Path, monkeypatch, capsys
 ) -> None:
     from veles.daemon import spawn as spawn_mod
 
@@ -185,7 +185,7 @@ def test_detach_path_spawn_returns_none_reports_failure(
 
 
 def test_detach_path_pid_never_appears_reports_log_tail(
-    project, isolated_user_home: Path, monkeypatch, capsys
+    project, fake_channel, isolated_user_home: Path, monkeypatch, capsys
 ) -> None:
     """Child exited before writing pid → parent times out and prints
     the tail of the daemon log file."""
@@ -218,7 +218,7 @@ def test_detach_path_pid_never_appears_reports_log_tail(
 
 
 def test_detach_path_already_running_refuses(
-    project, isolated_user_home: Path, monkeypatch, capsys
+    project, fake_channel, isolated_user_home: Path, monkeypatch, capsys
 ) -> None:
     """Existing pid file + live pid → reject the start (same project)."""
     pid_file = isolated_user_home / "daemon-detach-tests.pid"
@@ -236,7 +236,7 @@ def test_detach_path_already_running_refuses(
 
 
 def test_foreground_flag_runs_aiohttp_inline(
-    project, isolated_user_home: Path, monkeypatch
+    project, fake_channel, isolated_user_home: Path, monkeypatch
 ) -> None:
     """With `--foreground`, the function skips `_detach_and_report`
     and calls `web.run_app` directly (we mock it so the test doesn't

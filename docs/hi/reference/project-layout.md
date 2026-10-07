@@ -7,15 +7,16 @@
 ## `veles init` क्या बनाता है
 
 user-content वाला हिस्सा चुने गए layout pack पर निर्भर करता है (`--layout`,
-default `llm-wiki`); `.veles/` स्टेट वाला हिस्सा हर जगह एक जैसा होता है।
+default `bare` — `AGENTS.md` के सिवा कुछ नहीं); `.veles/` स्टेट वाला हिस्सा हर जगह
+एक जैसा होता है। नीचे registry के `llm-wiki` layout पर एक project है:
 
 ```
-my-project/                  # veles init  (default llm-wiki layout)
+my-project/                  # veles init --layout llm-wiki
 ├── AGENTS.md                # project context (injected into the agent)
 ├── CLAUDE.md → AGENTS.md    # symlink, so a `claude` CLI picks up the same context
 ├── GEMINI.md → AGENTS.md    # symlink, for a `gemini` CLI
-├── sources/                 # raw, immutable source material (agent-readonly)
-├── wiki/                    # the LLM-writable knowledge zone
+├── sources/                 # (llm-wiki) raw source material, readonly by convention
+├── wiki/                    # (llm-wiki) the LLM-writable knowledge zone
 │   ├── concepts/ entities/ queries/ self-doc/ sessions/
 └── .veles/                  # project state (do not commit; machine-managed)
     ├── project.toml         # name, created_at, schema_version, layout
@@ -29,8 +30,8 @@ my-project/                  # veles init  (default llm-wiki layout)
     └── skills/              # project-local skills
 ```
 
-`--layout notes` के साथ content वाला हिस्सा सिर्फ एक `notes/` डायरेक्टरी होता है;
-`--layout bare` के साथ कोई content scaffold बिल्कुल नहीं होता। `wiki/INDEX.md`
+default `bare` के साथ कोई content scaffold बिल्कुल नहीं होता; `notes` (registry से) के साथ
+यह सिर्फ एक `notes/` डायरेक्टरी होती है। wiki का `INDEX.md`
 (on-demand catalog) wiki के बढ़ने के साथ जनरेट होता है; `config.toml`, `tools/`,
 और `plans/` `.veles/` के अंदर तभी दिखते हैं जब आप कुछ कॉन्फ़िगर करते हैं, कोई agent
 कोई tool लिखता है, या आप कोई goal चलाते हैं।
@@ -67,7 +68,9 @@ digests, proposals, system-ops journal)। मुख्य tables:
 
 ## Layout packs
 
-`veles init --layout {llm-wiki|notes|bare|<custom>}` content layout चुनता है; pack
+`veles init --layout {bare|llm-wiki|notes|<custom>}` content layout चुनता है (केवल
+`bare` built in है; बाकी registry से आते हैं और उनके install का प्रस्ताव मिलता है); pack
 के पास scaffold, AGENTS.md template, writable zones, और यह तय करने का अधिकार होता है
-कि wiki engine (wiki tools, INDEX prompt injection, wiki recall) active है या नहीं।
+कि वह कौन-सा content engine (जैसे wiki: wiki tools, INDEX prompt injection, wiki recall)
+माँगता है।
 देखें [layout packs & the LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md)।

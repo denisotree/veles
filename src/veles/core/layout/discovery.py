@@ -21,12 +21,8 @@ from veles.core.layout.manifest import (
     LayoutManifestError,
     read_manifest,
 )
-from veles.core.project import Project
+from veles.core.project import LAYOUT_DEFAULT, Project
 from veles.core.user_paths import user_home
-
-LAYOUT_DEFAULT = "llm-wiki"
-"""Builtin layout pack name. `veles init` defaults to this; it produces
-the Karpathy LLM Wiki layout described in VISION §5.2."""
 
 
 @dataclass(frozen=True, slots=True)

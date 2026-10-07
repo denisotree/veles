@@ -85,6 +85,8 @@ class ModuleRegistry:
         self._hooks: dict[str, list[tuple[str, HookFn]]] = {n: [] for n in HOOK_NAMES}
         self._contributions: dict[str, list[Contribution]] = {}
         self.modules: list[str] = []
+        # Module name → its directory, for modules loaded from one (their `skills/`).
+        self.module_dirs: dict[str, Path] = {}
 
     def add_contribution(self, point: str, name: str, module_name: str, obj: object) -> None:
         """`ValueError` for an unknown point, an object the point doesn't take, or a
@@ -217,6 +219,12 @@ def discover_modules(project: Project) -> list[ModuleHandle]:
     return discover_modules_in(project.modules_dir)
 
 
+def module_package(name: str) -> str:
+    """The import name a loaded module's files live under — also the root of its
+    loggers (`logging.getLogger(__name__)` in its files)."""
+    return f"_veles_module_{name}"
+
+
 def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
     """Import the entrypoint file and call `register(api)` to populate hooks."""
     try:
@@ -225,7 +233,11 @@ def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
         raise ModuleLoadError(str(exc)) from exc
     if not file_path.is_file():
         raise ModuleLoadError(f"entrypoint file {str(file_path)!r} not found")
-    spec = importlib.util.spec_from_file_location(f"_veles_module_{handle.name}", file_path)
+    # The entrypoint is a package rooted at the module dir, so a multi-file module
+    # imports its own files relatively (`from .helpers import x`).
+    spec = importlib.util.spec_from_file_location(
+        module_package(handle.name), file_path, submodule_search_locations=[str(handle.dir)]
+    )
     if spec is None or spec.loader is None:
         raise ModuleLoadError(f"could not build import spec for {file_path}")
     module = importlib.util.module_from_spec(spec)
@@ -253,10 +265,12 @@ def load_module(handle: ModuleHandle, registry: ModuleRegistry) -> None:
         try:
             refuse_builtin_collisions(scratch)
             registry.merge_from(scratch, handle.name)
+            registry.module_dirs[handle.name] = handle.dir
         except ValueError as exc:
             raise ModuleLoadError(str(exc)) from exc
     except BaseException:
-        sys.modules.pop(spec.name, None)
+        for loaded in [m for m in sys.modules if m == spec.name or m.startswith(spec.name + ".")]:
+            sys.modules.pop(loaded, None)
         raise
 
 

@@ -75,7 +75,7 @@ approve its file). Other spellings of the same file (case, `..`, a symlink) are 
 too.
 
 Files that run without an explicit command or steer an agent CLI — anything under
-`.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.codex/`, `.vscode/`, `.devcontainer/`,
+`.git/`, `.githooks/`, `.claude/`, `.gemini/`, `.agents/`, `.codex/`, `.vscode/`, `.devcontainer/`,
 `.husky/`, and `.envrc`, `.mcp.json`, `.pre-commit-config.yaml`, `lefthook.yml`, at any
 depth, plus — when the git repo sits at the project root — the `core.hooksPath` set in its
 `.git/config` and wherever a symlinked `.git` points —
@@ -83,26 +83,86 @@ the agent's file tools write only after you confirm that write. Trust grants and
 autopilot don't cover it; the daemon asks in the channel, and a batch run with nobody to
 ask refuses.
 
-The `claude-cli` and `gemini-cli` providers run as a model with Veles' tools only: their
-own shell, file-edit and web tools, the project's `.claude/` settings and hooks, and
+The `claude-cli`, `codex` and `antigravity-cli` providers run as a model with Veles' tools only:
+their own shell, file-edit and web tools, the project's `.claude/` settings and hooks, and
 other MCP servers don't apply, and every Veles tool they call goes through the trust
 ladder above (nobody can answer a prompt there, so anything not already granted is
-refused).
+refused). Their MCP config lives in `.veles/tmp/delegate-<pid>/`, one per running
+process, which the agent's file tools can't write. `agy` runs in a scratch workspace
+outside the project, under `~/.veles/tmp/`, so the project's own `.agents/` hooks and
+MCP servers never reach it. It runs with `--dangerously-skip-permissions` when it has
+Veles' tools — agy refuses MCP calls headless otherwise — and a hook in that workspace
+denies every tool of its own; a hook that fails denies too. Veles' file tools can't
+write outside the project, so agy can't rewrite that hook through them. `codex` also
+runs outside the project, with your codex config ignored, a read-only sandbox and its
+own tools switched off by feature flags whose names Veles checks before every first
+run — a codex that renamed one it relies on is refused, not run open. Its MCP server
+goes in its arguments (no config file), only that server's tools are approved, and the
+environment that server gets is forwarded by name — never `VELES_TRUST_AUTO_ALLOW`.
+
+### `run_shell` in an OS sandbox
+
+Commands the agent runs with `run_shell` run in an OS sandbox — `sandbox-exec` on macOS,
+`bwrap` (bubblewrap) on Linux — that makes these paths read-only for them: the hooks and
+config of every repo in the project (for a worktree or submodule, the main repo's), every
+config file git reads (its includes, `~/.gitconfig`, the system one) and the
+`core.hooksPath` directory; the auto-run names above (`.envrc`, `.claude/`, `.mcp.json`,
+…) at any depth; the project's `.veles/` except `skills/`, `tools/`, `tmp/`, `plans/`,
+`memory/` and `artifacts/`; `~/.veles/` (approvals, trust, your modules); shell start-up
+files (`~/.zshrc`, `~/.bashrc`, …), `~/.ssh/`, LaunchAgents and autostart entries; and
+`~/.claude/`, `~/.codex/`, `~/.gemini/`. Those paths, their parent directories and the
+repos can't be renamed away either. Everything else works as before: the project,
+`git commit`, a new repo (`git init`, `git clone`), package caches, temp dirs and the
+network. A refused write tells the agent to ask you.
+
+`veles doctor` shows whether the sandbox is active. To switch it off, set
+`[sandbox] enabled = false` in `~/.veles/config.toml` — a project's own config can't.
+
+On Linux, `bwrap` needs unprivileged user namespaces. Ubuntu 24.04 and later restrict
+them through AppArmor; allow them for `bwrap` alone with a profile:
+
+```
+# /etc/apparmor.d/bwrap — then: sudo apparmor_parser -r /etc/apparmor.d/bwrap
+abi <abi/4.0>,
+include <tunables/global>
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
+```
+
+In Docker the sandbox needs `--security-opt seccomp=unconfined --security-opt
+apparmor=unconfined`. Where it can't start, `run_shell` runs as before and Veles warns
+once.
 
 Known limits:
 
-- `run_shell` is a shell: once you grant it (or under autopilot) it can write any of
-  the files above without the per-file confirmation.
-- An MCP approval pins the server's command line, not the files it runs from the project
-  (a script named in `args`) — review those too.
+- Where the sandbox isn't active, `run_shell` is a shell: once you grant it (or under
+  autopilot) it can write any of the files above without the per-file confirmation —
+  and the approval stores in `~/.veles/`. `veles … approve` needs a terminal or the
+  reviewed hash (`--sha256`) and refuses a command the agent's shell started, but a
+  granted shell can strip that mark or write those files directly.
+- The sandbox protects writes, not reads, and not the network. Directories on your
+  `PATH` (`~/.local/bin`) stay writable.
+- It stops the command's own processes, not a service the command asks to act for it:
+  a container it starts with `docker run -v …`, `systemd-run`, `launchctl` or
+  `osascript` writes as you.
+- A repo the command creates (`git init`) isn't protected until the next command; a new
+  repo at the project root is reported to you.
+- On Linux the sandbox can only protect paths that exist, and finds protected names six
+  levels deep in the project: a new `.envrc` at the root or a new start-up file in your
+  home (`~/.bash_profile`) can be created — Veles reports it to you and in the memory
+  log — and a symlink on the way to the project (`~/code` → `/Volumes/…`) can be
+  replaced. macOS refuses both.
+- An MCP approval covers the project scripts named in `command`/`args` and modules run
+  with `-m` (at the root or under `src/`), not the files those import.
 - With a CLI provider, runs that pre-authorise tools only for themselves (daemon
-  background jobs, `veles research`) don't pass that on to the delegated CLI: its Veles
-  tools need a standing `veles trust set` grant or an autopilot window. The parent run's
-  planning mode doesn't reach them either.
-- `gemini-cli` trusts the project folder for its run, so gemini also reads the project's
-  `.env` — keep gemini settings you don't want the agent to steer out of it.
-- On a machine with managed (system) gemini policies, gemini ignores the policy Veles
-  passes, so `gemini-cli` isn't limited to Veles' tools there.
+  background jobs, `veles research`) don't pass that on to the delegated CLI: the
+  pre-authorisation lives in the Veles process, and the MCP server the CLI starts is a
+  separate one, so its Veles tools need a standing `veles trust set` grant or an
+  autopilot window. The parent run's planning mode doesn't reach them either.
+- `antigravity-cli` relies on agy honouring its workspace's `.agents/hooks.json`; an agy
+  release that stopped reading workspace hooks would leave its own tools open under
+  `--dangerously-skip-permissions`.
 
 Paths with control characters (terminal escapes, bidi overrides) are refused, and
 confirmations, the trust prompt and the diff preview show such characters escaped —

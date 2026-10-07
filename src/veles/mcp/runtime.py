@@ -63,7 +63,7 @@ def mount_mcp_tools(registry: Registry, project: Project) -> list[str]:
     from veles.mcp.config import load_disabled_tools, load_raw_mcp_servers, parse_servers
 
     raw = load_raw_mcp_servers(project)
-    configs = only_approved(project.root, parse_servers(raw), raw)
+    configs = only_approved(project.root, parse_servers(raw, cwd=project.root), raw)
     if not configs:
         return []
     try:

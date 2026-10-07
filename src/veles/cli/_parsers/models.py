@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import argparse
 
-from veles.cli._parsers._common import PROVIDER_CHOICES
-
 
 def register(sub: argparse._SubParsersAction) -> None:
     cmd = sub.add_parser(
@@ -16,7 +14,7 @@ def register(sub: argparse._SubParsersAction) -> None:
             "providers (ollama / llamacpp / openai-compat) are always live."
         ),
     )
-    cmd.add_argument("provider", choices=PROVIDER_CHOICES, help="Provider whose models to list.")
+    cmd.add_argument("provider", metavar="PROVIDER", help="Provider id whose models to list.")
     cmd.add_argument(
         "--refresh",
         action="store_true",

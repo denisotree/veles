@@ -52,9 +52,10 @@ veles tool promote <name>      # ~/.veles/tools/로 이동 (프로젝트 간 공
 veles module list                              # 두 범위 모두, `scope` 열 포함
 veles module add https://github.com/org/module.git
 veles module add ./local-module --user          # ~/.veles/modules/에 설치, 모든 프로젝트에서 사용
-veles module show <name> [--user]
+veles module show <name> [--user]             # 매니페스트 + 파일 sha256
 veles module remove <name> [--user]
-veles module approve <name> [--user]
+veles module approve <name> [--user]          # 터미널에서 `yes` 입력
+veles module approve <name> --sha256 <hash>   # 터미널 없이: 검토한 해시
 ```
 
 모듈은 스킬, 도구와 마찬가지로 두 범위에 존재합니다. 프로젝트 로컬(`<project>/.veles/modules/`)과 모든 프로젝트에서 로드되는 사용자 전역(`~/.veles/modules/`)입니다. 사용자 수준 모듈도 프로젝트 모듈과 같은 승인 게이트를 거치며, 게이트는 이름을 비교하기 전에 실행됩니다. 프로젝트 모듈과 사용자 모듈의 이름이 같으면 승인된 프로젝트 모듈이 로드되고 Veles는 사용자 수준 모듈이 가려진다고 경고합니다. 승인되지 않은 프로젝트 모듈은 건너뛰고(경고에 해당 디렉터리가 표시됨) 사용자 모듈이 로드됩니다. 같은 범위에서 승인된 두 모듈의 이름이 같으면 (디렉터리 순으로) 첫 번째가 로드되고 나머지는 경고와 함께 건너뜁니다. `veles module {show,approve,remove}`는 매니페스트 이름(`list`가 보여 주는 것)을 받으며, 범위 내 둘 이상의 디렉터리가 선언한 이름은 해당 디렉터리를 나열하고 거부합니다. `veles module add`는 범위 내 다른 디렉터리가 이미 선언한 이름의 모듈 설치를 거부합니다.

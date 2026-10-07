@@ -32,7 +32,7 @@ def _fresh_engine_cache():
 @pytest.fixture()
 def wiki_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("VELES_USER_HOME", str(tmp_path / "home"))
-    p = init_project(tmp_path / "proj", name="proj", layout="llm-wiki")
+    p = init_project(tmp_path / "proj", name="proj")
     (p.root / "wiki" / "concepts").mkdir(parents=True, exist_ok=True)
     (p.root / "sources").mkdir(parents=True, exist_ok=True)
     token = set_active_project(p)

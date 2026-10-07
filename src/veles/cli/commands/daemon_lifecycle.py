@@ -39,10 +39,15 @@ def _bootstrap_daemon(project, *, name: str | None = None) -> None:
     its own log file (`instance_log_path`)."""
     from veles.cli._project import _load_project_modules
     from veles.core.context import set_active_project
-    from veles.core.modules import set_module_registry
+    from veles.core.modules import current_module_registry, set_module_registry
 
     set_active_project(project)
-    set_module_registry(_load_project_modules(project))
+    # `daemon start` loaded them already (to check its channels); reuse that registry.
+    set_module_registry(current_module_registry() or _load_project_modules(project))
+    from veles.core.registry.ensure import ensure_project_extensions
+
+    # No terminal to ask at: a missing layout/engine is one warning in the log.
+    ensure_project_extensions(project, interactive=False)
 
     # M226: images arriving on a channel are described by the project's own
     # vision route (`[vision]` in config.toml). Installed here so every
@@ -374,6 +379,29 @@ def _stop_status_paths(args: argparse.Namespace):
     return _resolve_instance_paths(project, getattr(args, "name", None) or None)
 
 
+def _prepare_channels(project, session: str | None) -> None:
+    """Load the modules and install the platform of every channel the config
+    declares (the config is the user's decision)."""
+    from veles.core.module_loading import load_project_modules
+    from veles.core.modules import current_module_registry, set_module_registry
+    from veles.core.registry.ensure import ensure_channel_platforms
+
+    set_module_registry(load_project_modules(project, into=current_module_registry()))
+    ensure_channel_platforms(project, session)
+
+
+def _channel_ready_or_say_why(project, session: str | None) -> bool:
+    """A daemon hosts channels: False (after printing why and what to run) when
+    none is ready."""
+    from veles.core.channel_setup import channel_readiness, no_channel_message
+
+    statuses = channel_readiness(project, session)
+    if any(s.state == "ok" for s in statuses):
+        return True
+    print(no_channel_message(statuses, session), file=sys.stderr)
+    return False
+
+
 def _restart_named_session(args: argparse.Namespace, name: str) -> int:
     """`veles daemon restart --name <name>` — stop this project's named
     session (per-instance pid) and respawn it from its `[daemon.<name>]`
@@ -385,6 +413,10 @@ def _restart_named_session(args: argparse.Namespace, name: str) -> int:
     project = require_project(args)
     if project is None:
         return 2
+    # Checked before the stop: the new daemon would refuse, and the running one stays.
+    _prepare_channels(project, name)
+    if not _channel_ready_or_say_why(project, name):
+        return 1
     pid_path, _info = _resolve_instance_paths(project, name)
     pid = read_pid(pid_path)
     if pid and is_alive(pid):

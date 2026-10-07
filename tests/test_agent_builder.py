@@ -155,8 +155,8 @@ def test_tool_aware_provider_and_callable_system_prompt(
     bridge_calls: list[dict] = []
     prompt_saw: list[object] = []
 
-    def fake_bridge(name, proj, *, skill_model=None):
-        bridge_calls.append({"name": name, "skill_model": skill_model})
+    def fake_bridge(name, proj, *, model=None):
+        bridge_calls.append({"name": name, "model": model})
         return stub_provider
 
     monkeypatch.setattr("veles.cli._console.ensure_api_key", lambda *a, **kw: True)
@@ -185,6 +185,6 @@ def test_tool_aware_provider_and_callable_system_prompt(
     assert agent.provider is stub_provider
     assert agent._system_prompt == "QUALIFIED"
     assert prompt_saw == [stub_provider]
-    assert bridge_calls == [{"name": "openrouter", "skill_model": "test/model"}]
+    assert bridge_calls == [{"name": "openrouter", "model": "test/model"}]
     # no compressor requested → none built
     assert agent._compressor is None

@@ -7,6 +7,7 @@ import shutil
 import sys
 from pathlib import Path
 
+from veles.cli._console import reviewed_sha256
 from veles.core.critical_ops import confirm_critical
 from veles.core.module_install import (
     ModuleInstallError,
@@ -64,11 +65,19 @@ def _list(args: argparse.Namespace, project: Project) -> int:
         print("(no modules)")
         return 0
     print(f"{'name':<20}  {'scope':<8}  {'version':<10}  description")
+    project_names = {h.name for scope, h in rows if scope == "project"}
+    seen: set[tuple[str, str]] = set()
     for scope, h in rows:
         version = h.manifest.version or "—"
         desc = shown(h.manifest.description)
         if len(desc) > 60:
             desc = desc[:57] + "..."
+        # The same rules the loader applies (`core/module_loading.py`).
+        if (scope, h.name) in seen:
+            desc = f"[duplicate name — ignored: {shown(h.dir)}] {desc}"
+        elif scope == "user" and h.name in project_names:
+            desc = f"[shadowed by the project's] {desc}"
+        seen.add((scope, h.name))
         print(f"{h.name:<20}  {scope:<8}  {shown(version):<10}  {desc}")
     return 0
 
@@ -99,8 +108,13 @@ def _show(args: argparse.Namespace, project: Project) -> int:
     module_dir = _find(_modules_dir(args, project), args.name)
     if module_dir is None:
         return 1
+    from veles.core.registry.gate import module_approved
+    from veles.core.registry.hashing import tree_sha256
+
     text = (module_dir / "module.toml").read_text(encoding="utf-8")
     print("\n".join(shown(line) for line in text.splitlines()))
+    approved = "approved" if module_approved(module_dir) else "not approved"
+    print(f"---\nfiles sha256: {tree_sha256(module_dir)} ({approved})")
     return 0
 
 
@@ -168,27 +182,65 @@ def _remove(args: argparse.Namespace, project: Project) -> int:
 
 
 def _approve(args: argparse.Namespace, project: Project) -> int:
+    if not getattr(args, "all", False):
+        if not args.name:
+            print("error: name a module, or pass --all", file=sys.stderr)
+            return 2
+        return _approve_one(args, project, args.name)
+    if args.name or getattr(args, "sha256", None) is not None:
+        print("error: --all takes no name and no --sha256", file=sys.stderr)
+        return 2
+    from veles.core.registry.gate import NOT_APPROVED, admit_module
+
+    root = None if getattr(args, "user", False) else project.root
+    # Only modules an approval would load — not a symlinked dir or one with a `.git`.
+    pending = [
+        h.name
+        for h in discover_modules_in(_modules_dir(args, project))
+        if admit_module(h.dir, project_root=root) == NOT_APPROVED
+    ]
+    if not pending:
+        print("no module here waits for approval.", file=sys.stderr)
+    return max((_approve_one(args, project, name) for name in pending), default=0)
+
+
+def _approve_one(args: argparse.Namespace, project: Project, name: str) -> int:
+    """A human approves a module's files: at a terminal by typing `yes` to the hash
+    shown, or — headless, for a deploy script — with `--sha256`, the hash they
+    reviewed. Either way the files must still hash to it."""
     from veles.core.registry.gate import approve_module
     from veles.core.registry.hashing import tree_sha256
 
-    module_dir = _find(_modules_dir(args, project), args.name)
+    sha = getattr(args, "sha256", None)
+    expected = reviewed_sha256(sha) if sha is not None else None
+    if sha is not None and expected is None:
+        return 2
+    module_dir = _find(_modules_dir(args, project), name)
     if module_dir is None or not _in_own_scope(args, project, module_dir):
         return 1
+    user = getattr(args, "user", False)
+    flag = "--user " if user else ""
     try:
-        digest = tree_sha256(module_dir)
-        summary = (
-            f"Module: {shown(module_dir)}\nFiles hash: {digest[:12]}\n"
-            "Its code will run on every agent turn. Review it first."
-        )
-        if not confirm_critical(f"approve module {args.name}", summary):
-            print("<aborted>", file=sys.stderr)
-            return 1
-        project_root = None if getattr(args, "user", False) else project.root
-        approve_module(
-            module_dir, name=args.name, project_root=project_root, expected_sha256=digest
-        )
+        if expected is None:
+            expected = tree_sha256(module_dir)
+            summary = (
+                f"Module: {shown(module_dir)}\nFiles hash: {expected}\n"
+                "Its code will run on every agent turn. Review it first."
+            )
+            if not confirm_critical(f"approve module {name}", summary):
+                print("<aborted>", file=sys.stderr)
+                if not sys.stdin.isatty():
+                    print(
+                        f"without a terminal, approve the hash you reviewed: `veles module "
+                        f"approve {flag}{name} --sha256 <hash>` (`veles module show "
+                        f"{flag}{name}` prints it)",
+                        file=sys.stderr,
+                    )
+                return 1
+        project_root = None if user else project.root
+        approve_module(module_dir, name=name, project_root=project_root, expected_sha256=expected)
     except (OSError, ValueError) as exc:
         print(f"error: {shown(exc)}", file=sys.stderr)
         return 1
-    print(f"<approved module {args.name!r}>", file=sys.stderr)
+    print(f"<approved module {name!r}>", file=sys.stderr)
     return 0

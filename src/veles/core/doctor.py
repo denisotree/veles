@@ -12,20 +12,24 @@ run means the agent is observable, gated, and reproducible.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import subprocess
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from veles.core.approval import list_approvals
-from veles.core.layout.engines import wiki_enabled
 from veles.core.project import Project
 from veles.core.timeutil import utc_iso
 from veles.core.trace import cache_fragmentation_alert, read_records, trace_path_for_project
+
+if TYPE_CHECKING:
+    from veles.core.sandbox import Wrapped
 
 CheckStatus = Literal["ok", "warn", "error", "info"]
 
@@ -152,6 +156,42 @@ def _check_user_config() -> CheckResult:
     return CheckResult(name="user_config", status="ok", message=f"{cfg} parses cleanly")
 
 
+def _check_provider_catalog(project: Project | None = None) -> CheckResult:
+    """The user catalogue reads cleanly and every provider the config routes to is
+    in the catalogue (a registry-offered one installs on the next run)."""
+    from veles.core.providers import RETIRED, catalog, find_provider, user_catalog_problems
+    from veles.core.routing.ensemble import KNOWN_TASKS, effective_route
+
+    problems = user_catalog_problems()
+    named: set[str] = set()
+    if project is not None:
+        for task in KNOWN_TASKS:
+            try:
+                named.add(effective_route(task, project)[0])
+            except Exception:
+                continue
+    retired = sorted(n for n in named if n in RETIRED)
+    missing = sorted(n for n in named if n not in RETIRED and find_provider(n) is None)
+    details: dict[str, object] = {"catalogue": problems, "missing": missing}
+    if retired:
+        return CheckResult(
+            name="provider_catalog", status="error", message=RETIRED[retired[0]], details=details
+        )
+    if missing or problems:
+        what = f"not in the catalogue: {', '.join(missing)}" if missing else problems[0]
+        return CheckResult(
+            name="provider_catalog",
+            status="warn",
+            message=what,
+            fix_hint="a registry module installs on the next run if one provides it; "
+            "otherwise fix the name or add it to ~/.veles/providers.toml",
+            details=details,
+        )
+    return CheckResult(
+        name="provider_catalog", status="ok", message=f"{len(catalog())} providers in the catalogue"
+    )
+
+
 def _check_provider_keys(project: Project | None = None) -> CheckResult:
     """Which providers have a key, checked where the runtime looks for one.
 
@@ -166,13 +206,16 @@ def _check_provider_keys(project: Project | None = None) -> CheckResult:
     `veles:OPENROUTER_API_KEY` entry, which the runtime has not read since M149
     — but only for a provider that has no working key, so someone with both a
     stale entry and a wizard key is not told to fix what is not broken."""
-    from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
+    from veles.core.providers import catalog
     from veles.core.secrets import get_provider_key, get_secret
 
     scope = project.name if project is not None else None
     sources: dict[str, str] = {}
     stranded: list[str] = []
-    for provider, env_names in PROVIDER_API_KEY_ENVS.items():
+    for provider, spec in catalog().items():
+        if not spec.needs_key:
+            continue
+        env_names = spec.key_env
         if get_provider_key(provider, project=scope, env_fallback=False):
             sources[provider] = "keychain"
         elif any(os.environ.get(n) for n in env_names):
@@ -613,29 +656,37 @@ def _check_symlinks(project: Project | None) -> CheckResult:
     return CheckResult(name="symlinks", status="ok", message="CLAUDE.md and GEMINI.md → AGENTS.md")
 
 
-def _check_wiki_files(project: Project | None) -> CheckResult:
+def _check_context_file(project: Project | None) -> CheckResult:
+    """The layout pack's `context_file` (e.g. the wiki's INDEX.md), when it names one."""
+    from veles.core.layout.discovery import find_layout
+    from veles.core.registry.ensure import install_hint
+
+    name = "context_file"
     if project is None:
-        return CheckResult(name="wiki_files", status="info", message="no active project")
-    if not wiki_enabled(project):
+        return CheckResult(name=name, status="info", message="no active project")
+    pack = find_layout(project.layout_name, project)
+    if pack is None:
         return CheckResult(
-            name="wiki_files",
-            status="info",
-            message=(
-                f"layout '{project.layout_name}' has no wiki engine — INDEX.md/LOG.md not required"
-            ),
-        )
-    missing: list[str] = []
-    for name in ("INDEX.md", "LOG.md"):
-        if not (project.root / name).exists():
-            missing.append(name)
-    if missing:
-        return CheckResult(
-            name="wiki_files",
+            name=name,
             status="warn",
-            message=f"missing: {', '.join(missing)}",
-            fix_hint="run `veles dream` to regenerate INDEX.md",
+            message=f"layout {project.layout_name!r} is not installed",
+            fix_hint=install_hint(project) or "",
         )
-    return CheckResult(name="wiki_files", status="ok", message="INDEX.md and LOG.md present")
+    context = pack.manifest.context_file
+    if not context:
+        return CheckResult(
+            name=name,
+            status="info",
+            message=f"layout '{project.layout_name}' declares no context file",
+        )
+    if not (project.root / context).exists():
+        return CheckResult(
+            name=name,
+            status="warn",
+            message=f"missing: {context}",
+            fix_hint="run `veles dream` (or `veles layout sync`) to regenerate it",
+        )
+    return CheckResult(name=name, status="ok", message=f"{context} present")
 
 
 def _check_trace_health(project: Project | None) -> CheckResult:
@@ -699,6 +750,34 @@ def _check_events_health(project: Project | None) -> CheckResult:
     return CheckResult(name="events_health", status="ok", message=f"events.jsonl: {size} bytes")
 
 
+def _check_channel_platforms(project: Project | None) -> CheckResult:
+    """A channel declared in config whose platform module isn't installed. doctor
+    never installs — the next daemon start does (the config is the decision)."""
+    if project is None:
+        return CheckResult(name="channel_platforms", status="info", message="no active project")
+    from veles.core.registry.ensure import channel_needs, ref_for
+
+    try:
+        needs = channel_needs(project, None)
+    except Exception as exc:
+        return CheckResult(
+            name="channel_platforms", status="warn", message=f"could not check channels: {exc}"
+        )
+    if not needs:
+        return CheckResult(
+            name="channel_platforms", status="ok", message="declared channels have their modules"
+        )
+    names = ", ".join(n.name for n in needs)
+    refs = " ".join(ref_for(n) or n.name for n in needs)
+    return CheckResult(
+        name="channel_platforms",
+        status="warn",
+        message=f"channel declared but its module isn't installed: {names}",
+        fix_hint=f"it installs on the next `veles daemon start`, or now: "
+        f"`veles registry install {refs}`",
+    )
+
+
 def _check_extensions(project: Project | None) -> CheckResult:
     from veles.core.registry.maintenance import verify
     from veles.core.registry.repo import RegistryRepoError
@@ -712,7 +791,7 @@ def _check_extensions(project: Project | None) -> CheckResult:
             status="warn",
             message=f"could not verify extensions: {shown(exc)}",
         )
-    broken = [i for i in issues if i.problem in ("missing", "modified")]
+    broken = [i for i in issues if i.problem in ("missing", "modified", "missing-dependency")]
     revoked = [i for i in issues if i.problem in ("yanked", "removed")]
     ahead = [i for i in issues if i.problem == "upstream-ahead"]
     if broken:
@@ -741,6 +820,84 @@ def _check_extensions(project: Project | None) -> CheckResult:
             fix_hint="`veles registry verify` shows the versions; re-vendor when reviewed",
         )
     return CheckResult(name="extensions", status="ok", message="installed extensions verified")
+
+
+def _check_modules(project: Project | None) -> CheckResult:
+    """Every module on disk loads — a never-approved one has no install record, so
+    `_check_extensions` can't see it, yet the agent runs without it."""
+    from veles.core.module_loading import refused_modules
+    from veles.core.text import shown
+
+    refused = refused_modules(project)
+    if not refused:
+        return CheckResult(name="modules", status="ok", message="every module on disk loads")
+    return CheckResult(
+        name="modules",
+        status="error",
+        message="modules not loaded: "
+        + ", ".join(f"{name} ({shown(why)})" for name, why, _ in refused),
+        fix_hint="; ".join(f"{name}: {fix}" for name, _, fix in refused),
+    )
+
+
+def _check_sandbox(project: Project | None) -> CheckResult:
+    """Whether `run_shell` runs in the OS sandbox (release F); a project-level
+    `[sandbox]` is ignored — only ~/.veles/config.toml can switch it off."""
+    from veles.core import sandbox
+    from veles.core.project_config import get_section, load_project_config
+
+    if project is not None and get_section(load_project_config(project), "sandbox"):
+        return CheckResult(
+            name="sandbox",
+            status="warn",
+            message="[sandbox] in the project's config.toml is ignored",
+            fix_hint="set it in ~/.veles/config.toml — a project can't switch the sandbox off",
+        )
+    status = sandbox.sandbox_status()
+    if status.disabled:
+        return CheckResult(name="sandbox", status="info", message="run_shell sandbox is off")
+    if status.active:
+        failure = _sandbox_start_failure(sandbox.wrap(["true"], project), project)
+        if failure:
+            return CheckResult(
+                name="sandbox",
+                status="warn",
+                message=f"run_shell's sandbox fails to start here: {failure}",
+                fix_hint="run_shell commands don't run in this project until this is fixed",
+            )
+        return CheckResult(name="sandbox", status="ok", message=f"run_shell runs in {status.kind}")
+    hint = (
+        "install bubblewrap; on Ubuntu 24.04+ allow its user namespaces with an AppArmor "
+        "profile for /usr/bin/bwrap (see the security docs); in Docker add "
+        "--security-opt seccomp=unconfined --security-opt apparmor=unconfined"
+        if status.kind == "bwrap"
+        else ""
+    )
+    return CheckResult(
+        name="sandbox",
+        status="warn",
+        message=f"run_shell is not sandboxed: {status.reason}",
+        fix_hint=hint,
+    )
+
+
+def _sandbox_start_failure(wrapped: Wrapped, project: Project | None) -> str:
+    """Run `true` under this project's real profile/binds: the probe binds nothing."""
+    try:
+        proc = subprocess.run(
+            wrapped.argv,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+            cwd=str(project.root) if project is not None else None,
+            stdin=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return str(exc)
+    if proc.returncode == 0:
+        return ""
+    return (proc.stderr.strip().splitlines() or [f"exit {proc.returncode}"])[0]
 
 
 def _check_approval_audit(project: Project | None) -> CheckResult:
@@ -787,6 +944,7 @@ def run_all(project: Project | None) -> DoctorReport:
     project_aware: list[Callable[[Project | None], CheckResult]] = [
         # Project-aware because the runtime resolves a key per project scope.
         _check_provider_keys,
+        _check_provider_catalog,
         _check_active_project,
         _check_config_schema,
         _check_memory_fts,
@@ -796,12 +954,43 @@ def run_all(project: Project | None) -> DoctorReport:
         _check_agents_md_sections,
         _check_registry_paths,
         _check_symlinks,
-        _check_wiki_files,
+        _check_context_file,
         _check_trace_health,
         _check_events_health,
         _check_approval_audit,
         _check_extensions,
+        _check_modules,
+        _check_sandbox,
+        _check_channel_platforms,
     ]
     results: list[CheckResult] = [c() for c in no_arg]
-    results.extend(c(project) for c in project_aware)
+    with _project_modules(project):
+        results.extend(c(project) for c in project_aware)
     return DoctorReport(results=results)
+
+
+@contextlib.contextmanager
+def _project_modules(project: Project | None) -> Iterator[None]:
+    """The project's modules while the project checks run, when the caller
+    loaded none (the `veles doctor` verb): a channel platform is a module, so
+    without it its config keys go unchecked (M201) and it reads as missing."""
+    from veles.core.module_loading import load_project_modules
+    from veles.core.modules import (
+        current_module_registry,
+        reset_module_registry,
+        set_module_registry,
+    )
+
+    if project is None or current_module_registry() is not None:
+        yield
+        return
+    try:
+        registry = load_project_modules(project)
+    except Exception:  # a broken module is the extensions check's finding, not a crash
+        yield
+        return
+    token = set_module_registry(registry)
+    try:
+        yield
+    finally:
+        reset_module_registry(token)

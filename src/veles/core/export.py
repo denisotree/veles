@@ -4,8 +4,8 @@ Three commands cover three use cases:
 
 - `veles export full <bundle.tar.gz>` packs the whole project (`AGENTS.md`
   + `.veles/`) into a tarball for backup or migration to another machine.
-  Excludes runtime ephemera (`*.lock` and `budget.state.json` reflect the
-  live loop, not durable state).
+  Excludes runtime ephemera (`*.lock`, `budget.state.json` and `.veles/tmp/`
+  reflect the live loop, not durable state).
 
 - `veles export template <bundle.tar.gz>` packs a sanitised subset for
   sharing or publishing: schema (`AGENTS.md` + `project.toml`), memory
@@ -218,6 +218,8 @@ def _iter_project_files(project: Project, *, mode: str) -> Iterator[tuple[Path, 
 
 
 def _is_excluded(rel_path: str, name: str, *, mode: str) -> bool:
+    if rel_path.startswith(".veles/tmp/"):
+        return True  # runtime artefacts: clipboard pastes, web cache, delegate directories
     if name in _RUNTIME_EXCLUDED_NAMES:
         return True
     if name.endswith(".lock"):

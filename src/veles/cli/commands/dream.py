@@ -31,10 +31,14 @@ def cmd_dream(args: argparse.Namespace, project) -> int:
         # backend for the hardcoded `anthropic/claude-haiku-4.5` slug → 404.
         # An explicit `--provider` still wins; the routed model is adopted
         # only when it belongs to that same provider.
+        from veles.cli._console import check_provider
         from veles.core.model_resolver import ConfigurationError
         from veles.core.provider_factory import make_provider as _make_provider
         from veles.core.routing.ensemble import route
 
+        named = getattr(args, "provider", None)
+        if named and not check_provider(named, reason="named with --provider"):
+            return 2
         try:
             routed_provider, routed_model = route("insights", project)
         except ConfigurationError:

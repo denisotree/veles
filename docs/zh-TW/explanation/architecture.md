@@ -44,7 +44,7 @@ context 檔案(`AGENTS.md`)刻意保持精簡;輔助知識(wiki 頁面、專案�
 
 - `<project>/.veles/`——本專案的記憶、設定、本地 skills／tools。
 - `~/.veles/`——使用者全域設定、跨專案 skills／tools、快取、trust。
-- `<project>/AGENTS.md`、`wiki/`、`sources/`——你的內容(LLM-Wiki 佈局)。
+- `<project>/AGENTS.md`、以及你的佈局新增的內容(例如 LLM-Wiki 佈局的 `wiki/`、`sources/`)——你的內容。
 
 參見[專案佈局](../reference/project-layout.md)。
 
@@ -54,7 +54,7 @@ context 檔案(`AGENTS.md`)刻意保持精簡;輔助知識(wiki 頁面、專案�
 
 ## 各個介面
 
-- **CLI**(`veles run`、`veles add`、……)——一次性與腳本化使用。
+- **CLI**(`veles run`、`veles organize`、……,以及模組新增的指令,如 wiki 的 `veles add`)——一次性與腳本化使用。
 - **TUI**(`veles tui`)——具備[執行模式](modes.md)的互動式 REPL。
 - **Daemon + channels**——無頭 API、Telegram、排程作業。
 

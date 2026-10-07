@@ -6,9 +6,14 @@ Telegram থেকে একটি Veles প্রজেক্টের সা�
 [daemon](run-as-daemon.md)-এ ফরোয়ার্ড করে এবং উত্তর stream করে ফিরিয়ে আনে। প্রতিটি chat তার
 নিজস্ব কথোপকথন session পায়।
 
+Telegram অফিসিয়াল extension registry-র (`official/telegram`) একটি module, Veles core-এর অংশ নয়।
+এটি হাতে install করতে হয় না: `veles channel add` এটি offer করে, আর আপনার config-এ
+`[channels.telegram]` block পরের `veles daemon start`-এ এটি install করে দেয় — আপনি channel declare
+করেছেন, তাই সেটিই সম্মতি। এটি শুধু আপনার সংযুক্ত registry থেকে install হয়।
+
 ## পূর্বশর্ত
 
-- একটি চালু daemon (দেখুন [run as a daemon](run-as-daemon.md))।
+- একটি Veles প্রজেক্ট (daemon শুধু কাজ করা channel থাকলেই চালু হয় — এটি তেমনই একটি)।
 - [@BotFather](https://t.me/BotFather) থেকে একটি Telegram bot token।
 
 ## বিকল্প A — wizard-এর মাধ্যমে যুক্ত করুন (প্রস্তাবিত)
@@ -39,22 +44,30 @@ whitelist = ["@alice", "123456789"]
 **whitelist** নিয়ন্ত্রণ করে bot কাকে উত্তর দেবে (Telegram `@username` বা numeric user id)।
 সবাইকে উত্তর দিতে এটি খালি রাখুন — যা প্রস্তাবিত নয়, কারণ প্রতিটি মেসেজ মডেল token খরচ করে।
 
-প্রয়োগ করতে daemon restart করুন:
+প্রয়োগ করতে daemon start (বা restart) করুন:
 
 ```bash
-veles daemon restart
+veles daemon start      # or: veles daemon restart
 ```
+
+হাতে block লেখাও একইভাবে কাজ করে। Token `veles channel add` দিয়ে keychain-এ রাখুন, অথবা block-এ
+`bot_token = "…"` হিসেবে; token না থাকলে daemon চালু হতে অস্বীকার করে এবং যে command এটি ঠিক করবে
+তার নাম জানায়।
 
 ## বিকল্প B — একটি standalone gateway চালান
 
 আপনি যদি একটি আলাদা প্রসেস পছন্দ করেন (in-daemon channel-এর পরিবর্তে), চালান:
 
 ```bash
-export TELEGRAM_BOT_TOKEN=123456:ABC...
+export TELEGRAM_BOT_TOKEN=123456:ABC...   # or pass --secret
 veles channel run --channel telegram \
   --daemon-url http://127.0.0.1:8765 \
   --daemon-token "$(veles daemon token add tg)"
 ```
+
+`veles channel run --channel telegram` module না থাকলে আগে সেটি install করে।
+
+এটি যে daemon-এর সঙ্গে কথা বলে, সেটি কেবল নিজের একটি প্রস্তুত channel নিয়েই start হয়, তাই এই বিকল্প এমন daemon-এর জন্য উপযুক্ত যা ইতিমধ্যে অন্য একটি channel host করছে। একই bot দুই জায়গায় চালাবেন না: Telegram একটি bot-এর update কেবল একটি poller-কে দেয়, তাই দ্বিতীয়টি fail করে।
 
 ## Chat session পরিচালনা করুন
 
@@ -82,6 +95,10 @@ veles channel remove telegram            # drop the channel binding
 এজেন্টের এমন কোনো তথ্য দরকার হলে যা শুধু আপনিই জানেন, সে চ্যাটে জিজ্ঞেস করে।
 প্রস্তাবিত একটি উত্তরে চাপুন বা নিজের উত্তর লিখুন। পাঁচ মিনিটের মধ্যে উত্তর না
 পেলে সে সবচেয়ে ভালো অনুমানে এগোয় এবং কী অনুমান করেছে তা জানায়।
+
+`/settings` একটি মেসেজে model (daemon-এর config দিয়ে নির্ধারিত), chat-এর session, তার token usage এবং
+mode button দেখায়। `/tokens` daemon চালু হওয়ার পর থেকে session-এর token usage দেখায়; `/context`
+দেখায় model-এর context window কতটা ভরেছে।
 
 ## Multimodal সীমাবদ্ধতা
 

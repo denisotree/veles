@@ -63,7 +63,8 @@ viene richiamata **su richiesta** invece di essere riversata tutta in anticipo.
   skill/strumenti locali.
 - `~/.veles/` — configurazione globale dell'utente, skill/strumenti cross-progetto,
   cache, fiducia.
-- `<project>/AGENTS.md`, `wiki/`, `sources/` — i tuoi contenuti (il layout LLM-Wiki).
+- `<project>/AGENTS.md` e ciò che aggiunge il tuo layout (es. `wiki/`, `sources/`
+  per il layout LLM-Wiki) — i tuoi contenuti.
 
 Vedi [layout del progetto](../reference/project-layout.md).
 
@@ -76,7 +77,8 @@ contesto. Vedi [progetti multipli](../how-to/multi-project-and-subprojects.md).
 
 ## Le superfici
 
-- **CLI** (`veles run`, `veles add`, …) — uso one-shot e scriptato.
+- **CLI** (`veles run`, `veles organize`, …, più i verbi aggiunti dai moduli, come
+  il `veles add` della wiki) — uso one-shot e scriptato.
 - **TUI** (`veles tui`) — REPL interattivo con [modalità di esecuzione](modes.md).
 - **Daemon + canali** — API headless, Telegram, job pianificati.
 

@@ -6,7 +6,7 @@ Veles 會在執行期讀取以下變數。API 金鑰與權杖最好存放在 OS 
 
 ## 供應商 API 金鑰
 
-API 金鑰的查詢串接順序：OS 鑰匙圈（專案範圍）→ OS 鑰匙圈（預設範圍）→ 環境變數。
+API 金鑰的查詢串接順序：OS 鑰匙圈（專案範圍）→ OS 鑰匙圈（預設範圍）→ 環境變數。供應商讀取哪些變數取決於其目錄項目的 `key_env`——你在 `~/.veles/providers.toml` 中自己的項目會指定各自的變數，而 `veles secret set <VARIABLE>` 會把金鑰存放到該供應商讀取它的位置。
 
 | 變數 | 供應商 | 備註 |
 |---|---|---|
@@ -15,8 +15,9 @@ API 金鑰的查詢串接順序：OS 鑰匙圈（專案範圍）→ OS 鑰匙圈
 | `OPENAI_API_KEY` | openai | OpenAI 直連 API |
 | `GEMINI_API_KEY` | gemini | Google Gemini 的主要金鑰 |
 | `GOOGLE_API_KEY` | gemini | Google Gemini 的退路金鑰 |
+| `OPENAI_COMPAT_API_KEY` | openai-compat | 選用——供需要金鑰的閘道使用 |
 
-`claude-cli` 與 `gemini-cli` 透過各自的執行檔進行驗證——不需環境變數。
+`claude-cli`、`codex` 與 `antigravity-cli` 透過各自的執行檔進行驗證——不需環境變數。
 
 ## 本機供應商
 
@@ -26,7 +27,7 @@ API 金鑰的查詢串接順序：OS 鑰匙圈（專案範圍）→ OS 鑰匙圈
 | `OLLAMA_HOST` | 跟隨 `OLLAMA_BASE_URL` | 用於 embedding 的 Ollama 主機 |
 | `LLAMACPP_BASE_URL` | `http://localhost:8080/v1` | llama.cpp 伺服器端點 |
 | `OPENAI_COMPAT_BASE_URL` | —（必填） | `openai-compat` 供應商的端點 |
-| `VELES_LOCAL_TOOLS` | 關閉 | 在本機供應商上啟用工具呼叫（`1`/`true`） |
+| `VELES_LOCAL_TOOLS` | 偵測 | 本機供應商上的工具呼叫：`1` 強制開啟，`0` 關閉；未設定則依伺服器偵測 |
 | `VELES_OLLAMA_EMBED_MODEL` | 供應商預設 | 覆寫 Ollama 的 embedding 模型 |
 | `VELES_LOCAL_JSON_MODE` | 開啟 | 對必須回傳 JSON 物件的本地呼叫送出 `response_format: json_object`（`0` 關閉） |
 

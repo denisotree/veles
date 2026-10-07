@@ -7,15 +7,16 @@ O que o `veles init` cria, onde o Veles guarda o estado e o esquema da memória 
 ## O que o `veles init` produz
 
 A metade de conteúdo de utilizador depende do layout pack escolhido (`--layout`,
-predefinição `llm-wiki`); a metade de estado `.veles/` é idêntica em todo o lado.
+predefinição `bare` — nada além de `AGENTS.md`); a metade de estado `.veles/` é
+idêntica em todo o lado. Abaixo, um projeto com o layout `llm-wiki` do registo:
 
 ```
-my-project/                  # veles init  (default llm-wiki layout)
+my-project/                  # veles init --layout llm-wiki
 ├── AGENTS.md                # project context (injected into the agent)
 ├── CLAUDE.md → AGENTS.md    # symlink, so a `claude` CLI picks up the same context
 ├── GEMINI.md → AGENTS.md    # symlink, for a `gemini` CLI
-├── sources/                 # raw, immutable source material (agent-readonly)
-├── wiki/                    # the LLM-writable knowledge zone
+├── sources/                 # (llm-wiki) raw source material, readonly by convention
+├── wiki/                    # (llm-wiki) the LLM-writable knowledge zone
 │   ├── concepts/ entities/ queries/ self-doc/ sessions/
 └── .veles/                  # project state (do not commit; machine-managed)
     ├── project.toml         # name, created_at, schema_version, layout
@@ -29,9 +30,9 @@ my-project/                  # veles init  (default llm-wiki layout)
     └── skills/              # project-local skills
 ```
 
-Com `--layout notes` a metade de conteúdo é um único diretório `notes/`; com
-`--layout bare` não há qualquer scaffold de conteúdo. O `wiki/INDEX.md` (o
-catálogo a pedido) é gerado à medida que a wiki cresce; o `config.toml`, `tools/`
+Com o `bare` predefinido não há qualquer scaffold de conteúdo; com `notes` (do
+registo) a metade de conteúdo é um único diretório `notes/`. O `INDEX.md` (o
+catálogo a pedido da wiki) é gerado à medida que a wiki cresce; o `config.toml`, `tools/`
 e `plans/` surgem em `.veles/` assim que configuras algo, um agente
 escreve uma ferramenta ou corres um objetivo.
 
@@ -68,8 +69,9 @@ para perceber como estes são escritos e recuperados.
 
 ## Layout packs
 
-`veles init --layout {llm-wiki|notes|bare|<custom>}` escolhe o layout de
-conteúdo; o pack é dono do scaffold, do template AGENTS.md, das zonas
-escrevíveis e de saber se o motor wiki (ferramentas wiki, injeção do prompt
-INDEX, recall da wiki) está ativo. Consulta
+`veles init --layout {bare|llm-wiki|notes|<custom>}` escolhe o layout de
+conteúdo (só o `bare` é incorporado; os restantes vêm de um registo e são oferecidos
+para instalação); o pack é dono do scaffold, do template AGENTS.md, das zonas
+escrevíveis e de qual motor de conteúdo (p. ex. a wiki: ferramentas wiki, injeção do
+prompt INDEX, recall da wiki) pede. Consulta
 [layout packs e o LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).

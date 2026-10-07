@@ -1,7 +1,7 @@
 """MCP server entrypoint — exposes Veles builtin tools and project skills.
 
 Run as:
-    python -m veles.adapters.cli.mcp_server --project-root <path> [--skill-model <id>]
+    python -m veles.adapters.cli.mcp_server --project-root <path> [--budget-file <path>]
 
 Speaks JSON-RPC 2.0 on stdin/stdout, implements the Model Context Protocol
 methods we need: `initialize`, `tools/list`, `tools/call`, plus the no-op
@@ -9,16 +9,15 @@ methods we need: `initialize`, `tools/list`, `tools/call`, plus the no-op
 the response stream.
 
 Skills (M19): per-project skills under `<project>/.veles/skills/<name>/`
-are exposed as MCP tools when `OPENROUTER_API_KEY` is set. The skill
-sub-agent runs through OpenRouter inside this process, so the parent CLI
-delegate (claude/gemini) does not need to bridge an LLM back into Veles.
+are exposed as MCP tools. The skill sub-agent runs inside this process on the
+provider and model routed for `skills` (release E), so the parent CLI delegate
+does not need to bridge an LLM back into Veles.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 from typing import IO, Any
@@ -38,19 +37,9 @@ from veles.core.tools.registry import Registry
 _PROTOCOL_VERSION = "2024-11-05"
 _SERVER_NAME = "veles"
 _SERVER_VERSION = "0.1"
-_DEFAULT_SKILL_MODEL = "anthropic/claude-sonnet-4.6"
 
-_MCP_TOOLS: tuple[str, ...] = (
-    "read_file",
-    "write_file",
-    "run_shell",
-    "fetch_url",
-    "wiki_list_pages",
-    "wiki_read_page",
-    "wiki_search",
-    "wiki_write_page",
-    "wiki_append_log",
-)
+# Core tools the delegated CLI gets; module tools come from their tool sets.
+_CORE_TOOLS: tuple[str, ...] = ("read_file", "write_file", "run_shell", "fetch_url")
 
 
 class MCPServer:
@@ -210,11 +199,6 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="Project root whose .veles/project.toml is loaded as the active project.",
     )
     parser.add_argument(
-        "--skill-model",
-        default=_DEFAULT_SKILL_MODEL,
-        help=f"OpenRouter model used to execute project skills (default: {_DEFAULT_SKILL_MODEL}).",
-    )
-    parser.add_argument(
         "--budget-file",
         default=None,
         help="Path to BudgetSnapshot JSON for cross-process token-budget propagation.",
@@ -222,19 +206,36 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _register_project_skills(registry_obj: Registry, project: Project, model: str) -> list[str]:
-    """Register every project skill into `registry_obj`. Returns added names."""
-    if not os.environ.get("OPENROUTER_API_KEY"):
-        _log("OPENROUTER_API_KEY missing — skill tools disabled")
-        return []
-    from veles.adapters.openrouter import OpenRouterProvider
+def _register_project_skills(registry_obj: Registry, project: Project) -> list[str]:
+    """Register every project skill, run on the provider and model routed for
+    `skills` — key from the keychain or env. A route to a CLI delegate can't run a
+    skill here; skills are then off, said once in the log."""
+    from veles.core.provider_factory import make_provider
+    from veles.core.providers import find_provider
+    from veles.core.routing import route
     from veles.core.skill_tool import make_skill_tool
     from veles.core.skills import discover_skills
 
     skills = discover_skills(project)
     if not skills:
         return []
-    provider = OpenRouterProvider(model=model)
+    try:
+        provider_name, model = route("skills", project)
+    except Exception as exc:
+        _log(f"no route for skills ({exc}) — skill tools disabled")
+        return []
+    spec = find_provider(provider_name)
+    if spec is None or spec.wire == "cli":
+        _log(
+            f"skills route to {provider_name!r}, which can't run a skill here — skill tools "
+            'disabled; set [routing.tasks] skills = "<provider>:<model>"'
+        )
+        return []
+    try:
+        provider = make_provider(provider_name, model=model)
+    except Exception as exc:
+        _log(f"skill tools disabled: {exc}")
+        return []
     out: list[str] = []
     for skill in skills:
         try:
@@ -257,14 +258,28 @@ def main(argv: list[str] | None = None) -> int:
         snap = load_budget_snapshot(budget_path)
         if snap is not None:
             set_budget(TokenBudget(limit=snap.limit, consumed=snap.consumed))
-    # M163: module tools (wiki) exist only when the project's layout enables their
-    # engine — loaded here the way `runtime/registry.py` does, else dropped.
-    from veles.core.contributions import load_tool_sets
+    # The same approved user/project modules the parent CLI loaded — a registry-installed
+    # module's tools must exist here too.
+    from veles.core.contributions import ToolSet, contributions, load_tool_sets
+    from veles.core.module_loading import load_project_modules
+    from veles.core.modules import set_module_registry
 
+    set_module_registry(load_project_modules(project))
+    # M163: a module's tools exist only when the project's layout enables the engine
+    # its tool set is gated on — loaded here the way `runtime/registry.py` does, else
+    # dropped. Every loaded tool set is offered; core keeps no list of module tools.
     gated = load_tool_sets(project)
     composite = registry.subset(registry.list_names())
-    skill_names = _register_project_skills(composite, project, args.skill_model)
-    tool_names = [t for t in _MCP_TOOLS if t not in gated]
+    skill_names = _register_project_skills(composite, project)
+    available = set(composite.list_names())
+    module_tools = [
+        name for c in contributions("tool") if isinstance(c.obj, ToolSet) for name in c.obj.tools
+    ]
+    tool_names = [
+        name
+        for name in dict.fromkeys([*_CORE_TOOLS, *module_tools])
+        if name not in gated and name in available
+    ]
     server = MCPServer(composite, tool_names + skill_names, budget_path=budget_path)
     return server.serve(stdin=sys.stdin, stdout=sys.stdout)
 

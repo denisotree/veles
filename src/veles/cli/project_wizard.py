@@ -6,9 +6,11 @@ user-level wizard's shape: pre-Textual stdin prompts, ContextVar-backed
 prompter for tests, every step opt-in with skip-by-default.
 
 Steps (each gated by its own y/N, default `n` = skip):
-  1. Bootstrap — confirm + run `init_project(cwd)`. This step is the
-     wizard's gate; declining returns None and the caller exits with
-     the standard "no project found" error.
+  1. Bootstrap — confirm, pick a layout (asked only when there is more
+     than one; a registry layout is installed now, or the default is used),
+     then `init_project(cwd, layout=...)`. This step is the wizard's gate;
+     declining returns None and the caller exits with the standard "no
+     project found" error.
   2. Provider override — optional `.veles/config.toml` `[engine]` block.
      Default = inherit from user-level config.
   3. Channel — optional. Pick a type from the platform registry (M172),
@@ -29,17 +31,15 @@ from collections.abc import Callable
 from contextvars import ContextVar, Token
 from pathlib import Path
 
-from veles.cli.wizard import _ask_choice, _default_prompter
+from veles.cli.wizard import _ask_choice, _ask_provider, _default_prompter
 from veles.core.i18n import t
-from veles.core.project import Project, ProjectAlreadyExists, init_project
+from veles.core.project import LAYOUT_DEFAULT, Project, ProjectAlreadyExists, init_project
 from veles.core.project_config import (
     load_project_config as _load_project_toml,
 )
 from veles.core.project_config import (
     save_project_config as _save_project_toml,
 )
-from veles.core.providers import PROVIDER_VALUES as _PROVIDER_CHOICES
-from veles.modules.wiki.wiki import Wiki
 
 Prompter = Callable[[str, str | None], str]
 """(prompt_label, default_value) -> raw_answer."""
@@ -96,8 +96,9 @@ def run_project_wizard(cwd: Path) -> Project | None:
     if not _ask_yes_no(prompter, t("project_wizard.ask_initialize"), default=True):
         return None
 
+    layout = _step_layout(prompter)
     try:
-        project = init_project(cwd, name=None, force=False)
+        project = init_project(cwd, name=None, force=False, layout=layout)
     except ProjectAlreadyExists:
         # Race: someone created `.veles/` since the gate; load and continue.
         from veles.core.project import load_project
@@ -105,22 +106,8 @@ def run_project_wizard(cwd: Path) -> Project | None:
         project = load_project(cwd)
     print(t("project_wizard.created_state", state_dir=project.state_dir), file=sys.stderr)
 
-    from veles.core.layout.engines import wiki_enabled
-
     _step_provider_override(project, prompter)
     _step_channel(project, prompter)
-
-    # Seed the FTS index so the post-init promise — "files will be
-    # indexed" — actually holds. Cheap (empty / few-page) wiki rebuild.
-    # M162: only when the layout pack activates the wiki engine.
-    pages = 0
-    if wiki_enabled(project):
-        try:
-            pages = Wiki(project.wiki_root).reindex_if_stale()
-        except Exception:
-            pages = 0
-    if pages:
-        print(t("project_wizard.indexed_wiki", pages=pages), file=sys.stderr)
 
     print("\n" + t("project_wizard.ready", name=project.name) + "\n", file=sys.stderr)
     return project
@@ -129,12 +116,23 @@ def run_project_wizard(cwd: Path) -> Project | None:
 # ---------------- steps ----------------
 
 
+def _step_layout(prompter: Prompter) -> str:
+    """Which layout pack the project gets. Asked only when there is a choice; a
+    registry layout is offered for install, and one that can't be had falls back
+    to the default."""
+    from veles.core.registry import ensure
+
+    choices = tuple(ensure.available_layouts())
+    if len(choices) < 2:
+        return LAYOUT_DEFAULT
+    layout = _ask_choice(prompter, t("project_wizard.ask_layout"), choices, default=LAYOUT_DEFAULT)
+    return ensure.layout_or_default(layout, interactive=True)
+
+
 def _step_provider_override(project: Project, prompter: Prompter) -> None:
     if not _ask_yes_no(prompter, t("project_wizard.ask_provider_override"), default=False):
         return
-    provider = _ask_choice(
-        prompter, t("project_wizard.ask_provider_label"), _PROVIDER_CHOICES, default="openrouter"
-    )
+    provider = _ask_provider(prompter, t("project_wizard.ask_provider_label"))
     model = prompter(t("project_wizard.ask_model_label"), None).strip() or None
     cfg = _load_project_toml(project)
     cfg.setdefault("engine", {})
@@ -155,16 +153,12 @@ def _step_channel(project: Project, prompter: Prompter) -> None:
     by `veles channel add` and the TUI flows, so no telegram is hardcoded. The
     type prompt is always shown (even with one platform): it is the seam new
     channels register on."""
-    from veles.channels.platform_registry import (
-        ensure_builtins_registered,
-        get_platform,
-        list_platforms,
-    )
     from veles.cli.channel_wizard import apply_channel, collect_channel_fields
+    from veles.core.platforms import get_platform
+    from veles.core.registry import ensure
     from veles.core.secrets import KeyringUnavailable
 
-    ensure_builtins_registered()
-    platforms = tuple(list_platforms())
+    platforms = tuple(ensure.available_platforms())
     if not platforms:
         return
     if not _ask_yes_no(prompter, t("project_wizard.ask_channel"), default=False):
@@ -172,6 +166,8 @@ def _step_channel(project: Project, prompter: Prompter) -> None:
     channel = _ask_choice(
         prompter, t("project_wizard.ask_channel_type"), platforms, default=platforms[0]
     )
+    if not ensure.ensure_platform_interactive(channel):
+        return
     try:
         entry = get_platform(channel)
     except KeyError as exc:

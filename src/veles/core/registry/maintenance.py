@@ -17,6 +17,7 @@ from veles.core.registry.install import (
     describe,
     install,
     installed_records,
+    record_ref,
     remove_installed,
     resolve_one_record,
 )
@@ -38,7 +39,14 @@ def verify(project: Project | None) -> list[Issue]:
     yanked/outdated/removed/upstream-ahead, so a broken registry can't hide drift."""
     found, readable, broken = _catalog()
     issues: list[Issue] = []
-    for rec in installed_records(project):
+    records = installed_records(project)
+    have = {record_ref(r) for r in records}
+    for rec in records:
+        issues += [
+            Issue(rec, "missing-dependency", f"needs {ref} — `veles registry install {ref}`")
+            for ref in rec.requires_extensions
+            if ref not in have
+        ]
         drift = _drift(rec)
         if drift is not None:
             issues.append(drift)
@@ -110,8 +118,10 @@ def _upstream_ahead(current: Found, found: list[Found]) -> str | None:
     return f"{ref} is at {matches[0].ext.version}; the vendored copy is {current.ext.version}"
 
 
-def upgrade(name: str, *, project: Project | None) -> InstallRecord | None:
-    rec = resolve_one_record(name, project=project)
+def upgrade(
+    name: str, *, project: Project | None, user_scope: bool | None = None
+) -> InstallRecord | None:
+    rec = resolve_one_record(name, project=project, user_scope=user_scope)
     if rec.registry is None:
         raise InstallError(
             f"{name!r} was installed from a raw source; reinstall it from a registry"
@@ -228,8 +238,14 @@ def _cleanup_backup(backup: _Backup) -> None:
 
 
 def _restore(rec: InstallRecord, backup: _Backup) -> None:
-    from veles.core.registry.records import put_record
+    from veles.core.registry.records import load_records, put_record
 
+    if any(r.path == rec.path for r in load_records()):
+        # Another install of this extension finished between our remove and our
+        # install — its copy and record are not ours to replace. (A copy left by
+        # an interrupted install of ours has no record, and is replaced below.)
+        _cleanup_backup(backup)
+        return
     if backup.dir is not None:
         shutil.rmtree(rec.path, ignore_errors=True)
         backup.dir.rename(rec.path)

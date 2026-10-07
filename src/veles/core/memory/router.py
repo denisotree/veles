@@ -214,7 +214,7 @@ class MemoryRouter:
 
     def _collect_about_veles(self, query: str, *, limit: int) -> list[RecallHit]:
         """Framework-global Veles usage knowledge (M186). Engine-independent:
-        the store is package-shipped, so this never consults `wiki_enabled`.
+        the store is package-shipped, so this never consults `engine_enabled`.
         Below-threshold queries return [], keeping non-Veles turns clean."""
         from veles.core.knowledge.store import get_default_store
 

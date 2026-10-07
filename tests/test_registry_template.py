@@ -30,7 +30,7 @@ def test_init_produces_a_valid_registry(tmp_path: Path) -> None:
     assert (root / ".github" / "workflows" / "validate.yml").is_file()
     assert (root / ".gitignore").is_file()
     workflow = (root / ".github/workflows/validate.yml").read_text(encoding="utf-8")
-    assert "@@" not in workflow and "${{ github.base_ref }}" in workflow
+    assert "@@" not in workflow and "BASE_REF: ${{ github.base_ref }}" in workflow
     assert "--from 'veles-ai==" in workflow and " veles registry validate" in workflow
     assert not list(root.rglob("*.tmpl"))
     report = validate_registry(root)

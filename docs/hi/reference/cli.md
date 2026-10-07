@@ -12,6 +12,8 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 - `--no-wizard` — पहली बार चलने वाले setup wizard को छोड़ दें, भले ही
   `~/.veles/config.toml` मौजूद न हो (यह TTY और `VELES_NO_WIZARD=1` पर भी निर्भर है)।
+  wizard केवल उन commands से पहले आता है जो agent शुरू करते हैं (सादा `veles`, `run`,
+  `daemon`, `channel`, …); `module`, `tool` और `doctor` जैसे admin verbs इसे कभी नहीं खोलते।
 - बिना किसी argument के, `veles` interactive [TUI](tui.md) शुरू करता है।
 
 अधिकांश agent commands [साझा agent-loop flags](#shared-agent-loop-flags) और नीचे
@@ -28,7 +30,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | Flag | Default | उद्देश्य |
 |---|---|---|
 | `name` (positional) | cwd basename | प्रोजेक्ट का नाम |
-| `--layout <name>` | `llm-wiki` | content scaffold के लिए layout pack (`llm-wiki`, `notes`, `bare`, या `~/.veles/layouts/` से कोई custom pack) |
+| `--layout <name>` | `bare` (terminal पर पूछा जाता है) | content scaffold के लिए layout pack (`bare`, किसी registry से install किया pack जैसे `llm-wiki` या `notes`, या `~/.veles/layouts/` से कोई custom pack)। जो pack installed नहीं है उसके install का प्रस्ताव मिलता है; मना करने पर कुछ नहीं बनता |
 | `--force` | off | `.veles/` को फिर से बनाएँ भले ही वह पहले से मौजूद हो |
 
 ### `veles schema {validate,edit,fix}`
@@ -39,7 +41,8 @@ veles [--no-wizard] <command> [subcommand] [options]
 - `fix` — एक LLM wizard के ज़रिए लुप्त sections को interactively जोड़ें।
 
 ### `veles self-doc [refresh|show]`
-प्रोजेक्ट self-documentation (`wiki/self-doc/overview.md`) उत्पन्न करें और दिखाएँ।
+प्रोजेक्ट self-documentation उत्पन्न करें और दिखाएँ — layout के page store में यदि उसके
+पास है (wiki: `wiki/self-doc/overview.md`), अन्यथा `.veles/memory/self-doc.md` में।
 सादा `veles self-doc` वर्तमान पेज दिखाता है; `refresh` इसे फिर से उत्पन्न करता है।
 
 ### `veles doctor`
@@ -108,11 +111,17 @@ interactive REPL खोलें। देखें [TUI संदर्भ](tui
 | `--theme <name>` | config या `everforest` | Color theme (everforest, dracula, gruvbox, tokyo-night, catppuccin) |
 
 ### `veles add <source>`
+*(`wiki` module से — `veles registry install llm-wiki` या `… install wiki`)*
 एक source (एक local file या `http(s)://` URL) पढ़ें और उसे एक wiki पेज में संश्लेषित
-करें। साझा agent-loop flags स्वीकार करता है।
+करें। module के बिना `veles add` एक अज्ञात command है और error install का नाम बताती है।
+साझा agent-loop flags स्वीकार करता है।
+
+Modules इसी तरह अपने verbs जोड़ सकते हैं; वे module वाले project के भीतर `veles --help`
+में दिखते हैं।
 
 ### `veles curate`
-एक curator pass चलाएँ: unprocessed sessions को `wiki/sessions/` पेजों में compact करें।
+एक curator pass चलाएँ: unprocessed sessions को memory insights में compact करें (और
+wiki engine चालू होने पर `wiki/sessions/` पेजों में)।
 
 | Flag | Default | उद्देश्य |
 |---|---|---|
@@ -167,22 +176,33 @@ suggestions → wiki lint, वैकल्पिक रूप से LLM consoli
 | `list` | इस प्रोजेक्ट की `memory.db` में सूचीबद्ध tools दिखाएँ |
 | `show <name>` | किसी tool का manifest + telemetry प्रिंट करें |
 | `promote <name> [-y]` | एक project tool को `~/.veles/tools/` (cross-project) में ले जाएँ |
-| `approve [<name>] [--all] [-y]` | एक self-authored tool file की समीक्षा करें + approve करें ताकि loader उसे चलाए |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | एक self-authored tool file की समीक्षा करें + approve करें ताकि loader उसे चलाए |
 
 self-authored tools (`.veles/tools/*.py`) अपना module-level code तब चलाते हैं जब
 loader उन्हें import करता है, इसलिए एक नई या edited file **तब तक load नहीं होती जब
 तक आप उसे approve न करें** — `veles tool approve` code दिखाता है और उसका hash
-रिकॉर्ड करता है। सादा `veles tool approve` दिखाता है कि क्या लंबित है। यही कारण है
-कि agent द्वारा लिखे गए tool को callable बनने से पहले एक review step की ज़रूरत होती है।
+रिकॉर्ड करता है। सादा `veles tool approve` हर file के sha256 के साथ दिखाता है कि क्या
+लंबित है। यही कारण है कि agent द्वारा लिखे गए tool को callable बनने से पहले एक review step
+की ज़रूरत होती है।
 
-### `veles module {list,show,add,remove}`
+terminal के बिना (deploy script) किसी file को उस hash से approve करें जिसकी आपने समीक्षा की है:
+`veles tool approve <name> --sha256 <hash>` — इसके बाद file बदल गई हो तो यह विफल हो जाता है।
+`-y` prompt को केवल terminal में छोड़ता है।
+
+### `veles module {list,show,add,remove,approve}`
 
 | Subcommand | उद्देश्य |
 |---|---|
 | `list` | installed modules सूचीबद्ध करें |
-| `show <name>` | किसी module का manifest प्रिंट करें |
+| `show <name>` | किसी module का manifest और उसकी files का sha256 प्रिंट करें |
 | `add <source> [--name N] [-y]` | git URL या local path से एक module install करें |
 | `remove <name> [-y]` | एक installed module हटाएँ |
+| `approve <name> [--user] [--sha256 H]` | समीक्षा के बाद एक module approve करें |
+| `approve --all [--user]` | उस scope का हर module जो approval की प्रतीक्षा में है, हर एक के लिए एक confirmation |
+
+Approval में terminal पर `yes` टाइप करना पड़ता है; terminal के बिना, आपने जिन files की समीक्षा की उनका
+hash (`show` इसे प्रिंट करता है) `--sha256` के रूप में दें — files के बाद में बदल जाने पर यह विफल हो
+जाता है। `veles doctor` disk पर मौजूद हर उस module की रिपोर्ट करता है जो load नहीं होता।
 
 ### `veles registry search [query] [--kind K]`
 connected registries में search करें (module, skill, layout pack, MCP recipe)।
@@ -247,11 +267,12 @@ connected registries में search करें (module, skill, layout pack, 
 
 ### `veles models <provider>`
 किसी provider के लिए models सूचीबद्ध करें। Cloud providers (openrouter/openai/gemini)
-24h के लिए cached होते हैं; local providers हमेशा live होते हैं।
+24h के लिए cached होते हैं; local providers, `codex` और `antigravity-cli` हमेशा live होते हैं।
+अज्ञात provider एक पंक्ति की error है जो बताती है कि क्या-क्या मौजूद है (exit `2`)।
 
 | Flag | Default | उद्देश्य |
 |---|---|---|
-| `provider` (positional) | — | [provider names](#provider-names) में से एक |
+| `provider` (positional) | — | [catalogue](#provider-names) से एक provider id |
 | `--refresh` | off | disk cache को bypass करें (केवल cloud) |
 | `--json` | off | `{provider, source, models}` को JSON के रूप में निकालें |
 
@@ -339,13 +360,14 @@ HTTP+WS daemon चलाएँ/नियंत्रित करें। स�
 `--provider` प्रोजेक्ट config पर default होते हैं और daemon के जीवनकाल भर के लिए fixed रहते हैं।
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-बाहरी chat gateways (Telegram, …) जो किसी daemon से बात करते हैं। देखें
+बाहरी chat gateways (Telegram, …) जो किसी daemon से बात करते हैं। एक platform extension registry का
+module है; `run` और `add` उसके न होने पर उसे install करते हैं। देखें
 [Telegram जोड़ें](../how-to/connect-telegram.md)।
 
 | Subcommand | उद्देश्य |
 |---|---|
-| `list` | पंजीकृत channel platforms + session counts सूचीबद्ध करें |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | foreground में एक gateway शुरू करें |
+| `list` | installed channel platforms + session counts सूचीबद्ध करें, और वे declared channels जिनका module मौजूद नहीं |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | foreground में एक gateway शुरू करें; `--secret` platform का primary secret है (अन्यथा keychain या उसका env var) |
 | `list-sessions [--channel C]` | `chat_id → session_id` mappings दिखाएँ |
 | `reset-session <chat_id> [--channel C]` | एक mapping भूलें (अगला message नए सिरे से शुरू होगा) |
 | `add [--channel C] [--session S]` | किसी daemon से एक channel जोड़ें (wizard; creds → keychain) |
@@ -382,8 +404,12 @@ HTTP+WS daemon चलाएँ/नियंत्रित करें। स�
 
 ## Provider names
 
-`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` और `veles models` provider catalogue की कोई भी id लेते हैं — builtin वाले,
+आपकी `~/.veles/providers.toml`, और installed modules के providers:
 
-Local providers (`ollama`, `llamacpp`, `openai-compat`) को कोई API key नहीं चाहिए। देखें
+`openrouter` (default) · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
+`ollama` · `llamacpp` · `openai-compat` (builtin)
+
+जो provider केवल एक registry module देता है (`antigravity-cli`) वह नाम देने पर खुद install हो
+जाता है। Local providers (`ollama`, `llamacpp`, `openai-compat`) को कोई API key नहीं चाहिए। देखें
 [providers संदर्भ](providers.md) और [providers configure करें](../how-to/configure-providers.md)।

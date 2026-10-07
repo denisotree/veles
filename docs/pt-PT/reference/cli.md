@@ -12,7 +12,9 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 - `--no-wizard` — ignora o assistente de configuração do primeiro arranque mesmo que
   `~/.veles/config.toml` esteja em falta (condicionado também a um TTY e a
-  `VELES_NO_WIZARD=1`).
+  `VELES_NO_WIZARD=1`). O assistente só antecede comandos que iniciam um agente
+  (`veles` simples, `run`, `daemon`, `channel`, …); verbos administrativos como
+  `module`, `tool` e `doctor` nunca o abrem.
 - Sem argumentos, `veles` lança a [TUI](tui.md) interactiva.
 
 A maioria dos comandos do agente aceita as [opções partilhadas do ciclo do agente](#shared-agent-loop-flags)
@@ -29,7 +31,7 @@ Cria um novo projecto Veles no directório actual (um directório de estado `.ve
 | Opção | Predefinição | Finalidade |
 |---|---|---|
 | `name` (posicional) | nome base do cwd | Nome do projecto |
-| `--layout <name>` | `llm-wiki` | Pack de layout para o scaffold de conteúdo (`llm-wiki`, `notes`, `bare`, ou um pack personalizado de `~/.veles/layouts/`) |
+| `--layout <name>` | `bare` (perguntado num terminal) | Pack de layout para o scaffold de conteúdo (`bare`, um pack instalado de um registo como `llm-wiki` ou `notes`, ou um pack personalizado de `~/.veles/layouts/`). Um pack não instalado é oferecido para instalação; recusar não cria nada |
 | `--force` | desligado | Recria `.veles/` mesmo que já exista |
 
 ### `veles schema {validate,edit,fix}`
@@ -40,7 +42,9 @@ Valida ou edita o `AGENTS.md` (o ficheiro de contexto do projecto).
 - `fix` — adiciona interactivamente as secções em falta através de um assistente LLM.
 
 ### `veles self-doc [refresh|show]`
-Gera e mostra a auto-documentação do projecto (`wiki/self-doc/overview.md`).
+Gera e mostra a auto-documentação do projecto — no armazenamento de páginas do layout
+quando este tem um (a wiki: `wiki/self-doc/overview.md`), caso contrário em
+`.veles/memory/self-doc.md`.
 `veles self-doc` simples mostra a página actual; `refresh` regenera-a.
 
 ### `veles doctor`
@@ -110,12 +114,14 @@ do ciclo do agente, `--resume`, as opções `--no-*` de injecção/compressão a
 | `--theme <name>` | config ou `everforest` | Tema de cores (everforest, dracula, gruvbox, tokyo-night, catppuccin) |
 
 ### `veles add <source>`
+*(do módulo `wiki` — `veles registry install llm-wiki` ou `… install wiki`)*
 Lê uma fonte (um ficheiro local ou URL `http(s)://`) e sintetiza-a numa página de wiki.
+Sem o módulo, `veles add` é um comando desconhecido e o erro indica a instalação.
 Aceita as opções partilhadas do ciclo do agente.
 
 ### `veles curate`
-Executa uma passagem do curador: compacta as sessões não processadas em páginas
-`wiki/sessions/`.
+Executa uma passagem do curador: compacta as sessões não processadas em insights de memória (e em páginas
+`wiki/sessions/` quando a engine de wiki está ativa).
 
 | Opção | Predefinição | Finalidade |
 |---|---|---|
@@ -170,22 +176,33 @@ skills → sugestões de promoção → lint da wiki, opcionalmente consolidaç�
 | `list` | Lista as ferramentas catalogadas no `memory.db` deste projecto |
 | `show <name>` | Imprime o manifesto + telemetria de uma ferramenta |
 | `promote <name> [-y]` | Move uma ferramenta de projecto para `~/.veles/tools/` (transversal a projectos) |
-| `approve [<name>] [--all] [-y]` | Revê + aprova um ficheiro de ferramenta auto-escrito para que o carregador o execute |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | Revê + aprova um ficheiro de ferramenta auto-escrito para que o carregador o execute |
 
 As ferramentas auto-escritas (`.veles/tools/*.py`) executam o seu código ao nível do
 módulo quando o carregador as importa, por isso um ficheiro novo ou editado **não é
 carregado enquanto não o aprovares** — `veles tool approve` mostra o código e regista o
-seu hash. `veles tool approve` simples lista o que está pendente. É por isto que uma
-ferramenta escrita pelo agente precisa de um passo de revisão antes de se tornar invocável.
+seu hash. `veles tool approve` simples lista o que está pendente, com o sha256 de cada
+ficheiro. É por isto que uma ferramenta escrita pelo agente precisa de um passo de
+revisão antes de se tornar invocável.
 
-### `veles module {list,show,add,remove}`
+Sem um terminal (um script de implementação), aprova um ficheiro pelo hash revisto:
+`veles tool approve <name> --sha256 <hash>` — falha se o ficheiro mudou entretanto.
+`-y` salta a confirmação apenas num terminal.
+
+### `veles module {list,show,add,remove,approve}`
 
 | Subcomando | Finalidade |
 |---|---|
 | `list` | Lista os módulos instalados |
-| `show <name>` | Imprime o manifesto de um módulo |
+| `show <name>` | Imprime o manifesto de um módulo e o sha256 dos seus ficheiros |
 | `add <source> [--name N] [-y]` | Instala um módulo a partir de um URL git ou caminho local |
 | `remove <name> [-y]` | Apaga um módulo instalado |
+| `approve <name> [--user] [--sha256 H]` | Aprova um módulo depois de o rever |
+| `approve --all [--user]` | Todos os módulos desse âmbito à espera de aprovação, uma confirmação para cada |
+
+A aprovação pede-te que escrevas `yes` num terminal; sem um, passa o hash dos ficheiros
+revistos (o `show` imprime-o) como `--sha256` — falha se os ficheiros mudaram
+entretanto. `veles doctor` indica todos os módulos em disco que não carregam.
 
 ### `veles registry search [query] [--kind K]`
 Pesquisa nos registos ligados (módulos, skills, pacotes de layout, receitas
@@ -251,11 +268,12 @@ Encaminhamento de ensemble por tarefa — que `provider:model` trata cada tipo d
 
 ### `veles models <provider>`
 Lista os modelos de um fornecedor. Os fornecedores na nuvem (openrouter/openai/gemini)
-ficam em cache 24h; os fornecedores locais são sempre ao vivo.
+ficam em cache 24h; os fornecedores locais, o `codex` e o `antigravity-cli` são sempre ao vivo. Um
+fornecedor desconhecido é um erro de uma linha que lista o que existe (saída `2`).
 
 | Opção | Predefinição | Finalidade |
 |---|---|---|
-| `provider` (posicional) | — | Um dos [nomes de fornecedores](#provider-names) |
+| `provider` (posicional) | — | Um id de fornecedor do [catálogo](#provider-names) |
 | `--refresh` | desligado | Ignora a cache em disco (apenas nuvem) |
 | `--json` | desligado | Emite `{provider, source, models}` como JSON |
 
@@ -344,13 +362,14 @@ daemons** (projecto → daemons → canais). Ver [executar como daemon](../how-t
 tempo de vida do daemon.
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-Gateways de chat externos (Telegram, …) que falam com um daemon. Ver
+Gateways de chat externos (Telegram, …) que falam com um daemon. Uma plataforma é um módulo
+do registo de extensões; `run` e `add` instalam-no quando está em falta. Ver
 [ligar o Telegram](../how-to/connect-telegram.md).
 
 | Subcomando | Finalidade |
 |---|---|
-| `list` | Lista as plataformas de canal registadas + contagens de sessões |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | Arranca um gateway em primeiro plano |
+| `list` | Lista as plataformas de canal instaladas + contagens de sessões, e os canais declarados cujo módulo está em falta |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | Arranca um gateway em primeiro plano; `--secret` é o segredo principal da plataforma (senão o keychain ou a sua variável de ambiente) |
 | `list-sessions [--channel C]` | Mostra os mapeamentos `chat_id → session_id` |
 | `reset-session <chat_id> [--channel C]` | Esquece um mapeamento (a próxima mensagem começa do zero) |
 | `add [--channel C] [--session S]` | Liga um canal a um daemon (assistente; credenciais → chaveiro) |
@@ -387,8 +406,12 @@ Aceites por `run`, `add`, `tui`, `curate`, `research`, `job tick`, e `daemon sta
 
 ## Nomes de fornecedores
 
-`openrouter` (predefinição) · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` e `veles models` aceitam qualquer id do catálogo de fornecedores — os
+incorporados, o seu `~/.veles/providers.toml` e os fornecedores de módulos instalados:
 
-Os fornecedores locais (`ollama`, `llamacpp`, `openai-compat`) não precisam de chave de
-API. Ver a [referência de fornecedores](providers.md) e [configurar fornecedores](../how-to/configure-providers.md).
+`openrouter` (predefinição) · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
+`ollama` · `llamacpp` · `openai-compat` (incorporados)
+
+Um fornecedor oferecido apenas por um módulo do registo (`antigravity-cli`) instala-se
+sozinho quando o nomeia. Os fornecedores locais (`ollama`, `llamacpp`, `openai-compat`)
+não precisam de chave de API. Ver a [referência de fornecedores](providers.md) e [configurar fornecedores](../how-to/configure-providers.md).

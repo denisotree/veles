@@ -299,8 +299,35 @@ async def test_cursor_and_focus_survive_stop_action(
         assert screen._tree.has_focus is True
 
 
-async def test_restart_kills_before_spawn_and_keeps_focus(
+async def test_restart_without_a_ready_channel_keeps_the_running_daemon(
     tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The new daemon would refuse to start — killing the old one first would
+    take a working daemon down."""
+    import veles.tui.screens.daemon_picker as dp
+
+    project = init_project(tmp_path / "p", name="p")
+    _seed_registry([_entry("p", project_path=str(tmp_path / "p"), pid=4242)])
+    seq: list[str] = []
+    monkeypatch.setattr(dp, "is_alive", lambda pid: True)
+    monkeypatch.setattr("veles.tui.screens._daemon_picker_data.is_alive", lambda pid: True)
+    monkeypatch.setattr("veles.daemon.registry.is_alive", lambda pid: True)
+    monkeypatch.setattr(dp.os, "kill", lambda pid, sig: seq.append("kill"))
+    monkeypatch.setattr(dp, "spawn_daemon_node", lambda node: (seq.append("spawn"), True)[1])
+
+    app = DaemonPickerApp(project=project)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.pause()
+        await pilot.press("r")
+        await pilot.pause()
+        await pilot.pause()
+        assert seq == []
+        assert "channel" in pilot.app.screen.last_action
+
+
+async def test_restart_kills_before_spawn_and_keeps_focus(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, fake_channel
 ) -> None:
     """Restart runs in a worker (non-blocking poll) and must SIGTERM the old
     process *before* spawning the new one, or the spawn races it for the port.
@@ -416,7 +443,7 @@ async def test_enter_opens_named_session_log(tmp_path) -> None:
 # ---------------- channel flows ----------------
 
 
-async def test_add_channel_to_daemon(tmp_path, fake_keyring) -> None:
+async def test_add_channel_to_daemon(tmp_path, fake_keyring, fake_platform) -> None:
     from veles.core.project_config import get_section, load_project_config
 
     project = init_project(tmp_path / "p", name="p")
@@ -428,30 +455,28 @@ async def test_add_channel_to_daemon(tmp_path, fake_keyring) -> None:
         await pilot.pause()
         await pilot.press("c")  # cursor on the 'default' daemon
         await pilot.pause()
-        await pilot.press("enter")  # ChoiceScreen → telegram (default)
+        await pilot.press("enter")  # ChoiceScreen → fake (default)
         await pilot.pause()
         await pilot.press(*"tok123")
-        await pilot.press("enter")  # bot token
+        await pilot.press("enter")  # token
         await pilot.pause()
-        await pilot.press("enter")  # whitelist blank
+        await pilot.press("enter")  # rooms blank
         await pilot.pause()
         screen = pilot.app.screen
-        assert "added telegram" in screen.last_action
+        assert "added fake" in screen.last_action
 
     # Global block (session=None) for the unnamed/default daemon.
     cfg = load_project_config(project)
-    assert get_section(cfg, "channels", "telegram").get("enabled") is True
+    assert get_section(cfg, "channels", "fake").get("enabled") is True
 
 
-async def test_remove_channel_on_leaf_directly(tmp_path, fake_keyring) -> None:
+async def test_remove_channel_on_leaf_directly(tmp_path, fake_keyring, fake_platform) -> None:
     from veles.cli.channel_wizard import apply_channel
     from veles.core.project_config import get_section, load_project_config
 
     project = init_project(tmp_path / "p", name="p")
     _seed_registry([_entry("p", project_path=str(tmp_path / "p"))])
-    apply_channel(
-        project, session=None, channel="telegram", secrets={"bot_token": "t"}, config_fields={}
-    )
+    apply_channel(project, session=None, channel="fake", secrets={"token": "t"}, config_fields={})
 
     app = DaemonPickerApp(project=project)
     async with app.run_test() as pilot:
@@ -465,13 +490,13 @@ async def test_remove_channel_on_leaf_directly(tmp_path, fake_keyring) -> None:
         await pilot.pause()
         await pilot.press("x")  # deletes that channel directly (no picker)
         await pilot.pause()
-        assert "removed telegram" in screen.last_action
+        assert "removed fake" in screen.last_action
 
     assert get_section(load_project_config(project), "channels") == {}
 
 
 async def test_add_channel_failure_does_not_crash(
-    tmp_path, monkeypatch: pytest.MonkeyPatch, fake_keyring
+    tmp_path, monkeypatch: pytest.MonkeyPatch, fake_keyring, fake_platform
 ) -> None:
     project = init_project(tmp_path / "p", name="p")
     _seed_registry([_entry("p", project_path=str(tmp_path / "p"))])
@@ -487,15 +512,15 @@ async def test_add_channel_failure_does_not_crash(
         await pilot.pause()
         await pilot.press("c")
         await pilot.pause()
-        await pilot.press("enter")  # telegram
+        await pilot.press("enter")  # fake
         await pilot.pause()
         await pilot.press(*"tok")
         await pilot.press("enter")
         await pilot.pause()
-        await pilot.press("enter")  # whitelist blank
+        await pilot.press("enter")  # rooms blank
         await pilot.pause()
         screen = pilot.app.screen
-        assert "failed to add telegram" in screen.last_action
+        assert "failed to add fake" in screen.last_action
     assert app.return_code in (None, 0)
 
 

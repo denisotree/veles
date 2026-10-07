@@ -7,15 +7,16 @@ What `veles init` creates, where Veles keeps state, and the project memory schem
 ## What `veles init` produces
 
 The user-content half depends on the chosen layout pack (`--layout`,
-default `llm-wiki`); the `.veles/` state half is identical everywhere.
+default `bare` — nothing but `AGENTS.md`); the `.veles/` state half is identical
+everywhere. Below, a project on the `llm-wiki` layout from the registry:
 
 ```
-my-project/                  # veles init  (default llm-wiki layout)
+my-project/                  # veles init --layout llm-wiki
 ├── AGENTS.md                # project context (injected into the agent)
 ├── CLAUDE.md → AGENTS.md    # symlink, so a `claude` CLI picks up the same context
 ├── GEMINI.md → AGENTS.md    # symlink, for a `gemini` CLI
-├── sources/                 # raw source material (readonly by convention, not enforced)
-├── wiki/                    # the LLM-writable knowledge zone
+├── sources/                 # (llm-wiki) raw source material, readonly by convention
+├── wiki/                    # (llm-wiki) the LLM-writable knowledge zone
 │   ├── concepts/ entities/ queries/ self-doc/ sessions/
 └── .veles/                  # project state (do not commit; machine-managed)
     ├── project.toml         # name, created_at, schema_version, layout
@@ -29,8 +30,8 @@ my-project/                  # veles init  (default llm-wiki layout)
     └── skills/              # project-local skills
 ```
 
-With `--layout notes` the content half is a single `notes/` directory; with
-`--layout bare` there is no content scaffold at all. `wiki/INDEX.md` (the
+With the default `bare` there is no content scaffold at all; with `notes` (from
+the registry) it is a single `notes/` directory. `INDEX.md` (the wiki's
 on-demand catalog) is generated as the wiki grows; `config.toml`, `tools/`,
 and `plans/` appear under `.veles/` once you configure something, an agent
 writes a tool, or you run a goal.
@@ -68,8 +69,9 @@ for how these are written and recalled.
 
 ## Layout packs
 
-`veles init --layout {llm-wiki|notes|bare|<custom>}` picks the content
-layout; the pack owns the scaffold, the AGENTS.md template, writable zones,
-and whether the wiki engine (wiki tools, INDEX prompt injection, wiki
-recall) is active. See
+`veles init --layout {bare|llm-wiki|notes|<custom>}` picks the content
+layout (only `bare` is built in; the others come from a registry and are
+offered for install); the pack owns the scaffold, the AGENTS.md template,
+writable zones, and which content engine (e.g. the wiki: wiki tools, INDEX
+prompt injection, wiki recall) it asks for. See
 [layout packs & the LLM-Wiki](../explanation/layout-packs-and-llm-wiki.md).

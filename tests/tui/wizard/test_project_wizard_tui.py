@@ -94,11 +94,11 @@ async def test_daemon_no_skips_channel(tmp_cwd: Path) -> None:
     assert answers.get("channel") is None
 
 
-async def test_daemon_yes_with_channel(tmp_cwd: Path) -> None:
+async def test_daemon_yes_with_channel(tmp_cwd: Path, fake_platform) -> None:
     # M172: registry-driven channel sub-flow. After daemon host/port, the
-    # wizard asks to add a channel, shows the channel-TYPE picker (telegram is
+    # wizard asks to add a channel, shows the channel-TYPE picker (fake is
     # the only platform → it's the default), then drives that platform's cred
-    # fields (bot_token, then whitelist) via the shared modal collector.
+    # fields (token, then rooms) via the shared modal collector.
     steps = [BootstrapStep(cwd=tmp_cwd), DaemonModeStep(), RecapStep()]
     keys = [
         "y",  # bootstrap
@@ -106,28 +106,28 @@ async def test_daemon_yes_with_channel(tmp_cwd: Path) -> None:
         "enter",  # host default 127.0.0.1
         "enter",  # port default 8765
         "y",  # add a channel? yes
-        "enter",  # channel type picker → telegram (default)
+        "enter",  # channel type picker → fake (default)
         "t",
         "o",
         "k",
         "e",
         "n",
-        "enter",  # bot_token cred
+        "enter",  # token cred
         "@",
         "f",
         "o",
         "o",
-        "enter",  # whitelist cred (comma-separated input)
+        "enter",  # rooms cred (comma-separated input)
         "enter",  # recap close
     ]
     answers = await _drive(steps, keys, poll=120)
     assert answers["daemon"] == {"host": "127.0.0.1", "port": 8765, "autostart": True}
-    assert answers["channel"]["channel"] == "telegram"
+    assert answers["channel"]["channel"] == "fake"
     assert answers["channel"]["status"] == "saved"
-    assert answers["channel"]["config_fields"]["whitelist"] == ["@foo"]
+    assert answers["channel"]["config_fields"]["rooms"] == ["@foo"]
     # Token landed in the keychain under project scope.
     project = answers["project"]
-    assert secrets.get_provider_key("telegram", project=project.name) == "token"
+    assert secrets.get_provider_key("fake", project=project.name) == "token"
     # Daemon + channel settings persisted to .veles/config.toml.
     import tomllib
 
@@ -137,8 +137,8 @@ async def test_daemon_yes_with_channel(tmp_cwd: Path) -> None:
     assert cfg["daemon"]["host"] == "127.0.0.1"
     assert cfg["daemon"]["port"] == 8765
     assert cfg["daemon"]["autostart"] is True
-    assert cfg["channels"]["telegram"]["enabled"] is True
-    assert cfg["channels"]["telegram"]["whitelist"] == ["@foo"]
+    assert cfg["channels"]["fake"]["enabled"] is True
+    assert cfg["channels"]["fake"]["rooms"] == ["@foo"]
 
 
 # ---------------- Provider override ----------------

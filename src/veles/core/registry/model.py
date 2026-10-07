@@ -22,6 +22,7 @@ SOURCE_TYPES = ("path", "git")
 
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
+_REF_RE = re.compile(r"^[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$")
 _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -60,6 +61,8 @@ class Extension:
     tags: tuple[str, ...] = ()
     provides: tuple[str, ...] = ()
     requires: tuple[str, ...] = ()
+    # Other extensions this one needs, as full refs `<registry>:<group>/<name>`.
+    requires_extensions: tuple[str, ...] = ()
     upstream: str | None = None
     yanked: str | None = None
     mcp: dict[str, Any] | None = None
@@ -98,6 +101,13 @@ def parse_extension(text: str, *, group: str = "", dir: Path | None = None) -> E
         raise ExtensionError(f"[extension].version {version!r} must be MAJOR.MINOR.PATCH")
     provides = _str_list(ext, "provides")
     requires = _str_list(ext, "requires")
+    requires_extensions = _str_list(ext, "requires_extensions")
+    bad_refs = [r for r in requires_extensions if not _REF_RE.fullmatch(r)]
+    if bad_refs:
+        raise ExtensionError(
+            f"[extension].requires_extensions entries must be full refs "
+            f"<registry>:<group>/<name>: {bad_refs}"
+        )
     if kind != "module" and (provides or requires):
         raise ExtensionError("provides/requires are only allowed for kind = 'module'")
     mcp = data.get("mcp")
@@ -117,6 +127,7 @@ def parse_extension(text: str, *, group: str = "", dir: Path | None = None) -> E
         tags=_str_list(ext, "tags"),
         provides=provides,
         requires=requires,
+        requires_extensions=requires_extensions,
         upstream=_optional(ext, "upstream"),
         yanked=_optional(ext, "yanked"),
         mcp=dict(mcp) if isinstance(mcp, dict) else None,

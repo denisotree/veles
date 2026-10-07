@@ -27,8 +27,8 @@ The functions degrade gracefully:
   - *Every other secret* (`TAVILY_API_KEY`, `VELES_DAEMON_TOKEN`, …) lives at
     `veles:<NAME>`, read by `get_secret` (keychain → env).
 
-`provider_for_env_name` decides which kind a name is, from
-`PROVIDER_API_KEY_ENVS`. Before M271 there was no router: `veles secret`
+`provider_for_env_name` decides which kind a name is, from the provider
+catalogue's `key_env`. Before M271 there was no router: `veles secret`
 wrote every name as the second kind, including provider keys, whose flat entry
 M149 had stopped reading as a legacy form — so `veles secret set
 OPENROUTER_API_KEY` stored a key nothing used, and the web-search keys were
@@ -160,25 +160,19 @@ def delete_secret(name: str) -> bool:
         return False
 
 
-def list_known_names() -> list[str]:
-    """Return the set of names *expected* to be configured.
+_NON_PROVIDER_NAMES = frozenset({"BRAVE_SEARCH_API_KEY", "TAVILY_API_KEY", "VELES_DAEMON_TOKEN"})
 
-    Keyring's API doesn't expose enumeration cross-platform — we can't list
-    every entry the user has stored. This helper returns the canonical names
-    Veles itself consults, so `veles secret list` can show which are set vs.
-    missing instead of crashing.
-    """
-    return sorted(
-        {
-            "OPENROUTER_API_KEY",
-            "ANTHROPIC_API_KEY",
-            "OPENAI_API_KEY",
-            "GOOGLE_API_KEY",
-            "BRAVE_SEARCH_API_KEY",
-            "TAVILY_API_KEY",
-            "VELES_DAEMON_TOKEN",
-        }
-    )
+
+def list_known_names() -> list[str]:
+    """The names Veles itself consults — every catalogue provider's key env plus
+    the search and daemon tokens — so `veles secret list` can show which are set.
+    (Keyring can't enumerate its entries cross-platform.)"""
+    from veles.core.providers import catalog
+
+    names = set(_NON_PROVIDER_NAMES)
+    for spec in catalog().values():
+        names.update(spec.key_env)
+    return sorted(names)
 
 
 # ---------------- scoped provider keys ----------------
@@ -193,12 +187,12 @@ def provider_for_env_name(name: str) -> str | None:
     only place the runtime reads it from (`provider_factory.resolve_api_key`);
     every other secret lives at `veles:<NAME>`. Before this, `veles secret set
     OPENROUTER_API_KEY` wrote the second kind for a provider key, so the key was
-    stored and never used. Derived from `PROVIDER_API_KEY_ENVS` rather than a
+    stored and never used. Derived from the catalogue (`key_env`) rather than a
     second table, so a new provider cannot be routed differently in two places."""
-    from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
+    from veles.core.providers import catalog
 
-    for provider, env_names in PROVIDER_API_KEY_ENVS.items():
-        if name in env_names:
+    for provider, spec in catalog().items():
+        if name in spec.key_env:
             return provider
     return None
 
@@ -211,7 +205,7 @@ def get_provider_key(
     Lookup order:
       1. Keychain `veles:<provider>:<project>` (if project given).
       2. Keychain `veles:<provider>:default`.
-      3. ENV vars listed in `PROVIDER_API_KEY_ENVS[provider]` (when
+      3. ENV vars listed in the catalogue entry's `key_env` (when
          `env_fallback=True`).
 
     Returns the first non-empty value or None.
@@ -312,7 +306,7 @@ def _read_keychain(name: str) -> str | None:
 
 
 def _env_for_provider(provider: str) -> str | None:
-    """ENV fallback honouring the canonical names in `PROVIDER_API_KEY_ENVS`.
+    """ENV fallback honouring the catalogue entry's `key_env`.
     Imported lazily to keep `secrets.py` free of cross-package deps."""
     from veles.core.provider_factory import env_api_key
 

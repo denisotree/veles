@@ -83,3 +83,9 @@ def test_make_provider_local_tools_env_override_wins(monkeypatch: pytest.MonkeyP
     monkeypatch.setenv("VELES_LOCAL_TOOLS", "0")
     monkeypatch.setattr(_PROBE, lambda self, model: True)
     assert make_provider("ollama", model="qwen3:4b-instruct").supports_tools is False
+
+
+def test_gemini_cli_is_retired_with_a_hint() -> None:
+    with pytest.raises(ValueError, match=r"removed in 1\.2\.6") as exc:
+        make_provider("gemini-cli")
+    assert "GEMINI_API_KEY" in str(exc.value) and "antigravity-cli" in str(exc.value)

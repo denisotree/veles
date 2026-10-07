@@ -59,6 +59,7 @@ def make_app(state: DaemonState) -> web.Application:
     app.router.add_post("/v1/runs/{run_id}/prompts/{prompt_id}", _handle_resolve_prompt)
     app.router.add_get("/v1/sessions", _handle_list_sessions)
     app.router.add_get("/v1/sessions/{session_id}", _handle_get_session)
+    app.router.add_get("/v1/sessions/{session_id}/usage", _handle_session_usage)
     app.router.add_delete("/v1/sessions/{session_id}", _handle_delete_session)
     app.router.add_patch("/v1/sessions/{session_id}", _handle_patch_session)
     app.router.add_delete("/v1/sessions/{session_id}/goal", _handle_cancel_session_goal)
@@ -136,14 +137,13 @@ async def _handle_list_channels(request: web.Request) -> web.Response:
        evidence that a channel has been used. Each platform reports its
        persisted chat count.
     """
-    from veles.channels.platform_registry import ensure_builtins_registered, list_platforms
-    from veles.channels.session_map import (
+    from veles.core.chat_sessions import (
         SessionMap,
         channel_session_path,
         default_channels_dir,
     )
+    from veles.core.platforms import list_platforms
 
-    ensure_builtins_registered()
     platforms = list_platforms()
     channels_dir = default_channels_dir()
     out: list[dict[str, Any]] = []
@@ -175,10 +175,7 @@ async def _handle_list_channels(request: web.Request) -> web.Response:
 # M234. Mirrors the wording of `core/tools/builtin/task_tools.py::_resolve_target`,
 # which rejects a bad target at write time so the caller fixes it now rather than
 # discovering it at delivery time.
-_BAD_TARGET = (
-    "{field!r} is not a valid delivery target; use '<platform>:<chat_id>' "
-    "(e.g. 'telegram:42') or 'local'"
-)
+_BAD_TARGET = "{field!r} is not a valid delivery target; use '<platform>:<chat_id>' or 'local'"
 
 
 def _resolve_deliver_to(raw: Any, origin: str | None) -> tuple[str | None, str | None]:
@@ -421,6 +418,13 @@ async def _handle_list_sessions(request: web.Request) -> web.Response:
     )
 
 
+async def _handle_session_usage(request: web.Request) -> web.Response:
+    """M116b: the session's tokens since this daemon started and the model's
+    context window. A session with no finished run yet reports zeros."""
+    state: DaemonState = request.app["state"]
+    return web.json_response(state.usage_payload(request.match_info["session_id"]))
+
+
 async def _handle_get_session(request: web.Request) -> web.Response:
     state: DaemonState = request.app["state"]
     session_id = request.match_info["session_id"]
@@ -559,6 +563,7 @@ async def _stop_background_runners(app: web.Application) -> None:
     state.channel_runners.clear()
     state.channel_tasks.clear()
     state.active_channels.clear()
+    state.channel_caps.clear()
 
 
 async def _drain_in_flight_runs(app: web.Application) -> None:

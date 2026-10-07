@@ -4,10 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from veles.cli._parsers._common import (
-    PROVIDER_CHOICES,
-    add_project_root_flag,
-)
+from veles.cli._parsers._common import add_project_root_flag
 
 
 def register(sub: argparse._SubParsersAction) -> None:
@@ -54,8 +51,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     )
     dream.add_argument(
         "--provider",
-        choices=PROVIDER_CHOICES,
         default=None,
+        metavar="PROVIDER",
         help=(
             "Provider for the consolidation sub-agent. Omit to use the "
             "routed provider for this project (`veles route show insights`)."

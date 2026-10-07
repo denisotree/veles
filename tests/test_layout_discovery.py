@@ -38,8 +38,8 @@ description = "{description}"
 # ---- builtin pack ----
 
 
-def test_builtin_llm_wiki_pack_discovered(isolated_home: Path) -> None:
-    """The repo ships an llm-wiki pack under `src/veles/layouts/llm-wiki/`.
+def test_builtin_default_pack_discovered(isolated_home: Path) -> None:
+    """The repo ships the default pack under `src/veles/layouts/bare/`.
     With no project/user packs, builtin still appears."""
     packs = discover_layouts(project=None)
     names = [p.manifest.name for p in packs]
@@ -60,8 +60,6 @@ def test_find_layout_returns_default(isolated_home: Path) -> None:
     assert entry is not None
     assert entry.manifest.name == LAYOUT_DEFAULT
     assert entry.scope == "builtin"
-    # The pack root contains the `skills/` directory (sanity, not strict spec).
-    assert (entry.root / "skills").is_dir()
 
 
 def test_find_layout_unknown_returns_none(isolated_home: Path) -> None:
@@ -141,19 +139,10 @@ def test_malformed_pack_silently_skipped(isolated_home: Path, tmp_path: Path) ->
 # ---- builtin pack manifest content ----
 
 
-def test_llm_wiki_pack_declares_three_operations(isolated_home: Path) -> None:
-    """The shipped llm-wiki pack covers ingest/query/lint per VISION §5.2."""
-    entry = find_layout(LAYOUT_DEFAULT, project=None)
-    assert entry is not None
-    op_names = {op.name for op in entry.manifest.operations}
-    assert {"ingest", "query", "lint"} <= op_names
-
-
-def test_llm_wiki_pack_declares_no_writable_zones(isolated_home: Path) -> None:
-    """M189: llm-wiki declares NO `writable_zones` — it is permissive by
-    design (the universal opt-in mechanism treats "no zones" as no write
-    restriction at all). The sources/wiki split is a prompt convention
-    now, not an enforced manifest boundary."""
+def test_default_pack_declares_no_writable_zones(isolated_home: Path) -> None:
+    """The default pack declares NO `writable_zones` — permissive by design
+    (the universal opt-in mechanism treats "no zones" as no write
+    restriction at all)."""
     entry = find_layout(LAYOUT_DEFAULT, project=None)
     assert entry is not None
     assert entry.manifest.writable_zones == ()

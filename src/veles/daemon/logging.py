@@ -91,7 +91,12 @@ def setup_daemon_logging(
     resolved_level_str = (env_level or level or DEFAULT_LEVEL).upper()
     resolved_level = getattr(logging, resolved_level_str, logging.INFO)
 
-    for logger_name in _LOGGER_NAMES:
+    # Loaded modules (a channel gateway) log under their own package, outside `veles.*`.
+    from veles.core.modules import current_module_registry, module_package
+
+    registry = current_module_registry()
+    module_loggers = [module_package(n) for n in registry.module_dirs] if registry else []
+    for logger_name in (*_LOGGER_NAMES, *module_loggers):
         log = logging.getLogger(logger_name)
         already = [h for h in log.handlers if h.get_name() == handler.get_name()]
         if not already:

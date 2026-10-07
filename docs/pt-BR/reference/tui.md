@@ -34,7 +34,7 @@ Digite `/` no compositor; `Tab` completa. Os comandos registrados são:
 | `/model` | Abre a seletora de modelos |
 | `/mode` | Alterna o modo de execução (auto/planning/writing/goal) |
 | `/session` | Abre a seletora de sessões (retomar) |
-| `/save` | Salva / nomeia a sessão atual |
+| `/save <slug>` | Salva a última resposta — uma página no armazenamento de páginas do layout (a wiki: `wiki/queries/<slug>.md`) quando há um, senão um insight da memória do projeto |
 | `/history` | Mostra o histórico da sessão |
 | `/tokens` | Uso de tokens (entrada / saída / por turno / por sessão) |
 | `/context` | Tamanho atual do contexto vs. o limite |
@@ -42,7 +42,7 @@ Digite `/` no compositor; `Tab` completa. Os comandos registrados são:
 | `/insights` | Mostra os insights aprendidos do projeto |
 | `/rules` | Mostra o resumo de regras do projeto |
 | `/schema` | Valida / corrige o `AGENTS.md` |
-| `/wiki` | Operações de wiki para o layout ativo |
+| `/wiki add <path\|url>` / `/wiki query <question>` | Operações de wiki do módulo `wiki` — só onde o layout ativo habilita o engine de wiki (p. ex. `llm-wiki`). Os módulos podem adicionar seus próprios `/commands` do mesmo jeito |
 | `/daemon` | Abre o painel de controle do daemon (projeto → daemons → canais) |
 
 > O conjunto de comandos de barra é o mesmo quer você inicie a TUI diretamente, quer a abra a partir de

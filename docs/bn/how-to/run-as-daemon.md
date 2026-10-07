@@ -6,6 +6,14 @@
 করে — [চ্যানেল](connect-telegram.md) (Telegram, …), শিডিউল করা
 [জব](long-running-tasks.md), এবং রিমোট/হেডলেস ব্যবহারের ভিত্তি।
 
+ডিমন channel হোস্ট করে, তাই অন্তত একটি channel প্রস্তুত থাকলেই এটি চালু হয় — তার module install করা
+এবং secret যথাস্থানে। কোনোটি না থাকলে terminal-এ `veles daemon start` একটি যুক্ত করার প্রস্তাব দেয়;
+terminal ছাড়া এটি অস্বীকার করে এবং চালানোর command প্রিন্ট করে
+(`veles channel add --channel <platform>`, অথবা registry install)। `[channels.<platform>]`-এ declare
+করা channel চালুর সময় আপনার সংযুক্ত registry থেকে তার module install করে। Channel platform হলো
+module — দেখুন [Telegram channel সংযুক্ত করুন](connect-telegram.md) এবং
+[module দিয়ে Veles বাড়ান](../../en/how-to/extend-veles-with-modules.md)।
+
 ## চালু ও বন্ধ করা
 
 ```bash

@@ -11,7 +11,7 @@ Veles 由两个 TOML 文件和一组状态目录进行配置。密钥（API key�
 | `~/.veles/` | 用户全局 | `config.toml`、trust 授权、跨项目 skills/tools、模型缓存、本地化、注册表 |
 | `<project>/.veles/` | 项目本地 | `project.toml`、`config.toml`、`memory.db`、项目级 skills/tools、plans、运行时临时数据 |
 | `<project>/AGENTS.md` | 项目 | 注入到 agent 中的上下文文件（符号链接到 `CLAUDE.md` / `GEMINI.md`） |
-| `<project>/wiki/`、`sources/` | 项目 | 用户内容（默认的 LLM-Wiki 布局） |
+| `<project>/wiki/`、`sources/`、… | 项目 | 用户内容，由布局包决定其组织方式（例如 LLM-Wiki） |
 
 `VELES_USER_HOME` 会重定向 `~`（这样用户状态会落到 `<override>/.veles/`）。完整目录树参见[项目布局](project-layout.md)。
 
@@ -40,6 +40,9 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 transport = "stdio"
 command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
+
+[sandbox]
+enabled = true                   # run_shell 在 OS 沙箱中运行；false 则关闭
 ```
 
 | 键 | 类型 | 用途 |
@@ -49,6 +52,7 @@ args = ["-m", "my_mcp_server"]
 | `[user] default_model` | string | 未指定时使用的模型 |
 | `[user] tui_theme` | string | 默认的 TUI 配色主题 |
 | `[permissions] <tool>` | policy | 按 tool 的权限策略（参见[信任与沙箱](../explanation/trust-and-sandbox.md)） |
+| `[sandbox] enabled` | bool | `run_shell` 在 OS 沙箱中运行（默认 `true`）；仅在此处读取——项目的 `[sandbox]` 会被忽略（参见[安全](../how-to/security-and-permissions.md)） |
 
 ---
 
@@ -107,7 +111,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[daemon]` | 未命名/"默认" daemon 的绑定地址 + 自动启动 |
 | `[daemon.<name>]` | 一个具名 daemon session（拥有自己的 model/provider/host/port/mode） |
 | `[goal]` | 新目标的预算 — `max_steps`（30）、`max_cost_usd`（5.0）、`max_wall_time_s`（3600）；`veles goal start` 的参数优先 |
-| `[channels.<type>]` | 由未命名 daemon 提供服务的 channel（例如 `telegram`） |
+| `[channels.<type>]` | 由未命名 daemon 提供服务的 channel（例如 `telegram`）。其键由平台自行定义（`enabled` 加上其模块声明的键）；声明它会在下一次 `veles daemon start` 时安装该模块 |
 | `[daemon.<name>.channels.<type>]` | 绑定到某个具名 daemon session 的 channel |
 | `[mcp.servers.<name>]` | 一个外部 MCP 服务器（tool 来源） |
 

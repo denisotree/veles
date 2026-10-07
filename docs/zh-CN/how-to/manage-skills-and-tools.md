@@ -52,9 +52,10 @@ veles tool promote <name>      # move to ~/.veles/tools/ (cross-project)
 veles module list                              # both scopes, with a `scope` column
 veles module add https://github.com/org/module.git
 veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
-veles module show <name> [--user]
+veles module show <name> [--user]             # 清单 + 文件 sha256
 veles module remove <name> [--user]
-veles module approve <name> [--user]
+veles module approve <name> [--user]          # 在终端中输入 `yes`
+veles module approve <name> --sha256 <hash>   # 无终端时：你审阅过的哈希
 ```
 
 与技能和工具一样，模块存在于两个作用域：项目本地（`<project>/.veles/modules/`）和用户全局（`~/.veles/modules/`，在每个项目中加载）。用户级模块与项目级模块经过同样的批准门禁，且门禁在比较名称之前运行。如果项目模块与用户模块同名，已批准的项目模块会加载，Veles 会警告用户级模块被遮蔽；未批准的项目模块会被跳过（警告中会指明其目录），此时加载用户模块。同一作用域内两个已批准的模块同名时——按目录排序的第一个加载，其余的发出警告并被跳过。`veles module {show,approve,remove}` 接受清单名称（`list` 显示的名称），并会拒绝该作用域内被多个目录声明的名称，同时列出这些目录；`veles module add` 会拒绝安装名称已被该作用域内另一个目录声明的模块。

@@ -4,7 +4,8 @@
 
 Um **layout pack** define como o *conteúdo do utilizador* de um projeto está organizado —
 que diretórios existem, em quais o agente pode escrever e que operações oferece. A
-predefinição é a **LLM-Wiki**. Esta é uma opção de conteúdo, e **não** um princípio
+predefinição é o **`bare`**, que não acrescenta ao seu diretório nada além de `.veles/`
+e `AGENTS.md`. A **LLM-Wiki** é uma opção do registo de extensões, e **não** um princípio
 central do Veles.
 
 ## O que é um layout pack
@@ -18,26 +19,40 @@ skills e de templates). O manifesto declara:
 - **Operações** — fluxos de trabalho nomeados, fornecidos como skills dentro do pack.
 - **Scaffold** (`[layout.scaffold]`) — o que o `veles init` cria: diretórios e um template
   `AGENTS.md` opcional (`{name}` é substituído).
-- **Engines** (`[layout.engines]`) — qual a maquinaria de conteúdo do núcleo que o pack
-  ativa. Hoje existe uma engine: `wiki`. Sem ela, não existem ferramentas de wiki, nem
-  recall de wiki, nem injeção de INDEX no projeto.
+- **Engines** (`[layout.engines]`) — qual a maquinaria de conteúdo que o pack
+  pede. Uma engine é fornecida por um módulo (o módulo `wiki` do registo fornece `wiki`).
+  Sem ela, não existem ferramentas de wiki, nem recall de wiki, nem injeção de INDEX no
+  projeto.
 - **Ficheiro de contexto** (`context_file`) — um ficheiro injetado no prompt de sistema
   estável do agente (a LLM-Wiki usa o `INDEX.md`).
 
-## Packs incorporados
+## Packs disponíveis
 
-| Pack | O que o `veles init --layout <name>` produz |
-|---|---|
-| `llm-wiki` *(predefinição)* | A [LLM-Wiki ao estilo Karpathy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): `sources/` (só de leitura), `wiki/` (gravável pelo agente), `INDEX.md` injetado no prompt, skills `ingest`/`query`/`lint`, a engine de wiki ativa. |
-| `notes` | Um único diretório `notes/` plano onde o agente escreve. Sem maquinaria de wiki. |
-| `bare` | Sem qualquer scaffold de conteúdo — para repositórios de código e trabalho de forma livre. As escritas são permissivas dentro da raiz do projeto (continuando sujeitas à escada de confiança). |
+| Pack | De onde vem | O que o `veles init --layout <name>` produz |
+|---|---|---|
+| `bare` *(predefinição)* | incorporado | Sem qualquer scaffold de conteúdo — para repositórios de código e trabalho de forma livre. As escritas são permissivas dentro da raiz do projeto (continuando sujeitas à escada de confiança). |
+| `llm-wiki` | registo (`public:official/llm-wiki`, traz o módulo `wiki`) | A [LLM-Wiki ao estilo Karpathy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): `sources/` (só de leitura por convenção, não imposto), `wiki/` (gravável pelo agente), `INDEX.md` injetado no prompt, skills `ingest`/`query`/`lint`/`organize`/`structure_design`, a engine de wiki ativa, `veles add` e `/wiki`. Um prompt comportamental declarado pelo layout (`templates/behaviour.md`) transporta a disciplina sources/wiki e as regras de migração/patch do log. |
+| `notes` | registo (`public:official/notes`) | Um único diretório `notes/` plano onde o agente escreve. Sem maquinaria de wiki. |
+
+O `veles init` num terminal pergunta que pack usar (os instalados e os dos seus
+registos); escolher um que não está instalado oferece instalá-lo.
+`veles registry install llm-wiki` instala-o antecipadamente.
+
+## Projetos anteriores à 1.2.3
+
+Um projeto cujo layout não está instalado (um projeto `llm-wiki` após a atualização, ou
+um sem a chave `layout` — todos eram projetos wiki) abre na mesma. Num terminal, `veles`
+e `veles run` oferecem instalar o pack (com a engine de que precisa) com uma única
+confirmação; noutros sítios — o daemon, os canais, os restantes verbos — o Veles imprime
+o comando de instalação uma vez e trabalha sem a wiki. Nada em `wiki/` é tocado.
 
 ## Layouts personalizados
 
 Coloque um pack em `~/.veles/layouts/<name>/layout.toml` (global do utilizador) ou
 `<project>/.veles/layouts/<name>/` (local ao projeto; tem precedência sobre packs do
 utilizador e incorporados com o mesmo nome) e passe `veles init --layout <name>`. O pack
-incorporado `notes` é o exemplo mínimo para copiar. Também pode descrever convenções no
+`notes` do registo é um exemplo mínimo para copiar. Um pack que pede uma engine que
+nenhum módulo instalado fornece recebe a mesma oferta de instalação. Também pode descrever convenções no
 `AGENTS.md` — o layout impõe as zonas, o AGENTS.md orienta o comportamento.
 
 ## O que *não* é

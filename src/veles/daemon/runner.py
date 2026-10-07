@@ -32,10 +32,10 @@ import secrets
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from concurrent.futures import Future
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
-from veles.core.agent import Agent, RunResult
+from veles.core.agent import Agent, RunResult, UsageSnapshot
 
 if TYPE_CHECKING:
     from veles.core.orchestration import ManagerRunResult
@@ -96,6 +96,8 @@ class RunHandle:
     delivery_error: str | None = None
     iterations: int = 0
     stopped_reason: str | None = None
+    # M116b: the run's token usage, recorded into its session on completion.
+    usage: UsageSnapshot | None = None
     events: list[dict[str, Any]] = field(default_factory=list)
     event_added: asyncio.Event = field(default_factory=asyncio.Event)
     done: asyncio.Event = field(default_factory=asyncio.Event)
@@ -239,20 +241,23 @@ async def _complete(
     deliver_hook: Callable[[str], Awaitable[None]] | None,
     on_finished: Callable[[RunHandle], None] | None,
 ) -> None:
-    """End the run as completed: the `completed` event, the `deliver_to` push,
-    then settle — delivery before `done` so the shutdown drain covers it."""
+    """End the run as completed: the `completed` event (with `handle.usage`, when
+    the caller set it), the `deliver_to` push, then settle — delivery before
+    `done` so the shutdown drain covers it."""
     handle.mark_completed(
         text=text, iterations=iterations, stopped_reason=stopped_reason, session_id=session_id
     )
-    post(
-        {
-            "type": "completed",
-            "stopped_reason": stopped_reason,
-            "iterations": iterations,
-            "text": text,
-            "session_id": handle.session_id,
-        }
-    )
+    usage = handle.usage
+    event: dict[str, Any] = {
+        "type": "completed",
+        "stopped_reason": stopped_reason,
+        "iterations": iterations,
+        "text": text,
+        "session_id": handle.session_id,
+    }
+    if usage is not None:
+        event["usage"] = asdict(usage)
+    post(event)
     await _run_deliver_hook(handle, deliver_hook)
     _settle(handle, on_finished)
 
@@ -439,6 +444,7 @@ async def run_agent_in_background(  # noqa: PLR0913
                 result.session_id or handle.session_id,
                 result.iterations,
             )
+        handle.usage = getattr(result, "usage", None)  # M116b
         await _complete(
             handle,
             text=result.text,
@@ -592,6 +598,12 @@ async def run_manager_in_background(
         # Emit the (possibly escalated) text as one final delta + completed
         # event so channels' existing buffering machinery picks it up unchanged.
         _post({"type": "text_delta", "delta": final_text})
+        # M116b: the workers' tokens are this run's (the manager writes nothing itself).
+        handle.usage = UsageSnapshot(
+            prompt_tokens=sum(h.tokens_in for h in result.handles),
+            completion_tokens=sum(h.tokens_out for h in result.handles),
+            total_tokens=sum(h.tokens_in + h.tokens_out for h in result.handles),
+        )
         await _complete(
             handle,
             text=final_text,

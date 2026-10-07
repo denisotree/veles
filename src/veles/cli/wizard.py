@@ -5,12 +5,15 @@ Triggers from `cli/__init__.py::main` when ALL of:
 - stdin is a TTY.
 - `--no-wizard` was not passed.
 - `VELES_NO_WIZARD=1` is not set in the env.
-- The active command isn't a bootstrap one (`init`, `import`) — those
-  set up state themselves and the wizard would interleave awkwardly.
+- The command starts an agent (`_starts_agent`: the REPL, `run`, `daemon start`, …).
+  Admin verbs (`module approve`, `tool`, `doctor`, …) never trigger it — on a fresh
+  `$HOME` the TTY that `module approve` requires must reach the approval.
 
-Asks three things and writes `~/.veles/config.toml`:
+With stdout a TTY too it is the TUI onboarding (`tui/wizard`: language, provider,
+key, model, theme, first project); otherwise three stdin questions, then writes
+`~/.veles/config.toml`:
 1. Preferred language (`en` / `ru`) — recorded for future UI strings.
-2. Default LLM provider — bare-list choice from `_PROVIDER_CHOICES`.
+2. Default LLM provider — bare-list choice from the provider catalogue.
 3. (Soft hint only) which API-key env var to set; **NEVER persists keys**.
 
 Optional first-project name field exists in the schema but the wizard
@@ -30,8 +33,6 @@ from collections.abc import Callable
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 
-from veles.core.provider_factory import PROVIDER_API_KEY_ENVS
-from veles.core.providers import PROVIDER_VALUES as _PROVIDER_CHOICES
 from veles.core.user_config import (
     UserConfig,
     save_user_config,
@@ -39,7 +40,31 @@ from veles.core.user_config import (
 )
 
 _LANGUAGES: tuple[str, ...] = ("en", "ru")
-_BOOTSTRAP_COMMANDS: frozenset[str] = frozenset({"init", "import"})
+# Verbs that start an agent and so need a provider; None is the bare-`veles` REPL.
+_AGENT_COMMANDS: frozenset[str | None] = frozenset(
+    {None, "run", "research", "organize", "curate", "goal", "dream"}
+)
+# (verb, subcommand) pairs that start one; `veles daemon` alone opens the picker.
+_AGENT_SUBCOMMANDS: frozenset[tuple[str, str | None]] = frozenset(
+    {
+        ("daemon", "start"),
+        ("daemon", None),
+        ("channel", "run"),
+        ("route", "refresh"),
+        ("job", "tick"),
+    }
+)
+
+
+def _starts_agent(args: argparse.Namespace) -> bool:
+    from veles.cli import _COMMANDS
+
+    command = getattr(args, "command", None)
+    if command in _AGENT_COMMANDS:
+        return True
+    if command not in _COMMANDS:
+        return True  # a registry module's verb may start an agent (`run_agent`)
+    return (command, getattr(args, f"{command}_command", None)) in _AGENT_SUBCOMMANDS
 
 
 Prompter = Callable[[str, str | None], str]
@@ -69,7 +94,7 @@ def should_run_wizard(args: argparse.Namespace) -> bool:
         return False
     if os.environ.get("VELES_NO_WIZARD") == "1":
         return False
-    if getattr(args, "command", None) in _BOOTSTRAP_COMMANDS:
+    if not _starts_agent(args):
         return False
     if not sys.stdin.isatty():
         return False
@@ -89,12 +114,7 @@ def run_wizard() -> WizardResult:
         file=sys.stderr,
     )
     language = _ask_choice(prompter, "Preferred language", _LANGUAGES, default="en")
-    provider = _ask_choice(
-        prompter,
-        "Default LLM provider",
-        _PROVIDER_CHOICES,
-        default="openrouter",
-    )
+    provider = _ask_provider(prompter, "Default LLM provider")
     _hint_about_api_key(provider)
     first_project = prompter("First project name (optional, blank to skip)", None).strip() or None
 
@@ -130,11 +150,27 @@ def _ask_choice(prompter: Prompter, prompt: str, choices: tuple[str, ...], *, de
         )
 
 
+def _ask_provider(prompter: Prompter, prompt: str) -> str:
+    """Pick a provider — the catalogue, then what the cached registries offer;
+    a registry pick is installed (with the normal confirmation) before it counts."""
+    from veles.core.registry import ensure
+
+    while True:
+        provider = _ask_choice(
+            prompter, prompt, tuple(ensure.available_providers()), default="openrouter"
+        )
+        if ensure.ensure_provider_interactive(provider):
+            return provider
+        print("  ! not installed; pick another", file=sys.stderr)
+
+
 def _hint_about_api_key(provider: str) -> None:
-    envs = PROVIDER_API_KEY_ENVS.get(provider)
-    if not envs:
-        # cli-delegate providers authenticate via their own binary.
-        return
+    from veles.core.providers import find_provider
+
+    spec = find_provider(provider)
+    if spec is None or not spec.needs_key:
+        return  # local servers and CLI delegates carry no key
+    envs = spec.key_env
     if any(os.environ.get(name) for name in envs):
         return
     label = " or ".join(envs)

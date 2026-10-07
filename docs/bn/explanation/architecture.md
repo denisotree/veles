@@ -59,7 +59,8 @@ response  ──►  saved to memory  ──►  learning triggers (insights, cu
 
 - `<project>/.veles/` — এই প্রোজেক্টের মেমরি, config, local skills/tools।
 - `~/.veles/` — user-global config, cross-project skills/tools, caches, trust।
-- `<project>/AGENTS.md`, `wiki/`, `sources/` — আপনার কন্টেন্ট (LLM-Wiki লেআউট)।
+- `<project>/AGENTS.md` এবং আপনার লেআউট যা যোগ করে (যেমন LLM-Wiki লেআউটের জন্য `wiki/`,
+  `sources/`) — আপনার কন্টেন্ট।
 
 দেখুন [প্রোজেক্ট লেআউট](../reference/project-layout.md)।
 
@@ -72,7 +73,8 @@ response  ──►  saved to memory  ──►  learning triggers (insights, cu
 
 ## surfaces
 
-- **CLI** (`veles run`, `veles add`, …) — one-shot এবং স্ক্রিপ্টেড ব্যবহার।
+- **CLI** (`veles run`, `veles organize`, …, সাথে module-এর যোগ করা verb, যেমন wiki-র
+  `veles add`) — one-shot এবং স্ক্রিপ্টেড ব্যবহার।
 - **TUI** (`veles tui`) — [run modes](modes.md) সহ ইন্টারঅ্যাক্টিভ REPL।
 - **Daemon + channels** — headless API, Telegram, scheduled jobs।
 

@@ -47,7 +47,6 @@ _ALLOWED = {
     "src/veles/core/modes/goal.py": "spells out which word forms each stem covers",
     "src/veles/modules/agentops/tools.py": "quotes example phrases the tool matches",
     "tests/test_repl_prototype.py": "quotes the leaked UI string under guard",
-    "tests/test_telegram_forward_grouping.py": "quotes the message used as input",
     # This file explains the rule by showing the exception, so it is one.
     "tests/test_code_is_english.py": "quotes the stem example in its own docstring",
 }

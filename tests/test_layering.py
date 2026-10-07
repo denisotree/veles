@@ -26,6 +26,7 @@ _RULES: dict[str, tuple[str, ...]] = {
     "veles.adapters": ("veles.cli", "veles.daemon", "veles.channels", "veles.tui", "veles.runtime"),
     "veles.mcp": ("veles.cli", "veles.daemon", "veles.channels", "veles.tui", "veles.runtime"),
     "veles.runtime": ("veles.cli", "veles.daemon", "veles.channels", "veles.tui"),
+    "veles.sdk": ("veles.cli", "veles.daemon", "veles.channels", "veles.tui"),
     "veles.modules": ("veles.cli", "veles.daemon", "veles.tui"),
     "veles.channels": ("veles.cli", "veles.daemon", "veles.tui"),
     "veles.daemon": ("veles.cli", "veles.tui"),
@@ -35,10 +36,6 @@ _KNOWN: frozenset[tuple[str, str]] = frozenset(
     {
         # Self-knowledge: describes the CLI surface by walking its parser.
         ("veles.core.knowledge.skeleton", "veles.cli._parsers"),
-        # Config validation knows which keys each registered channel accepts.
-        ("veles.core.config_schema", "veles.channels.platform_registry"),
-        # "Last active chat" is read from the channels' session maps.
-        ("veles.core.proactive.target_resolver", "veles.channels.session_map"),
     }
 )
 

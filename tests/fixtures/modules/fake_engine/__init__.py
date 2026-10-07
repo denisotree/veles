@@ -24,6 +24,7 @@ def register(api) -> None:
         DreamStep,
         Engine,
         PageSource,
+        PageStore,
         ToolSet,
     )
     from veles.core.layout.engines import engine_enabled
@@ -77,9 +78,13 @@ def register(api) -> None:
         ),
     )
     api.contribute(
-        "self_doc",
+        "page_store",
         "fake",
-        lambda project, content: "fake/self-doc.md" if on(project) else None,
+        PageStore(
+            write=lambda project, category, slug, title, content: f"fake/{category}/{slug}.md",
+            read=lambda project, category, slug: None,
+            engine="fake",
+        ),
     )
     api.contribute(
         "scaffold",

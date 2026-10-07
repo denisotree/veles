@@ -13,7 +13,7 @@ Veles настраивается двумя файлами TOML и наборо�
 | `~/.veles/` | User-global | `config.toml`, trust-разрешения, навыки/инструменты между проектами, кэш моделей, локали, реестр |
 | `<project>/.veles/` | Project-local | `project.toml`, `config.toml`, `memory.db`, навыки/инструменты проекта, планы, runtime-артефакты |
 | `<project>/AGENTS.md` | Project | Контекстный файл, внедряемый в агента (симлинкуется на `CLAUDE.md` / `GEMINI.md`) |
-| `<project>/wiki/`, `sources/` | Project | Пользовательский контент (раскладка LLM-Wiki по умолчанию) |
+| `<project>/wiki/`, `sources/`, … | Project | Пользовательский контент, как его раскладывает пакет (например, LLM-Wiki) |
 
 `VELES_USER_HOME` перенаправляет `~` (так что состояние пользователя попадёт в
 `<override>/.veles/`). Полное дерево см. в [раскладке проекта](project-layout.md).
@@ -43,6 +43,9 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 transport = "stdio"
 command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
+
+[sandbox]
+enabled = true                   # run_shell в песочнице ОС; false — выключить
 ```
 
 | Ключ | Тип | Назначение |
@@ -52,6 +55,7 @@ args = ["-m", "my_mcp_server"]
 | `[user] default_model` | string | Модель, используемая, когда она не задана явно |
 | `[user] tui_theme` | string | Цветовая тема TUI по умолчанию |
 | `[permissions] <tool>` | policy | Политика прав по инструментам (см. [trust и песочница](../explanation/trust-and-sandbox.md)) |
+| `[sandbox] enabled` | bool | `run_shell` в песочнице ОС (по умолчанию `true`); читается только здесь — `[sandbox]` проекта игнорируется (см. [безопасность](../how-to/security-and-permissions.md)) |
 
 ---
 
@@ -110,7 +114,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[daemon]` | Привязка + автозапуск неименованного/«default» демона |
 | `[daemon.<name>]` | Именованная сессия демона (собственные model/provider/host/port/mode) |
 | `[goal]` | Бюджет новой цели — `max_steps` (30), `max_cost_usd` (5.0), `max_wall_time_s` (3600); флаги `veles goal start` его перекрывают |
-| `[channels.<type>]` | Канал, обслуживаемый неименованным демоном (например, `telegram`) |
+| `[channels.<type>]` | Канал, обслуживаемый неименованным демоном (например, `telegram`). Ключи в нём — собственные ключи платформы (`enabled` плюс то, что объявляет её модуль); объявление блока ставит модуль при следующем `veles daemon start` |
 | `[daemon.<name>.channels.<type>]` | Канал, привязанный к именованной сессии демона |
 | `[mcp.servers.<name>]` | Внешний MCP-сервер (источник инструментов) |
 

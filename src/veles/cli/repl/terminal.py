@@ -98,6 +98,9 @@ def _register_kitty_sequences() -> None:
       - `Ctrl+<letter>` → `\\x1b[<codepoint>;5u`. These MUST be remapped or the
         protocol would break pt's emacs line-editing (Ctrl+A/E/K/W…) and our
         own Ctrl+C/D/J/O bindings.
+      - `Alt+<key>` → `\\x1b[<codepoint>;3u` (Option+Backspace on a Mac →
+        `\\x1b[127;3u`) → the legacy `ESC <key>` pair, else the raw sequence
+        lands in the input and word editing (Alt+Backspace/B/F/D) is gone.
     Each maps to the SAME `Keys.*` member as the legacy byte, so mapping both is
     purely additive: whichever form the terminal emits resolves identically, and
     plain text / unmodified Enter/Tab/arrows are untouched. Idempotent."""
@@ -115,6 +118,11 @@ def _register_kitty_sequences() -> None:
     seqs["\x1b[127u"] = Keys.Backspace
     seqs["\x1b[9;2u"] = Keys.BackTab  # Shift+Tab → cycle mode
     seqs["\x1b[127;5u"] = Keys.Backspace  # Ctrl+Backspace
+    # Alt+<key> (Option on a Mac) → the legacy `ESC <key>` pair, which pt's emacs
+    # bindings use for word editing: Alt+Backspace backward-kill-word, Alt+B/F/D…
+    seqs["\x1b[127;3u"] = (Keys.Escape, Keys.ControlH)
+    for code in range(0x21, 0x7F):
+        seqs[f"\x1b[{code};3u"] = (Keys.Escape, chr(code))  # type: ignore[assignment]
     # Ctrl+a..z → Keys.ControlA..ControlZ (same enum as legacy \x01..\x1a).
     for i in range(26):
         seqs[f"\x1b[{ord('a') + i};5u"] = getattr(Keys, f"Control{chr(ord('A') + i)}")
@@ -130,6 +138,7 @@ def _register_kitty_sequences() -> None:
         ctrl = getattr(Keys, f"Control{latin.upper()}")
         for ch in (cyr, cyr.upper()):
             seqs[f"\x1b[{ord(ch)};5u"] = ctrl
+            seqs[f"\x1b[{ord(ch)};3u"] = (Keys.Escape, latin)  # type: ignore[assignment]
 
 
 def _slash_completer(registry, *, paused=lambda: False):

@@ -13,7 +13,7 @@ Secrets (API keys, bot tokens) इन files में **कभी** नहीं
 | `~/.veles/` | User-global | `config.toml`, trust grants, cross-project skills/tools, model cache, locales, registry |
 | `<project>/.veles/` | Project-local | `project.toml`, `config.toml`, `memory.db`, project skills/tools, plans, runtime artefacts |
 | `<project>/AGENTS.md` | Project | agent में inject होने वाली context file (`CLAUDE.md` / `GEMINI.md` से symlinked) |
-| `<project>/wiki/`, `sources/` | Project | user content (default LLM-Wiki layout) |
+| `<project>/wiki/`, `sources/`, … | Project | user content, जैसा layout pack उसे बिछाता है (जैसे LLM-Wiki) |
 
 `VELES_USER_HOME` `~` को redirect करता है (ताकि user state `<override>/.veles/` में रहे)।
 पूरे tree के लिए देखें [project layout](project-layout.md)।
@@ -43,6 +43,9 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 transport = "stdio"
 command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
+
+[sandbox]
+enabled = true                   # OS sandbox में run_shell; false इसे बंद करता है
 ```
 
 | Key | प्रकार | उद्देश्य |
@@ -52,6 +55,7 @@ args = ["-m", "my_mcp_server"]
 | `[user] default_model` | string | जब कोई न दिया हो तब उपयोग होने वाला model |
 | `[user] tui_theme` | string | Default TUI color theme |
 | `[permissions] <tool>` | policy | प्रति-tool permission policy (देखें [trust & sandbox](../explanation/trust-and-sandbox.md)) |
+| `[sandbox] enabled` | bool | OS sandbox में `run_shell` (default `true`); केवल यहीं पढ़ा जाता है — project का `[sandbox]` अनदेखा किया जाता है (देखें [security](../how-to/security-and-permissions.md)) |
 
 ---
 
@@ -110,7 +114,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[daemon]` | unnamed/"default" daemon का bind + autostart |
 | `[daemon.<name>]` | एक नामित daemon session (अपना model/provider/host/port/mode) |
 | `[goal]` | नए goal का बजट — `max_steps` (30), `max_cost_usd` (5.0), `max_wall_time_s` (3600); `veles goal start` के flags इसे बदल देते हैं |
-| `[channels.<type>]` | unnamed daemon द्वारा served एक channel (जैसे `telegram`) |
+| `[channels.<type>]` | unnamed daemon द्वारा served एक channel (जैसे `telegram`)। इसकी keys platform की अपनी होती हैं (`enabled` और जो उसका module declare करे); इसे declare करने पर अगले `veles daemon start` पर module install हो जाता है |
 | `[daemon.<name>.channels.<type>]` | किसी नामित daemon session से bound एक channel |
 | `[mcp.servers.<name>]` | एक बाहरी MCP server (tool source) |
 

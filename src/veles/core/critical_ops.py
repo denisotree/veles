@@ -51,6 +51,7 @@ Tests inject a fake confirmer via `set_critical_confirmer`.
 
 from __future__ import annotations
 
+import os
 import sys
 from collections.abc import Callable
 from contextvars import ContextVar, Token
@@ -58,6 +59,20 @@ from contextvars import ContextVar, Token
 Confirmer = Callable[[str, str], bool]
 
 _LITERAL_YES = "yes"
+
+# Set on every command the agent's `run_shell` runs. An approval asked for from there
+# is the agent approving its own code. A shell can strip it: this stops the agent
+# that "fixes" a skipped-module warning, not a determined one (an OS sandbox does).
+AGENT_SHELL_ENV = "VELES_AGENT_SHELL"
+
+
+def refuse_in_agent_shell(what: str) -> None:
+    """Raise PermissionError when called from a command the agent's shell started."""
+    if os.environ.get(AGENT_SHELL_ENV):
+        raise PermissionError(
+            f"{what} can't come from the agent's shell ({AGENT_SHELL_ENV} is set) — run it yourself"
+        )
+
 
 _critical_confirmer: ContextVar[Confirmer | None] = ContextVar(
     "veles_critical_confirmer", default=None
@@ -98,6 +113,13 @@ def _default_confirmer(op: str, summary: str) -> bool:
 
     op = shown(op)
     summary = gutter(shown_multiline(summary)) if summary else ""
+    if os.environ.get(AGENT_SHELL_ENV):
+        print(
+            f"\nCRITICAL: {op} refused: the agent's shell ({AGENT_SHELL_ENV} is set) can't "
+            "confirm it.",
+            file=sys.stderr,
+        )
+        return False
     if not sys.stdin.isatty():
         print(
             f"\nCRITICAL: {op} requires interactive confirmation; non-TTY context refuses.",

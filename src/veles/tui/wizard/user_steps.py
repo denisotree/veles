@@ -15,8 +15,6 @@ from __future__ import annotations
 import contextlib
 from dataclasses import dataclass
 
-from veles.core.providers import ALL_PROVIDERS as _ALL_PROVIDERS
-from veles.core.providers import tui_label
 from veles.tui.wizard.screens import (
     ChoiceScreen,
     ConfirmScreen,
@@ -35,7 +33,34 @@ _LANGUAGES = [
     ChoiceItem(label="Русский", value="ru"),
 ]
 
-_PROVIDERS = [ChoiceItem(label=tui_label(spec), value=spec.value) for spec in _ALL_PROVIDERS]
+
+def _provider_items() -> list[ChoiceItem]:
+    """The catalogue, then what the cached registries offer (installed on pick)."""
+    from veles.core.providers import list_providers, tui_label
+    from veles.core.registry import ensure
+
+    known = set(list_providers())
+    return [
+        ChoiceItem(label=tui_label(n) if n in known else f"{n} (registry)", value=n)
+        for n in ensure.available_providers()
+    ]
+
+
+async def install_picked_provider(ctx: WizardContext, name: str) -> bool:
+    """A registry pick is installed (the normal confirmation, on the terminal)
+    before it counts; a catalogue pick is already there. Shared with the project
+    wizard."""
+    from veles.core.providers import find_provider
+    from veles.core.registry import ensure
+    from veles.tui.wizard.install import install_with_terminal
+
+    if find_provider(name) is not None:
+        return True
+    return install_with_terminal(
+        ctx.app,
+        lambda: ensure.ensure_provider_interactive(name),
+        hint=f"run `veles registry install {name}`",
+    )
 
 
 # ---------------- Step 1: Language ----------------
@@ -74,7 +99,7 @@ class ProviderStep:
         result = await ctx.app.push_screen_wait(
             ChoiceScreen(
                 title=self.title,
-                items=_PROVIDERS,
+                items=_provider_items(),
                 subtitle=("Veles can talk to any of these. You can override per-project later."),
                 default=ctx.answers.get("default_provider", "openrouter"),
             )
@@ -82,6 +107,8 @@ class ProviderStep:
         nav = outcome_from_dismiss(result)
         if nav is not None:
             return nav
+        if not await install_picked_provider(ctx, result):
+            return WizardOutcome.BACK
         ctx.answers["default_provider"] = result
         return WizardOutcome.NEXT
 
@@ -209,15 +236,15 @@ class ModelStep:
 
     async def run(self, ctx: WizardContext) -> WizardOutcome:
         from veles.cli.repl.model_fetcher import validate_and_fetch_models
-        from veles.core.provider_factory import LOCAL_PROVIDERS
+        from veles.core.provider_factory import needs_api_key
         from veles.core.secrets import get_provider_key
 
         provider = ctx.answers["default_provider"]
         api_status = ctx.answers.get("api_key_status", "")
-        # Resolve the key the user just configured; for local providers
-        # this is a sentinel ("local") because the adapter doesn't
-        # authenticate but still serves /models.
-        if provider in LOCAL_PROVIDERS:
+        # Resolve the key the user just configured; for a provider without a
+        # key this is a sentinel ("local"): a local adapter doesn't authenticate
+        # but still serves /models, a CLI delegate lists its curated models.
+        if not needs_api_key(provider):
             api_key = "local"
         elif api_status == "deferred":
             # No key configured — fall back to curated list so the picker

@@ -13,7 +13,7 @@ nằm trong keychain của hệ điều hành hoặc trong biến môi trường
 | `~/.veles/` | User-global | `config.toml`, các cấp quyền trust, skills/tools dùng chung nhiều dự án, cache model, locale, registry |
 | `<project>/.veles/` | Cục bộ theo dự án | `project.toml`, `config.toml`, `memory.db`, skills/tools của dự án, plan, các file tạm lúc chạy |
 | `<project>/AGENTS.md` | Dự án | File ngữ cảnh được chèn vào agent (symlink tới `CLAUDE.md` / `GEMINI.md`) |
-| `<project>/wiki/`, `sources/` | Dự án | Nội dung của người dùng (layout LLM-Wiki mặc định) |
+| `<project>/wiki/`, `sources/`, … | Dự án | Nội dung của người dùng, theo cách layout pack bố trí (ví dụ LLM-Wiki) |
 
 `VELES_USER_HOME` chuyển hướng `~` (nên trạng thái user nằm tại `<override>/.veles/`).
 Xem [layout dự án](project-layout.md) để biết cây thư mục đầy đủ.
@@ -43,6 +43,9 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 transport = "stdio"
 command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
+
+[sandbox]
+enabled = true                   # run_shell trong sandbox của hệ điều hành; false để tắt
 ```
 
 | Khóa | Kiểu | Mục đích |
@@ -52,6 +55,7 @@ args = ["-m", "my_mcp_server"]
 | `[user] default_model` | string | Model dùng khi không chỉ định |
 | `[user] tui_theme` | string | Chủ đề màu TUI mặc định |
 | `[permissions] <tool>` | policy | Chính sách quyền theo từng tool (xem [trust & sandbox](../explanation/trust-and-sandbox.md)) |
+| `[sandbox] enabled` | bool | `run_shell` trong sandbox của hệ điều hành (mặc định `true`); chỉ được đọc ở đây — `[sandbox]` của dự án bị bỏ qua (xem [bảo mật](../how-to/security-and-permissions.md)) |
 
 ---
 
@@ -110,7 +114,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[daemon]` | Bind + autostart của daemon không tên/"default" |
 | `[daemon.<name>]` | Một session daemon có tên (model/provider/host/port/mode riêng) |
 | `[goal]` | Ngân sách của một mục tiêu mới — `max_steps` (30), `max_cost_usd` (5.0), `max_wall_time_s` (3600); các flag của `veles goal start` được ưu tiên |
-| `[channels.<type>]` | Một channel do daemon không tên phục vụ (ví dụ `telegram`) |
+| `[channels.<type>]` | Một channel do daemon không tên phục vụ (ví dụ `telegram`). Các key của nó là của chính nền tảng (`enabled` cùng những gì module của nó khai báo); khai báo nó sẽ cài module ở lần `veles daemon start` kế tiếp |
 | `[daemon.<name>.channels.<type>]` | Một channel gắn với một session daemon có tên |
 | `[mcp.servers.<name>]` | Một máy chủ MCP bên ngoài (nguồn tool) |
 

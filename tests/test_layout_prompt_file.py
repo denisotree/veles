@@ -109,7 +109,7 @@ def test_prompt_file_present_when_wiki_engine_off(tmp_path: Path, user_home: Pat
     """Engine-independence: the block appears even for a pack that does NOT
     enable the wiki engine — this is a general pack-authoring hook, not a
     wiki feature."""
-    from veles.core.layout import wiki_enabled
+    from veles.core.layout import engine_enabled
     from veles.runtime.prompt import build_run_system_prompt
 
     _make_pack(
@@ -120,7 +120,7 @@ def test_prompt_file_present_when_wiki_engine_off(tmp_path: Path, user_home: Pat
         wiki_engine=False,
     )
     project = init_project(tmp_path / "p", name="p", layout="plain-with-prompt")
-    assert not wiki_enabled(project)
+    assert not engine_enabled(project, "wiki")
 
     prompt = build_run_system_prompt(project, prompt="anything")
 

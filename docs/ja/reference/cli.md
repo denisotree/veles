@@ -8,7 +8,7 @@ Veles のすべてのコマンド・サブコマンド・フラグを掲載し�
 veles [--no-wizard] <command> [subcommand] [options]
 ```
 
-- `--no-wizard` — `~/.veles/config.toml` が存在しない場合でも初回セットアップウィザードをスキップします（TTY であること、および `VELES_NO_WIZARD=1` も条件になります）。
+- `--no-wizard` — `~/.veles/config.toml` が存在しない場合でも初回セットアップウィザードをスキップします（TTY であること、および `VELES_NO_WIZARD=1` も条件になります）。ウィザードが表示されるのは、エージェントを起動するコマンド（引数なしの `veles`、`run`、`daemon`、`channel` など）の前だけです。`module`、`tool`、`doctor` のような管理系コマンドでは開きません。
 - 引数なしで実行すると、`veles` は対話型 [TUI](tui.md) を起動します。
 
 ほとんどのエージェントコマンドは、末尾に記載した[共通エージェントループフラグ](#shared-agent-loop-flags)と[プロバイダー名](#provider-names)を受け付けます。
@@ -23,7 +23,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | フラグ | デフォルト | 目的 |
 |---|---|---|
 | `name`（位置引数） | cwd のベース名 | プロジェクト名 |
-| `--layout <name>` | `llm-wiki` | コンテンツスキャフォールド用のレイアウトパック（`llm-wiki`、`notes`、`bare`、または `~/.veles/layouts/` のカスタムパック） |
+| `--layout <name>` | `bare`（ターミナルでは確認される） | コンテンツスキャフォールド用のレイアウトパック（`bare`、`llm-wiki` や `notes` のようにレジストリからインストールしたパック、または `~/.veles/layouts/` のカスタムパック）。未インストールのパックはインストールを提案され、拒否すると何も作成されない |
 | `--force` | オフ | `.veles/` が既に存在しても再作成する |
 
 ### `veles schema {validate,edit,fix}`
@@ -34,7 +34,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 - `fix` — LLM ウィザードを使って不足しているセクションを対話的に追加します。
 
 ### `veles self-doc [refresh|show]`
-プロジェクトの自己ドキュメント（`wiki/self-doc/overview.md`）を生成して表示します。引数なしの `veles self-doc` は現在のページを表示し、`refresh` は再生成します。
+プロジェクトの自己ドキュメントを生成して表示します — レイアウトにページストアがあればそこに（wiki では `wiki/self-doc/overview.md`）、なければ `.veles/memory/self-doc.md` に保存されます。引数なしの `veles self-doc` は現在のページを表示し、`refresh` は再生成します。
 
 ### `veles doctor`
 ユーザーグローバルの状態とアクティブなプロジェクトに対してヘルスチェックを実行します。アクティブなプロジェクトの有無にかかわらず動作します。
@@ -94,10 +94,13 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `--theme <name>` | 設定値または `everforest` | カラーテーマ（everforest、dracula、gruvbox、tokyo-night、catppuccin） |
 
 ### `veles add <source>`
-ソース（ローカルファイルまたは `http(s)://` URL）を読み込み、wiki ページに合成します。共通エージェントループフラグを受け付けます。
+*（`wiki` モジュール由来 — `veles registry install llm-wiki` または `… install wiki`）*
+ソース（ローカルファイルまたは `http(s)://` URL）を読み込み、wiki ページに合成します。モジュールがない場合、`veles add` は未知のコマンドとなり、エラーにインストール方法が示されます。
+
+モジュールも同様に独自の動詞を追加できます。それらは、そのモジュールがあるプロジェクト内の `veles --help` に表示されます。共通エージェントループフラグを受け付けます。
 
 ### `veles curate`
-キュレーターを 1 回実行します。未処理のセッションを `wiki/sessions/` ページにコンパクト化します。
+キュレーターを 1 回実行します。未処理のセッションをメモリのインサイトにコンパクト化します（wiki エンジンが有効なら `wiki/sessions/` ページにも）。
 
 | フラグ | デフォルト | 目的 |
 |---|---|---|
@@ -150,18 +153,24 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `list` | このプロジェクトの `memory.db` にカタログ化されたツールを一覧表示する |
 | `show <name>` | ツールのマニフェスト + テレメトリを表示する |
 | `promote <name> [-y]` | プロジェクトツールを `~/.veles/tools/`（プロジェクト横断）へ移動する |
-| `approve [<name>] [--all] [-y]` | 自作ツールファイルをレビューして承認し、ローダーが実行できるようにする |
+| `approve [<name>] [--all] [-y] [--sha256 H]` | 自作ツールファイルをレビューして承認し、ローダーが実行できるようにする |
 
-自作ツール（`.veles/tools/*.py`）は、ローダーがインポートするときにモジュールレベルのコードを実行します。そのため、新規または編集されたファイルは**承認するまでロードされません** — `veles tool approve` はコードを表示してそのハッシュを記録します。引数なしの `veles tool approve` は保留中のものを一覧表示します。
+自作ツール（`.veles/tools/*.py`）は、ローダーがインポートするときにモジュールレベルのコードを実行します。そのため、新規または編集されたファイルは**承認するまでロードされません** — `veles tool approve` はコードを表示してそのハッシュを記録します。引数なしの `veles tool approve` は、保留中のものを各ファイルの sha256 とともに一覧表示します。
 
-### `veles module {list,show,add,remove}`
+ターミナルがない場合（デプロイスクリプトなど）は、レビュー済みのハッシュで 1 つのファイルを承認します: `veles tool approve <name> --sha256 <hash>` — ファイルがその後変更されていると失敗します。`-y` がプロンプトを省略するのはターミナル上だけです。
+
+### `veles module {list,show,add,remove,approve}`
 
 | サブコマンド | 目的 |
 |---|---|
 | `list` | インストール済みのモジュールを一覧表示する |
-| `show <name>` | モジュールのマニフェストを表示する |
+| `show <name>` | モジュールのマニフェストとそのファイルの sha256 を表示する |
 | `add <source> [--name N] [-y]` | git URL またはローカルパスからモジュールをインストールする |
 | `remove <name> [-y]` | インストール済みのモジュールを削除する |
+| `approve <name> [--user] [--sha256 H]` | レビューしたモジュールを承認する |
+| `approve --all [--user]` | その範囲で承認待ちのすべてのモジュールを、1 つずつ確認しながら承認する |
+
+承認では、ターミナル上で `yes` の入力を求められます。ターミナルがない場合は、レビューしたファイルのハッシュ（`show` が表示します）を `--sha256` として渡します — ファイルがその後変更されていると失敗します。`veles doctor` は、ディスク上にあるロードされないモジュールをすべて報告します。
 
 ### `veles registry search [query] [--kind K]`
 接続されたレジストリを検索します(モジュール、スキル、レイアウトパック、MCP レシピ)。
@@ -223,11 +232,11 @@ veles [--no-wizard] <command> [subcommand] [options]
 | `refresh [--force]` | `AGENTS.md` から自然言語のルーティングヒントを再解析する |
 
 ### `veles models <provider>`
-プロバイダーのモデルを一覧表示します。クラウドプロバイダー（openrouter/openai/gemini）は 24 時間キャッシュされ、ローカルプロバイダーは常にライブです。
+プロバイダーのモデルを一覧表示します。クラウドプロバイダー（openrouter/openai/gemini）は 24 時間キャッシュされ、ローカルプロバイダー、`codex`、`antigravity-cli` は常にライブです。未知のプロバイダーは、存在するものを列挙した 1 行のエラーになります（終了コード `2`）。
 
 | フラグ | デフォルト | 目的 |
 |---|---|---|
-| `provider`（位置引数） | — | [プロバイダー名](#provider-names)のいずれか |
+| `provider`（位置引数） | — | [カタログ](#provider-names)にあるプロバイダー id |
 | `--refresh` | オフ | ディスクキャッシュをバイパスする（クラウドのみ） |
 | `--json` | オフ | `{provider, source, models}` を JSON として出力する |
 
@@ -312,12 +321,12 @@ HTTP+WS デーモンの実行/制御を行います。引数なしの `veles dae
 `start` は共通エージェントループフラグも受け付けます。デーモンでは `--model` / `--provider` がプロジェクト設定をデフォルトとし、デーモンの稼働中は固定されます。
 
 ### `veles channel {list,run,list-sessions,reset-session,add,remove}`
-デーモンと通信する外部チャットゲートウェイ（Telegram など）です。[Telegram に接続する](../how-to/connect-telegram.md)を参照してください。
+デーモンと通信する外部チャットゲートウェイ（Telegram など）です。プラットフォームは拡張レジストリのモジュールで、`run` と `add` は不足していればインストールします。[Telegram に接続する](../how-to/connect-telegram.md)を参照してください。
 
 | サブコマンド | 目的 |
 |---|---|
-| `list` | 登録済みのチャンネルプラットフォームとセッション数を一覧表示する |
-| `run --channel telegram [--bot-token T] [--daemon-url U] [--daemon-token T]` | ゲートウェイをフォアグラウンドで起動する |
+| `list` | インストール済みのチャンネルプラットフォームとセッション数、およびモジュールが不足している宣言済みチャンネルを一覧表示する |
+| `run [--channel P] [--secret S] [--daemon-url U] [--daemon-token T]` | ゲートウェイをフォアグラウンドで起動する。`--secret` はプラットフォームの主要シークレット（なければキーチェーンまたはその環境変数） |
 | `list-sessions [--channel C]` | `chat_id → session_id` のマッピングを表示する |
 | `reset-session <chat_id> [--channel C]` | マッピングを破棄する（次のメッセージから新規開始） |
 | `add [--channel C] [--session S]` | チャンネルをデーモンに接続する（ウィザード、認証情報 → キーチェーン） |
@@ -353,7 +362,9 @@ HTTP+WS デーモンの実行/制御を行います。引数なしの `veles dae
 
 ## プロバイダー名
 
-`openrouter`（デフォルト） · `anthropic` · `openai` · `gemini` · `claude-cli` ·
-`gemini-cli` · `ollama` · `llamacpp` · `openai-compat`
+`--provider` と `veles models` は、プロバイダーカタログにある任意の id を受け付けます — ビルトイン、`~/.veles/providers.toml` のもの、インストール済みモジュールのプロバイダーです:
 
-ローカルプロバイダー（`ollama`、`llamacpp`、`openai-compat`）は API キー不要です。[プロバイダーリファレンス](providers.md)と[プロバイダーの設定](../how-to/configure-providers.md)を参照してください。
+`openrouter`（デフォルト） · `anthropic` · `openai` · `gemini` · `claude-cli` · `codex` ·
+`ollama` · `llamacpp` · `openai-compat`（ビルトイン）
+
+レジストリのモジュールだけが提供するプロバイダー（`antigravity-cli`）は、指定すると自動的にインストールされます。ローカルプロバイダー（`ollama`、`llamacpp`、`openai-compat`）は API キー不要です。[プロバイダーリファレンス](providers.md)と[プロバイダーの設定](../how-to/configure-providers.md)を参照してください。

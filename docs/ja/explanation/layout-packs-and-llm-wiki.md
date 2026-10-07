@@ -2,7 +2,7 @@
 
 > 🌐 **言語:** [English](../../en/explanation/layout-packs-and-llm-wiki.md) · [简体中文](../../zh-CN/explanation/layout-packs-and-llm-wiki.md) · [繁體中文](../../zh-TW/explanation/layout-packs-and-llm-wiki.md) · **日本語** · [한국어](../../ko/explanation/layout-packs-and-llm-wiki.md) · [Español](../../es/explanation/layout-packs-and-llm-wiki.md) · [Français](../../fr/explanation/layout-packs-and-llm-wiki.md) · [Italiano](../../it/explanation/layout-packs-and-llm-wiki.md) · [Português (BR)](../../pt-BR/explanation/layout-packs-and-llm-wiki.md) · [Português (PT)](../../pt-PT/explanation/layout-packs-and-llm-wiki.md) · [Русский](../../ru/explanation/layout-packs-and-llm-wiki.md) · [العربية](../../ar/explanation/layout-packs-and-llm-wiki.md) · [हिन्दी](../../hi/explanation/layout-packs-and-llm-wiki.md) · [বাংলা](../../bn/explanation/layout-packs-and-llm-wiki.md) · [Tiếng Việt](../../vi/explanation/layout-packs-and-llm-wiki.md)
 
-**レイアウトパック** は、プロジェクトの *ユーザーコンテンツ* がどのように構成されるか — どのディレクトリが存在し、エージェントがどこに書き込んでよく、どのような操作を提供するか — を定義します。デフォルトは **LLM-Wiki** です。これはコンテンツのオプションであって、Veles のコア原則では **ありません**。
+**レイアウトパック** は、プロジェクトの *ユーザーコンテンツ* がどのように構成されるか — どのディレクトリが存在し、エージェントがどこに書き込んでよく、どのような操作を提供するか — を定義します。デフォルトは **`bare`** で、`.veles/` と `AGENTS.md` 以外はディレクトリに何も追加しません。**LLM-Wiki** は拡張レジストリにあるオプションの 1 つであって、Veles のコア原則では **ありません**。
 
 ## レイアウトパックとは何か
 
@@ -12,20 +12,26 @@
 - **読み取り専用ゾーン** — エージェントが読み取るが決して変更しない素材。
 - **操作（Operations）** — 名前付きのワークフロー。パック内にスキルとして同梱される。
 - **スキャフォールド**（`[layout.scaffold]`）— `veles init` が作成するもの。ディレクトリと、オプションの `AGENTS.md` テンプレート（`{name}` が置換される）。
-- **エンジン**（`[layout.engines]`）— パックがどのコアコンテンツ機構を有効化するか。現在はエンジンが 1 つあります: `wiki`。これがないと、プロジェクトには wiki ツールも、wiki リコールも、INDEX 注入も存在しません。
+- **エンジン**（`[layout.engines]`）— パックがどのコンテンツ機構を要求するか。エンジンはモジュールが提供します（レジストリの `wiki` モジュールが `wiki` を提供）。これがないと、プロジェクトには wiki ツールも、wiki リコールも、INDEX 注入も存在しません。
 - **コンテキストファイル**（`context_file`）— エージェントの安定したシステムプロンプトに注入されるファイル（LLM-Wiki は `INDEX.md` を使用）。
 
-## 組み込みパック
+## 利用可能なパック
 
-| パック | `veles init --layout <name>` が生成するもの |
-|---|---|
-| `llm-wiki` *(デフォルト)* | [Karpathy スタイルの LLM-Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): `sources/`（読み取り専用）、`wiki/`（エージェント書き込み可能）、プロンプトに注入される `INDEX.md`、`ingest`/`query`/`lint` スキル、wiki エンジン有効。 |
-| `notes` | エージェントが書き込む単一のフラットな `notes/` ディレクトリ。wiki 機構はなし。 |
-| `bare` | コンテンツのスキャフォールドは一切なし — コードリポジトリや自由形式の作業向け。プロジェクトルート内では書き込みが許容される（それでもトラストラダーの対象）。 |
+| パック | 提供元 | `veles init --layout <name>` が生成するもの |
+|---|---|---|
+| `bare` *(デフォルト)* | 組み込み | コンテンツのスキャフォールドは一切なし — コードリポジトリや自由形式の作業向け。プロジェクトルート内では書き込みが許容される（それでもトラストラダーの対象）。 |
+| `llm-wiki` | レジストリ（`public:official/llm-wiki`、`wiki` モジュールを同梱） | [Karpathy スタイルの LLM-Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): `sources/`（慣例として読み取り専用で、強制はされない）、`wiki/`（エージェント書き込み可能）、プロンプトに注入される `INDEX.md`、`ingest`/`query`/`lint`/`organize`/`structure_design` スキル、wiki エンジン有効、`veles add` と `/wiki`。レイアウトが宣言する振る舞いプロンプト（`templates/behaviour.md`）が、sources/wiki の規律と移行/ログパッチのルールを担います。 |
+| `notes` | レジストリ（`public:official/notes`） | エージェントが書き込む単一のフラットな `notes/` ディレクトリ。wiki 機構はなし。 |
+
+ターミナルでは、`veles init` がどのパックを使うか尋ねます（インストール済みのものとレジストリにあるもの）。未インストールのパックを選ぶと、インストールを提案します。`veles registry install llm-wiki` で事前にインストールできます。
+
+## 1.2.3 より前のプロジェクト
+
+レイアウトが未インストールのプロジェクト（アップグレード後の `llm-wiki` プロジェクト、または `layout` キーのないプロジェクト — それらはすべて wiki プロジェクトでした）もそのまま開けます。ターミナルでは、`veles` と `veles run` が 1 回の確認でパック（必要なエンジンを含む）のインストールを提案します。それ以外 — デーモン、チャネル、その他の動詞 — では、Veles はインストールコマンドを一度だけ表示し、wiki なしで動作します。`wiki/` 内のものには一切触れません。
 
 ## カスタムレイアウト
 
-パックを `~/.veles/layouts/<name>/layout.toml`（ユーザーグローバル）または `<project>/.veles/layouts/<name>/`（プロジェクトローカル。同名のユーザーパックや組み込みパックを上書きする）に配置し、`veles init --layout <name>` を渡します。コピー元として最小の例は `notes` 組み込みパックです。規約は `AGENTS.md` に記述することもできます — レイアウトがゾーンを強制し、AGENTS.md が振る舞いをガイドします。
+パックを `~/.veles/layouts/<name>/layout.toml`（ユーザーグローバル）または `<project>/.veles/layouts/<name>/`（プロジェクトローカル。同名のユーザーパックや組み込みパックを上書きする）に配置し、`veles init --layout <name>` を渡します。コピー元として最小の例はレジストリの `notes` パックです。インストール済みのどのモジュールも提供しないエンジンを要求するパックにも、同じインストール提案が出ます。規約は `AGENTS.md` に記述することもできます — レイアウトがゾーンを強制し、AGENTS.md が振る舞いをガイドします。
 
 ## それが *そうではない* もの
 

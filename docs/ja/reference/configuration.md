@@ -11,7 +11,7 @@ Veles は 2 つの TOML ファイルと一連の状態ディレクトリで設�
 | `~/.veles/` | ユーザーグローバル | `config.toml`、trust の付与、プロジェクト横断のスキル/ツール、モデルキャッシュ、ロケール、レジストリ |
 | `<project>/.veles/` | プロジェクトローカル | `project.toml`、`config.toml`、`memory.db`、プロジェクトのスキル/ツール、プラン、実行時アーティファクト |
 | `<project>/AGENTS.md` | プロジェクト | エージェントに注入されるコンテキストファイル（`CLAUDE.md` / `GEMINI.md` にシンボリックリンクされる） |
-| `<project>/wiki/`, `sources/` | プロジェクト | ユーザーコンテンツ（デフォルトの LLM-Wiki レイアウト） |
+| `<project>/wiki/`, `sources/`, … | プロジェクト | レイアウトパックが配置するユーザーコンテンツ（例: LLM-Wiki） |
 
 `VELES_USER_HOME` は `~` をリダイレクトします（ユーザー状態は `<override>/.veles/` に置かれます）。ツリー全体については[プロジェクトレイアウト](project-layout.md)を参照してください。
 
@@ -40,6 +40,9 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 transport = "stdio"
 command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
+
+[sandbox]
+enabled = true                   # run_shell を OS サンドボックスで実行。false で無効化
 ```
 
 | キー | 型 | 目的 |
@@ -49,6 +52,7 @@ args = ["-m", "my_mcp_server"]
 | `[user] default_model` | string | モデルが指定されないときに使われるモデル |
 | `[user] tui_theme` | string | デフォルトの TUI カラーテーマ |
 | `[permissions] <tool>` | policy | ツールごとのパーミッションポリシー（[trust とサンドボックス](../explanation/trust-and-sandbox.md)を参照） |
+| `[sandbox] enabled` | bool | OS サンドボックス内の `run_shell`（デフォルトは `true`）。ここでのみ読み取られ、プロジェクトの `[sandbox]` は無視される（[セキュリティ](../how-to/security-and-permissions.md)を参照） |
 
 ---
 
@@ -107,7 +111,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[daemon]` | 無名/「デフォルト」デーモンのバインド + 自動起動 |
 | `[daemon.<name>]` | 名前付きデーモンセッション（独自の model/provider/host/port/mode） |
 | `[goal]` | 新しい目標の予算 — `max_steps`（30）、`max_cost_usd`（5.0）、`max_wall_time_s`（3600）。`veles goal start` のフラグが優先 |
-| `[channels.<type>]` | 無名デーモンが提供するチャンネル（例: `telegram`） |
+| `[channels.<type>]` | 無名デーモンが提供するチャンネル（例: `telegram`）。キーはプラットフォーム固有のもの（`enabled` とそのモジュールが宣言するもの）で、宣言すると次回の `veles daemon start` でモジュールがインストールされる |
 | `[daemon.<name>.channels.<type>]` | 名前付きデーモンセッションにバインドされたチャンネル |
 | `[mcp.servers.<name>]` | 外部 MCP サーバー（ツールソース） |
 

@@ -10,6 +10,8 @@ a stub WizardContext + stub `push_screen_wait`.
 
 from __future__ import annotations
 
+import contextlib
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -27,12 +29,18 @@ class _StubApp:
 
     responses: list[Any] = field(default_factory=list)
     pushed: list[Any] = field(default_factory=list)
+    suspended: int = 0
 
     async def push_screen_wait(self, screen: Any) -> Any:
         self.pushed.append(screen)
         if not self.responses:
             raise AssertionError("test queued no response for push_screen_wait")
         return self.responses.pop(0)
+
+    @contextlib.contextmanager
+    def suspend(self) -> Iterator[None]:
+        self.suspended += 1
+        yield
 
 
 @dataclass
@@ -57,21 +65,18 @@ def _write_user_pack(isolated_home: Path, name: str, description: str = "") -> P
     return pack_dir
 
 
-# ---- builtin packs: picker offered, default llm-wiki ----
+# ---- only the builtin pack: no picker, default bare ----
 
 
-async def test_builtin_packs_offer_picker_with_llm_wiki_default(
-    isolated_home: Path, tmp_path: Path
-) -> None:
-    """M164 ships three builtin packs (llm-wiki / bare / notes), so the
-    picker always shows; accepting the default records llm-wiki."""
-    app = _StubApp(responses=["llm-wiki"])
+async def test_single_builtin_pack_auto_picks_bare(isolated_home: Path, tmp_path: Path) -> None:
+    """Veles ships only `bare`; with no other installed pack the picker is
+    skipped and the default recorded."""
+    app = _StubApp(responses=[])
     ctx = _StubCtx(app=app)
-    step = LayoutPickerStep()
-    outcome = await step.run(ctx)
+    outcome = await LayoutPickerStep().run(ctx)
     assert outcome == WizardOutcome.NEXT
-    assert ctx.answers["layout"] == "llm-wiki"
-    assert len(app.pushed) == 1
+    assert ctx.answers["layout"] == "bare"
+    assert app.pushed == []
 
 
 # ---- multi-pack: picker offered ----
@@ -126,4 +131,38 @@ async def test_picker_runs_without_project_in_ctx(tmp_path: Path) -> None:
     ctx = _StubCtx(app=app)  # no `project` key
     outcome = await LayoutPickerStep().run(ctx)
     assert outcome == WizardOutcome.NEXT
+    assert ctx.answers["layout"] == "bare"
+
+
+# ---- registry layouts: listed, installed with the terminal handed back ----
+
+
+async def test_registry_layout_is_listed_and_installed_with_the_terminal(
+    isolated_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from veles.core.registry import ensure
+
+    monkeypatch.setattr(ensure, "available_layouts", lambda: ["bare", "llm-wiki"])
+    asked: list[str] = []
+    monkeypatch.setattr(
+        ensure, "ensure_layout", lambda name, *, interactive: asked.append(name) or True
+    )
+    app = _StubApp(responses=["llm-wiki"])
+    ctx = _StubCtx(app=app)
+    assert await LayoutPickerStep().run(ctx) == WizardOutcome.NEXT
+    labels = [item.label for item in app.pushed[0]._items]
+    assert any("llm-wiki" in label and "registry" in label for label in labels), labels
+    assert asked == ["llm-wiki"] and app.suspended == 1
+    assert ctx.answers["layout"] == "llm-wiki"
+
+
+async def test_registry_layout_that_cannot_be_had_falls_back_to_bare(
+    isolated_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from veles.core.registry import ensure
+
+    monkeypatch.setattr(ensure, "available_layouts", lambda: ["bare", "llm-wiki"])
+    monkeypatch.setattr(ensure, "ensure_layout", lambda name, *, interactive: False)
+    ctx = _StubCtx(app=_StubApp(responses=["llm-wiki"]))
+    await LayoutPickerStep().run(ctx)
     assert ctx.answers["layout"] == "bare"

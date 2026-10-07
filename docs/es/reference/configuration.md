@@ -13,7 +13,7 @@ residen en el llavero del SO o en variables de entorno (consulta [variables de e
 | `~/.veles/` | Global del usuario | `config.toml`, concesiones de confianza, skills/herramientas entre proyectos, caché de modelos, locales, registro |
 | `<project>/.veles/` | Local del proyecto | `project.toml`, `config.toml`, `memory.db`, skills/herramientas del proyecto, planes, artefactos de tiempo de ejecución |
 | `<project>/AGENTS.md` | Proyecto | El archivo de contexto inyectado en el agente (con enlace simbólico a `CLAUDE.md` / `GEMINI.md`) |
-| `<project>/wiki/`, `sources/` | Proyecto | Contenido del usuario (el layout LLM-Wiki por defecto) |
+| `<project>/wiki/`, `sources/`, … | Proyecto | Contenido del usuario, tal como lo dispone el pack de layout (p. ej. la LLM-Wiki) |
 
 `VELES_USER_HOME` redirige `~` (de modo que el estado del usuario acaba en `<override>/.veles/`).
 Consulta [layout del proyecto](project-layout.md) para ver el árbol completo.
@@ -43,6 +43,9 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 transport = "stdio"
 command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
+
+[sandbox]
+enabled = true                   # run_shell en un sandbox del SO; false lo desactiva
 ```
 
 | Clave | Tipo | Propósito |
@@ -52,6 +55,7 @@ args = ["-m", "my_mcp_server"]
 | `[user] default_model` | string | Modelo usado cuando no se indica ninguno |
 | `[user] tui_theme` | string | Tema de color por defecto de la TUI |
 | `[permissions] <tool>` | policy | Política de permisos por herramienta (consulta [confianza y sandbox](../explanation/trust-and-sandbox.md)) |
+| `[sandbox] enabled` | bool | `run_shell` en un sandbox del SO (por defecto `true`); se lee solo aquí — el `[sandbox]` de un proyecto se ignora (consulta [seguridad](../how-to/security-and-permissions.md)) |
 
 ---
 
@@ -110,7 +114,7 @@ env = { GITHUB_TOKEN = "${GITHUB_TOKEN}" }   # ${VAR} interpolates from the envi
 | `[daemon]` | Bind + autoarranque del daemon sin nombre/"por defecto" |
 | `[daemon.<name>]` | Una sesión de daemon con nombre (modelo/proveedor/host/puerto/modo propios) |
 | `[goal]` | El presupuesto de un objetivo nuevo — `max_steps` (30), `max_cost_usd` (5.0), `max_wall_time_s` (3600); los flags de `veles goal start` lo sustituyen |
-| `[channels.<type>]` | Un canal servido por el daemon sin nombre (p. ej. `telegram`) |
+| `[channels.<type>]` | Un canal servido por el daemon sin nombre (p. ej. `telegram`). Sus claves son las propias de la plataforma (`enabled` más lo que declare su módulo); declararlo instala el módulo en el siguiente `veles daemon start` |
 | `[daemon.<name>.channels.<type>]` | Un canal vinculado a una sesión de daemon con nombre |
 | `[mcp.servers.<name>]` | Un servidor MCP externo (fuente de herramientas) |
 

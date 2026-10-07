@@ -7,6 +7,373 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.9] — 2026-10-07
+
+`run_shell` runs in an OS sandbox. The commands the agent runs can no longer rewrite git
+hooks or config, `.envrc`-style auto-run files, agent-CLI configs, Veles' own state or your
+approval stores themselves. (A service they ask to act for them — a container started
+with `docker run -v`, `systemd-run`, `launchctl` — still writes as you.)
+
+### Upgrading from 1.2.8
+
+- **Where a sandbox works (`sandbox-exec` on macOS, `bwrap` on Linux), `run_shell`
+  can't write:** the hooks and config of every repo in the project (a worktree's or
+  submodule's main repo included), every config file git reads (includes, `~/.gitconfig`,
+  the system one) and the `core.hooksPath` directory; `.envrc`, `.claude/`, `.mcp.json`
+  and the other auto-run names at any depth; the project's `.veles/` outside
+  `skills/ tools/ tmp/ plans/ memory/ artifacts/`; `~/.veles/`; shell start-up files,
+  `~/.ssh/`, LaunchAgents/autostart; `~/.claude/`, `~/.codex/`, `~/.gemini/`.
+  `git push -u` and `git remote add` from the agent's shell hit `.git/config`; a new
+  repo (`git init`, `git clone`) works. Switch the sandbox off with
+  `[sandbox] enabled = false` in `~/.veles/config.toml` (a project's config can't).
+- **Linux needs unprivileged user namespaces for `bwrap`.** Ubuntu 24.04+ restricts
+  them; an AppArmor profile for `/usr/bin/bwrap` allows them (see "How to manage
+  security"). In unprivileged Docker the sandbox stays off unless the container runs
+  with `--security-opt seccomp=unconfined --security-opt apparmor=unconfined`; Veles
+  warns once and `veles doctor` says why.
+- **An MCP server run with `python -m <project module>`** now has that module's files in
+  its approval hash: approve it again with `veles mcp approve <name>`.
+
+### Added
+
+- `core/sandbox.py`: the protected set comes from the file tools' own rules
+  (`writable.shell_guard`) plus what git reports (`git config --show-origin`,
+  `--git-path`), so a path the file tools guard is guarded for `run_shell` too. Repos,
+  protected paths and their existing parent directories can't be renamed away — macOS
+  also refuses swapping a symlink on the way to the project. A refused write tells the
+  agent to ask you; a protected path the command created (a new repo at the root; on
+  Linux, which can only protect existing paths, also a new `.envrc` or home start-up
+  file) is reported to you and in the memory log; a sandbox that fails to start is
+  reported once.
+- `veles doctor` `sandbox` check: active (running the project's real profile),
+  unavailable with the fix, or off; a project-level `[sandbox]` is flagged as ignored.
+
+### Fixed
+
+- An MCP approval now covers the project module a server runs with `python -m` or
+  `--module`, at the root or under `src/`, namespace packages included.
+
+## [1.2.8] — 2026-10-06
+
+Veles in a container, without a terminal: a deploy script approves modules and tools
+by the hash it reviewed, `veles doctor` names every module that doesn't load, and admin
+commands no longer open the first-run wizard.
+
+### Upgrading from 1.2.7
+
+- **`veles tool approve --yes` needs a terminal.** Without one it approved every tool
+  file on disk — including one the agent wrote and approved from its own `run_shell`.
+  A script now approves each file by the hash it reviewed:
+  `veles tool approve <name> --sha256 <hash>`; bare `veles tool approve` lists the
+  hashes. `--yes` at a terminal works as before.
+- **`veles doctor` reports a module that doesn't load as an error** — for example one
+  that was never approved. A start-up check that requires zero errors now fails until
+  the module is approved.
+- **Stdio MCP servers get `VELES_AGENT_SHELL=1`** in their environment, and `run_shell`
+  runs commands with stdin closed. A server or a command run that way can't approve
+  modules, tools or MCP servers, connect a registry, or confirm a critical operation.
+
+### Added
+
+- `veles module approve <name> --sha256 <hash>` and `veles tool approve <name> --sha256
+  <hash>` approve without a terminal and refuse if the files changed since that hash
+  was reviewed; rerunning one that is already approved succeeds. `veles module show`
+  prints the module's files hash; `veles module approve --all` asks for every module
+  in that scope waiting for approval.
+- Each tool call is a `tool_call` line in `.veles/events.jsonl` (and its outcome a
+  `tool_result` line); their keys are now part of the `veles run` contract test and
+  documented in "How to embed `veles run`". Tool calls a CLI delegate (`claude-cli`,
+  `codex`, `antigravity-cli`) makes through its MCP server are not written there.
+
+### Fixed
+
+- The first-run wizard fronts only commands that start an agent. On a fresh `$HOME`
+  with a terminal, `veles module approve` (which requires one) opened a six-step
+  onboarding instead of approving.
+- `veles doctor` said "0 error" while a never-approved module was skipped. Its hint
+  and the load warning suggest `veles module approve` only where approving helps.
+- Commands the agent runs with `run_shell` carry `VELES_AGENT_SHELL`, and every
+  approval store (modules, tools, MCP servers, connected registries) and the critical
+  confirmation refuse them — the agent's "fix" for a skipped module can't approve its
+  own code. A shell can still strip the variable or write the stores directly; an OS
+  sandbox around `run_shell` is what closes that.
+- `run_shell` no longer inherits your terminal as stdin, so a confirmation prompt it
+  starts can't read your keys.
+- `veles tool promote` approved the moved file even if it had never been approved; it
+  now only carries an existing approval. Interactive `tool approve` approves exactly
+  the bytes it showed.
+- A bundled MCP tool template that couldn't be approved when it was copied is approved
+  on the next start if it is still unchanged.
+
+## [1.2.7] — 2026-10-06
+
+`codex` — the Codex CLI on a ChatGPT subscription — is the ninth builtin provider, a CLI
+delegate like `claude-cli`.
+
+### Added
+
+- Provider `codex`: `codex exec --json` runs outside your project (under
+  `~/.veles/tmp/`), with your codex config ignored, no session files, a read-only sandbox
+  and its own tools — shell, file edits, images, subagents, browser, web search — switched
+  off. Veles checks those feature flags once per process (ignoring your codex config, as
+  the run does) and refuses a codex that renamed or retired one it relies on. With Veles'
+  tools, the MCP server goes in codex's arguments (no config file), only that server's
+  tools are approved, a tool gets half the run's time, and the environment it needs
+  (SearXNG, proxy and CA settings included) is forwarded by name — never
+  `VELES_TRUST_AUTO_ALLOW`. An error after a partial answer is shown after it.
+  `veles models codex` lists your account's models. In `veles run` codex follows Veles'
+  tool protocol less reliably than claude: it may answer without calling a tool.
+- `veles.sdk.providers.popen_jsonl`; `delegate_workspace` works without a project.
+
+### Fixed
+
+- A CLI delegate that reports its failure in its event stream and exits non-zero (agy's
+  missing login, codex's `turn.failed`) now shows that error and its hint instead of
+  "exited 1: <stderr>". CLI delegates run with no stdin.
+- A `base_url` on `[providers.anthropic]` or `[providers.gemini]` in
+  `~/.veles/providers.toml` now applies; a `kind` on a builtin override is a warning.
+- Vision on a provider that speaks the Anthropic or Gemini format uses that provider's key
+  and base URL instead of the builtin's, and never lets the SDK send its own env key there.
+- `veles run` and `veles daemon start` name an unknown provider before a missing model;
+  the auto-install line says where the name came from — `--provider`, `[engine]`,
+  `[daemon.<name>]` or your default provider.
+
+## [1.2.6] — 2026-10-06
+
+Providers are a catalogue. Every LLM provider — builtin, your own in
+`~/.veles/providers.toml`, or one a registry module contributes — is an entry that
+`--provider`, `veles models`, routing, the wizards and `veles doctor` read. The Antigravity
+CLI (`agy`) arrives as the `antigravity-cli` registry module; `gemini-cli` is gone.
+
+### Upgrading from 1.2.5
+
+- **`gemini-cli` is removed** — Google no longer serves the Gemini CLI to personal
+  accounts. Naming it is a one-line error: use `gemini` with `GEMINI_API_KEY`, or
+  `antigravity-cli` for a Google subscription.
+- **Skills inside a `claude-cli` MCP server run on your routing.** They used OpenRouter from
+  the environment with a fixed claude model; now they run on `[routing.tasks] skills` (or
+  the project's provider) with the keychain key. A route to a CLI delegate turns them off
+  there, said once in the log.
+- **`--provider` takes any catalogue id** — no fixed list in `--help` any more; an unknown
+  id is a one-line error listing what exists.
+- **`.veles/mcp.json` is no longer written.** A CLI delegate's MCP config now lives in
+  `.veles/tmp/delegate-<pid>/`; delete a leftover `.veles/mcp.json` by hand.
+
+### Added
+
+- `~/.veles/providers.toml`: add a hosted OpenAI-compatible API (`kind = "openai-api"`) or a
+  server you run (`kind = "local"`) with a `base_url` and `key_env`; an entry with a
+  builtin id overrides that provider's settings. `veles secret set <VAR>` stores the key
+  where that provider reads it, and `veles secret list` names every catalogue key.
+- Contribution point `provider` and `veles.sdk.providers`: a module contributes a
+  `ProviderSpec`; a CLI delegate builds on `CLIProvider`, `delegate_dir` and
+  `veles_mcp_server`.
+- A provider named in `[engine] provider`, a route or `--provider` that only a registry
+  module offers installs from your connected registries on that run, like a declared
+  channel. The wizards list registry providers after the installed ones and install the
+  pick.
+- `antigravity-cli` (registry module `official/antigravity-cli`): agy runs headless in a
+  scratch workspace outside the project (`~/.veles/tmp/agy/`), so a project's own
+  `.agents/` hooks and MCP servers never reach it, with Veles' tools over MCP behind a gate
+  that denies agy's own shell and file tools. `veles.sdk.providers.delegate_workspace` gives
+  a module delegate such a directory.
+- `veles doctor` checks `~/.veles/providers.toml` and every provider your routes name.
+
+### Changed
+
+- Vision and embeddings run on any OpenAI-wire provider in the catalogue, local ones
+  included; NL routing hints accept any catalogue provider except a CLI delegate.
+- `veles export` skips `.veles/tmp/`.
+
+### Fixed
+
+- Two processes delegating to `claude-cli` in one project no longer rewrite each other's
+  MCP config and budget file mid-run: each process has its own directory, written
+  atomically, removed at exit, swept when a crashed process left one.
+- An unknown provider in `veles run`, `veles models`, `veles dream` or `veles daemon start`
+  is a one-line error instead of an argparse dump or a traceback.
+- A missing-key error names the command that stores the key where the provider reads it
+  (`veles secret set OPENROUTER_API_KEY`); it suggested `veles secret set <provider>`, a
+  slot nothing reads, and `veles secret add`, which doesn't exist.
+
+## [1.2.5] — 2026-10-05
+
+Channels are modules. Telegram leaves the core and ships from the extension registry
+(`official/telegram`); any module can contribute a messaging platform. A daemon starts
+only with a working channel.
+
+### Upgrading from 1.2.4
+
+- **Telegram installs itself.** A `[channels.telegram]` block in your config installs the
+  module from the official registry on the next `veles daemon start` — no prompt, since
+  you declared the channel; a registry cache that predates the module is refreshed first.
+  Your bot token stays where it is (the keychain slot `telegram`).
+- **A daemon needs a working channel.** With no channel ready (module installed, secrets
+  in place), `veles daemon start` offers to connect one at a terminal and otherwise
+  refuses, naming the command to run. That includes a daemon used only for its HTTP API.
+- `veles channel run`: `--bot-token` is now `--secret` (the platform's primary secret);
+  `--channel` has no default — with one platform installed it is picked, otherwise name it.
+
+### Added
+
+- Contribution point `platform`: a module contributes `PlatformSpec(build, caps,
+  cred_fields, config_keys)` and the daemon builds the channel's gateway through
+  `build(ChannelContext)`. `veles.sdk.channels` is the contract, `veles.sdk.media` the
+  speech-to-text and vision adapters, `veles.sdk.channel_checks` the checks a channel
+  module's own tests run on its spec.
+- A module ships its strings in `locales/<lang>.toml`; they are merged under the module's
+  name (`t("<module>.<key>")`), and a key Veles defines wins.
+- Each secret field of a platform gets its own keychain slot: the first `<platform>`, any
+  other `<platform>.<key>`.
+- The channel wizards (`veles channel add`, the new-project and daemon-start wizards, the
+  daemon picker) list the platforms in your registries next to the installed ones and
+  install the pick.
+- `veles doctor` names a declared channel whose module is missing; `veles channel list`
+  shows it too.
+- `GET /v1/sessions/{id}/usage` — a session's token usage since the daemon started and the
+  model's context window.
+- Telegram: `/settings` (model, session, usage and the mode buttons in one message),
+  `/tokens` and `/context` show real numbers.
+
+### Changed
+
+- Config validation checks a channel block against its platform's own keys; a block of a
+  platform that isn't installed is not checked. `veles doctor` loads the project's modules
+  for its checks, so an installed channel's keys are checked there too.
+- The daemon log also captures the loggers of loaded modules (a channel gateway's).
+- `veles daemon restart` (and restart in the daemon picker) checks that a channel is ready
+  before stopping the running daemon; with none, it leaves it running and says why.
+
+### Fixed
+
+- `veles registry validate --run-code` runs an extension's async tests instead of failing
+  them for want of an async plugin.
+- An unknown channel platform is reported without stray quotes.
+- `veles daemon start` with no model configured prints one line naming the fix instead of
+  a traceback.
+- `/tokens` counts goal, planning and manager runs too, not only plain turns.
+
+## [1.2.4] — 2026-10-03
+
+A module can be a complete, reusable bundle: it ships its own skills and pulls the
+modules, layouts and skills it builds on. The new-project wizard offers registry layouts.
+
+### Added
+
+- A module ships skills in `skills/<name>/SKILL.md`; they mount for every project that loads
+  the module, below the project's and the user's own skills and above the layout's. They
+  belong to the module's approved tree — editing one keeps the module unloaded until it is
+  approved again.
+- Skills can be dependencies: `requires_extensions` lists modules, layouts and skills, and
+  installing a combined module installs the whole chain under one confirmation, in the
+  module's scope.
+- The new-project wizard (the one an agent command opens in a directory with no project)
+  lists the layouts in your cached registries next to the installed ones and installs the
+  pick — the full-screen wizard hands the terminal back for the confirmation. A layout that
+  can't be had leaves you with a `bare` project and the reason.
+
+### Fixed
+
+- `veles registry validate` checks that a dependency is a module, layout or skill (not an
+  `mcp` recipe) and resolves refs into connected registries; a ref into a registry that
+  isn't connected where it runs becomes a note for the reviewer.
+- A delegated `claude`/`gemini` CLI gets every tool of the project's loaded modules through
+  Veles' MCP server, not a fixed list of five wiki tools.
+- Installing a missing extension when a session starts loads only the new modules; already
+  loaded modules no longer run their entrypoint a second time.
+- An install or upgrade that loses a race with another install of the same extension fails
+  cleanly instead of deleting the other one's copy.
+- REPL: Alt/Option-key editing works in terminals that speak the kitty keyboard protocol
+  (Ghostty, kitty, WezTerm, iTerm2 ≥ 3.5…). Option+Backspace deletes the previous word and
+  Option+B/F/D move or delete by word, instead of printing `[127;3u` into the input.
+- `veles registry update` says what happened to each registry (fetched, updated `old → new`,
+  or already up to date) and what it holds — e.g. `7 extensions (4 modules, 2 layouts,
+  1 MCP recipe)` — instead of a bare commit hash.
+
+## [1.2.3] — 2026-10-02
+
+`veles init` creates a bare project by default; the wiki engine and the `llm-wiki` and
+`notes` layouts ship from the extension registry, and registry modules build on a public
+`veles.sdk`. No existing project silently loses its wiki.
+
+### Added
+
+- `veles.sdk` — the public surface for modules (`veles.sdk`, `.contributions`, `.tools`,
+  `.memory`, `.layout`, `.jobs`). Its names are pinned by a test; changes are listed here.
+  `veles registry validate` refuses a registry module that imports Veles from anywhere else
+  (its tests are exempt).
+- Contribution points `cli_command` (a `veles <verb>`; the command gets a host that runs agent
+  turns the way `veles run` does), `slash_command` (a REPL `/command`) and `page_store` (keeps
+  pages: `/save` and the self-documentation page). A verb only an uninstalled registry
+  extension provides points at the install.
+- `requires_extensions` in `extension.toml`: installing an extension installs what it needs
+  under one confirmation and rolls the whole set back on failure; `uninstall` refuses to pull
+  a dependency out from under an installed extension (`--force`); `verify`/`doctor` report a
+  missing one; `validate` checks refs and cycles.
+- A project whose layout pack, or a content engine its pack asks for, isn't installed is
+  offered the install when `veles`/`veles run` start at a terminal; elsewhere Veles prints the
+  install command once and works without it. Former built-in layouts and the wiki engine
+  come from `public:official/*`. `layout sync`, `organize` and `doctor` name the install.
+- `veles init` asks for a layout at a terminal (installed packs plus layouts in your
+  registries); a layout that isn't installed is offered for install, and refusing creates
+  nothing.
+- A module may span several files and import them relatively — its entrypoint loads as a
+  package rooted at the module directory.
+- `veles registry uninstall`/`upgrade --user|--project` when a name is installed in both.
+- Reviewer report: native binaries (`.so`/`.pyd`/`.dylib`/`.dll`) in a payload; `search` and
+  `install` warn when a registry clone is a week old or more.
+- `veles module list` marks a user module shadowed by the project's and an ignored duplicate.
+
+### Changed
+
+- **`bare` is the default layout.** `init_project()` without `layout=` gives `bare` too.
+- The wiki engine (`veles add`, `/wiki`, the `wiki_*` tools, wiki recall, dream lint/reindex,
+  curated session pages) moved to the `wiki` module in the public registry; the `llm-wiki`
+  layout (with `structure_design`) and `notes` moved there too. Only `bare` is built in.
+- The delegated-CLI MCP server loads your approved modules, so a registry-installed wiki's
+  tools reach `claude`/`gemini` delegates.
+- `veles doctor` checks the layout's context file (e.g. the wiki's `INDEX.md`) instead of
+  INDEX.md/LOG.md, and names the install when the layout is missing.
+- An MCP server approval also covers the project code its recipe runs (a `command` that is a
+  project file, `args` that are scripts by suffix or executable bit): editing such a script
+  revokes the approval; data files the server writes don't. Stdio servers start in the
+  project root. Recipes that run no project files keep their approvals.
+- A layout pack that isn't installed fails closed in the write guard: only `.veles/`'s agent
+  dirs and `AGENTS.md` stay writable until it is (a not-yet-reinstalled `llm-wiki` project
+  stays permissive and `notes` keeps its `notes/` zone, as before).
+- The write guard protects the hooks directory git actually uses (`git rev-parse --git-path
+  hooks`: every config level, an enclosing repository, a `.git` file).
+- New wiki projects no longer build the search index at init; search scans pages until dream
+  builds it.
+
+### Removed
+
+- `veles.core.layout.wiki_enabled` — use `engine_enabled(project, "wiki")`.
+- The `self_doc` contribution point — a module keeps the page through `page_store`.
+
+### Fixed
+
+- Install records are written under a lock, so two installs at once (or an install and
+  `module approve`) no longer drop each other's record.
+- `veles self-doc show` shows the page on projects without a wiki.
+
+### Upgrading from 1.2.2
+
+- `veles init` now creates a `bare` project; pass `--layout llm-wiki` (or pick it when asked)
+  for the wiki.
+- An `llm-wiki` or `notes` project — and one without a `layout` key — asks to install its
+  layout the first time you open it at a terminal, or run
+  `veles registry update && veles registry install llm-wiki`. Nothing in `wiki/` changes.
+  The daemon and channels keep working without the wiki until it is installed.
+- `veles add` and `/wiki` are commands of the `wiki` module.
+- Calling `init_project()` from code without `layout=` now gives `bare`.
+- A module that imported `veles.core…` keeps working in your project, but a registry module
+  must import `veles.sdk…` only.
+- Edits made to the built-in `llm-wiki` files inside the installed package are not carried
+  over.
+- Rolling back to 1.2.2 with the `wiki` module installed: 1.2.2 loads its built-in wiki and
+  skips the installed one with a warning.
+
 ## [1.2.2] — 2026-10-02
 
 Modules add to Veles through typed contribution points; the wiki engine is now a module like

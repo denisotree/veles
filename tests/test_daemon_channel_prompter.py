@@ -252,3 +252,20 @@ def test_critical_confirmer_timeout_denies_and_cleans_up() -> None:
         assert handle.pending_prompts == {}
     finally:
         loop.close()
+
+
+def test_prompt_options_are_localised_and_platform_neutral(monkeypatch) -> None:
+    from veles.core import i18n
+    from veles.daemon import channel_prompter as cp
+
+    monkeypatch.setenv("VELES_LOCALE", "ru")
+    i18n.reset_for_tests()
+    try:
+        opts = cp._trust_options()
+        assert [o["key"] for o in opts] == ["once", "always_project", "refuse"]
+        assert opts[0]["label"] == "⏱ Один раз"
+        assert all(not o["label"].startswith("<missing") for o in cp._critical_options())
+        assert not [n for n in dir(cp) if "TELEGRAM" in n.upper()]
+    finally:
+        monkeypatch.delenv("VELES_LOCALE")
+        i18n.reset_for_tests()
