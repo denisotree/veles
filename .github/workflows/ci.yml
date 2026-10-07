@@ -40,5 +40,10 @@ jobs:
           enable-cache: true
       - name: Install dependencies
         run: uv sync --locked
+      - name: Install bubblewrap (Linux sandbox)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y -qq bubblewrap
+          if bwrap --dev-bind / / -- true; then echo "BWRAP_OK"; else echo "BWRAP_UNAVAILABLE"; fi
       - name: Run tests
         run: uv run pytest -q
