@@ -35,7 +35,20 @@ def test_a_worktree_protects_the_real_git_config(tmp_path: Path) -> None:
     repo, and the file itself must not be repointed."""
     main = tmp_path / "main"
     _git("init", "-q", str(main))
-    _git("-C", str(main), "commit", "-q", "--allow-empty", "-m", "init")
+    # CI runners have no git identity.
+    _git(
+        "-C",
+        str(main),
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "init",
+    )
     _git("-C", str(main), "worktree", "add", "-q", str(tmp_path / "wt"), "-b", "side")
     project = init_project(tmp_path / "wt", name="p")
     guard = shell_guard(project)
