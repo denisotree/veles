@@ -241,3 +241,32 @@ async def test_model_step_unreachable_provider_takes_a_typed_model(
     answers = await _drive_user_wizard(keys, poll=80)
     assert answers["default_model"] == "abc"
     assert answers["api_key_status"] == "deferred"
+
+
+async def test_back_to_the_model_step_retries_an_unreachable_provider(
+    _isolate: _FakeKeyring, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Going back to the model step once the network is up lists the models again —
+    it used to skip the step and drop the typed id."""
+    from veles.cli.repl import model_fetcher as _model_fetcher
+
+    answers_by_call = iter(
+        [("unreachable", [], "openrouter didn't answer in 10s"), ("ok", ["openrouter/x"], "")]
+    )
+    monkeypatch.setattr(
+        _model_fetcher, "validate_and_fetch_models", lambda p, k: next(answers_by_call)
+    )
+    secrets.set_provider_key("openrouter", "sk-key")
+    keys = [
+        "enter",  # language
+        "enter",  # provider openrouter
+        "enter",  # use existing keychain key
+        "a",
+        "enter",  # typed model id "a"
+        "escape",  # theme → back to the model step
+        "enter",  # the live list this time: openrouter/x
+        "enter",  # theme default
+        "n",  # init? no
+    ]
+    answers = await _drive_user_wizard(keys, poll=80)
+    assert answers["default_model"] == "openrouter/x"
