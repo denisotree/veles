@@ -17,6 +17,7 @@ store approves nothing.
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import logging
 import os
@@ -77,7 +78,26 @@ def project_files(project_root: Path, raw: dict[str, Any]) -> list[Path]:
                 continue
             if is_command or path.suffix.lower() in _SCRIPT_SUFFIXES or os.access(path, os.X_OK):
                 found.append(path)
+    found += [p for p in _dash_m_files(root, args) if p not in found]
     return sorted(found)
+
+
+def _dash_m_files(root: Path, args: Any) -> list[Path]:
+    """`python -m pkg.mod` (or `-mpkg.mod`) naming a project module: its file, or every
+    `.py` of its package — editing them must revoke the approval too."""
+    if not isinstance(args, list):
+        return []
+    tokens = [a for a in args if isinstance(a, str)]
+    modules = [nxt for flag, nxt in itertools.pairwise(tokens) if flag == "-m"]
+    modules += [t[2:] for t in tokens if t.startswith("-m") and len(t) > 2]
+    out: list[Path] = []
+    for dotted in modules:
+        base = root.joinpath(*dotted.split("."))
+        if base.with_suffix(".py").is_file():
+            out.append(base.with_suffix(".py").resolve())
+        elif (base / "__init__.py").is_file():
+            out += sorted(p.resolve() for p in base.rglob("*.py") if p.is_file())
+    return [p for p in out if p.is_relative_to(root)]
 
 
 def _file_digest(path: Path) -> str:

@@ -330,3 +330,17 @@ def test_concurrent_approvals_are_not_lost(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(mod, "_load", real_load)
     assert mod.approval_state(root, "a", {"command": "a"}) == "yes"
     assert mod.approval_state(root, "b", {"command": "b"}) == "yes"
+
+
+def test_a_module_run_with_dash_m_is_part_of_the_approval(tmp_path: Path) -> None:
+    from veles.mcp.approvals import project_files
+
+    root = tmp_path.resolve()
+    (root / "srv").mkdir()
+    (root / "srv" / "__init__.py").write_text("")
+    (root / "srv" / "main.py").write_text("print(1)")
+    (root / "tool.py").write_text("print(2)")
+    files = project_files(root, {"command": "python", "args": ["-m", "srv"]})
+    assert files == [root / "srv" / "__init__.py", root / "srv" / "main.py"]
+    assert project_files(root, {"command": "python", "args": ["-mtool"]}) == [root / "tool.py"]
+    assert project_files(root, {"command": "python", "args": ["-m", "json"]}) == []
