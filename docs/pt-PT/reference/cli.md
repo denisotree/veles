@@ -193,13 +193,16 @@ Sem um terminal (um script de implementação), aprova um ficheiro pelo hash rev
 
 | Subcomando | Finalidade |
 |---|---|
-| `list` | Lista os módulos instalados |
-| `show <name>` | Imprime o manifesto de um módulo e o sha256 dos seus ficheiros |
-| `add <source> [--name N] [-y]` | Instala um módulo a partir de um URL git ou caminho local |
-| `remove <name> [-y]` | Apaga um módulo instalado |
+| `list [--user]` | Lista os módulos instalados (ambos os âmbitos, com uma coluna `scope`, a não ser com `--user`) |
+| `show <name> [--user]` | Imprime o manifesto de um módulo e o sha256 dos seus ficheiros |
+| `add <source> [--name N] [--user] [-y]` | Instala um módulo a partir de um URL git ou caminho local |
+| `remove <name> [--user] [-y]` | Apaga um módulo instalado |
 | `approve <name> [--user] [--sha256 H]` | Aprova um módulo depois de o rever |
 | `approve --all [--user]` | Todos os módulos desse âmbito à espera de aprovação, uma confirmação para cada |
 
+`--user` aponta para `~/.veles/modules/` em vez do directório do projecto, pelo que o
+módulo carrega em todos os projectos. Um módulo de projecto com o mesmo nome
+sobrepõe-se a um de nível de utilizador.
 A aprovação pede-te que escrevas `yes` num terminal; sem um, passa o hash dos ficheiros
 revistos (o `show` imprime-o) como `--sha256` — falha se os ficheiros mudaram
 entretanto. `veles doctor` indica todos os módulos em disco que não carregam.

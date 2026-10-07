@@ -69,7 +69,7 @@ rarement nécessaire.
 | `VELES_NO_WIZARD` | désactivé | Saute l'assistant de premier lancement (nécessite aussi un TTY) |
 | `VELES_MANAGER_MODE` | désactivé | Force le manager multi-agents pour `veles run` (`1` activé / `0` coupe-circuit) |
 | `VELES_VERIFY_MODE` | désactivé | Force la passe verify→escalade pour `veles run` (`1` activé / `0` coupe-circuit) |
-| `VELES_FENCED_TOOLS` | désactivé | Exécute les outils via le chemin d'exécution cloisonné / en bac à sable |
+| `VELES_FENCED_TOOLS` | activé | Appels d'outils en texte (blocs `veles-tool` dans la réponse) pour les modèles sans appel d'outils natif ; `0`/`false`/`no`/`off` les désactivent |
 | `VELES_TRUST_AUTO_ALLOW` | désactivé | Contourne l'échelle de confiance (CI / autopilot / sous-agents pré-autorisés) |
 | `VELES_SANDBOX_ROOTS` | projet + `~/.veles` | Surcharge (séparée par `:`) des racines lecture/écriture du bac à sable |
 | `VELES_FETCH_ALLOW_PRIVATE` | désactivé | Autorise les outils à atteindre des adresses RFC-1918 / privées |

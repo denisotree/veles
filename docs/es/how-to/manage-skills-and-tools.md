@@ -62,9 +62,9 @@ en cada ejecución solo mientras sus archivos sigan coincidiendo con lo que apro
 (consulta [mantén las instalaciones bajo control](../../en/how-to/extension-registries.md#keep-installs-honest)).
 
 ```bash
-veles module list                              # both scopes, with a `scope` column
+veles module list                              # ambos ámbitos, con una columna `scope`
 veles module add https://github.com/org/module.git
-veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
+veles module add ./local-module --user          # instala en ~/.veles/modules/, para todos los proyectos
 veles module show <name> [--user]             # manifiesto + sha256 de los archivos
 veles module remove <name> [--user]
 veles module approve <name> [--user]          # escribe `yes` en una terminal

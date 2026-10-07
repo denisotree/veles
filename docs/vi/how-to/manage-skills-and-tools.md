@@ -60,9 +60,9 @@ phần lõi. Việc cài đặt một module yêu cầu xác nhận theo mặc �
 bản cài đặt trung thực](../../en/how-to/extension-registries.md#keep-installs-honest)).
 
 ```bash
-veles module list                              # both scopes, with a `scope` column
+veles module list                              # cả hai phạm vi, kèm cột `scope`
 veles module add https://github.com/org/module.git
-veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
+veles module add ./local-module --user          # cài vào ~/.veles/modules/, dùng cho mọi dự án
 veles module show <name> [--user]             # manifest + sha256 của các tệp
 veles module remove <name> [--user]
 veles module approve <name> [--user]          # gõ `yes` trong terminal

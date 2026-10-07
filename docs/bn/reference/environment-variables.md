@@ -66,7 +66,7 @@ object constraint সেটিকে নিষিদ্ধ করবে। এ�
 | `VELES_NO_WIZARD` | off | প্রথম-রানের উইজার্ড এড়িয়ে যায় (একটি TTY-ও দরকার) |
 | `VELES_MANAGER_MODE` | off | `veles run`-এর জন্য মাল্টি-এজেন্ট ম্যানেজার বাধ্য করে (`1` on / `0` kill switch) |
 | `VELES_VERIFY_MODE` | off | `veles run`-এর জন্য verify→escalate পাস বাধ্য করে (`1` on / `0` kill switch) |
-| `VELES_FENCED_TOOLS` | off | fenced/sandboxed এক্সিকিউশন পাথে tools চালায় |
+| `VELES_FENCED_TOOLS` | on | native tool calling নেই এমন মডেলের জন্য টেক্সট tool call (উত্তরে `veles-tool` ব্লক); `0`/`false`/`no`/`off` এগুলো বন্ধ করে |
 | `VELES_TRUST_AUTO_ALLOW` | off | trust ladder বাইপাস করে (CI / autopilot / প্রি-অথরাইজড সাব-এজেন্ট) |
 | `VELES_SANDBOX_ROOTS` | project + `~/.veles` | read/write স্যান্ডবক্স রুটের `:`-সেপারেটেড ওভাররাইড |
 | `VELES_FETCH_ALLOW_PRIVATE` | off | tools-কে RFC-1918 / প্রাইভেট ঠিকানা ফেচ করতে দেয় |

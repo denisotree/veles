@@ -67,7 +67,7 @@ petición se reintenta sin él, así que normalmente no hace falta tocar este in
 | `VELES_NO_WIZARD` | desactivado | Omite el asistente de primera ejecución (también requiere un TTY) |
 | `VELES_MANAGER_MODE` | desactivado | Fuerza el manager multi-agente para `veles run` (`1` activa / `0` interruptor de apagado) |
 | `VELES_VERIFY_MODE` | desactivado | Fuerza la pasada de verificar→escalar para `veles run` (`1` activa / `0` interruptor de apagado) |
-| `VELES_FENCED_TOOLS` | desactivado | Ejecuta las herramientas por la ruta de ejecución vallada/en sandbox |
+| `VELES_FENCED_TOOLS` | activado | Llamadas a herramientas en texto (bloques `veles-tool` en la respuesta) para modelos sin llamada nativa a herramientas; `0`/`false`/`no`/`off` las desactivan |
 | `VELES_TRUST_AUTO_ALLOW` | desactivado | Omite la escala de confianza (CI / autopilot / subagentes preautorizados) |
 | `VELES_SANDBOX_ROOTS` | proyecto + `~/.veles` | Anulación separada por `:` de las raíces del sandbox de lectura/escritura |
 | `VELES_FETCH_ALLOW_PRIVATE` | desactivado | Permite a las herramientas acceder a direcciones RFC-1918 / privadas |

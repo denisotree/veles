@@ -163,14 +163,14 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 | 子命令 | 用途 |
 |---|---|
-| `list` | 列出已安装的 modules |
-| `show <name>` | 打印某个 module 的清单及其文件的 sha256 |
-| `add <source> [--name N] [-y]` | 从 git URL 或本地路径安装 module |
-| `remove <name> [-y]` | 删除已安装的 module |
+| `list [--user]` | 列出已安装的 modules（除非使用 `--user`，否则列出两个范围，并带 `scope` 列） |
+| `show <name> [--user]` | 打印某个 module 的清单及其文件的 sha256 |
+| `add <source> [--name N] [--user] [-y]` | 从 git URL 或本地路径安装 module |
+| `remove <name> [--user] [-y]` | 删除已安装的 module |
 | `approve <name> [--user] [--sha256 H]` | 审阅后批准一个 module |
 | `approve --all [--user]` | 该范围内所有待批准的 module，每个单独确认一次 |
 
-批准时会要求在终端中输入 `yes`；没有终端时，请把你审阅过的文件哈希（`show` 会打印）作为 `--sha256` 传入——若文件自那以后发生了变化则会失败。`veles doctor` 会报告磁盘上每个未加载的 module。
+`--user` 针对 `~/.veles/modules/` 而非项目目录，因此该 module 会在每个项目中加载。同名的项目 module 会覆盖用户级 module。批准时会要求在终端中输入 `yes`；没有终端时，请把你审阅过的文件哈希（`show` 会打印）作为 `--sha256` 传入——若文件自那以后发生了变化则会失败。`veles doctor` 会报告磁盘上每个未加载的 module。
 
 ### `veles registry search [query] [--kind K]`
 在已连接的注册表中搜索（模块、技能、layout 包、MCP 配方）。

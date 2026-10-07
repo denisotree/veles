@@ -63,9 +63,9 @@ défaut, et il ne se charge à chaque exécution que tant que ses fichiers corre
 fiables](../../en/how-to/extension-registries.md#keep-installs-honest)).
 
 ```bash
-veles module list                              # both scopes, with a `scope` column
+veles module list                              # les deux périmètres, avec une colonne `scope`
 veles module add https://github.com/org/module.git
-veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
+veles module add ./local-module --user          # installe dans ~/.veles/modules/, pour tous les projets
 veles module show <name> [--user]             # manifeste + sha256 des fichiers
 veles module remove <name> [--user]
 veles module approve <name> [--user]          # saisir `yes` dans un terminal

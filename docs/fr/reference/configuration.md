@@ -40,11 +40,6 @@ write_file = "always_confirm"
 [routing.tasks]                  # routage optionnel à la portée utilisateur (voir ci-dessous)
 compressor = "openrouter:anthropic/claude-haiku-4.5"
 
-[mcp.servers.my-server]          # serveurs MCP optionnels à la portée utilisateur
-transport = "stdio"
-command = "python"               # exécutable seulement — les arguments vont dans `args`
-args = ["-m", "my_mcp_server"]
-
 [sandbox]
 enabled = true                   # run_shell dans un bac à sable de l'OS ; false le désactive
 ```

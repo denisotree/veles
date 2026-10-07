@@ -68,7 +68,7 @@ không có nó, nên thường bạn không cần đụng tới công tắc này
 | `VELES_NO_WIZARD` | tắt | Bỏ qua trình thiết lập lần đầu (cũng cần một TTY) |
 | `VELES_MANAGER_MODE` | tắt | Bắt buộc dùng manager đa-agent cho `veles run` (`1` bật / `0` công tắc tắt) |
 | `VELES_VERIFY_MODE` | tắt | Bắt buộc lượt verify→escalate cho `veles run` (`1` bật / `0` công tắc tắt) |
-| `VELES_FENCED_TOOLS` | tắt | Chạy tool theo đường thực thi fenced/sandbox |
+| `VELES_FENCED_TOOLS` | bật | Lệnh gọi tool dạng văn bản (các khối `veles-tool` trong câu trả lời) cho model không có tool calling gốc; `0`/`false`/`no`/`off` sẽ tắt chúng |
 | `VELES_TRUST_AUTO_ALLOW` | tắt | Bỏ qua trust ladder (CI / autopilot / các sub-agent đã được cấp quyền trước) |
 | `VELES_SANDBOX_ROOTS` | dự án + `~/.veles` | Ghi đè (phân tách bằng `:`) các thư mục gốc đọc/ghi của sandbox |
 | `VELES_FETCH_ALLOW_PRIVATE` | tắt | Cho phép tool truy cập các địa chỉ RFC-1918 / riêng tư |

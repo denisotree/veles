@@ -196,13 +196,16 @@ changé depuis. `-y` ne saute la question que dans un terminal.
 
 | Sous-commande | Rôle |
 |---|---|
-| `list` | Liste les modules installés |
-| `show <name>` | Affiche le manifeste d'un module et le sha256 de ses fichiers |
-| `add <source> [--name N] [-y]` | Installe un module depuis une URL git ou un chemin local |
-| `remove <name> [-y]` | Supprime un module installé |
+| `list [--user]` | Liste les modules installés (les deux périmètres, avec une colonne `scope`, sauf avec `--user`) |
+| `show <name> [--user]` | Affiche le manifeste d'un module et le sha256 de ses fichiers |
+| `add <source> [--name N] [--user] [-y]` | Installe un module depuis une URL git ou un chemin local |
+| `remove <name> [--user] [-y]` | Supprime un module installé |
 | `approve <name> [--user] [--sha256 H]` | Approuve un module après l'avoir relu |
 | `approve --all [--user]` | Chaque module de ce périmètre en attente d'approbation, une confirmation chacun |
 
+`--user` cible `~/.veles/modules/` au lieu de celui du projet, si bien que le module
+se charge dans tous les projets. Un module de projet du même nom l'emporte sur un
+module de niveau utilisateur.
 L'approbation vous demande de saisir `yes` dans un terminal ; sans terminal, passez en
 `--sha256` le hash des fichiers que vous avez relus (`show` l'affiche) — la commande
 échoue si les fichiers ont changé depuis. `veles doctor` signale chaque module sur disque

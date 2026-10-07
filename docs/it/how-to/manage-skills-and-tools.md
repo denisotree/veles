@@ -61,9 +61,9 @@ ciò che hai approvato (vedi [mantenere le installazioni
 affidabili](../../en/how-to/extension-registries.md#keep-installs-honest)).
 
 ```bash
-veles module list                              # both scopes, with a `scope` column
+veles module list                              # entrambi gli ambiti, con una colonna `scope`
 veles module add https://github.com/org/module.git
-veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
+veles module add ./local-module --user          # installa in ~/.veles/modules/, per tutti i progetti
 veles module show <name> [--user]             # manifest + sha256 dei file
 veles module remove <name> [--user]
 veles module approve <name> [--user]          # digita `yes` in un terminale

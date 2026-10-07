@@ -60,7 +60,7 @@ fenced-tools 路径需要在代码块周围保留散文，而 JSON 对象约束�
 | `VELES_NO_WIZARD` | 关闭 | 跳过首次运行的向导（同样需要 TTY） |
 | `VELES_MANAGER_MODE` | 关闭 | 为 `veles run` 强制启用多 agent manager（`1` 开启 / `0` 强制关闭） |
 | `VELES_VERIFY_MODE` | 关闭 | 为 `veles run` 强制启用验证→升级流程（`1` 开启 / `0` 强制关闭） |
-| `VELES_FENCED_TOOLS` | 关闭 | 在受隔离/沙箱化的执行路径中运行 tools |
+| `VELES_FENCED_TOOLS` | 开启 | 面向不支持原生 tool 调用的模型的文本 tool 调用（回复中的 `veles-tool` 块）；`0`/`false`/`no`/`off` 将其关闭 |
 | `VELES_TRUST_AUTO_ALLOW` | 关闭 | 绕过信任阶梯（CI / autopilot / 已预授权的子 agent） |
 | `VELES_SANDBOX_ROOTS` | 项目 + `~/.veles` | 以 `:` 分隔的读写沙箱根目录覆盖 |
 | `VELES_FETCH_ALLOW_PRIVATE` | 关闭 | 允许 tools 获取 RFC-1918 / 私有地址 |

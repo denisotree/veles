@@ -52,9 +52,9 @@ veles tool promote <name>      # move to ~/.veles/tools/ (cross-project)
 ([ইনস্টল নির্ভরযোগ্য রাখুন](../../en/how-to/extension-registries.md#keep-installs-honest) দেখুন)।
 
 ```bash
-veles module list                              # both scopes, with a `scope` column
+veles module list                              # দুটি scope-ই, `scope` কলামসহ
 veles module add https://github.com/org/module.git
-veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
+veles module add ./local-module --user          # ~/.veles/modules/-এ ইনস্টল, সব প্রজেক্টের জন্য
 veles module show <name> [--user]             # ম্যানিফেস্ট + ফাইলগুলোর sha256
 veles module remove <name> [--user]
 veles module approve <name> [--user]          # টার্মিনালে `yes` টাইপ করুন

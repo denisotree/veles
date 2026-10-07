@@ -38,7 +38,7 @@ _HEADING = re.compile(r"^#{2,3} ", re.MULTILINE)
 # with the four sections they were missing (M226 [vision], M250 pinning,
 # M257 retention + log rotation).
 _BASELINE = {
-    "how-to/embed-veles-run.md": 14,  # M233; never translated at all
+    "how-to/embed-veles-run.md": 13,  # M233; ru since 1.2.10, the other 13 still to translate
     "how-to/run-as-daemon.md": 14,  # M234 added the HTTP section
     "reference/cli.md": 14,
     "how-to/extension-registries.md": 13,  # extension-registry spec; en+ru only by design

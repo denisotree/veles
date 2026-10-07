@@ -68,7 +68,7 @@ repetida sem ele, então normalmente não é preciso mexer nessa chave.
 | `VELES_NO_WIZARD` | desligado | Pula o assistente de primeira execução (também precisa de um TTY) |
 | `VELES_MANAGER_MODE` | desligado | Força o gerente multiagente em `veles run` (`1` liga / `0` desliga via kill switch) |
 | `VELES_VERIFY_MODE` | desligado | Força a passada verify→escalate em `veles run` (`1` liga / `0` desliga via kill switch) |
-| `VELES_FENCED_TOOLS` | desligado | Executa tools pelo caminho de execução cercado/em sandbox |
+| `VELES_FENCED_TOOLS` | ligado | Chamadas de tool em texto (blocos `veles-tool` na resposta) para modelos sem tool calling nativo; `0`/`false`/`no`/`off` as desligam |
 | `VELES_TRUST_AUTO_ALLOW` | desligado | Ignora a escada de confiança (CI / autopilot / subagentes pré-autorizados) |
 | `VELES_SANDBOX_ROOTS` | projeto + `~/.veles` | Sobrescrita separada por `:` das raízes de leitura/escrita da sandbox |
 | `VELES_FETCH_ALLOW_PRIVATE` | desligado | Permite que tools acessem endereços RFC-1918 / privados |
