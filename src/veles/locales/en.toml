@@ -59,3 +59,6 @@ yes = "✅ Allow"
 no = "❌ Deny"
 critical_yes = "⚠️ Allow"
 critical_no = "🚫 Cancel"
+
+[daemon]
+prompt_refused_no_buttons = "Refused: {what} needs your confirmation, which this channel can't ask for — allow it in a terminal (`veles trust set`) or a chat that can ask."

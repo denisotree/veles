@@ -285,6 +285,7 @@ async def run_agent_in_background(  # noqa: PLR0913
     turn_lock: asyncio.Lock | None = None,
     deliver_hook: Callable[[str], Awaitable[None]] | None = None,
     ask_channel: bool = False,
+    refuse_prompts: bool = False,
 ) -> None:
     """Drive `agent.run(prompt)` to completion, mirroring events into `handle`.
 
@@ -358,7 +359,12 @@ async def run_agent_in_background(  # noqa: PLR0913
         reset_question_prompter,
         set_question_prompter,
     )
-    from veles.daemon.channel_prompter import make_unified_prompter
+    from veles.daemon.channel_prompter import (
+        make_critical_confirmer,
+        make_refusing_confirmer,
+        make_refusing_prompter,
+        make_unified_prompter,
+    )
 
     # M166: the originating chat (e.g. "telegram:<id>") as a delivery target,
     # so tools like `task_add` can default `deliver_to` to "this chat". Set
@@ -377,18 +383,21 @@ async def run_agent_in_background(  # noqa: PLR0913
     )
     # The unified prompter carries `arguments` and `reason` to the
     # Telegram trust-prompt render and serves both trust and approval.
-    unified_token = set_unified_prompter(make_unified_prompter(handle, loop))
     # M213: critical-ops confirms (M39 always-confirm + the M198 exfiltration
     # gate) get the same channel round-trip as approval — an inline keyboard
     # instead of the daemon's M212 auto-deny. Deny on timeout stays the
-    # fail-closed floor.
+    # fail-closed floor. A channel that can't ask (email) refuses both at once.
     from veles.core.critical_ops import (
         reset_critical_confirmer,
         set_critical_confirmer,
     )
-    from veles.daemon.channel_prompter import make_critical_confirmer
 
-    critical_token = set_critical_confirmer(make_critical_confirmer(handle, loop))
+    if refuse_prompts:
+        unified_token = set_unified_prompter(make_refusing_prompter(handle, loop))
+        critical_token = set_critical_confirmer(make_refusing_confirmer(handle, loop))
+    else:
+        unified_token = set_unified_prompter(make_unified_prompter(handle, loop))
+        critical_token = set_critical_confirmer(make_critical_confirmer(handle, loop))
     # M148: ask_user must never reach the default stdin prompter here — a
     # foreground `veles channel run` has a TTY and would block on the
     # *operator's* stdin. M284: a chat that can answer gets the question as a
