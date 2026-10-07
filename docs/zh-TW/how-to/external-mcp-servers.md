@@ -8,8 +8,8 @@ Veles 是一個 [MCP](https://modelcontextprotocol.io/) **用戶端**：它可�
 
 ## 設定一個伺服器
 
-在 `<project>/.veles/config.toml`（或 user-global 的
-`~/.veles/config.toml`）中新增一個 `[mcp.servers.<name>]` 區塊。`<name>` 必須符合
+在 `<project>/.veles/config.toml`
+中新增一個 `[mcp.servers.<name>]` 區塊——伺服器只從專案設定讀取。`<name>` 必須符合
 `[A-Za-z0-9][A-Za-z0-9_-]{0,31}` — 它會成為每個 tool 名稱的一部分。支援三種
 傳輸方式：`stdio`（預設）、`http`、`sse`。
 

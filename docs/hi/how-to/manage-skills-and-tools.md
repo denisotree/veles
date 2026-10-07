@@ -59,9 +59,9 @@ install करने के लिए default रूप से confirmation च�
 रखें](../../en/how-to/extension-registries.md#keep-installs-honest))।
 
 ```bash
-veles module list                              # both scopes, with a `scope` column
+veles module list                              # दोनों scopes, `scope` column के साथ
 veles module add https://github.com/org/module.git
-veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
+veles module add ./local-module --user          # ~/.veles/modules/ में install, सभी projects के लिए
 veles module show <name> [--user]             # manifest + files का sha256
 veles module remove <name> [--user]
 veles module approve <name> [--user]          # terminal पर `yes` टाइप करें

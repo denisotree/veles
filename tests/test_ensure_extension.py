@@ -52,7 +52,7 @@ def fake_install(monkeypatch):
 
     def resolve(spec: str):
         calls.append(f"resolve {spec}")
-        return SimpleNamespace(ref=spec, ext=SimpleNamespace(kind="layout"))
+        return SimpleNamespace(ref=spec, ext=SimpleNamespace(kind="layout", requires=()))
 
     def install(found, *, project, user_scope, preapproved=False):
         calls.append(

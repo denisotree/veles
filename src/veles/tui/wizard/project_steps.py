@@ -196,10 +196,9 @@ async def _pick_project_model(
     ctx: WizardContext, provider: str, *, default_pref: str | None
 ) -> str | None:
     """Mirror of user-level ModelStep, scoped to the project."""
-    from veles.cli.repl.model_fetcher import validate_and_fetch_models
     from veles.core.provider_factory import needs_api_key
     from veles.core.secrets import get_provider_key
-    from veles.tui.wizard.user_steps import model_choice_screen
+    from veles.tui.wizard.user_steps import ask_model_id, fetch_models_for, model_choice_screen
 
     project: Project = ctx.answers["project"]
     slug = project.name
@@ -210,9 +209,14 @@ async def _pick_project_model(
         if not api_key:
             return None
 
-    ok, models, _err = validate_and_fetch_models(provider, api_key)
+    status, models, error = await fetch_models_for(ctx, provider, api_key)
+    if status == "unreachable":
+        typed = await ask_model_id(ctx, "Project model override", error, default=default_pref or "")
+        if not isinstance(typed, str) or typed == _CANCEL_SENTINEL:
+            return None
+        return typed.strip() or None
     screen = model_choice_screen(
-        "Project model override", provider, models if ok else [], default=default_pref
+        "Project model override", provider, models if status == "ok" else [], default=default_pref
     )
     if screen is None:
         return None

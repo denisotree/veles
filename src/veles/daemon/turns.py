@@ -144,6 +144,7 @@ async def start_turn(
             turn_lock=(state.session_lock(effective_session_id) if effective_session_id else None),
             deliver_hook=deliver_hook,
             ask_channel=asks_questions(state, origin),
+            refuse_prompts=refuses_prompts(state, origin),
         ),
     )
     return handle
@@ -158,6 +159,16 @@ def asks_questions(state: DaemonState, origin: str | None) -> bool:
         return False
     caps = state.channel_caps.get(origin.split(":", 1)[0])
     return bool(caps and caps.asks_questions)
+
+
+def refuses_prompts(state: DaemonState, origin: str | None) -> bool:
+    """A running channel that can't render questions (`asks_questions=False`, e.g.
+    email): trust/approval/critical prompts are refused at once instead of waiting out
+    the prompt timeout. Not an HTTP caller — the TUI answers those over the socket."""
+    if not origin:
+        return False
+    caps = state.channel_caps.get(origin.split(":", 1)[0])
+    return bool(caps and not caps.asks_questions)
 
 
 def _session_for_mode_turn(state: DaemonState, session_id: str) -> str:

@@ -59,7 +59,7 @@ class ChannelStatus:
     """One enabled channel the daemon would host, and whether it is ready."""
 
     name: str
-    state: Literal["ok", "no_module", "no_creds"]
+    state: Literal["ok", "no_module", "load_failed", "no_creds"]
     detail: str = ""
 
 
@@ -77,7 +77,7 @@ def channel_readiness(project: Project, session: str | None = None) -> list[Chan
         try:
             spec = get_platform(name)
         except KeyError:
-            out.append(ChannelStatus(name, "no_module", "its module isn't installed"))
+            out.append(_without_platform(name))
             continue
         _, missing = resolve_secrets(spec, name, block, project=project)
         if missing:
@@ -85,6 +85,28 @@ def channel_readiness(project: Project, session: str | None = None) -> list[Chan
         else:
             out.append(ChannelStatus(name, "ok"))
     return out
+
+
+def _without_platform(name: str) -> ChannelStatus:
+    """No loaded module provides the platform: its module isn't installed — or it is
+    (registry channel modules are named after their platform) and failed to load into
+    this registry, and then its error is the reason."""
+    from veles.core.module_loading import load_failures
+
+    failures = load_failures()
+    error = failures.pop(name, None)
+    if error is None:
+        detail = "its module isn't installed"
+        if failures:
+            detail += f" (modules that failed to load: {', '.join(sorted(failures))})"
+        return ChannelStatus(name, "no_module", detail)
+    detail = f"its module failed to load — {error}"
+    if "No module named" in error:
+        detail += (
+            " — it may need a Python package: uv tool install veles-ai --with <package>"
+            " (see the module's README)"
+        )
+    return ChannelStatus(name, "load_failed", detail)
 
 
 def no_channel_message(statuses: list[ChannelStatus], session: str | None) -> str:
@@ -96,6 +118,8 @@ def no_channel_message(statuses: list[ChannelStatus], session: str | None) -> st
     for s in statuses:
         if s.state == "no_module":
             fix = f"`veles registry update && veles registry install {s.name}`"
+        elif s.state == "load_failed":
+            fix = "`veles doctor` shows every module that doesn't load"
         else:
             fix = f"`veles channel add --channel {s.name}{suffix}`"
         lines.append(f"  {s.name}: {s.detail} — {fix}")

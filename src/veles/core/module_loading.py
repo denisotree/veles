@@ -50,8 +50,20 @@ def _load_handles(handles: list[ModuleHandle], into: ModuleRegistry | None) -> M
         try:
             load_module(handle, registry)
         except ModuleLoadError as exc:
+            registry.load_errors[handle.name] = str(exc)
             _warn(f"skipping module {handle.name!r}: {shown(exc)}")
+        else:
+            registry.load_errors.pop(handle.name, None)
     return registry
+
+
+def load_failures() -> dict[str, str]:
+    """Modules the current registry skipped on load, name → error text — so a channel
+    whose module didn't load can say why instead of "isn't installed"."""
+    from veles.core.modules import current_module_registry
+
+    reg = current_module_registry()
+    return dict(reg.load_errors) if reg is not None else {}
 
 
 def load_project_modules(project: Project, into: ModuleRegistry | None = None) -> ModuleRegistry:
@@ -147,4 +159,4 @@ def _fix(name: str, refusal: str, project_root: Path | None) -> str:
     return f"review it, then `veles module approve {flag}{name}`"
 
 
-__all__ = ["load_project_modules", "load_user_modules", "refused_modules"]
+__all__ = ["load_failures", "load_project_modules", "load_user_modules", "refused_modules"]

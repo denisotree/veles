@@ -46,10 +46,12 @@ class RunBackend(Protocol):
         """Yield typed event dicts until the run completes or errors.
 
         Events: `started`, `text_delta`, `tool_call`, `completed`,
-        `error`, `trust_prompt`, `approval_prompt`, `prompt_resolved`.
-        Older backends may emit only the first five; new event types
-        from M-channel-prompts onward extend the stream without
-        breaking forward-compat."""
+        `error`, `trust_prompt`, `approval_prompt`, `critical_prompt`,
+        `clarification_prompt`, `prompt_resolved`, `manager_plan`, `notice`.
+        A `notice` carries `text` and `live`: a live one is shown now, the
+        rest go in front of the answer — a channel that can't ask hears why a
+        prompt was refused only this way. Unknown types are skipped: new
+        ones extend the stream without breaking forward-compat."""
         ...
 
     async def submit_prompt_answer(

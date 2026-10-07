@@ -29,6 +29,7 @@ Veles — это минималистичный, local-first фреймворк 
 - [Настройка провайдеров (облачных и локальных)](how-to/configure-providers.md)
 - [Маршрутизация разных задач на разные модели](how-to/per-task-routing.md)
 - [Запуск Veles в режиме демона](how-to/run-as-daemon.md)
+- [Встраивание `veles run` в другую программу](how-to/embed-veles-run.md)
 - [Подключение Telegram-канала](how-to/connect-telegram.md)
 - [Управление навыками, инструментами и модулями](how-to/manage-skills-and-tools.md)
 - [Установка расширений из реестров](how-to/extension-registries.md)

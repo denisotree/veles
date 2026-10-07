@@ -163,14 +163,14 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 | 하위 명령 | 용도 |
 |---|---|
-| `list` | 설치된 모듈 나열 |
-| `show <name>` | 모듈의 매니페스트와 파일 sha256 출력 |
-| `add <source> [--name N] [-y]` | git URL 또는 로컬 경로에서 모듈 설치 |
-| `remove <name> [-y]` | 설치된 모듈 삭제 |
+| `list [--user]` | 설치된 모듈 나열(`--user`가 없으면 두 범위를 `scope` 열과 함께 표시) |
+| `show <name> [--user]` | 모듈의 매니페스트와 파일 sha256 출력 |
+| `add <source> [--name N] [--user] [-y]` | git URL 또는 로컬 경로에서 모듈 설치 |
+| `remove <name> [--user] [-y]` | 설치된 모듈 삭제 |
 | `approve <name> [--user] [--sha256 H]` | 검토 후 모듈 승인 |
 | `approve --all [--user]` | 해당 범위에서 승인을 기다리는 모든 모듈 — 모듈마다 한 번씩 확인 |
 
-승인은 터미널에서 `yes` 입력을 요구합니다. 터미널이 없으면 검토한 파일 해시(`show`가 출력함)를 `--sha256`으로 전달하세요 — 그 이후 파일이 바뀌었다면 실패합니다. `veles doctor`는 디스크에 있으면서 로드되지 않는 모든 모듈을 보고합니다.
+`--user`는 프로젝트 대신 `~/.veles/modules/`를 대상으로 하므로 모듈이 모든 프로젝트에서 로드됩니다. 이름이 같은 프로젝트 모듈이 사용자 수준 모듈을 덮어씁니다. 승인은 터미널에서 `yes` 입력을 요구합니다. 터미널이 없으면 검토한 파일 해시(`show`가 출력함)를 `--sha256`으로 전달하세요 — 그 이후 파일이 바뀌었다면 실패합니다. `veles doctor`는 디스크에 있으면서 로드되지 않는 모든 모듈을 보고합니다.
 
 ### `veles registry search [query] [--kind K]`
 연결된 레지스트리를 검색합니다 (모듈, 스킬, 레이아웃 팩, MCP 레시피).

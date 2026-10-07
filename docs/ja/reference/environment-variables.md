@@ -62,7 +62,7 @@ API キーの参照カスケード: OS キーチェーン（プロジェクト�
 | `VELES_NO_WIZARD` | off | 初回ウィザードをスキップする（TTY も必要） |
 | `VELES_MANAGER_MODE` | off | `veles run` でマルチエージェントマネージャーを強制する（`1` で有効 / `0` でキルスイッチ） |
 | `VELES_VERIFY_MODE` | off | `veles run` で検証 → エスカレーションのパスを強制する（`1` で有効 / `0` でキルスイッチ） |
-| `VELES_FENCED_TOOLS` | off | ツールをフェンス化/サンドボックス化された実行経路で実行する |
+| `VELES_FENCED_TOOLS` | on | ネイティブのツール呼び出しを持たないモデル向けのテキストツール呼び出し（返信内の `veles-tool` ブロック）。`0`/`false`/`no`/`off` で無効化 |
 | `VELES_TRUST_AUTO_ALLOW` | off | 信頼ラダーをバイパスする（CI / オートパイロット / 事前承認済みサブエージェント） |
 | `VELES_SANDBOX_ROOTS` | project + `~/.veles` | 読み取り/書き込みサンドボックスのルートを `:` 区切りで上書きする |
 | `VELES_FETCH_ALLOW_PRIVATE` | off | ツールが RFC-1918 / プライベートアドレスを取得するのを許可する |

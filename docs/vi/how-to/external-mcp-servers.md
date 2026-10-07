@@ -8,8 +8,8 @@ các máy chủ MCP bên ngoài và cung cấp các công cụ của chúng cho 
 
 ## Cấu hình một máy chủ
 
-Thêm một khối `[mcp.servers.<name>]` vào `<project>/.veles/config.toml` (hoặc
-tệp cấu hình toàn cục của người dùng `~/.veles/config.toml`). `<name>` phải khớp với
+Thêm một khối `[mcp.servers.<name>]` vào `<project>/.veles/config.toml` — các máy chủ
+chỉ được đọc từ cấu hình dự án. `<name>` phải khớp với
 `[A-Za-z0-9][A-Za-z0-9_-]{0,31}` — nó trở thành một phần trong tên của mỗi công cụ. Có ba
 phương thức truyền tải (transport) được hỗ trợ: `stdio` (mặc định), `http`, `sse`.
 

@@ -195,13 +195,16 @@ entonces. `-y` omite la pregunta solo en una terminal.
 
 | Subcomando | Propósito |
 |---|---|
-| `list` | Lista los módulos instalados |
-| `show <name>` | Imprime el manifiesto de un módulo y el sha256 de sus archivos |
-| `add <source> [--name N] [-y]` | Instala un módulo desde una URL de git o una ruta local |
-| `remove <name> [-y]` | Elimina un módulo instalado |
+| `list [--user]` | Lista los módulos instalados (ambos ámbitos, con una columna `scope`, salvo con `--user`) |
+| `show <name> [--user]` | Imprime el manifiesto de un módulo y el sha256 de sus archivos |
+| `add <source> [--name N] [--user] [-y]` | Instala un módulo desde una URL de git o una ruta local |
+| `remove <name> [--user] [-y]` | Elimina un módulo instalado |
 | `approve <name> [--user] [--sha256 H]` | Aprueba un módulo tras revisarlo |
 | `approve --all [--user]` | Cada módulo de ese ámbito pendiente de aprobación, con una confirmación por cada uno |
 
+`--user` apunta a `~/.veles/modules/` en lugar del directorio del proyecto, así que el
+módulo se carga en todos los proyectos. Un módulo de proyecto con el mismo nombre
+prevalece sobre uno de nivel de usuario.
 La aprobación te pide escribir `yes` en una terminal; sin terminal, pasa el hash de los
 archivos que revisaste (`show` lo imprime) como `--sha256` — falla si los archivos
 cambiaron desde entonces. `veles doctor` informa de cada módulo en disco que no se carga.

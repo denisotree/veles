@@ -60,7 +60,7 @@ fenced-tools 路徑需要在區塊周圍保留敘述文字，而 JSON 物件約�
 | `VELES_NO_WIZARD` | 關閉 | 跳過首次執行精靈（同時也需 TTY） |
 | `VELES_MANAGER_MODE` | 關閉 | 為 `veles run` 強制啟用多代理 manager（`1` 開啟／`0` 終止開關） |
 | `VELES_VERIFY_MODE` | 關閉 | 為 `veles run` 強制啟用 verify→升級流程（`1` 開啟／`0` 終止開關） |
-| `VELES_FENCED_TOOLS` | 關閉 | 在隔離／沙箱化的執行路徑中執行工具 |
+| `VELES_FENCED_TOOLS` | 開啟 | 供不支援原生工具呼叫的模型使用的文字工具呼叫（回覆中的 `veles-tool` 區塊）；`0`/`false`/`no`/`off` 會將其關閉 |
 | `VELES_TRUST_AUTO_ALLOW` | 關閉 | 繞過信任階梯（CI／autopilot／已預先授權的子代理） |
 | `VELES_SANDBOX_ROOTS` | 專案 ＋ `~/.veles` | 以 `:` 分隔的讀寫沙箱根目錄覆寫 |
 | `VELES_FETCH_ALLOW_PRIVATE` | 關閉 | 允許工具抓取 RFC-1918／私有位址 |

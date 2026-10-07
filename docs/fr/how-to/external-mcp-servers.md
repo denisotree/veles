@@ -8,8 +8,8 @@ intégrés (GitHub, documentation de bibliothèques, recherche web, vos propres 
 
 ## Configurer un serveur
 
-Ajoutez un bloc `[mcp.servers.<name>]` à `<project>/.veles/config.toml` (ou au fichier
-global utilisateur `~/.veles/config.toml`). Le `<name>` doit correspondre à
+Ajoutez un bloc `[mcp.servers.<name>]` à `<project>/.veles/config.toml` — les serveurs
+sont lus uniquement depuis la configuration du projet. Le `<name>` doit correspondre à
 `[A-Za-z0-9][A-Za-z0-9_-]{0,31}` — il devient une partie du nom de chaque outil. Trois
 transports sont pris en charge : `stdio` (par défaut), `http`, `sse`.
 

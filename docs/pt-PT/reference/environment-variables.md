@@ -69,7 +69,7 @@ ele, pelo que normalmente não é preciso mexer neste interruptor.
 | `VELES_NO_WIZARD` | desligado | Ignora o assistente do primeiro arranque (também precisa de um TTY) |
 | `VELES_MANAGER_MODE` | desligado | Força o gestor multi-agente para `veles run` (`1` ligado / `0` kill switch) |
 | `VELES_VERIFY_MODE` | desligado | Força a passagem verificar→escalar para `veles run` (`1` ligado / `0` kill switch) |
-| `VELES_FENCED_TOOLS` | desligado | Executa as ferramentas no caminho de execução fenced/em sandbox |
+| `VELES_FENCED_TOOLS` | ligado | Chamadas de ferramentas em texto (blocos `veles-tool` na resposta) para modelos sem chamada nativa de ferramentas; `0`/`false`/`no`/`off` desligam-nas |
 | `VELES_TRUST_AUTO_ALLOW` | desligado | Contorna a escada de confiança (CI / autopilot / subagentes pré-autorizados) |
 | `VELES_SANDBOX_ROOTS` | projecto + `~/.veles` | Sobreposição separada por `:` das raízes de sandbox de leitura/escrita |
 | `VELES_FETCH_ALLOW_PRIVATE` | desligado | Permite às ferramentas obter endereços RFC-1918 / privados |

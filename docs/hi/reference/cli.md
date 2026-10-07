@@ -193,13 +193,15 @@ terminal के बिना (deploy script) किसी file को उस has
 
 | Subcommand | उद्देश्य |
 |---|---|
-| `list` | installed modules सूचीबद्ध करें |
-| `show <name>` | किसी module का manifest और उसकी files का sha256 प्रिंट करें |
-| `add <source> [--name N] [-y]` | git URL या local path से एक module install करें |
-| `remove <name> [-y]` | एक installed module हटाएँ |
+| `list [--user]` | installed modules सूचीबद्ध करें (दोनों scopes, `scope` column के साथ, जब तक `--user` न हो) |
+| `show <name> [--user]` | किसी module का manifest और उसकी files का sha256 प्रिंट करें |
+| `add <source> [--name N] [--user] [-y]` | git URL या local path से एक module install करें |
+| `remove <name> [--user] [-y]` | एक installed module हटाएँ |
 | `approve <name> [--user] [--sha256 H]` | समीक्षा के बाद एक module approve करें |
 | `approve --all [--user]` | उस scope का हर module जो approval की प्रतीक्षा में है, हर एक के लिए एक confirmation |
 
+`--user` project की जगह `~/.veles/modules/` को लक्षित करता है, इसलिए module हर project में
+load होता है। उसी नाम का project module user-level module को override कर देता है।
 Approval में terminal पर `yes` टाइप करना पड़ता है; terminal के बिना, आपने जिन files की समीक्षा की उनका
 hash (`show` इसे प्रिंट करता है) `--sha256` के रूप में दें — files के बाद में बदल जाने पर यह विफल हो
 जाता है। `veles doctor` disk पर मौजूद हर उस module की रिपोर्ट करता है जो load नहीं होता।

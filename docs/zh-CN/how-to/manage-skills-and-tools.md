@@ -49,9 +49,9 @@ veles tool promote <name>      # move to ~/.veles/tools/ (cross-project)
 模块是在 Veles 内部运行的 Python 代码（`module.toml` + 一个入口点）——在不让核心臃肿的前提下添加可选能力（记忆提供方、embeddings、vision、STT）。安装一个模块默认需要确认，并且只有当它的文件仍与你批准的内容一致时才会在每次运行中加载（参见[保持安装可信](extension-registries.md#keep-installs-honest)）。
 
 ```bash
-veles module list                              # both scopes, with a `scope` column
+veles module list                              # 两个作用域，带 `scope` 列
 veles module add https://github.com/org/module.git
-veles module add ./local-module --user          # install to ~/.veles/modules/, all projects
+veles module add ./local-module --user          # 安装到 ~/.veles/modules/，对所有项目生效
 veles module show <name> [--user]             # 清单 + 文件 sha256
 veles module remove <name> [--user]
 veles module approve <name> [--user]          # 在终端中输入 `yes`

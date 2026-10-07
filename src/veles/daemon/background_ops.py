@@ -191,7 +191,14 @@ def make_on_op_finished(state):
         def _deliver_final(h) -> None:
             if router is None:
                 return
-            text = h.final_text or notify_text
+            # Only the final text travels on this path, so the run's notices for the
+            # reply (a refused prompt) go in front of it, as a gateway would put them.
+            notes = [
+                str(e.get("text", ""))
+                for e in h.events
+                if e.get("type") == "notice" and not e.get("live")
+            ]
+            text = "\n\n".join([*notes, h.final_text or notify_text])
             t = loop.create_task(router.deliver(target, text))
             delivery_tasks.add(t)
             t.add_done_callback(delivery_tasks.discard)
@@ -207,6 +214,9 @@ def make_on_op_finished(state):
                 origin=target,
                 subagent_factory=getattr(state, "subagent_factory", None),
                 turn_lock=state.session_lock(session_id),
+                # No subscriber can answer a job-initiated turn's prompt: refuse at
+                # once rather than wait out the prompt timeout for each one.
+                refuse_prompts=True,
             )
         finally:
             reset_resume_depth(depth_token)

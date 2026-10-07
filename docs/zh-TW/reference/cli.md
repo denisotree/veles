@@ -163,14 +163,14 @@ veles [--no-wizard] <command> [subcommand] [options]
 
 | 子命令 | 用途 |
 |---|---|
-| `list` | 列出已安裝的模組 |
-| `show <name>` | 印出某模組的清單檔及其檔案的 sha256 |
-| `add <source> [--name N] [-y]` | 從 git URL 或本機路徑安裝模組 |
-| `remove <name> [-y]` | 刪除已安裝的模組 |
+| `list [--user]` | 列出已安裝的模組（除非使用 `--user`，否則列出兩個範圍，並附 `scope` 欄） |
+| `show <name> [--user]` | 印出某模組的清單檔及其檔案的 sha256 |
+| `add <source> [--name N] [--user] [-y]` | 從 git URL 或本機路徑安裝模組 |
+| `remove <name> [--user] [-y]` | 刪除已安裝的模組 |
 | `approve <name> [--user] [--sha256 H]` | 審閱後核准一個模組 |
 | `approve --all [--user]` | 該範圍內所有待核准的模組，每個各確認一次 |
 
-核准時會要求在終端機中輸入 `yes`；沒有終端機時，請把你審閱過的檔案雜湊值（`show` 會印出）以 `--sha256` 傳入——若檔案自那之後有變動則會失敗。`veles doctor` 會回報磁碟上每個未載入的模組。
+`--user` 針對 `~/.veles/modules/` 而非專案目錄，因此該模組會在每個專案中載入。同名的專案模組會覆寫使用者層級的模組。核准時會要求在終端機中輸入 `yes`；沒有終端機時，請把你審閱過的檔案雜湊值（`show` 會印出）以 `--sha256` 傳入——若檔案自那之後有變動則會失敗。`veles doctor` 會回報磁碟上每個未載入的模組。
 
 ### `veles registry search [query] [--kind K]`
 在已連接的登錄庫中搜尋（模組、技能、layout 包、MCP 配方）。

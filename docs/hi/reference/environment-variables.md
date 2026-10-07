@@ -66,7 +66,7 @@ strict JSON की अपेक्षा रखते हैं — फ़िल
 | `VELES_NO_WIZARD` | off | पहली बार चलने वाला wizard छोड़ें (TTY भी चाहिए) |
 | `VELES_MANAGER_MODE` | off | `veles run` के लिए multi-agent manager बाध्य करें (`1` on / `0` kill switch) |
 | `VELES_VERIFY_MODE` | off | `veles run` के लिए verify→escalate pass बाध्य करें (`1` on / `0` kill switch) |
-| `VELES_FENCED_TOOLS` | off | tools को fenced/sandboxed execution path में चलाएँ |
+| `VELES_FENCED_TOOLS` | on | native tool calling के बिना models के लिए text tool calls (reply में `veles-tool` blocks); `0`/`false`/`no`/`off` इन्हें बंद करते हैं |
 | `VELES_TRUST_AUTO_ALLOW` | off | trust ladder को bypass करें (CI / autopilot / pre-authorised sub-agents) |
 | `VELES_SANDBOX_ROOTS` | project + `~/.veles` | read/write sandbox roots का `:`-separated override |
 | `VELES_FETCH_ALLOW_PRIVATE` | off | tools को RFC-1918 / private addresses fetch करने दें |

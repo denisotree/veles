@@ -12,6 +12,7 @@ which API key env var to consult, theme is independent (any moment),
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 from dataclasses import dataclass
 
@@ -235,30 +236,36 @@ class ModelStep:
     title: str = "Step 4/6 — Default model"
 
     async def run(self, ctx: WizardContext) -> WizardOutcome:
-        from veles.cli.repl.model_fetcher import validate_and_fetch_models
         from veles.core.provider_factory import needs_api_key
         from veles.core.secrets import get_provider_key
 
         provider = ctx.answers["default_provider"]
-        api_status = ctx.answers.get("api_key_status", "")
         # Resolve the key the user just configured; for a provider without a
         # key this is a sentinel ("local"): a local adapter doesn't authenticate
         # but still serves /models, a CLI delegate lists its curated models.
+        # A deferred key that is in the keychain (an unreachable provider, a
+        # rejected key kept) is tried again: coming back here is the retry.
         if not needs_api_key(provider):
             api_key = "local"
-        elif api_status == "deferred":
-            # No key configured — fall back to curated list so the picker
-            # still shows the canonical names.
-            ctx.answers["default_model"] = None
-            return WizardOutcome.SKIP
         else:
             api_key = get_provider_key(provider) or ""
             if not api_key:
                 ctx.answers["default_model"] = None
                 return WizardOutcome.SKIP
 
-        ok, models, error = validate_and_fetch_models(provider, api_key)
-        if not ok:
+        status, models, error = await fetch_models_for(ctx, provider, api_key)
+        if status == "unreachable":
+            entered = await ask_model_id(
+                ctx, self.title, error, default=ctx.answers.get("default_model") or ""
+            )
+            nav = outcome_from_dismiss(entered)
+            if nav is not None:
+                return nav
+            typed = str(entered).strip()
+            ctx.answers["default_model"] = typed or None
+            ctx.answers["api_key_status"] = "deferred"
+            return WizardOutcome.NEXT if typed else WizardOutcome.SKIP
+        if status == "rejected":
             # Confirm + bounce: go BACK to ApiKeyStep so the user can
             # paste a correct key.
             retry = await ctx.app.push_screen_wait(
@@ -292,6 +299,30 @@ class ModelStep:
             return nav
         ctx.answers["default_model"] = result
         return WizardOutcome.NEXT
+
+
+async def fetch_models_for(
+    ctx: WizardContext, provider: str, api_key: str
+) -> tuple[str, list[str], str]:
+    """`validate_and_fetch_models` in a thread — bounded, but seconds long — with a
+    note on screen so the wait doesn't read as a hang."""
+    from veles.cli.repl.model_fetcher import FETCH_TIMEOUT_S, validate_and_fetch_models
+
+    ctx.app.notify(f"Checking {provider}'s models…", timeout=FETCH_TIMEOUT_S)
+    return await asyncio.to_thread(validate_and_fetch_models, provider, api_key)
+
+
+async def ask_model_id(ctx: WizardContext, title: str, error: str, default: str = "") -> object:
+    """The provider didn't answer (a closed network): ask for a model id instead of
+    blaming the key. Returns the screen's dismiss value (`outcome_from_dismiss`)."""
+    return await ctx.app.push_screen_wait(
+        InputScreen(
+            title=title,
+            prompt=f"Couldn't list models ({error}). Type a model id, or leave empty to "
+            "choose later.",
+            default=default,
+        )
+    )
 
 
 def model_choice_screen(

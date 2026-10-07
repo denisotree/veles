@@ -193,13 +193,15 @@ thay đổi kể từ đó. `-y` chỉ bỏ qua câu hỏi xác nhận khi có t
 
 | Lệnh con | Mục đích |
 |---|---|
-| `list` | Liệt kê các module đã cài đặt |
-| `show <name>` | In ra manifest của một module cùng sha256 của các file |
-| `add <source> [--name N] [-y]` | Cài đặt một module từ URL git hoặc đường dẫn cục bộ |
-| `remove <name> [-y]` | Xóa một module đã cài đặt |
+| `list [--user]` | Liệt kê các module đã cài đặt (cả hai phạm vi, kèm cột `scope`, trừ khi dùng `--user`) |
+| `show <name> [--user]` | In ra manifest của một module cùng sha256 của các file |
+| `add <source> [--name N] [--user] [-y]` | Cài đặt một module từ URL git hoặc đường dẫn cục bộ |
+| `remove <name> [--user] [-y]` | Xóa một module đã cài đặt |
 | `approve <name> [--user] [--sha256 H]` | Phê duyệt một module sau khi xem lại |
 | `approve --all [--user]` | Mọi module trong phạm vi đó đang chờ phê duyệt, mỗi module một lần xác nhận |
 
+`--user` nhắm tới `~/.veles/modules/` thay vì thư mục của dự án, nên module được nạp
+trong mọi dự án. Một module dự án trùng tên sẽ ghi đè module cấp user.
 Việc phê duyệt yêu cầu bạn gõ `yes` trong terminal; nếu không có terminal, hãy truyền
 hash của các file bạn đã xem lại (`show` sẽ in ra) qua `--sha256` — lệnh thất bại nếu
 các file đã thay đổi kể từ đó. `veles doctor` báo cáo mọi module trên đĩa không nạp được.

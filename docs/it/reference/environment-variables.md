@@ -69,7 +69,7 @@ richiesta viene ritentata senza, quindi di norma questo interruttore non serve.
 | `VELES_NO_WIZARD` | off | Salta la procedura guidata al primo avvio (richiede anche un TTY) |
 | `VELES_MANAGER_MODE` | off | Forza il manager multi-agente per `veles run` (`1` on / `0` kill switch) |
 | `VELES_VERIFY_MODE` | off | Forza il passaggio verify→escalate per `veles run` (`1` on / `0` kill switch) |
-| `VELES_FENCED_TOOLS` | off | Esegue i tool nel percorso di esecuzione recintato/in sandbox |
+| `VELES_FENCED_TOOLS` | attivo | Chiamate di tool testuali (blocchi `veles-tool` nella risposta) per i modelli senza tool calling nativo; `0`/`false`/`no`/`off` le disattivano |
 | `VELES_TRUST_AUTO_ALLOW` | off | Bypassa la scala di fiducia (CI / autopilot / sub-agenti pre-autorizzati) |
 | `VELES_SANDBOX_ROOTS` | progetto + `~/.veles` | Override separato da `:` delle radici della sandbox di lettura/scrittura |
 | `VELES_FETCH_ALLOW_PRIVATE` | off | Consente ai tool di raggiungere indirizzi RFC-1918 / privati |

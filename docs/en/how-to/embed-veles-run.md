@@ -1,6 +1,6 @@
 # How to embed `veles run` in another program
 
-> 🌐 **Languages:** **English** (other locales still to sync)
+> 🌐 **Languages:** **English** · [Русский](../../ru/how-to/embed-veles-run.md)
 
 `veles run` is the supported way to call Veles from another system — a monitoring
 pipeline, a CI step, a cron script. It is a plain subprocess: prompt in, answer on

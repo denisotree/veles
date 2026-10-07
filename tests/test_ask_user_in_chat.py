@@ -114,3 +114,86 @@ def test_asks_questions_reads_state_from_a_thread(tmp_path) -> None:
     worker.start()
     worker.join()
     assert seen == [True]
+
+
+@dataclass
+class _GatedAgent:
+    session_id: str
+
+    def run(self, prompt, *, on_text_delta=None, event_listener=None):
+        from veles.core.critical_ops import confirm_critical
+        from veles.core.permission.prompt import PromptRequest, current_prompter
+
+        prompter = current_prompter()
+        assert prompter is not None
+        answer = prompter(PromptRequest("run_shell", {"command": "ls"}, kind="approval"))
+        critical = confirm_critical("delete notes.txt", "")
+        return RunResult(
+            text=f"{answer.decision} {critical}", iterations=1, session_id=self.session_id
+        )
+
+
+def _gated_state(tmp_path, *, caps):
+    from veles.core.platforms import ChannelCaps
+
+    project = init_project(tmp_path / "proj", name="proj")
+    store = SessionStore(project.memory_db_path)
+
+    def factory(session_id, *, prompt=None, **_kw):
+        return _GatedAgent(session_id=session_id or store.create_session())
+
+    state = build_state(
+        project=project,
+        store=store,
+        token_store=TokenStore.load(tmp_path / "t.json"),
+        agent_factory=factory,
+    )
+    state.channel_caps["mail"] = ChannelCaps(asks_questions=caps)
+    return state, store
+
+
+async def test_a_channel_that_cannot_ask_refuses_at_once(tmp_path) -> None:
+    """Email can't show buttons: every prompt waited out the 300 s timeout."""
+    state, store = _gated_state(tmp_path, caps=False)
+    payload = await InProcessRunBackend(state).submit_run("go", origin="mail:a@b")
+    await asyncio.wait_for(asyncio.gather(*state.run_tasks), 5)
+    run = state.get_run(payload["run_id"])
+    assert run is not None
+    assert run.final_text == "deny False"
+    notices = [e for e in run.events if e.get("type") == "notice"]
+    assert len(notices) == 2 and all(not n["live"] for n in notices)
+    assert not any(str(e.get("type", "")).endswith("_prompt") for e in run.events)
+    store.close()
+
+
+def test_the_refusal_says_what_would_allow_it() -> None:
+    """`veles trust set` lifts a trust prompt, not a per-call approval nor a critical
+    op — those need a chat that can ask, or a terminal."""
+    from veles.core.permission.prompt import PromptRequest
+    from veles.daemon.channel_prompter import make_refusing_confirmer, make_refusing_prompter
+    from veles.daemon.runner import new_run_handle
+
+    async def scenario() -> list[str]:
+        handle = new_run_handle(session_id="s")
+        loop = asyncio.get_running_loop()
+        prompter = make_refusing_prompter(handle, loop)
+        prompter(PromptRequest("web_fetch", {}, kind="trust"))
+        prompter(PromptRequest("run_shell", {}, kind="approval"))
+        make_refusing_confirmer(handle, loop)("delete notes.txt", "")
+        await asyncio.sleep(0)
+        return [e["text"] for e in handle.events if e["type"] == "notice"]
+
+    trust, approval, critical = asyncio.run(scenario())
+    assert "veles trust set" in trust
+    assert "veles trust set" not in approval and "run_shell" in approval
+    assert "veles trust set" not in critical and "delete notes.txt" in critical
+
+
+def test_an_http_run_still_gets_prompts(tmp_path) -> None:
+    from veles.daemon.turns import refuses_prompts
+
+    state, store = _gated_state(tmp_path, caps=False)
+    assert refuses_prompts(state, None) is False  # the TUI answers over WebSocket
+    assert refuses_prompts(state, "mail:x") is True
+    assert refuses_prompts(state, "notrunning:x") is False
+    store.close()

@@ -61,7 +61,7 @@ advisor(`advisor_review`, verify 단계, goal 모드의 CHECK 단계에서 사�
 | `VELES_NO_WIZARD` | off | 첫 실행 마법사 건너뛰기(TTY도 필요) |
 | `VELES_MANAGER_MODE` | off | `veles run`에 멀티 에이전트 매니저 강제(`1` on / `0` 킬 스위치) |
 | `VELES_VERIFY_MODE` | off | `veles run`에 verify→escalate 패스 강제(`1` on / `0` 킬 스위치) |
-| `VELES_FENCED_TOOLS` | off | 펜스/샌드박스 실행 경로로 도구 실행 |
+| `VELES_FENCED_TOOLS` | 켜짐 | 네이티브 도구 호출이 없는 모델을 위한 텍스트 도구 호출(응답 안의 `veles-tool` 블록); `0`/`false`/`no`/`off`로 끔 |
 | `VELES_TRUST_AUTO_ALLOW` | off | 신뢰 사다리 우회(CI / 오토파일럿 / 사전 승인된 서브 에이전트) |
 | `VELES_SANDBOX_ROOTS` | 프로젝트 + `~/.veles` | 읽기/쓰기 샌드박스 루트의 `:`로 구분된 재정의 |
 | `VELES_FETCH_ALLOW_PRIVATE` | off | 도구가 RFC-1918 / 사설 주소를 가져오도록 허용 |

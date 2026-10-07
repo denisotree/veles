@@ -6,7 +6,7 @@ Veles는 [MCP](https://modelcontextprotocol.io/) **클라이언트**입니다. �
 
 ## 서버 설정
 
-`<project>/.veles/config.toml` (또는 사용자 전역 `~/.veles/config.toml`)에 `[mcp.servers.<name>]` 블록을 추가합니다. `<name>`은 `[A-Za-z0-9][A-Za-z0-9_-]{0,31}` 패턴과 일치해야 하며, 각 도구 이름의 일부가 됩니다. 지원하는 전송 방식은 `stdio`(기본값), `http`, `sse` 세 가지입니다.
+`<project>/.veles/config.toml`에 `[mcp.servers.<name>]` 블록을 추가합니다. 서버는 프로젝트 설정에서만 읽습니다. `<name>`은 `[A-Za-z0-9][A-Za-z0-9_-]{0,31}` 패턴과 일치해야 하며, 각 도구 이름의 일부가 됩니다. 지원하는 전송 방식은 `stdio`(기본값), `http`, `sse` 세 가지입니다.
 
 | 키 | 전송 방식 | 기본값 | 설명 |
 |---|---|---|---|

@@ -39,11 +39,6 @@ write_file = "always_confirm"
 [routing.tasks]                  # optional user-scope routing (see below)
 compressor = "openrouter:anthropic/claude-haiku-4.5"
 
-[mcp.servers.my-server]          # optional user-scope MCP servers
-transport = "stdio"
-command = "python"               # executable only — arguments go in `args`
-args = ["-m", "my_mcp_server"]
-
 [sandbox]
 enabled = true                   # run_shell в песочнице ОС; false — выключить
 ```

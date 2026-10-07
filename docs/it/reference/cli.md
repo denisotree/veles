@@ -197,13 +197,16 @@ cambiato nel frattempo. `-y` salta la richiesta solo in un terminale.
 
 | Sottocomando | Scopo |
 |---|---|
-| `list` | Elenca i moduli installati |
-| `show <name>` | Stampa il manifest di un modulo e lo sha256 dei suoi file |
-| `add <source> [--name N] [-y]` | Installa un modulo da un URL git o da un percorso locale |
-| `remove <name> [-y]` | Elimina un modulo installato |
+| `list [--user]` | Elenca i moduli installati (entrambi gli ambiti, con una colonna `scope`, a meno di `--user`) |
+| `show <name> [--user]` | Stampa il manifest di un modulo e lo sha256 dei suoi file |
+| `add <source> [--name N] [--user] [-y]` | Installa un modulo da un URL git o da un percorso locale |
+| `remove <name> [--user] [-y]` | Elimina un modulo installato |
 | `approve <name> [--user] [--sha256 H]` | Approva un modulo dopo averlo revisionato |
 | `approve --all [--user]` | Ogni modulo di quell'ambito in attesa di approvazione, una conferma per ciascuno |
 
+`--user` punta a `~/.veles/modules/` invece che alla directory del progetto, così il
+modulo si carica in ogni progetto. Un modulo di progetto con lo stesso nome ha la
+precedenza su uno a livello utente.
 L'approvazione chiede di digitare `yes` in un terminale; senza terminale, passa come
 `--sha256` l'hash dei file che hai revisionato (lo stampa `show`) — fallisce se i file
 sono cambiati nel frattempo. `veles doctor` segnala ogni modulo su disco che non si carica.

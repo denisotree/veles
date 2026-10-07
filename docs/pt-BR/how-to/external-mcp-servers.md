@@ -8,8 +8,8 @@ servidores MCP externos e expor as ferramentas deles ao agente como se fossem na
 
 ## Configurar um servidor
 
-Adicione um bloco `[mcp.servers.<name>]` ao `<project>/.veles/config.toml` (ou ao
-`~/.veles/config.toml` global do usuário). O `<name>` deve corresponder a
+Adicione um bloco `[mcp.servers.<name>]` ao `<project>/.veles/config.toml` — os
+servidores são lidos apenas da configuração do projeto. O `<name>` deve corresponder a
 `[A-Za-z0-9][A-Za-z0-9_-]{0,31}` — ele se torna parte do nome de cada ferramenta. Três
 transportes são suportados: `stdio` (padrão), `http`, `sse`.
 

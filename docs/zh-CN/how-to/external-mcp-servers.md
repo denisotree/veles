@@ -6,7 +6,7 @@ Veles 是一个 [MCP](https://modelcontextprotocol.io/) **客户端**：它可�
 
 ## 配置一个服务器
 
-在 `<project>/.veles/config.toml`（或用户全局的 `~/.veles/config.toml`）中添加一个 `[mcp.servers.<name>]` 块。`<name>` 必须匹配 `[A-Za-z0-9][A-Za-z0-9_-]{0,31}`——它会成为每个工具名称的一部分。支持三种传输方式：`stdio`（默认）、`http`、`sse`。
+在 `<project>/.veles/config.toml` 中添加一个 `[mcp.servers.<name>]` 块——服务器只从项目配置中读取。`<name>` 必须匹配 `[A-Za-z0-9][A-Za-z0-9_-]{0,31}`——它会成为每个工具名称的一部分。支持三种传输方式：`stdio`（默认）、`http`、`sse`。
 
 | 键 | 传输方式 | 默认值 | 用途 |
 |---|---|---|---|
