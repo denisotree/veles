@@ -70,6 +70,16 @@ def test_a_network_error_is_unreachable_and_401_is_rejected(monkeypatch) -> None
     assert model_fetcher.validate_and_fetch_models("openrouter", "sk")[0] == "rejected"
 
 
+def test_the_bounded_listing_sees_the_callers_context() -> None:
+    """A module provider lives in the module-registry ContextVar; the listing thread
+    must see it, or `veles models <module provider>` finds no provider."""
+    import contextvars
+
+    var: contextvars.ContextVar[str] = contextvars.ContextVar("v", default="unset")
+    var.set("caller")
+    assert model_fetcher._bounded(lambda: [var.get()], 5) == ["caller"]
+
+
 def test_anthropic_no_list_endpoint_returns_curated(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

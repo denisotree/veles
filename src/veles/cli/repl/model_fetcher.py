@@ -29,6 +29,7 @@ caller can tell the user why they're seeing the fallback.
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import os
 import threading
@@ -125,8 +126,10 @@ def _list_live(provider: str) -> list[str] | None:
 def _bounded(fn: Callable[[], list[str] | None], timeout: float) -> list[str] | None:
     """Run `fn` in a daemon thread for at most `timeout` s — the SDKs default to minutes
     with retries, and a closed network froze the wizard. A daemon thread never blocks
-    process exit; raises TimeoutError, or `fn`'s own error."""
+    process exit; raises TimeoutError, or `fn`'s own error. Runs in a copy of the
+    caller's context: a module provider lives in the module-registry ContextVar."""
     box: dict[str, Any] = {}
+    ctx = contextvars.copy_context()
 
     def run() -> None:
         try:
@@ -134,7 +137,7 @@ def _bounded(fn: Callable[[], list[str] | None], timeout: float) -> list[str] | 
         except Exception as exc:  # carried to the caller
             box["error"] = exc
 
-    worker = threading.Thread(target=run, daemon=True)
+    worker = threading.Thread(target=ctx.run, args=(run,), daemon=True)
     worker.start()
     worker.join(timeout)
     if worker.is_alive():
