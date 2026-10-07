@@ -89,10 +89,40 @@ shell、檔案編輯與網路工具、專案的 `.claude/` 設定與 hooks，以
 codex 會被拒絕，而不是在開放狀態下執行。它的 MCP 伺服器放在其引數中（沒有設定檔），只核可該伺服器的工具，
 而該伺服器取得的環境變數是按名稱轉發的——絕不會包含 `VELES_TRUST_AUTO_ALLOW`。
 
+### OS 沙箱中的 `run_shell`
+
+agent 透過 `run_shell` 執行的指令會在 OS 沙箱中運行——macOS 上是 `sandbox-exec`，Linux 上是
+`bwrap`（bubblewrap）——沙箱會讓下列路徑對它們唯讀：git hooks、`.git/config` 以及 `core.hooksPath` 目錄；
+上文列出的自動執行名稱（`.envrc`、`.claude/`、`.mcp.json` 等）的任意深度；專案的 `.veles/`，但 `skills/`、
+`tools/`、`tmp/`、`plans/`、`memory/` 與 `artifacts/` 除外；`~/.veles/`（核可、信任、你的模組）；
+shell 啟動檔（`~/.zshrc`、`~/.bashrc` 等）、`~/.ssh/`、`~/.gitconfig`、LaunchAgents 與自動啟動項目；
+以及 `~/.claude/`、`~/.codex/`、`~/.gemini/`。其餘一切照常運作：專案、`git commit`、套件快取、暫存目錄與網路。
+寫入被拒絕時，會提示 agent 去詢問你。
+
+`veles doctor` 會顯示沙箱是否處於啟用狀態。要關閉它，請在 `~/.veles/config.toml` 中設定
+`[sandbox] enabled = false`——專案自己的設定做不到這一點。
+
+在 Linux 上，`bwrap` 需要非特權使用者命名空間。Ubuntu 24.04 及更新版本透過 AppArmor 限制它們；
+可以用一個設定檔只為 `bwrap` 放行：
+
+```
+# /etc/apparmor.d/bwrap — then: sudo apparmor_parser -r /etc/apparmor.d/bwrap
+abi <abi/4.0>,
+include <tunables/global>
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
+```
+
+在 Docker 中，沙箱需要 `--security-opt seccomp=unconfined --security-opt apparmor=unconfined`。
+在它無法啟動的地方，`run_shell` 照舊執行，Veles 會警告一次。
+
 已知限制：
 
-- `run_shell` 就是一個 shell：一旦你授予它（或處於 autopilot 之下），它就能在沒有逐檔確認的情況下寫入上述任何檔案——以及 `~/.veles/` 中的核可儲存檔。`veles … approve` 需要終端機或已審閱的雜湊值（`--sha256`），並會拒絕由代理的 shell 啟動的指令，但已獲授權的 shell 可以抹除該標記或直接寫入這些檔案。
-- MCP 核可固定的是伺服器的命令列，而不是它從專案中執行的檔案（`args` 中指定的腳本）— 也請審查這些檔案。
+- 在沙箱未生效的地方，`run_shell` 就是一個 shell：一旦你授予它（或處於 autopilot 之下），它就能在沒有逐檔確認的情況下寫入上述任何檔案——以及 `~/.veles/` 中的核可儲存檔。`veles … approve` 需要終端機或已審閱的雜湊值（`--sha256`），並會拒絕由代理的 shell 啟動的指令，但已獲授權的 shell 可以抹除該標記或直接寫入這些檔案。
+- 沙箱保護的是寫入，而不是讀取，也不是網路。`PATH` 中的目錄（`~/.local/bin`）仍然可寫。
+- 在 Linux 上，沙箱只能保護已存在的路徑：新的 `.envrc`（或其他受保護的名稱）可以被建立，Veles 會向你回報並記入記憶日誌。
+- MCP 核可涵蓋 `command`/`args` 中指定的專案腳本，以及以 `-m` 執行的模組，但不涵蓋它們所匯入的檔案。
 - 使用 CLI provider 時，僅為自身預先授權工具的執行（daemon 背景工作、`veles research`）不會把授權傳遞給被委派的 CLI：
   預先授權存在於 Veles 行程中，而該 CLI 啟動的 MCP 伺服器是另一個獨立行程，因此其 Veles 工具需要常駐的
   `veles trust set` 授權或 autopilot 視窗。父執行的規劃模式同樣不會傳遞給它們。

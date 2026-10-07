@@ -43,6 +43,9 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 transport = "stdio"
 command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
+
+[sandbox]
+enabled = true                   # run_shell trong sandbox của hệ điều hành; false để tắt
 ```
 
 | Khóa | Kiểu | Mục đích |
@@ -52,6 +55,7 @@ args = ["-m", "my_mcp_server"]
 | `[user] default_model` | string | Model dùng khi không chỉ định |
 | `[user] tui_theme` | string | Chủ đề màu TUI mặc định |
 | `[permissions] <tool>` | policy | Chính sách quyền theo từng tool (xem [trust & sandbox](../explanation/trust-and-sandbox.md)) |
+| `[sandbox] enabled` | bool | `run_shell` trong sandbox của hệ điều hành (mặc định `true`); chỉ được đọc ở đây — `[sandbox]` của dự án bị bỏ qua (xem [bảo mật](../how-to/security-and-permissions.md)) |
 
 ---
 

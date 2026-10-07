@@ -108,15 +108,54 @@ suo server MCP va nei suoi argomenti (nessun file di config), vengono approvati 
 strumenti di quel server, e l'ambiente che quel server riceve viene inoltrato per nome —
 mai `VELES_TRUST_AUTO_ALLOW`.
 
+### `run_shell` in una sandbox del SO
+
+I comandi che l'agente esegue con `run_shell` girano in una sandbox del sistema
+operativo — `sandbox-exec` su macOS, `bwrap` (bubblewrap) su Linux — che rende questi
+percorsi in sola lettura per loro: gli hook di git, `.git/config` e la directory di
+`core.hooksPath`; i nomi a esecuzione automatica elencati sopra (`.envrc`, `.claude/`,
+`.mcp.json`, …) a qualsiasi profondità; il `.veles/` del progetto, tranne `skills/`,
+`tools/`, `tmp/`, `plans/`, `memory/` e `artifacts/`; `~/.veles/` (approvazioni, trust,
+i tuoi moduli); i file di avvio della shell (`~/.zshrc`, `~/.bashrc`, …), `~/.ssh/`,
+`~/.gitconfig`, i LaunchAgents e le voci di avvio automatico; e `~/.claude/`,
+`~/.codex/`, `~/.gemini/`. Tutto il resto funziona come prima: il progetto,
+`git commit`, le cache dei pacchetti, le directory temporanee e la rete. Una scrittura
+rifiutata dice all'agente di chiedere a te.
+
+`veles doctor` mostra se la sandbox è attiva. Per disattivarla, imposta
+`[sandbox] enabled = false` in `~/.veles/config.toml` — la config propria di un progetto
+non può farlo.
+
+Su Linux, `bwrap` richiede user namespace non privilegiati. Ubuntu 24.04 e successivi li
+limitano tramite AppArmor; consentili solo a `bwrap` con un profilo:
+
+```
+# /etc/apparmor.d/bwrap — then: sudo apparmor_parser -r /etc/apparmor.d/bwrap
+abi <abi/4.0>,
+include <tunables/global>
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
+```
+
+In Docker la sandbox richiede `--security-opt seccomp=unconfined --security-opt apparmor=unconfined`.
+Dove non riesce ad avviarsi, `run_shell` gira come prima e Veles avvisa una sola volta.
+
 Limiti noti:
 
-- `run_shell` è una shell: una volta che lo concedi (o sotto autopilot) può scrivere
-  qualsiasi dei file qui sopra senza la conferma per file — e gli archivi di approvazione
-  in `~/.veles/`. `veles … approve` richiede un terminale o l'hash revisionato (`--sha256`)
-  e rifiuta un comando avviato dalla shell dell'agente, ma una shell concessa può rimuovere
-  quel contrassegno o scrivere quei file direttamente.
-- Un'approvazione MCP fissa la riga di comando del server, non i file che esegue dal
-  progetto (uno script indicato in `args`) — rivedi anche quelli.
+- Dove la sandbox non è attiva, `run_shell` è una shell: una volta che lo concedi (o
+  sotto autopilot) può scrivere qualsiasi dei file qui sopra senza la conferma per file
+  — e gli archivi di approvazione in `~/.veles/`. `veles … approve` richiede un
+  terminale o l'hash revisionato (`--sha256`) e rifiuta un comando avviato dalla shell
+  dell'agente, ma una shell concessa può rimuovere quel contrassegno o scrivere quei
+  file direttamente.
+- La sandbox protegge le scritture, non le letture né la rete. Le directory nel tuo
+  `PATH` (`~/.local/bin`) restano scrivibili.
+- Su Linux la sandbox può proteggere solo i percorsi esistenti: un nuovo `.envrc` (o un
+  altro nome protetto) può essere creato, e Veles te lo segnala e lo registra nel
+  journal di memoria.
+- Un'approvazione MCP copre gli script del progetto indicati in `command`/`args` e i
+  moduli eseguiti con `-m`, non i file che questi importano.
 - Con un provider CLI, le esecuzioni che preautorizzano gli strumenti solo per sé stesse
   (job in background del daemon, `veles research`) non lo trasmettono alla CLI
   delegata: la preautorizzazione vive nel processo di Veles, e il server MCP avviato

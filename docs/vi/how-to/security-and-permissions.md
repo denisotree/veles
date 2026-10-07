@@ -102,15 +102,54 @@ của nó nằm trong tham số (không có tệp config), chỉ các công cụ
 duyệt, và môi trường server đó nhận được được chuyển tiếp theo tên — không bao giờ là
 `VELES_TRUST_AUTO_ALLOW`.
 
+### `run_shell` trong sandbox của hệ điều hành
+
+Các lệnh agent chạy bằng `run_shell` chạy trong một sandbox của hệ điều hành —
+`sandbox-exec` trên macOS, `bwrap` (bubblewrap) trên Linux — khiến các đường dẫn sau
+chỉ đọc đối với chúng: hook của git, `.git/config` và thư mục `core.hooksPath`; các
+tên tự chạy ở trên (`.envrc`, `.claude/`, `.mcp.json`, …) ở bất kỳ độ sâu nào;
+`.veles/` của dự án, trừ `skills/`, `tools/`, `tmp/`, `plans/`, `memory/` và
+`artifacts/`; `~/.veles/` (các phê duyệt, trust, module của bạn); các tệp khởi động
+của shell (`~/.zshrc`, `~/.bashrc`, …), `~/.ssh/`, `~/.gitconfig`, LaunchAgents và
+các mục tự khởi động; cùng `~/.claude/`, `~/.codex/`, `~/.gemini/`. Mọi thứ còn lại
+vẫn hoạt động như trước: dự án, `git commit`, cache gói, thư mục tạm và mạng. Khi một
+lần ghi bị từ chối, agent được nhắc hỏi bạn.
+
+`veles doctor` cho biết sandbox có đang hoạt động hay không. Để tắt nó, đặt
+`[sandbox] enabled = false` trong `~/.veles/config.toml` — config của chính dự án thì
+không tắt được.
+
+Trên Linux, `bwrap` cần user namespace không đặc quyền. Ubuntu 24.04 trở lên hạn chế
+chúng qua AppArmor; hãy cho phép chúng riêng cho `bwrap` bằng một profile:
+
+```
+# /etc/apparmor.d/bwrap — then: sudo apparmor_parser -r /etc/apparmor.d/bwrap
+abi <abi/4.0>,
+include <tunables/global>
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
+```
+
+Trong Docker, sandbox cần `--security-opt seccomp=unconfined --security-opt
+apparmor=unconfined`. Ở nơi nó không khởi động được, `run_shell` chạy như trước và
+Veles cảnh báo một lần.
+
 Các giới hạn đã biết:
 
-- `run_shell` là một shell: một khi bạn cấp quyền cho nó (hoặc dưới autopilot), nó có
-  thể ghi bất kỳ tệp nào ở trên mà không cần xác nhận theo từng tệp — và cả các kho
-  phê duyệt trong `~/.veles/`. `veles … approve` cần một terminal hoặc hash đã được xem
-  xét (`--sha256`) và từ chối lệnh do shell của agent khởi chạy, nhưng một shell đã
-  được cấp quyền vẫn có thể gỡ dấu đó hoặc ghi trực tiếp vào các tệp đó.
-- Một phê duyệt MCP ghim dòng lệnh của máy chủ, không ghim các tệp nó chạy từ dự án
-  (một script nêu trong `args`) — hãy xem xét cả chúng.
+- Ở nơi sandbox không hoạt động, `run_shell` là một shell: một khi bạn cấp quyền cho
+  nó (hoặc dưới autopilot), nó có thể ghi bất kỳ tệp nào ở trên mà không cần xác nhận
+  theo từng tệp — và cả các kho phê duyệt trong `~/.veles/`. `veles … approve` cần một
+  terminal hoặc hash đã được xem xét (`--sha256`) và từ chối lệnh do shell của agent
+  khởi chạy, nhưng một shell đã được cấp quyền vẫn có thể gỡ dấu đó hoặc ghi trực tiếp
+  vào các tệp đó.
+- Sandbox bảo vệ việc ghi, không bảo vệ việc đọc, cũng không bảo vệ mạng. Các thư mục
+  trong `PATH` của bạn (`~/.local/bin`) vẫn ghi được.
+- Trên Linux, sandbox chỉ bảo vệ được các đường dẫn đã tồn tại: một `.envrc` mới (hoặc
+  một tên được bảo vệ khác) vẫn có thể được tạo ra, và Veles báo cho bạn biết đồng thời
+  ghi vào nhật ký bộ nhớ.
+- Một phê duyệt MCP bao gồm các script của dự án nêu trong `command`/`args` và các
+  module chạy bằng `-m`, không bao gồm các tệp mà chúng import.
 - Với một provider CLI, các lần chạy chỉ tiền cấp quyền công cụ cho riêng mình (tác vụ
   nền của daemon, `veles research`) không truyền điều đó cho CLI được ủy quyền: việc
   tiền cấp quyền nằm trong tiến trình Veles, còn máy chủ MCP mà CLI khởi động là một

@@ -111,15 +111,56 @@ ouvert. Son serveur MCP passe dans ses arguments (pas de fichier de configuratio
 les outils de ce serveur sont approuvés, et l'environnement que reçoit ce serveur est
 transmis par nom — jamais `VELES_TRUST_AUTO_ALLOW`.
 
+### `run_shell` dans un bac à sable de l'OS
+
+Les commandes que l'agent lance avec `run_shell` s'exécutent dans un bac à sable de
+l'OS — `sandbox-exec` sur macOS, `bwrap` (bubblewrap) sur Linux — qui rend ces chemins
+en lecture seule pour elles : les hooks git, `.git/config` et le répertoire de
+`core.hooksPath` ; les noms à exécution automatique ci-dessus (`.envrc`, `.claude/`,
+`.mcp.json`, …) à n'importe quelle profondeur ; le `.veles/` du projet, sauf `skills/`,
+`tools/`, `tmp/`, `plans/`, `memory/` et `artifacts/` ; `~/.veles/` (approbations,
+confiance, vos modules) ; les fichiers de démarrage du shell (`~/.zshrc`, `~/.bashrc`,
+…), `~/.ssh/`, `~/.gitconfig`, les LaunchAgents et les entrées de démarrage
+automatique ; et `~/.claude/`, `~/.codex/`, `~/.gemini/`. Tout le reste fonctionne comme
+avant : le projet, `git commit`, les caches de paquets, les répertoires temporaires et
+le réseau. Une écriture refusée indique à l'agent de vous demander.
+
+`veles doctor` indique si le bac à sable est actif. Pour le désactiver, définissez
+`[sandbox] enabled = false` dans `~/.veles/config.toml` — la config propre à un projet
+ne le peut pas.
+
+Sous Linux, `bwrap` a besoin des user namespaces non privilégiés. Ubuntu 24.04 et les
+versions suivantes les restreignent via AppArmor ; autorisez-les pour `bwrap` seul avec
+un profil :
+
+```
+# /etc/apparmor.d/bwrap — then: sudo apparmor_parser -r /etc/apparmor.d/bwrap
+abi <abi/4.0>,
+include <tunables/global>
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
+```
+
+Dans Docker, le bac à sable a besoin de `--security-opt seccomp=unconfined --security-opt apparmor=unconfined`.
+Là où il ne peut pas démarrer, `run_shell` s'exécute comme avant et Veles prévient une
+seule fois.
+
 Limites connues :
 
-- `run_shell` est un shell : une fois que vous l'accordez (ou sous autopilot), il peut
-  écrire n'importe lequel des fichiers ci-dessus sans la confirmation par fichier — ainsi
-  que les magasins d'approbation dans `~/.veles/`. `veles … approve` exige un terminal ou
-  le hash relu (`--sha256`) et refuse une commande lancée par le shell de l'agent, mais
-  un shell accordé peut retirer cette marque ou écrire ces fichiers directement.
-- Une approbation MCP fige la ligne de commande du serveur, pas les fichiers qu'il
-  exécute depuis le projet (un script nommé dans `args`) — relisez-les aussi.
+- Là où le bac à sable n'est pas actif, `run_shell` est un shell : une fois que vous
+  l'accordez (ou sous autopilot), il peut écrire n'importe lequel des fichiers
+  ci-dessus sans la confirmation par fichier — ainsi que les magasins d'approbation
+  dans `~/.veles/`. `veles … approve` exige un terminal ou le hash relu (`--sha256`) et
+  refuse une commande lancée par le shell de l'agent, mais un shell accordé peut retirer
+  cette marque ou écrire ces fichiers directement.
+- Le bac à sable protège les écritures, pas les lectures ni le réseau. Les répertoires
+  de votre `PATH` (`~/.local/bin`) restent accessibles en écriture.
+- Sous Linux, le bac à sable ne peut protéger que les chemins qui existent : un nouveau
+  `.envrc` (ou un autre nom protégé) peut être créé, et Veles vous le signale et
+  l'inscrit dans le journal de mémoire.
+- Une approbation MCP couvre les scripts du projet nommés dans `command`/`args` et les
+  modules lancés avec `-m`, pas les fichiers qu'ils importent.
 - Avec un fournisseur CLI, les exécutions qui pré-autorisent des outils uniquement
   pour elles-mêmes (tâches d'arrière-plan du daemon, `veles research`) ne le
   transmettent pas à la CLI déléguée : la pré-autorisation vit dans le processus Veles, et

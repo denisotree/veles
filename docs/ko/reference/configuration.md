@@ -40,6 +40,9 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 transport = "stdio"
 command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
+
+[sandbox]
+enabled = true                   # OS 샌드박스 안의 run_shell; false면 끔
 ```
 
 | 키 | 타입 | 용도 |
@@ -49,6 +52,7 @@ args = ["-m", "my_mcp_server"]
 | `[user] default_model` | string | 모델이 지정되지 않았을 때 사용 |
 | `[user] tui_theme` | string | 기본 TUI 색상 테마 |
 | `[permissions] <tool>` | policy | 도구별 권한 정책([신뢰 & 샌드박스](../explanation/trust-and-sandbox.md) 참고) |
+| `[sandbox] enabled` | bool | OS 샌드박스 안의 `run_shell`(기본값 `true`); 여기서만 읽습니다 — 프로젝트의 `[sandbox]`는 무시됩니다([보안](../how-to/security-and-permissions.md) 참고) |
 
 ---
 

@@ -43,6 +43,9 @@ compressor = "openrouter:anthropic/claude-haiku-4.5"
 transport = "stdio"
 command = "python"               # executable only — arguments go in `args`
 args = ["-m", "my_mcp_server"]
+
+[sandbox]
+enabled = true                   # OS sandbox में run_shell; false इसे बंद करता है
 ```
 
 | Key | प्रकार | उद्देश्य |
@@ -52,6 +55,7 @@ args = ["-m", "my_mcp_server"]
 | `[user] default_model` | string | जब कोई न दिया हो तब उपयोग होने वाला model |
 | `[user] tui_theme` | string | Default TUI color theme |
 | `[permissions] <tool>` | policy | प्रति-tool permission policy (देखें [trust & sandbox](../explanation/trust-and-sandbox.md)) |
+| `[sandbox] enabled` | bool | OS sandbox में `run_shell` (default `true`); केवल यहीं पढ़ा जाता है — project का `[sandbox]` अनदेखा किया जाता है (देखें [security](../how-to/security-and-permissions.md)) |
 
 ---
 

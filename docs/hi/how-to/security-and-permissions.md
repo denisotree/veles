@@ -101,15 +101,49 @@ config अनदेखा करके, read-only sandbox के साथ औ�
 (कोई config file नहीं), केवल उसी server के tools approve होते हैं, और उस server को मिलने वाला
 environment नाम से forward किया जाता है — `VELES_TRUST_AUTO_ALLOW` कभी नहीं।
 
+### OS sandbox में `run_shell`
+
+agent जो commands `run_shell` से चलाता है वे OS sandbox में चलते हैं — macOS पर `sandbox-exec`,
+Linux पर `bwrap` (bubblewrap) — जो इन paths को उनके लिए read-only बना देता है: git hooks,
+`.git/config` और `core.hooksPath` directory; ऊपर बताए गए auto-run नाम (`.envrc`, `.claude/`,
+`.mcp.json`, …) किसी भी गहराई पर; project की `.veles/`, सिवाय `skills/`, `tools/`, `tmp/`,
+`plans/`, `memory/` और `artifacts/` के; `~/.veles/` (approvals, trust, आपके modules); shell
+start-up files (`~/.zshrc`, `~/.bashrc`, …), `~/.ssh/`, `~/.gitconfig`, LaunchAgents और autostart
+entries; और `~/.claude/`, `~/.codex/`, `~/.gemini/`। बाकी सब पहले की तरह काम करता है: project,
+`git commit`, package caches, temp dirs और network। अस्वीकार की गई write agent को आपसे पूछने के
+लिए कहती है।
+
+`veles doctor` दिखाता है कि sandbox सक्रिय है या नहीं। इसे बंद करने के लिए `~/.veles/config.toml` में
+`[sandbox] enabled = false` सेट करें — project की अपनी config ऐसा नहीं कर सकती।
+
+Linux पर `bwrap` को unprivileged user namespaces चाहिए। Ubuntu 24.04 और उसके बाद के संस्करण इन्हें
+AppArmor के ज़रिए सीमित करते हैं; इन्हें केवल `bwrap` के लिए एक profile से अनुमति दें:
+
+```
+# /etc/apparmor.d/bwrap — then: sudo apparmor_parser -r /etc/apparmor.d/bwrap
+abi <abi/4.0>,
+include <tunables/global>
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
+```
+
+Docker में sandbox को `--security-opt seccomp=unconfined --security-opt apparmor=unconfined` चाहिए।
+जहाँ यह शुरू नहीं हो पाता, वहाँ `run_shell` पहले की तरह चलता है और Veles एक बार चेतावनी देता है।
+
 ज्ञात सीमाएँ:
 
-- `run_shell` एक shell है: एक बार आप इसे grant कर दें (या autopilot में), यह ऊपर की किसी भी
-  file को per-file confirmation के बिना लिख सकता है — और `~/.veles/` के approval stores को भी।
+- जहाँ sandbox सक्रिय नहीं है, वहाँ `run_shell` एक shell है: एक बार आप इसे grant कर दें (या
+  autopilot में), यह ऊपर की किसी भी file को per-file confirmation के बिना लिख सकता है — और `~/.veles/` के approval stores को भी।
   `veles … approve` के लिए terminal या समीक्षा किया हुआ hash (`--sha256`) चाहिए
   और यह agent के shell द्वारा शुरू किए गए command को अस्वीकार कर देता है, लेकिन grant किया हुआ
   shell उस निशान को हटा सकता है या उन files को सीधे लिख सकता है।
-- MCP approval server की command line को pin करता है, उन files को नहीं जिन्हें वह project से
-  चलाता है (`args` में नामित script) — उन्हें भी review करें।
+- sandbox writes की रक्षा करता है, reads या network की नहीं। आपके `PATH` की directories
+  (`~/.local/bin`) writable रहती हैं।
+- Linux पर sandbox केवल मौजूदा paths की रक्षा कर सकता है: नया `.envrc` (या कोई अन्य सुरक्षित नाम)
+  बनाया जा सकता है, और Veles इसकी सूचना आपको देता है तथा memory log में दर्ज करता है।
+- MCP approval `command`/`args` में नामित project scripts और `-m` से चलाए गए modules को कवर करता है,
+  उन files को नहीं जिन्हें वे import करते हैं।
 - CLI provider के साथ, जो runs tools को केवल अपने लिए pre-authorise करते हैं (daemon background
   jobs, `veles research`) वे इसे delegated CLI तक नहीं पहुँचाते: pre-authorisation Veles process में
   रहता है, और CLI जो MCP server start करता है वह एक अलग process है, इसलिए उसके Veles tools को

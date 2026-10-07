@@ -88,10 +88,40 @@ shell、文件编辑和网络工具、项目的 `.claude/` 设置和钩子，以
 codex 会被拒绝，而不是在开放状态下运行。它的 MCP 服务器通过参数传入（没有配置文件），只批准该服务器的工具，
 并且该服务器获得的环境变量按名称转发——绝不会包含 `VELES_TRUST_AUTO_ALLOW`。
 
+### OS 沙箱中的 `run_shell`
+
+智能体通过 `run_shell` 运行的命令会在 OS 沙箱中执行——macOS 上是 `sandbox-exec`，Linux 上是
+`bwrap`（bubblewrap）——沙箱会让下列路径对它们只读：git 钩子、`.git/config` 以及 `core.hooksPath` 目录；
+上文列出的自动运行名称（`.envrc`、`.claude/`、`.mcp.json` 等）的任意深度；项目的 `.veles/`，但 `skills/`、
+`tools/`、`tmp/`、`plans/`、`memory/` 和 `artifacts/` 除外；`~/.veles/`（批准、信任、你的模块）；
+shell 启动文件（`~/.zshrc`、`~/.bashrc` 等）、`~/.ssh/`、`~/.gitconfig`、LaunchAgents 和自启动项；
+以及 `~/.claude/`、`~/.codex/`、`~/.gemini/`。其余一切照常工作：项目、`git commit`、包缓存、临时目录和网络。
+写入被拒绝时，会提示智能体去询问你。
+
+`veles doctor` 会显示沙箱是否处于活动状态。要关闭它，请在 `~/.veles/config.toml` 中设置
+`[sandbox] enabled = false`——项目自己的配置做不到这一点。
+
+在 Linux 上，`bwrap` 需要非特权用户命名空间。Ubuntu 24.04 及更高版本通过 AppArmor 限制它们；
+可以用一个配置文件只为 `bwrap` 放行：
+
+```
+# /etc/apparmor.d/bwrap — then: sudo apparmor_parser -r /etc/apparmor.d/bwrap
+abi <abi/4.0>,
+include <tunables/global>
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
+```
+
+在 Docker 中，沙箱需要 `--security-opt seccomp=unconfined --security-opt apparmor=unconfined`。
+在它无法启动的地方，`run_shell` 照旧运行，Veles 会警告一次。
+
 已知限制：
 
-- `run_shell` 就是一个 shell：一旦你授予它（或处于 autopilot 下），它就能在没有逐文件确认的情况下写入上述任何文件——以及 `~/.veles/` 中的批准存储。`veles … approve` 需要终端或已审阅的哈希（`--sha256`），并会拒绝由 agent 的 shell 启动的命令，但获得授权的 shell 可以抹掉该标记或直接写入这些文件。
-- MCP 批准固定的是服务器的命令行，而不是它从项目中运行的文件（`args` 中指定的脚本）——也请审查这些文件。
+- 在沙箱未生效的地方，`run_shell` 就是一个 shell：一旦你授予它（或处于 autopilot 下），它就能在没有逐文件确认的情况下写入上述任何文件——以及 `~/.veles/` 中的批准存储。`veles … approve` 需要终端或已审阅的哈希（`--sha256`），并会拒绝由 agent 的 shell 启动的命令，但获得授权的 shell 可以抹掉该标记或直接写入这些文件。
+- 沙箱保护的是写入，而不是读取，也不是网络。`PATH` 中的目录（`~/.local/bin`）仍然可写。
+- 在 Linux 上，沙箱只能保护已存在的路径：新的 `.envrc`（或其他受保护的名称）可以被创建，Veles 会向你报告并记入记忆日志。
+- MCP 批准涵盖 `command`/`args` 中指定的项目脚本以及用 `-m` 运行的模块，但不涵盖它们所导入的文件。
 - 使用 CLI 提供方时，仅为自身预先授权工具的运行（守护进程后台作业、`veles research`）不会把授权传递给被委派的 CLI：
   预先授权存在于 Veles 进程中，而该 CLI 启动的 MCP 服务器是另一个独立进程，因此其 Veles 工具需要长期的
   `veles trust set` 授权或 autopilot 窗口。父运行的规划模式同样不会传递给它们。
