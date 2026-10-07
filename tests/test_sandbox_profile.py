@@ -45,14 +45,16 @@ def test_profile_denies_then_reopens_holes_then_relocks() -> None:
 
 def test_names_match_any_case() -> None:
     prof = sandbox.sbpl_profile(_guard(Path("/w/proj")))
-    assert r"\.[eE][nN][vV][rR][cC](/|$)" in prof
-    assert r"\.[gG][iI][tT]/[hH][oO][oO][kK][sS](/|$)" in prof
+    # SBPL string form: the regex's backslashes are doubled.
+    assert r"\\.[eE][nN][vV][rR][cC](/|$)" in prof
+    assert r"\\.[gG][iI][tT]/[hH][oO][oO][kK][sS](/|$)" in prof
 
 
 def test_profile_escapes_odd_root_names() -> None:
     prof = sandbox.sbpl_profile(_guard(Path('/w/my "odd" proj')))
     assert '(subpath "/w/my \\"odd\\" proj/.git/hooks")' in prof
-    assert r'#"^/w/my \"odd\" proj/(.*/)?' in prof
+    assert r'(regex "^/w/my \"odd\" proj/(.*/)?' in prof
+    assert '#"' not in prof  # the raw-regex literal can't hold a quote
 
 
 def test_profile_uses_canonical_paths(tmp_path: Path) -> None:

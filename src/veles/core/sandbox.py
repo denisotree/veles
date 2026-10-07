@@ -123,13 +123,17 @@ def sbpl_profile(guard: ShellGuard) -> str:
     deny += [f'(literal "{_quoted(p)}")' for p in _no_rename(guard)]
     if guard.root is not None:
         root = _regex(str(guard.root))
-        deny += [f'(regex #"^{root}/(.*/)?{_any_case(n)}(/|$)")' for n in guard.readonly_names]
+        deny += [
+            f'(regex "{_quoted(f"^{root}/(.*/)?{_any_case(n)}(/|$)")}")'
+            for n in guard.readonly_names
+        ]
     lines = ["(version 1)", "(allow default)", f"(deny file-write* {' '.join(deny)})"]
     if guard.holes:
         holes = " ".join(f'(subpath "{_quoted(h)}")' for h in guard.holes)
         lines.append(f"(allow file-write* {holes})")
     if guard.relock_prefix is not None:
-        lines.append(f'(deny file-write* (regex #"^{_regex(str(guard.relock_prefix))}"))')
+        relock = _quoted("^" + _regex(str(guard.relock_prefix)))
+        lines.append(f'(deny file-write* (regex "{relock}"))')
     return "\n".join(lines)
 
 
@@ -194,13 +198,14 @@ def _absent_root_entries(guard: ShellGuard) -> tuple[Path, ...]:
     )
 
 
-def _quoted(p: Path) -> str:
-    return str(p).replace("\\", "\\\\").replace('"', '\\"')
+def _quoted(text: Path | str) -> str:
+    """An SBPL string body. Regexes go in the string form too: the `#"…"` literal can't
+    hold a `"` (a project dir named `my "odd" dir` broke the profile)."""
+    return str(text).replace("\\", "\\\\").replace('"', '\\"')
 
 
 def _regex(text: str) -> str:
-    escaped = "".join("\\" + c if c in _REGEX_META else c for c in text)
-    return escaped.replace('"', '\\"')
+    return "".join("\\" + c if c in _REGEX_META else c for c in text)
 
 
 def _any_case(name: str) -> str:
