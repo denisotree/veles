@@ -54,6 +54,20 @@ def test_a_named_registry_provider_installs_itself(
     assert "(named with --provider)" in capsys.readouterr().err
 
 
+def test_an_auto_install_names_the_python_packages_it_needs(
+    isolated_user_home: Path, fake_install: list[str], monkeypatch, capsys
+) -> None:
+    monkeypatch.setattr(
+        ensure,
+        "_resolve",
+        lambda spec: SimpleNamespace(
+            ref=spec, ext=SimpleNamespace(version="1", requires=("discord.py",))
+        ),
+    )
+    ensure.ensure_provider("antigravity-cli", reason="named with --provider")
+    assert "uv tool install veles-ai --with 'discord.py'" in capsys.readouterr().err
+
+
 def test_a_routed_provider_a_registry_offers_installs(
     isolated_user_home: Path, tmp_path: Path, fake_install: list[str], monkeypatch
 ) -> None:

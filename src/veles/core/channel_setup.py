@@ -77,7 +77,7 @@ def channel_readiness(project: Project, session: str | None = None) -> list[Chan
         try:
             spec = get_platform(name)
         except KeyError:
-            out.append(ChannelStatus(name, "no_module", "its module isn't installed"))
+            out.append(ChannelStatus(name, "no_module", _no_module_detail(name)))
             continue
         _, missing = resolve_secrets(spec, name, block, project=project)
         if missing:
@@ -85,6 +85,25 @@ def channel_readiness(project: Project, session: str | None = None) -> list[Chan
         else:
             out.append(ChannelStatus(name, "ok"))
     return out
+
+
+def _no_module_detail(name: str) -> str:
+    """ "Isn't installed" — unless a module failed to load in this process: then its
+    error, which is the real reason (the module named after the channel when there
+    is one, else every failure)."""
+    from veles.core.module_loading import load_failures
+
+    failures = load_failures()
+    if not failures:
+        return "its module isn't installed"
+    errors = [failures[name]] if name in failures else [f"{n}: {e}" for n, e in failures.items()]
+    detail = "its module failed to load — " + "; ".join(errors)
+    if "No module named" in detail:
+        detail += (
+            " — it may need a Python package: uv tool install veles-ai --with <package>"
+            " (see the module's README)"
+        )
+    return detail
 
 
 def no_channel_message(statuses: list[ChannelStatus], session: str | None) -> str:

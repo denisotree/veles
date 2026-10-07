@@ -125,6 +125,12 @@ def ensure_extension(
             user_scope=isinstance(need, (EngineNeed, PlatformNeed, ProviderNeed)),
             preapproved=auto,
         )
+        if auto:  # an interactive install showed its pip requirements before asking
+            from veles.core.registry.install import pip_hint
+
+            hint = pip_hint(found)
+            if hint:
+                print(hint, file=sys.stderr)
         return True
     except Exception as exc:  # registry down, declined, bad manifest, anything at all
         _warn(need, ref_for(need) or need.name, reason=str(exc))

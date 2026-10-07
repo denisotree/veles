@@ -37,6 +37,30 @@ def test_resolution_order_keychain_config_env(monkeypatch) -> None:
     assert values == {"bot_token": "env-bot"}
 
 
+def test_a_channel_whose_module_failed_to_load_says_why(tmp_path, monkeypatch) -> None:
+    """Not "its module isn't installed" — it is, and a missing package broke it."""
+    from veles.core import module_loading
+    from veles.core.channel_setup import channel_readiness
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path / "p", name="p")
+    (project.state_dir / "config.toml").write_text(
+        "[channels.discordish]\nenabled = true\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(module_loading, "_failures", {})
+    [status] = channel_readiness(project)
+    assert status.detail == "its module isn't installed"
+    monkeypatch.setattr(
+        module_loading,
+        "_failures",
+        {"discordish": "failed to import m.py: No module named 'discord'"},
+    )
+    [status] = channel_readiness(project)
+    assert status.state == "no_module"
+    assert "No module named 'discord'" in status.detail
+    assert "uv tool install veles-ai --with" in status.detail
+
+
 def test_each_secret_reads_its_own_slot(monkeypatch) -> None:
     store = {"slackish": "bot", "slackish.app_token": "app"}
     monkeypatch.setattr("veles.core.secrets.get_provider_key", lambda slot, **kw: store.get(slot))

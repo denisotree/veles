@@ -77,6 +77,28 @@ def test_doctor_reports_a_module_that_never_loads(tmp_path: Path) -> None:
     assert "veles module approve guard" in (res.fix_hint or "")
 
 
+def test_a_module_that_fails_to_load_is_recorded(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The reason a module was skipped outlives the stderr warning, so a channel
+    whose module didn't load can name it (missing Python package or a plain bug)."""
+    from veles.core import module_loading
+
+    monkeypatch.setattr(module_loading, "_failures", {})
+    project = init_project(tmp_path / "p", name="p")
+    needs = _user_module("needspkg")
+    (needs / "m.py").write_text("import not_a_real_pkg_xyz\n", encoding="utf-8")
+    broken = _user_module("broken")
+    (broken / "m.py").write_text("def register(api) oops\n", encoding="utf-8")
+    approve_module(needs, name="needspkg", project_root=None)
+    approve_module(broken, name="broken", project_root=None)
+    module_loading.load_project_modules(project)
+    failures = module_loading.load_failures()
+    assert "not_a_real_pkg_xyz" in failures["needspkg"]
+    assert "m.py, line 1" in failures["broken"]
+    assert "No module named" not in failures["broken"]
+
+
 def test_builtin_modules_load_once_across_threads(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
     barrier = threading.Barrier(4)
