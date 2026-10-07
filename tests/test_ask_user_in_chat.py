@@ -166,6 +166,29 @@ async def test_a_channel_that_cannot_ask_refuses_at_once(tmp_path) -> None:
     store.close()
 
 
+def test_the_refusal_says_what_would_allow_it() -> None:
+    """`veles trust set` lifts a trust prompt, not a per-call approval nor a critical
+    op — those need a chat that can ask, or a terminal."""
+    from veles.core.permission.prompt import PromptRequest
+    from veles.daemon.channel_prompter import make_refusing_confirmer, make_refusing_prompter
+    from veles.daemon.runner import new_run_handle
+
+    async def scenario() -> list[str]:
+        handle = new_run_handle(session_id="s")
+        loop = asyncio.get_running_loop()
+        prompter = make_refusing_prompter(handle, loop)
+        prompter(PromptRequest("web_fetch", {}, kind="trust"))
+        prompter(PromptRequest("run_shell", {}, kind="approval"))
+        make_refusing_confirmer(handle, loop)("delete notes.txt", "")
+        await asyncio.sleep(0)
+        return [e["text"] for e in handle.events if e["type"] == "notice"]
+
+    trust, approval, critical = asyncio.run(scenario())
+    assert "veles trust set" in trust
+    assert "veles trust set" not in approval and "run_shell" in approval
+    assert "veles trust set" not in critical and "delete notes.txt" in critical
+
+
 def test_an_http_run_still_gets_prompts(tmp_path) -> None:
     from veles.daemon.turns import refuses_prompts
 

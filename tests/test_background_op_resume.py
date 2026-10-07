@@ -142,6 +142,51 @@ def test_mapped_session_resumes_and_delivers_final_text(tmp_path: Path) -> None:
     assert target == "telegram:12345" and "продолжаю" in text
 
 
+def test_a_resume_turn_refuses_prompts_at_once_and_says_so(tmp_path: Path) -> None:
+    """A job-initiated turn has no subscriber to answer a prompt: each one waited out
+    the 300 s timeout. It refuses at once, and the refusal reaches the chat with the
+    answer (only the final text is delivered on this path)."""
+    from veles.core.chat_sessions import SessionMap, channel_session_path
+    from veles.daemon.background_ops import make_on_op_finished
+
+    project = _project(tmp_path)
+    router = _FakeRouter()
+
+    class _GatedResume:
+        def run(self, prompt, on_text_delta=None, event_listener=None):
+            from veles.core.permission.prompt import PromptRequest, current_prompter
+
+            prompter = current_prompter()
+            assert prompter is not None
+            answer = prompter(PromptRequest("run_shell", {"command": "ls"}, kind="approval"))
+
+            class _RR:
+                text = f"approval: {answer.decision}"
+                iterations = 1
+                stopped_reason = "completed"
+                session_id = "sess-1"
+
+            return _RR()
+
+    smap = SessionMap.load(channel_session_path("telegram"))
+    smap.set("12345", "sess-1")
+    smap.save()
+    state = _FakeState(
+        project=project,
+        agent_factory=lambda session_id, *, prompt=None: _GatedResume(),
+        delivery_router=router,
+    )
+    job = _job(project, deliver_to="telegram:12345")
+
+    async def scenario() -> None:
+        await asyncio.wait_for(make_on_op_finished(state)(job, "done"), 5)
+        await asyncio.sleep(0)  # the delivery task
+
+    asyncio.run(scenario())
+    [(_, text)] = router.delivered
+    assert "approval: deny" in text and "run_shell" in text
+
+
 def test_resume_into_a_stale_session_follows_the_session_the_factory_allocated(
     tmp_path: Path,
 ) -> None:

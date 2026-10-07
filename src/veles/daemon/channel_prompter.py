@@ -185,24 +185,27 @@ def make_refusing_prompter(handle: RunHandle, loop: asyncio.AbstractEventLoop) -
     the reply — confirming it is the user's job in a terminal or a chat that can ask."""
 
     def prompter(req: PromptRequest) -> PromptAnswer:
-        _refused(handle, loop, req.tool_name)
+        # A trust grant (`veles trust set`) lifts a trust prompt for good; an approval
+        # is asked per call, so only a chat that can ask (or a terminal) can give it.
+        _refused(handle, loop, req.tool_name, trust=req.kind == "trust")
         return PromptAnswer("deny")
 
     return prompter
 
 
 def make_refusing_confirmer(handle: RunHandle, loop: asyncio.AbstractEventLoop) -> Confirmer:
-    """`make_refusing_prompter`'s twin for `confirm_critical`."""
+    """`make_refusing_prompter`'s twin for `confirm_critical` — no grant lifts those."""
 
     def confirmer(op: str, summary: str) -> bool:
-        _refused(handle, loop, op)
+        _refused(handle, loop, op, trust=False)
         return False
 
     return confirmer
 
 
-def _refused(handle: RunHandle, loop: asyncio.AbstractEventLoop, what: str) -> None:
-    text = t("daemon.prompt_refused_no_buttons", what=what)
+def _refused(handle: RunHandle, loop: asyncio.AbstractEventLoop, what: str, *, trust: bool) -> None:
+    key = "daemon.prompt_refused_no_buttons" if trust else "daemon.prompt_refused_ask_elsewhere"
+    text = t(key, what=what)
     loop.call_soon_threadsafe(handle.append_event, {"type": "notice", "text": text, "live": False})
 
 
