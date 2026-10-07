@@ -86,6 +86,18 @@ def test_bwrap_order_pins_then_readonly_then_holes_then_relock(tmp_path: Path) -
     assert f"--ro-bind-try {root}/sub/.envrc {root}/sub/.envrc" in flat  # found by the walk
 
 
+def test_bwrap_creates_missing_holes_first(tmp_path: Path, monkeypatch) -> None:
+    """bwrap can't bind a path that doesn't exist: with `.veles/` read-only, a fresh
+    project's `.veles/tmp` could never be created (Linux CI)."""
+    from veles.core.project import init_project
+
+    project = init_project(tmp_path / "p", name="p")
+    monkeypatch.setattr(sandbox, "sandbox_status", lambda: sandbox.SandboxStatus("bwrap", True))
+    assert not (project.state_dir / "tmp").exists()
+    sandbox.wrap(["true"], project)
+    assert (project.state_dir / "tmp").is_dir() and (project.state_dir / "artifacts").is_dir()
+
+
 def test_disabled_runs_plain_and_quietly(monkeypatch, capsys) -> None:
     monkeypatch.setattr(sandbox, "_enabled", lambda: False)
     wrapped = sandbox.wrap(["bash", "-c", "true"], None)

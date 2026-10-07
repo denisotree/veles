@@ -9,6 +9,7 @@ caches, temp dirs and the network stay usable.
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import os
 import shutil
@@ -90,6 +91,11 @@ def wrap(argv: list[str], project: Project | None) -> Wrapped:
     guard = shell_guard(project)
     if status.kind == "sandbox-exec":
         return Wrapped(["sandbox-exec", "-p", sbpl_profile(guard), *argv], True)
+    # bwrap binds only existing paths: under a read-only `.veles/` a missing hole could
+    # never be created, so Veles makes its own agent dirs first.
+    for hole in guard.holes:
+        with contextlib.suppress(OSError):
+            hole.mkdir(parents=True, exist_ok=True)
     return Wrapped(bwrap_argv(guard, argv), True, _absent_root_entries(guard))
 
 
