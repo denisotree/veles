@@ -50,18 +50,20 @@ def _load_handles(handles: list[ModuleHandle], into: ModuleRegistry | None) -> M
         try:
             load_module(handle, registry)
         except ModuleLoadError as exc:
-            _failures[handle.name] = str(exc)
+            registry.load_errors[handle.name] = str(exc)
             _warn(f"skipping module {handle.name!r}: {shown(exc)}")
+        else:
+            registry.load_errors.pop(handle.name, None)
     return registry
 
 
-_failures: dict[str, str] = {}
-
-
 def load_failures() -> dict[str, str]:
-    """Modules this process skipped on load, name → error text — so a channel whose
-    module didn't load can say why instead of "isn't installed"."""
-    return dict(_failures)
+    """Modules the current registry skipped on load, name → error text — so a channel
+    whose module didn't load can say why instead of "isn't installed"."""
+    from veles.core.modules import current_module_registry
+
+    reg = current_module_registry()
+    return dict(reg.load_errors) if reg is not None else {}
 
 
 def load_project_modules(project: Project, into: ModuleRegistry | None = None) -> ModuleRegistry:

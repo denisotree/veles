@@ -39,26 +39,34 @@ def test_resolution_order_keychain_config_env(monkeypatch) -> None:
 
 def test_a_channel_whose_module_failed_to_load_says_why(tmp_path, monkeypatch) -> None:
     """Not "its module isn't installed" — it is, and a missing package broke it."""
-    from veles.core import module_loading
-    from veles.core.channel_setup import channel_readiness
+    from veles.core.channel_setup import channel_readiness, no_channel_message
+    from veles.core.modules import ModuleRegistry, reset_module_registry, set_module_registry
     from veles.core.project import init_project
 
     project = init_project(tmp_path / "p", name="p")
     (project.state_dir / "config.toml").write_text(
         "[channels.discordish]\nenabled = true\n", encoding="utf-8"
     )
-    monkeypatch.setattr(module_loading, "_failures", {})
-    [status] = channel_readiness(project)
-    assert status.detail == "its module isn't installed"
-    monkeypatch.setattr(
-        module_loading,
-        "_failures",
-        {"discordish": "failed to import m.py: No module named 'discord'"},
-    )
-    [status] = channel_readiness(project)
-    assert status.state == "no_module"
-    assert "No module named 'discord'" in status.detail
-    assert "uv tool install veles-ai --with" in status.detail
+    reg = ModuleRegistry()
+    token = set_module_registry(reg)
+    try:
+        [status] = channel_readiness(project)
+        assert (status.state, status.detail) == ("no_module", "its module isn't installed")
+        # Another module's failure doesn't make this one "failed to load".
+        reg.load_errors["other"] = "failed to import m.py: No module named 'x'"
+        [status] = channel_readiness(project)
+        assert status.state == "no_module" and "isn't installed" in status.detail
+        assert "other" in status.detail and "uv tool install" not in status.detail
+        reg.load_errors["discordish"] = "failed to import m.py: No module named 'discord'"
+        [status] = channel_readiness(project)
+        assert status.state == "load_failed"
+        assert "No module named 'discord'" in status.detail
+        assert "uv tool install veles-ai --with" in status.detail
+        # Reinstalling an installed module doesn't fix its import.
+        message = no_channel_message([status], None)
+        assert "veles doctor" in message and "registry install" not in message
+    finally:
+        reset_module_registry(token)
 
 
 def test_each_secret_reads_its_own_slot(monkeypatch) -> None:

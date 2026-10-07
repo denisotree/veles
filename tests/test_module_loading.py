@@ -83,8 +83,8 @@ def test_a_module_that_fails_to_load_is_recorded(
     """The reason a module was skipped outlives the stderr warning, so a channel
     whose module didn't load can name it (missing Python package or a plain bug)."""
     from veles.core import module_loading
+    from veles.core.modules import reset_module_registry, set_module_registry
 
-    monkeypatch.setattr(module_loading, "_failures", {})
     project = init_project(tmp_path / "p", name="p")
     needs = _user_module("needspkg")
     (needs / "m.py").write_text("import not_a_real_pkg_xyz\n", encoding="utf-8")
@@ -92,11 +92,21 @@ def test_a_module_that_fails_to_load_is_recorded(
     (broken / "m.py").write_text("def register(api) oops\n", encoding="utf-8")
     approve_module(needs, name="needspkg", project_root=None)
     approve_module(broken, name="broken", project_root=None)
-    module_loading.load_project_modules(project)
-    failures = module_loading.load_failures()
-    assert "not_a_real_pkg_xyz" in failures["needspkg"]
-    assert "m.py, line 1" in failures["broken"]
-    assert "No module named" not in failures["broken"]
+    reg = module_loading.load_project_modules(project)
+    assert module_loading.load_failures() == {}  # another registry's — not this one's
+    token = set_module_registry(reg)
+    try:
+        failures = module_loading.load_failures()
+        assert "not_a_real_pkg_xyz" in failures["needspkg"]
+        assert "m.py, line 1" in failures["broken"]
+        assert "No module named" not in failures["broken"]
+        # Fixed and loaded again into the same registry: no longer a failure.
+        (broken / "m.py").write_text("def register(api):\n    pass\n", encoding="utf-8")
+        approve_module(broken, name="broken", project_root=None)
+        module_loading.load_project_modules(project, into=reg)
+        assert set(module_loading.load_failures()) == {"needspkg"}
+    finally:
+        reset_module_registry(token)
 
 
 def test_builtin_modules_load_once_across_threads(monkeypatch: pytest.MonkeyPatch) -> None:

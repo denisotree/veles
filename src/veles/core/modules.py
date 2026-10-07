@@ -87,6 +87,8 @@ class ModuleRegistry:
         self.modules: list[str] = []
         # Module name → its directory, for modules loaded from one (their `skills/`).
         self.module_dirs: dict[str, Path] = {}
+        # Module name → why it didn't load into this registry (`module_loading`).
+        self.load_errors: dict[str, str] = {}
 
     def add_contribution(self, point: str, name: str, module_name: str, obj: object) -> None:
         """`ValueError` for an unknown point, an object the point doesn't take, or a
