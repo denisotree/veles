@@ -55,13 +55,16 @@ from __future__ import annotations
 
 import configparser
 import logging
+import os
 import subprocess
 import unicodedata
+from dataclasses import dataclass
 from pathlib import Path
 
 from veles.core.delegate_dir import DIR_PREFIX as _DELEGATE_PREFIX
 from veles.core.path_guard import is_inside
 from veles.core.project import Project
+from veles.core.user_paths import user_home
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +266,85 @@ def _git_hooks_dir(root: Path) -> Path | None:
         return None
 
 
+# Files under $HOME that run without an explicit command, and the agent CLIs' config:
+# closed for run_shell (release F). `~/.veles` (approvals, trust, user modules) is added
+# from `user_home()`.
+_HOME_AUTORUN: tuple[str, ...] = (
+    ".bashrc",
+    ".bash_profile",
+    ".bash_login",
+    ".profile",
+    ".zshrc",
+    ".zprofile",
+    ".zshenv",
+    ".zlogin",
+    ".config/fish",
+    ".ssh",
+    ".gitconfig",
+    ".config/git",
+    "Library/LaunchAgents",
+    ".config/autostart",
+    ".config/systemd/user",
+    ".claude",
+    ".claude.json",
+    ".codex",
+    ".gemini",
+)
+# Where git runs code from, at any depth (objects, refs and the index stay writable).
+_GIT_CODE: tuple[str, ...] = (".git/hooks", ".git/config", ".git/config.worktree")
+
+
+@dataclass(frozen=True, slots=True)
+class ShellGuard:
+    """What the agent's `run_shell` may not write (`core/sandbox.py` enforces it): the
+    paths the file tools refuse or hard-confirm, plus the user's own auto-run files.
+    Canonical paths — a sandbox profile with a symlinked path protects nothing."""
+
+    root: Path | None
+    readonly: tuple[Path, ...]
+    readonly_names: tuple[str, ...]
+    holes: tuple[Path, ...]
+    relock_prefix: Path | None
+    pinned: tuple[Path, ...]
+
+
+def shell_guard(project: Project | None) -> ShellGuard:
+    home = Path.home()
+    paths: list[Path] = [user_home(), *(home / rel for rel in _HOME_AUTORUN)]
+    if project is None:
+        return ShellGuard(None, _canonical(paths), (), (), None, ())
+    root = Path(os.path.realpath(project.root))
+    git = root / ".git"
+    paths += [root / rel for rel in _GIT_CODE]
+    paths += [*sorted(git.glob("modules/*/hooks")), *sorted(git.glob("modules/*/config"))]
+    paths += [root / name for name in sorted(_CONFIRM_NAMES - {".git"})]
+    paths += _protected_targets(project)
+    paths.append(project.state_dir)
+    state = Path(os.path.realpath(project.state_dir))
+    holes = [state / n for n in AGENT_WRITABLE_STATE if not (project.state_dir / n).is_symlink()]
+    names = tuple(sorted((_CONFIRM_NAMES - {".git"}) | _MANAGED_NAMES)) + _GIT_CODE
+    return ShellGuard(
+        root=root,
+        readonly=_canonical(paths),
+        readonly_names=names,
+        holes=tuple(holes),
+        relock_prefix=state / "tmp" / _DELEGATE_PREFIX,
+        pinned=(root, Path(os.path.realpath(git))),
+    )
+
+
+def _canonical(paths: list[Path]) -> tuple[Path, ...]:
+    """`realpath` of each (a missing tail stays as written), plus the path as written
+    when it is a symlink — replacing the link must be refused too. Order kept, no dups."""
+    out: dict[Path, None] = {}
+    for p in paths:
+        absolute = Path(os.path.abspath(p))
+        out[Path(os.path.realpath(absolute))] = None
+        if absolute.is_symlink():
+            out[absolute] = None
+    return tuple(out)
+
+
 def _state_verdict(project: Project, abs_path: Path) -> bool | None:
     """None outside Veles-managed paths; inside the project's `.veles/`, whether
     the agent may write there. Decided by file identity (`is_inside`), not
@@ -322,4 +404,11 @@ def _effective_writable_zones(project: Project) -> list[str]:
     return list(pack.manifest.writable_path_strings())
 
 
-__all__ = ["AGENT_WRITABLE_STATE", "is_veles_managed", "is_writable", "writable_zones"]
+__all__ = [
+    "AGENT_WRITABLE_STATE",
+    "ShellGuard",
+    "is_veles_managed",
+    "is_writable",
+    "shell_guard",
+    "writable_zones",
+]
