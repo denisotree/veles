@@ -160,6 +160,7 @@ files = [
     "src/veles/core/session_state.py",
     "src/veles/core/memory/schema.py",
     "src/veles/core/registry",
+    "src/veles/core/sandbox.py",
     "src/veles/runtime/prompt.py",
     "src/veles/daemon/runner.py",
     "src/veles/daemon/http_util.py",
