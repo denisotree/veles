@@ -6,8 +6,8 @@ import subprocess
 from veles.core.context import current_project
 from veles.core.critical_ops import AGENT_SHELL_ENV
 from veles.core.path_guard import sandbox_cwd
-from veles.core.sandbox import notes, wrap
 from veles.core.risk import RiskClass
+from veles.core.sandbox import notes, wrap
 from veles.core.tools.registry import tool
 
 _MAX_OUTPUT_BYTES = 8 * 1024
