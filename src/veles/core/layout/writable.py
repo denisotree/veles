@@ -338,7 +338,7 @@ def _canonical(paths: list[Path]) -> tuple[Path, ...]:
     when it is a symlink — replacing the link must be refused too. Order kept, no dups."""
     out: dict[Path, None] = {}
     for p in paths:
-        absolute = Path(os.path.abspath(p))
+        absolute = p.absolute()  # not resolve(): the link itself must stay in the set
         out[Path(os.path.realpath(absolute))] = None
         if absolute.is_symlink():
             out[absolute] = None
