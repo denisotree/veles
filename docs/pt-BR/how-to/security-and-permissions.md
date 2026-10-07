@@ -110,15 +110,18 @@ ambiente que esse servidor recebe é repassado por nome — nunca `VELES_TRUST_A
 
 Os comandos que o agente executa com `run_shell` rodam em um sandbox do SO —
 `sandbox-exec` no macOS, `bwrap` (bubblewrap) no Linux — que torna estes caminhos
-somente leitura para eles: hooks do git, `.git/config` e o diretório `core.hooksPath`;
+somente leitura para eles: os hooks e a config de cada repo do projeto (em um worktree
+ou submódulo, os do repo principal), todo arquivo de configuração que o git lê (seus
+includes, `~/.gitconfig`, o do sistema) e o diretório `core.hooksPath`;
 os nomes de execução automática acima (`.envrc`, `.claude/`, `.mcp.json`, …) em
 qualquer profundidade; o `.veles/` do projeto, exceto `skills/`, `tools/`, `tmp/`,
 `plans/`, `memory/` e `artifacts/`; `~/.veles/` (aprovações, confiança, seus módulos);
 arquivos de inicialização do shell (`~/.zshrc`, `~/.bashrc`, …), `~/.ssh/`,
-`~/.gitconfig`, LaunchAgents e entradas de inicialização automática; e `~/.claude/`,
-`~/.codex/`, `~/.gemini/`. Todo o resto funciona como antes: o projeto, `git commit`,
-caches de pacotes, diretórios temporários e a rede. Uma escrita recusada diz ao agente
-para perguntar a você.
+LaunchAgents e entradas de inicialização automática; e `~/.claude/`,
+`~/.codex/`, `~/.gemini/`. Esses caminhos, seus diretórios pais e os repos também não
+podem ser contornados renomeando-os. Todo o resto funciona como antes: o projeto,
+`git commit`, um novo repo (`git init`, `git clone`), caches de pacotes, diretórios
+temporários e a rede. Uma escrita recusada diz ao agente para perguntar a você.
 
 `veles doctor` mostra se o sandbox está ativo. Para desligá-lo, defina
 `[sandbox] enabled = false` em `~/.veles/config.toml` — a config do próprio projeto não
@@ -150,11 +153,18 @@ Limites conhecidos:
   arquivos diretamente.
 - O sandbox protege escritas, não leituras nem a rede. Os diretórios no seu `PATH`
   (`~/.local/bin`) continuam graváveis.
-- No Linux, o sandbox só consegue proteger caminhos que existem: um novo `.envrc` (ou
-  outro nome protegido) pode ser criado, e o Veles avisa você e registra no log de
-  memória.
+- Ele detém os processos do próprio comando, não um serviço a quem o comando pede que
+  aja em seu nome: um contêiner iniciado com `docker run -v …`, `systemd-run`,
+  `launchctl` ou `osascript` escreve como você.
+- Um repo que o comando cria (`git init`) só fica protegido a partir do próximo comando;
+  o Veles avisa você sobre um novo repo na raiz do projeto.
+- No Linux, o sandbox só consegue proteger caminhos que existem e encontra nomes
+  protegidos até seis níveis de profundidade no projeto: um novo `.envrc` na raiz ou um
+  novo arquivo de inicialização na sua home (`~/.bash_profile`) pode ser criado — o
+  Veles avisa você e registra no log de memória — e um link simbólico no caminho até o
+  projeto (`~/code` → `/Volumes/…`) pode ser substituído. O macOS recusa os dois.
 - Uma aprovação de MCP cobre os scripts do projeto citados em `command`/`args` e os
-  módulos executados com `-m`, não os arquivos que eles importam.
+  módulos executados com `-m` (na raiz ou em `src/`), não os arquivos que eles importam.
 - Com um provedor CLI, execuções que pré-autorizam tools só para si mesmas (jobs em
   segundo plano do daemon, `veles research`) não repassam isso à CLI delegada: a
   pré-autorização vive no processo do Veles, e o servidor MCP que a CLI inicia é outro,

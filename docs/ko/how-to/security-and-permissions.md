@@ -59,7 +59,7 @@ veles secret set OPENROUTER_API_KEY --project myproj   # 한 프로젝트 전용
 
 ### OS 샌드박스 안의 `run_shell`
 
-에이전트가 `run_shell`로 실행하는 명령은 OS 샌드박스 — macOS에서는 `sandbox-exec`, Linux에서는 `bwrap`(bubblewrap) — 안에서 실행되며, 이 샌드박스는 다음 경로를 읽기 전용으로 만듭니다: git 훅, `.git/config`, `core.hooksPath` 디렉터리; 위에 나열한 자동 실행 이름(`.envrc`, `.claude/`, `.mcp.json`, …)(어떤 깊이든); 프로젝트의 `.veles/`(`skills/`, `tools/`, `tmp/`, `plans/`, `memory/`, `artifacts/` 제외); `~/.veles/`(승인, 신뢰, 사용자의 모듈); 셸 시작 파일(`~/.zshrc`, `~/.bashrc`, …), `~/.ssh/`, `~/.gitconfig`, LaunchAgents와 자동 시작 항목; 그리고 `~/.claude/`, `~/.codex/`, `~/.gemini/`. 그 밖의 것은 이전과 같이 동작합니다: 프로젝트, `git commit`, 패키지 캐시, 임시 디렉터리, 네트워크. 쓰기가 거부되면 에이전트에게 사용자에게 물어보라고 안내합니다.
+에이전트가 `run_shell`로 실행하는 명령은 OS 샌드박스 — macOS에서는 `sandbox-exec`, Linux에서는 `bwrap`(bubblewrap) — 안에서 실행되며, 이 샌드박스는 다음 경로를 읽기 전용으로 만듭니다: 프로젝트 안 모든 저장소의 훅과 설정(worktree나 서브모듈이라면 메인 저장소의 것), git이 읽는 모든 설정 파일(그 include, `~/.gitconfig`, 시스템 설정), `core.hooksPath` 디렉터리; 위에 나열한 자동 실행 이름(`.envrc`, `.claude/`, `.mcp.json`, …)(어떤 깊이든); 프로젝트의 `.veles/`(`skills/`, `tools/`, `tmp/`, `plans/`, `memory/`, `artifacts/` 제외); `~/.veles/`(승인, 신뢰, 사용자의 모듈); 셸 시작 파일(`~/.zshrc`, `~/.bashrc`, …), `~/.ssh/`, LaunchAgents와 자동 시작 항목; 그리고 `~/.claude/`, `~/.codex/`, `~/.gemini/`. 이 경로들과 그 상위 디렉터리, 저장소는 이름을 바꿔서 피할 수도 없습니다. 그 밖의 것은 이전과 같이 동작합니다: 프로젝트, `git commit`, 새 저장소(`git init`, `git clone`), 패키지 캐시, 임시 디렉터리, 네트워크. 쓰기가 거부되면 에이전트에게 사용자에게 물어보라고 안내합니다.
 
 `veles doctor`는 샌드박스가 활성 상태인지 보여 줍니다. 끄려면 `~/.veles/config.toml`에 `[sandbox] enabled = false`를 설정하세요 — 프로젝트 자체의 설정으로는 끌 수 없습니다.
 
@@ -80,8 +80,10 @@ Docker에서는 샌드박스에 `--security-opt seccomp=unconfined --security-op
 
 - 샌드박스가 활성 상태가 아닌 곳에서 `run_shell`은 셸입니다. 이를 부여하면(또는 자동 조종 중에는) 파일별 확인 없이 위의 어떤 파일에도, 그리고 `~/.veles/`의 승인 저장소에도 쓸 수 있습니다. `veles … approve`는 터미널 또는 검토한 해시(`--sha256`)가 필요하며 에이전트의 셸이 시작한 명령은 거부하지만, 부여된 셸은 그 표시를 지우거나 해당 파일을 직접 쓸 수 있습니다.
 - 샌드박스는 쓰기를 보호하며, 읽기와 네트워크는 보호하지 않습니다. `PATH`에 있는 디렉터리(`~/.local/bin`)는 계속 쓸 수 있습니다.
-- Linux에서 샌드박스는 이미 존재하는 경로만 보호할 수 있습니다. 새 `.envrc`(또는 보호 대상인 다른 이름)는 만들어질 수 있으며, Veles는 이를 사용자에게 알리고 메모리 로그에 기록합니다.
-- MCP 승인은 `command`/`args`에 지정된 프로젝트 스크립트와 `-m`으로 실행되는 모듈을 포괄하지만, 그것들이 import하는 파일은 포괄하지 않습니다.
+- 샌드박스는 명령 자신의 프로세스를 막을 뿐, 명령이 자기 대신 동작해 달라고 요청하는 서비스는 막지 못합니다. `docker run -v …`로 띄운 컨테이너, `systemd-run`, `launchctl`, `osascript`는 사용자 권한으로 씁니다.
+- 명령이 만든 저장소(`git init`)는 다음 명령부터 보호됩니다. 프로젝트 루트에 새 저장소가 생기면 사용자에게 알립니다.
+- Linux에서 샌드박스는 이미 존재하는 경로만 보호할 수 있고, 보호 대상 이름은 프로젝트 안 여섯 단계 깊이까지 찾아냅니다. 루트의 새 `.envrc`나 홈의 새 시작 파일(`~/.bash_profile`)은 만들어질 수 있으며, Veles는 이를 사용자에게 알리고 메모리 로그에 기록합니다. 또 프로젝트로 가는 경로 위의 심볼릭 링크(`~/code` → `/Volumes/…`)는 교체될 수 있습니다. macOS는 둘 다 거부합니다.
+- MCP 승인은 `command`/`args`에 지정된 프로젝트 스크립트와 `-m`으로 실행되는 모듈(루트 또는 `src/` 아래)을 포괄하지만, 그것들이 import하는 파일은 포괄하지 않습니다.
 - CLI 제공자를 쓸 때, 자기 자신에게만 도구를 미리 승인하는 실행(데몬 백그라운드 작업, `veles research`)은 그 승인을 위임된 CLI에 넘기지 않습니다. 사전 승인은 Veles 프로세스 안에 있고 CLI가 시작하는 MCP 서버는 별개의 프로세스이므로, 해당 CLI의 Veles 도구에는 상시 `veles trust set` 부여나 자동 조종 구간이 필요합니다. 부모 실행의 계획 모드도 마찬가지로 전달되지 않습니다.
 - `antigravity-cli`는 agy가 워크스페이스의 `.agents/hooks.json`을 따른다는 점에 의존합니다. 워크스페이스 훅 읽기를 중단한 agy 릴리스에서는 `--dangerously-skip-permissions` 아래에서 agy 자체의 도구가 열려 있게 됩니다.
 

@@ -104,13 +104,15 @@ environment नाम से forward किया जाता है — `VELES
 ### OS sandbox में `run_shell`
 
 agent जो commands `run_shell` से चलाता है वे OS sandbox में चलते हैं — macOS पर `sandbox-exec`,
-Linux पर `bwrap` (bubblewrap) — जो इन paths को उनके लिए read-only बना देता है: git hooks,
-`.git/config` और `core.hooksPath` directory; ऊपर बताए गए auto-run नाम (`.envrc`, `.claude/`,
+Linux पर `bwrap` (bubblewrap) — जो इन paths को उनके लिए read-only बना देता है: project के हर repo के
+hooks और config (worktree या submodule के लिए, मुख्य repo के), git जो हर config file पढ़ता है (उसके
+includes, `~/.gitconfig`, system वाली) और `core.hooksPath` directory; ऊपर बताए गए auto-run नाम (`.envrc`, `.claude/`,
 `.mcp.json`, …) किसी भी गहराई पर; project की `.veles/`, सिवाय `skills/`, `tools/`, `tmp/`,
 `plans/`, `memory/` और `artifacts/` के; `~/.veles/` (approvals, trust, आपके modules); shell
-start-up files (`~/.zshrc`, `~/.bashrc`, …), `~/.ssh/`, `~/.gitconfig`, LaunchAgents और autostart
-entries; और `~/.claude/`, `~/.codex/`, `~/.gemini/`। बाकी सब पहले की तरह काम करता है: project,
-`git commit`, package caches, temp dirs और network। अस्वीकार की गई write agent को आपसे पूछने के
+start-up files (`~/.zshrc`, `~/.bashrc`, …), `~/.ssh/`, LaunchAgents और autostart
+entries; और `~/.claude/`, `~/.codex/`, `~/.gemini/`। इन paths, उनकी parent directories और repos का
+नाम बदलकर भी बचा नहीं जा सकता। बाकी सब पहले की तरह काम करता है: project,
+`git commit`, नया repo (`git init`, `git clone`), package caches, temp dirs और network। अस्वीकार की गई write agent को आपसे पूछने के
 लिए कहती है।
 
 `veles doctor` दिखाता है कि sandbox सक्रिय है या नहीं। इसे बंद करने के लिए `~/.veles/config.toml` में
@@ -140,10 +142,17 @@ Docker में sandbox को `--security-opt seccomp=unconfined --security-op
   shell उस निशान को हटा सकता है या उन files को सीधे लिख सकता है।
 - sandbox writes की रक्षा करता है, reads या network की नहीं। आपके `PATH` की directories
   (`~/.local/bin`) writable रहती हैं।
-- Linux पर sandbox केवल मौजूदा paths की रक्षा कर सकता है: नया `.envrc` (या कोई अन्य सुरक्षित नाम)
-  बनाया जा सकता है, और Veles इसकी सूचना आपको देता है तथा memory log में दर्ज करता है।
-- MCP approval `command`/`args` में नामित project scripts और `-m` से चलाए गए modules को कवर करता है,
-  उन files को नहीं जिन्हें वे import करते हैं।
+- यह command की अपनी processes को रोकता है, उस service को नहीं जिससे command अपनी ओर से काम करवाने को
+  कहता है: `docker run -v …`, `systemd-run`, `launchctl` या `osascript` से शुरू किया गया container आपके
+  नाम से लिखता है।
+- command जो repo बनाता है (`git init`) वह अगली command तक सुरक्षित नहीं होता; project root पर नया repo
+  बनने पर Veles आपको सूचित करता है।
+- Linux पर sandbox केवल मौजूदा paths की रक्षा कर सकता है, और project में छह स्तर गहराई तक सुरक्षित नाम खोज
+  लेता है: root पर नया `.envrc` या home में नई start-up file (`~/.bash_profile`) बनाई जा सकती है — Veles इसकी
+  सूचना आपको देता है तथा memory log में दर्ज करता है — और project तक जाने वाले रास्ते का कोई symlink
+  (`~/code` → `/Volumes/…`) बदला जा सकता है। macOS दोनों को अस्वीकार करता है।
+- MCP approval `command`/`args` में नामित project scripts और `-m` से चलाए गए modules (root पर या `src/` के
+  अंतर्गत) को कवर करता है, उन files को नहीं जिन्हें वे import करते हैं।
 - CLI provider के साथ, जो runs tools को केवल अपने लिए pre-authorise करते हैं (daemon background
   jobs, `veles research`) वे इसे delegated CLI तक नहीं पहुँचाते: pre-authorisation Veles process में
   रहता है, और CLI जो MCP server start करता है वह एक अलग process है, इसलिए उसके Veles tools को

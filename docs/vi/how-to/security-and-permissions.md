@@ -106,13 +106,17 @@ duyệt, và môi trường server đó nhận được được chuyển tiếp
 
 Các lệnh agent chạy bằng `run_shell` chạy trong một sandbox của hệ điều hành —
 `sandbox-exec` trên macOS, `bwrap` (bubblewrap) trên Linux — khiến các đường dẫn sau
-chỉ đọc đối với chúng: hook của git, `.git/config` và thư mục `core.hooksPath`; các
+chỉ đọc đối với chúng: hook và config của mọi repo trong dự án (với worktree hoặc
+submodule thì là của repo chính), mọi tệp cấu hình mà git đọc (các include của nó,
+`~/.gitconfig`, tệp của hệ thống) và thư mục `core.hooksPath`; các
 tên tự chạy ở trên (`.envrc`, `.claude/`, `.mcp.json`, …) ở bất kỳ độ sâu nào;
 `.veles/` của dự án, trừ `skills/`, `tools/`, `tmp/`, `plans/`, `memory/` và
 `artifacts/`; `~/.veles/` (các phê duyệt, trust, module của bạn); các tệp khởi động
-của shell (`~/.zshrc`, `~/.bashrc`, …), `~/.ssh/`, `~/.gitconfig`, LaunchAgents và
-các mục tự khởi động; cùng `~/.claude/`, `~/.codex/`, `~/.gemini/`. Mọi thứ còn lại
-vẫn hoạt động như trước: dự án, `git commit`, cache gói, thư mục tạm và mạng. Khi một
+của shell (`~/.zshrc`, `~/.bashrc`, …), `~/.ssh/`, LaunchAgents và
+các mục tự khởi động; cùng `~/.claude/`, `~/.codex/`, `~/.gemini/`. Các đường dẫn đó,
+thư mục cha của chúng và các repo cũng không thể bị né bằng cách đổi tên. Mọi thứ còn
+lại vẫn hoạt động như trước: dự án, `git commit`, repo mới (`git init`, `git clone`),
+cache gói, thư mục tạm và mạng. Khi một
 lần ghi bị từ chối, agent được nhắc hỏi bạn.
 
 `veles doctor` cho biết sandbox có đang hoạt động hay không. Để tắt nó, đặt
@@ -145,11 +149,19 @@ Các giới hạn đã biết:
   vào các tệp đó.
 - Sandbox bảo vệ việc ghi, không bảo vệ việc đọc, cũng không bảo vệ mạng. Các thư mục
   trong `PATH` của bạn (`~/.local/bin`) vẫn ghi được.
-- Trên Linux, sandbox chỉ bảo vệ được các đường dẫn đã tồn tại: một `.envrc` mới (hoặc
-  một tên được bảo vệ khác) vẫn có thể được tạo ra, và Veles báo cho bạn biết đồng thời
-  ghi vào nhật ký bộ nhớ.
+- Nó chặn các tiến trình của chính lệnh, không chặn một dịch vụ mà lệnh nhờ hành động
+  thay: một container nó khởi chạy bằng `docker run -v …`, `systemd-run`, `launchctl`
+  hay `osascript` ghi với tư cách của bạn.
+- Một repo do lệnh tạo ra (`git init`) chưa được bảo vệ cho đến lệnh kế tiếp; repo mới ở
+  thư mục gốc của dự án sẽ được báo cho bạn.
+- Trên Linux, sandbox chỉ bảo vệ được các đường dẫn đã tồn tại, và tìm các tên được bảo
+  vệ sâu tới sáu cấp trong dự án: một `.envrc` mới ở thư mục gốc hoặc một tệp khởi động
+  mới trong thư mục home của bạn (`~/.bash_profile`) vẫn có thể được tạo ra — Veles báo
+  cho bạn biết đồng thời ghi vào nhật ký bộ nhớ — và một symlink trên đường tới dự án
+  (`~/code` → `/Volumes/…`) có thể bị thay thế. macOS từ chối cả hai.
 - Một phê duyệt MCP bao gồm các script của dự án nêu trong `command`/`args` và các
-  module chạy bằng `-m`, không bao gồm các tệp mà chúng import.
+  module chạy bằng `-m` (ở thư mục gốc hoặc dưới `src/`), không bao gồm các tệp mà
+  chúng import.
 - Với một provider CLI, các lần chạy chỉ tiền cấp quyền công cụ cho riêng mình (tác vụ
   nền của daemon, `veles research`) không truyền điều đó cho CLI được ủy quyền: việc
   tiền cấp quyền nằm trong tiến trình Veles, còn máy chủ MCP mà CLI khởi động là một

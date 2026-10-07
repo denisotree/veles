@@ -96,13 +96,15 @@ tool-ই approve করা হয়, আর ওই server যে environment �
 ### OS sandbox-এ `run_shell`
 
 এজেন্ট `run_shell` দিয়ে যে কমান্ড চালায় সেগুলো একটি OS sandbox-এ চলে — macOS-এ `sandbox-exec`,
-Linux-এ `bwrap` (bubblewrap) — যা এই পাথগুলো তাদের জন্য read-only করে দেয়: git hook, `.git/config` ও
-`core.hooksPath` ডিরেক্টরি; উপরে উল্লিখিত auto-run নামগুলো (`.envrc`, `.claude/`, `.mcp.json`, …)
+Linux-এ `bwrap` (bubblewrap) — যা এই পাথগুলো তাদের জন্য read-only করে দেয়: প্রজেক্টের প্রতিটি repo-র hook ও
+config (worktree বা submodule-এর ক্ষেত্রে মূল repo-র), git যে প্রতিটি config ফাইল পড়ে (তার include,
+`~/.gitconfig`, সিস্টেমেরটি) এবং `core.hooksPath` ডিরেক্টরি; উপরে উল্লিখিত auto-run নামগুলো (`.envrc`, `.claude/`, `.mcp.json`, …)
 যেকোনো গভীরতায়; প্রজেক্টের `.veles/`, কেবল `skills/`, `tools/`, `tmp/`, `plans/`, `memory/` ও
 `artifacts/` বাদে; `~/.veles/` (approval, trust, আপনার module); shell start-up ফাইল (`~/.zshrc`,
-`~/.bashrc`, …), `~/.ssh/`, `~/.gitconfig`, LaunchAgents ও autostart এন্ট্রি; এবং `~/.claude/`,
-`~/.codex/`, `~/.gemini/`। বাকি সবকিছু আগের মতোই কাজ করে: প্রজেক্ট, `git commit`, package cache, temp
-ডিরেক্টরি ও নেটওয়ার্ক। কোনো write প্রত্যাখ্যাত হলে এজেন্টকে আপনাকে জিজ্ঞেস করতে বলা হয়।
+`~/.bashrc`, …), `~/.ssh/`, LaunchAgents ও autostart এন্ট্রি; এবং `~/.claude/`,
+`~/.codex/`, `~/.gemini/`। এই পাথ, তাদের parent ডিরেক্টরি ও repo-গুলোও rename করে এড়ানো যায় না।
+বাকি সবকিছু আগের মতোই কাজ করে: প্রজেক্ট, `git commit`, নতুন repo (`git init`, `git clone`), package cache,
+temp ডিরেক্টরি ও নেটওয়ার্ক। কোনো write প্রত্যাখ্যাত হলে এজেন্টকে আপনাকে জিজ্ঞেস করতে বলা হয়।
 
 `veles doctor` দেখায় sandbox সক্রিয় আছে কি না। এটি বন্ধ করতে `~/.veles/config.toml`-এ
 `[sandbox] enabled = false` সেট করুন — প্রজেক্টের নিজস্ব config তা পারে না।
@@ -130,10 +132,16 @@ Docker-এ sandbox-এর জন্য `--security-opt seccomp=unconfined --secu
   প্রত্যাখ্যান করে, কিন্তু grant করা shell সেই চিহ্ন সরিয়ে দিতে বা ফাইলগুলো সরাসরি লিখতে পারে।
 - sandbox write সুরক্ষিত রাখে, read বা নেটওয়ার্ক নয়। আপনার `PATH`-এর ডিরেক্টরিগুলো (`~/.local/bin`)
   writable-ই থাকে।
-- Linux-এ sandbox কেবল বিদ্যমান পাথ সুরক্ষিত রাখতে পারে: নতুন `.envrc` (বা অন্য কোনো সুরক্ষিত নাম) তৈরি করা
-  যায়, এবং Veles আপনাকে তা জানায় ও memory log-এ লিখে রাখে।
-- MCP approval `command`/`args`-এ উল্লিখিত প্রজেক্ট script এবং `-m` দিয়ে চালানো module কভার করে,
-  সেগুলো যে ফাইল import করে সেগুলো নয়।
+- এটি কমান্ডের নিজস্ব প্রসেস থামায়, এমন কোনো service নয় যাকে কমান্ড নিজের হয়ে কাজ করতে বলে:
+  `docker run -v …`, `systemd-run`, `launchctl` বা `osascript` দিয়ে চালু করা container আপনার পরিচয়ে লেখে।
+- কমান্ড যে repo তৈরি করে (`git init`) পরের কমান্ড পর্যন্ত তা সুরক্ষিত নয়; প্রজেক্টের root-এ নতুন repo
+  হলে Veles আপনাকে জানায়।
+- Linux-এ sandbox কেবল বিদ্যমান পাথ সুরক্ষিত রাখতে পারে, এবং প্রজেক্টের ভেতরে ছয় স্তর গভীর পর্যন্ত সুরক্ষিত
+  নাম খুঁজে পায়: root-এ নতুন `.envrc` বা হোমে নতুন start-up ফাইল (`~/.bash_profile`) তৈরি করা যায় — Veles
+  আপনাকে তা জানায় ও memory log-এ লিখে রাখে — এবং প্রজেক্টে যাওয়ার পথের কোনো symlink (`~/code` →
+  `/Volumes/…`) বদলে দেওয়া যায়। macOS দুটোই প্রত্যাখ্যান করে।
+- MCP approval `command`/`args`-এ উল্লিখিত প্রজেক্ট script এবং `-m` দিয়ে চালানো module (root-এ বা `src/`-এর
+  নিচে) কভার করে, সেগুলো যে ফাইল import করে সেগুলো নয়।
 - CLI provider-এর ক্ষেত্রে, যে run কেবল নিজেদের জন্য tool আগে থেকে authorise করে (daemon-এর
   background job, `veles research`) সেগুলো তা delegate করা CLI-কে দেয় না: আগে থেকে authorise করা
   Veles প্রসেসের ভেতরেই থাকে, আর CLI যে MCP server চালু করে সেটি আলাদা একটি, তাই তার Veles tool-গুলোর জন্য

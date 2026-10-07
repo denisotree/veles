@@ -115,15 +115,19 @@ transmis par nom — jamais `VELES_TRUST_AUTO_ALLOW`.
 
 Les commandes que l'agent lance avec `run_shell` s'exécutent dans un bac à sable de
 l'OS — `sandbox-exec` sur macOS, `bwrap` (bubblewrap) sur Linux — qui rend ces chemins
-en lecture seule pour elles : les hooks git, `.git/config` et le répertoire de
+en lecture seule pour elles : les hooks et la config de chaque dépôt du projet (pour un
+worktree ou un sous-module, ceux du dépôt principal), chaque fichier de configuration que
+lit git (ses includes, `~/.gitconfig`, celui du système) et le répertoire de
 `core.hooksPath` ; les noms à exécution automatique ci-dessus (`.envrc`, `.claude/`,
 `.mcp.json`, …) à n'importe quelle profondeur ; le `.veles/` du projet, sauf `skills/`,
 `tools/`, `tmp/`, `plans/`, `memory/` et `artifacts/` ; `~/.veles/` (approbations,
 confiance, vos modules) ; les fichiers de démarrage du shell (`~/.zshrc`, `~/.bashrc`,
-…), `~/.ssh/`, `~/.gitconfig`, les LaunchAgents et les entrées de démarrage
-automatique ; et `~/.claude/`, `~/.codex/`, `~/.gemini/`. Tout le reste fonctionne comme
-avant : le projet, `git commit`, les caches de paquets, les répertoires temporaires et
-le réseau. Une écriture refusée indique à l'agent de vous demander.
+…), `~/.ssh/`, les LaunchAgents et les entrées de démarrage automatique ; et
+`~/.claude/`, `~/.codex/`, `~/.gemini/`. Ces chemins, leurs répertoires parents et les
+dépôts ne peuvent pas non plus être contournés en les renommant. Tout le reste
+fonctionne comme avant : le projet, `git commit`, un nouveau dépôt (`git init`,
+`git clone`), les caches de paquets, les répertoires temporaires et le réseau. Une
+écriture refusée indique à l'agent de vous demander.
 
 `veles doctor` indique si le bac à sable est actif. Pour le désactiver, définissez
 `[sandbox] enabled = false` dans `~/.veles/config.toml` — la config propre à un projet
@@ -156,11 +160,20 @@ Limites connues :
   cette marque ou écrire ces fichiers directement.
 - Le bac à sable protège les écritures, pas les lectures ni le réseau. Les répertoires
   de votre `PATH` (`~/.local/bin`) restent accessibles en écriture.
-- Sous Linux, le bac à sable ne peut protéger que les chemins qui existent : un nouveau
-  `.envrc` (ou un autre nom protégé) peut être créé, et Veles vous le signale et
-  l'inscrit dans le journal de mémoire.
+- Il arrête les processus de la commande elle-même, pas un service à qui la commande
+  demande d'agir pour elle : un conteneur lancé avec `docker run -v …`, `systemd-run`,
+  `launchctl` ou `osascript` écrit en tant que vous.
+- Un dépôt créé par la commande (`git init`) n'est pas protégé avant la commande
+  suivante ; un nouveau dépôt à la racine du projet vous est signalé.
+- Sous Linux, le bac à sable ne peut protéger que les chemins qui existent, et repère les
+  noms protégés jusqu'à six niveaux de profondeur dans le projet : un nouveau `.envrc` à
+  la racine ou un nouveau fichier de démarrage dans votre répertoire personnel
+  (`~/.bash_profile`) peut être créé — Veles vous le signale et l'inscrit dans le
+  journal de mémoire — et un lien symbolique sur le chemin du projet (`~/code` →
+  `/Volumes/…`) peut être remplacé. macOS refuse les deux.
 - Une approbation MCP couvre les scripts du projet nommés dans `command`/`args` et les
-  modules lancés avec `-m`, pas les fichiers qu'ils importent.
+  modules lancés avec `-m` (à la racine ou sous `src/`), pas les fichiers qu'ils
+  importent.
 - Avec un fournisseur CLI, les exécutions qui pré-autorisent des outils uniquement
   pour elles-mêmes (tâches d'arrière-plan du daemon, `veles research`) ne le
   transmettent pas à la CLI déléguée : la pré-autorisation vit dans le processus Veles, et
