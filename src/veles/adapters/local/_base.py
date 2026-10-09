@@ -32,6 +32,13 @@ from openai import OpenAI
 
 from veles.core.context import expects_strict_json
 from veles.core.openai_wire import OpenAICompatibleProvider, json_mode_enabled
+from veles.core.provider import ServerFacts
+
+# What marks a thinking model in llama.cpp's `/props` (M325): either
+# `chat_template_caps` flag, or the chat template itself handling a thinking
+# channel — Qwen3 reports both flags false and still thinks by default.
+_REASONING_CAPS = ("supports_reasoning_effort", "supports_preserve_reasoning")
+_REASONING_TEMPLATE_MARKERS = ("<think>", "enable_thinking", "reasoning_content")
 
 
 class LocalOpenAIBase(OpenAICompatibleProvider):
@@ -40,6 +47,8 @@ class LocalOpenAIBase(OpenAICompatibleProvider):
     name: str = "openai-compatible"
     supports_streaming: bool = True
     supports_tools: bool = False
+    # Set by the provider factory (`apply_local_tool_policy`) from one probe.
+    facts: ServerFacts | None = None
 
     DEFAULT_BASE_URL: ClassVar[str] = ""
     BASE_URL_ENV: ClassVar[str | None] = None
@@ -107,17 +116,29 @@ class LocalOpenAIBase(OpenAICompatibleProvider):
         # always use `max_tokens` regardless of model id.
         return "max_tokens"
 
-    # ---- tool-call auto-detection (M256) ----
+    # ---- what the server says about its model (M256 tools, M325 budgets) ----
 
-    def model_supports_tools(self, model: str) -> bool:
-        """Whether this server's loaded model speaks OpenAI tool calls.
+    def server_facts(self, model: str) -> ServerFacts | None:
+        """Tools, reasoning and context size of this server's loaded model.
 
-        Asks llama.cpp's `GET /props`, whose `chat_template_caps` object reports
-        what the loaded GGUF's chat template can do. Verified live against
+        Asks llama.cpp's `GET /props`: `chat_template_caps` reports what the
+        loaded GGUF's chat template can do, `default_generation_settings.n_ctx`
+        the context the server was started with. Verified live against
         llama.cpp b10809 with Qwen3.8-27B (2026-09-18):
 
             "chat_template_caps": { … "supports_tools": true,
                                         "supports_tool_calls": true … }
+
+        **Reasoning (M325)** is `supports_reasoning_effort` or
+        `supports_preserve_reasoning` (templates of different models set
+        different ones), or a chat template that handles a thinking channel. The
+        last one is not optional: Qwen3-0.6B on b11146 reports both flags false,
+        its template carries `<think>` and `enable_thinking`, and asked to "say
+        pong" with 300 tokens it spent all 300 on reasoning and answered nothing
+        (live, 2026-10-09). With none of the three known, it is None and the
+        model name decides. It only ever raises a completion cap (see
+        `model_budgets`), so reading a template that merely *can* think as a
+        thinker costs nothing.
 
         **`model` is ignored, deliberately.** For ollama the question is about a
         model — `/api/show` reports a per-model `capabilities` array, and the
@@ -144,22 +165,36 @@ class LocalOpenAIBase(OpenAICompatibleProvider):
         that mistake should be short. A local server that cannot return its own
         metadata within 2s is not ready to serve a turn either.
 
-        **Deliberately not cached.** The obvious next move — memoise per base_url
-        — is wrong for the daemon, which outlives the llama.cpp server it talks
-        to: restart that server on a different model and a cached "no tools"
-        would stick for the daemon's whole life.
+        **Deliberately not cached across providers.** The obvious next move —
+        memoise per base_url — is wrong for the daemon, which outlives the
+        llama.cpp server it talks to: restart that server on a different model
+        and a cached "no tools" would stick for the daemon's whole life. The
+        factory asks once per provider construction and keeps the answer on that
+        provider (`facts`).
         """
         del model
-        base = str(self._client.base_url).rstrip("/")
-        if base.endswith("/v1"):
-            base = base[:-3].rstrip("/")
         try:
-            resp = httpx.get(f"{base}/props", timeout=2.0)
+            resp = httpx.get(f"{self._server_root()}/props", timeout=2.0)
             resp.raise_for_status()
-            caps = resp.json().get("chat_template_caps") or {}
+            data = resp.json()
         except Exception:
-            return False
-        return bool(caps.get("supports_tools")) and bool(caps.get("supports_tool_calls"))
+            return None
+        caps = data.get("chat_template_caps") or {}
+        template = data.get("chat_template")
+        signals = [bool(caps[k]) for k in _REASONING_CAPS if k in caps]
+        if isinstance(template, str) and template:
+            signals.append(any(m in template for m in _REASONING_TEMPLATE_MARKERS))
+        n_ctx = (data.get("default_generation_settings") or {}).get("n_ctx")
+        return ServerFacts(
+            tools=bool(caps.get("supports_tools")) and bool(caps.get("supports_tool_calls")),
+            reasoning=any(signals) if signals else None,
+            n_ctx=n_ctx if isinstance(n_ctx, int) and n_ctx > 0 else None,
+        )
+
+    def _server_root(self) -> str:
+        """The server root — native endpoints sit beside the `/v1` OpenAI surface."""
+        base = str(self._client.base_url).rstrip("/")
+        return base[:-3].rstrip("/") if base.endswith("/v1") else base
 
     # ---- structured output (M239) ----
 

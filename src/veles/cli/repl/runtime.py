@@ -100,6 +100,7 @@ def _build_runtime(args: argparse.Namespace, project: Project):
             model=state.model,
             max_iterations=args.max_iterations,
             system_prompt=system_prompt,
+            max_tokens=getattr(args, "max_tokens", None),
             verbose=getattr(args, "verbose", False),
             store=store,
             session_id=state.session_id,
@@ -121,6 +122,7 @@ def _build_runtime(args: argparse.Namespace, project: Project):
             model=args.model,
             max_iterations=min(args.max_iterations, 200),  # generous: a batch worker isn't 20 calls
             system_prompt=system_prompt,
+            max_tokens=getattr(args, "max_tokens", None),
             store=None,
             compressor=compressor,
             hard_ceiling_tokens=default_hard_ceiling_for(args.model),

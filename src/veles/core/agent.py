@@ -71,7 +71,8 @@ from veles.core.history_repair import (
     supersede_native,
 )
 from veles.core.memory import SessionStore
-from veles.core.model_budgets import default_max_tokens_for
+from veles.core.model_budgets import resolve_max_tokens, side_call_max_tokens
+from veles.core.model_windows import default_hard_ceiling_for
 from veles.core.modules import fire_hook
 from veles.core.provider import (
     Message,
@@ -79,6 +80,7 @@ from veles.core.provider import (
     ProviderResponse,
     TokenUsage,
     ToolCall,
+    server_facts_of,
 )
 from veles.core.stall_guard import STALL_NUDGE, TOKEN_WARN_NUDGE, StallGuard
 from veles.core.stream_consumer import consume_stream
@@ -252,8 +254,18 @@ class Agent:
         self._role = role
         self._max_iterations = max_iterations
         self._system_prompt = system_prompt
-        self._max_tokens = max_tokens if max_tokens is not None else default_max_tokens_for(model)
+        # M325: a local server's own word (`provider.facts`, one probe at
+        # construction) beats the model name for the cap and the context window.
+        facts = server_facts_of(provider)
+        self._max_tokens, self._max_tokens_source = resolve_max_tokens(
+            model, facts, explicit=max_tokens
+        )
+        if facts is not None and facts.n_ctx is not None:
+            server_ceiling = default_hard_ceiling_for(model, n_ctx=facts.n_ctx)
+            if hard_ceiling_tokens is None or hard_ceiling_tokens > server_ceiling:
+                hard_ceiling_tokens = server_ceiling
         self._verbose = verbose
+        self._log(f"-> max_tokens={self._max_tokens} ({self._max_tokens_source})")
         self._store = store
         self._session_id = session_id
         self._compressor = compressor
@@ -600,10 +612,10 @@ class Agent:
         #     a tool-free round (M214), bounded like the parse nudge.
         if response.finish_reason == "length":
             self._log(
-                f"-> empty answer: response hit the token cap "
-                f"({turn.usage.completion_tokens} completion tokens, "
-                f"{turn.usage.reasoning_tokens} of them reasoning) — "
-                "raise --max-tokens or the model's budget"
+                f"-> empty answer: response hit the token cap of {self._max_tokens} "
+                f"({self._max_tokens_source}; {turn.usage.completion_tokens} completion "
+                f"tokens, {turn.usage.reasoning_tokens} of them reasoning) — "
+                "raise it with --max-tokens or [engine] max_tokens"
             )
             return self._result(turn, "", iteration, "truncated")
         if turn.empty_nudges < _EMPTY_ANSWER_NUDGE_LIMIT:
@@ -911,7 +923,12 @@ def run_oneshot(
 ) -> RunResult:
     """One tool-less, single-round sub-agent call: summarise, classify, judge.
 
+    `max_tokens` is the size of the answer the caller wants; a reasoning model
+    gets room to think on top of it (`side_call_max_tokens`, M325).
+
     Exceptions propagate — each caller decides what a failed side call means."""
+    if max_tokens is not None:
+        max_tokens = side_call_max_tokens(model, server_facts_of(provider), max_tokens)
     agent = Agent(
         provider=provider,
         registry=Registry(),

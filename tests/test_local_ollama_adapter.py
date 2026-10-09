@@ -10,7 +10,7 @@ import pytest
 
 from veles.adapters.local.ollama import OllamaProvider
 from veles.core.openai_wire import to_openai_message as _to_openai_message
-from veles.core.provider import Message, ToolCall
+from veles.core.provider import Message, ServerFacts, ToolCall
 
 # ---------- mock OpenAI client ----------
 
@@ -315,43 +315,45 @@ def test_to_openai_message_tool_requires_id() -> None:
         _to_openai_message(Message(role="tool", content="r"))
 
 
-# ---------- model_supports_tools (tool-capability auto-detect) ----------
+# ---------- server_facts (tool + reasoning capability auto-detect) ----------
 
 
-def test_model_supports_tools_true() -> None:
+def _show(capabilities: list[str]) -> MagicMock:
     fake_resp = MagicMock()
-    fake_resp.json.return_value = {"capabilities": ["completion", "tools", "thinking"]}
+    fake_resp.json.return_value = {"capabilities": capabilities}
     fake_resp.raise_for_status = MagicMock()
-    fake_post = MagicMock(return_value=fake_resp)
+    return MagicMock(return_value=fake_resp)
+
+
+def test_server_facts_reads_tools_and_thinking() -> None:
+    fake_post = _show(["completion", "tools", "thinking"])
     p = OllamaProvider(client=_StubClient())
     with patch("veles.adapters.local.ollama.httpx.post", fake_post):
-        assert p.model_supports_tools("qwen3:4b-instruct") is True
+        facts = p.server_facts("qwen3:4b-instruct")
+    assert facts == ServerFacts(tools=True, reasoning=True, n_ctx=None)
     # /v1 suffix stripped before calling /api/show, model passed in the body
     assert fake_post.call_args.args[0] == "http://localhost:11434/api/show"
     assert fake_post.call_args.kwargs["json"] == {"model": "qwen3:4b-instruct"}
 
 
-def test_model_supports_tools_false_when_capability_absent() -> None:
-    fake_resp = MagicMock()
-    fake_resp.json.return_value = {"capabilities": ["completion", "embedding"]}
-    fake_resp.raise_for_status = MagicMock()
+def test_server_facts_without_the_capabilities() -> None:
     p = OllamaProvider(client=_StubClient())
-    with patch("veles.adapters.local.ollama.httpx.post", MagicMock(return_value=fake_resp)):
-        assert p.model_supports_tools("nomic-embed-text") is False
+    with patch("veles.adapters.local.ollama.httpx.post", _show(["completion", "embedding"])):
+        assert p.server_facts("nomic-embed-text") == ServerFacts(tools=False, reasoning=False)
 
 
-def test_model_supports_tools_false_on_error() -> None:
-    """Server down / model not pulled / old Ollama with no field ⇒ conservative False."""
+def test_server_facts_none_on_error() -> None:
+    """Server down / model not pulled ⇒ no opinion, so tools stay off."""
     p = OllamaProvider(client=_StubClient())
     with patch(
         "veles.adapters.local.ollama.httpx.post", MagicMock(side_effect=RuntimeError("boom"))
     ):
-        assert p.model_supports_tools("whatever") is False
+        assert p.server_facts("whatever") is None
 
 
-def test_model_supports_tools_empty_model_skips_probe() -> None:
+def test_server_facts_empty_model_skips_probe() -> None:
     p = OllamaProvider(client=_StubClient())
     fake_post = MagicMock()
     with patch("veles.adapters.local.ollama.httpx.post", fake_post):
-        assert p.model_supports_tools("") is False
+        assert p.server_facts("") is None
     fake_post.assert_not_called()

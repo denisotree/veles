@@ -156,7 +156,7 @@ def _cmd_tick(args: argparse.Namespace, store: JobsStore, project) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     max_iterations = int(getattr(args, "max_iterations", 30))
-    max_tokens = int(getattr(args, "max_tokens", 4096))
+    max_tokens = getattr(args, "max_tokens", None)  # None → resolved per model (M325)
 
     def factory(session_id: str | None):
         provider = make_provider(provider_name, model)

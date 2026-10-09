@@ -29,6 +29,13 @@ import pytest
 from veles.adapters.local.llamacpp import LlamaCppProvider
 from veles.core.provider_factory import make_provider
 
+
+def _tools(provider: LlamaCppProvider) -> bool:
+    """What the factory decides from the probe: tools iff the server says so."""
+    facts = provider.server_facts("")
+    return facts is not None and facts.tools
+
+
 # Verbatim from the live server with the model's own chat template.
 CAPS_WITH_TOOLS = {
     "supports_object_arguments": True,
@@ -78,12 +85,12 @@ def _no_env_override(monkeypatch):
 
 def test_detects_a_tool_capable_template(monkeypatch) -> None:
     _props(monkeypatch, {"chat_template_caps": CAPS_WITH_TOOLS})
-    assert LlamaCppProvider().model_supports_tools("") is True
+    assert _tools(LlamaCppProvider()) is True
 
 
 def test_detects_a_template_without_tools(monkeypatch) -> None:
     _props(monkeypatch, {"chat_template_caps": CAPS_WITHOUT_TOOLS})
-    assert LlamaCppProvider().model_supports_tools("") is False
+    assert _tools(LlamaCppProvider()) is False
 
 
 def test_both_halves_are_required(monkeypatch) -> None:
@@ -92,7 +99,7 @@ def test_both_halves_are_required(monkeypatch) -> None:
     loop needs both, so a template offering only one is not usable."""
     half = {**CAPS_WITH_TOOLS, "supports_tool_calls": False}
     _props(monkeypatch, {"chat_template_caps": half})
-    assert LlamaCppProvider().model_supports_tools("") is False
+    assert _tools(LlamaCppProvider()) is False
 
 
 def test_props_is_queried_at_the_server_root(monkeypatch) -> None:
@@ -100,7 +107,7 @@ def test_props_is_queried_at_the_server_root(monkeypatch) -> None:
     same `/v1` strip ollama's probe does for `/api/show`."""
     seen: list[str] = []
     _props(monkeypatch, {"chat_template_caps": CAPS_WITH_TOOLS}, seen=seen)
-    LlamaCppProvider().model_supports_tools("")
+    LlamaCppProvider().server_facts("")
     assert seen == ["http://localhost:8080/props"]
 
 
@@ -109,21 +116,21 @@ def test_an_unreachable_server_is_not_tool_capable(monkeypatch) -> None:
         raise httpx.ConnectError("refused")
 
     monkeypatch.setattr("httpx.get", _boom)
-    assert LlamaCppProvider().model_supports_tools("") is False
+    assert _tools(LlamaCppProvider()) is False
 
 
 def test_a_build_without_chat_template_caps_is_not_tool_capable(monkeypatch) -> None:
     """A build predating the field answers 200 without it — degrade to the
     pre-M256 behaviour rather than guess from the raw jinja string."""
     _props(monkeypatch, {"model_path": "/x.gguf"})
-    assert LlamaCppProvider().model_supports_tools("") is False
+    assert _tools(LlamaCppProvider()) is False
 
 
 def test_a_backend_with_no_props_endpoint_is_not_tool_capable(monkeypatch) -> None:
     """`openai-compat` pointed at something that isn't llama.cpp: 404, no tools,
     no crash."""
     _props(monkeypatch, {"error": "not found"}, status=404)
-    assert LlamaCppProvider().model_supports_tools("") is False
+    assert _tools(LlamaCppProvider()) is False
 
 
 def test_factory_turns_tools_on_without_a_model_name(monkeypatch) -> None:

@@ -121,6 +121,26 @@ class StreamEnd:
 StreamEvent = TextDelta | ReasoningDelta | StreamEnd
 
 
+@dataclass(frozen=True, slots=True)
+class ServerFacts:
+    """What a server you run says about the model it serves (M325).
+
+    llama.cpp answers from `/props`, ollama from `/api/show`. A local server
+    ignores the model *name*, so these beat any guess made from it. `None` means
+    the server did not say."""
+
+    tools: bool = False
+    reasoning: bool | None = None
+    n_ctx: int | None = None
+
+
+def server_facts_of(provider: object) -> ServerFacts | None:
+    """What a provider's server said about its model when the provider was
+    built (`facts`); None for anything not probed — cloud, CLI delegates, stubs."""
+    facts = getattr(provider, "facts", None)
+    return facts if isinstance(facts, ServerFacts) else None
+
+
 class Provider(Protocol):
     """Minimal provider surface."""
 
