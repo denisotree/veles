@@ -25,6 +25,7 @@ a thin parallel to `core/skills.py::discover_skills`.
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import logging
 import sqlite3
@@ -157,6 +158,34 @@ def load_into_registry(
     )
 
 
+def tool_file_problem(source: str) -> str | None:
+    """Why a tool file would register nothing, judged from its text — or None.
+
+    M325: a file the agent wrote without `@tool` (a plain CLI script) was
+    approved, imported and silently registered nothing; the model said "tool
+    created", the human approved "a tool", and neither learned otherwise. This
+    reads the source without running it, so it can speak at write time and at
+    approval time, before the reviewed code ever executes."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as exc:
+        return f"does not parse (line {exc.lineno}: {exc.msg})"
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and any(
+            _is_tool_decorator(d) for d in node.decorator_list
+        ):
+            return None
+    return "defines no @tool function"
+
+
+def _is_tool_decorator(node: ast.expr) -> bool:
+    """`@tool`, `@tool(...)` or `@<module>.tool(...)`."""
+    target = node.func if isinstance(node, ast.Call) else node
+    if isinstance(target, ast.Attribute):
+        return target.attr == "tool"
+    return isinstance(target, ast.Name) and target.id == "tool"
+
+
 # ---------- internals ----------
 
 
@@ -216,6 +245,10 @@ def _load_one_file(
     finally:
         _registry_module.registry = saved_registry
 
+    if not sandbox.list_names():
+        # M325: imported fine and registered nothing — say so, not silence.
+        return "defines no @tool function — nothing registered"
+
     # Anything that registered in the sandbox is now ours to merge.
     # `overridden` carries `(name, winning_scope)` so the agent log
     # can say "your user-level `echo` was shadowed by the project one".
@@ -250,4 +283,5 @@ __all__ = [
     "LoadReport",
     "LoadedTool",
     "load_into_registry",
+    "tool_file_problem",
 ]

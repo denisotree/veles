@@ -5,7 +5,7 @@ import logging
 from veles.core.context import current_project
 from veles.core.path_guard import resolve_safe
 from veles.core.risk import RiskClass
-from veles.core.tools.builtin.fs_write_guard import display_path, guard_write
+from veles.core.tools.builtin.fs_write_guard import display_path, guard_write, tool_file_note
 from veles.core.tools.registry import tool
 
 logger = logging.getLogger(__name__)
@@ -35,4 +35,4 @@ def write_file(path: str, content: str) -> str:
     n = p.write_text(content, encoding="utf-8")
     display = display_path(p, project)
     logger.info("file.write rel=%s bytes=%d", display, n)
-    return f"wrote {n} bytes to {display}"
+    return f"wrote {n} bytes to {display}{tool_file_note(p, project)}"
