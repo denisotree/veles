@@ -66,6 +66,12 @@ Two flags fall **outside** this contract:
   before a tool call — not just the final answer. Do not use it if you parse stdout.
 - `--manager` returns before the session line and the exit-code mapping.
 
+You don't need `--stream` for a slow model. Without it, Veles still streams from any
+provider that can and prints only the final answer, so the request timeout
+(`[engine] request_timeout_s`) bounds the pause between chunks, not the whole answer:
+a slow local model runs for as long as it keeps writing, and a hung server is still
+caught.
+
 ### Tool calls in `events.jsonl`
 
 To count or audit tool calls, read `<project>/.veles/events.jsonl`, one JSON object

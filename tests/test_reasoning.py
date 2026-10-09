@@ -68,6 +68,21 @@ def test_agent_forwards_reasoning_as_thinking_event_not_to_chat():
     assert result.text == "The answer is 4."
 
 
+def test_reasoning_stays_out_of_the_event_log(tmp_path):
+    """M326: thinking deltas reach live listeners only. One `events.jsonl` line per
+    chunk was thousands a turn, and headless runs now stream internally — so it
+    would land in every embedder's audit file."""
+    from veles.core.events import EventWriter, read_events
+
+    log = tmp_path / "events.jsonl"
+    seen_events = []
+    agent = Agent(_ReasoningProvider(), Registry(), model="m", event_writer=EventWriter(log))
+    agent.run("2+2?", on_text_delta=lambda _: None, event_listener=seen_events.append)
+
+    assert any(isinstance(e, ThinkingDelta) for e in seen_events)
+    assert not [e for e in read_events(log) if e.get("type") == "thinking_delta"]
+
+
 # ---- wire-layer parsing of the `reasoning` delta field ----
 
 

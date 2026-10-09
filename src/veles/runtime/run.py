@@ -135,13 +135,25 @@ def run_agent_streaming_aware(
             sys.stdout.write("\n")
             sys.stdout.flush()
         else:
+            # M326: stream internally whenever the provider can, printing only the
+            # final answer. The request timeout then bounds the gap between chunks
+            # instead of the whole response — a slow model runs as long as it
+            # writes, a hung server is still caught.
+            streams = getattr(getattr(agent, "provider", None), "supports_streaming", False)
             with budget_scope(args, project=project) as budget:
-                result = agent.run(prompt)
+                if streams is True:
+                    result = agent.run(prompt, on_text_delta=_discard)
+                else:
+                    result = agent.run(prompt)
             if emit_output:
                 print(result.text)
     finally:
         end_trust_turn(trust_turn_token)
     return result, budget
+
+
+def _discard(_chunk: str) -> None:
+    """The delta sink of an internal stream: the answer is printed once, at the end."""
 
 
 @contextlib.contextmanager

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Upgrading from 1.2.11
+
+- **`events.jsonl` no longer has `thinking_delta` lines.** A reasoning model's thinking
+  went to the audit log one line per chunk — thousands a turn. It still reaches live
+  listeners (the REPL inspector, the daemon's push stream).
+
+### Changed
+
+- **`veles run` streams internally.** Without `--stream`, a provider that can stream is
+  streamed and only the final answer is printed, so the request timeout bounds the pause
+  between chunks instead of the whole answer: a slow local model is no longer cut off at
+  the timeout. stdout is unchanged.
+
 ## [1.2.11] — 2026-10-09
 
 Fixes from a headless run with local models (llama.cpp, Qwen3.8 and Bonsai-2): the

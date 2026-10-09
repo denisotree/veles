@@ -235,6 +235,29 @@ def test_stream_puts_intermediate_narration_on_stdout(
     assert out != "the answer\n"
 
 
+def test_without_stream_a_streaming_provider_streams_internally(
+    project: Project, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """M326: a provider that can stream is streamed even without `--stream`, so
+    the request timeout bounds the gap between chunks, not the whole answer —
+    and stdout is still exactly the final answer."""
+
+    class _StreamingAgent:
+        provider = type("P", (), {"supports_streaming": True})()
+        delta_installed = False
+
+        def run(self, _prompt: str, on_text_delta=None, **_kwargs: Any) -> _Result:
+            _StreamingAgent.delta_installed = on_text_delta is not None
+            if on_text_delta is not None:
+                on_text_delta("let me check that first...")
+            return _Result(text="the answer")
+
+    monkeypatch.setattr(cli, "build_command_agent", lambda *a, **k: _StreamingAgent())
+    assert cmd_run(_args(), project) == 0
+    assert _StreamingAgent.delta_installed
+    assert capsys.readouterr().out == "the answer\n"
+
+
 # ---- 6. non-TTY never blocks on a permission prompt --------------------------
 
 
