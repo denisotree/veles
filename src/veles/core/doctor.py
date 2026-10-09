@@ -251,7 +251,21 @@ def _check_provider_keys(project: Project | None = None) -> CheckResult:
     )
 
 
-def _check_embedding_backend() -> CheckResult:
+def _check_embedding_backend(project: Project | None = None) -> CheckResult:
+    """See `_detect_embedding_backend`; inside `project`, whose
+    `[routing.tasks].embedding` may name the embedder (M326)."""
+    if project is None:
+        return _detect_embedding_backend()
+    from veles.core.context import reset_active_project, set_active_project
+
+    token = set_active_project(project)
+    try:
+        return _detect_embedding_backend()
+    finally:
+        reset_active_project(token)
+
+
+def _detect_embedding_backend() -> CheckResult:
     """M231: report whether semantic recall of insights is actually on.
 
     M192 routes both the recall query and the insight backfill through
@@ -277,7 +291,9 @@ def _check_embedding_backend() -> CheckResult:
     detected = autodetect_embedding_adapter()
     hint = (
         "run a local embedder — install Ollama and `ollama pull nomic-embed-text` "
-        "(override the model with VELES_OLLAMA_EMBED_MODEL)"
+        "(override the model with VELES_OLLAMA_EMBED_MODEL), or route `embedding` "
+        'to a server you run: `[routing.tasks] embedding = "<provider>:<model>"`, '
+        "e.g. a llama-server started with --embeddings"
     )
     if detected is not None:
         return CheckResult(
@@ -939,9 +955,9 @@ def run_all(project: Project | None) -> DoctorReport:
         _check_python_version,
         _check_user_home,
         _check_user_config,
-        _check_embedding_backend,
     ]
     project_aware: list[Callable[[Project | None], CheckResult]] = [
+        _check_embedding_backend,
         # Project-aware because the runtime resolves a key per project scope.
         _check_provider_keys,
         _check_provider_catalog,

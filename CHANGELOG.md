@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reasoning), the budget consumed, warnings and the first error — so an embedder no
   longer reads the outcome from a `--verbose` debug line. stderr and exit codes are
   unchanged; setup errors come out as an object too.
+- **A local embedder other than Ollama.** `[routing.tasks].embedding` naming an
+  OpenAI-wire provider — a llama-server started with `--embeddings`, added to
+  `~/.veles/providers.toml` as `kind = "local"` — now drives semantic recall; a
+  provider that needs no key counts as local, a cloud one still doesn't. `veles doctor`
+  reads the project's route. The database records which embedder wrote its vectors:
+  after a switch, backfill embeds the insights again and recall ignores the old vectors
+  until it has.
 
 ### Changed
 

@@ -297,6 +297,24 @@ Semantic recall of insights additionally needs a **local** embedding backend
 project text is never sent to a cloud embedder. Without one, recall stays
 keyword-only. `veles doctor` reports which backend is active.
 
+Any server you run that serves `/v1/embeddings` works too — a llama-server started
+with `--embeddings`, say. Add it to the provider catalogue and route `embedding` to it;
+a provider that needs no key counts as local:
+
+```toml
+# ~/.veles/providers.toml
+[providers.llama-embed]
+kind = "local"
+base_url = "http://127.0.0.1:8081/v1"   # llama-server --embeddings -m nomic-embed-text-v1.5.Q4_K_M.gguf
+
+# <project>/.veles/config.toml (or ~/.veles/config.toml)
+[routing.tasks]
+embedding = "llama-embed:nomic-embed-text-v1.5"
+```
+
+The database remembers which embedder wrote its vectors: switch to another and the next
+backfill embeds the insights again, while recall ignores the old vectors until it has.
+
 ## Concurrency
 
 One `memory.db` per project, so serialise runs against the same project in the

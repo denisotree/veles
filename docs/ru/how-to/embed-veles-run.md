@@ -301,6 +301,24 @@ ORDER BY created_at DESC LIMIT 10
 текст проекта никогда не уходит облачному эмбеддеру. Без локального бэкенда recall
 остаётся только по ключевым словам. Какой бэкенд активен, показывает `veles doctor`.
 
+Подойдёт и любой ваш сервер, отдающий `/v1/embeddings`, например llama-server с
+`--embeddings`. Добавьте его в каталог провайдеров и направьте на него задачу
+`embedding`; провайдер без ключа считается локальным:
+
+```toml
+# ~/.veles/providers.toml
+[providers.llama-embed]
+kind = "local"
+base_url = "http://127.0.0.1:8081/v1"   # llama-server --embeddings -m nomic-embed-text-v1.5.Q4_K_M.gguf
+
+# <project>/.veles/config.toml (или ~/.veles/config.toml)
+[routing.tasks]
+embedding = "llama-embed:nomic-embed-text-v1.5"
+```
+
+База помнит, каким эмбеддером записаны её векторы: при переходе на другой следующий
+backfill заново эмбеддит инсайты, а recall до этого не использует старые векторы.
+
 ## Параллельность
 
 На проект один `memory.db`, поэтому запуски против одного проекта сериализуйте на
