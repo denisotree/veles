@@ -77,8 +77,25 @@ _TITLE_WEIGHT = 3
 _BODY_WEIGHT = 1
 
 
+def _singular(token: str) -> str:
+    """`tools` → `tool` (M325): without it `tool` + `tools` counted as two distinct
+    matches, and a note about trust cleared the gate for a question about writing
+    a tool. Crude on purpose — both sides go through it, so `process` → `proces`
+    still matches `process`."""
+    if len(token) > 3 and token.endswith("s") and not token.endswith("ss"):
+        return token[:-1]
+    return token
+
+
 def _tokens(text: str) -> set[str]:
-    return {t for t in _TOKEN_RE.findall(text.lower()) if t not in _STOPWORDS and len(t) > 1}
+    out = set()
+    for t in _TOKEN_RE.findall(text.lower()):
+        if t in _STOPWORDS or len(t) < 2:
+            continue
+        s = _singular(t)
+        if s not in _STOPWORDS:  # `uses` → `use`, a stopword
+            out.add(s)
+    return out
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,7 +165,11 @@ class KnowledgeStore:
         body_hits = len(q & e.body_tokens)
         return _TITLE_WEIGHT * title_hits + _BODY_WEIGHT * body_hits
 
-    def search(self, query: str, *, limit: int = 5) -> list[KnowledgeHit]:
+    def search(
+        self, query: str, *, limit: int = 5, min_matches: int = MIN_DISTINCT_MATCHES
+    ) -> list[KnowledgeHit]:
+        """`min_matches` is the gate (see the module docstring). Recall keeps the
+        default; `veles_help`, asked about Veles explicitly, passes 1 (M325)."""
         q = _tokens(query)
         if not q:
             return []
@@ -160,7 +181,7 @@ class KnowledgeStore:
             # incidental generic verb in a note body ("add", "run") lets an
             # ordinary coding query leak Veles docs into recall (M186 review).
             distinct = len(q & e.title_tokens)
-            if distinct < MIN_DISTINCT_MATCHES:
+            if distinct < min_matches:
                 continue
             s = self._score(q, e)
             scored.append((s, e))
