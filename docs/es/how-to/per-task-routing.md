@@ -81,7 +81,9 @@ Para cada tarea, gana la primera capa que produzca una especificación:
 La capa 4 es `[engine]` durante una sola ejecución: `veles run --provider llamacpp
 --model qwen3` también comprime, extrae insights y revisa con ese modelo, incluso en un
 proyecto cuyo `[engine]` nombra un modelo en la nube. Igual que `[engine]`, cede ante las
-rutas de tareas propias de tu proyecto y se impone a las de nivel de usuario.
+rutas de tareas propias de tu proyecto y se impone a las de nivel de usuario. Un delegado
+de CLI (`claude-cli`, `codex`, `antigravity-cli`) nunca es esta capa: no puede atender una
+tarea auxiliar, así que esas siguen enrutándose según la configuración.
 
 Si ninguna de estas resuelve, **no hay respaldo codificado** — la tarea queda sin
 asignar y quien la invoca degrada (omite la funcionalidad) o falla con claridad, en lugar

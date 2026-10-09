@@ -81,6 +81,8 @@ Layer 4 एक run की अवधि के लिए `[engine]` है: `vele
 --model qwen3` compression, insight extraction और review भी उसी model पर करता है, भले
 ही project का `[engine]` किसी cloud model का नाम देता हो। `[engine]` की तरह, आपके
 project के अपने task routes इससे ऊपर रहते हैं और यह आपके user-level routes से ऊपर रहता है।
+कोई CLI delegate (`claude-cli`, `codex`, `antigravity-cli`) कभी यह layer नहीं होता — वह
+कोई side task नहीं संभाल सकता, इसलिए वे config के अनुसार ही route होते रहते हैं।
 
 यदि इनमें से कोई भी resolve नहीं होता, तो कोई **hardcoded fallback नहीं है** — task
 unset छोड़ दिया जाता है और उसका caller degrade हो जाता है (feature छोड़ देता है) या साफ

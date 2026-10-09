@@ -82,7 +82,9 @@ Para cada tarefa, vence a primeira camada que produzir uma especificação:
 A camada 4 é o `[engine]` durante uma execução: `veles run --provider llamacpp
 --model qwen3` também compacta, extrai insights e revisa nesse modelo, mesmo num
 projeto cujo `[engine]` aponta para um modelo de nuvem. Assim como o `[engine]`,
-ela perde para as rotas de tarefa do próprio projeto e vence as do usuário.
+ela perde para as rotas de tarefa do próprio projeto e vence as do usuário. Uma CLI
+delegada (`claude-cli`, `codex`, `antigravity-cli`) nunca é esta camada — ela não consegue
+atender uma tarefa auxiliar, então essas continuam sendo roteadas pela configuração.
 
 Se nada disso resolver, **não há fallback fixo no código** — a tarefa fica sem
 definição e quem a chama degrada (pula a funcionalidade) ou falha de forma clara,

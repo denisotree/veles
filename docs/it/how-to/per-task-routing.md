@@ -83,7 +83,9 @@ Il livello 4 è `[engine]` per la durata di una sola esecuzione: `veles run --pr
 llamacpp --model qwen3` comprime, estrae gli insight e fa la review anch'esso su quel
 modello, anche in un progetto il cui `[engine]` indica un modello cloud. Come
 `[engine]`, cede alle route dei task del tuo progetto e prevale su quelle a livello
-utente.
+utente. Una CLI delegata (`claude-cli`, `codex`, `antigravity-cli`) non è mai questo
+livello: non può servire un task secondario, quindi quelli continuano a essere instradati
+secondo la configurazione.
 
 Se nessuno di questi risolve, **non esiste un ripiego hardcoded** — il task resta
 non impostato e il suo chiamante degrada (salta la funzionalità) o segnala un

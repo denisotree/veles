@@ -81,7 +81,9 @@ Với mỗi tác vụ, lớp đầu tiên cho ra một spec sẽ thắng:
 Lớp 4 là `[engine]` trong suốt một lần chạy: `veles run --provider llamacpp
 --model qwen3` cũng nén lịch sử, trích xuất insight và review trên model đó, kể cả
 trong dự án có `[engine]` chỉ tới một model đám mây. Giống `[engine]`, nó xếp sau các
-route tác vụ của chính dự án và đứng trên các route cấp user.
+route tác vụ của chính dự án và đứng trên các route cấp user. Một CLI ủy thác
+(`claude-cli`, `codex`, `antigravity-cli`) không bao giờ là lớp này — nó không thể phục vụ
+một tác vụ phụ, nên các tác vụ đó vẫn được định tuyến theo cấu hình.
 
 Nếu không lớp nào giải quyết được, **không có fallback cứng** — tác vụ được để
 trống và bên gọi nó suy giảm chức năng (bỏ qua tính năng) hoặc báo lỗi rõ ràng,

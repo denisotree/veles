@@ -72,7 +72,7 @@ veles route refresh --force    # even if AGENTS.md hasn't changed
 6. ユーザーの `[routing.tasks][task]` / `.default`
 7. ユーザーの `[user] default_provider` + `default_model`
 
-レイヤー 4 は 1 回の実行のあいだだけ有効な `[engine]` です。`veles run --provider llamacpp --model qwen3` は、プロジェクトの `[engine]` がクラウドモデルを指していても、圧縮・インサイト抽出・レビューもそのモデルで行います。`[engine]` と同じく、プロジェクト自身のタスクルートには負け、ユーザーレベルのルートには勝ちます。
+レイヤー 4 は 1 回の実行のあいだだけ有効な `[engine]` です。`veles run --provider llamacpp --model qwen3` は、プロジェクトの `[engine]` がクラウドモデルを指していても、圧縮・インサイト抽出・レビューもそのモデルで行います。`[engine]` と同じく、プロジェクト自身のタスクルートには負け、ユーザーレベルのルートには勝ちます。CLI 委譲（`claude-cli`、`codex`、`antigravity-cli`）がこのレイヤーになることはありません — 補助タスクを処理できないため、それらは引き続き設定に従ってルーティングされます。
 
 これらのいずれも解決しない場合、**ハードコードされたフォールバックはありません** — そのタスクは未設定のままとなり、呼び出し側は機能を縮退させる（その機能をスキップする）か、明確にエラーを返します。ひそかにクラウドモデルへ手を伸ばすことはありません。
 
