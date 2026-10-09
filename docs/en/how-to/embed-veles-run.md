@@ -128,7 +128,11 @@ tools with it.
 sees neither the tool nor a refusal, so the agent can answer confidently having
 never reached its data source. Since v0.30 the skip prints
 `warning: N self-authored tool file(s) not loaded (unapproved): …` to stderr;
-watch for it, and re-approve after every write.
+watch for it, and re-approve after every write. A file that imports but defines no
+`@tool` function (an agent's argparse script, say) is no tool either: `veles tool approve`
+warns `… defines no @tool function — nothing will be registered` (and still exits 0 — the
+bytes are approved), and every run prints `warning: tool file <name>.py not loaded: …` to
+stderr, as it does for a file that fails to import.
 
 **Modules work the same way.** A module's code runs on every agent turn, so it loads
 only while its files match the approved hash:

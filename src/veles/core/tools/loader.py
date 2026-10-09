@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import ast
 import importlib.util
-import logging
 import sqlite3
 import sys
 from dataclasses import dataclass
@@ -35,8 +34,6 @@ from pathlib import Path
 
 from veles.core.tools.persistence import upsert_tool
 from veles.core.tools.registry import Registry, ToolEntry
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,7 +237,7 @@ def _load_one_file(
             spec.loader.exec_module(module)
         except BaseException as exc:
             sys.modules.pop(mod_name, None)
-            logger.warning("tools loader: failed to import %s: %s", source, exc)
+            # Reported through `LoadReport.errors`, which the callers print (M325).
             return f"{type(exc).__name__}: {exc}"
     finally:
         _registry_module.registry = saved_registry
