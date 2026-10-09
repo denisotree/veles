@@ -225,6 +225,67 @@ def test_json_output_refuses_stream(project: Project, capsys) -> None:
     assert "--stream" in payload["error"]
 
 
+def test_json_output_refuses_the_env_manager(
+    project: Project, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """`VELES_MANAGER_MODE=1` turns the manager on without `--manager`; it writes
+    the answer to stdout itself, ahead of the object."""
+    monkeypatch.setenv("VELES_MANAGER_MODE", "1")
+    assert cmd_run(_args(output="json"), project) == 2
+    payload, _ = _json_out(capsys)
+    assert "VELES_MANAGER_MODE" in payload["error"]
+
+
+def test_json_output_survives_an_unmapped_exception(
+    project: Project, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """An SDK error that is not a ProviderError (anthropic, gemini, a database
+    error) used to leave stdout empty under a traceback."""
+
+    class _Broken:
+        def run(self, *_a: Any, **_k: Any):
+            raise RuntimeError("sqlite exploded")
+
+    monkeypatch.setattr(cli, "build_command_agent", lambda *a, **k: _Broken())
+    assert cmd_run(_args(output="json"), project) == 1
+    payload, err = _json_out(capsys)
+    assert payload["error"] == "RuntimeError: sqlite exploded"
+    assert "Traceback" in err
+
+
+def test_json_output_without_a_project(tmp_path: Path, monkeypatch, capsys) -> None:
+    from veles.cli import main
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("VELES_NO_WIZARD", "1")
+    assert main(["run", "--output", "json", "hi"]) == 2
+    payload, _ = _json_out(capsys)
+    assert payload["exit_code"] == 2
+    assert payload["error"].startswith("no Veles project found")
+
+
+def test_a_cli_delegate_is_not_streamed_internally(
+    project: Project, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """A CLI delegate's stream path turns a failed CLI into text with
+    finish_reason "error" — a "completed" exit 0 — and has no deadline for a
+    silent child; its one-shot path raises and times out."""
+
+    class _Delegate:
+        provider = type("P", (), {"supports_streaming": True})()
+        streamed = None
+
+        def run(self, _prompt: str, on_text_delta=None, **_kwargs: Any) -> _Result:
+            _Delegate.streamed = on_text_delta is not None
+            return _Result()
+
+    monkeypatch.setattr(cli, "build_command_agent", lambda *a, **k: _Delegate())
+    monkeypatch.setattr("veles.cli._console.ensure_api_key", lambda *a, **k: True)
+    monkeypatch.setattr("veles.cli._console.check_provider", lambda *a, **k: True)
+    cmd_run(_args(provider="claude-cli", model="sonnet", _provider_explicit=True), project)
+    assert _Delegate.streamed is False
+
+
 # ---- 3. exit codes distinguish the failure modes (M228) ----------------------
 
 

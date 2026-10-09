@@ -419,8 +419,7 @@ class SessionStore:
             # M326: vectors from another embedder than the one that embedded the
             # query compare as noise — none until backfill has redone them.
             adapter = get_local_embedding_adapter()
-            stored = stored_embedder(self._conn)
-            if adapter is not None and stored is not None and stored != adapter.name:
+            if adapter is not None and stored_embedder(self._conn) != adapter.name:
                 return []
             # Over-fetch: some neighbours may be hidden and filtered out.
             neighbours = knn(self._conn, query_vec, ref_kind="insight", limit=limit * 3)

@@ -58,12 +58,17 @@ def test_a_routed_llamacpp_embedder_is_local(project_with_route, monkeypatch) ->
     assert get_local_embedding_adapter() is adapter  # passes the on-device gate
 
 
-def test_a_routed_cloud_embedder_is_not_local(project_with_route, monkeypatch) -> None:
+def test_a_cloud_route_does_not_displace_a_local_embedder(project_with_route, monkeypatch) -> None:
+    """`[routing.tasks].embedding` set to a cloud model (for `skill dedup`) must not
+    take over from a running Ollama: `project_tree` embeds the prompt through the
+    ungated adapter, so that would send every prompt to the cloud."""
+    import veles.modules.embedding_autodetect as auto
+
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setattr(auto, "probe_ollama", lambda: True)
     project_with_route("openai:text-embedding-3-small")
     adapter = autodetect_embedding_adapter(force=True)
-    assert adapter is not None and adapter.name == "openai:text-embedding-3-small"
-    assert get_local_embedding_adapter() is None  # project text stays off the cloud
+    assert adapter is not None and adapter.name.startswith("ollama:")
 
 
 def test_doctor_reads_the_projects_route(project_with_route, monkeypatch) -> None:
@@ -137,17 +142,23 @@ def test_recall_ignores_another_embedders_vectors(tmp_path: Path) -> None:
         store.close()
 
 
-def test_vectors_from_before_the_marker_are_kept(tmp_path: Path) -> None:
-    """A database embedded before M326 recorded no embedder; it was the only local
-    one there was, so its vectors are adopted, not thrown away."""
+def test_vectors_from_before_the_marker_are_redone(tmp_path: Path) -> None:
+    """A database embedded before M326 recorded no embedder. Adopting its vectors
+    under whatever embedder came next would keep Ollama's vectors under a
+    llama.cpp name for good (backfill only fills missing rows) — so they are
+    embedded once more instead."""
     from veles.core.memory.vector import upsert_embedding
 
     store = SessionStore(tmp_path / "m.db")
     try:
         iid = _insight(store)
-        upsert_embedding(store._conn, ref_kind="insight", ref_id=iid, vec=[1.0, 0.0])
+        upsert_embedding(store._conn, ref_kind="insight", ref_id=iid, vec=[0.5] * 768)
         store._conn.commit()
-        assert backfill_insight_embeddings(store._conn, _Embedder("ollama:nomic")) == 0
-        assert stored_embedder(store._conn) == "ollama:nomic"
+        register_embedding_adapter(_Embedder("llamacpp:bge"))
+        assert store.knn_insights([1.0, 0.0], limit=5) == []  # unknown origin: not used
+        assert backfill_insight_embeddings(store._conn, _Embedder("llamacpp:bge")) == 1
+        assert stored_embedder(store._conn) == "llamacpp:bge"
+        assert len(store.knn_insights([1.0, 0.0], limit=5)) == 1
     finally:
+        reset_embedding_adapter()
         store.close()

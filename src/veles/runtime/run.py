@@ -139,12 +139,14 @@ def run_agent_streaming_aware(
             # final answer. The request timeout then bounds the gap between chunks
             # instead of the whole response — a slow model runs as long as it
             # writes, a hung server is still caught.
+            # Not a CLI delegate: its stream path reports a failed CLI as text
+            # with finish_reason "error" (a "completed" exit 0) and has no
+            # deadline for a silent child, where the one-shot path raises and
+            # times out.
             streams = getattr(getattr(agent, "provider", None), "supports_streaming", False)
+            streams = streams is True and not is_cli_provider(getattr(args, "provider", "") or "")
             with budget_scope(args, project=project) as budget:
-                if streams is True:
-                    result = agent.run(prompt, on_text_delta=_discard)
-                else:
-                    result = agent.run(prompt)
+                result = agent.run(prompt, on_text_delta=_discard) if streams else agent.run(prompt)
             if emit_output:
                 print(result.text)
     finally:

@@ -80,7 +80,8 @@ JSON object (stderr and the exit code stay as they are), also on a setup error:
 `status` is the stop reason (or `error`), `tokens` the main loop's own spend,
 `budget.consumed` everything the run charged including side tasks, `warnings` the
 `warning:` lines and Veles' logged warnings, `error` the first `error:` line. Tool calls
-stay in `events.jsonl`. It can't be combined with `--stream` or `--manager` (exit 2).
+stay in `events.jsonl`. It can't be combined with `--stream` or the manager (`--manager`,
+`VELES_MANAGER_MODE=1`), which print the answer themselves (exit 2).
 The keys are asserted by `tests/test_cli_run_contract.py`.
 
 You don't need `--stream` for a slow model. Without it, Veles still streams from any
@@ -312,8 +313,10 @@ base_url = "http://127.0.0.1:8081/v1"   # llama-server --embeddings -m nomic-emb
 embedding = "llama-embed:nomic-embed-text-v1.5"
 ```
 
-The database remembers which embedder wrote its vectors: switch to another and the next
-backfill embeds the insights again, while recall ignores the old vectors until it has.
+The database remembers which embedder wrote its vectors: switch to another — or upgrade
+from a release before 1.2.12, which recorded none — and the next backfill embeds the
+insights again, while recall ignores the old vectors until it has. A cloud `embedding`
+route never takes over from a local embedder.
 
 ## Concurrency
 

@@ -223,15 +223,14 @@ def stored_embedder(conn: sqlite3.Connection) -> str | None:
 
 
 def adopt_embedder(conn: sqlite3.Connection, name: str, *, ref_kind: str) -> None:
-    """Record `name` as the embedder. A different one recorded before means the
-    stored `ref_kind` vectors are another model's, so they go. A database that
-    recorded none (written before M326, by the only local embedder there was)
-    keeps its vectors."""
-    previous = stored_embedder(conn)
-    if previous == name:
+    """Record `name` as the embedder. Any other — or none, a database written
+    before M326 — means the stored `ref_kind` vectors may be another model's, so
+    they go and backfill embeds them again: once, for an old database, which
+    beats keeping Ollama vectors under a llama.cpp name for good."""
+    if stored_embedder(conn) == name:
         return
-    if previous is not None:
-        conn.execute("DELETE FROM embeddings_blob WHERE ref_kind = ?", (ref_kind,))
+    ensure_embeddings_table(conn)
+    conn.execute("DELETE FROM embeddings_blob WHERE ref_kind = ?", (ref_kind,))
     conn.execute(
         "INSERT INTO embeddings_meta(key, value) VALUES ('embedder', ?)"
         " ON CONFLICT(key) DO UPDATE SET value = excluded.value",

@@ -247,15 +247,21 @@ def _warning_log(warnings: list[str], log: logging.Logger) -> logging.Handler:
 
 def _run_as_json(args: argparse.Namespace, project: Project) -> int:
     import contextlib
-    import json
     import time
+    import traceback
+
+    from veles.core.orchestration.integration import env_manager_mode
 
     started = time.monotonic()
     warnings: list[str] = []
     errors: list[str] = []
     report: dict = {}
-    if getattr(args, "stream", False) or getattr(args, "manager", False):
-        errors.append("--output json can't be combined with --stream or --manager")
+    if getattr(args, "stream", False) or getattr(args, "manager", False) or env_manager_mode():
+        # Both write the answer to stdout themselves.
+        errors.append(
+            "--output json can't be combined with --stream or the manager "
+            "(--manager, VELES_MANAGER_MODE=1)"
+        )
         rc = 2
     else:
         log = logging.getLogger("veles")
@@ -264,8 +270,31 @@ def _run_as_json(args: argparse.Namespace, project: Project) -> int:
         try:
             with contextlib.redirect_stderr(_StderrTee(sys.stderr, warnings, errors)):
                 rc = _cmd_run(args, project, report)
+        except Exception as exc:
+            # Whatever `_cmd_run` doesn't map to an exit code (an SDK error that
+            # is not a ProviderError, a database error) still ends in the object.
+            traceback.print_exc()
+            errors.append(f"{type(exc).__name__}: {exc}")
+            rc = 1
         finally:
             log.removeHandler(handler)
+    print_outcome_json(report, rc, started=started, warnings=warnings, errors=errors)
+    return rc
+
+
+def print_outcome_json(
+    report: dict,
+    rc: int,
+    *,
+    started: float | None = None,
+    warnings: list[str] | None = None,
+    errors: list[str] | None = None,
+) -> None:
+    """The `--output json` object (M326). Also printed by the CLI dispatcher for
+    a run that fails before it gets here (no project)."""
+    import json
+    import time
+
     result, budget = report.get("result"), report.get("budget")
     usage = getattr(result, "usage", None)
     payload = {
@@ -274,7 +303,7 @@ def _run_as_json(args: argparse.Namespace, project: Project) -> int:
         "session_id": getattr(result, "session_id", None),
         "answer": getattr(result, "text", None),
         "turns": getattr(result, "iterations", 0),
-        "elapsed_s": round(time.monotonic() - started, 3),
+        "elapsed_s": round(time.monotonic() - started, 3) if started is not None else 0.0,
         # The main loop's own spend; side calls are in `budget.consumed`.
         "tokens": {
             "prompt": getattr(usage, "prompt_tokens", 0),
@@ -286,11 +315,10 @@ def _run_as_json(args: argparse.Namespace, project: Project) -> int:
             "consumed": getattr(budget, "consumed", 0),
             "limit": getattr(budget, "limit", 0),
         },
-        "warnings": warnings,
+        "warnings": warnings or [],
         "error": errors[0] if errors else None,
     }
     print(json.dumps(payload, ensure_ascii=False))
-    return rc
 
 
 def _cmd_run(args: argparse.Namespace, project: Project, report: dict | None = None) -> int:

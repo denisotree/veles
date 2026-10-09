@@ -63,7 +63,10 @@ def autodetect_embedding_adapter(
     # probe. ponytail: process-wide like the rest of autodetect, so a daemon
     # serving several projects uses the first one's route.
     routed = build_from_route()
-    if routed is not None:
+    # Local only: a cloud route (e.g. for `skill dedup`, which reads the route
+    # itself) must not displace a running Ollama — `project_tree` and the
+    # pattern detector embed through the ungated adapter.
+    if routed is not None and routed.is_local:
         register_embedding_adapter(routed)
         logger.info("embedding backend: %s (routed)", routed.name)
         return routed

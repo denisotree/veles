@@ -19,21 +19,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   id, answer, turns, elapsed time, the main loop's tokens (prompt, completion,
   reasoning), the budget consumed, warnings and the first error — so an embedder no
   longer reads the outcome from a `--verbose` debug line. stderr and exit codes are
-  unchanged; setup errors come out as an object too.
+  unchanged; setup errors (no project included) and unexpected exceptions come out as
+  an object too. It refuses `--stream` and the manager (`--manager`,
+  `VELES_MANAGER_MODE=1`), which print the answer themselves.
 - **A local embedder other than Ollama.** `[routing.tasks].embedding` naming an
   OpenAI-wire provider — a llama-server started with `--embeddings`, added to
   `~/.veles/providers.toml` as `kind = "local"` — now drives semantic recall; a
   provider that needs no key counts as local, a cloud one still doesn't. `veles doctor`
-  reads the project's route. The database records which embedder wrote its vectors:
-  after a switch, backfill embeds the insights again and recall ignores the old vectors
-  until it has.
+  reads the project's route. A cloud route (e.g. for `veles skill dedup`) does not
+  displace a running Ollama. The database records which embedder wrote its vectors:
+  after a switch — and once for a database written before this release, whose vectors
+  have no recorded origin — backfill embeds the insights again, and recall ignores the
+  old vectors until it has.
 
 ### Changed
 
 - **`veles run` streams internally.** Without `--stream`, a provider that can stream is
   streamed and only the final answer is printed, so the request timeout bounds the pause
   between chunks instead of the whole answer: a slow local model is no longer cut off at
-  the timeout. stdout is unchanged.
+  the timeout. stdout is unchanged. CLI delegates (`claude-cli`, `codex`,
+  `antigravity-cli`) keep the one-shot call, which reports a failed CLI as an error and
+  times out a silent one.
 
 ## [1.2.11] — 2026-10-09
 
