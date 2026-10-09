@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.11] — 2026-10-09
+
+Fixes from a headless run with local models (llama.cpp, Qwen3.8 and Bonsai-2): the
+token budget, the response cap, timeouts, side tasks and writing your own tools.
+
+### Upgrading from 1.2.10
+
+- **`--max-tokens N` is a flag of its own: the completion cap for each response.**
+  Before, argparse accepted it as an abbreviation of `--max-tokens-total`; a script that
+  writes `--max-tokens` meaning the total budget must spell `--max-tokens-total`.
+- **The daemon and `veles job` no longer cap every response at 4096 tokens.** They now
+  get the same cap as `veles run` — 32000 for a reasoning model — so a reasoning model
+  there can spend more per turn. Set `[engine] max_tokens` to choose.
+- **Side tasks follow a model you name for the run.** With `--provider`/`--model` (or a
+  `[daemon.<name>]` pin), the compressor, insights, advisor and other routed tasks
+  without their own `[routing.tasks]` entry run on that model, ahead of `[engine]`. A
+  local run no longer summarises its history on a cloud `[engine]`; a project without
+  `[engine]` no longer switches the compressor off. A CLI delegate (`claude-cli`,
+  `codex`) is not a base: side tasks keep routing by config there. One consequence for
+  `--verify` and a pinned daemon's verify hook: with no `[routing.tasks].advisor`, the
+  advisor is now the run's own model, so escalation is skipped (it says so on stderr)
+  instead of going to `[engine]` — set `[routing.tasks].advisor` to keep a stronger
+  reviewer.
+- **Streams report token usage.** OpenAI-wire streams ask for usage
+  (`stream_options.include_usage`), so `--stream` runs against llama.cpp, ollama, vLLM
+  and api.openai.com count tokens — and `--max-tokens-total` can now stop them.
+- **stderr gains two lines:** `-> max_tokens=… (source)` under `--verbose`, and
+  `warning: tool file <name>.py not loaded: …` for a tool file that fails to import or
+  defines no `@tool` function (it used to go to the log only).
+
+### Fixed
+
+- **Local servers: real timeouts, configurable.** `llamacpp`, `ollama` and `local`
+  providers read `[engine] request_timeout_s` and `max_retries`. The wait for a response
+  defaults to 600 s (not a guess from the model name), connecting is limited to 10 s, and
+  retries stay 0 unless set. Before, the SDK's own timeout overrode the client's: connect
+  waited 600 s, and the 120 s per-read limit never applied.
+- **The response cap comes from the server, not the name.** A local server ignores the
+  model name, yet the cap came from it: `--model bonsai-2-27b` got 4096 against a
+  server for which `qwen3.8-27b` got 32000. Veles now asks the server once when it builds
+  the provider — llama.cpp's `/props` (a thinking chat template), ollama's `/api/show`
+  (the `thinking` capability) — and keeps the cap under the server's `n_ctx`, which also
+  sets the context ceiling. `--max-tokens` and `[engine] max_tokens` override it;
+  `--verbose` prints the cap and where it came from.
+- **Side calls on a reasoning model answer.** The summariser (1024 tokens), the auto-mode
+  classifier (8), the extractors and image descriptions asked for so little that a
+  reasoning model spent it all on thinking and returned nothing; on such a model they now
+  get the full cap. The summariser's input is bounded by the server it runs on (half its
+  `n_ctx`).
+- **Emergency truncation keeps the newest turn.** When a request is over the context
+  ceiling, the oldest turns go first and the newest always stays — over the limit with it
+  kept, the server refuses loudly, instead of the model answering a request with no
+  prompt in it.
+- **`veles_help` finds the tool contract.** A new note, "Author a Veles tool", covers
+  `@tool`, the approval gate and the `tool_authoring` skill. `veles_help` also finds
+  one-word names (skills, tools, commands), which its search could never return, and
+  `tool`/`tools` no longer count as two matches.
+- **Writing a tool file says what happens next.** `write_file`/`edit_file` into
+  `.veles/tools/` warn when the file defines no `@tool` function and note that it loads
+  only after `veles tool approve`. `veles tool approve` warns about such a file (still
+  exit 0), and `veles tool list` names every tool file that did not load and why.
+- **`tool_authoring`** stops after one fix and one re-review and quotes the remaining
+  concerns, instead of looping on the advisor; it tells the user to approve the tool
+  rather than calling it ready.
+- Docs: configuration reference (local timeouts, `max_tokens`), CLI reference
+  (`--max-tokens`), per-task routing (the run's model), embedding guide (tool files
+  that don't load).
+
 ## [1.2.10] — 2026-10-07
 
 Fixes from embedding Veles in a closed network and on channels that can't show buttons.

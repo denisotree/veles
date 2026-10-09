@@ -484,7 +484,11 @@ def emergency_truncate(
     per_turn = [estimate_tokens([m]) for m in body]
     total = estimate_tokens(head) + sum(per_turn)
     n_dropped = 0
-    while n_dropped < len(body) and total > target_tokens:
+    # The newest turn always stays (M325): dropping it too left a request of the
+    # system prompt alone, which a model answers as if asked nothing — a fake
+    # summary, or a headless run "completed" without its prompt. Over the limit
+    # with it kept, the server refuses loudly instead.
+    while n_dropped < len(body) - 1 and total > target_tokens:
         total -= per_turn[n_dropped]
         n_dropped += 1
     body = body[n_dropped:]

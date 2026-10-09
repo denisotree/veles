@@ -167,20 +167,28 @@ def tool_file_problem(source: str) -> str | None:
         tree = ast.parse(source)
     except SyntaxError as exc:
         return f"does not parse (line {exc.lineno}: {exc.msg})"
+    # `from … import tool as t` makes `@t` the decorator.
+    names = {"tool"} | {
+        a.asname
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom)
+        for a in node.names
+        if a.name == "tool" and a.asname
+    }
     for node in tree.body:
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and any(
-            _is_tool_decorator(d) for d in node.decorator_list
+            _is_tool_decorator(d, names) for d in node.decorator_list
         ):
             return None
     return "defines no @tool function"
 
 
-def _is_tool_decorator(node: ast.expr) -> bool:
-    """`@tool`, `@tool(...)` or `@<module>.tool(...)`."""
+def _is_tool_decorator(node: ast.expr, names: set[str]) -> bool:
+    """`@tool`, `@tool(...)`, its alias, or `@<module>.tool(...)`."""
     target = node.func if isinstance(node, ast.Call) else node
     if isinstance(target, ast.Attribute):
         return target.attr == "tool"
-    return isinstance(target, ast.Name) and target.id == "tool"
+    return isinstance(target, ast.Name) and target.id in names
 
 
 # ---------- internals ----------

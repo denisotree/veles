@@ -128,15 +128,17 @@ def _describe_anthropic(
 def _describe_openai(provider_name: str, model: str, image_b64: str, mime: str, prompt: str) -> str:
     from openai import OpenAI
 
-    from veles.core.providers import openai_wire_endpoint
-
     # Keychain-first key (M92): the SDK default would pick up OPENAI_API_KEY
     # for an OpenRouter call and 401.
+    from veles.core.model_budgets import side_call_max_tokens
+    from veles.core.providers import openai_wire_endpoint
+
     base_url, api_key = openai_wire_endpoint(provider_name)
     client = OpenAI(api_key=api_key, base_url=base_url)
     response = client.chat.completions.create(
         model=model,
-        max_tokens=_VISION_MAX_TOKENS,
+        # A reasoning vision model thinks before it describes (M325).
+        max_tokens=side_call_max_tokens(model, None, _VISION_MAX_TOKENS),
         messages=[
             {
                 "role": "user",

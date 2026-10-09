@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import contextvars
 import json
 import os
 import signal
@@ -127,6 +128,12 @@ def _warn_on_security_config_typos(project) -> None:
 
 
 def _cmd_daemon_start(args: argparse.Namespace) -> int:
+    # Its own context: the daemon sets the run base (M325) for its lifetime, and
+    # an in-process start (tests, the picker) must not leak it to the caller.
+    return contextvars.copy_context().run(_daemon_start, args)
+
+
+def _daemon_start(args: argparse.Namespace) -> int:
     from veles.cli._console import ensure_api_key as _ensure_api_key
     from veles.cli._project import _resolve_active_project
     from veles.core.memory import SessionStore
@@ -252,6 +259,16 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
     if not getattr(args, "foreground", False):
         return _detach_and_report(args, project, name=name)
 
+    from veles.core.context import set_run_base
+    from veles.core.model_resolver import run_base
+
+    # M325: a daemon started with `--provider/--model`, or a session pinned by
+    # `[daemon.<name>]`, routes its side tasks to that model too. Set before
+    # anything resolves a route — the background runners pick the dream and
+    # consolidation models at attach time — and kept for the process: every
+    # turn runs in a task or `to_thread` worker that copies this context.
+    set_run_base(run_base(args, project, daemon_session=name))
+
     _bootstrap_daemon(project, name=name)
     token_store = _initialise_token_store()
 
@@ -311,17 +328,9 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
         f"(project: {project.name}, root: {project.root})",
         file=sys.stderr,
     )
-    from veles.core.context import reset_run_base, set_run_base
-    from veles.core.model_resolver import run_base
-
-    # M325: a daemon started with `--provider/--model`, or a session pinned by
-    # `[daemon.<name>]`, routes its side tasks to that model too. Every turn runs
-    # in a task or `to_thread` worker that copies this context.
-    base_token = set_run_base(run_base(args, project, daemon_session=name))
     try:
         _run_app_logged(app, host=args.host, port=args.port)
     finally:
-        reset_run_base(base_token)
         _cleanup_daemon_exit(
             project,
             pid_path=pid_path,

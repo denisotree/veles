@@ -168,13 +168,20 @@ def run_base(
         explicit = bool(pin.get("provider") or pin.get("model"))
     if not explicit:
         return None
+    provider = resolve_effective_provider(args, project, daemon_session=daemon_session)
+    from veles.core.providers import is_cli_provider
+
+    if is_cli_provider(provider):
+        # A CLI delegate (claude-cli, codex) can't serve a side call — routed to
+        # it, the compressor and insights switch off. They keep routing by config.
+        return None
     try:
         model = ensure_model_configured(
             resolve_effective_model(args, project, daemon_session=daemon_session)
         )
     except ConfigurationError:
         return None
-    return resolve_effective_provider(args, project, daemon_session=daemon_session), model
+    return provider, model
 
 
 __all__ = [
