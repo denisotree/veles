@@ -7,11 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.12] — 2026-10-10
+
+Headless output for embedders, from the same local-model report: no timeout on a slow
+stream, the outcome as one JSON object, and semantic recall without Ollama.
+
 ### Upgrading from 1.2.11
 
 - **`events.jsonl` no longer has `thinking_delta` lines.** A reasoning model's thinking
   went to the audit log one line per chunk — thousands a turn. It still reaches live
   listeners (the REPL inspector, the daemon's push stream).
+- **Insight vectors are rebuilt once.** A database from before 1.2.12 doesn't say which
+  embedder wrote its vectors, so the first backfill (`veles dream
+  --include-consolidation`, the curator) embeds the insights again; until then
+  semantic recall answers from keywords only.
 
 ### Added
 
