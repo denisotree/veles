@@ -38,6 +38,15 @@ def _register_run(sub: argparse._SubParsersAction) -> None:
     add_common_run_flags(run)
     run.add_argument("--resume", metavar="ID", default=None, help="Continue an existing session.")
     run.add_argument(
+        "--output",
+        choices=("text", "json"),
+        default="text",
+        help=(
+            "stdout format: `text` (the answer, default) or `json` (one object: status, "
+            "exit code, session, answer, turns, tokens, budget, warnings)."
+        ),
+    )
+    run.add_argument(
         "--manager",
         action="store_true",
         help=(

@@ -136,6 +136,95 @@ def test_provider_error_message_goes_to_stderr_not_stdout(
     assert captured.out == ""
 
 
+# ---- 2b. `--output json`: one object instead of the answer (M326) -------------
+
+_JSON_KEYS = {
+    "status",
+    "exit_code",
+    "session_id",
+    "answer",
+    "turns",
+    "elapsed_s",
+    "tokens",
+    "budget",
+    "warnings",
+    "error",
+}
+
+
+def _json_out(capsys) -> tuple[dict, str]:
+    import json
+
+    captured = capsys.readouterr()
+    lines = captured.out.splitlines()
+    assert len(lines) == 1, captured.out  # exactly one object, nothing else
+    return json.loads(lines[0]), captured.err
+
+
+def test_json_output_schema(project: Project, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    _stub_run(monkeypatch, _Result(text="the answer"))
+    assert cmd_run(_args(output="json"), project) == 0
+    payload, err = _json_out(capsys)
+    assert set(payload) == _JSON_KEYS
+    assert set(payload["tokens"]) == {"prompt", "completion", "reasoning", "total"}
+    assert set(payload["budget"]) == {"consumed", "limit"}
+    assert payload["status"] == "completed"
+    assert payload["exit_code"] == 0
+    assert payload["answer"] == "the answer"
+    assert payload["session_id"] == "sess-1"
+    assert payload["error"] is None
+    assert "<session=sess-1>" in err  # stderr is unchanged
+
+
+def test_json_output_carries_the_failure(
+    project: Project, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    class _Exploding:
+        def run(self, *_a: Any, **_k: Any):
+            raise ProviderError("upstream exploded")
+
+    monkeypatch.setattr(cli, "build_command_agent", lambda *a, **k: _Exploding())
+    assert cmd_run(_args(output="json"), project) == 1
+    payload, err = _json_out(capsys)
+    assert payload["status"] == "error"
+    assert payload["exit_code"] == 1
+    assert payload["error"] == "upstream exploded"
+    assert "error: upstream exploded" in err
+
+
+def test_json_output_collects_warnings(
+    project: Project, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """Printed `warning:` lines and `veles.*` log warnings both land in the object
+    — the second is how "compressor disabled" reaches an embedder."""
+    import logging
+    import sys
+
+    class _Warning:
+        def run(self, *_a: Any, **_k: Any) -> _Result:
+            print("warning: tool file x.py not loaded: defines no @tool function", file=sys.stderr)
+            logging.getLogger("veles.core.context_compressor").warning("compressor disabled: x")
+            return _Result()
+
+    monkeypatch.setattr(cli, "build_command_agent", lambda *a, **k: _Warning())
+    # As in a plain CLI process: no logging configured (pytest installs handlers).
+    monkeypatch.setattr(logging.getLogger("veles"), "hasHandlers", lambda: False)
+    cmd_run(_args(output="json"), project)
+    payload, err = _json_out(capsys)
+    assert payload["warnings"] == [
+        "tool file x.py not loaded: defines no @tool function",
+        "compressor disabled: x",
+    ]
+    assert "compressor disabled: x" in err  # still printed, as without the flag
+
+
+def test_json_output_refuses_stream(project: Project, capsys) -> None:
+    assert cmd_run(_args(output="json", stream=True), project) == 2
+    payload, _ = _json_out(capsys)
+    assert payload["status"] == "error"
+    assert "--stream" in payload["error"]
+
+
 # ---- 3. exit codes distinguish the failure modes (M228) ----------------------
 
 

@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   went to the audit log one line per chunk — thousands a turn. It still reaches live
   listeners (the REPL inspector, the daemon's push stream).
 
+### Added
+
+- **`veles run --output json`.** stdout becomes one object — status, exit code, session
+  id, answer, turns, elapsed time, the main loop's tokens (prompt, completion,
+  reasoning), the budget consumed, warnings and the first error — so an embedder no
+  longer reads the outcome from a `--verbose` debug line. stderr and exit codes are
+  unchanged; setup errors come out as an object too.
+
 ### Changed
 
 - **`veles run` streams internally.** Without `--stream`, a provider that can stream is

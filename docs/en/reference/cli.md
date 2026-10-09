@@ -95,6 +95,7 @@ triggers. Accepts all [shared agent-loop flags](#shared-agent-loop-flags) plus:
 | Flag | Default | Purpose |
 |---|---|---|
 | `--resume <session_id>` | new session | Continue an existing session |
+| `--output {text,json}` | `text` | `json`: print one object (status, exit code, session, answer, turns, tokens, budget, warnings) instead of the answer |
 | `--manager` | off | Decompose via the multi-agent manager (also `VELES_MANAGER_MODE=1`) |
 | `--verify` | off | After the run, the routed advisor judges the answer; on a confident failure, re-run on the stronger model (also `VELES_VERIFY_MODE=1`) |
 | `--plan` | off | Planning mode: read/search/draft allowed, mutations blocked |

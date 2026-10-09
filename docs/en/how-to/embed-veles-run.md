@@ -66,6 +66,23 @@ Two flags fall **outside** this contract:
   before a tool call — not just the final answer. Do not use it if you parse stdout.
 - `--manager` returns before the session line and the exit-code mapping.
 
+To read the outcome without parsing stderr, pass `--output json`: stdout becomes one
+JSON object (stderr and the exit code stay as they are), also on a setup error:
+
+```json
+{"status": "completed", "exit_code": 0, "session_id": "1791568162-2acefc20",
+ "answer": "…", "turns": 4, "elapsed_s": 19.7,
+ "tokens": {"prompt": 4224, "completion": 1197, "reasoning": 980, "total": 5421},
+ "budget": {"consumed": 6020, "limit": 100000},
+ "warnings": ["compressor disabled: …"], "error": null}
+```
+
+`status` is the stop reason (or `error`), `tokens` the main loop's own spend,
+`budget.consumed` everything the run charged including side tasks, `warnings` the
+`warning:` lines and Veles' logged warnings, `error` the first `error:` line. Tool calls
+stay in `events.jsonl`. It can't be combined with `--stream` or `--manager` (exit 2).
+The keys are asserted by `tests/test_cli_run_contract.py`.
+
 You don't need `--stream` for a slow model. Without it, Veles still streams from any
 provider that can and prints only the final answer, so the request timeout
 (`[engine] request_timeout_s`) bounds the pause between chunks, not the whole answer:
