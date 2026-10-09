@@ -1,6 +1,6 @@
 ---
 name: tool_authoring
-description: Generate a new project-level python tool for a repeating task and register it via veles tool list
+description: Create a reusable Veles tool (a @tool python function in .veles/tools/) for a repeating task — use this instead of writing the file by hand; it loads once the user runs veles tool approve
 tools: [write_file, read_file, advisor_review]
 parameters:
   - name: tool_name
@@ -71,8 +71,10 @@ You write a new project-level python tool for the user. The tool lives at
    env access beyond the parameters, silent error-swallowing, undeclared
    side effects." Then:
    - If the verdict raises concerns, **fix the code and re-write the
-     file** (back to step 3) before finishing — do not ship a tool the
-     advisor flagged. Re-review after the fix.
+     file** (back to step 3), then review it **once more**. That is the
+     whole budget: one fix, one re-review. If the second verdict still
+     raises concerns, stop — finish, and quote the remaining concerns to
+     the user rather than looping; they decide whether to approve.
    - If the advisor is unavailable (`<advisor unavailable: …>`), say so
      to the user and proceed only after restating the hard rules you
      checked yourself.
@@ -85,17 +87,20 @@ You write a new project-level python tool for the user. The tool lives at
    tool can import. This is what M120's `base_tool_id` field tracks
    on promotion.
 
-6. **End with a self-test.** After writing, instruct the user how to
-   exercise the tool:
-   - "Run `veles tool show <tool_name>` to see the catalogue entry."
-   - "In `veles run`, call it via the model: try a prompt that
-     mentions what the tool does."
+6. **Tell the user it needs their approval.** A tool file Veles wrote
+   is not loaded until a human approves its exact bytes — you cannot do
+   it yourself, and every later edit needs approving again. Do not say
+   the tool is ready; say it is written and waiting. End with:
+   - "Review `.veles/tools/<tool_name>.py`, then run
+     `veles tool approve <tool_name>` to enable it."
+   - "After that, `veles tool show <tool_name>` shows the catalogue
+     entry; try a prompt that mentions what the tool does."
    - "If it works, consider `veles tool promote <tool_name>` to make
      it user-global."
 
-7. **Do not modify the catalogue directly.** The loader at startup
-   sees the new `.py` and inserts the row. Trying to write into
-   `memory.db` from the tool body bypasses validation.
+7. **Do not modify the catalogue directly.** Once approved, the loader
+   at startup imports the `.py` and inserts the row. Trying to write
+   into `memory.db` from the tool body bypasses validation.
 
 If at any step you hit a permission / approval prompt, comply with
 its decision — refuse means stop and report back; once means proceed

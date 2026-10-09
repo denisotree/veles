@@ -32,6 +32,9 @@ Resolution order in `effective_route(task_type, project)` — first hit wins:
 2.  project `[routing.tasks].default`           (`project-route-default`)
 3.  project NL `routing.nl.toml`  [task_type]   (`nl`)
 4.  project NL `routing.nl.toml`  default        (`nl-default`)
+4a. the run's own model, when the user chose it  (`run-base`)
+    for this run: `--provider/--model` or a `[daemon.<name>]` pin (M325) —
+    `[engine]` for the duration of the run (`core.context.current_run_base`)
 5.  project `[engine]` base  (M125)              (`project-provider`)
 6.  user `[routing.tasks][task_type]`  (M125)    (`user-route`)
 7.  user `[routing.tasks].default`  (M125)       (`user-route-default`)
@@ -229,12 +232,19 @@ def effective_route(task_type: str, project: Project) -> tuple[str, str, str]:
         else None
     )
 
+    from veles.core.context import current_run_base
+
+    run_base = current_run_base()
+
     return _first_spec(
         [
             (proj_routes.get(task_type), "project-route"),
             (proj_routes.get("default"), "project-route-default"),
             (nl.get(task_type), "nl"),
             (nl.get("default"), "nl-default"),
+            # M325: the run's own model when the user chose it for this run —
+            # `[engine]` for the duration of the run, so it sits just above it.
+            (provider_to_spec(*run_base) if run_base else None, "run-base"),
             (proj_base, "project-provider"),
             (user_routes.get(task_type), "user-route"),
             (user_routes.get("default"), "user-route-default"),

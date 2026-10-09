@@ -69,6 +69,27 @@ def reset_current_session_id(token: Token) -> None:
     _current_session_id.reset(token)
 
 
+# ---- run base (M325: the run's own model as the base for routed side tasks) ----
+# `(provider, model)` the user chose for THIS run — `--provider/--model`, or a
+# `[daemon.<name>]` pin — set by the CLI for the whole command (worker threads get
+# it through `copy_context`/`to_thread`). `routing.effective_route` treats it the
+# way it treats `[engine]`: the base for every side task without its own route.
+# None when the run's model came from config, which routing already reads.
+_run_base: ContextVar[tuple[str, str] | None] = ContextVar("veles_run_base", default=None)
+
+
+def current_run_base() -> tuple[str, str] | None:
+    return _run_base.get()
+
+
+def set_run_base(base: tuple[str, str] | None) -> Token:
+    return _run_base.set(base)
+
+
+def reset_run_base(token: Token) -> None:
+    _run_base.reset(token)
+
+
 # ---- background-op resume depth (M204 auto-resume loop guard) ----
 # When a background op (structured job) completes, the daemon resumes the
 # origin session with a follow-up turn. That turn runs with resume depth =

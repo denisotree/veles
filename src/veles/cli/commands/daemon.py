@@ -311,9 +311,17 @@ def _cmd_daemon_start(args: argparse.Namespace) -> int:
         f"(project: {project.name}, root: {project.root})",
         file=sys.stderr,
     )
+    from veles.core.context import reset_run_base, set_run_base
+    from veles.core.model_resolver import run_base
+
+    # M325: a daemon started with `--provider/--model`, or a session pinned by
+    # `[daemon.<name>]`, routes its side tasks to that model too. Every turn runs
+    # in a task or `to_thread` worker that copies this context.
+    base_token = set_run_base(run_base(args, project, daemon_session=name))
     try:
         _run_app_logged(app, host=args.host, port=args.port)
     finally:
+        reset_run_base(base_token)
         _cleanup_daemon_exit(
             project,
             pid_path=pid_path,
