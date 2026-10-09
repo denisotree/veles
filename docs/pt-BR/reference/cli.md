@@ -90,6 +90,7 @@ gatilhos de curadoria/aprendizado. Aceita todas as [flags compartilhadas do loop
 | Flag | Padrão | Finalidade |
 |---|---|---|
 | `--resume <session_id>` | nova sessão | Continua uma sessão existente |
+| `--output {text,json}` | `text` | `json`: imprime um único objeto (status, código de saída, sessão, resposta, turnos, tokens, orçamento, avisos) em vez da resposta |
 | `--manager` | desligado | Decompõe via o gerente multiagente (também `VELES_MANAGER_MODE=1`) |
 | `--verify` | desligado | Após a execução, o advisor roteado julga a resposta; diante de uma falha confiável, reexecuta no modelo mais forte (também `VELES_VERIFY_MODE=1`) |
 | `--plan` | desligado | Modo de planejamento: leitura/busca/rascunho permitidos, mutações bloqueadas |

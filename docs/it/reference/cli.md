@@ -93,6 +93,7 @@ dell'agente](#shared-agent-loop-flags) più:
 | Flag | Default | Scopo |
 |---|---|---|
 | `--resume <session_id>` | nuova sessione | Continua una sessione esistente |
+| `--output {text,json}` | `text` | `json`: stampa un unico oggetto (stato, codice di uscita, sessione, risposta, turni, token, budget, avvisi) al posto della risposta |
 | `--manager` | off | Decompone tramite il manager multi-agente (anche `VELES_MANAGER_MODE=1`) |
 | `--verify` | off | Al termine, l'advisor instradato giudica la risposta; in caso di fallimento netto, riesegue sul modello più potente (anche `VELES_VERIFY_MODE=1`) |
 | `--plan` | off | Modalità pianificazione: lettura/ricerca/bozza consentite, mutazioni bloccate |

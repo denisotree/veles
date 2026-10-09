@@ -88,6 +88,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | ফ্ল্যাগ | ডিফল্ট | উদ্দেশ্য |
 |---|---|---|
 | `--resume <session_id>` | new session | একটি বিদ্যমান সেশন চালিয়ে যায় |
+| `--output {text,json}` | `text` | `json`: উত্তরের বদলে একটি অবজেক্ট প্রিন্ট করে (স্ট্যাটাস, exit code, সেশন, উত্তর, টার্ন, টোকেন, বাজেট, ওয়ার্নিং) |
 | `--manager` | off | মাল্টি-এজেন্ট ম্যানেজারের মাধ্যমে বিভাজন করে (`VELES_MANAGER_MODE=1`-ও) |
 | `--verify` | off | রানের পরে, রাউট করা advisor উত্তরটি বিচার করে; আত্মবিশ্বাসী ব্যর্থতায়, শক্তিশালী মডেলে পুনরায় চালায় (`VELES_VERIFY_MODE=1`-ও) |
 | `--plan` | off | প্ল্যানিং মোড: read/search/draft অনুমোদিত, mutations ব্লক করা |

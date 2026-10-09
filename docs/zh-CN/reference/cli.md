@@ -72,6 +72,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | 参数 | 默认值 | 用途 |
 |---|---|---|
 | `--resume <session_id>` | 新建 session | 继续一个已有的 session |
+| `--output {text,json}` | `text` | `json`：输出单个对象（状态、退出码、session、答案、轮次、token、预算、警告），而非答案 |
 | `--manager` | 关闭 | 通过多 agent manager 进行任务分解（也可用 `VELES_MANAGER_MODE=1`） |
 | `--verify` | 关闭 | 运行结束后，由路由到的 advisor 评判答案；当确信失败时，在更强的模型上重新运行（也可用 `VELES_VERIFY_MODE=1`） |
 | `--plan` | 关闭 | 规划模式：允许读取/搜索/起草，禁止改动 |
