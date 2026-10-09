@@ -6,10 +6,12 @@ adapters:
 
 - **No API key required.** Local servers don't authenticate; we pass a
   placeholder string because the OpenAI SDK refuses an empty `api_key`.
-- **Generous timeouts.** Default 10-minute total request timeout, with an
-  httpx per-read timeout (`inactivity_timeout`) — on a streamed response
-  that means "time between chunks", so a slow local model can run for as
-  long as it keeps emitting tokens.
+- **Generous timeouts.** `request_timeout` (default 600s, `[engine]
+  request_timeout_s` overrides) is httpx's *read* timeout: the longest wait for
+  the next bytes. On a one-shot call the server sends nothing until it is done,
+  so it caps the whole response; on a stream it is the gap between chunks, so a
+  slow model runs for as long as it keeps emitting tokens. Connecting stays at
+  10s — a host that drops packets fails fast.
 - **No `apply_cache_hints`.** Prompt-cache sentinels are an Anthropic
   feature surfaced through OpenRouter; local backends have nothing to do
   with them.
@@ -48,8 +50,8 @@ class LocalOpenAIBase(OpenAICompatibleProvider):
         base_url: str | None = None,
         api_key: str = "local",
         request_timeout: float = 600.0,
-        inactivity_timeout: float = 120.0,
         connect_timeout: float = 10.0,
+        max_retries: int = 0,
         enable_tools: bool = False,
         client: OpenAI | None = None,
     ) -> None:
@@ -69,26 +71,27 @@ class LocalOpenAIBase(OpenAICompatibleProvider):
                 f"{self.BASE_URL_ENV} env var)"
             )
 
-        http = httpx.Client(
-            timeout=httpx.Timeout(
-                connect=connect_timeout,
-                read=inactivity_timeout,
-                write=connect_timeout,
-                pool=None,
-            )
-        )
         super().__init__(
             client=OpenAI(
                 api_key=api_key,
                 base_url=url,
-                timeout=request_timeout,
-                http_client=http,
+                # M325: a Timeout object, not a float. The SDK applies its
+                # `timeout` to every request, overriding the http client's own,
+                # and a float sets all four phases — so `connect` was 600s and
+                # a separate per-read setting on the http client never applied.
+                timeout=httpx.Timeout(
+                    connect=connect_timeout,
+                    read=request_timeout,
+                    write=connect_timeout,
+                    pool=None,
+                ),
                 # M132b: a down local server (closed port) should fail
                 # *immediately* with a clear `ProviderUnavailable`, not after
                 # the SDK's default retry/backoff — that retry loop is what
                 # made veles appear to "silently hang" on a closed port.
-                # Local servers don't recover within a retry window anyway.
-                max_retries=0,
+                # Local servers don't recover within a retry window anyway, so
+                # 0 is the default; `[engine] max_retries` can still ask.
+                max_retries=max_retries,
             )
         )
         self.supports_tools = enable_tools

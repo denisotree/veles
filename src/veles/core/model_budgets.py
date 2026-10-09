@@ -171,9 +171,9 @@ def request_timeout_for(model: str | None) -> float:
 #     max_retries = 1
 #
 # Read here rather than in the adapter so the rule for where a budget comes from
-# lives in one module. Only the OpenRouter adapter takes these today — the
-# Anthropic/OpenAI/Gemini clients are built without either parameter, and the
-# keys are ignored there.
+# lives in one module. OpenRouter, the `openai-api` kind and (M325) the local
+# adapters take these — the Anthropic/OpenAI/Gemini clients are built without
+# either parameter, and the keys are ignored there.
 
 
 def _engine_section() -> dict[str, object]:
@@ -200,8 +200,14 @@ def _config_error(key: str, value: object, expected: str) -> Exception:
     )
 
 
-def resolve_request_timeout(model: str | None, *, explicit: float | None = None) -> float:
+def resolve_request_timeout(
+    model: str | None, *, explicit: float | None = None, fallback: float | None = None
+) -> float:
     """Seconds to wait for one request: explicit → `[engine]` → per-model default.
+
+    `fallback` replaces the per-model default (M325). Local adapters pass their
+    own: on a server you run, speed is set by the hardware, not by the name, so
+    the name-derived 120/450/900s is the wrong guess there.
 
     Raises `ConfigError` on a non-positive or non-numeric `request_timeout_s`.
     A bad *value* is caught here rather than in `config_schema`, whose finding
@@ -212,7 +218,7 @@ def resolve_request_timeout(model: str | None, *, explicit: float | None = None)
         return explicit
     raw = _engine_section().get("request_timeout_s")
     if raw is None:
-        return request_timeout_for(model)
+        return fallback if fallback is not None else request_timeout_for(model)
     if isinstance(raw, bool) or not isinstance(raw, int | float) or raw <= 0:
         raise _config_error("request_timeout_s", raw, "a positive number of seconds")
     return float(raw)

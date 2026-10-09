@@ -160,3 +160,48 @@ def test_skill_runtime_propagates_the_model(project_with, monkeypatch) -> None:
 
     provider = make_tool_aware_provider("openrouter", project, model=SLOW)
     assert provider._client.timeout == 450.0
+
+
+# ---- local adapters (M325) ----
+
+
+def _effective_timeout(provider) -> dict:
+    """The timeout httpx actually gets for a request — the SDK puts its own on
+    every request, so the client object's settings alone prove nothing."""
+    from openai._models import FinalRequestOptions
+
+    options = FinalRequestOptions.construct(method="post", url="/chat/completions", json_data={})
+    return provider._client._build_request(options).extensions["timeout"]
+
+
+@pytest.fixture()
+def no_tool_probe(monkeypatch):
+    monkeypatch.setenv("VELES_LOCAL_TOOLS", "0")  # skip the /props probe
+
+
+@pytest.mark.parametrize("name", ["llamacpp", "ollama"])
+def test_local_adapter_reads_the_engine_timeout(project_with, no_tool_probe, name) -> None:
+    """The reported ceiling: a one-shot llama.cpp answer could not run past 600s,
+    and `[engine] request_timeout_s` did not reach local adapters at all."""
+    from veles.core.provider_factory import make_provider
+
+    project_with({"request_timeout_s": 3600})
+    timeout = _effective_timeout(make_provider(name, model="qwen3.8-27b"))
+    assert timeout["read"] == 3600.0
+    assert timeout["connect"] == 10.0  # was 600: a float timeout set every phase
+
+
+def test_local_adapter_default_is_not_the_name_guess(project_with, no_tool_probe) -> None:
+    from veles.core.provider_factory import make_provider
+
+    project_with(None)
+    provider = make_provider("llamacpp", model="qwen3.8-27b")  # 900s by its name
+    assert _effective_timeout(provider)["read"] == 600.0
+    assert provider._client.max_retries == 0  # M132b: a closed port fails at once
+
+
+def test_local_adapter_retries_only_when_asked(project_with, no_tool_probe) -> None:
+    from veles.core.provider_factory import make_provider
+
+    project_with({"max_retries": 2})
+    assert make_provider("llamacpp", model="m")._client.max_retries == 2

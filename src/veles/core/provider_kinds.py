@@ -105,11 +105,26 @@ def _codex_tool_aware(entry: Entry, ctx: ProviderContext) -> Provider:
     )
 
 
+_LOCAL_REQUEST_TIMEOUT_S = 600.0
+
+
+def _local_budgets(ctx: ProviderContext) -> dict[str, Any]:
+    """`[engine] request_timeout_s` / `max_retries` for a server you run (M325).
+    Unset, the timeout is the local 600s, not the name-derived guess, and
+    retries stay 0 (M132b: a closed port fails at once)."""
+    from veles.core.model_budgets import resolve_max_retries, resolve_request_timeout
+
+    return {
+        "request_timeout": resolve_request_timeout(ctx.model, fallback=_LOCAL_REQUEST_TIMEOUT_S),
+        "max_retries": resolve_max_retries() or 0,
+    }
+
+
 def _ollama(entry: Entry, ctx: ProviderContext) -> Provider:
     from veles.adapters.local.ollama import OllamaProvider
     from veles.core.provider_factory import apply_local_tool_policy
 
-    prov = OllamaProvider(base_url=entry_base_url(entry))
+    prov = OllamaProvider(base_url=entry_base_url(entry), **_local_budgets(ctx))
     apply_local_tool_policy(prov, ctx.model, str(entry.get("tools", "auto")))
     return prov
 
@@ -118,7 +133,7 @@ def _llamacpp(entry: Entry, ctx: ProviderContext) -> Provider:
     from veles.adapters.local.llamacpp import LlamaCppProvider
     from veles.core.provider_factory import apply_local_tool_policy
 
-    prov = LlamaCppProvider(base_url=entry_base_url(entry))
+    prov = LlamaCppProvider(base_url=entry_base_url(entry), **_local_budgets(ctx))
     apply_local_tool_policy(prov, ctx.model, str(entry.get("tools", "auto")))
     return prov
 
@@ -133,7 +148,9 @@ def _local(entry: Entry, ctx: ProviderContext) -> Provider:
     if not url:
         hint = entry.get("base_url_env") or "base_url in ~/.veles/providers.toml"
         raise RuntimeError(f"{ctx.name}: no base URL — set {hint}")
-    prov = OpenAICompatibleProvider(base_url=url, api_key=resolve_api_key(ctx.name) or "local")
+    prov = OpenAICompatibleProvider(
+        base_url=url, api_key=resolve_api_key(ctx.name) or "local", **_local_budgets(ctx)
+    )
     prov.name = ctx.name  # `[engine.request.<id>]` and logs key on the catalogue id
     apply_local_tool_policy(prov, ctx.model, str(entry.get("tools", "auto")))
     return prov

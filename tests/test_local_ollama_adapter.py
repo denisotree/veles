@@ -127,27 +127,20 @@ def test_default_base_url_when_no_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert fake_openai.call_args.kwargs["base_url"] == "http://localhost:11434/v1"
 
 
-def test_inactivity_timeout_propagates(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`inactivity_timeout` becomes the httpx Timeout `read` value (per-chunk gap)."""
+def test_request_timeout_is_the_read_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`request_timeout` is httpx's `read` (the wait for the next bytes) and
+    `connect_timeout` stays short — handed to the SDK as one Timeout object,
+    since the SDK's own timeout overrides any set on an http client (M325)."""
     monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
     fake_openai = MagicMock(return_value=MagicMock())
-    captured: dict[str, Any] = {}
+    with patch("veles.adapters.local._base.OpenAI", fake_openai):
+        OllamaProvider(request_timeout=1800.0, connect_timeout=5.0)
 
-    def _fake_httpx_client(*, timeout: Any) -> MagicMock:
-        captured["timeout"] = timeout
-        return MagicMock()
-
-    with (
-        patch("veles.adapters.local._base.OpenAI", fake_openai),
-        patch("veles.adapters.local._base.httpx.Client", _fake_httpx_client),
-    ):
-        OllamaProvider(inactivity_timeout=900.0, request_timeout=1800.0, connect_timeout=5.0)
-
-    timeout = captured["timeout"]
-    assert timeout.read == 900.0
-    assert timeout.connect == 5.0
-    # request_timeout is set on OpenAI client itself
-    assert fake_openai.call_args.kwargs["timeout"] == 1800.0
+    kwargs = fake_openai.call_args.kwargs
+    assert kwargs["timeout"].read == 1800.0
+    assert kwargs["timeout"].connect == 5.0
+    assert "http_client" not in kwargs
+    assert kwargs["max_retries"] == 0
 
 
 # ---------- create_message ----------

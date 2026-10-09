@@ -161,8 +161,16 @@ Precedence for both: an explicit argument in code → `[engine]` → the per-mod
 default. A value that is not a positive number (or, for `max_retries`, a
 non-negative integer) aborts with a `ConfigError` naming the file.
 
-**Scope:** only the OpenRouter adapter reads these today. The Anthropic, OpenAI and
-Gemini clients are built without either parameter and ignore the keys.
+**Scope:** OpenRouter, hosted `openai-api` providers and the local servers (`llamacpp`,
+`ollama`, `local`) read these. The Anthropic, OpenAI and Gemini clients are built
+without either parameter and ignore the keys.
+
+For a local server the derived default is not the name guess but **600s**, and
+retries stay **0** unless you set `max_retries` — a server that is down fails at once.
+The timeout is the longest wait for the *next* bytes: without `--stream` the server
+sends nothing until it has finished, so it caps the whole answer; a slow model that
+writes for longer than ten minutes needs a larger `request_timeout_s`. Connecting is
+always limited to 10s.
 
 ### Pinning a backend, and other request-body keys
 

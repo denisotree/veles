@@ -7,8 +7,9 @@ default `base_url`, env-var name, and (for Ollama) backend-specific extras
 like `list_models()`.
 
 Local backends can be slow — users who connect them have opted in to that.
-The base class uses a 10-minute total `request_timeout` and an httpx
-per-read (i.e. per-chunk on a stream) `inactivity_timeout` so the request
+The base class waits up to `request_timeout` (600s, `[engine]
+request_timeout_s` overrides) for the next bytes: the whole response on a
+one-shot call, the gap between chunks on a stream, so a streamed request
 lives as long as data keeps flowing.
 """
 
