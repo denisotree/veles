@@ -398,6 +398,7 @@ module है; `run` और `add` उसके न होने पर उसे
 |---|---|---|
 | `--model <id>` | प्रोजेक्ट `[engine]` model → user `default_model` से resolved (कोई hardcoded default नहीं) | Model ID |
 | `--provider <name>` | `openrouter` | Provider (नीचे देखें) |
+| `--max-tokens <n>` | `[engine] max_tokens`, अन्यथा derived (reasoning model के लिए 32000, बाकी के लिए 4096) | हर model response की completion सीमा |
 | `--max-tokens-total <n>` | `100000` | संचयी token budget; `0` अक्षम करता है |
 | `--max-iterations <n>` | `1000` | प्रति turn अधिकतम tool-calling iterations |
 | `--stream` | off | प्रतिक्रिया को token-दर-token stream करें |

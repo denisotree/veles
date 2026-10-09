@@ -73,9 +73,17 @@ Per ogni task, vince il primo livello che produce una specifica:
 1. `[routing.tasks][task]` del progetto
 2. `[routing.tasks].default` del progetto
 3. suggerimento NL del progetto (`routing.nl.toml`)
-4. base `[engine]` del progetto
-5. `[routing.tasks][task]` / `.default` dell'utente
-6. `[user] default_provider` + `default_model` dell'utente
+4. il modello dell'esecuzione stessa, quando l'hai scelto per questa esecuzione:
+   `--provider`/`--model` da riga di comando, oppure un `[daemon.<name>]` fissato
+5. base `[engine]` del progetto
+6. `[routing.tasks][task]` / `.default` dell'utente
+7. `[user] default_provider` + `default_model` dell'utente
+
+Il livello 4 è `[engine]` per la durata di una sola esecuzione: `veles run --provider
+llamacpp --model qwen3` comprime, estrae gli insight e fa la review anch'esso su quel
+modello, anche in un progetto il cui `[engine]` indica un modello cloud. Come
+`[engine]`, cede alle route dei task del tuo progetto e prevale su quelle a livello
+utente.
 
 Se nessuno di questi risolve, **non esiste un ripiego hardcoded** — il task resta
 non impostato e il suo chiamante degrada (salta la funzionalità) o segnala un

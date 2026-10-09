@@ -401,6 +401,7 @@ Aceites por `run`, `add`, `tui`, `curate`, `research`, `job tick`, e `daemon sta
 |---|---|---|
 | `--model <id>` | resolvido a partir do modelo `[engine]` do projecto → `default_model` do utilizador (sem predefinição rígida) | ID do modelo |
 | `--provider <name>` | `openrouter` | Fornecedor (ver abaixo) |
+| `--max-tokens <n>` | `[engine] max_tokens`, caso contrário deduzido (32000 para um modelo de raciocínio, 4096 para os restantes) | Limite de saída de cada resposta do modelo |
 | `--max-tokens-total <n>` | `100000` | Orçamento cumulativo de tokens; `0` desactiva |
 | `--max-iterations <n>` | `1000` | Máximo de iterações de chamada a ferramentas por turno |
 | `--stream` | desligado | Transmite a resposta token a token |

@@ -354,6 +354,7 @@ HTTP+WS 데몬을 실행/제어합니다. 인자 없는 `veles daemon`은 **데�
 |---|---|---|
 | `--model <id>` | 프로젝트 `[engine]` model → 사용자 `default_model` 순으로 해석(하드코딩된 기본값 없음) | 모델 ID |
 | `--provider <name>` | `openrouter` | 프로바이더(아래 참고) |
+| `--max-tokens <n>` | `[engine] max_tokens`, 없으면 유추값(추론 모델은 32000, 그 외는 4096) | 모델 응답 한 번당 길이 상한 |
 | `--max-tokens-total <n>` | `100000` | 누적 토큰 예산; `0`이면 비활성화 |
 | `--max-iterations <n>` | `1000` | 한 턴당 최대 도구 호출 반복 횟수 |
 | `--stream` | off | 토큰 단위로 응답 스트리밍 |

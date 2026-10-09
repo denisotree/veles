@@ -403,6 +403,7 @@ Aceitas por `run`, `add`, `tui`, `curate`, `research`, `job tick` e `daemon star
 |---|---|---|
 | `--model <id>` | resolvido a partir do modelo de `[engine]` do projeto → `default_model` do usuário (sem padrão fixo) | ID do modelo |
 | `--provider <name>` | `openrouter` | Provedor (veja abaixo) |
+| `--max-tokens <n>` | `[engine] max_tokens`, senão deduzido (32000 para um modelo de raciocínio, 4096 para os demais) | Limite de saída de cada resposta do modelo |
 | `--max-tokens-total <n>` | `100000` | Orçamento cumulativo de tokens; `0` desativa |
 | `--max-iterations <n>` | `1000` | Máximo de iterações de chamada de tools por turno |
 | `--stream` | desligado | Transmite a resposta token a token |

@@ -59,6 +59,7 @@ provider = "openrouter"                               # provider name for the ma
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
 request_timeout_s = 180                              # 可选；等待一次响应的时长
 max_retries = 1                                      # 可选；每个请求的重试次数
+max_tokens = 32000                                   # 可选；每次响应的输出上限
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -138,8 +139,23 @@ max_retries = 1
 两者的优先级：代码中的显式参数 → `[engine]` → 按模型推断的默认值。取值若不是正数
 （`max_retries` 若不是非负整数），会以指明文件名的 `ConfigError` 中止。
 
-**适用范围：** 目前只有 OpenRouter 适配器读取这两个键。Anthropic、OpenAI 和 Gemini
-的客户端在构造时不接收这两个参数，会忽略它们。
+**适用范围：** OpenRouter、托管的 `openai-api` 提供商以及本地服务器（`llamacpp`、
+`ollama`、`local`）会读取这两个键。Anthropic、OpenAI 和 Gemini 的客户端在构造时不接收
+这两个参数，会忽略它们。
+
+对于本地服务器，推断出的默认值不是按名字猜测，而是 **600 秒**；除非设置
+`max_retries`，否则重试次数保持为 **0** —— 宕掉的服务器会立即失败。超时是等待*下一批*
+字节的最长时间：不加 `--stream` 时，服务器在完成之前什么都不发送，所以超时限制的是整个
+回答；写作时间超过十分钟的慢模型需要更大的 `request_timeout_s`。连接始终限制在 10 秒。
+
+`max_tokens` 是同一预算的另一面：单次响应最多能写多少。不设置时，推理模型得到 32000，
+其余模型得到 4096 —— 而推理模型会在写出第一个可见字符之前就把这个上限花在思考上，
+所以上限太小得到的是空回答，而不是短回答。是否算“推理”模型，能问服务器时由服务器
+说了算（llama.cpp 的 `/props`：带思考的聊天模板；ollama 的 `/api/show`：`thinking`
+能力），因为本地服务器会忽略模型名；否则依次由提供商目录和名字决定。这个上限永远不会
+超过 llama.cpp 服务器启动时的上下文。优先级：`--max-tokens` → `[engine] max_tokens` →
+推断值。`--verbose` 会打印当前生效的上限及其来源：
+`-> max_tokens=8192 (server: reasoning template, capped at the server's n_ctx)`。
 
 ### 固定后端，以及其他请求体键
 

@@ -62,6 +62,7 @@ provider = "openrouter"                               # provider name for the ma
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
 request_timeout_s = 180                              # tuỳ chọn; chờ một phản hồi bao lâu
 max_retries = 1                                      # tuỳ chọn; số lần thử lại mỗi yêu cầu
+max_tokens = 32000                                   # tuỳ chọn; giới hạn độ dài mỗi phản hồi
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -148,8 +149,28 @@ Thứ tự ưu tiên của cả hai: đối số tường minh trong mã → `[e
 theo mô hình. Giá trị không phải số dương (hoặc, với `max_retries`, không phải số
 nguyên không âm) sẽ dừng lần chạy bằng `ConfigError` nêu rõ tên tệp.
 
-**Phạm vi:** hiện chỉ adapter OpenRouter đọc hai khoá này. Client của Anthropic,
-OpenAI và Gemini được dựng mà không có cả hai tham số và bỏ qua chúng.
+**Phạm vi:** OpenRouter, các provider `openai-api` được host và các server cục bộ
+(`llamacpp`, `ollama`, `local`) đọc hai khoá này. Client của Anthropic, OpenAI và
+Gemini được dựng mà không có cả hai tham số và bỏ qua chúng.
+
+Với server cục bộ, giá trị mặc định suy ra không phải là đoán theo tên mà là
+**600 giây**, và số lần thử lại giữ ở **0** trừ khi bạn đặt `max_retries` — server
+đang tắt sẽ báo lỗi ngay. Thời gian chờ là khoảng chờ tối đa cho những byte *tiếp
+theo*: không có `--stream` thì server không gửi gì cho tới khi xong, nên nó giới hạn
+cả câu trả lời; mô hình chậm viết lâu hơn mười phút cần `request_timeout_s` lớn hơn.
+Việc kết nối luôn bị giới hạn ở 10 giây.
+
+`max_tokens` là mặt còn lại của cùng ngân sách đó: một phản hồi được viết bao nhiêu.
+Nếu không đặt, mô hình suy luận nhận 32000, còn lại nhận 4096 — và mô hình suy luận
+tiêu hạn mức đó vào việc suy nghĩ trước khi viết ra ký tự hiển thị nào, nên hạn mức
+quá nhỏ cho ra câu trả lời rỗng chứ không phải câu trả lời ngắn. Mô hình có "suy
+luận" hay không được quyết định theo lời server khi nó có thể nói (`/props` của
+llama.cpp: chat template có phần suy nghĩ; `/api/show` của ollama: capability
+`thinking`), vì server cục bộ bỏ qua tên mô hình; nếu không thì theo danh mục
+provider, rồi tới tên. Hạn mức không bao giờ vượt quá context mà server llama.cpp
+được khởi động cùng. Thứ tự ưu tiên: `--max-tokens` → `[engine] max_tokens` → giá
+trị suy ra. `--verbose` in ra hạn mức đang áp dụng và nguồn của nó:
+`-> max_tokens=8192 (server: reasoning template, capped at the server's n_ctx)`.
 
 ### Ghim backend và các khoá khác trong thân yêu cầu
 

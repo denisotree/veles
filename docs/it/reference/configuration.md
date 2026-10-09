@@ -65,6 +65,7 @@ provider = "openrouter"                               # provider name for the ma
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
 request_timeout_s = 180                              # facoltativo; quanto attendere una risposta
 max_retries = 1                                      # facoltativo; tentativi per richiesta
+max_tokens = 32000                                   # facoltativo; limite di lunghezza per risposta
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -153,8 +154,29 @@ Precedenza per entrambe: argomento esplicito nel codice → `[engine]` → valor
 modello. Un valore che non sia un numero positivo (o, per `max_retries`, un intero
 non negativo) interrompe con un `ConfigError` che nomina il file.
 
-**Ambito:** oggi solo l'adattatore OpenRouter legge queste chiavi. I client
-Anthropic, OpenAI e Gemini vengono costruiti senza entrambi i parametri e le ignorano.
+**Ambito:** leggono queste chiavi OpenRouter, i provider ospitati di tipo `openai-api`
+e i server locali (`llamacpp`, `ollama`, `local`). I client Anthropic, OpenAI e Gemini
+vengono costruiti senza entrambi i parametri e le ignorano.
+
+Per un server locale il valore dedotto non è la congettura dal nome ma **600 s**, e i
+tentativi restano a **0** finché non imposti `max_retries`: un server spento fallisce
+subito. Il timeout è l'attesa massima dei *prossimi* byte: senza `--stream` il server
+non invia nulla finché non ha finito, quindi limita l'intera risposta; un modello lento
+che scrive per più di dieci minuti ha bisogno di un `request_timeout_s` più grande. La
+connessione è sempre limitata a 10 s.
+
+`max_tokens` è l'altra faccia dello stesso budget: quanto può scrivere una risposta.
+Senza di esso un modello di ragionamento riceve 32000 e qualsiasi altro 4096 — e un
+modello di ragionamento spende quel limite a pensare prima di scrivere un solo
+carattere visibile, quindi un limite troppo piccolo dà una risposta vuota, non una
+breve. Se un modello ragiona lo decide ciò che dice il server quando può dirlo
+(`/props` di llama.cpp: un template di chat con ragionamento; `/api/show` di ollama:
+la capacità `thinking`), perché un server locale ignora il nome del modello;
+altrimenti il catalogo del provider, poi il nome. Il limite non supera mai il
+contesto con cui è stato avviato un server llama.cpp. Precedenza: `--max-tokens` →
+`[engine] max_tokens` → valore dedotto. `--verbose` stampa il limite in vigore e da
+dove viene:
+`-> max_tokens=8192 (server: reasoning template, capped at the server's n_ctx)`.
 
 ### Fissare un backend e altre chiavi del corpo della richiesta
 

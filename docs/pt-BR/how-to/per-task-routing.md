@@ -73,9 +73,16 @@ Para cada tarefa, vence a primeira camada que produzir uma especificação:
 1. `[routing.tasks][task]` do projeto
 2. `[routing.tasks].default` do projeto
 3. dica em NL do projeto (`routing.nl.toml`)
-4. base `[engine]` do projeto
-5. `[routing.tasks][task]` / `.default` do usuário
-6. `[user] default_provider` + `default_model` do usuário
+4. o próprio modelo da execução, quando você o escolheu para esta execução —
+   `--provider`/`--model` na linha de comando, ou uma fixação `[daemon.<name>]`
+5. base `[engine]` do projeto
+6. `[routing.tasks][task]` / `.default` do usuário
+7. `[user] default_provider` + `default_model` do usuário
+
+A camada 4 é o `[engine]` durante uma execução: `veles run --provider llamacpp
+--model qwen3` também compacta, extrai insights e revisa nesse modelo, mesmo num
+projeto cujo `[engine]` aponta para um modelo de nuvem. Assim como o `[engine]`,
+ela perde para as rotas de tarefa do próprio projeto e vence as do usuário.
 
 Se nada disso resolver, **não há fallback fixo no código** — a tarefa fica sem
 definição e quem a chama degrada (pula a funcionalidade) ou falha de forma clara,

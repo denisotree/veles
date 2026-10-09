@@ -71,9 +71,17 @@ veles route refresh --force    # even if AGENTS.md hasn't changed
 1. project `[routing.tasks][task]`
 2. project `[routing.tasks].default`
 3. project NL hint (`routing.nl.toml`)
-4. project `[engine]` base
-5. user `[routing.tasks][task]` / `.default`
-6. user `[user] default_provider` + `default_model`
+4. রানের নিজস্ব মডেল, যদি আপনি এই রানের জন্যই সেটি বেছে থাকেন — কমান্ড লাইনে
+   `--provider`/`--model`, অথবা একটি `[daemon.<name>]` পিন
+5. project `[engine]` base
+6. user `[routing.tasks][task]` / `.default`
+7. user `[user] default_provider` + `default_model`
+
+লেয়ার 4 হলো একটি রানের সময়কালের জন্য `[engine]`: `veles run --provider llamacpp
+--model qwen3` কনটেক্সট কম্প্রেশন, insight এক্সট্রাকশন আর রিভিউও ওই মডেলেই চালায়,
+এমনকি এমন প্রজেক্টেও যার `[engine]` একটি ক্লাউড মডেলের নাম দেয়। `[engine]`-এর মতোই,
+আপনার প্রজেক্টের নিজস্ব টাস্ক রুট এর ওপরে থাকে, আর এটি আপনার ইউজার-স্তরের রুটগুলোর
+ওপরে থাকে।
 
 এগুলোর কোনোটিই রিজলভ না হলে, **কোনো হার্ডকোডেড ফলব্যাক নেই** — টাস্কটি আনসেট থাকে
 এবং এর কলার ডিগ্রেড করে (ফিচারটি এড়িয়ে যায়) বা স্পষ্টভাবে এরর দেয়, নীরবে একটি

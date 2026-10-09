@@ -72,9 +72,16 @@ Para cada tarefa, ganha a primeira camada que produz uma especificação:
 1. `[routing.tasks][task]` do projecto
 2. `[routing.tasks].default` do projecto
 3. pista em LN do projecto (`routing.nl.toml`)
-4. base `[engine]` do projecto
-5. `[routing.tasks][task]` / `.default` do utilizador
-6. `[user] default_provider` + `default_model` do utilizador
+4. o próprio modelo da execução, quando o escolheu para esta execução — `--provider`/`--model`
+   na linha de comandos, ou uma fixação `[daemon.<name>]`
+5. base `[engine]` do projecto
+6. `[routing.tasks][task]` / `.default` do utilizador
+7. `[user] default_provider` + `default_model` do utilizador
+
+A camada 4 é o `[engine]` durante uma execução: `veles run --provider llamacpp --model qwen3`
+também compacta, extrai insights e faz revisões nesse modelo, mesmo num projecto cujo
+`[engine]` indica um modelo na nuvem. Tal como o `[engine]`, é ultrapassada pelas rotas de
+tarefa do próprio projecto e ultrapassa as do utilizador.
 
 Se nenhuma destas resolver, **não existe um recurso de reserva rígido** — a tarefa fica por
 definir e quem a invoca degrada (ignora a funcionalidade) ou falha com clareza, em vez de
