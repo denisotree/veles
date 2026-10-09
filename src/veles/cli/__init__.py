@@ -134,14 +134,23 @@ def _run_in_project(args, command, modules=None) -> int:
 
     # A provider the config routes to and a registry offers installs itself.
     ensure_routed_providers(project)
-    from veles.core.context import reset_run_base, set_run_base
+    from veles.core.context import (
+        reset_run_base,
+        reset_run_max_tokens,
+        set_run_base,
+        set_run_max_tokens,
+    )
     from veles.core.model_resolver import run_base
 
-    # M325: a model chosen on the command line is the base for side tasks too.
+    # M325: a model chosen on the command line is the base for side tasks too,
+    # and `--max-tokens` caps every agent call of the command, not only the ones
+    # built from `args`.
     base_token = set_run_base(run_base(args, project))
+    cap_token = set_run_max_tokens(getattr(args, "max_tokens", None))
     try:
         return command(args, project)
     finally:
+        reset_run_max_tokens(cap_token)
         reset_run_base(base_token)
         reset_module_registry(mod_token)
         reset_active_project(token)

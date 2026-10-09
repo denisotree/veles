@@ -41,6 +41,14 @@ stream, the outcome as one JSON object, and semantic recall without Ollama.
   have no recorded origin — backfill embeds the insights again, and recall ignores the
   old vectors until it has.
 
+### Fixed
+
+- **`--max-tokens` caps the whole command.** It reached only the agents built from the
+  command line; a skill's sub-agent took `[engine] max_tokens` or the derived cap, and a
+  side call on a reasoning model could ask for 32000 past the cap you set.
+- Docs: exit code `7` (`truncated`) is in the exit-code tables; CLI delegates are
+  named as the exception to internal streaming and to the run's routing layer.
+
 ### Changed
 
 - **`veles run` streams internally.** Without `--stream`, a provider that can stream is

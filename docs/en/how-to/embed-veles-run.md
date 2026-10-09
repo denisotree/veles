@@ -88,7 +88,8 @@ You don't need `--stream` for a slow model. Without it, Veles still streams from
 provider that can and prints only the final answer, so the request timeout
 (`[engine] request_timeout_s`) bounds the pause between chunks, not the whole answer:
 a slow local model runs for as long as it keeps writing, and a hung server is still
-caught.
+caught. CLI delegates (`claude-cli`, `codex`, `antigravity-cli`) are the exception: they
+keep the one-shot call, which reports a failed CLI as an error and times out a silent one.
 
 ### Tool calls in `events.jsonl`
 
@@ -121,6 +122,7 @@ CLI calls Veles' tools through its own MCP server, and those calls are not writt
 | 4 | `budget_exhausted` | raise `--max-tokens-total` |
 | 5 | `empty` — the model produced no final text | retry |
 | 6 | `cancelled` | interrupted |
+| 7 | `truncated` — the answer hit the completion cap | raise `--max-tokens` or `[engine] max_tokens`; the same cap truncates again |
 
 A stop reason added in a later version maps to 1, so an unknown outcome can never
 be mistaken for success.
