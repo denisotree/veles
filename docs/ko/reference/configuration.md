@@ -59,6 +59,7 @@ provider = "openrouter"                               # provider name for the ma
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
 request_timeout_s = 180                              # 선택. 한 번의 응답을 기다리는 시간
 max_retries = 1                                      # 선택. 요청당 재시도 횟수
+max_tokens = 32000                                   # 선택. 한 번의 응답 길이 상한
 
 [routing.tasks]                  # per-task overrides (highest priority below explicit flags)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -141,8 +142,25 @@ max_retries = 1
 아닌 값(`max_retries`는 음이 아닌 정수가 아닌 값)은 파일 이름을 알려주는
 `ConfigError`로 중단됩니다.
 
-**적용 범위:** 현재 이 키들을 읽는 것은 OpenRouter 어댑터뿐입니다. Anthropic, OpenAI,
-Gemini 클라이언트는 두 파라미터 없이 생성되며 키를 무시합니다.
+**적용 범위:** 이 키들은 OpenRouter, 호스팅된 `openai-api` 제공자, 로컬 서버(`llamacpp`,
+`ollama`, `local`)가 읽습니다. Anthropic, OpenAI, Gemini 클라이언트는 두 파라미터 없이
+생성되며 키를 무시합니다.
+
+로컬 서버에서는 유추된 기본값이 이름 기반 추측이 아니라 **600초**이고, `max_retries`를
+설정하지 않는 한 재시도는 **0**회입니다. 꺼져 있는 서버는 즉시 실패합니다. 타임아웃은
+*다음* 바이트를 기다리는 최대 시간입니다. `--stream` 없이는 서버가 끝날 때까지 아무것도
+보내지 않으므로 타임아웃이 응답 전체의 상한이 됩니다. 10분 넘게 쓰는 느린 모델에는 더
+큰 `request_timeout_s`가 필요합니다. 연결은 항상 10초로 제한됩니다.
+
+`max_tokens`는 같은 예산의 다른 쪽, 즉 한 번의 응답이 쓸 수 있는 양입니다. 설정하지
+않으면 추론 모델은 32000, 나머지는 4096을 받습니다. 추론 모델은 보이는 문자를 하나
+쓰기 전에 이 상한을 생각하는 데 쓰므로, 상한이 너무 작으면 짧은 답이 아니라 빈 답이
+나옵니다. "추론" 여부는 서버가 알려줄 수 있으면 서버의 말로 정합니다(llama.cpp의
+`/props`: 사고용 채팅 템플릿, ollama의 `/api/show`: `thinking` 기능). 로컬 서버는 모델
+이름을 무시하기 때문입니다. 그렇지 않으면 제공자 카탈로그, 그다음 이름으로 정합니다.
+상한은 llama.cpp 서버가 시작될 때의 컨텍스트를 넘지 않습니다. 우선순위: `--max-tokens`
+→ `[engine] max_tokens` → 유추값. `--verbose`는 적용 중인 상한과 그 출처를 출력합니다:
+`-> max_tokens=8192 (server: reasoning template, capped at the server's n_ctx)`.
 
 ### 백엔드 고정 및 기타 요청 본문 키
 

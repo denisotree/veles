@@ -81,7 +81,7 @@ def apply_local_tool_policy(
 
     A catalogue entry's `tools = "on"|"off"` forces it. Otherwise an explicit
     `VELES_LOCAL_TOOLS` value wins (force on/off). Otherwise
-    auto-detect through the provider's `model_supports_tools` probe — ollama's
+    auto-detect through the provider's `server_facts` probe — ollama's
     `/api/show` per model, llama.cpp's `/props` per server. When the capability
     can't be determined (no probe, or probe error) default to off: a tool-blind
     model handed tool schemas can stall the agent loop.
@@ -91,7 +91,17 @@ def apply_local_tool_policy(
     unanswerable without a name — but llama.cpp serves one model chosen at
     startup and answers for itself, so refusing to ask left `llamacpp` tool-blind
     even against a server that advertises support. Probes that need the name and
-    don't get one still return False on their own."""
+    don't get one still return False on their own.
+
+    M325: the same single probe (`server_facts`) also says whether the model
+    reasons and how much context the server holds; it is kept on the provider
+    (`provider.facts`) for the completion cap and the context ceiling, so it
+    runs whatever decides the tools."""
+    try:
+        facts = provider.server_facts(model or "")
+    except Exception:
+        facts = None
+    provider.facts = facts
     if mode in ("on", "off"):
         provider.supports_tools = mode == "on"
         return
@@ -99,14 +109,7 @@ def apply_local_tool_policy(
     if override is not None:
         provider.supports_tools = override
         return
-    detect = getattr(provider, "model_supports_tools", None)
-    if callable(detect):
-        try:
-            provider.supports_tools = bool(detect(model or ""))
-        except Exception:
-            provider.supports_tools = False
-    else:
-        provider.supports_tools = False
+    provider.supports_tools = facts is not None and facts.tools
 
 
 def make_provider(name: str, model: str | None = None) -> Provider:

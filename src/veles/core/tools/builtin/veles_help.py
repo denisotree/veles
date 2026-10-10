@@ -23,7 +23,12 @@ def veles_help(query: str, limit: int = 3) -> str:
     from veles.core.knowledge.store import get_default_store
 
     limit = max(1, min(limit, 8))
-    hits = get_default_store().search(query, limit=limit)
+    # M325: one shared title/topic word is enough here. The two-word gate exists
+    # for recall, where every coding prompt is searched and must not pull Veles
+    # docs in; a call to this tool is a question about Veles by definition. With
+    # two, a one-word name (`tool_authoring`, `init`) could never be found, and
+    # nor could anything asked about in only one Veles word.
+    hits = get_default_store().search(query, limit=limit, min_matches=1)
     if not hits:
         return "(no matching Veles documentation — rephrase, or check `veles --help`)"
     blocks: list[str] = []

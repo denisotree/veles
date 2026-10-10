@@ -5,7 +5,7 @@ import logging
 from veles.core.context import current_project
 from veles.core.path_guard import resolve_safe
 from veles.core.risk import RiskClass
-from veles.core.tools.builtin.fs_write_guard import display_path, guard_write
+from veles.core.tools.builtin.fs_write_guard import display_path, guard_write, tool_file_note
 from veles.core.tools.registry import tool
 
 logger = logging.getLogger(__name__)
@@ -62,4 +62,5 @@ def edit_file(path: str, old_string: str, new_string: str, replace_all: bool = F
     n = count if replace_all else 1
     p.write_text(updated, encoding="utf-8")
     logger.info("file.edit rel=%s replacements=%d", display, n)
-    return f"edited {display} ({n} replacement{'s' if n != 1 else ''})"
+    plural = "s" if n != 1 else ""
+    return f"edited {display} ({n} replacement{plural}){tool_file_note(p, project)}"

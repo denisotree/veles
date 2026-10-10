@@ -72,9 +72,16 @@ Para cada tarea, gana la primera capa que produzca una especificación:
 1. proyecto `[routing.tasks][task]`
 2. proyecto `[routing.tasks].default`
 3. pista NL del proyecto (`routing.nl.toml`)
-4. base `[engine]` del proyecto
-5. usuario `[routing.tasks][task]` / `.default`
-6. usuario `[user] default_provider` + `default_model`
+4. el modelo de la propia ejecución, si lo elegiste para ella: `--provider`/`--model`
+   en la línea de comandos o una fijación `[daemon.<name>]`
+5. base `[engine]` del proyecto
+6. usuario `[routing.tasks][task]` / `.default`
+7. usuario `[user] default_provider` + `default_model`
+
+La capa 4 es `[engine]` durante una sola ejecución: `veles run --provider llamacpp
+--model qwen3` también comprime, extrae insights y revisa con ese modelo, incluso en un
+proyecto cuyo `[engine]` nombra un modelo en la nube. Igual que `[engine]`, cede ante las
+rutas de tareas propias de tu proyecto y se impone a las de nivel de usuario.
 
 Si ninguna de estas resuelve, **no hay respaldo codificado** — la tarea queda sin
 asignar y quien la invoca degrada (omite la funcionalidad) o falla con claridad, en lugar

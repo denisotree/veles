@@ -35,6 +35,11 @@ non-reasoning defaults.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from veles.core.provider import ServerFacts
+
 # Non-reasoning defaults — what the old constants were, kept as the floor.
 _DEFAULT_MAX_TOKENS = 4096
 _DEFAULT_TIMEOUT_S = 120.0
@@ -171,9 +176,9 @@ def request_timeout_for(model: str | None) -> float:
 #     max_retries = 1
 #
 # Read here rather than in the adapter so the rule for where a budget comes from
-# lives in one module. Only the OpenRouter adapter takes these today — the
-# Anthropic/OpenAI/Gemini clients are built without either parameter, and the
-# keys are ignored there.
+# lives in one module. OpenRouter, the `openai-api` kind and (M325) the local
+# adapters take these — the Anthropic/OpenAI/Gemini clients are built without
+# either parameter, and the keys are ignored there.
 
 
 def _engine_section() -> dict[str, object]:
@@ -200,8 +205,14 @@ def _config_error(key: str, value: object, expected: str) -> Exception:
     )
 
 
-def resolve_request_timeout(model: str | None, *, explicit: float | None = None) -> float:
+def resolve_request_timeout(
+    model: str | None, *, explicit: float | None = None, fallback: float | None = None
+) -> float:
     """Seconds to wait for one request: explicit → `[engine]` → per-model default.
+
+    `fallback` replaces the per-model default (M325). Local adapters pass their
+    own: on a server you run, speed is set by the hardware, not by the name, so
+    the name-derived 120/450/900s is the wrong guess there.
 
     Raises `ConfigError` on a non-positive or non-numeric `request_timeout_s`.
     A bad *value* is caught here rather than in `config_schema`, whose finding
@@ -212,10 +223,55 @@ def resolve_request_timeout(model: str | None, *, explicit: float | None = None)
         return explicit
     raw = _engine_section().get("request_timeout_s")
     if raw is None:
-        return request_timeout_for(model)
+        return fallback if fallback is not None else request_timeout_for(model)
     if isinstance(raw, bool) or not isinstance(raw, int | float) or raw <= 0:
         raise _config_error("request_timeout_s", raw, "a positive number of seconds")
     return float(raw)
+
+
+def resolve_max_tokens(
+    model: str | None, facts: ServerFacts | None = None, *, explicit: int | None = None
+) -> tuple[int, str]:
+    """Completion cap for an agent call, and where it came from (M325).
+
+    explicit (`--max-tokens`, or a caller's number) → `[engine] max_tokens` →
+    the server's own word (a reasoning template, M325) → `default_max_tokens_for`
+    (catalogue, then the name). Never above the server's `n_ctx` when it is
+    known. The source is for `--verbose`: a cap is invisible until it truncates
+    an answer, so saying where it came from is what makes it fixable.
+
+    A local server ignores the model name, so `bonsai-2-27b` used to get 4096
+    and `qwen3.8-27b` 32000 for the same server; the facts close that. They only
+    ever raise the cap: under-capping a thinker truncates it, over-capping a
+    quiet model costs nothing."""
+    if explicit is not None:
+        value, source = explicit, "explicit"
+    elif (raw := _engine_section().get("max_tokens")) is not None:
+        if isinstance(raw, bool) or not isinstance(raw, int) or raw <= 0:
+            raise _config_error("max_tokens", raw, "a positive integer")
+        value, source = raw, "[engine] max_tokens"
+    elif facts is not None and facts.reasoning:
+        value, source = _REASONING_MAX_TOKENS, "server: reasoning template"
+    else:
+        value = default_max_tokens_for(model)
+        source = "model id: reasoning" if value == _REASONING_MAX_TOKENS else "model id"
+    if facts is not None and facts.n_ctx is not None and value > facts.n_ctx:
+        value, source = facts.n_ctx, f"{source}, capped at the server's n_ctx"
+    return value, source
+
+
+def side_call_max_tokens(model: str | None, facts: ServerFacts | None, answer_tokens: int) -> int:
+    """Cap for a side call (summary, classifier, extractor) that sized its answer.
+
+    `answer_tokens` is the visible answer a caller wants — 8 for a one-word
+    classifier, 1024 for a summary. A reasoning model spends its cap on thinking
+    first, so on one of those the number is an empty answer, not a short one:
+    the cap becomes the full agent cap instead (M325). Found when M325 routed
+    side tasks to the run's own model, often a local thinker."""
+    reasoning = (facts is not None and bool(facts.reasoning)) or is_reasoning_model(model)
+    if not reasoning:
+        return answer_tokens
+    return max(answer_tokens, resolve_max_tokens(model, facts)[0])
 
 
 def resolve_max_retries(*, explicit: int | None = None) -> int | None:
@@ -239,5 +295,7 @@ __all__ = [
     "is_slow_by_default",
     "request_timeout_for",
     "resolve_max_retries",
+    "resolve_max_tokens",
     "resolve_request_timeout",
+    "side_call_max_tokens",
 ]

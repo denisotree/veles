@@ -443,6 +443,7 @@ start`:
 |---|---|---|
 | `--model <id>` | resolved from project `[engine]` model → user `default_model` (no hardcoded default) | Model ID |
 | `--provider <name>` | `openrouter` | Provider (see below) |
+| `--max-tokens <n>` | `[engine] max_tokens`, else derived (32000 for a reasoning model, 4096 otherwise) | Completion cap for each model response |
 | `--max-tokens-total <n>` | `100000` | Cumulative token budget; `0` disables |
 | `--max-iterations <n>` | `1000` | Max tool-calling iterations per turn (a runaway backstop; the stall guard is the real stop) |
 | `--stream` | off | Stream the response token-by-token |

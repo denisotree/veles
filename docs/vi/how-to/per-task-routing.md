@@ -72,9 +72,16 @@ Với mỗi tác vụ, lớp đầu tiên cho ra một spec sẽ thắng:
 1. `[routing.tasks][task]` của dự án
 2. `[routing.tasks].default` của dự án
 3. gợi ý NL của dự án (`routing.nl.toml`)
-4. `[engine]` cơ sở của dự án
-5. `[routing.tasks][task]` / `.default` của user
-6. `[user] default_provider` + `default_model` của user
+4. model của chính lần chạy, khi bạn chọn nó cho lần chạy này — `--provider`/`--model`
+   trên dòng lệnh, hoặc một ghim `[daemon.<name>]`
+5. `[engine]` cơ sở của dự án
+6. `[routing.tasks][task]` / `.default` của user
+7. `[user] default_provider` + `default_model` của user
+
+Lớp 4 là `[engine]` trong suốt một lần chạy: `veles run --provider llamacpp
+--model qwen3` cũng nén lịch sử, trích xuất insight và review trên model đó, kể cả
+trong dự án có `[engine]` chỉ tới một model đám mây. Giống `[engine]`, nó xếp sau các
+route tác vụ của chính dự án và đứng trên các route cấp user.
 
 Nếu không lớp nào giải quyết được, **không có fallback cứng** — tác vụ được để
 trống và bên gọi nó suy giảm chức năng (bỏ qua tính năng) hoặc báo lỗi rõ ràng,

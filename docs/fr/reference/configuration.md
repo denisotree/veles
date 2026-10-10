@@ -63,6 +63,7 @@ provider = "openrouter"                               # nom du fournisseur pour 
 model = "anthropic/claude-sonnet-4.6"                # id du modèle (omettre pour exiger --model ou le default_model utilisateur)
 request_timeout_s = 180                              # optionnel ; délai d'attente d'une réponse
 max_retries = 1                                      # optionnel ; tentatives par requête
+max_tokens = 32000                                   # optionnel ; plafond de longueur par réponse
 
 [routing.tasks]                  # surcharges par tâche (priorité la plus haute en dessous des flags explicites)
 default    = "openrouter:anthropic/claude-sonnet-4.6"
@@ -152,8 +153,29 @@ modèle. Une valeur qui n'est pas un nombre positif (ou, pour `max_retries`, un
 entier positif ou nul) interrompt l'exécution avec une `ConfigError` nommant le
 fichier.
 
-**Portée :** aujourd'hui seul l'adaptateur OpenRouter lit ces clés. Les clients
-Anthropic, OpenAI et Gemini sont construits sans ces deux paramètres et les ignorent.
+**Portée :** OpenRouter, les fournisseurs hébergés de type `openai-api` et les serveurs
+locaux (`llamacpp`, `ollama`, `local`) lisent ces clés. Les clients Anthropic, OpenAI
+et Gemini sont construits sans ces deux paramètres et les ignorent.
+
+Pour un serveur local, la valeur déduite n'est pas la supposition tirée du nom mais
+**600 s**, et les tentatives restent à **0** tant que vous ne fixez pas `max_retries` :
+un serveur arrêté échoue aussitôt. Le délai est l'attente maximale des *prochains*
+octets : sans `--stream`, le serveur n'envoie rien avant d'avoir fini, il plafonne donc
+la réponse entière ; un modèle lent qui écrit pendant plus de dix minutes a besoin d'un
+`request_timeout_s` plus grand. La connexion est toujours limitée à 10 s.
+
+`max_tokens` est l'autre face du même budget : ce qu'une réponse peut écrire. Sans lui,
+un modèle de raisonnement obtient 32000 et tout autre 4096 — et un modèle de
+raisonnement dépense ce plafond à réfléchir avant d'écrire le moindre caractère
+visible, si bien qu'un plafond trop bas donne une réponse vide, pas une réponse courte.
+Ce qui compte comme « raisonnement » est décidé par ce que dit le serveur quand il le
+peut (`/props` de llama.cpp : un template de chat avec réflexion ; `/api/show`
+d'ollama : la capacité `thinking`), car un serveur local ignore le nom du modèle ;
+sinon par le catalogue du fournisseur, puis par le nom. Le plafond ne dépasse jamais
+le contexte avec lequel un serveur llama.cpp a été lancé. Priorité : `--max-tokens` →
+`[engine] max_tokens` → valeur déduite. `--verbose` affiche le plafond en vigueur et
+son origine :
+`-> max_tokens=8192 (server: reasoning template, capped at the server's n_ctx)`.
 
 ### Épingler un backend et autres clés du corps de requête
 

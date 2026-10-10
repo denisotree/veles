@@ -354,6 +354,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 |---|---|---|
 | `--model <id>` | 由專案 `[engine]` model → 使用者 `default_model` 解析（無硬寫死的預設） | 模型 ID |
 | `--provider <name>` | `openrouter` | 供應商（見下方） |
+| `--max-tokens <n>` | `[engine] max_tokens`，否則推斷（推理模型 32000，其餘 4096） | 模型每次回應的輸出上限 |
 | `--max-tokens-total <n>` | `100000` | 累積 token 預算；`0` 表停用 |
 | `--max-iterations <n>` | `1000` | 每輪最多的工具呼叫迭代數 |
 | `--stream` | 關閉 | 逐 token 串流回應 |

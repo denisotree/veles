@@ -53,8 +53,11 @@ _CHANNEL_BASE_KEYS = frozenset({"enabled"})
 # `request` is the M250 passthrough table. `request_timeout_s`/`max_retries`
 # (M266) are read by `model_budgets.resolve_request_timeout/resolve_max_retries`
 # — client parameters, not body keys, which is why they sit flat here rather
-# than under `[engine.request.<provider>]`.
-_ENGINE_KNOWN = frozenset({"provider", "model", "request", "request_timeout_s", "max_retries"})
+# than under `[engine.request.<provider>]`. `max_tokens` (M325) is read by
+# `model_budgets.resolve_max_tokens` for every agent call.
+_ENGINE_KNOWN = frozenset(
+    {"provider", "model", "request", "request_timeout_s", "max_retries", "max_tokens"}
+)
 
 
 class ConfigError(ValueError):

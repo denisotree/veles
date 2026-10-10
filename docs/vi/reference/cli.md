@@ -401,6 +401,7 @@ Kiểm tra các máy chủ MCP bên ngoài được cấu hình dưới `[mcp.se
 |---|---|---|
 | `--model <id>` | giải quyết từ model `[engine]` của dự án → `default_model` của user (không có mặc định cứng) | ID model |
 | `--provider <name>` | `openrouter` | Nhà cung cấp (xem bên dưới) |
+| `--max-tokens <n>` | `[engine] max_tokens`, nếu không thì suy ra (32000 cho model suy luận, 4096 cho các model khác) | Giới hạn độ dài mỗi phản hồi của model |
 | `--max-tokens-total <n>` | `100000` | Ngân sách token tích lũy; `0` để tắt |
 | `--max-iterations <n>` | `1000` | Số vòng lặp gọi tool tối đa mỗi lượt |
 | `--stream` | tắt | Truyền phát phản hồi theo từng token |

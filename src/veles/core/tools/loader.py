@@ -25,8 +25,8 @@ a thin parallel to `core/skills.py::discover_skills`.
 
 from __future__ import annotations
 
+import ast
 import importlib.util
-import logging
 import sqlite3
 import sys
 from dataclasses import dataclass
@@ -34,8 +34,6 @@ from pathlib import Path
 
 from veles.core.tools.persistence import upsert_tool
 from veles.core.tools.registry import Registry, ToolEntry
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +155,42 @@ def load_into_registry(
     )
 
 
+def tool_file_problem(source: str) -> str | None:
+    """Why a tool file would register nothing, judged from its text — or None.
+
+    M325: a file the agent wrote without `@tool` (a plain CLI script) was
+    approved, imported and silently registered nothing; the model said "tool
+    created", the human approved "a tool", and neither learned otherwise. This
+    reads the source without running it, so it can speak at write time and at
+    approval time, before the reviewed code ever executes."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as exc:
+        return f"does not parse (line {exc.lineno}: {exc.msg})"
+    # `from … import tool as t` makes `@t` the decorator.
+    names = {"tool"} | {
+        a.asname
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom)
+        for a in node.names
+        if a.name == "tool" and a.asname
+    }
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and any(
+            _is_tool_decorator(d, names) for d in node.decorator_list
+        ):
+            return None
+    return "defines no @tool function"
+
+
+def _is_tool_decorator(node: ast.expr, names: set[str]) -> bool:
+    """`@tool`, `@tool(...)`, its alias, or `@<module>.tool(...)`."""
+    target = node.func if isinstance(node, ast.Call) else node
+    if isinstance(target, ast.Attribute):
+        return target.attr == "tool"
+    return isinstance(target, ast.Name) and target.id in names
+
+
 # ---------- internals ----------
 
 
@@ -211,10 +245,14 @@ def _load_one_file(
             spec.loader.exec_module(module)
         except BaseException as exc:
             sys.modules.pop(mod_name, None)
-            logger.warning("tools loader: failed to import %s: %s", source, exc)
+            # Reported through `LoadReport.errors`, which the callers print (M325).
             return f"{type(exc).__name__}: {exc}"
     finally:
         _registry_module.registry = saved_registry
+
+    if not sandbox.list_names():
+        # M325: imported fine and registered nothing — say so, not silence.
+        return "defines no @tool function — nothing registered"
 
     # Anything that registered in the sandbox is now ours to merge.
     # `overridden` carries `(name, winning_scope)` so the agent log
@@ -250,4 +288,5 @@ __all__ = [
     "LoadReport",
     "LoadedTool",
     "load_into_registry",
+    "tool_file_problem",
 ]

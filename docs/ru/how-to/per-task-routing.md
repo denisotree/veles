@@ -72,9 +72,16 @@ veles route refresh --force    # even if AGENTS.md hasn't changed
 1. project `[routing.tasks][task]`
 2. project `[routing.tasks].default`
 3. project NL-подсказка (`routing.nl.toml`)
-4. project `[engine]` база
-5. user `[routing.tasks][task]` / `.default`
-6. user `[user] default_provider` + `default_model`
+4. модель самого запуска, если вы выбрали её для этого запуска: `--provider`/`--model`
+   в командной строке или закрепление `[daemon.<name>]`
+5. project `[engine]` база
+6. user `[routing.tasks][task]` / `.default`
+7. user `[user] default_provider` + `default_model`
+
+Слой 4 — это `[engine]` на время одного запуска: `veles run --provider llamacpp
+--model qwen3` сжимает историю, извлекает инсайты и проводит ревью тоже на этой модели,
+даже если `[engine]` проекта указывает облачную. Как и `[engine]`, он уступает задачам,
+явно маршрутизированным в проекте, и перекрывает пользовательские.
 
 Если ничего из этого не разрешилось, **жёстко зашитого запасного варианта нет** —
 задача остаётся незаданной, и её вызывающая сторона деградирует (пропускает

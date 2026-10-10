@@ -225,6 +225,17 @@ def _handle_slash(
     return result.quit, result.submit_prompt
 
 
+def _follow_model_switch(model: str) -> None:
+    """Keep a command-line run base (M325) on the model `/model` switched to, so
+    side tasks (post-turn upkeep included) follow the session's model. Run in the
+    REPL's parent context, which every turn and upkeep job copies."""
+    from veles.core.context import current_run_base, set_run_base
+
+    base = current_run_base()
+    if base is not None and base[1] != model:
+        set_run_base((base[0], model))
+
+
 class TurnMixin:
     """Turn dispatch + execution for the inline `_ReplApp`.
 
@@ -390,6 +401,7 @@ class TurnMixin:
                 # A fresh copy of the captured parent context per turn (a Context
                 # can't be run concurrently); the executor runs the turn inside it
                 # so the active project / module registry / i18n reach the tools.
+                self._parent_ctx.run(_follow_model_switch, self.state.model)
                 turn_ctx = self._parent_ctx.run(contextvars.copy_context)
                 try:
                     result = await loop.run_in_executor(

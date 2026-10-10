@@ -100,4 +100,38 @@ def guard_write(p: Path, project) -> str | None:
     return None
 
 
-__all__ = ["display_path", "guard_write", "is_within"]
+def tool_file_note(p: Path, project) -> str:
+    """What to tell the model after it wrote a self-authored tool file (M325).
+
+    Empty unless `p` is a loadable `.py` in a tools directory. The model that
+    skipped `tool_authoring` wrote a CLI script there and reported "tool
+    created"; even a correct `@tool` file loads only after a human approves its
+    bytes, which the model cannot do. Both are said in the same turn, in the
+    tool result the model reads."""
+    from veles.core.tools.loader import tool_file_problem
+    from veles.core.user_paths import user_home
+
+    tools_dirs = [user_home() / "tools"]
+    if project is not None:
+        tools_dirs.append(project.state_dir / "tools")
+    if (
+        p.suffix != ".py"
+        or p.name.startswith("_")
+        or not any(p.parent == d.resolve() for d in tools_dirs)
+    ):
+        return ""
+    lines = []
+    problem = tool_file_problem(p.read_text(encoding="utf-8"))
+    if problem is not None:
+        lines.append(
+            f"warning: {p.name} {problem}, so Veles will not load it as a tool. "
+            'See veles_help("tool_authoring") or call the tool_authoring skill.'
+        )
+    lines.append(
+        f"note: Veles loads it only after the user reviews it and runs "
+        f"`veles tool approve {p.stem}` — you cannot approve it, so tell them."
+    )
+    return "\n" + "\n".join(lines)
+
+
+__all__ = ["display_path", "guard_write", "is_within", "tool_file_note"]

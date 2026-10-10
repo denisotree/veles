@@ -21,7 +21,7 @@ from veles.core.context import TokenBudget, reset_budget, set_budget
 from veles.core.context_compressor import CompressionConfig, make_default_compressor
 from veles.core.defaults import DEFAULT_COMPRESS_THRESHOLD_TOKENS
 from veles.core.project import Project
-from veles.core.provider import Provider
+from veles.core.provider import Provider, server_facts_of
 from veles.core.provider_factory import has_api_key, make_provider
 from veles.core.providers import is_cli_provider
 from veles.core.routing import route
@@ -74,8 +74,19 @@ def build_compressor(
         cfg_kwargs["max_summariser_input_tokens"] = max_summariser_input_tokens
     if hard_ceiling_tokens is not None:
         cfg_kwargs["hard_ceiling_tokens"] = hard_ceiling_tokens
+    summariser = make_provider(routed_provider, model=model)
+    facts = server_facts_of(summariser)
+    if facts is not None and facts.n_ctx is not None:
+        # M325: the summariser's input must fit the server it runs on — a 150k
+        # middle sent to a 65k llama.cpp server is refused. ponytail: half the
+        # window for input, the rest for thinking and the summary; size it from
+        # the summariser's real cap if half proves wrong.
+        default_input = CompressionConfig().max_summariser_input_tokens
+        cfg_kwargs["max_summariser_input_tokens"] = min(
+            cfg_kwargs.get("max_summariser_input_tokens", default_input), facts.n_ctx // 2
+        )
     return make_default_compressor(
-        provider=make_provider(routed_provider, model=model),
+        provider=summariser,
         model=model,
         cfg=CompressionConfig(**cfg_kwargs),
         project=project,

@@ -39,6 +39,7 @@ from pathlib import Path
 from veles.core.memory.store import local_connection
 from veles.core.project import Project
 from veles.core.timeutil import local_stamp
+from veles.core.tools.loader import LoadReport
 from veles.core.tools.persistence import (
     ToolTelemetry,
     get_tool,
@@ -59,7 +60,7 @@ class LiveTool:
     description: str
 
 
-def _live_tools(project: Project, conn) -> tuple[list[LiveTool], tuple[Path, ...]]:
+def _live_tools(project: Project, conn) -> tuple[list[LiveTool], LoadReport]:
     """Build the agent's builtin + file-based toolset and report it.
 
     Mirrors `runtime/registry.py::load_skills` for the parts that need no
@@ -104,7 +105,7 @@ def _live_tools(project: Project, conn) -> tuple[list[LiveTool], tuple[Path, ...
         )
         for name in sorted(live.list_names())
     ]
-    return tools, report.unapproved
+    return tools, report
 
 
 def cmd_tool(args: argparse.Namespace, project: Project) -> int:
@@ -181,6 +182,7 @@ def _cmd_approve(args: argparse.Namespace, project: Project) -> int:
             print(f"\n===== {f} =====")
             print(data.decode("utf-8", errors="replace"))
             print("=" * (len(str(f)) + 12))
+            _warn_if_not_a_tool(f.name, data)  # before the question: it is a reason to say no
             if not yes and not _confirm(f"Approve '{f.name}' to execute its code at load? [y/N]"):
                 print(f"skipped {f.name}")
                 continue
@@ -223,7 +225,20 @@ def _approve_by_hash(args: argparse.Namespace, candidates: list[Path]) -> int:
             print(f"error: {exc}", file=sys.stderr)
             return 1
     print(f"approved {match.name} ({expected[:12]}…)")
+    _warn_if_not_a_tool(match.name, match.read_bytes())
     return 0
+
+
+def _warn_if_not_a_tool(name: str, data: bytes) -> None:
+    """M325: approving a file that defines no `@tool` approved "a tool" that does
+    not exist — exit 0, an empty `tool list`, no word why. Read from the text, not
+    by importing: the code is not run before it is approved. Still exit 0: what
+    is approved is the reviewed bytes, whatever they turn out to be."""
+    from veles.core.tools.loader import tool_file_problem
+
+    problem = tool_file_problem(data.decode("utf-8", errors="replace"))
+    if problem is not None:
+        print(f"warning: {name} {problem} — nothing will be registered.", file=sys.stderr)
 
 
 # ---------- list ----------
@@ -232,7 +247,7 @@ def _approve_by_hash(args: argparse.Namespace, candidates: list[Path]) -> int:
 def _cmd_list(args: argparse.Namespace, project: Project) -> int:
     del args
     with local_connection(project) as conn:
-        records, unapproved = _live_tools(project, conn)
+        records, report = _live_tools(project, conn)
         conn.commit()
         tele = telemetry_batch(conn, [r.name for r in records])
     if not records:
@@ -245,15 +260,18 @@ def _cmd_list(args: argparse.Namespace, project: Project) -> int:
         f"\n{len(records)} tools visible to the agent here. "
         "Skills: `veles skill list`. MCP servers: `veles mcp list`."
     )
-    if unapproved:
+    if report.unapproved:
         # M199 skips an unapproved file's import entirely, so the agent never
         # sees the tool OR a refusal. `tool list` is where you come looking.
-        names = ", ".join(sorted(p.stem for p in unapproved))
+        names = ", ".join(sorted(p.stem for p in report.unapproved))
         print(
-            f"{len(unapproved)} self-authored tool file(s) NOT loaded (unapproved): {names} — "
-            "run `veles tool approve <name>` (or --all) to enable them.",
+            f"{len(report.unapproved)} self-authored tool file(s) NOT loaded (unapproved): "
+            f"{names} — run `veles tool approve <name>` (or --all) to enable them.",
             file=sys.stderr,
         )
+    for file_name, reason in report.errors:
+        # M325: approved and imported, yet no tool — say which file and why.
+        print(f"tool file {file_name} NOT loaded: {reason}", file=sys.stderr)
     return 0
 
 

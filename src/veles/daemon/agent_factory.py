@@ -31,7 +31,7 @@ class FactorySettings:
     provider_name: str
     model: str
     max_iterations: int
-    max_tokens: int
+    max_tokens: int | None  # None → resolved by the Agent (M325)
     verbose: bool
     no_compress: bool
     compress_threshold: int
@@ -98,7 +98,9 @@ def factory_settings_from_args(
         provider_name=provider_name,
         model=model,
         max_iterations=int(getattr(args, "max_iterations", DEFAULT_MAX_ITERATIONS)),
-        max_tokens=int(getattr(args, "max_tokens", 4096)),
+        # M325: None lets the Agent resolve it (`[engine]`, the server, the model)
+        # — a hard 4096 here held every daemon reasoning model to 4096.
+        max_tokens=getattr(args, "max_tokens", None),
         verbose=bool(getattr(args, "verbose", False)),
         no_compress=bool(getattr(args, "no_compress", False)),
         compress_threshold=int(

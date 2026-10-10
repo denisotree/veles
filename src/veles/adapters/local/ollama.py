@@ -22,6 +22,7 @@ from typing import ClassVar
 import httpx
 
 from veles.adapters.local._base import LocalOpenAIBase
+from veles.core.provider import ServerFacts
 
 
 class OllamaProvider(LocalOpenAIBase):
@@ -60,34 +61,36 @@ class OllamaProvider(LocalOpenAIBase):
         unreachable from this client's perspective (the HTTP error is
         re-raised — caller decides how to handle a dead server).
         """
-        base = str(self._client.base_url).rstrip("/")
-        if base.endswith("/v1"):
-            base = base[:-3].rstrip("/")
-        resp = httpx.get(f"{base}/api/tags", timeout=10.0)
+        resp = httpx.get(f"{self._server_root()}/api/tags", timeout=10.0)
         resp.raise_for_status()
         return [m["name"] for m in resp.json().get("models", [])]
 
-    def model_supports_tools(self, model: str) -> bool:
-        """Return True iff Ollama advertises the `tools` capability for `model`.
+    def server_facts(self, model: str) -> ServerFacts | None:
+        """What Ollama's `/api/show` says about `model`.
 
-        Ollama's native `/api/show` returns a `capabilities` array that lists
-        `"tools"` for models that speak the OpenAI tool-call format (e.g.
-        `qwen3`, `llama3.1`, `qwen2.5`). The provider factory uses this to
-        enable tool calling automatically — no `VELES_LOCAL_TOOLS` flag needed.
+        Its `capabilities` array lists `"tools"` for models that speak the OpenAI
+        tool-call format (e.g. `qwen3`, `llama3.1`, `qwen2.5`) — the provider
+        factory enables tool calling from it, no `VELES_LOCAL_TOOLS` flag needed
+        — and `"thinking"` for models that reason (M325), which raises their
+        completion cap whatever the tag is called.
+
+        `n_ctx` stays None: the context Ollama actually runs a model with is its
+        `num_ctx` setting, not the trained length `/api/show` reports.
 
         Conservative on failure: a missing model, an old Ollama without the
-        `capabilities` field, or an unreachable server all return False so
+        `capabilities` field, or an unreachable server all return None so
         auto-detection never wrongly enables tools or blocks startup.
         """
         if not model:
-            return False
-        base = str(self._client.base_url).rstrip("/")
-        if base.endswith("/v1"):
-            base = base[:-3].rstrip("/")
+            return None
         try:
-            resp = httpx.post(f"{base}/api/show", json={"model": model}, timeout=10.0)
+            resp = httpx.post(
+                f"{self._server_root()}/api/show", json={"model": model}, timeout=10.0
+            )
             resp.raise_for_status()
-            caps = resp.json().get("capabilities") or []
+            caps = resp.json().get("capabilities")
         except Exception:
-            return False
-        return "tools" in caps
+            return None
+        if not isinstance(caps, list):
+            return ServerFacts()
+        return ServerFacts(tools="tools" in caps, reasoning="thinking" in caps)

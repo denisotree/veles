@@ -26,7 +26,7 @@ def test_factory_settings_extracts_defaults(tmp_path: Path) -> None:
     s = factory_settings_from_args(argparse.Namespace(model="test/model"), project)
     assert s.provider_name == "openrouter"
     assert s.model == "test/model"
-    assert s.max_tokens == 4096
+    assert s.max_tokens is None  # M325: resolved per model by the Agent, not a flat 4096
     assert s.verbose is False
     assert s.no_compress is False
     assert s.skills_cache_ttl == 600.0  # M158-followup default

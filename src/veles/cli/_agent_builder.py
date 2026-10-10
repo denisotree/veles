@@ -86,6 +86,7 @@ def build_command_agent(  # noqa: PLR0913
         model=args.model,
         max_iterations=args.max_iterations,
         system_prompt=system_prompt,
+        max_tokens=getattr(args, "max_tokens", None),
         verbose=args.verbose,
         store=store,
         session_id=session_id,
@@ -119,6 +120,7 @@ def make_worker_factory(
             model=args.model,
             max_iterations=args.max_iterations,
             system_prompt=full_system,
+            max_tokens=getattr(args, "max_tokens", None),
             verbose=args.verbose,
             compressor=compressor,
         )

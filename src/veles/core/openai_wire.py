@@ -23,7 +23,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any
 
 import httpx
@@ -92,6 +92,40 @@ def disable_json_mode() -> None:
 def _reset_json_mode_for_tests() -> None:
     global _json_mode_disabled
     _json_mode_disabled = False
+
+
+# M325: OpenAI, llama.cpp, ollama and vLLM put `usage` in a stream only when asked
+# (`stream_options.include_usage`); without it every streamed turn counted 0 tokens
+# and `--max-tokens-total` limited nothing. OpenRouter sends it unasked. A backend
+# that rejects the option turns it off for the process, like JSON mode above.
+_stream_usage_disabled = False
+_warned_no_stream_usage = False
+
+
+def stream_usage_enabled() -> bool:
+    return not _stream_usage_disabled
+
+
+def disable_stream_usage() -> None:
+    global _stream_usage_disabled
+    _stream_usage_disabled = True
+
+
+def _reset_stream_usage_for_tests() -> None:
+    global _stream_usage_disabled, _warned_no_stream_usage
+    _stream_usage_disabled = False
+    _warned_no_stream_usage = False
+
+
+def _warn_no_stream_usage(provider: str) -> None:
+    global _warned_no_stream_usage
+    if _warned_no_stream_usage:
+        return
+    _warned_no_stream_usage = True
+    logger.warning(
+        "%s reported no token usage in a stream; --max-tokens-total cannot limit it",
+        provider,
+    )
 
 
 def _is_400_about(exc: Exception, parameter: str) -> bool:
@@ -325,44 +359,60 @@ class OpenAICompatibleProvider:
         return [m.id for m in page]
 
     def _call_create(self, kwargs: dict[str, Any], messages: list[Message], model: str) -> Any:
-        """Run `chat.completions.create` with the M220 cache self-heal: if the
-        wire rejects our `cache_control` tool-tail hint (400), drop the tool-tail
-        breakpoint process-wide, re-prepare the messages, and retry once. The
-        cache is a bonus — a rejection must never break an agentic turn.
+        """Run `chat.completions.create`, self-healing the optional hints a wire
+        may reject with a 400 naming them. Each is a bonus, so a rejection turns
+        it off process-wide and the request is retried without it, rather than
+        failing the turn:
 
-        M239 adds the same treatment for `response_format`: a local backend that
-        doesn't accept it disables JSON mode process-wide and the request is
-        retried without it, rather than failing the turn."""
-        try:
-            return self._client.chat.completions.create(**kwargs)
-        except _TRANSLATED_OPENAI_ERRORS as exc:
-            from veles.core.cache_hints import disable_tool_tail, tool_tail_enabled
+          - `response_format` (M239) — local JSON mode;
+          - `cache_control` (M220) — the tool-tail cache breakpoint, which lives
+            in the messages, so they are re-prepared;
+          - `stream_options` (M325) — usage in streams.
 
-            if "response_format" in kwargs and _is_400_about(exc, "response_format"):
-                disable_json_mode()
+        Each heals at most once per call, so two different rejections in a row
+        both heal."""
+        from veles.core.cache_hints import disable_tool_tail, tool_tail_enabled
+
+        def _without(key: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
+            return lambda kw: {k: v for k, v in kw.items() if k != key}
+
+        # (parameter, applies to this request, turn it off, request without it)
+        heals: list[tuple[str, bool, Callable[[], None], Callable[[dict], dict]]] = [
+            (
+                "response_format",
+                "response_format" in kwargs,
+                disable_json_mode,
+                _without("response_format"),
+            ),
+            (
+                "cache_control",
+                tool_tail_enabled(),
+                disable_tool_tail,
+                lambda kw: {**kw, "messages": self._prepare_messages(messages, model)},
+            ),
+            (
+                "stream_options",
+                "stream_options" in kwargs,
+                disable_stream_usage,
+                _without("stream_options"),
+            ),
+        ]
+        while True:
+            try:
+                return self._client.chat.completions.create(**kwargs)
+            except _TRANSLATED_OPENAI_ERRORS as exc:
+                heal = next((h for h in heals if h[1] and _is_400_about(exc, h[0])), None)
+                if heal is None:
+                    raise self._translate_openai_error(exc) from exc
+                heals.remove(heal)
+                param, _, disable, rebuild = heal
+                disable()
                 logger.warning(
-                    "response_format rejected; disabled local JSON mode and "
-                    "retrying without it (self-healed, %s)",
+                    "%s rejected; turned it off and retrying without it (self-healed, %s)",
+                    param,
                     getattr(self, "name", "provider"),
                 )
-                retry = {k: v for k, v in kwargs.items() if k != "response_format"}
-                try:
-                    return self._client.chat.completions.create(**retry)
-                except _TRANSLATED_OPENAI_ERRORS as exc2:
-                    raise self._translate_openai_error(exc2) from exc2
-            if tool_tail_enabled() and _is_400_about(exc, "cache_control"):
-                disable_tool_tail()
-                logger.warning(
-                    "cache_control rejected on the tool tail; disabled tool-tail "
-                    "caching and retrying without it (self-healed, %s)",
-                    getattr(self, "name", "provider"),
-                )
-                retry = {**kwargs, "messages": self._prepare_messages(messages, model)}
-                try:
-                    return self._client.chat.completions.create(**retry)
-                except _TRANSLATED_OPENAI_ERRORS as exc2:
-                    raise self._translate_openai_error(exc2) from exc2
-            raise self._translate_openai_error(exc) from exc
+                kwargs = rebuild(kwargs)
 
     def _request_kwargs(
         self,
@@ -416,6 +466,8 @@ class OpenAICompatibleProvider:
     ) -> Iterator[StreamEvent]:
         kwargs = self._request_kwargs(messages, tools, model=model, max_tokens=max_tokens)
         kwargs["stream"] = True
+        if stream_usage_enabled():
+            kwargs["stream_options"] = {"include_usage": True}
 
         text_buffer = ""
         tool_calls_acc: dict[int, dict[str, Any]] = {}
@@ -494,6 +546,8 @@ class OpenAICompatibleProvider:
             if choice.finish_reason:
                 finish_reason = choice.finish_reason
 
+        if finish_reason is not None and usage.total_tokens == 0:
+            _warn_no_stream_usage(getattr(self, "name", "provider"))
         tool_calls: list[ToolCall] = []
         for acc in tool_calls_acc.values():
             arguments = decode_tool_args(acc["arguments"])

@@ -130,8 +130,14 @@ def _run_in_project(args, command, modules=None) -> int:
 
     # A provider the config routes to and a registry offers installs itself.
     ensure_routed_providers(project)
+    from veles.core.context import reset_run_base, set_run_base
+    from veles.core.model_resolver import run_base
+
+    # M325: a model chosen on the command line is the base for side tasks too.
+    base_token = set_run_base(run_base(args, project))
     try:
         return command(args, project)
     finally:
+        reset_run_base(base_token)
         reset_module_registry(mod_token)
         reset_active_project(token)

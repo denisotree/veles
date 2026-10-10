@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 import pytest
 
+from veles.core.provider import ServerFacts
 from veles.core.provider_factory import make_provider, require_api_key
 
 
@@ -44,13 +43,17 @@ def test_error_message_for_unknown_provider(monkeypatch: pytest.MonkeyPatch) -> 
 
 # ---------- local-provider tool-capability auto-detect (replaces VELES_LOCAL_TOOLS gate) ----------
 
-_PROBE = "veles.adapters.local.ollama.OllamaProvider.model_supports_tools"
+_PROBE = "veles.adapters.local.ollama.OllamaProvider.server_facts"
+
+
+def _tools_if(capable: bool) -> ServerFacts:
+    return ServerFacts(tools=capable)
 
 
 def test_make_provider_ollama_autodetects_tool_capability(monkeypatch: pytest.MonkeyPatch) -> None:
     """No env flag: tools turn on iff the model advertises the `tools` capability."""
     monkeypatch.delenv("VELES_LOCAL_TOOLS", raising=False)
-    monkeypatch.setattr(_PROBE, lambda self, model: model == "qwen3:4b-instruct")
+    monkeypatch.setattr(_PROBE, lambda self, model: _tools_if(model == "qwen3:4b-instruct"))
     assert make_provider("ollama", model="qwen3:4b-instruct").supports_tools is True
     assert make_provider("ollama", model="llama2-uncensored").supports_tools is False
 
@@ -72,16 +75,17 @@ def test_make_provider_ollama_no_model_defaults_off(monkeypatch: pytest.MonkeyPa
 
 
 def test_make_provider_local_tools_env_override_wins(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Explicit VELES_LOCAL_TOOLS forces on/off regardless of model capability."""
-    # force ON even though the model has no tool capability (and never probe)
+    """Explicit VELES_LOCAL_TOOLS forces on/off regardless of model capability.
+
+    The server is still asked (M325): the same answer sets the completion cap
+    and the context ceiling, which the override says nothing about."""
+    # force ON even though the model has no tool capability
     monkeypatch.setenv("VELES_LOCAL_TOOLS", "1")
-    probe = MagicMock(return_value=False)
-    monkeypatch.setattr(_PROBE, probe)
+    monkeypatch.setattr(_PROBE, lambda self, model: _tools_if(False))
     assert make_provider("ollama", model="x").supports_tools is True
-    probe.assert_not_called()
     # force OFF even though the model IS tool-capable
     monkeypatch.setenv("VELES_LOCAL_TOOLS", "0")
-    monkeypatch.setattr(_PROBE, lambda self, model: True)
+    monkeypatch.setattr(_PROBE, lambda self, model: _tools_if(True))
     assert make_provider("ollama", model="qwen3:4b-instruct").supports_tools is False
 
 

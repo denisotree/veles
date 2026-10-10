@@ -403,6 +403,7 @@ start`:
 |---|---|---|
 | `--model <id>` | resuelto desde el modelo de `[engine]` del proyecto → `default_model` del usuario (sin valor por defecto codificado) | ID del modelo |
 | `--provider <name>` | `openrouter` | Proveedor (ver más abajo) |
+| `--max-tokens <n>` | `[engine] max_tokens`, si no, deducido (32000 para un modelo de razonamiento, 4096 para el resto) | Límite de longitud de cada respuesta del modelo |
 | `--max-tokens-total <n>` | `100000` | Presupuesto de tokens acumulado; `0` lo desactiva |
 | `--max-iterations <n>` | `1000` | Máximo de iteraciones de llamada a herramientas por turno |
 | `--stream` | desactivado | Transmite la respuesta token a token |

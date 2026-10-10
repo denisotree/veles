@@ -71,9 +71,16 @@ explicit `[routing.tasks]` entries हमेशा NL hints पर जीतत�
 1. project `[routing.tasks][task]`
 2. project `[routing.tasks].default`
 3. project NL hint (`routing.nl.toml`)
-4. project `[engine]` base
-5. user `[routing.tasks][task]` / `.default`
-6. user `[user] default_provider` + `default_model`
+4. run का अपना model, जब आपने उसे इसी run के लिए चुना हो — command line पर
+   `--provider`/`--model`, या एक `[daemon.<name>]` pin
+5. project `[engine]` base
+6. user `[routing.tasks][task]` / `.default`
+7. user `[user] default_provider` + `default_model`
+
+Layer 4 एक run की अवधि के लिए `[engine]` है: `veles run --provider llamacpp
+--model qwen3` compression, insight extraction और review भी उसी model पर करता है, भले
+ही project का `[engine]` किसी cloud model का नाम देता हो। `[engine]` की तरह, आपके
+project के अपने task routes इससे ऊपर रहते हैं और यह आपके user-level routes से ऊपर रहता है।
 
 यदि इनमें से कोई भी resolve नहीं होता, तो कोई **hardcoded fallback नहीं है** — task
 unset छोड़ दिया जाता है और उसका caller degrade हो जाता है (feature छोड़ देता है) या साफ

@@ -107,9 +107,12 @@ def test_create_message_round_trip() -> None:
 
 
 def test_huge_request_timeout_default(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Local models can run for minutes — default total timeout is 10 minutes."""
+    """Local models can run for minutes — the default wait for a response is 10
+    minutes, while connecting stays short."""
     monkeypatch.delenv("LLAMACPP_BASE_URL", raising=False)
     fake_openai = MagicMock(return_value=MagicMock())
     with patch("veles.adapters.local._base.OpenAI", fake_openai):
         LlamaCppProvider()
-    assert fake_openai.call_args.kwargs["timeout"] == 600.0
+    timeout = fake_openai.call_args.kwargs["timeout"]
+    assert timeout.read == 600.0
+    assert timeout.connect == 10.0

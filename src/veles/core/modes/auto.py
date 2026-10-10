@@ -25,7 +25,7 @@ from typing import Literal
 from veles.core.modes.base import Mode, ModeContext
 from veles.core.modes.planning import PlanningMode
 from veles.core.modes.writing import WritingMode
-from veles.core.provider import Message
+from veles.core.provider import Message, server_facts_of
 from veles.core.session_state import ModeName
 
 Verdict = Literal["direct", "plan"]
@@ -55,6 +55,8 @@ def classify(prompt: str, provider, model: str) -> Verdict:
     user through planning on an ambiguous response is more annoying
     than the inverse, and PlanningMode is a strict read-only sandbox
     so a miss there can't damage anything."""
+    from veles.core.model_budgets import side_call_max_tokens
+
     try:
         resp = provider.create_message(
             [
@@ -63,7 +65,8 @@ def classify(prompt: str, provider, model: str) -> Verdict:
             ],
             tools=None,
             model=model,
-            max_tokens=8,
+            # 8 tokens is one word; a reasoning model needs room to think first.
+            max_tokens=side_call_max_tokens(model, server_facts_of(provider), 8),
         )
     except Exception:
         return "direct"

@@ -71,9 +71,16 @@ For each task, the first layer that yields a spec wins:
 1. project `[routing.tasks][task]`
 2. project `[routing.tasks].default`
 3. project NL hint (`routing.nl.toml`)
-4. project `[engine]` base
-5. user `[routing.tasks][task]` / `.default`
-6. user `[user] default_provider` + `default_model`
+4. the run's own model, when you chose it for this run — `--provider`/`--model`
+   on the command line, or a `[daemon.<name>]` pin
+5. project `[engine]` base
+6. user `[routing.tasks][task]` / `.default`
+7. user `[user] default_provider` + `default_model`
+
+Layer 4 is `[engine]` for the duration of one run: `veles run --provider llamacpp
+--model qwen3` compresses, extracts insights and reviews on that model too, even in
+a project whose `[engine]` names a cloud model. Like `[engine]`, it is outranked by
+your project's own task routes and outranks your user-level ones.
 
 If none of these resolves, there is **no hardcoded fallback** — the task is left
 unset and its caller degrades (skips the feature) or errors clearly, rather than

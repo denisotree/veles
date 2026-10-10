@@ -144,9 +144,50 @@ def resolve_effective_model(
     return DEFAULT_MODEL
 
 
+def run_base(
+    args: argparse.Namespace,
+    project: Project | None,
+    *,
+    daemon_session: str | None = None,
+) -> tuple[str, str] | None:
+    """The run's `(provider, model)` when the user chose it for this run, else None.
+
+    M325: side tasks (compressor, insights, advisor, …) are routed from config,
+    so a run started with `--provider llamacpp --model qwen` in a project without
+    `[engine]` had its compressor switched off, and one with a cloud `[engine]`
+    sent the history to the cloud to be summarised. "Chose" means an explicit
+    `--provider`/`--model`, or a `[daemon.<name>]` pin; a pair that came from
+    config returns None, because routing already reads config — and a user
+    default returned here would shadow the user's own `[routing.tasks]`."""
+    explicit = getattr(args, "_provider_explicit", False) or getattr(args, "model", None) not in (
+        None,
+        DEFAULT_MODEL,
+    )
+    if not explicit and daemon_session and project is not None:
+        pin = get_section(load_project_config(project), "daemon", daemon_session)
+        explicit = bool(pin.get("provider") or pin.get("model"))
+    if not explicit:
+        return None
+    provider = resolve_effective_provider(args, project, daemon_session=daemon_session)
+    from veles.core.providers import is_cli_provider
+
+    if is_cli_provider(provider):
+        # A CLI delegate (claude-cli, codex) can't serve a side call — routed to
+        # it, the compressor and insights switch off. They keep routing by config.
+        return None
+    try:
+        model = ensure_model_configured(
+            resolve_effective_model(args, project, daemon_session=daemon_session)
+        )
+    except ConfigurationError:
+        return None
+    return provider, model
+
+
 __all__ = [
     "ConfigurationError",
     "ensure_model_configured",
     "resolve_effective_model",
     "resolve_effective_provider",
+    "run_base",
 ]

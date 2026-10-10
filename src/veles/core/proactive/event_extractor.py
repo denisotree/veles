@@ -26,7 +26,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from veles.core.provider import Message, Provider
+from veles.core.provider import Message, Provider, server_facts_of
 
 _MAX_CORPUS_CHARS = 8000
 
@@ -118,10 +118,12 @@ def extract_definite_events(
         return []
     now_iso = _dt.datetime.fromtimestamp(now, tz=_dt.UTC).isoformat()
     prompt = _PROMPT.format(now_iso=now_iso, corpus=corpus[:_MAX_CORPUS_CHARS])
+    from veles.core.model_budgets import side_call_max_tokens
+
     response = provider.create_message(
         [Message(role="system", content=_SYSTEM), Message(role="user", content=prompt)],
         model=model,
-        max_tokens=max_tokens,
+        max_tokens=side_call_max_tokens(model, server_facts_of(provider), max_tokens),
     )
     events: list[ProactiveEvent] = []
     seen: set[str] = set()

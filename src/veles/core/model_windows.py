@@ -67,6 +67,9 @@ def context_window_for(model: str | None) -> int:
     return _DEFAULT_WINDOW
 
 
-def default_hard_ceiling_for(model: str | None) -> int:
-    """Token ceiling the request must stay under (≈90% of the window)."""
-    return int(context_window_for(model) * _HARD_CEILING_FRACTION)
+def default_hard_ceiling_for(model: str | None, *, n_ctx: int | None = None) -> int:
+    """Token ceiling the request must stay under (≈90% of the window).
+
+    `n_ctx` (M325) is the window a local server reports for itself — it beats
+    the table, which would hold a 65k llama.cpp server to the 200k default."""
+    return int((n_ctx or context_window_for(model)) * _HARD_CEILING_FRACTION)

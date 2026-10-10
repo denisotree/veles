@@ -62,6 +62,7 @@ provider = "openrouter"                              # provider name for the mai
 model = "anthropic/claude-sonnet-4.6"                # model id (omit to require --model or the user default_model)
 request_timeout_s = 180                              # optional; how long to wait for one response
 max_retries = 1                                      # optional; retries per request
+max_tokens = 32000                                   # optional; completion cap per response
 
 [engine.request.openrouter.provider]   # forwarded into the request body as-is
 order = ["GMICloud"]                   # pin one backend (see "Pinning a backend" below)
@@ -161,8 +162,27 @@ Precedence for both: an explicit argument in code → `[engine]` → the per-mod
 default. A value that is not a positive number (or, for `max_retries`, a
 non-negative integer) aborts with a `ConfigError` naming the file.
 
-**Scope:** only the OpenRouter adapter reads these today. The Anthropic, OpenAI and
-Gemini clients are built without either parameter and ignore the keys.
+**Scope:** OpenRouter, hosted `openai-api` providers and the local servers (`llamacpp`,
+`ollama`, `local`) read these. The Anthropic, OpenAI and Gemini clients are built
+without either parameter and ignore the keys.
+
+For a local server the derived default is not the name guess but **600s**, and
+retries stay **0** unless you set `max_retries` — a server that is down fails at once.
+The timeout is the longest wait for the *next* bytes: without `--stream` the server
+sends nothing until it has finished, so it caps the whole answer; a slow model that
+writes for longer than ten minutes needs a larger `request_timeout_s`. Connecting is
+always limited to 10s.
+
+`max_tokens` is the other side of the same budget: how much one response may write.
+Unset, a reasoning model gets 32000 and anything else 4096 — and a reasoning model
+spends that cap on thinking before it writes a visible character, so too small a cap
+is an empty answer, not a short one. "Reasoning" is decided by what the server says
+when it can (llama.cpp's `/props`: a thinking chat template; ollama's `/api/show`:
+the `thinking` capability), since a local server ignores the model name; otherwise by
+the provider catalogue, then the name. The cap never exceeds the context a llama.cpp
+server was started with. Precedence: `--max-tokens` → `[engine] max_tokens` → derived.
+`--verbose` prints the cap in force and where it came from:
+`-> max_tokens=8192 (server: reasoning template, capped at the server's n_ctx)`.
 
 ### Pinning a backend, and other request-body keys
 

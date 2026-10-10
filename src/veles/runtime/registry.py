@@ -107,8 +107,11 @@ def _load_file_tools(full: Registry, project: Project) -> list[str]:
     except Exception as exc:
         logger.warning("project tools unavailable: %s", exc)
         return []
-    for name, scope in report.errors:
-        logger.warning("project tool %s failed to load: %s", name, scope)
+    for file_name, reason in report.errors:
+        # Printed, like the unapproved line below (M325): a tool file that
+        # failed to import, or imported and registered nothing, vanishes from
+        # the agent's toolset just as silently.
+        print(f"warning: tool file {file_name} not loaded: {reason}", file=sys.stderr)
     if report.unapproved:
         names = ", ".join(sorted(p.stem for p in report.unapproved))
         # Printed, not logged: an unapproved tool vanishes silently — the model

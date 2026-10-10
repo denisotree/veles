@@ -74,9 +74,16 @@ Pour chaque tâche, la première couche qui produit une spécification l'emporte
 1. `[routing.tasks][task]` du projet
 2. `[routing.tasks].default` du projet
 3. indication NL du projet (`routing.nl.toml`)
-4. base `[engine]` du projet
-5. `[routing.tasks][task]` / `.default` de l'utilisateur
-6. `[user] default_provider` + `default_model` de l'utilisateur
+4. le modèle propre à l'exécution, quand vous l'avez choisi pour celle-ci :
+   `--provider`/`--model` en ligne de commande, ou un épinglage `[daemon.<name>]`
+5. base `[engine]` du projet
+6. `[routing.tasks][task]` / `.default` de l'utilisateur
+7. `[user] default_provider` + `default_model` de l'utilisateur
+
+La couche 4 est `[engine]` le temps d'une exécution : `veles run --provider llamacpp
+--model qwen3` compresse, extrait les insights et relit aussi sur ce modèle, même dans
+un projet dont l'`[engine]` désigne un modèle cloud. Comme `[engine]`, elle cède devant
+les routes de tâches propres à votre projet et l'emporte sur celles de niveau utilisateur.
 
 Si aucune de ces couches ne résout, il n'y a **aucun repli codé en dur** — la tâche
 reste non définie et son appelant se dégrade (saute la fonctionnalité) ou échoue

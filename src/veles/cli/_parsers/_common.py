@@ -137,6 +137,16 @@ def add_common_run_flags(p: argparse.ArgumentParser, *, defaults: bool = False) 
         ),
     )
     p.add_argument(
+        "--max-tokens",
+        type=int,
+        default=_default(None, defaults=defaults),
+        metavar="N",
+        help=(
+            "Completion cap for each model response (default: [engine] max_tokens, "
+            "else derived from the model — 32000 for a reasoning model, 4096 otherwise)."
+        ),
+    )
+    p.add_argument(
         "--max-tokens-total",
         type=int,
         default=_default(DEFAULT_MAX_TOKENS_TOTAL, defaults=defaults),

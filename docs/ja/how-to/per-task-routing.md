@@ -67,9 +67,12 @@ veles route refresh --force    # even if AGENTS.md hasn't changed
 1. プロジェクトの `[routing.tasks][task]`
 2. プロジェクトの `[routing.tasks].default`
 3. プロジェクトの自然言語ヒント（`routing.nl.toml`）
-4. プロジェクトの `[engine]` ベース
-5. ユーザーの `[routing.tasks][task]` / `.default`
-6. ユーザーの `[user] default_provider` + `default_model`
+4. この実行自体のモデル（この実行のために選んだ場合）— コマンドラインの `--provider`/`--model`、または `[daemon.<name>]` による固定
+5. プロジェクトの `[engine]` ベース
+6. ユーザーの `[routing.tasks][task]` / `.default`
+7. ユーザーの `[user] default_provider` + `default_model`
+
+レイヤー 4 は 1 回の実行のあいだだけ有効な `[engine]` です。`veles run --provider llamacpp --model qwen3` は、プロジェクトの `[engine]` がクラウドモデルを指していても、圧縮・インサイト抽出・レビューもそのモデルで行います。`[engine]` と同じく、プロジェクト自身のタスクルートには負け、ユーザーレベルのルートには勝ちます。
 
 これらのいずれも解決しない場合、**ハードコードされたフォールバックはありません** — そのタスクは未設定のままとなり、呼び出し側は機能を縮退させる（その機能をスキップする）か、明確にエラーを返します。ひそかにクラウドモデルへ手を伸ばすことはありません。
 
