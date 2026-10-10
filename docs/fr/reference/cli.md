@@ -90,6 +90,7 @@ déclencheurs du curateur / d'apprentissage. Accepte toutes les [options partag�
 | Option | Défaut | Rôle |
 |---|---|---|
 | `--resume <session_id>` | nouvelle session | Poursuit une session existante |
+| `--output {text,json}` | `text` | `json` : affiche un objet unique (statut, code de sortie, session, réponse, tours, tokens, budget, avertissements) au lieu de la réponse |
 | `--manager` | désactivé | Décompose via le gestionnaire multi-agent (aussi `VELES_MANAGER_MODE=1`) |
 | `--verify` | désactivé | Après l'exécution, l'advisor routé juge la réponse ; en cas d'échec avéré, relance sur le modèle plus puissant (aussi `VELES_VERIFY_MODE=1`) |
 | `--plan` | désactivé | Mode planification : lecture/recherche/brouillon autorisés, mutations bloquées |

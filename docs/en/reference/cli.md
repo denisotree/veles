@@ -95,6 +95,7 @@ triggers. Accepts all [shared agent-loop flags](#shared-agent-loop-flags) plus:
 | Flag | Default | Purpose |
 |---|---|---|
 | `--resume <session_id>` | new session | Continue an existing session |
+| `--output {text,json}` | `text` | `json`: print one object (status, exit code, session, answer, turns, tokens, budget, warnings) instead of the answer |
 | `--manager` | off | Decompose via the multi-agent manager (also `VELES_MANAGER_MODE=1`) |
 | `--verify` | off | After the run, the routed advisor judges the answer; on a confident failure, re-run on the stronger model (also `VELES_VERIFY_MODE=1`) |
 | `--plan` | off | Planning mode: read/search/draft allowed, mutations blocked |
@@ -111,7 +112,8 @@ triggers. Accepts all [shared agent-loop flags](#shared-agent-loop-flags) plus:
 
 **Exit codes:** `0` completed · `1` provider error or unrecognised
 non-completion · `2` configuration, API key, or unknown `--resume` id · `3`
-`max_iterations` · `4` `budget_exhausted` · `5` `empty` · `6` `cancelled`.
+`max_iterations` · `4` `budget_exhausted` · `5` `empty` · `6` `cancelled` · `7`
+`truncated` (the answer hit the completion cap — raise `--max-tokens`).
 
 Calling `run` from another program? stdout carries the answer and nothing else,
 every diagnostic goes to stderr, and both are contract-tested — see

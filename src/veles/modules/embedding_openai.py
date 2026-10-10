@@ -41,9 +41,16 @@ class OpenAIEmbeddingProviderAdapter:
     api_key: str | None = None
     base_url: str | None = None
     dim: int = _DEFAULT_DIM
+    # M326: a server the user runs (llama.cpp, a `local` entry) is on-device: the
+    # recall gate (`get_local_embedding_adapter`) lets project text reach it.
+    is_local: bool = False
+    # `<provider>:<model>` when built from a route, for `veles doctor`.
+    label: str | None = None
 
     @property
     def name(self) -> str:
+        if self.label:
+            return self.label
         host = self.base_url or "openai.com"
         return f"openai:{self.model}@{host}"
 
@@ -82,7 +89,38 @@ def build_from_env() -> OpenAIEmbeddingProviderAdapter | None:
     return None
 
 
+def build_from_route() -> OpenAIEmbeddingProviderAdapter | None:
+    """The embedder `[routing.tasks].embedding` names, if it speaks the OpenAI
+    wire (M326) — `/v1/embeddings`, which llama-server (`--embeddings`), ollama,
+    vLLM and the cloud APIs all serve. A provider that needs no key is a server
+    the user runs, so the adapter is local. None with no project, no route, or
+    a provider that can't serve embeddings."""
+    from veles.core.context import current_project
+    from veles.core.providers import find_provider, openai_wire_endpoint
+    from veles.core.routing import route
+
+    project = current_project()
+    if project is None:
+        return None
+    try:
+        provider, model = route("embedding", project)
+        spec = find_provider(provider)
+        if spec is None or spec.wire != "openai-wire":
+            return None
+        base_url, api_key = openai_wire_endpoint(provider)
+    except Exception:  # unrouted, unknown or unreachable: the next tier decides
+        return None
+    return OpenAIEmbeddingProviderAdapter(
+        model=model,
+        api_key=api_key,
+        base_url=base_url,
+        is_local=not spec.key_required,
+        label=f"{provider}:{model}",
+    )
+
+
 __all__ = [
     "OpenAIEmbeddingProviderAdapter",
     "build_from_env",
+    "build_from_route",
 ]

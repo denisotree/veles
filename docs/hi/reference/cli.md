@@ -88,6 +88,7 @@ memory persistence और curator/learning triggers के साथ एक sing
 | Flag | Default | उद्देश्य |
 |---|---|---|
 | `--resume <session_id>` | नया session | मौजूदा session जारी रखें |
+| `--output {text,json}` | `text` | `json`: उत्तर के बजाय एक object print करें (status, exit code, session, उत्तर, turns, tokens, budget, warnings) |
 | `--manager` | off | multi-agent manager के ज़रिए decompose करें (`VELES_MANAGER_MODE=1` भी) |
 | `--verify` | off | run के बाद routed advisor उत्तर का मूल्यांकन करता है; पक्की विफलता पर, मज़बूत model पर फिर से चलाएँ (`VELES_VERIFY_MODE=1` भी) |
 | `--plan` | off | Planning mode: read/search/draft की अनुमति, mutations अवरुद्ध |

@@ -17,7 +17,7 @@ from veles.core.memory.insight_embeddings import (
     embed_survivor_insights,
 )
 from veles.core.memory.router import MemoryRouter
-from veles.core.memory.vector import get_embedding, upsert_embedding
+from veles.core.memory.vector import adopt_embedder, get_embedding, upsert_embedding
 from veles.core.project import init_project
 from veles.modules.embedding import (
     get_local_embedding_adapter,
@@ -196,6 +196,7 @@ def test_router_vector_recall_surfaces_paraphrase(tmp_path: Path) -> None:
     project = init_project(tmp_path, name="t")
     store = SessionStore(project.memory_db_path)
     iid = _insert_insight(store, title="deploy", body="run terraform apply after migration")
+    adopt_embedder(store._conn, _FakeEmbedder.name, ref_kind="insight")  # as backfill does
     upsert_embedding(store._conn, ref_kind="insight", ref_id=iid, vec=[1.0, 0.0])
     store._conn.commit()
     query = "shipping infrastructure changes"  # zero token overlap with the insight

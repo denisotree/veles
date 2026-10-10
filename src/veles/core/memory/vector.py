@@ -200,6 +200,44 @@ def _migrate_json_vectors(conn: sqlite3.Connection) -> None:
         conn.execute("VACUUM")
 
 
+# ---------- which embedder wrote the vectors (M326) ----------
+#
+# Rows are matched on width only, and two embedders of one width (768 is common)
+# produce vectors that compare as noise. With a second local backend (llama.cpp
+# beside ollama) switching is a real case, so the database remembers whose
+# vectors it holds: backfill starts over on a switch, and nearest-neighbour
+# search answers nothing until it has.
+
+
+def _ensure_meta(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS embeddings_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+    )
+
+
+def stored_embedder(conn: sqlite3.Connection) -> str | None:
+    """The embedder the stored vectors came from; None before any was recorded."""
+    _ensure_meta(conn)
+    row = conn.execute("SELECT value FROM embeddings_meta WHERE key = 'embedder'").fetchone()
+    return row[0] if row else None
+
+
+def adopt_embedder(conn: sqlite3.Connection, name: str, *, ref_kind: str) -> None:
+    """Record `name` as the embedder. Any other — or none, a database written
+    before M326 — means the stored `ref_kind` vectors may be another model's, so
+    they go and backfill embeds them again: once, for an old database, which
+    beats keeping Ollama vectors under a llama.cpp name for good."""
+    if stored_embedder(conn) == name:
+        return
+    ensure_embeddings_table(conn)
+    conn.execute("DELETE FROM embeddings_blob WHERE ref_kind = ?", (ref_kind,))
+    conn.execute(
+        "INSERT INTO embeddings_meta(key, value) VALUES ('embedder', ?)"
+        " ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (name,),
+    )
+
+
 # ---------- writes ----------
 
 
@@ -395,12 +433,14 @@ def _cosine_distance(a: list[float], b: list[float]) -> float:
 
 __all__ = [
     "EmbeddingHit",
+    "adopt_embedder",
     "available_backend",
     "cosine_similarity",
     "ensure_embeddings_table",
     "get_embedding",
     "knn",
     "pack",
+    "stored_embedder",
     "unpack",
     "upsert_embedding",
 ]

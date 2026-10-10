@@ -176,6 +176,22 @@ def test_daemon_settings_leave_the_cap_to_the_agent(tmp_path) -> None:
     assert agent._max_tokens == 32000
 
 
+def test_the_commands_cap_reaches_what_args_cannot(engine) -> None:
+    """`--max-tokens` is set for the whole command: a skill's sub-agent (built
+    with no number) gets it, and a side call on a thinker is widened only up to
+    it — not to 32000 past what the user set."""
+    from veles.core.context import reset_run_max_tokens, set_run_max_tokens
+
+    engine({"max_tokens": 20000})
+    token = set_run_max_tokens(8000)
+    try:
+        assert resolve_max_tokens("bonsai-2-27b", REASONING) == (8000, "--max-tokens")
+        assert side_call_max_tokens("bonsai-2-27b", REASONING, 1024) == 8000
+        assert resolve_max_tokens("m", None, explicit=500)[0] == 500  # a caller's number wins
+    finally:
+        reset_run_max_tokens(token)
+
+
 # ---- the CLI flag ----
 
 

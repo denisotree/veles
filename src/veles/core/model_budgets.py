@@ -234,18 +234,24 @@ def resolve_max_tokens(
 ) -> tuple[int, str]:
     """Completion cap for an agent call, and where it came from (M325).
 
-    explicit (`--max-tokens`, or a caller's number) → `[engine] max_tokens` →
-    the server's own word (a reasoning template, M325) → `default_max_tokens_for`
-    (catalogue, then the name). Never above the server's `n_ctx` when it is
-    known. The source is for `--verbose`: a cap is invisible until it truncates
-    an answer, so saying where it came from is what makes it fixable.
+    explicit (a caller's number) → `--max-tokens` of the running command (also
+    for the skill sub-agents and side calls built out of reach of `args`) →
+    `[engine] max_tokens` → the server's own word (a reasoning template, M325) →
+    `default_max_tokens_for` (catalogue, then the name). Never above the server's
+    `n_ctx` when it is known. The source is for `--verbose`: a cap is invisible
+    until it truncates an answer, so saying where it came from is what makes it
+    fixable.
 
     A local server ignores the model name, so `bonsai-2-27b` used to get 4096
     and `qwen3.8-27b` 32000 for the same server; the facts close that. They only
     ever raise the cap: under-capping a thinker truncates it, over-capping a
     quiet model costs nothing."""
+    from veles.core.context import current_run_max_tokens
+
     if explicit is not None:
         value, source = explicit, "explicit"
+    elif (flag := current_run_max_tokens()) is not None:
+        value, source = flag, "--max-tokens"
     elif (raw := _engine_section().get("max_tokens")) is not None:
         if isinstance(raw, bool) or not isinstance(raw, int) or raw <= 0:
             raise _config_error("max_tokens", raw, "a positive integer")

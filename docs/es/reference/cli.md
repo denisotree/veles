@@ -89,6 +89,7 @@ disparadores del curador/aprendizaje. Acepta todas las [opciones compartidas del
 | Opción | Predeterminado | Propósito |
 |---|---|---|
 | `--resume <session_id>` | nueva sesión | Continúa una sesión existente |
+| `--output {text,json}` | `text` | `json`: imprime un único objeto (estado, código de salida, sesión, respuesta, turnos, tokens, presupuesto, advertencias) en lugar de la respuesta |
 | `--manager` | desactivado | Descompone mediante el manager multi-agente (también `VELES_MANAGER_MODE=1`) |
 | `--verify` | desactivado | Tras la ejecución, el advisor enrutado juzga la respuesta; ante un fallo seguro, reejecuta en el modelo más fuerte (también `VELES_VERIFY_MODE=1`) |
 | `--plan` | desactivado | Modo de planificación: se permite leer/buscar/redactar, las mutaciones se bloquean |

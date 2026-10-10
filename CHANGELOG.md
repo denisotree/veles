@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.12] — 2026-10-10
+
+Headless output for embedders, from the same local-model report: no timeout on a slow
+stream, the outcome as one JSON object, and semantic recall without Ollama.
+
+### Upgrading from 1.2.11
+
+- **`events.jsonl` no longer has `thinking_delta` lines.** A reasoning model's thinking
+  went to the audit log one line per chunk — thousands a turn. It still reaches live
+  listeners (the REPL inspector, the daemon's push stream).
+- **Insight vectors are rebuilt once.** A database from before 1.2.12 doesn't say which
+  embedder wrote its vectors, so the first backfill (`veles dream
+  --include-consolidation`, the curator) embeds the insights again; until then
+  semantic recall answers from keywords only.
+
+### Added
+
+- **`veles run --output json`.** stdout becomes one object — status, exit code, session
+  id, answer, turns, elapsed time, the main loop's tokens (prompt, completion,
+  reasoning), the budget consumed, warnings and the first error — so an embedder no
+  longer reads the outcome from a `--verbose` debug line. stderr and exit codes are
+  unchanged; setup errors (no project included) and unexpected exceptions come out as
+  an object too. It refuses `--stream` and the manager (`--manager`,
+  `VELES_MANAGER_MODE=1`), which print the answer themselves.
+- **A local embedder other than Ollama.** `[routing.tasks].embedding` naming an
+  OpenAI-wire provider — a llama-server started with `--embeddings`, added to
+  `~/.veles/providers.toml` as `kind = "local"` — now drives semantic recall; a
+  provider that needs no key counts as local, a cloud one still doesn't. `veles doctor`
+  reads the project's route. A cloud route (e.g. for `veles skill dedup`) does not
+  displace a running Ollama. The database records which embedder wrote its vectors:
+  after a switch — and once for a database written before this release, whose vectors
+  have no recorded origin — backfill embeds the insights again, and recall ignores the
+  old vectors until it has.
+
+### Fixed
+
+- **`--max-tokens` caps the whole command.** It reached only the agents built from the
+  command line; a skill's sub-agent took `[engine] max_tokens` or the derived cap, and a
+  side call on a reasoning model could ask for 32000 past the cap you set.
+- Docs: exit code `7` (`truncated`) is in the exit-code tables; CLI delegates are
+  named as the exception to internal streaming and to the run's routing layer.
+
+### Changed
+
+- **`veles run` streams internally.** Without `--stream`, a provider that can stream is
+  streamed and only the final answer is printed, so the request timeout bounds the pause
+  between chunks instead of the whole answer: a slow local model is no longer cut off at
+  the timeout. stdout is unchanged. CLI delegates (`claude-cli`, `codex`,
+  `antigravity-cli`) keep the one-shot call, which reports a failed CLI as an error and
+  times out a silent one.
+
 ## [1.2.11] — 2026-10-09
 
 Fixes from a headless run with local models (llama.cpp, Qwen3.8 and Bonsai-2): the

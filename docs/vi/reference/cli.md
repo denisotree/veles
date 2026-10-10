@@ -89,6 +89,7 @@ curator/học. Chấp nhận tất cả [các cờ vòng lặp agent dùng chung
 | Cờ | Mặc định | Mục đích |
 |---|---|---|
 | `--resume <session_id>` | session mới | Tiếp tục một session đang có |
+| `--output {text,json}` | `text` | `json`: in ra một object duy nhất (trạng thái, mã thoát, session, câu trả lời, lượt, token, ngân sách, cảnh báo) thay cho câu trả lời |
 | `--manager` | tắt | Phân rã qua manager đa-agent (cũng dùng `VELES_MANAGER_MODE=1`) |
 | `--verify` | tắt | Sau khi chạy, advisor được định tuyến đánh giá câu trả lời; nếu thất bại với độ tin cậy cao, chạy lại trên model mạnh hơn (cũng dùng `VELES_VERIFY_MODE=1`) |
 | `--plan` | tắt | Chế độ lập kế hoạch: cho phép đọc/tìm/soạn thảo, chặn các thay đổi |

@@ -14,8 +14,9 @@ to defaults; `veles route refresh` re-parses natural-language routing hints
 from `AGENTS.md` (explicit config entries always win).
 
 A task without its own route runs on the run's model when you chose one for
-this run (`veles run --provider … --model …`, or a `[daemon.<name>]` pin), then
-on `[engine]`, then on your user default — so a local run compresses locally.
+this run (`veles run --provider … --model …`, or a `[daemon.<name>]` pin; not a
+CLI delegate), then on `[engine]`, then on your user default — so a local run
+compresses locally.
 
 The `skills` task also decides where project skills run inside a CLI delegate's
 MCP server (claude-cli, antigravity-cli): a route to an API provider runs them

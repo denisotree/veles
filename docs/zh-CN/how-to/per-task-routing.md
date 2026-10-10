@@ -72,7 +72,7 @@ veles route refresh --force    # even if AGENTS.md hasn't changed
 6. 用户 `[routing.tasks][task]` / `.default`
 7. 用户 `[user] default_provider` + `default_model`
 
-第 4 层就是仅在一次运行期间有效的 `[engine]`：`veles run --provider llamacpp --model qwen3` 的压缩、洞察提取和评审也都在这个模型上进行，即使项目的 `[engine]` 指向的是云端模型。和 `[engine]` 一样，它让位于项目自己的任务路由，但优先于用户级的路由。
+第 4 层就是仅在一次运行期间有效的 `[engine]`：`veles run --provider llamacpp --model qwen3` 的压缩、洞察提取和评审也都在这个模型上进行，即使项目的 `[engine]` 指向的是云端模型。和 `[engine]` 一样，它让位于项目自己的任务路由，但优先于用户级的路由。CLI 委托（`claude-cli`、`codex`、`antigravity-cli`）永远不会是这一层——它无法承担辅助任务，因此这些任务仍按配置路由。
 
 如果以上都无法解析，则**没有硬编码回退**——该任务保持未设置状态，其调用方会优雅降级（跳过该功能）或清晰报错，而不会悄悄去用某个云端模型。
 

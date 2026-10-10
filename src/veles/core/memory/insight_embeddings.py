@@ -14,7 +14,7 @@ import sqlite3
 from typing import Protocol
 
 from veles.core.memory.eligibility import eligible_sql
-from veles.core.memory.vector import ensure_embeddings_table, upsert_embedding
+from veles.core.memory.vector import adopt_embedder, ensure_embeddings_table, upsert_embedding
 
 
 class _Embedder(Protocol):
@@ -37,6 +37,10 @@ def backfill_insight_embeddings(
     survivor set yields 0. Best-effort — a single embed failure aborts the batch
     without raising (recall keeps working on FTS)."""
     ensure_embeddings_table(conn)
+    name = getattr(adapter, "name", None)
+    if isinstance(name, str) and name:
+        # M326: another embedder's vectors compare as noise — start over.
+        adopt_embedder(conn, name, ref_kind="insight")
     rows = conn.execute(
         "SELECT i.id, i.title, i.body FROM insights i"
         " LEFT JOIN embeddings_blob e"

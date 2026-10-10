@@ -90,6 +90,24 @@ def reset_run_base(token: Token) -> None:
     _run_base.reset(token)
 
 
+# `--max-tokens` for the whole command (M325), next to the run base: the agents
+# the CLI builds get it as an argument, but a skill's sub-agent or a side call is
+# built where `args` is out of reach — and must not exceed what the user set.
+_run_max_tokens: ContextVar[int | None] = ContextVar("veles_run_max_tokens", default=None)
+
+
+def current_run_max_tokens() -> int | None:
+    return _run_max_tokens.get()
+
+
+def set_run_max_tokens(value: int | None) -> Token:
+    return _run_max_tokens.set(value)
+
+
+def reset_run_max_tokens(token: Token) -> None:
+    _run_max_tokens.reset(token)
+
+
 # ---- background-op resume depth (M204 auto-resume loop guard) ----
 # When a background op (structured job) completes, the daemon resumes the
 # origin session with a follow-up turn. That turn runs with resume depth =

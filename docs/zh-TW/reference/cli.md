@@ -72,6 +72,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | 旗標 | 預設 | 用途 |
 |---|---|---|
 | `--resume <session_id>` | 新工作階段 | 接續既有的工作階段 |
+| `--output {text,json}` | `text` | `json`：輸出單一物件（狀態、結束代碼、工作階段、答案、回合、token、預算、警告），取代答案 |
 | `--manager` | 關閉 | 透過多代理 manager 進行任務拆解（亦可用 `VELES_MANAGER_MODE=1`） |
 | `--verify` | 關閉 | 執行結束後，由路由選定的 advisor 評判答案；若確信失敗，則在更強的模型上重跑（亦可用 `VELES_VERIFY_MODE=1`） |
 | `--plan` | 關閉 | 規劃模式：允許讀取／搜尋／草擬，封鎖任何變更 |

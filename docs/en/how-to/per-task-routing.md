@@ -80,7 +80,9 @@ For each task, the first layer that yields a spec wins:
 Layer 4 is `[engine]` for the duration of one run: `veles run --provider llamacpp
 --model qwen3` compresses, extracts insights and reviews on that model too, even in
 a project whose `[engine]` names a cloud model. Like `[engine]`, it is outranked by
-your project's own task routes and outranks your user-level ones.
+your project's own task routes and outranks your user-level ones. A CLI delegate
+(`claude-cli`, `codex`, `antigravity-cli`) is never this layer — it can't serve a side
+task, so those keep routing by config.
 
 If none of these resolves, there is **no hardcoded fallback** — the task is left
 unset and its caller degrades (skips the feature) or errors clearly, rather than

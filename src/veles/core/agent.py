@@ -703,7 +703,12 @@ class Agent:
                 model=self._model,
                 max_tokens=self._max_tokens,
                 on_text_delta=on_text_delta,
-                emit_event=self._emit_event,
+                # M326: reasoning deltas go to live listeners only (REPL
+                # inspector, daemon push). One line per chunk in the audit log
+                # `events.jsonl` was thousands of lines a turn, and with
+                # headless runs streaming internally it would reach every
+                # embedder's file.
+                emit_event=lambda event: _emit(None, event, self._event_listener),
                 session_id=self._session_id,
             )
         else:

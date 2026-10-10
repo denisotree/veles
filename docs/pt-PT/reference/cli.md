@@ -91,6 +91,7 @@ mais:
 | Opção | Predefinição | Finalidade |
 |---|---|---|
 | `--resume <session_id>` | sessão nova | Continua uma sessão existente |
+| `--output {text,json}` | `text` | `json`: imprime um único objecto (estado, código de saída, sessão, resposta, turnos, tokens, orçamento, avisos) em vez da resposta |
 | `--manager` | desligado | Decompõe através do gestor multi-agente (também `VELES_MANAGER_MODE=1`) |
 | `--verify` | desligado | Após a execução, o advisor encaminhado avalia a resposta; perante uma falha confiante, reexecuta no modelo mais forte (também `VELES_VERIFY_MODE=1`) |
 | `--plan` | desligado | Modo de planeamento: ler/pesquisar/rascunhar permitido, mutações bloqueadas |

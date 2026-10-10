@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import io
+import logging
 import os
 import sys
 
@@ -195,6 +197,133 @@ def _maybe_run_via_manager(args: argparse.Namespace, project: Project) -> bool:
 
 
 def cmd_run(args: argparse.Namespace, project: Project) -> int:
+    if getattr(args, "output", "text") == "json":
+        return _run_as_json(args, project)
+    return _cmd_run(args, project)
+
+
+# ---- `--output json` (M326) ----
+#
+# One object on stdout instead of the answer, so an embedder stops assembling a
+# run's outcome from three places: the exit code, a `--verbose` debug line on
+# stderr (reason, turns, budget) and `events.jsonl`. stderr is unchanged; tool
+# calls stay in `events.jsonl`, already a contract. The keys are locked by
+# `tests/test_cli_run_contract.py`.
+
+
+class _StderrTee:
+    """sys.stderr as is, also keeping the `warning:`/`error:` lines Veles prints."""
+
+    def __init__(self, stream, warnings: list[str], errors: list[str]) -> None:
+        self._stream, self._warnings, self._errors, self._line = stream, warnings, errors, ""
+
+    def write(self, text: str) -> int:
+        self._line += text
+        *done, self._line = self._line.split("\n")
+        for line in done:
+            if line.startswith("warning: "):
+                self._warnings.append(line.removeprefix("warning: "))
+            elif line.startswith("error: "):
+                self._errors.append(line.removeprefix("error: "))
+        return self._stream.write(text)
+
+    def flush(self) -> None:
+        self._stream.flush()
+
+    def __getattr__(self, name: str):
+        return getattr(self._stream, name)
+
+
+def _warning_log(warnings: list[str], log: logging.Logger) -> logging.Handler:
+    """A handler keeping WARNING+ records from `veles.*` (e.g. "compressor
+    disabled: …"). While it is attached, logging's last-resort stderr print no
+    longer fires, so it prints them as that would — and nowhere when the
+    process configured logging itself: stderr stays as it was."""
+    handler = logging.StreamHandler(sys.stderr if not log.hasHandlers() else io.StringIO())
+    handler.setLevel(logging.WARNING)
+    handler.addFilter(lambda record: warnings.append(record.getMessage()) or True)
+    return handler
+
+
+def _run_as_json(args: argparse.Namespace, project: Project) -> int:
+    import contextlib
+    import time
+    import traceback
+
+    from veles.core.orchestration.integration import env_manager_mode
+
+    started = time.monotonic()
+    warnings: list[str] = []
+    errors: list[str] = []
+    report: dict = {}
+    if getattr(args, "stream", False) or getattr(args, "manager", False) or env_manager_mode():
+        # Both write the answer to stdout themselves.
+        errors.append(
+            "--output json can't be combined with --stream or the manager "
+            "(--manager, VELES_MANAGER_MODE=1)"
+        )
+        rc = 2
+    else:
+        log = logging.getLogger("veles")
+        handler = _warning_log(warnings, log)
+        log.addHandler(handler)
+        try:
+            with contextlib.redirect_stderr(_StderrTee(sys.stderr, warnings, errors)):
+                rc = _cmd_run(args, project, report)
+        except Exception as exc:
+            # Whatever `_cmd_run` doesn't map to an exit code (an SDK error that
+            # is not a ProviderError, a database error) still ends in the object.
+            traceback.print_exc()
+            errors.append(f"{type(exc).__name__}: {exc}")
+            rc = 1
+        finally:
+            log.removeHandler(handler)
+    print_outcome_json(report, rc, started=started, warnings=warnings, errors=errors)
+    return rc
+
+
+def print_outcome_json(
+    report: dict,
+    rc: int,
+    *,
+    started: float | None = None,
+    warnings: list[str] | None = None,
+    errors: list[str] | None = None,
+) -> None:
+    """The `--output json` object (M326). Also printed by the CLI dispatcher for
+    a run that fails before it gets here (no project)."""
+    import json
+    import time
+
+    result, budget = report.get("result"), report.get("budget")
+    usage = getattr(result, "usage", None)
+    payload = {
+        "status": result.stopped_reason if result is not None else "error",
+        "exit_code": rc,
+        "session_id": getattr(result, "session_id", None),
+        "answer": getattr(result, "text", None),
+        "turns": getattr(result, "iterations", 0),
+        "elapsed_s": round(time.monotonic() - started, 3) if started is not None else 0.0,
+        # The main loop's own spend; side calls are in `budget.consumed`.
+        "tokens": {
+            "prompt": getattr(usage, "prompt_tokens", 0),
+            "completion": getattr(usage, "completion_tokens", 0),
+            "reasoning": getattr(usage, "reasoning_tokens", 0),
+            "total": getattr(usage, "total_tokens", 0),
+        },
+        "budget": {
+            "consumed": getattr(budget, "consumed", 0),
+            "limit": getattr(budget, "limit", 0),
+        },
+        "warnings": warnings or [],
+        "error": errors[0] if errors else None,
+    }
+    print(json.dumps(payload, ensure_ascii=False))
+
+
+def _cmd_run(args: argparse.Namespace, project: Project, report: dict | None = None) -> int:
+    """The run itself. With `report` (`--output json`) the answer is not printed;
+    the result and the budget are left in `report` for the JSON line instead."""
     # Lazy imports so monkey-patches on the owning modules win at call time.
     from veles.cli._agent_builder import build_command_agent
     from veles.cli._console import check_provider, ensure_api_key
@@ -280,7 +409,7 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
         verify_on = _verify_enabled(args)
         try:
             result, budget = run_agent_streaming_aware(
-                agent, args.prompt, args, emit_output=not verify_on
+                agent, args.prompt, args, emit_output=not verify_on and report is None
             )
         except ProviderError as exc:
             # M132b: a provider that's unreachable / timed out / returned a
@@ -291,10 +420,13 @@ def cmd_run(args: argparse.Namespace, project: Project) -> int:
             return 1
         if verify_on:
             result = _maybe_verify_and_escalate(args, project, result, store)
-            print(result.text)
+            if report is None:
+                print(result.text)
         print(f"<session={result.session_id}>", file=sys.stderr)
         print_run_summary(args, result, budget)
         rc = EXIT_BY_REASON.get(result.stopped_reason, 1)
+        if report is not None:
+            report.update(result=result, budget=budget)
     finally:
         store.close()
     maybe_run_insight_extractor(args, project, result.history, result.session_id)

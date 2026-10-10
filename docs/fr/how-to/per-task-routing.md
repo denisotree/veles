@@ -84,6 +84,8 @@ La couche 4 est `[engine]` le temps d'une exécution : `veles run --provider lla
 --model qwen3` compresse, extrait les insights et relit aussi sur ce modèle, même dans
 un projet dont l'`[engine]` désigne un modèle cloud. Comme `[engine]`, elle cède devant
 les routes de tâches propres à votre projet et l'emporte sur celles de niveau utilisateur.
+Un délégué CLI (`claude-cli`, `codex`, `antigravity-cli`) n'est jamais cette couche : il ne
+peut pas assurer une tâche annexe, donc celles-ci restent routées selon la configuration.
 
 Si aucune de ces couches ne résout, il n'y a **aucun repli codé en dur** — la tâche
 reste non définie et son appelant se dégrade (saute la fonctionnalité) ou échoue

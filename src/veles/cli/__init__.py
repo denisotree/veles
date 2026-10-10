@@ -108,11 +108,15 @@ def _run_in_project(args, command, modules=None) -> int:
         if getattr(args, "_wizard_user_chose_no_project", False):
             print("<no project initialised; nothing to do.>", file=sys.stderr)
             return 0
+        message = f"no Veles project found at {Path.cwd()} or any parent."
         print(
-            f"error: no Veles project found at {Path.cwd()} or any parent.\n"
-            "       Run `veles init` to create one in the current directory.",
+            f"error: {message}\n       Run `veles init` to create one in the current directory.",
             file=sys.stderr,
         )
+        if getattr(args, "output", None) == "json":  # `veles run --output json` (M326)
+            from veles.cli.commands.run import print_outcome_json
+
+            print_outcome_json({}, 2, errors=[message])
         return 2
 
     token = set_active_project(project)
@@ -130,14 +134,23 @@ def _run_in_project(args, command, modules=None) -> int:
 
     # A provider the config routes to and a registry offers installs itself.
     ensure_routed_providers(project)
-    from veles.core.context import reset_run_base, set_run_base
+    from veles.core.context import (
+        reset_run_base,
+        reset_run_max_tokens,
+        set_run_base,
+        set_run_max_tokens,
+    )
     from veles.core.model_resolver import run_base
 
-    # M325: a model chosen on the command line is the base for side tasks too.
+    # M325: a model chosen on the command line is the base for side tasks too,
+    # and `--max-tokens` caps every agent call of the command, not only the ones
+    # built from `args`.
     base_token = set_run_base(run_base(args, project))
+    cap_token = set_run_max_tokens(getattr(args, "max_tokens", None))
     try:
         return command(args, project)
     finally:
+        reset_run_max_tokens(cap_token)
         reset_run_base(base_token)
         reset_module_registry(mod_token)
         reset_active_project(token)

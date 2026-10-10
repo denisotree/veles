@@ -2,6 +2,9 @@
 
 Run once at daemon / CLI startup. Priority order:
 
+0. **The routed embedder** (M326) — `[routing.tasks].embedding =
+   "<provider>:<model>"` naming an OpenAI-wire provider, e.g. a llama-server
+   started with `--embeddings`. Local when the provider needs no key.
 1. **Ollama** — `localhost:11434/api/tags` answers. Cheapest path:
    no pip dep, no network egress, no API key. Picks the user's
    declared model via `VELES_OLLAMA_EMBED_MODEL` env (default
@@ -30,7 +33,7 @@ from veles.modules.embedding import (
     register_embedding_adapter,
 )
 from veles.modules.embedding_ollama import OllamaEmbeddingAdapter, probe_ollama
-from veles.modules.embedding_openai import build_from_env
+from veles.modules.embedding_openai import build_from_env, build_from_route
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +57,19 @@ def autodetect_embedding_adapter(
         cached = get_embedding_adapter()
         if cached is not None:
             return cached
+
+    # Tier 0 (M326): the embedder the config names — `[routing.tasks].embedding`,
+    # e.g. a llama-server started with `--embeddings`. The user's choice beats a
+    # probe. ponytail: process-wide like the rest of autodetect, so a daemon
+    # serving several projects uses the first one's route.
+    routed = build_from_route()
+    # Local only: a cloud route (e.g. for `skill dedup`, which reads the route
+    # itself) must not displace a running Ollama — `project_tree` and the
+    # pattern detector embed through the ungated adapter.
+    if routed is not None and routed.is_local:
+        register_embedding_adapter(routed)
+        logger.info("embedding backend: %s (routed)", routed.name)
+        return routed
 
     # Tier 1: Ollama
     if probe_ollama():

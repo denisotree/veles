@@ -72,7 +72,7 @@ veles route refresh --force    # even if AGENTS.md hasn't changed
 6. 사용자 `[routing.tasks][task]` / `.default`
 7. 사용자 `[user] default_provider` + `default_model`
 
-4번 계층은 실행 한 번 동안만 유효한 `[engine]`입니다. `veles run --provider llamacpp --model qwen3`은 프로젝트의 `[engine]`이 클라우드 모델을 가리키더라도 압축, 인사이트 추출, 리뷰까지 그 모델로 수행합니다. `[engine]`과 마찬가지로 프로젝트 자체의 태스크 라우트에는 밀리고, 사용자 수준의 라우트보다는 우선합니다.
+4번 계층은 실행 한 번 동안만 유효한 `[engine]`입니다. `veles run --provider llamacpp --model qwen3`은 프로젝트의 `[engine]`이 클라우드 모델을 가리키더라도 압축, 인사이트 추출, 리뷰까지 그 모델로 수행합니다. `[engine]`과 마찬가지로 프로젝트 자체의 태스크 라우트에는 밀리고, 사용자 수준의 라우트보다는 우선합니다. CLI 위임(`claude-cli`, `codex`, `antigravity-cli`)은 결코 이 계층이 되지 않습니다 — 보조 태스크를 처리할 수 없으므로, 그런 태스크는 계속 설정에 따라 라우팅됩니다.
 
 이 중 어느 것도 해석되지 않으면 **하드코딩된 폴백은 없습니다** — 태스크는 설정되지 않은 채로 남고, 그 호출자는 (해당 기능을 건너뛰며) 우아하게 성능을 낮추거나 명확하게 오류를 냅니다. 조용히 클라우드 모델을 끌어다 쓰지 않습니다.
 

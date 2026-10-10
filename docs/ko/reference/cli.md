@@ -72,6 +72,7 @@ veles [--no-wizard] <command> [subcommand] [options]
 | 플래그 | 기본값 | 용도 |
 |---|---|---|
 | `--resume <session_id>` | 새 세션 | 기존 세션을 이어가기 |
+| `--output {text,json}` | `text` | `json`: 답 대신 단일 객체(상태, 종료 코드, 세션, 답, 턴, 토큰, 예산, 경고)를 출력 |
 | `--manager` | off | 멀티 에이전트 매니저로 분해(`VELES_MANAGER_MODE=1`도 동일) |
 | `--verify` | off | 실행 후 라우팅된 어드바이저가 답을 평가하고, 확신 있는 실패 시 더 강력한 모델로 재실행(`VELES_VERIFY_MODE=1`도 동일) |
 | `--plan` | off | 계획 모드: 읽기/검색/초안 허용, 변경은 차단 |

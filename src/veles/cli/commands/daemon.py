@@ -259,7 +259,7 @@ def _daemon_start(args: argparse.Namespace) -> int:
     if not getattr(args, "foreground", False):
         return _detach_and_report(args, project, name=name)
 
-    from veles.core.context import set_run_base
+    from veles.core.context import set_run_base, set_run_max_tokens
     from veles.core.model_resolver import run_base
 
     # M325: a daemon started with `--provider/--model`, or a session pinned by
@@ -268,6 +268,7 @@ def _daemon_start(args: argparse.Namespace) -> int:
     # consolidation models at attach time — and kept for the process: every
     # turn runs in a task or `to_thread` worker that copies this context.
     set_run_base(run_base(args, project, daemon_session=name))
+    set_run_max_tokens(getattr(args, "max_tokens", None))
 
     _bootstrap_daemon(project, name=name)
     token_store = _initialise_token_store()

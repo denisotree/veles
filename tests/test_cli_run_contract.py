@@ -136,6 +136,156 @@ def test_provider_error_message_goes_to_stderr_not_stdout(
     assert captured.out == ""
 
 
+# ---- 2b. `--output json`: one object instead of the answer (M326) -------------
+
+_JSON_KEYS = {
+    "status",
+    "exit_code",
+    "session_id",
+    "answer",
+    "turns",
+    "elapsed_s",
+    "tokens",
+    "budget",
+    "warnings",
+    "error",
+}
+
+
+def _json_out(capsys) -> tuple[dict, str]:
+    import json
+
+    captured = capsys.readouterr()
+    lines = captured.out.splitlines()
+    assert len(lines) == 1, captured.out  # exactly one object, nothing else
+    return json.loads(lines[0]), captured.err
+
+
+def test_json_output_schema(project: Project, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    _stub_run(monkeypatch, _Result(text="the answer"))
+    assert cmd_run(_args(output="json"), project) == 0
+    payload, err = _json_out(capsys)
+    assert set(payload) == _JSON_KEYS
+    assert set(payload["tokens"]) == {"prompt", "completion", "reasoning", "total"}
+    assert set(payload["budget"]) == {"consumed", "limit"}
+    assert payload["status"] == "completed"
+    assert payload["exit_code"] == 0
+    assert payload["answer"] == "the answer"
+    assert payload["session_id"] == "sess-1"
+    assert payload["error"] is None
+    assert "<session=sess-1>" in err  # stderr is unchanged
+
+
+def test_json_output_carries_the_failure(
+    project: Project, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    class _Exploding:
+        def run(self, *_a: Any, **_k: Any):
+            raise ProviderError("upstream exploded")
+
+    monkeypatch.setattr(cli, "build_command_agent", lambda *a, **k: _Exploding())
+    assert cmd_run(_args(output="json"), project) == 1
+    payload, err = _json_out(capsys)
+    assert payload["status"] == "error"
+    assert payload["exit_code"] == 1
+    assert payload["error"] == "upstream exploded"
+    assert "error: upstream exploded" in err
+
+
+def test_json_output_collects_warnings(
+    project: Project, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """Printed `warning:` lines and `veles.*` log warnings both land in the object
+    — the second is how "compressor disabled" reaches an embedder."""
+    import logging
+    import sys
+
+    class _Warning:
+        def run(self, *_a: Any, **_k: Any) -> _Result:
+            print("warning: tool file x.py not loaded: defines no @tool function", file=sys.stderr)
+            logging.getLogger("veles.core.context_compressor").warning("compressor disabled: x")
+            return _Result()
+
+    monkeypatch.setattr(cli, "build_command_agent", lambda *a, **k: _Warning())
+    # As in a plain CLI process: no logging configured (pytest installs handlers).
+    monkeypatch.setattr(logging.getLogger("veles"), "hasHandlers", lambda: False)
+    cmd_run(_args(output="json"), project)
+    payload, err = _json_out(capsys)
+    assert payload["warnings"] == [
+        "tool file x.py not loaded: defines no @tool function",
+        "compressor disabled: x",
+    ]
+    assert "compressor disabled: x" in err  # still printed, as without the flag
+
+
+def test_json_output_refuses_stream(project: Project, capsys) -> None:
+    assert cmd_run(_args(output="json", stream=True), project) == 2
+    payload, _ = _json_out(capsys)
+    assert payload["status"] == "error"
+    assert "--stream" in payload["error"]
+
+
+def test_json_output_refuses_the_env_manager(
+    project: Project, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """`VELES_MANAGER_MODE=1` turns the manager on without `--manager`; it writes
+    the answer to stdout itself, ahead of the object."""
+    monkeypatch.setenv("VELES_MANAGER_MODE", "1")
+    assert cmd_run(_args(output="json"), project) == 2
+    payload, _ = _json_out(capsys)
+    assert "VELES_MANAGER_MODE" in payload["error"]
+
+
+def test_json_output_survives_an_unmapped_exception(
+    project: Project, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """An SDK error that is not a ProviderError (anthropic, gemini, a database
+    error) used to leave stdout empty under a traceback."""
+
+    class _Broken:
+        def run(self, *_a: Any, **_k: Any):
+            raise RuntimeError("sqlite exploded")
+
+    monkeypatch.setattr(cli, "build_command_agent", lambda *a, **k: _Broken())
+    assert cmd_run(_args(output="json"), project) == 1
+    payload, err = _json_out(capsys)
+    assert payload["error"] == "RuntimeError: sqlite exploded"
+    assert "Traceback" in err
+
+
+def test_json_output_without_a_project(tmp_path: Path, monkeypatch, capsys) -> None:
+    from veles.cli import main
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("VELES_NO_WIZARD", "1")
+    assert main(["run", "--output", "json", "hi"]) == 2
+    payload, _ = _json_out(capsys)
+    assert payload["exit_code"] == 2
+    assert payload["error"].startswith("no Veles project found")
+
+
+def test_a_cli_delegate_is_not_streamed_internally(
+    project: Project, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """A CLI delegate's stream path turns a failed CLI into text with
+    finish_reason "error" — a "completed" exit 0 — and has no deadline for a
+    silent child; its one-shot path raises and times out."""
+
+    class _Delegate:
+        provider = type("P", (), {"supports_streaming": True})()
+        streamed = None
+
+        def run(self, _prompt: str, on_text_delta=None, **_kwargs: Any) -> _Result:
+            _Delegate.streamed = on_text_delta is not None
+            return _Result()
+
+    monkeypatch.setattr(cli, "build_command_agent", lambda *a, **k: _Delegate())
+    monkeypatch.setattr("veles.cli._console.ensure_api_key", lambda *a, **k: True)
+    monkeypatch.setattr("veles.cli._console.check_provider", lambda *a, **k: True)
+    cmd_run(_args(provider="claude-cli", model="sonnet", _provider_explicit=True), project)
+    assert _Delegate.streamed is False
+
+
 # ---- 3. exit codes distinguish the failure modes (M228) ----------------------
 
 
@@ -233,6 +383,29 @@ def test_stream_puts_intermediate_narration_on_stdout(
     out = capsys.readouterr().out
     assert "let me check that first..." in out
     assert out != "the answer\n"
+
+
+def test_without_stream_a_streaming_provider_streams_internally(
+    project: Project, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """M326: a provider that can stream is streamed even without `--stream`, so
+    the request timeout bounds the gap between chunks, not the whole answer —
+    and stdout is still exactly the final answer."""
+
+    class _StreamingAgent:
+        provider = type("P", (), {"supports_streaming": True})()
+        delta_installed = False
+
+        def run(self, _prompt: str, on_text_delta=None, **_kwargs: Any) -> _Result:
+            _StreamingAgent.delta_installed = on_text_delta is not None
+            if on_text_delta is not None:
+                on_text_delta("let me check that first...")
+            return _Result(text="the answer")
+
+    monkeypatch.setattr(cli, "build_command_agent", lambda *a, **k: _StreamingAgent())
+    assert cmd_run(_args(), project) == 0
+    assert _StreamingAgent.delta_installed
+    assert capsys.readouterr().out == "the answer\n"
 
 
 # ---- 6. non-TTY never blocks on a permission prompt --------------------------
